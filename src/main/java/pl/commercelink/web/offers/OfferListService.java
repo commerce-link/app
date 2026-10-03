@@ -89,7 +89,7 @@ public class OfferListService {
         if (q.from() != null && q.to() != null) return text(locale, "offers.list.dates.range", day(q.from(), now), day(q.to(), now));
         if (q.from() != null) return text(locale, "offers.list.dates.since", day(q.from(), now));
         if (q.to() != null) return text(locale, "offers.list.dates.until", day(q.to(), now));
-        return text(locale, "offers.list.summary.all");
+        return text(locale, "offers.list.dates.any");
     }
 
     private List<OfferListPage.Chip> chips(OfferListQuery q, LocalDateTime now, Locale locale) {
@@ -109,12 +109,22 @@ public class OfferListService {
         return new OfferListPage.Chip(label, clearHref, text(locale, "offers.list.chip.clear", label));
     }
 
+    /** Names what the operator can change: the phrase when a search found nothing (the other filters stay), the filters otherwise. */
     private OfferListPage.EmptyState emptyState(OfferListQuery q, Locale locale) {
+        String segment = q.segment().param();
+        if (q.q() != null) {
+            return new OfferListPage.EmptyState(text(locale, "offers.list.empty.search." + segment, q.q()),
+                    text(locale, "offers.list.search.clear"), q.withQ(null).href());
+        }
         if (q.isFiltered()) {
-            return new OfferListPage.EmptyState(text(locale, "offers.list.empty.filtered"),
+            return new OfferListPage.EmptyState(text(locale, "offers.list.empty.filtered." + segment),
                     text(locale, "general.clear.filters"), q.cleared().href());
         }
-        return new OfferListPage.EmptyState(text(locale, "offers.list.empty." + q.segment().param()), null, null);
+        if (q.segment() == OfferSegment.OFFERS) {
+            return new OfferListPage.EmptyState(text(locale, "offers.list.empty.offers"),
+                    text(locale, "offers.list.empty.offers.action"), "/dashboard/offer/new?intent=manual");
+        }
+        return new OfferListPage.EmptyState(text(locale, "offers.list.empty." + segment), null, null);
     }
 
     private static String day(LocalDate date, LocalDateTime now) {

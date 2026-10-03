@@ -85,7 +85,9 @@ class OfferRowMapperTest {
         assertThat(row.author()).isEqualTo("Jan Kowalski");
         assertThat(row.validityLabel()).isEqualTo("Ważna");
         assertThat(row.validityTone()).isEqualTo("is-ok");
-        assertThat(row.validityNote()).isEqualTo("do 16.10 · dni: 13");
+        assertThat(row.validityNote()).isEqualTo("do 16.10 (13 dni)");
+        assertThat(row.copyLabel()).isEqualTo("Kopiuj link dla klienta: Stacje CAD");
+        assertThat(row.menuLabel()).isEqualTo("Akcje: Stacje CAD");
         assertThat(row.gross()).isEqualTo("2 460,00 PLN");
         assertThat(row.net()).isEqualTo("netto 2 000,00 PLN");
         assertThat(row.clientUrl()).startsWith("https://app.example/store/store-1/").endsWith(ID);
@@ -241,6 +243,8 @@ class OfferRowMapperTest {
         // then
         assertThat(row.createOfferHref()).isEqualTo("/dashboard/offer/new?intent=template&sourceId=" + ID);
         assertThat(row.deleteTitle()).isEqualTo("Usunąć szablon „Stacje CAD”?");
+        assertThat(row.itemsCount()).isEqualTo("2");
+        assertThat(row.itemsText()).isEqualTo("pozycje: 2");
     }
 
     @Test
@@ -257,5 +261,7 @@ class OfferRowMapperTest {
         assertThat(row.href()).isEqualTo("/dashboard/basket/view/" + ID);
         assertThat(row.created()).isEqualTo("02.10, 09:30");
         assertThat(row.client()).isEqualTo("gość, bez danych");
+        assertThat(row.itemsCount()).isEqualTo("2");
+        assertThat(row.itemsText()).isEqualTo("pozycje: 2");
     }
 }

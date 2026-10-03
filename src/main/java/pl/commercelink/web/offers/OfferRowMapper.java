@@ -57,7 +57,7 @@ public class OfferRowMapper {
         OfferValidity validity = OfferValidity.of(basket.getExpiresAt(), now);
         double gross = value(basket);
         return new OfferListPage.OfferRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
-                text("offers.list.items", String.valueOf(basket.getEffectiveBasketItems().size())),
+                itemsText(basket),
                 client(contact), contact == null ? null : StringUtils.trimToNull(contact.getEmail()),
                 date(basket.getCreatedAt()), author(basket),
                 text("offers.list.pill." + validity.param()), tone(validity), validityNote(validity, basket.getExpiresAt()),
@@ -66,14 +66,14 @@ public class OfferRowMapper {
                 basket.createOfferUrl(appDomain),
                 "/dashboard/offer/" + id + "/copy", "/dashboard/offer/" + id + "/copy?withContact=true",
                 deleteHref(id), text("offers.delete.confirm.title", name), text("offers.delete.confirm.message"),
-                text("offers.list.menu.aria", name), text("offers.list.copyLink.aria", basket.getShortenedBasketId()));
+                text("offers.list.menu.aria", name), text("offers.list.copyLink.aria", name));
     }
 
     public OfferListPage.TemplateRow template(Basket basket) {
         String id = basket.getBasketId();
         String name = name(basket);
         return new OfferListPage.TemplateRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
-                text("offers.list.items", String.valueOf(basket.getEffectiveBasketItems().size())), date(basket.getCreatedAt()), author(basket),
+                itemsText(basket), itemsCount(basket), date(basket.getCreatedAt()), author(basket),
                 money(value(basket)), "/dashboard/offer/new?intent=template&sourceId=" + id,
                 deleteHref(id), text("offers.delete.confirm.titleTemplate", name), text("offers.delete.confirm.messageTemplate"),
                 text("offers.list.menu.aria", name));
@@ -86,7 +86,16 @@ public class OfferRowMapper {
         return new OfferListPage.BasketRow("/dashboard/basket/view/" + id, basket.getShortenedBasketId(), id,
                 client != null ? client : text("offers.list.client.guest"),
                 created == null ? null : date(created) + ", " + TIME.format(created),
-                text("offers.list.items", String.valueOf(basket.getEffectiveBasketItems().size())), money(value(basket)));
+                itemsText(basket), itemsCount(basket), money(value(basket)));
+    }
+
+    /** "pozycje: n" where no column header names the number (offer name line, phone card); the bare n in the column. */
+    private String itemsText(Basket basket) {
+        return text("offers.list.items", itemsCount(basket));
+    }
+
+    private static String itemsCount(Basket basket) {
+        return String.valueOf(basket.getEffectiveBasketItems().size());
     }
 
     private String name(Basket basket) {

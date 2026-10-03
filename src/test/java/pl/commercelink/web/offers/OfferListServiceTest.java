@@ -74,11 +74,12 @@ class OfferListServiceTest {
         assertThat(page.segments()).extracting(OfferListPage.SegmentLink::label).containsExactly("Oferty", "Szablony", "Koszyki ze sklepu");
         assertThat(page.segments().get(0).active()).isTrue();
         assertThat(page.validitySummary()).isEqualTo("wszystkie");
-        assertThat(page.dates().value()).isEqualTo("wszystkie");
+        assertThat(page.dates().value()).isEqualTo("dowolnie");
         assertThat(page.chips()).isEmpty();
         assertThat(page.resultsLine()).isEqualTo("Oferty: 0");
-        assertThat(page.emptyState().text()).isEqualTo("Nie masz jeszcze ofert. Utwórz pierwszą przyciskiem „Nowa oferta”.");
-        assertThat(page.emptyState().actionHref()).isNull();
+        assertThat(page.emptyState().text()).isEqualTo("Nie masz jeszcze ofert. Szablon i import z pliku CSV znajdziesz pod „Nowa oferta”.");
+        assertThat(page.emptyState().actionLabel()).isEqualTo("Utwórz pustą ofertę");
+        assertThat(page.emptyState().actionHref()).isEqualTo("/dashboard/offer/new?intent=manual");
     }
 
     @Test
@@ -95,9 +96,45 @@ class OfferListServiceTest {
         assertThat(page.chips()).extracting(OfferListPage.Chip::label)
                 .containsExactly("Szukane: CAD", "Ważność: Wygasają w 7 dni", "Utworzono: 01.09 – 30.09");
         assertThat(page.chips().get(0).clearHref()).isEqualTo("/dashboard/offers?validity=expiring&from=2026-09-01&to=2026-09-30");
+        assertThat(page.chips().get(0).clearLabel()).isEqualTo("Wyczyść: Szukane: CAD");
         assertThat(page.activeFilterCount()).isEqualTo(3);
-        assertThat(page.emptyState().text()).isEqualTo("Brak wyników dla wybranych filtrów.");
-        assertThat(page.emptyState().actionHref()).isEqualTo("/dashboard/offers");
+    }
+
+    @Test
+    void searchWithoutResultsNamesThePhraseAndClearsOnlyTheSearch() {
+        // when
+        OfferListPage page = service.page("store-1", query("q", "OFERTA", "validity", "expiring"), NOW, PL);
+
+        // then — the search is the only thing the operator can fix here; the menus stay as they were
+        assertThat(page.emptyState().text())
+                .isEqualTo("Brak ofert dla „OFERTA”. Szukamy po nazwie (wielkość liter ma znaczenie) i po początku ID.");
+        assertThat(page.emptyState().actionLabel()).isEqualTo("Wyczyść wyszukiwanie");
+        assertThat(page.emptyState().actionHref()).isEqualTo("/dashboard/offers?validity=expiring");
+    }
+
+    @Test
+    void searchInTemplatesNamesTemplates() {
+        // when
+        OfferListPage page = service.page("store-1", query("segment", "templates", "q", "CAD"), NOW, PL);
+
+        // then
+        assertThat(page.emptyState().text())
+                .isEqualTo("Brak szablonów dla „CAD”. Szukamy po nazwie (wielkość liter ma znaczenie) i po początku ID.");
+        assertThat(page.emptyState().actionHref()).isEqualTo("/dashboard/offers?segment=templates");
+    }
+
+    @Test
+    void menusWithoutSearchNameTheRecordAndClearAllFilters() {
+        // when
+        OfferListPage offers = service.page("store-1", query("validity", "expired", "from", "2026-09-01"), NOW, PL);
+        OfferListPage baskets = service.page("store-1", query("segment", "baskets", "from", "2026-09-01"), NOW, PL);
+
+        // then
+        assertThat(offers.emptyState().text()).isEqualTo("Brak ofert spełniających filtry.");
+        assertThat(offers.emptyState().actionLabel()).isEqualTo("Wyczyść filtry");
+        assertThat(offers.emptyState().actionHref()).isEqualTo("/dashboard/offers");
+        assertThat(baskets.emptyState().text()).isEqualTo("Brak koszyków spełniających filtry.");
+        assertThat(baskets.emptyState().actionHref()).isEqualTo("/dashboard/offers?segment=baskets");
     }
 
     @Test
@@ -166,6 +203,7 @@ class OfferListServiceTest {
         // when / then
         assertThat(service.page("store-1", query("segment", "templates"), NOW, PL).emptyState().text())
                 .isEqualTo("Nie masz szablonów. Zapisz ofertę jako szablon na jej stronie.");
+        assertThat(service.page("store-1", query("segment", "templates"), NOW, PL).emptyState().actionHref()).isNull();
         assertThat(service.page("store-1", query("segment", "baskets"), NOW, PL).emptyState().text())
                 .isEqualTo("Brak koszyków z ostatnich 14 dni.");
     }

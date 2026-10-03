@@ -24,11 +24,11 @@ class OffersListRenderingTest {
                 "48 960,00 PLN", "netto 39 804,88 PLN", "https://app.example/store/s/client/offer/o1",
                 "/dashboard/offer/o1/copy", "/dashboard/offer/o1/copy?withContact=true",
                 "/dashboard/offer/o1/delete?returnTo=%2Fdashboard%2Foffers", "Usunąć ofertę „Stacje CAD”?",
-                "Oferta zniknie z listy…", "Akcje: Stacje CAD", "Kopiuj link do oferty 8f3a21c7 dla klienta");
+                "Oferta zniknie z listy…", "Akcje: Stacje CAD", "Kopiuj link dla klienta: Stacje CAD");
     }
 
     private static TemplateRow templateRow() {
-        return new TemplateRow("/dashboard/offer/t1", "Szablon CAD", "e41c09d2", "e41c09d2-full", "pozycje: 9", "28.08",
+        return new TemplateRow("/dashboard/offer/t1", "Szablon CAD", "e41c09d2", "e41c09d2-full", "pozycje: 9", "9", "28.08",
                 "Jan Kowalski", "8 160,00 PLN", "/dashboard/offer/new?intent=template&sourceId=t1",
                 "/dashboard/offer/t1/delete?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dtemplates", "Usunąć szablon „Szablon CAD”?",
                 "Szablon zniknie z listy…", "Akcje: Szablon CAD");
@@ -84,7 +84,7 @@ class OffersListRenderingTest {
     void storeBasketRowIsOnlyAPreviewLink() {
         // given
         BasketRow row = new BasketRow("/dashboard/basket/view/b1", "d7a20e31", "d7a20e31-full", "gość, bez danych",
-                "03.10, 11:42", "pozycje: 2", "1 698,00 PLN");
+                "03.10, 11:42", "pozycje: 2", "2", "1 698,00 PLN");
         OfferListPage page = page(OfferSegment.BASKETS, List.of(), List.of(), List.of(row), List.of(), null);
 
         // when

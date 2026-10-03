@@ -74,7 +74,8 @@ class OffersListMessagesTest {
             }
         }
         for (String segment : new String[]{"offers", "templates", "baskets"}) {
-            for (String prefix : new String[]{"offers.list.segment.", "offers.list.results.", "offers.list.empty."}) {
+            for (String prefix : new String[]{"offers.list.segment.", "offers.list.results.", "offers.list.empty.",
+                    "offers.list.empty.search.", "offers.list.empty.filtered."}) {
                 assertThat(pl).containsKey(prefix + segment);
                 assertThat(en).containsKey(prefix + segment);
             }
