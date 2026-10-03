@@ -8,11 +8,14 @@ import pl.commercelink.orders.FulfilmentStatus;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /** The "Add item" form: every field as typed, so a refused form comes back exactly as the operator left it. */
 @Getter
 @Setter
 public class WarehouseItemAddForm {
+
+    private static final Pattern PLAIN_DECIMAL = Pattern.compile("\\d+(\\.\\d+)?");
 
     private String manufacturerCode;
     private String cost;
@@ -58,11 +61,12 @@ public class WarehouseItemAddForm {
     }
 
     private Double amount() {
-        try {
-            String digits = StringUtils.deleteWhitespace(StringUtils.defaultString(cost).replace(' ', ' '));
-            return Double.parseDouble(digits.replace(',', '.'));
-        } catch (NumberFormatException e) {
+        String digits = StringUtils.deleteWhitespace(StringUtils.defaultString(cost).replace('\u00a0', ' ')).replace(',', '.');
+        // plain decimals only: parseDouble would also take NaN, Infinity, exponents and hex floats
+        if (!PLAIN_DECIMAL.matcher(digits).matches()) {
             return null;
         }
+        double value = Double.parseDouble(digits);
+        return Double.isFinite(value) ? value : null;
     }
 }

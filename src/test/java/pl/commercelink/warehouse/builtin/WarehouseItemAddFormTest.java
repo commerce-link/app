@@ -41,6 +41,14 @@ class WarehouseItemAddFormTest {
     }
 
     @Test
+    void rejectsNonFiniteAndExponentForms() {
+        // when / then
+        for (String bad : new String[]{"NaN", "Infinity", "-Infinity", "1e400", "1e2", "0x1p3", "1.5f", ".", ""}) {
+            assertThat(form("X1", bad, "net", "1", "New").validate(false)).as(bad).containsOnlyKeys("cost");
+        }
+    }
+
+    @Test
     void productDataIsRequiredOnlyForAnUnknownCode() {
         // given
         WarehouseItemAddForm form = form("X1", "10", "net", "1", "New");

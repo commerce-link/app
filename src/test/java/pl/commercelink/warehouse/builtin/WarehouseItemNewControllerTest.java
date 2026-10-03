@@ -189,4 +189,26 @@ class WarehouseItemNewControllerTest {
         assertThat((Map<String, String>) model.get("errors")).containsKey("supplier");
         verifyNoInteractions(receipts);
     }
+
+    @Test
+    void forgedStatusOrQuantityIsRefusedAndSavesNothing() throws Exception {
+        // given
+        when(taxonomy.findByMfn(any())).thenReturn(known());
+        WarehouseItemAddForm forgedStatus = form("GV-N406TWF2OC");
+        forgedStatus.setStatus("Delivered");
+        WarehouseItemAddForm negativeQty = form("GV-N406TWF2OC");
+        negativeQty.setQty("-2");
+
+        for (WarehouseItemAddForm forged : List.of(forgedStatus, negativeQty)) {
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            // when
+            String view = asStore(() -> controller.addItem(forged, new ExtendedModelMap(), PL, response, new RedirectAttributesModelMap()));
+
+            // then
+            assertThat(view).isEqualTo("warehouse-item-new");
+            assertThat(response.getStatus()).isEqualTo(422);
+        }
+        verifyNoInteractions(receipts);
+    }
 }
