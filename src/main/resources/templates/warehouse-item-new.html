@@ -1,0 +1,151 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/warehouse', #{nav.warehouse}, #{warehouse.item.new.title}, #{warehouse.item.new.lead}, null)}"></div>
+
+        <form th:fragment="form" class="cl-form" id="warehouseItemNewForm" method="post" novalidate data-cl-submit-once
+              th:action="@{/dashboard/warehouse/items/new}">
+
+            <div th:replace="~{fragments/settings-form :: errorSummaryWithArguments('warehouse-item-errors', ${errors}, ${errorArgs})}"></div>
+            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="alert">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${errorMessage}"></p>
+            </div>
+            <div th:if="${mfnUnknown}" class="cl-alert is-warn" role="alert">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{warehouse.item.new.unknown(${form.manufacturerCode})}"></p>
+            </div>
+
+            <div class="cl-card">
+                <fieldset class="cl-fieldset">
+                    <legend class="cl-fieldset-title" th:text="#{warehouse.item.new.group.item}"></legend>
+                    <div class="cl-form-grid">
+
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="manufacturerCode" th:text="#{warehouse.item.new.mfn}"></label>
+                            <input class="cl-input" id="manufacturerCode" name="manufacturerCode" type="text" required autocomplete="off"
+                                   th:value="${form.manufacturerCode}" th:placeholder="#{warehouse.item.new.mfn.placeholder}"
+                                   th:classappend="${errors['manufacturerCode'] != null} ? 'is-invalid'"
+                                   th:attr="aria-invalid=${errors['manufacturerCode'] != null ? 'true' : null},aria-describedby=${errors['manufacturerCode'] != null ? 'manufacturerCode-error' : null}">
+                            <p th:if="${errors['manufacturerCode'] != null}" class="cl-field-error" id="manufacturerCode-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['manufacturerCode']}}"></span>
+                            </p>
+                        </div>
+
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="cost" th:text="#{warehouse.item.new.cost}"></label>
+                            <div class="cl-input-row" data-cl-cost-field>
+                                <input class="cl-input" id="cost" name="cost" type="text" inputmode="decimal" required
+                                       th:value="${form.cost}" th:classappend="${errors['cost'] != null} ? 'is-invalid'"
+                                       th:attr="aria-invalid=${errors['cost'] != null ? 'true' : null},aria-describedby=${errors['cost'] != null ? 'cost-hint cost-error' : 'cost-hint'}">
+                                <div class="cl-segmented" role="group" th:aria-label="#{warehouse.item.new.cost.type}">
+                                    <button type="button" class="cl-segment" data-value="net"
+                                            th:attr="aria-pressed=${form.priceType != 'gross'}" th:text="#{warehouse.item.new.cost.net}"></button>
+                                    <button type="button" class="cl-segment" data-value="gross"
+                                            th:attr="aria-pressed=${form.priceType == 'gross'}" th:text="#{warehouse.item.new.cost.gross}"></button>
+                                </div>
+                                <input type="hidden" name="priceType" th:value="${form.priceType == 'gross' ? 'gross' : 'net'}">
+                            </div>
+                            <p class="cl-help" id="cost-hint" data-cl-cost-hint
+                               th:attr="data-tax=${vatRate},data-template-net=#{order.item.price.net.hint},data-template-gross=#{order.item.price.gross.hint},data-empty=#{warehouse.item.new.cost.hint}"
+                               th:text="#{warehouse.item.new.cost.hint}"></p>
+                            <p th:if="${errors['cost'] != null}" class="cl-field-error" id="cost-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['cost']}}"></span>
+                            </p>
+                        </div>
+
+                        <div class="cl-span-2 cl-field">
+                            <label class="cl-label" for="qty" th:text="#{warehouse.item.new.qty}"></label>
+                            <input class="cl-input is-qty" id="qty" name="qty" type="text" inputmode="numeric" required
+                                   th:value="${form.qty}" th:classappend="${errors['qty'] != null} ? 'is-invalid'"
+                                   th:attr="aria-invalid=${errors['qty'] != null ? 'true' : null},aria-describedby=${errors['qty'] != null ? 'qty-error' : null}">
+                            <p th:if="${errors['qty'] != null}" class="cl-field-error" id="qty-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['qty']}}"></span>
+                            </p>
+                        </div>
+
+                        <div class="cl-span-4" id="supplier">
+                            <div th:replace="~{fragments/supplier-choice :: clField('new-supplier', ${suppliers}, ${form.supplier}, ${form.customSupplier})}"></div>
+                            <p th:if="${errors['supplier'] != null}" class="cl-field-error" id="supplier-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="${#messages.msgWithParams(errors['supplier'], errorArgs['supplier'])}"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <fieldset class="cl-choice-group" id="status">
+                        <legend class="cl-label" th:text="#{warehouse.item.new.status}"></legend>
+                        <label class="cl-choice" th:each="s : ${statuses}">
+                            <input type="radio" name="status" th:value="${s.name()}" th:checked="${form.status == s.name()}">
+                            <span class="cl-choice-text">
+                                <span class="cl-choice-title" th:text="#{|FulfilmentStatus.${s.name()}|}"></span>
+                                <span class="cl-choice-description" th:text="#{|warehouse.item.new.status.${s.name()}.desc|}"></span>
+                            </span>
+                        </label>
+                        <p th:if="${errors['status'] != null}" class="cl-field-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="#{${errors['status']}}"></span>
+                        </p>
+                    </fieldset>
+                </fieldset>
+
+                <fieldset class="cl-fieldset" id="product-data" th:if="${mfnUnknown}">
+                    <legend class="cl-fieldset-title" th:text="#{warehouse.item.new.group.product}"></legend>
+                    <div class="cl-form-grid">
+                        <div class="cl-span-6 cl-field">
+                            <label class="cl-label" for="name" th:text="#{warehouse.item.new.name}"></label>
+                            <input class="cl-input" id="name" name="name" type="text" required autofocus
+                                   th:value="${form.name}" th:classappend="${errors['name'] != null} ? 'is-invalid'"
+                                   th:attr="aria-invalid=${errors['name'] != null ? 'true' : null},aria-describedby=${errors['name'] != null ? 'name-error' : null}">
+                            <p th:if="${errors['name'] != null}" class="cl-field-error" id="name-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['name']}}"></span>
+                            </p>
+                        </div>
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="ean" th:text="#{warehouse.item.new.ean}"></label>
+                            <input class="cl-input" id="ean" name="ean" type="text" inputmode="numeric" required
+                                   th:value="${form.ean}" th:classappend="${errors['ean'] != null} ? 'is-invalid'"
+                                   th:attr="aria-invalid=${errors['ean'] != null ? 'true' : null},aria-describedby=${errors['ean'] != null ? 'ean-error' : null}">
+                            <p th:if="${errors['ean'] != null}" class="cl-field-error" id="ean-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['ean']}}"></span>
+                            </p>
+                        </div>
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="category" th:text="#{warehouse.item.new.category}"></label>
+                            <select class="cl-select" id="category" name="category">
+                                <option value="" th:text="#{warehouse.item.new.category.none}"></option>
+                                <optgroup th:each="g : ${categoryGroups}" th:label="${g.catalog()}">
+                                    <option th:each="c : ${g.names()}" th:value="${c}" th:text="${c}"
+                                            th:selected="${c == form.category}"></option>
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <div class="cl-card-footer">
+                    <button class="cl-button is-primary" type="submit" th:text="#{warehouse.item.new.submit}"></button>
+                    <a class="cl-button" th:href="@{/dashboard/warehouse}" th:text="#{general.cancel}"></a>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+<script th:src="@{/js/supplier-choice.js}" defer></script>
+<script th:src="@{/js/cost-type-field.js}" defer></script>
+<script th:src="@{/js/submit-once.js}" defer></script>
+</div>
+</body>
+</html>
