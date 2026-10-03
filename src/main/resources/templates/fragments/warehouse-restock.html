@@ -1,0 +1,52 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The restock parameters, shared by the dialog on the warehouse list and the plain page behind it (restock = RestockForm).
+       The category list holds the categories of every catalog; static/js/dependent-select.js keeps the ones of the chosen
+       catalog. The price limit is optional: an empty value means "no limit". */-->
+<th:block th:fragment="fields">
+    <div class="cl-form-grid">
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" for="restock-catalog" th:text="#{warehouse.restock.field.catalog}"></label>
+            <select class="cl-select" id="restock-catalog" name="catalogId" required
+                    th:attr="aria-invalid=${restock.error() != null ? 'true' : null}">
+                <option value="" th:text="#{warehouse.restock.field.catalog.choose}"></option>
+                <option th:each="catalog : ${restock.catalogs()}" th:value="${catalog.catalogId}" th:text="${catalog.name}"
+                        th:selected="${catalog.catalogId == restock.selectedCatalogId() or restock.catalogs().size() == 1}"></option>
+            </select>
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" for="restock-category" th:text="#{warehouse.restock.field.category}"></label>
+            <select class="cl-select" id="restock-category" name="categoryId" data-cl-options-for="restock-catalog">
+                <option value="" th:text="#{warehouse.restock.all.categories}"></option>
+                <th:block th:each="entry : ${restock.categoriesByCatalog()}">
+                    <option th:each="category : ${entry.value}" th:value="${category['id']}" th:text="${category['name']}"
+                            th:attr="data-parent=${entry.key}"></option>
+                </th:block>
+            </select>
+        </div>
+    </div>
+    <fieldset class="cl-choice-group">
+        <legend class="cl-label" th:text="#{warehouse.restock.field.scope}"></legend>
+        <label class="cl-choice"><input type="radio" name="scope" value="ExpectedStockQty" checked>
+            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{warehouse.restock.scope.expected.title}"></span>
+            <span class="cl-choice-description" th:text="#{warehouse.restock.scope.expected.desc}"></span></span></label>
+        <label class="cl-choice"><input type="radio" name="scope" value="WholeCatalog">
+            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{warehouse.restock.scope.whole.title}"></span>
+            <span class="cl-choice-description" th:text="#{warehouse.restock.scope.whole.desc}"></span></span></label>
+    </fieldset>
+    <div class="cl-field">
+        <label class="cl-label" for="restock-price" th:text="#{warehouse.restock.field.price}"></label>
+        <select class="cl-select" id="restock-price" name="restockPrice" aria-describedby="restock-price-help">
+            <option th:each="price : ${T(pl.commercelink.warehouse.RestockPriceCategory).values()}" th:value="${price.name()}"
+                    th:text="#{${'warehouse.restock.price.' + price.name()}}"></option>
+            <option value="" th:text="#{warehouse.restock.price.none}"></option>
+        </select>
+        <p class="cl-help" id="restock-price-help" th:text="#{warehouse.restock.field.price.help}"></p>
+    </div>
+    <div th:replace="~{fragments/settings-form :: check('onlyMissingItems', 'warehouse.restock.only.missing.title', false, 'warehouse.restock.only.missing.desc', null, null)}"></div>
+</th:block>
+
+</body>
+</html>

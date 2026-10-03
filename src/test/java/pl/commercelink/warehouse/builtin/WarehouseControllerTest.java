@@ -9,6 +9,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
@@ -21,6 +22,7 @@ import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
 
 import java.util.Collections;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -80,7 +82,7 @@ class WarehouseControllerTest {
             Model model = new ConcurrentModel();
 
             // when
-            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model);
+            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model, Locale.ENGLISH, new MockHttpServletResponse());
 
             // then
             assertThat(view).isEqualTo("fulfilment");

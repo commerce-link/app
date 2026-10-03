@@ -1,7 +1,9 @@
 package pl.commercelink.warehouse.builtin;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,6 +17,8 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
@@ -76,6 +80,9 @@ class WarehouseController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private ProductCatalogRepository productCatalogRepository;
+
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
         addListPage(model, params, locale);
@@ -91,6 +98,9 @@ class WarehouseController {
     private void addListPage(Model model, MultiValueMap<String, String> params, Locale locale) {
         boolean wms = storesRepository.findById(getStoreId()).hasIntegration(IntegrationType.WMS_PROVIDER);
         model.addAttribute("page", warehouseListService.page(getStoreId(), wms, isAdmin(), WarehouseListQuery.parse(params, wms), locale));
+        if (isAdmin()) {
+            model.addAttribute("restock", restockForm(null, null));
+        }
     }
 
     @PostMapping("/dashboard/warehouse/markAsReserved")
@@ -245,14 +255,26 @@ class WarehouseController {
                 .collect(Collectors.toList());
     }
 
+    @GetMapping("/dashboard/warehouse/restock")
+    @PreAuthorize("hasRole('ADMIN')")
+    String restockPage(Model model) {
+        model.addAttribute("restock", restockForm(null, null));
+        return "warehouse-restock";
+    }
+
     @PostMapping("/dashboard/warehouse/restock")
     @PreAuthorize("hasRole('ADMIN')")
-    String restock(@RequestParam String catalogId,
+    String restock(@RequestParam(required = false) String catalogId,
                    @RequestParam(required = false) String categoryId,
                    @RequestParam RestockScope scope,
                    @RequestParam(required = false) RestockPriceCategory restockPrice,
                    @RequestParam(required = false) boolean onlyMissingItems,
-                   Model model) {
+                   Model model, Locale locale, HttpServletResponse response) {
+        if (catalogId == null || catalogId.isBlank()) {
+            response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            model.addAttribute("restock", restockForm(null, msg(locale, "warehouse.restock.error.catalog")));
+            return "warehouse-restock";
+        }
         List<RestockSuggestion> suggestions = restockSuggestionService.suggestForRestock(
                 getStoreId(), catalogId, categoryId, scope, onlyMissingItems, restockPrice);
 
@@ -274,6 +296,19 @@ class WarehouseController {
         model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 
         return "fulfilment";
+    }
+
+    private RestockForm restockForm(String selectedCatalogId, String error) {
+        List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId()).stream()
+                .sorted(Comparator.comparing(ProductCatalog::getName))
+                .collect(Collectors.toList());
+        Map<String, List<Map<String, String>>> categoriesByCatalog = catalogs.stream()
+                .collect(Collectors.toMap(
+                        ProductCatalog::getCatalogId,
+                        catalog -> catalog.getCategories().stream()
+                                .map(category -> Map.of("id", category.getCategoryId(), "name", category.getName()))
+                                .collect(Collectors.toList())));
+        return new RestockForm(catalogs, categoriesByCatalog, selectedCatalogId, error);
     }
 
     private int getRestockPrice(RestockSuggestion suggestion, RestockPriceCategory budget) {

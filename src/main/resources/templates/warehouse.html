@@ -270,6 +270,19 @@
 
         <noscript><p class="cl-help" th:text="#{warehouse.list.noscript}"></p></noscript>
         <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
+        <dialog th:if="${restock != null}" class="cl-dialog is-form" id="warehouse-restock" aria-labelledby="restock-title">
+            <form method="post" th:action="@{/dashboard/warehouse/restock}">
+                <h2 class="cl-dialog-title" id="restock-title" th:text="#{warehouse.restock.title}"></h2>
+                <div class="cl-dialog-body">
+                    <p class="cl-dialog-message" th:text="#{warehouse.restock.lead}"></p>
+                    <th:block th:replace="~{fragments/warehouse-restock :: fields}"></th:block>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-primary" th:text="#{warehouse.restock.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
     </div>
 </section>
 
@@ -277,6 +290,7 @@
 <script th:src="@{/js/menu.js}" defer></script>
 <script th:src="@{/js/table-select.js}" defer></script>
 <script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/dependent-select.js}" defer></script>
 <script th:src="@{/js/confirm-dialog.js}" defer></script>
 <script th:src="@{/js/selection-actions.js}" defer></script>
 </div>

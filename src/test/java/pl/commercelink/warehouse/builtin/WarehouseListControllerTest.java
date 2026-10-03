@@ -8,11 +8,15 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.util.LinkedMultiValueMap;
+import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +38,8 @@ class WarehouseListControllerTest {
     private WarehouseListService warehouseListService;
     @Mock
     private StoresRepository storesRepository;
+    @Mock
+    private ProductCatalogRepository productCatalogRepository;
 
     @InjectMocks
     private WarehouseController warehouseController;
@@ -77,5 +83,63 @@ class WarehouseListControllerTest {
             // then
             assertThat(model.getAttribute("page")).isSameAs(page);
         }
+    }
+
+    @Test
+    void adminGetsTheRestockFormWithCatalogsSortedByNameAndTheirCategories() {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ProductCatalog peripherals = catalog("c2", "Peryferia", List.of());
+        ProductCatalog computers = catalog("c1", "Komputery", List.of(category("k1", "GPU")));
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of(peripherals, computers));
+        ExtendedModelMap model = new ExtendedModelMap();
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
+
+            // when
+            warehouseController.warehouseItems(new LinkedMultiValueMap<>(), Locale.ENGLISH, model);
+
+            // then
+            RestockForm restock = (RestockForm) model.getAttribute("restock");
+            assertThat(restock.catalogs()).containsExactly(computers, peripherals);
+            assertThat(restock.categoriesByCatalog().get("c1")).containsExactly(java.util.Map.of("id", "k1", "name", "GPU"));
+            assertThat(restock.categoriesByCatalog().get("c2")).isEmpty();
+            assertThat(restock.error()).isNull();
+        }
+    }
+
+    @Test
+    void nonAdminGetsNoRestockForm() {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ExtendedModelMap model = new ExtendedModelMap();
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(false);
+
+            // when
+            warehouseController.warehouseItems(new LinkedMultiValueMap<>(), Locale.ENGLISH, model);
+
+            // then
+            assertThat(model.containsAttribute("restock")).isFalse();
+        }
+    }
+
+    private static ProductCatalog catalog(String id, String name, List<CategoryDefinition> categories) {
+        ProductCatalog catalog = new ProductCatalog();
+        catalog.setCatalogId(id);
+        catalog.setName(name);
+        catalog.setCategories(categories);
+        return catalog;
+    }
+
+    private static CategoryDefinition category(String id, String name) {
+        CategoryDefinition category = new CategoryDefinition();
+        category.setCategoryId(id);
+        category.setName(name);
+        return category;
     }
 }
