@@ -58,8 +58,6 @@ class SupplierLabelTemplatesTest {
         // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
         assertThat(template("rma-center-form.html")).contains("${providerOptions}");
         assertThat(template("rma-centers.html")).doesNotContain("${center.provider}").contains("center.title()");
-        assertThat(template("warehouse.html"))
-                .contains("fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)");
     }
 
     @Test

@@ -20,6 +20,7 @@
 // outside the selection row -- a live region revealed in the same frame as its text is often not read); it speaks only
 // when the count changes, never on load. The bulk form takes the page's query string along (the filter as the operator
 // left it, kept in the address by table-filter.js), so the redirect after the action can come back to it.
+// Tables that arrive with a list-page.js swap are wired on cl-list:swapped.
 (function () {
     'use strict';
 
@@ -289,7 +290,14 @@
     }
 
     function initAll() {
-        document.querySelectorAll('table[data-cl-select-table]').forEach(init);
+        document.querySelectorAll('table[data-cl-select-table]').forEach(function (table) {
+            // list-page.js swaps the results block in place: a fresh table needs its wiring, an old one keeps it
+            if (table.hasAttribute('data-cl-select-ready')) {
+                return;
+            }
+            table.setAttribute('data-cl-select-ready', '');
+            init(table);
+        });
     }
 
     if (document.readyState === 'loading') {
@@ -297,4 +305,5 @@
     } else {
         initAll();
     }
+    document.addEventListener('cl-list:swapped', initAll);
 })();

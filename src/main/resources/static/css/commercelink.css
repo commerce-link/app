@@ -8576,3 +8576,39 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 }
+
+/* --- Warehouse list (spec docs/active/warehouse-list-redesign §14) --- */
+.cl-page .cl-muted { color: var(--cl-ink-3); }
+/* one grid item per cell in the phone card mode, like the orders cells */
+.cl-page .cl-table.is-warehouse .cl-cell-stack { display: flex; flex-direction: column; min-width: 0; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-end; }
+.cl-page .cl-table.is-warehouse :is(th, td) { white-space: normal; overflow-wrap: break-word; }
+.cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; }
+.cl-page .cl-table.is-warehouse .cl-table-pills { max-width: 100%; }
+.cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { max-width: 100%; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: normal; text-align: right; }
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-warehouse { table-layout: fixed; width: 100%; }
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 12%; }
+    .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
+    .cl-page .cl-table.is-warehouse .cl-col-cost { width: 15%; }
+    .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 11%; }
+    .cl-page .cl-table.is-warehouse .cl-col-status { width: 16%; }
+}
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }
+    .cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }
+}
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
+    .cl-page .cl-table.is-warehouse .cl-table-code { overflow-wrap: anywhere; }
+    .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
+    /* the selection row of the warehouse list docks to the bottom of the viewport on phones (proposed, spec §14.4) */
+    .cl-page .cl-card:has(.cl-table.is-warehouse) .cl-selection-row:not([hidden]) {
+        position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 30;
+        padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+        box-shadow: 0 -4px 16px rgba(15, 23, 42, .12);
+    }
+}
+.cl-dialog .cl-quantity-table td.is-numeric { width: 120px; }
+.cl-dialog .cl-quantity-table .cl-input.is-qty { width: 96px; text-align: right; }

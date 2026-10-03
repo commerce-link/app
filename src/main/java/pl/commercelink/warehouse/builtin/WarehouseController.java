@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,18 +12,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
-import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.warehouse.RestockPriceCategory;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestion;
@@ -30,7 +26,6 @@ import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationItem;
-import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.*;
@@ -42,7 +37,7 @@ import java.util.stream.IntStream;
 class WarehouseController {
 
     @Autowired
-    private Warehouse warehouse;
+    private WarehouseListService warehouseListService;
 
     @Autowired
     private WarehouseRepository warehouseRepository;
@@ -55,9 +50,6 @@ class WarehouseController {
 
     @Autowired
     private RestockSuggestionService restockSuggestionService;
-
-    @Autowired
-    private ProductCatalogRepository productCatalogRepository;
 
     @Autowired
     private WarehouseGoodsOutService warehouseGoodsOutService;
@@ -81,120 +73,20 @@ class WarehouseController {
     private SupplierLabels supplierLabels;
 
     @GetMapping("/dashboard/warehouse")
-    String warehouseItems(@RequestParam(required = false) List<String> categories,
-                                  @RequestParam(required = false) List<String> statuses,
-                                  @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                                  Model model) {
-        Store store = storesRepository.findById(getStoreId());
-        boolean hasExternalWarehouse = store.hasIntegration(IntegrationType.WMS_PROVIDER);
-
-        List<WarehouseItem> warehouseItems;
-
-        // Convert status strings to FulfilmentStatus enums, excluding Destroyed
-        List<FulfilmentStatus> statusEnums = null;
-        if (showAll) {
-            statusEnums = Arrays.stream(FulfilmentStatus.values())
-                    .filter(s -> s != FulfilmentStatus.Destroyed)
-                    .collect(Collectors.toList());
-        } else if (statuses != null && !statuses.isEmpty()) {
-            statusEnums = statuses.stream()
-                    .map(FulfilmentStatus::valueOf)
-                    .filter(status -> status != FulfilmentStatus.Destroyed)
-                    .collect(Collectors.toList());
-        } else {
-            // Default statuses based on warehouse type
-            statusEnums = Collections.singletonList(hasExternalWarehouse ? FulfilmentStatus.Ordered : FulfilmentStatus.Delivered);
-        }
-
-        statusEnums = statusEnums.stream()
-                .filter(status -> status != FulfilmentStatus.Destroyed)
-                .filter(status -> status != FulfilmentStatus.Returned)
-                .filter(status -> status != FulfilmentStatus.Replaced)
-                .collect(Collectors.toList());
-
-        warehouseItems =  warehouseRepository.findAllFiltered(getStoreId(), categories, statusEnums)
-                .stream()
-                .filter(item -> item.getStatus() != FulfilmentStatus.Destroyed)
-                .sorted(Comparator.comparing(WarehouseItem::getCategory, Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(WarehouseItem::getName))
-                .collect(Collectors.toList());
-
-        double warehouseNetValue = warehouseItems.stream()
-                .mapToDouble(item -> item.totalUnitCost().netValue())
-                .sum();
-        double warehouseGrossValue = warehouseItems.stream()
-                .mapToDouble(item -> item.totalUnitCost().grossValue())
-                .sum();
-
-        // Split items by status
-        Map<FulfilmentStatus, List<WarehouseItem>> itemsByStatus = warehouseItems.stream()
-                .collect(Collectors.groupingBy(WarehouseItem::getStatus));
-
-        List<String> allCategories = warehouseRepository.findAllCategories(getStoreId()).stream()
-                .sorted()
-                .collect(Collectors.toList());
-
-        Arrays.stream(FulfilmentStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
-
-        // Add items grouped by status
-        model.addAttribute("deliveredItems", itemsByStatus.getOrDefault(FulfilmentStatus.Delivered, Collections.emptyList()));
-        model.addAttribute("orderedItems", itemsByStatus.getOrDefault(FulfilmentStatus.Ordered, Collections.emptyList()));
-        model.addAttribute("allocationItems", itemsByStatus.getOrDefault(FulfilmentStatus.Allocation, Collections.emptyList()));
-        model.addAttribute("newItems", itemsByStatus.getOrDefault(FulfilmentStatus.New, Collections.emptyList()));
-        model.addAttribute("reservedItems", itemsByStatus.getOrDefault(FulfilmentStatus.Reserved, Collections.emptyList()));
-        model.addAttribute("inRMAItems", itemsByStatus.getOrDefault(FulfilmentStatus.InRMA, Collections.emptyList()));
-        model.addAttribute("inExternalServiceItems", itemsByStatus.getOrDefault(FulfilmentStatus.InExternalService, Collections.emptyList()));
-
-        List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId()).stream()
-                .sorted(Comparator.comparing(ProductCatalog::getName))
-                .collect(Collectors.toList());
-
-        Map<String, List<Map<String, String>>> categoriesByCatalog = catalogs.stream()
-                .collect(Collectors.toMap(
-                        ProductCatalog::getCatalogId,
-                        c -> c.getCategories().stream()
-                                .map(cd -> Map.of("id", cd.getCategoryId(), "name", cd.getName()))
-                                .collect(Collectors.toList())
-                ));
-
-        model.addAttribute("warehouseNetValue", warehouseNetValue);
-        model.addAttribute("warehouseGrossValue", warehouseGrossValue);
-        model.addAttribute("categories", allCategories);
-        model.addAttribute("restockCatalogs", catalogs);
-        model.addAttribute("restockCategoriesByCatalog", categoriesByCatalog);
-        model.addAttribute("statuses", getFulfilmentStatuses(hasExternalWarehouse));
-        model.addAttribute("selectedCategories", categories != null ? categories : Collections.emptyList());
-        model.addAttribute("selectedStatuses", statusEnums.stream().map(FulfilmentStatus::name).collect(Collectors.toList()));
-        model.addAttribute("isAdmin", isAdmin());
-        model.addAttribute("hasExternalWarehouse", hasExternalWarehouse);
-        model.addAttribute("quickAddStatuses", WarehouseItemController.NEW_ITEM_STATUSES);
-        model.addAttribute("defaultVatRate", Price.DEFAULT_VAT_RATE);
-        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-        model.addAttribute("providerOptions", labels.options());
-        model.addAttribute("supplierLabels", labels);
-
+    String warehouseItems(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        addListPage(model, params, locale);
         return "warehouse";
     }
 
-    private static List<FulfilmentStatus> getFulfilmentStatuses(boolean hasExternalWarehouse) {
-        List<FulfilmentStatus> allStatuses;
-        if (hasExternalWarehouse) {
-            allStatuses = Arrays.asList(
-                    FulfilmentStatus.New,
-                    FulfilmentStatus.Allocation,
-                    FulfilmentStatus.Ordered
-            );
-        } else {
-            allStatuses = Arrays.asList(
-                    FulfilmentStatus.New,
-                    FulfilmentStatus.Allocation,
-                    FulfilmentStatus.Reserved,
-                    FulfilmentStatus.Ordered,
-                    FulfilmentStatus.Delivered,
-                    FulfilmentStatus.InRMA,
-                    FulfilmentStatus.InExternalService
-            );
-        }
-        return allStatuses;
+    @GetMapping("/dashboard/warehouse/list")
+    String warehouseList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        addListPage(model, params, locale);
+        return "warehouse :: results";
+    }
+
+    private void addListPage(Model model, MultiValueMap<String, String> params, Locale locale) {
+        boolean wms = storesRepository.findById(getStoreId()).hasIntegration(IntegrationType.WMS_PROVIDER);
+        model.addAttribute("page", warehouseListService.page(getStoreId(), wms, isAdmin(), WarehouseListQuery.parse(params, wms), locale));
     }
 
     @PostMapping("/dashboard/warehouse/markAsAvailable")
