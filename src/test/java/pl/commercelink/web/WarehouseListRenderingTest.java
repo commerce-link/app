@@ -116,6 +116,7 @@ class WarehouseListRenderingTest {
         assertThat(html).contains("Net value: 1.00 PLN · gross: 1.23 PLN");
         assertThat(html).doesNotContain("cl-table-results cl-visually-hidden");
         assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\"");
+        assertThat(html).contains("class=\"cl-list-meta is-warehouse\"");
     }
 
     @Test

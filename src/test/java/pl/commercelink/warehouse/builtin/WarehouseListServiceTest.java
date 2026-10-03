@@ -151,8 +151,8 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(first.rows()).hasSize(50);
-        assertThat(first.resultsLine()).isEqualTo("Pozycje: 55 · 110 szt. · Wartość netto: 1\u00a0100,00 PLN · brutto: 1\u00a0353,00 PLN");
-        assertThat(everything.resultsLine()).isEqualTo("Pozycje: 56 · 111 szt. · Wartość netto: 1\u00a0200,00 PLN · brutto: 1\u00a0476,00 PLN");
+        assertThat(first.resultsLine()).isEqualTo("Pozycje: 55 · 110 szt. · Wartość netto: 1\u00a0100,00\u00a0PLN · brutto: 1\u00a0353,00\u00a0PLN");
+        assertThat(everything.resultsLine()).isEqualTo("Pozycje: 56 · 111 szt. · Wartość netto: 1\u00a0200,00\u00a0PLN · brutto: 1\u00a0476,00\u00a0PLN");
     }
 
     @Test

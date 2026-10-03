@@ -108,7 +108,7 @@
                     </div>
                 </div>
 
-                <div class="cl-list-meta" th:unless="${page.storeEmpty()}">
+                <div class="cl-list-meta is-warehouse" th:unless="${page.storeEmpty()}">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>

@@ -8578,6 +8578,8 @@ a.cl-link-button:hover {
 }
 
 /* --- Warehouse list (spec docs/active/warehouse-list-redesign §14) --- */
+/* the results line carries the value of the list, so it keeps one place: the right edge, whether chips stand before it or not */
+.cl-page .cl-list-meta.is-warehouse .cl-table-results { margin-left: auto; text-align: right; }
 .cl-page .cl-muted { color: var(--cl-ink-3); }
 /* one grid item per cell in the phone card mode, like the orders cells */
 .cl-page .cl-table.is-warehouse .cl-cell-stack { display: flex; flex-direction: column; min-width: 0; }

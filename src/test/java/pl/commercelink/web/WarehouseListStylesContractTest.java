@@ -58,4 +58,14 @@ class WarehouseListStylesContractTest {
         // the fixed row at the bottom of a phone screen covered the last card and the pagination
         assertThat(section).contains(".cl-page .cl-card:has(.cl-table.is-warehouse):has(.cl-selection-row:not([hidden])) {");
     }
+
+    @Test
+    void resultsLineStaysAtTheRightEdgeWithOrWithoutChips() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // alone in its flex row (no chips) the line fell to the left edge, next to chips it stood on the right
+        assertThat(section).contains(".cl-page .cl-list-meta.is-warehouse .cl-table-results { margin-left: auto; text-align: right; }");
+    }
 }
