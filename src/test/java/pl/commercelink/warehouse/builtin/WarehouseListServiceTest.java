@@ -177,16 +177,16 @@ class WarehouseListServiceTest {
 
     @Test
     void emptyStoreHasItsOwnEmptyStateAndChipsNameFilters() {
-        // given
+        // when
         WarehousePageModel empty = page();
         add("A", "GPU", Reserved, 1, 1);
-
-        // when
         WarehousePageModel filtered = page("statuses", "Reserved", "categories", "GPU", "q", "a");
 
         // then
         assertThat(empty.storeEmpty()).isTrue();
         assertThat(empty.emptyState().text()).startsWith("Magazyn jest pusty");
+        assertThat(empty.emptyState().actionLabel()).isEqualTo("Dodaj pozycję");
+        assertThat(empty.emptyState().actionHref()).isEqualTo("/dashboard/warehouse/items/new");
         assertThat(filtered.chips()).extracting(WarehousePageModel.Chip::label)
                 .containsExactly("Status: Zarezerwowane", "Kategoria: GPU", "Szukaj: a");
         assertThat(page("statuses", "all").chips()).isEmpty();

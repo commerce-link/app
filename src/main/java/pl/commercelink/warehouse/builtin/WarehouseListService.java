@@ -213,8 +213,8 @@ class WarehouseListService {
 
     private EmptyState emptyState(WarehouseListQuery query, boolean storeEmpty, Locale locale) {
         if (storeEmpty) {
-            return new EmptyState(text(locale, "warehouse.list.empty.store"), text(locale, "warehouse.add.item"),
-                    "/dashboard/warehouse/items/add");
+            return new EmptyState(text(locale, "warehouse.list.empty.store"), text(locale, "warehouse.action.add.item"),
+                    "/dashboard/warehouse/items/new");
         }
         return new EmptyState(text(locale, "warehouse.list.empty.filtered"), text(locale, "general.clear.filters"), query.cleared().href());
     }
