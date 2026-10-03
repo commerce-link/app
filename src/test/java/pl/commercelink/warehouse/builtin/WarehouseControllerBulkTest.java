@@ -12,12 +12,18 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import org.springframework.web.servlet.view.RedirectView;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.api.Reservation;
 
 import java.util.List;
@@ -28,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,6 +65,8 @@ class WarehouseControllerBulkTest {
     private WarehouseGoodsOutService warehouseGoodsOutService;
     @Mock
     private WarehouseGoodsInService warehouseGoodsInService;
+    @Mock
+    private StoresRepository storesRepository;
     @Spy
     private ResourceBundleMessageSource messageSource = messages();
 
@@ -462,5 +471,42 @@ class WarehouseControllerBulkTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InExternalService&categories=GPU");
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage")).isEqualTo("PZ failed");
+    }
+
+    @Test
+    void refusalInAWmsStoreReturnsToTheSameCanonicalAddressAsTheListItself() throws Exception {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(store.hasIntegration(IntegrationType.WMS_PROVIDER)).thenReturn(true);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+        // every status a WMS store lists, posted from the address of its "all" view
+        MultiValueMap<String, String> posted = view("statuses", "New", "statuses", "Allocation", "statuses", "Ordered", "q", "rtx");
+
+        // when
+        String view = asStore(() -> controller.markAsInAllocation(List.of(), posted, PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=all&q=rtx");
+    }
+
+    @Test
+    void hostileSearchTextIsEncodedIntoASafeLocationHeader() throws Exception {
+        // given
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+        MultiValueMap<String, String> posted = view("q", "a\r\nSet-Cookie: x=1 //evil.example {id} ${x}");
+
+        // when
+        String view = asStore(() -> controller.markAsReserved(List.of(), List.of(), posted, PL, ra));
+        RedirectView redirect = new RedirectView(view.substring("redirect:".length()), true);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        redirect.render(java.util.Map.of(), new MockHttpServletRequest(), response);
+
+        // then
+        String location = response.getHeader("Location");
+        assertThat(location).startsWith("/dashboard/warehouse?q=")
+                .doesNotContain("\r").doesNotContain("\n").doesNotContain("//evil").doesNotContain("{").doesNotContain("}")
+                .doesNotContain(" ")
+                .isEqualTo("/dashboard/warehouse?q=a%0D%0ASet-Cookie%3A+x%3D1+%2F%2Fevil.example+%7Bid%7D+%24%7Bx%7D");
     }
 }

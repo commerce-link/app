@@ -15,6 +15,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 
 import java.util.List;
 import java.util.Locale;
@@ -41,8 +43,11 @@ public class WarehouseShippingController extends AbstractShippingController {
     public String initiate(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
                            @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra,
                            Model model) {
-        // a refusal returns to the list view the operator acted from, posted by selection-actions.js
-        String back = WarehouseListQuery.parse(view, false).href();
+        // a refusal returns to the list view the operator acted from, posted by selection-actions.js, read with the
+        // store's WMS flag as the list reads its address
+        Store store = getStore();
+        boolean wms = store != null && store.hasIntegration(IntegrationType.WMS_PROVIDER);
+        String back = WarehouseListQuery.parse(view, wms).href();
         if (itemIds == null || itemIds.isEmpty()) {
             return refuse(ra, back, locale, "warehouse.error.select.at.least.one");
         }
@@ -75,7 +80,7 @@ public class WarehouseShippingController extends AbstractShippingController {
 
         List<ShippingDetails> shippingDetailsList = retrieveRMACentersShippingDetailsList(warehouseItems.get(0).getDeliveryId());
 
-        return renderShippingForm(getStore(), shippingForm, shippingDetailsList, model);
+        return renderShippingForm(store, shippingForm, shippingDetailsList, model);
     }
 
     private String refuse(RedirectAttributes ra, String target, Locale locale, String key, Object... args) {

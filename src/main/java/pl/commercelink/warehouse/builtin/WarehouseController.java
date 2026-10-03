@@ -23,6 +23,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockPriceCategory;
 import pl.commercelink.warehouse.RestockScope;
@@ -99,7 +100,7 @@ class WarehouseController {
     }
 
     private void addListPage(Model model, MultiValueMap<String, String> params, Locale locale) {
-        boolean wms = storesRepository.findById(getStoreId()).hasIntegration(IntegrationType.WMS_PROVIDER);
+        boolean wms = wms();
         model.addAttribute("page", warehouseListService.page(getStoreId(), wms, isAdmin(), WarehouseListQuery.parse(params, wms), locale));
     }
 
@@ -254,15 +255,25 @@ class WarehouseController {
     private String done(WarehouseBulkAction action, int items, int units, MultiValueMap<String, String> view, Locale locale,
                         RedirectAttributes ra) {
         ra.addFlashAttribute("settingsSavedMessage", msg(locale, "warehouse.bulk." + action.key() + ".done", items, units));
-        return "redirect:" + WarehouseListQuery.parse(view, false).afterAction(action.after()).href();
+        return "redirect:" + postedView(view).afterAction(action.after()).href();
     }
 
     /**
      * The list view the operator acted from (statuses, categories, q, sort, dir, page), which selection-actions.js posts
      * from the address; a refusal returns there and a done action keeps all of it but the status.
      */
-    private static String back(MultiValueMap<String, String> view) {
-        return WarehouseListQuery.parse(view, false).href();
+    private String back(MultiValueMap<String, String> view) {
+        return postedView(view).href();
+    }
+
+    /** Read with the store's WMS flag, as the list reads its address, so a WMS view returns to the same canonical address. */
+    private WarehouseListQuery postedView(MultiValueMap<String, String> view) {
+        return WarehouseListQuery.parse(view, wms());
+    }
+
+    private boolean wms() {
+        Store store = storesRepository.findById(getStoreId());
+        return store != null && store.hasIntegration(IntegrationType.WMS_PROVIDER);
     }
 
     private String msg(Locale locale, String key, Object... args) {

@@ -17,6 +17,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 import java.util.Locale;
@@ -24,6 +27,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +41,8 @@ class WarehouseShippingGuardTest {
     private WarehouseRepository warehouseRepository;
     @Mock
     private DeliveredPredicate deliveredPredicate;
+    @Mock
+    private StoresRepository storesRepository;
     @Spy
     private ResourceBundleMessageSource messageSource = messages();
 
@@ -103,5 +109,25 @@ class WarehouseShippingGuardTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=all&q=rtx");
         assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage")).contains("RTX a").contains("Nic nie zmieniono");
+    }
+
+    @Test
+    void refusalInAWmsStoreReturnsToTheSameCanonicalAddressAsTheListItself() {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(store.hasIntegration(IntegrationType.WMS_PROVIDER)).thenReturn(true);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+            view = controller.initiate(List.of(), listView("statuses", "New", "statuses", "Allocation", "statuses", "Ordered"), PL, ra,
+                    new ConcurrentModel());
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=all");
     }
 }

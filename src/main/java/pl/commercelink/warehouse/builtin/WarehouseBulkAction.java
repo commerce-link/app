@@ -58,7 +58,7 @@ public enum WarehouseBulkAction {
         return items.stream().filter(item -> !allows(item.getStatus())).findFirst();
     }
 
-    /** The "Zmień stan" menu; "Zniszcz" stands alone in the selection row. */
+    /** The "Zmień status" menu; "Zniszcz" stands alone in the selection row. */
     public static List<WarehouseBulkAction> menu() {
         return Arrays.stream(values()).filter(a -> a != DESTROY).toList();
     }
