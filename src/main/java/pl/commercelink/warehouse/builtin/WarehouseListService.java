@@ -30,7 +30,7 @@ import static pl.commercelink.orders.FulfilmentStatus.*;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class WarehouseListService {
 
-    private static final List<DocumentReason> DESTROY_REASONS =
+    static final List<DocumentReason> DESTROY_REASONS =
             List.of(DocumentReason.StockAdjustment, DocumentReason.Destruction, DocumentReason.InternalUse, DocumentReason.Theft);
 
     private final WarehouseRepository repository;

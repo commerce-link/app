@@ -149,16 +149,26 @@ class WarehouseController {
     @PostMapping("/dashboard/warehouse/markAsDestroyed")
     String markAsDestroyed(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
                            @RequestParam(name = "quantities", required = false) List<Integer> quantities,
-                           @RequestParam("reason") DocumentReason reason, @RequestParam("note") String note,
+                           @RequestParam(name = "reason", required = false) String reason,
+                           @RequestParam(name = "note", required = false) String note,
                            Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
         String refused = guard(WarehouseBulkAction.DESTROY, itemIds, quantities, items, locale, ra);
         if (refused != null) return refused;
+        String back = "/dashboard/warehouse?statuses=" + items.get(0).getStatus().name();
+        Optional<DocumentReason> destroyReason = WarehouseListService.DESTROY_REASONS.stream()
+                .filter(r -> r.name().equals(reason)).findFirst();
+        if (destroyReason.isEmpty()) {
+            return refuse(ra, locale, back, "warehouse.error.destroy.reason");
+        }
+        if (note == null || note.isBlank()) {
+            return refuse(ra, locale, back, "warehouse.error.destroy.note");
+        }
         OperationResult<?> result = warehouseInternalIssueService.destroyItems(getStoreId(), toReservationItems(itemIds, quantities),
-                reason, note, CustomSecurityContext.getLoggedInUserName());
+                destroyReason.get(), note.trim(), CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
             ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
-            return "redirect:/dashboard/warehouse?statuses=" + items.get(0).getStatus().name();
+            return "redirect:" + back;
         }
         return done(WarehouseBulkAction.DESTROY, items.size(), sum(quantities), locale, ra);
     }
@@ -199,8 +209,12 @@ class WarehouseController {
         if (itemIds == null || itemIds.isEmpty()) {
             return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.select.at.least.one");
         }
+        // a forged post naming one item twice would merge an item into itself or issue it twice
+        if (new HashSet<>(itemIds).size() != itemIds.size()) {
+            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.duplicate");
+        }
         if (action.needsQuantity() && (quantities == null || quantities.size() != itemIds.size())) {
-            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.select.at.least.one");
+            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.quantities.mismatch");
         }
         for (String id : itemIds) {
             WarehouseItem item = warehouseRepository.findById(getStoreId(), id);

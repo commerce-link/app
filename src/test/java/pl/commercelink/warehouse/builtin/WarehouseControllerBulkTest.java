@@ -48,6 +48,12 @@ class WarehouseControllerBulkTest {
     private WarehouseInternalIssueService warehouseInternalIssueService;
     @Mock
     private DeliveredPredicate deliveredPredicate;
+    @Mock
+    private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Mock
+    private WarehouseGoodsOutService warehouseGoodsOutService;
+    @Mock
+    private WarehouseGoodsInService warehouseGoodsInService;
     @Spy
     private ResourceBundleMessageSource messageSource = messages();
 
@@ -151,7 +157,8 @@ class WarehouseControllerBulkTest {
         asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(1), PL, ra));
 
         // then
-        assertThat(ra.getFlashAttributes()).containsKey("settingsErrorMessage");
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Liczba ilości nie zgadza się z zaznaczonymi pozycjami. Odśwież listę. Nic nie zmieniono.");
         verifyNoInteractions(warehouseInternalReservationService);
     }
 
@@ -191,9 +198,211 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(2), DocumentReason.Theft, "lost", PL, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(2), "Theft", "lost", PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Zniszczono 2 szt. w 1 poz. (RW).");
+    }
+
+    @Test
+    void releaseWithTheSameItemTwiceIsRefusedWithoutTouchingStock() throws Exception {
+        // given
+        stored("a", Reserved, 2);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsAvailable(List.of("a", "a"), List.of(1, 1), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Ta sama pozycja jest zaznaczona dwa razy. Odśwież listę. Nic nie zmieniono.");
+        verifyNoInteractions(warehouseInternalReservationService);
+    }
+
+    @Test
+    void destroyWithTheSameItemTwiceIsRefusedWithoutAnyDocument() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        asStore(() -> controller.markAsDestroyed(List.of("a", "b", "a"), List.of(1, 1, 1), "Theft", "lost", PL, ra));
+
+        // then
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Ta sama pozycja jest zaznaczona dwa razy. Odśwież listę. Nic nie zmieniono.");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void allocationWithTheSameItemTwiceIsRefusedInEnglish() throws Exception {
+        // given
+        stored("a", FulfilmentStatus.New, 1);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        asStore(() -> controller.markAsInAllocation(List.of("a", "a"), Locale.ENGLISH, ra));
+
+        // then
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("The same item is selected twice. Refresh the list. Nothing changed.");
+        verifyNoInteractions(warehouseAllocationsManager);
+    }
+
+    @Test
+    void destroyWithoutReasonIsRefusedWithNothingChanged() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), null, "lost", PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Wybierz powód zniszczenia z listy. Nic nie zmieniono.");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void destroyWithReasonOutsideTheDestroyListIsRefused() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), DocumentReason.SupplierDelivery.name(), "lost", PL, ra));
+
+        // then
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Wybierz powód zniszczenia z listy. Nic nie zmieniono.");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void destroyWithUnknownReasonIsRefusedInsteadOfBadRequest() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Garbage", "lost", Locale.ENGLISH, ra));
+
+        // then
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Choose a reason for destroying from the list. Nothing changed.");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void destroyWithBlankNoteIsRefused() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", "   ", PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("Opisz, co się stało — notatka jest wymagana. Nic nie zmieniono.");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void destroyWithoutNoteIsRefused() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", null, PL, ra));
+
+        // then
+        assertThat(ra.getFlashAttributes()).containsKey("settingsErrorMessage");
+        verifyNoInteractions(warehouseInternalIssueService);
+    }
+
+    @Test
+    void releaseSucceedsAndRedirectsToStock() throws Exception {
+        // given
+        stored("a", Reserved, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsAvailable(List.of("a"), List.of(2), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Przywrócono na stan 2 szt. w 1 poz.");
+        verify(warehouseInternalReservationService).remove(any(Reservation.class));
+    }
+
+    @Test
+    void rmaSucceedsAndRedirectsToClaims() throws Exception {
+        // given
+        stored("a", Delivered, 1);
+        stored("b", Reserved, 2);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsInRMA(List.of("a", "b"), List.of(1, 2), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
+        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Zgłoszono do reklamacji 3 szt. w 2 poz.");
+        verify(warehouseInternalReservationService).create(any(Reservation.class));
+    }
+
+    @Test
+    void allocationSucceedsAndRedirectsToAllocation() throws Exception {
+        // given
+        stored("a", FulfilmentStatus.New, 1);
+        stored("b", FulfilmentStatus.New, 1);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsInAllocation(List.of("a", "b"), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Allocation");
+        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Skierowano do alokacji 2 poz.");
+        verify(warehouseAllocationsManager).schedule("store-1", List.of("a", "b"));
+    }
+
+    @Test
+    void externalServiceSucceedsAndRedirectsToExternalService() throws Exception {
+        // given
+        stored("a", InRMA, 1);
+        when(deliveredPredicate.isFromSameSource(eq("store-1"), anyList())).thenReturn(true);
+        when(warehouseGoodsOutService.issueGoodsOutForExternalService("store-1", List.of("a"), "operator"))
+                .thenReturn(OperationResult.success());
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsInExternalService(List.of("a"), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InExternalService");
+        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Wydano do serwisu 1 poz. (WZ).");
+    }
+
+    @Test
+    void receivedFromExternalServiceSucceedsAndRedirectsToStock() throws Exception {
+        // given
+        stored("a", FulfilmentStatus.InExternalService, 1);
+        when(warehouseGoodsInService.receiveFromExternalService("store-1", List.of("a"), "operator"))
+                .thenReturn(OperationResult.success());
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsReceivedFromExternalService(List.of("a"), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Przyjęto z serwisu 1 poz. (PZ).");
     }
 }
