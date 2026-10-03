@@ -58,7 +58,7 @@ class OffersListRenderingTest {
         // then
         assertThat(html).contains("class=\"cl-table is-orders is-offers\"")
                 .contains("<a class=\"cl-row-link cl-cell-name\" href=\"/dashboard/offer/o1\" title=\"Stacje CAD\">Stacje CAD</a>")
-                .contains("Biuro Lis s.c.").contains("biuro@lis.pl").contains("Jan Kowalski")
+                .contains("<span class=\"cl-cell-client\" title=\"Biuro Lis s.c.\">Biuro Lis s.c.</span>").contains("biuro@lis.pl").contains("Jan Kowalski")
                 .contains("cl-status is-warn").contains("jutro, 04.10").contains("48 960,00 PLN")
                 .contains("data-cl-copy=\"https://app.example/store/s/client/offer/o1\"")
                 .contains("action=\"/dashboard/offer/o1/copy\"").contains("action=\"/dashboard/offer/o1/copy?withContact=true\"")

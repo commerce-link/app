@@ -77,4 +77,22 @@ class OffersListStylesContractTest {
         // then
         assertThat(js).contains("closest('button[data-cl-copy]')");
     }
+
+    @Test
+    void clientNameStaysOnOneLineOnlyBetweenTheRailAndTheFullSidebar() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then
+        assertThat(css).contains("""
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-cell-client {
+        display: block;
+        max-width: 22ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}""");
+    }
 }

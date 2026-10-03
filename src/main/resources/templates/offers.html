@@ -163,7 +163,7 @@
                         </th>
                         <td th:attr="data-label=#{offers.list.column.client}">
                             <th:block th:if="${row.client() != null}">
-                                <span class="cl-cell-client" th:text="${row.client()}"></span>
+                                <span class="cl-cell-client" th:text="${row.client()}" th:title="${row.client()}"></span>
                                 <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
                             </th:block>
                             <span class="cl-cell-client cl-table-sub" th:unless="${row.client() != null}" th:text="#{offers.list.client.none}"></span>
@@ -273,7 +273,7 @@
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.basket}">
                             <a class="cl-row-link" th:href="@{${row.href()}}"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span></a>
                         </th>
-                        <td th:attr="data-label=#{offers.list.column.client}"><span class="cl-cell-client" th:text="${row.client()}"></span></td>
+                        <td th:attr="data-label=#{offers.list.column.client}"><span class="cl-cell-client" th:text="${row.client()}" th:title="${row.client()}"></span></td>
                         <td th:attr="data-label=#{offers.list.column.createdM}"><span class="cl-cell-date" th:text="${row.created()}"></span></td>
                         <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-cell-count" th:text="${row.itemsCount()}"></span><span class="cl-cell-count-text" th:text="${row.itemsText()}"></span></td>
                         <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}"><span class="cl-cell-amount" th:text="${row.gross()}"></span></td>

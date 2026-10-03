@@ -8688,6 +8688,19 @@ a.cl-link-button:hover {
     }
 }
 
+/* In the same range the client name ("Firma Testowa 1 sp. z o.o.") wrapped to two lines and made most rows 84 px instead
+   of ~63 px. It stays on one line and ends in an ellipsis (the full name is in title); the cap, like the name's 26ch,
+   keeps one long name from widening the column on every row. The phone card and 1216 px up keep their wrapping. */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-cell-client {
+        display: block;
+        max-width: 22ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
 /* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. The note and the
    menu share the fifth line explicitly (auto-placement put the menu's 44 px box under the note's text). The menu keeps
    its 44 px target, and the negative margin gives the growth back to the line above and the card padding, as the chip
