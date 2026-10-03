@@ -1,5 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -57,6 +59,13 @@ class WarehouseShippingGuardTest {
         return item;
     }
 
+    /** The list view the operator acted from, posted by selection-actions.js with the selection. */
+    private static MultiValueMap<String, String> listView(String... pairs) {
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        for (int i = 0; i < pairs.length; i += 2) params.add(pairs[i], pairs[i + 1]);
+        return params;
+    }
+
     @Test
     void itemsFromTwoSourcesAreSentBackToTheListWithAPolishMessage() {
         // given
@@ -69,11 +78,12 @@ class WarehouseShippingGuardTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
-            view = controller.initiate(List.of("a", "b"), PL, ra, new ConcurrentModel());
+            view = controller.initiate(List.of("a", "b"), listView("statuses", "InRMA", "categories", "GPU", "q", "rtx"), PL, ra,
+                    new ConcurrentModel());
         }
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA&categories=GPU&q=rtx");
         assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage")).startsWith("Zaznaczone pozycje muszą pochodzić");
     }
 
@@ -87,11 +97,11 @@ class WarehouseShippingGuardTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
-            view = controller.initiate(List.of("a"), PL, ra, new ConcurrentModel());
+            view = controller.initiate(List.of("a"), listView("statuses", "all", "q", "rtx"), PL, ra, new ConcurrentModel());
         }
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=all&q=rtx");
         assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage")).contains("RTX a").contains("Nic nie zmieniono");
     }
 }

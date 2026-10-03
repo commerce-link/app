@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,15 +39,18 @@ public class WarehouseShippingController extends AbstractShippingController {
 
     @PostMapping("")
     public String initiate(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
-                           Locale locale, RedirectAttributes ra, Model model) {
+                           @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra,
+                           Model model) {
+        // a refusal returns to the list view the operator acted from, posted by selection-actions.js
+        String back = WarehouseListQuery.parse(view, false).href();
         if (itemIds == null || itemIds.isEmpty()) {
-            return refuse(ra, "/dashboard/warehouse", locale, "warehouse.error.select.at.least.one");
+            return refuse(ra, back, locale, "warehouse.error.select.at.least.one");
         }
         List<WarehouseItem> warehouseItems = itemIds.stream()
                 .map(id -> warehouseRepository.findById(getStoreId(), id))
                 .toList();
         if (warehouseItems.contains(null)) {
-            return refuse(ra, "/dashboard/warehouse", locale, "warehouse.error.not.found");
+            return refuse(ra, back, locale, "warehouse.error.not.found");
         }
 
         Optional<WarehouseItem> refused = WarehouseBulkAction.SHIP.firstRefused(warehouseItems);
@@ -55,7 +59,7 @@ public class WarehouseShippingController extends AbstractShippingController {
             String allowed = WarehouseBulkAction.SHIP.allowed().stream()
                     .map(s -> messageSource.getMessage(WarehouseStatuses.labelKey(s), null, locale))
                     .collect(Collectors.joining(", "));
-            return refuse(ra, "/dashboard/warehouse?statuses=" + warehouseItems.get(0).getStatus().name(), locale, "warehouse.error.status",
+            return refuse(ra, back, locale, "warehouse.error.status",
                     item.getName(),
                     messageSource.getMessage(WarehouseStatuses.labelKey(item.getStatus()), null, locale),
                     messageSource.getMessage("warehouse.bulk.ship.label", null, locale),
@@ -63,7 +67,7 @@ public class WarehouseShippingController extends AbstractShippingController {
         }
 
         if (!deliveredPredicate.isFromSameSource(getStoreId(), warehouseItems)) {
-            return refuse(ra, "/dashboard/warehouse?statuses=InRMA", locale, "warehouse.error.same.source");
+            return refuse(ra, back, locale, "warehouse.error.same.source");
         }
 
         ShippingForm shippingForm = new ShippingForm(null, "warehouse");
