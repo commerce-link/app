@@ -195,11 +195,14 @@
                                 <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
                             </th>
                             <td class="is-hyphenated" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
-                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}" th:text="${row.qty()}"></td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}">
+                                <span class="cl-cards-hide" th:text="${row.qty()}"></span>
+                                <span class="cl-cards-only cl-card-figures" th:text="#{warehouse.row.card.figures(${row.qty()}, ${row.costNet()})}"></span>
+                            </td>
                             <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.cost}">
                                 <span class="cl-cell-stack">
-                                    <span th:text="${row.costNet()}"></span>
-                                    <span class="cl-table-sub" th:text="${row.costGross()}"></span>
+                                    <span class="cl-cards-hide" th:text="${row.costNet()}"></span>
+                                    <span class="cl-table-sub cl-cards-hide" th:text="${row.costGross()}"></span>
                                     <span class="cl-table-pills" th:if="${row.systemCost() != null}"><span class="cl-status is-info" th:title="${row.systemCostTitle()}" th:text="${row.systemCost()}"></span></span>
                                 </span>
                             </td>

@@ -98,4 +98,11 @@ class WarehouseIntroTextTest {
         assertThat(text("warehouse.row.code.next", "pl")).isEqualTo("· {0}");
         assertThat(text("warehouse.row.code.next", "en")).isEqualTo("· {0}");
     }
+
+    @Test
+    void phoneCardFiguresSayQuantityTimesNetUnitCost() {
+        // when / then
+        assertThat(text("warehouse.row.card.figures", "pl")).isEqualTo("{0} szt. × {1} netto");
+        assertThat(text("warehouse.row.card.figures", "en")).isEqualTo("{0} pcs × {1} net");
+    }
 }

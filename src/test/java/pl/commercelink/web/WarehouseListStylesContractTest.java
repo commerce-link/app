@@ -123,4 +123,20 @@ class WarehouseListStylesContractTest {
                 .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: nowrap; }");
         assertThat(section).contains("-webkit-line-clamp: 2;").doesNotContain(".cl-table-code { white-space: normal; }");
     }
+
+    @Test
+    void phoneCardIsACompactGridWithoutColumnLabels() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // like the orders card A: the cells give their parts to one grid (display: contents) and drop their labels;
+        // name and codes, then "3 szt. × cost" with the status pill, then category and delivery in one muted line
+        String phone = section.substring(section.indexOf("/* phone card"));
+        assertThat(phone).contains(".cl-page .cl-table.is-warehouse tbody tr { display: grid;")
+                .contains("tbody :is(th.cl-table-key, td:not(.cl-table-check)) { display: contents; }")
+                .contains("tbody :is(th, td)::before { content: none; }")
+                .contains(".cl-page .cl-table.is-warehouse .cl-cards-hide { display: none; }");
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-cards-only { display: none; }");
+    }
 }

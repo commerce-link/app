@@ -436,4 +436,19 @@ class WarehouseListRenderingTest {
         assertThat(html).containsPattern("<span class=\"cl-table-sub\"><span class=\"cl-table-code\" title=\"EAN 590\">EAN 590</span> "
                 + "<span class=\"cl-table-code\" title=\"GV-1\">· GV-1</span> </span>");
     }
+
+    @Test
+    void phoneCardReadsQuantityTimesUnitCostAsOneLineWhileTheTableKeepsItsColumns() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        // the card line ("3 pcs × 1 243,00 net") replaces the bare number and the net cost there; the table hides it
+        assertThat(html).containsPattern("<td class=\"is-numeric\" data-label=\"Qty\">\\s*<span class=\"cl-cards-hide\">3</span>\\s*"
+                + "<span class=\"cl-cards-only cl-card-figures\">3 pcs × 1 243,00 net</span>\\s*</td>");
+        assertThat(html).containsPattern("<span class=\"cl-cards-hide\">1 243,00</span>\\s*<span class=\"cl-table-sub cl-cards-hide\">gross 1 528,89</span>");
+    }
 }

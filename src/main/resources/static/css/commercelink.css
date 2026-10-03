@@ -8590,6 +8590,8 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-warehouse .cl-table-pills { max-width: 100%; }
 .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { max-width: 100%; }
 .cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; }
+/* the phone card's own line ("3 szt. × 1 243,00 netto") stands in for the quantity and net cost columns there */
+.cl-page .cl-table.is-warehouse .cl-cards-only { display: none; }
 /* the comment shows two lines; the whole of it is on the item page (the name links there) and in the title */
 .cl-page .cl-table.is-warehouse .cl-table-note {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: none; white-space: normal;
@@ -8615,6 +8617,29 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
     .cl-page .cl-table.is-warehouse .cl-table-code { overflow-wrap: anywhere; }
     .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
+
+    /* phone card (B3): like the orders card A, the cells give their parts to one grid of the row and drop their labels
+       (the labels stay in data-label): name, codes, condition and comment across the card; "3 szt. × 1 243,00 netto"
+       with the status pill on the right; the system cost; category and delivery with its supplier as one muted line.
+       The checkbox keeps its corner, the lines start level with the name; the right column (pill, delivery) takes at most
+       45 %, so a long delivery line wraps itself instead of the figures. */
+    .cl-page .cl-table.is-warehouse tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) fit-content(45%); column-gap: 10px; row-gap: 2px; align-items: center; padding: 12px 16px 12px 60px; }
+    .cl-page .cl-table.is-warehouse[data-cl-select-table] tbody :is(th.cl-table-key, td:not(.cl-table-check)) { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody :is(th, td)::before { content: none; }
+    .cl-page .cl-table.is-warehouse .cl-cards-hide { display: none; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > * { grid-column: 1 / -1; order: 1; margin-top: 0; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > a { font-weight: 600; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-card-figures { display: block; grid-column: 1; order: 2; font-variant-numeric: tabular-nums; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-status { grid-column: 2; justify-self: end; order: 2; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-cell-stack { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-table-pills { grid-column: 1 / -1; order: 3; justify-self: start; }
+    .cl-page .cl-table.is-warehouse tbody td.is-hyphenated > span { grid-column: 1; justify-self: start; order: 4; font-size: 12.5px; color: var(--cl-ink-2); }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack {
+        grid-column: 2; justify-self: end; order: 4; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; column-gap: 6px;
+        font-size: 12.5px; color: var(--cl-ink-2); text-align: right;
+    }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack > .cl-muted { display: none; }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-table-sub { margin: 0; }
 }
 /* the quantity dialog is narrow: its name / quantity table stays a two-column table on phones instead of the cards */
 @media screen and (max-width: 719px) {
