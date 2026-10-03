@@ -22,8 +22,6 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
-import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockPriceCategory;
 import pl.commercelink.warehouse.RestockScope;
@@ -272,8 +270,7 @@ class WarehouseController {
     }
 
     private boolean wms() {
-        Store store = storesRepository.findById(getStoreId());
-        return store != null && store.hasIntegration(IntegrationType.WMS_PROVIDER);
+        return WarehouseListQuery.usesWms(storesRepository.findById(getStoreId()));
     }
 
     private String msg(Locale locale, String key, Object... args) {

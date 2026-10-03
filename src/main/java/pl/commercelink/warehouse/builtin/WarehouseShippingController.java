@@ -15,7 +15,6 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.util.List;
@@ -46,8 +45,7 @@ public class WarehouseShippingController extends AbstractShippingController {
         // a refusal returns to the list view the operator acted from, posted by selection-actions.js, read with the
         // store's WMS flag as the list reads its address
         Store store = getStore();
-        boolean wms = store != null && store.hasIntegration(IntegrationType.WMS_PROVIDER);
-        String back = WarehouseListQuery.parse(view, wms).href();
+        String back = WarehouseListQuery.parse(view, store).href();
         if (itemIds == null || itemIds.isEmpty()) {
             return refuse(ra, back, locale, "warehouse.error.select.at.least.one");
         }

@@ -2,10 +2,14 @@ package pl.commercelink.warehouse.builtin;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.util.LinkedMultiValueMap;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static pl.commercelink.orders.FulfilmentStatus.*;
 
 class WarehouseListQueryTest {
@@ -32,6 +36,21 @@ class WarehouseListQueryTest {
         assertThat(external.statuses()).containsExactly(Ordered);
         assertThat(own.href()).isEqualTo("/dashboard/warehouse");
         assertThat(own.isFiltered()).isFalse();
+    }
+
+    @Test
+    void theStoreDecidesTheWmsFlagOneWayForEveryController() {
+        // given
+        Store withWms = mock(Store.class);
+        when(withWms.hasIntegration(IntegrationType.WMS_PROVIDER)).thenReturn(true);
+        Store withoutWms = mock(Store.class);
+
+        // when / then
+        assertThat(WarehouseListQuery.usesWms(withWms)).isTrue();
+        assertThat(WarehouseListQuery.usesWms(withoutWms)).isFalse();
+        assertThat(WarehouseListQuery.usesWms(null)).isFalse();
+        assertThat(WarehouseListQuery.parse(params(), withWms)).isEqualTo(WarehouseListQuery.parse(params(), true));
+        assertThat(WarehouseListQuery.parse(params(), withoutWms)).isEqualTo(WarehouseListQuery.parse(params(), false));
     }
 
     @Test

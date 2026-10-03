@@ -3,6 +3,8 @@ package pl.commercelink.warehouse.builtin;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.MultiValueMap;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.Categories;
 
 import java.net.URLEncoder;
@@ -52,6 +54,16 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
         public String param() { return name().toLowerCase(Locale.ROOT); }
         static Optional<Direction> parse(String v) { return Arrays.stream(values()).filter(d -> d.name().equalsIgnoreCase(trim(v))).findFirst(); }
         Direction flipped() { return this == ASC ? DESC : ASC; }
+    }
+
+    /** A store with an external WMS opens on "to receive" instead of "in stock"; no store reads as no WMS. */
+    public static boolean usesWms(Store store) {
+        return store != null && store.hasIntegration(IntegrationType.WMS_PROVIDER);
+    }
+
+    /** The list view these parameters address in this store, as the list itself reads them. */
+    public static WarehouseListQuery parse(MultiValueMap<String, String> params, Store store) {
+        return parse(params, usesWms(store));
     }
 
     public static WarehouseListQuery parse(MultiValueMap<String, String> params, boolean wms) {
