@@ -86,6 +86,9 @@ class WarehouseController {
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
         addListPage(model, params, locale);
+        if (isAdmin()) {
+            model.addAttribute("restock", restockForm(null, null));
+        }
         return "warehouse";
     }
 
@@ -98,9 +101,6 @@ class WarehouseController {
     private void addListPage(Model model, MultiValueMap<String, String> params, Locale locale) {
         boolean wms = storesRepository.findById(getStoreId()).hasIntegration(IntegrationType.WMS_PROVIDER);
         model.addAttribute("page", warehouseListService.page(getStoreId(), wms, isAdmin(), WarehouseListQuery.parse(params, wms), locale));
-        if (isAdmin()) {
-            model.addAttribute("restock", restockForm(null, null));
-        }
     }
 
     @PostMapping("/dashboard/warehouse/markAsReserved")
@@ -300,12 +300,13 @@ class WarehouseController {
 
     private RestockForm restockForm(String selectedCatalogId, String error) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId()).stream()
-                .sorted(Comparator.comparing(ProductCatalog::getName))
+                .sorted(Comparator.comparing(ProductCatalog::getName, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
         Map<String, List<Map<String, String>>> categoriesByCatalog = catalogs.stream()
                 .collect(Collectors.toMap(
                         ProductCatalog::getCatalogId,
                         catalog -> catalog.getCategories().stream()
+                                .filter(category -> category.getCategoryId() != null && category.getName() != null)
                                 .map(category -> Map.of("id", category.getCategoryId(), "name", category.getName()))
                                 .collect(Collectors.toList())));
         return new RestockForm(catalogs, categoriesByCatalog, selectedCatalogId, error);

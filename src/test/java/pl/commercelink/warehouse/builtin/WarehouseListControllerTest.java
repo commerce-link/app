@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -125,6 +126,48 @@ class WarehouseListControllerTest {
 
             // then
             assertThat(model.containsAttribute("restock")).isFalse();
+        }
+    }
+
+    @Test
+    void fragmentEndpointDoesNotQueryCatalogsNorExposeTheRestockForm() {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ExtendedModelMap model = new ExtendedModelMap();
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
+
+            // when
+            warehouseController.warehouseList(new LinkedMultiValueMap<>(), Locale.ENGLISH, model);
+
+            // then
+            assertThat(model.containsAttribute("restock")).isFalse();
+            verifyNoInteractions(productCatalogRepository);
+        }
+    }
+
+    @Test
+    void restockFormToleratesCatalogsAndCategoriesWithoutNames() {
+        // given
+        Store store = mock(Store.class);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ProductCatalog unnamed = catalog("c3", null, List.of(category("k2", null), category(null, "No id"), category("k3", "CPU")));
+        ProductCatalog named = catalog("c1", "Komputery", List.of());
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of(unnamed, named));
+        ExtendedModelMap model = new ExtendedModelMap();
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
+
+            // when
+            warehouseController.warehouseItems(new LinkedMultiValueMap<>(), Locale.ENGLISH, model);
+
+            // then
+            RestockForm restock = (RestockForm) model.getAttribute("restock");
+            assertThat(restock.catalogs()).containsExactly(named, unnamed);
+            assertThat(restock.categoriesByCatalog().get("c3")).containsExactly(java.util.Map.of("id", "k3", "name", "CPU"));
         }
     }
 

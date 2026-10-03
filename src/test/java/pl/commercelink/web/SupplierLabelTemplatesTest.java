@@ -46,12 +46,12 @@ class SupplierLabelTemplatesTest {
     @Test
     void orderAndRmaFiltersUseSelectsOfConnections() throws Exception {
         // when / then
-        assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
+        assertThat(template("fragments/supplier-choice.html")).contains(": 'supplier'")
                 .contains("th:each=\"option : ${options}\"")
                 // "other supplier" reveals a text field for a supplier that is not connected to the store;
                 // the option value is a literal (Thymeleaf 3.1 forbids T() here), so keep it in sync with the constant
                 .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("data-cl-custom-option=\"" + SupplierChoice.CUSTOM + "\"")
                 .contains("name=\"customSupplier\"")
                 .contains("order.item.supplier.custom.hint");
         // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall

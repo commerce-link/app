@@ -21,7 +21,7 @@ class WarehouseItemAddFormTest {
     void acceptsPolishNumbersAndConvertsGross() {
         // given
         WarehouseItemAddForm net = form("X1", "1 243,50", "net", "2", "New");
-        WarehouseItemAddForm nbsp = form("X1", "1 243,50", "net", "2", "New");
+        WarehouseItemAddForm nbsp = form("X1", "1\u00a0243,50", "net", "2", "New");
         WarehouseItemAddForm gross = form("X1", "123", "gross", "1", "Allocation");
 
         // when / then

@@ -116,26 +116,6 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
     }
 
-    Set<String> findAllCategories(String storeId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId")
-                .withExpressionAttributeValues(eav)
-                .withProjectionExpression("category");
-
-        List<WarehouseItem> items = dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
-
-        Set<String> categories = new HashSet<>();
-        for (WarehouseItem item : items) {
-            if (item.getCategory() != null) {
-                categories.add(item.getCategory());
-            }
-        }
-        return categories;
-    }
-
     WarehouseItem findBySerialNo(String storeId, String serialNo) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
