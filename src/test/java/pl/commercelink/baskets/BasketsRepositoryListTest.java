@@ -144,6 +144,33 @@ class BasketsRepositoryListTest {
     }
 
     @Test
+    void textWithASingleExpiringValueKeepsEachClauseWrappedOnce() {
+        // given
+        indexReturns(List.of());
+
+        // when
+        repository.findForList("store-1", new OfferListCriteria(BasketType.Offer, "CAD",
+                EnumSet.of(OfferValidity.EXPIRING), null, null, NOW), 1, 25);
+
+        // then
+        assertThat(capturedQuery().getFilterExpression()).isEqualTo("#type = :type AND (contains(#name, :q) OR begins_with(basketId, :q))"
+                + " AND (expiresAt >= :now AND expiresAt <= :soon)");
+    }
+
+    @Test
+    void singleActiveValueNeedsNoParentheses() {
+        // given
+        indexReturns(List.of());
+
+        // when
+        repository.findForList("store-1", new OfferListCriteria(BasketType.Offer, null,
+                EnumSet.of(OfferValidity.ACTIVE), null, null, NOW), 1, 25);
+
+        // then
+        assertThat(capturedQuery().getFilterExpression()).isEqualTo("#type = :type AND expiresAt > :soon");
+    }
+
+    @Test
     void activeAndExpiredUseTheSameBoundaries() {
         // given
         indexReturns(List.of());

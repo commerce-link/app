@@ -1,8 +1,10 @@
 package pl.commercelink.web.offers;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import pl.commercelink.baskets.Basket;
+import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.baskets.OfferValidity;
 import pl.commercelink.stores.Store;
@@ -20,6 +22,7 @@ import java.util.Locale;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 /** One basket as a row of the offers list (spec §3.3), texts resolved; same number and date formats as the deliveries list. */
+@Slf4j
 public class OfferRowMapper {
 
     private static final DateTimeFormatter SAME_YEAR = DateTimeFormatter.ofPattern("dd.MM");
@@ -88,7 +91,10 @@ public class OfferRowMapper {
 
     private String name(Basket basket) {
         String name = StringUtils.trimToNull(basket.getName());
-        return name != null ? name : text("offers.list.untitled", basket.getShortenedBasketId());
+        if (name != null) {
+            return name;
+        }
+        return text(basket.hasType(BasketType.OfferTemplate) ? "offers.list.untitledTemplate" : "offers.list.untitled", basket.getShortenedBasketId());
     }
 
     private static String client(ContactDetails contact) {
@@ -113,6 +119,8 @@ public class OfferRowMapper {
             delivery = store == null || store.getCheckoutConfiguration() == null ? 0.0 : basket.getDeliveryPrice(store);
         } catch (RuntimeException e) {
             // a removed or unknown delivery option must not take the whole list down
+            log.warn("Delivery price of basket {} (store {}, delivery option {}) skipped in the offers list: {}",
+                    basket.getBasketId(), basket.getStoreId(), basket.getDeliveryOptionId(), e.toString());
             delivery = 0.0;
         }
         return basket.getTotalPrice() + delivery;

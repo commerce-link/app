@@ -8,6 +8,7 @@ import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDateTime;
@@ -178,6 +179,34 @@ class OfferRowMapperTest {
 
         // then
         assertThat(row.gross()).isEqualTo("2 460,00 PLN");
+    }
+
+    @Test
+    void valueSkipsADeliveryOptionRemovedFromAnExistingCheckoutConfiguration() {
+        // given — the checkout configuration exists but findDeliveryOption throws for the basket's option
+        Basket basket = offer();
+        basket.setDeliveryOptionId("removed-courier");
+        CheckoutConfiguration checkout = mock(CheckoutConfiguration.class);
+        when(checkout.findDeliveryOption("removed-courier")).thenThrow(new IllegalArgumentException("Delivery option not found: removed-courier"));
+        Store store = mock(Store.class);
+        when(store.getCheckoutConfiguration()).thenReturn(checkout);
+
+        // when
+        OfferListPage.OfferRow row = mapper(store).offer(basket);
+
+        // then
+        assertThat(row.gross()).isEqualTo("2 460,00 PLN");
+    }
+
+    @Test
+    void unnamedTemplateUsesTheTemplateWording() {
+        // given
+        Basket template = offer();
+        template.setType(BasketType.OfferTemplate);
+        template.setName(null);
+
+        // when / then
+        assertThat(mapper(storeWithoutCheckout()).template(template).name()).isEqualTo("Szablon 8f3a21c7");
     }
 
     @Test

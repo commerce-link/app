@@ -95,6 +95,44 @@ class OfferDeleteTest {
         assertThat(redirect.getFlashAttributes().get("offerNotice")).isEqualTo("offers.template.deleted[Stacje CAD]");
     }
 
+    private Basket unnamed(BasketType type) {
+        Basket basket = stored(type);
+        basket.setBasketId("offer-1");
+        basket.setName(" ");
+        return basket;
+    }
+
+    @Test
+    void unnamedOfferIsNamedLikeInTheListInTheNoticeAndOnTheConfirmPage() {
+        // given
+        unnamed(BasketType.Offer);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.deleteOffer("offer-1", null, redirect, PL);
+        controller.confirmDeleteOffer("offer-1", null, model, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("offerNotice")).isEqualTo("offers.deleted[offers.list.untitled[offer-1]]");
+        assertThat(((ConfirmAction) model.get("confirm")).title())
+                .isEqualTo("offers.delete.confirm.title[offers.list.untitled[offer-1]]");
+    }
+
+    @Test
+    void unnamedTemplateUsesTheTemplateWording() {
+        // given
+        unnamed(BasketType.OfferTemplate);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.deleteOffer("offer-1", null, redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("offerNotice"))
+                .isEqualTo("offers.template.deleted[offers.list.untitledTemplate[offer-1]]");
+    }
+
     @Test
     void returnToOutsideTheOffersListFallsBack() {
         // when / then
@@ -104,6 +142,8 @@ class OfferDeleteTest {
         assertThat(OfferController.safeReturnTo("/dashboard/orders")).isEqualTo("/dashboard/offers");
         assertThat(OfferController.safeReturnTo("/dashboard/offers\r\nSet-Cookie: x")).isEqualTo("/dashboard/offers");
         assertThat(OfferController.safeReturnTo("/dashboard/offersX")).isEqualTo("/dashboard/offers");
+        assertThat(OfferController.safeReturnTo("/dashboard/offers?q={x}")).isEqualTo("/dashboard/offers");
+        assertThat(OfferController.safeReturnTo("/dashboard/offers?q=%7Bx%7D}")).isEqualTo("/dashboard/offers");
         assertThat(OfferController.safeReturnTo("/dashboard/offers?segment=templates")).isEqualTo("/dashboard/offers?segment=templates");
     }
 

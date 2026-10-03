@@ -123,6 +123,18 @@ class OfferListServiceTest {
     }
 
     @Test
+    void pastedUpperCaseFullIdIsLookedUpAsStored() {
+        // given
+        when(baskets.findById("store-1", TEMPLATE_ID)).thenReturn(Optional.of(template()));
+
+        // when
+        OfferListPage page = service.page("store-1", query("q", TEMPLATE_ID.toUpperCase()), NOW, PL);
+
+        // then
+        assertThat(page.templates()).extracting(OfferListPage.TemplateRow::name).containsExactly("Szablon CAD");
+    }
+
+    @Test
     void fullIdOfAnotherStoreFallsBackToTextSearch() {
         // given
         when(baskets.findById("store-1", TEMPLATE_ID)).thenReturn(Optional.empty());

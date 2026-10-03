@@ -128,4 +128,13 @@ class OffersListRenderingTest {
                 .contains("/js/list-page.js").contains("/js/menu.js").contains("/js/confirm-dialog.js").contains("/js/copy-field.js")
                 .doesNotContain("??");
     }
+
+    @Test
+    void templateSourceHasNoInlineHandlersOrStyles() throws Exception {
+        // given
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/templates/offers.html"));
+
+        // when / then
+        assertThat(source).doesNotContain("onclick").doesNotContain(" style=");
+    }
 }

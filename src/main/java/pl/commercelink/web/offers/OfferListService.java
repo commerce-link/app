@@ -41,7 +41,7 @@ public class OfferListService {
 
         // a pasted full ID opens that record in its own segment, whatever segment and validity were chosen (spec §3.5)
         Optional<Basket> exact = OfferListQuery.looksLikeId(requested.q())
-                ? baskets.findById(storeId, requested.q()) : Optional.empty();
+                ? baskets.findById(storeId, requested.q().toLowerCase(Locale.ROOT)) : Optional.empty();
         if (exact.isPresent()) {
             query = new OfferListQuery(OfferSegment.of(exact.get().getType()), requested.q(), List.of(), null, null, 1);
             rows = List.of(exact.get());

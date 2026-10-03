@@ -210,7 +210,7 @@ public class OfferController {
         Basket offer = deletable(offerId);
         String back = safeReturnTo(returnTo);
         boolean template = offer.hasType(BasketType.OfferTemplate);
-        String name = StringUtils.defaultIfBlank(offer.getName(), offer.getShortenedBasketId());
+        String name = displayName(offer, locale);
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage(template ? "offers.delete.confirm.titleTemplate" : "offers.delete.confirm.title", new Object[]{name}, locale),
                 messageSource.getMessage(template ? "offers.delete.confirm.messageTemplate" : "offers.delete.confirm.message", null, locale),
@@ -226,10 +226,19 @@ public class OfferController {
                               RedirectAttributes redirectAttributes, Locale locale) {
         Basket offer = deletable(offerId);
         basketsRepository.delete(offer);
-        String name = StringUtils.defaultIfBlank(offer.getName(), offer.getShortenedBasketId());
+        String name = displayName(offer, locale);
         redirectAttributes.addFlashAttribute("offerNotice", messageSource.getMessage(
                 offer.hasType(BasketType.OfferTemplate) ? "offers.template.deleted" : "offers.deleted", new Object[]{name}, locale));
         return "redirect:" + safeReturnTo(returnTo);
+    }
+
+    /** Same fallback as the list rows, so the dialog, the confirm page and the notice name a record alike. */
+    private String displayName(Basket offer, Locale locale) {
+        if (StringUtils.isNotBlank(offer.getName())) {
+            return offer.getName();
+        }
+        String key = offer.hasType(BasketType.OfferTemplate) ? "offers.list.untitledTemplate" : "offers.list.untitled";
+        return messageSource.getMessage(key, new Object[]{offer.getShortenedBasketId()}, locale);
     }
 
     private Basket deletable(String offerId) {
@@ -244,7 +253,9 @@ public class OfferController {
 
     /** Back to the list the delete came from, never to another address (no open redirect, no header injection). */
     static String safeReturnTo(String returnTo) {
-        if (returnTo == null || returnTo.contains("\r") || returnTo.contains("\n")) {
+        if (returnTo == null || returnTo.contains("\r") || returnTo.contains("\n")
+                // RedirectView expands {…} as URI templates, which would fail after the delete already happened
+                || returnTo.contains("{") || returnTo.contains("}")) {
             return LIST_PATH;
         }
         return returnTo.equals(LIST_PATH) || returnTo.startsWith(LIST_PATH + "?") ? returnTo : LIST_PATH;
