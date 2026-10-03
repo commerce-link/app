@@ -2,186 +2,294 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
-<head>
-    <style>
-        .offer-section {
-            padding-top: 20px;
-            padding-bottom: 20px;
-        }
-    </style>
-</head>
 <body>
 
 <div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
 
-    <section class="section">
-        <div class="container">
-
-            <div class="is-flex is-justify-content-flex-end mb-2">
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{offers.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-            </div>
-
-            <div th:replace="~{fragments/screen-intro :: panel('offers', 'fas fa-tags')}"></div>
-
-            <div class="box offer-section">
-                <div class="offer-section">
-                    <form method="get" th:action="@{/dashboard/offers}">
-                        <div class="field">
-                            <label class="label" th:text="#{baskets.id}"></label>
-                            <div class="control">
-                                <input class="input" type="text" name="basketId" th:value="${searchParams.basketId}">
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label" th:text="#{offers.name}"></label>
-                            <div class="control">
-                                <input class="input" type="text" name="name" th:value="${searchParams.name}">
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="label" th:text="#{offers.type}">]</label>
-                            <div class="control">
-                                <div class="select">
-                                    <select name="type">
-                                        <option th:text="#{offers.all}" value=""></option>
-                                        <option th:each="basketType : ${basketTypes}"
-                                                th:value="${basketType.name()}"
-                                                th:text="${basketType.name()}"
-                                                th:selected="${searchParams.type == basketType.name()}">
-                                        </option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="field is-grouped">
-                            <div class="control is-expanded">
-                                <label class="label" th:text="#{offers.created.at.start}"></label>
-                                <input class="input" type="date" name="createdAtStart"
-                                       th:value="${searchParams.createdAtStart}">
-                            </div>
-                            <div class="control is-expanded">
-                                <label class="label" th:text="#{offers.created.at.end}"></label>
-                                <input class="input" type="date" name="createdAtEnd"
-                                       th:value="${searchParams.createdAtEnd}">
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <div class="control">
-                                <button class="button is-link" type="submit" th:text="#{general.search}"></button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="offer-section">
-                    <table class="table is-fullwidth is-striped">
-                        <tr>
-                            <th th:text="#{source.basket.id.label}"></th>
-                            <th th:text="#{offers.type}"></th>
-                            <th th:text="#{catalog.name}"></th>
-                            <th th:text="#{offers.validity}"></th>
-                            <th th:text="#{general.actions}"></th>
-                        </tr>
-                        <tr th:each="offer : ${offers}">
-                            <td class="is-vcentered" style="white-space: nowrap;">
-                                <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
-                                   th:href="@{/dashboard/basket/view/{basketId}(basketId=${offer.basketId})}"
-                                   th:text="${offer.shortenedBasketId}" th:title="${offer.basketId}"></a>
-                                <a th:unless="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
-                                   th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}"
-                                   th:text="${offer.shortenedBasketId}" th:title="${offer.basketId}"></a>
-                                <button th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}"
-                                        type="button" class="button is-small is-white has-text-info ml-1 copy-offer-link cl-tooltip"
-                                        style="cursor: pointer;"
-                                        th:data-copy="${offer.createOfferUrl(backofficeDomain)}"
-                                        th:attr="data-tooltip=#{offers.link.for.client} + ' — ' + #{general.copy}"
-                                        onclick="copyOfferLink(this)">
-                                    <span class="icon is-small"><i class="fas fa-copy"></i></span>
-                                </button>
-                            </td>
-                            <td th:text="${offer.type}"></td>
-                            <td th:text="${offer.name}"></td>
-                            <td th:title="${offer.expiresAt != null ? #temporals.format(offer.expiresAt, 'yyyy-MM-dd HH:mm') : ''}">
-                                <th:block th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Offer}">
-                                    <span th:if="${offer.expired}" class="tag is-danger is-light" th:text="#{offers.expired}"></span>
-                                    <span th:if="${!offer.expired && offer.daysToExpiry > 0}" th:text="#{offers.expires.in.days(${offer.daysToExpiry})}"></span>
-                                    <span th:if="${!offer.expired && offer.daysToExpiry == 0}" class="has-text-warning-dark" th:text="#{offers.expires.in.hours(${offer.hoursToExpiry})}"></span>
-                                </th:block>
-                            </td>
-                            <td>
-                                <div class="buttons">
-                                    <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).OfferTemplate}"
-                                       class="button is-small is-info"
-                                       th:href="@{/dashboard/offer/new(intent='template',sourceId=${offer.basketId})}"
-                                       th:text="#{offers.manual.button}">
-                                    </a>
-
-                                    <th:block th:if="${offer.type != T(pl.commercelink.baskets.BasketType).Basket}">
-                                        <a class="button is-small is-info"
-                                           th:href="@{/dashboard/offer/{offerId}(offerId=${offer.basketId})}"
-                                           th:text="#{general.edit}"></a>
-                                        <form th:action="@{/dashboard/offer/{offerId}/delete(offerId=${offer.basketId})}"
-                                              method="post" style="display:inline;">
-                                            <button type="button" class="button is-small is-danger"
-                                                    onclick="confirmDelete(this)" th:text="#{general.delete}"></button>
-                                        </form>
-                                    </th:block>
-
-                                    <a th:if="${offer.type == T(pl.commercelink.baskets.BasketType).Basket}"
-                                       class="button is-small is-info"
-                                       th:href="@{/dashboard/basket/view/{basketId}(basketId=${offer.basketId})}"
-                                       th:text="#{general.view}">
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-
-                    <div th:replace="~{fragments/pagination :: pagination('/dashboard/offers', ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
-
+                <!--/* One main action with three ways to start (spec D3); a native details opens without JavaScript. */-->
+                <div class="cl-page-actions">
+                    <details class="cl-menu">
+                        <summary class="cl-button is-primary">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                            <span th:text="#{offers.list.new}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list" id="new-offer-menu">
+                            <li><a class="cl-menu-item" th:href="@{/dashboard/offer/new(intent='manual')}">
+                                <span th:text="#{offers.list.new.manual}"></span>
+                                <span class="cl-menu-desc" th:text="#{offers.list.new.manual.desc}"></span></a></li>
+                            <li><a class="cl-menu-item" th:href="@{/dashboard/offers(segment='templates')}">
+                                <span th:text="#{offers.list.new.template}"></span>
+                                <span class="cl-menu-desc" th:text="#{offers.list.new.template.desc}"></span></a></li>
+                            <li><a class="cl-menu-item" th:href="@{/dashboard/offer/new/csv}">
+                                <span th:text="#{offers.list.new.csv}"></span>
+                                <span class="cl-menu-desc" th:text="#{offers.list.new.csv.desc}"></span></a></li>
+                        </ul>
+                    </details>
                 </div>
             </div>
+            <p class="cl-page-lead" th:text="#{offers.list.lead}"></p>
+        </header>
 
-            <div class="box">
-                <h3 th:text="#{offers.create}"></h3>
+        <div th:replace="~{fragments/screen-intro :: panel('offers', 'fas fa-tags')}"></div>
 
-                <!-- Import Options -->
-                <div class="columns">
-                    <div class="column">
-                        <div class="card">
-                            <div class="card-content">
-                                <h4 class="title is-6" th:text="#{offers.import.sources.title}">Import from Sources</h4>
-                                <p class="subtitle is-7" th:text="#{offers.import.sources.description}">Create offers from external sources</p>
-                                <a href="/dashboard/offer/new/csv" class="button is-primary is-fullwidth" th:text="#{offers.import.sources.button}">Import Offer</a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column">
-                        <div class="card">
-                            <div class="card-content">
-                                <h4 class="title is-6" th:text="#{offers.manual.title}">Create Manual Offer</h4>
-                                <p class="subtitle is-7" th:text="#{offers.manual.description}">Start with empty offer</p>
-                                <a href="/dashboard/offer/new?intent=manual" class="button is-link is-fullwidth" th:text="#{offers.manual.button}">Create Offer</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-
+        <div class="cl-alert is-ok cl-page-notice" role="status" th:if="${offerNotice != null}">
+            <p class="cl-alert-text" th:text="${offerNotice}"></p>
         </div>
-    </section>
 
-    <script>
-        function copyOfferLink(button) {
-            navigator.clipboard.writeText(button.getAttribute('data-copy')).then(() => showToast(CL_TOAST_COPIED));
-        }
-    </script>
+        <div data-cl-list-results data-cl-list-path="/dashboard/offers" data-cl-list-fragment="/dashboard/offers/list"
+             th:fragment="results" th:with="q=${page.query()}">
 
+            <section class="cl-card" aria-labelledby="offers-table-title">
+                <h2 class="cl-visually-hidden" id="offers-table-title" th:text="#{offers.list.table.title}"></h2>
+
+                <div class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{offers.list.segment.label}">
+                            <a class="cl-segment" th:each="s : ${page.segments()}" th:href="@{${s.href()}}"
+                               th:attr="aria-current=${s.active()} ? 'page' : null" data-cl-list-nav><span th:text="${s.label()}"></span></a>
+                        </nav>
+                        <div class="cl-toolbar-search">
+                            <form method="get" th:action="@{/dashboard/offers}" class="cl-search-form" role="search" data-cl-list-form>
+                                <th:block th:replace="~{fragments/offers-list :: hidden('search')}"></th:block>
+                                <label class="cl-visually-hidden" for="offers-search" th:text="#{offers.list.search.label}"></label>
+                                <div class="cl-search-field">
+                                    <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <input class="cl-input cl-table-search" type="search" id="offers-search" name="q" autocomplete="off"
+                                           th:value="${q.q()}" th:attr="placeholder=#{offers.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                                    <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                       th:attr="aria-label=#{offers.list.search.clear}" data-cl-list-nav>
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                                <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                    <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                                </button>
+                            </form>
+                            <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="offers-filters" aria-expanded="true">
+                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                <span class="cl-toolbar-toggle-label"><span th:text="#{offers.list.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${page.activeFilterCount()}"></span></th:block></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cl-toolbar-filters" id="offers-filters">
+                        <details class="cl-filter-menu" data-cl-filter-menu="validity" th:if="${q.segment().name() == 'OFFERS'}">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{offers.list.validity.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.validitySummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/offers}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/offers-list :: hidden('validity')}"></th:block>
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{offers.list.validity.menu}">
+                                    <label class="cl-filter-menu-check" th:each="o : ${page.validityOptions()}">
+                                        <input type="checkbox" name="validity" th:value="${o.value()}" th:checked="${o.selected()}"/>
+                                        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                    </label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{offers.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <details class="cl-filter-menu is-end" data-cl-filter-menu="dates">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{offers.list.dates.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/offers}" class="cl-filter-menu-panel" data-cl-list-form>
+                                <th:block th:replace="~{fragments/offers-list :: hidden('dates')}"></th:block>
+                                <div class="cl-filter-menu-dates">
+                                    <label><span th:text="#{offers.list.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/></label>
+                                    <label><span th:text="#{offers.list.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/></label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" th:text="#{offers.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                    </div>
+                </div>
+
+                <p class="cl-tab-desc" th:if="${q.segment().name() != 'OFFERS'}" th:text="${q.segment().name() == 'TEMPLATES'} ? #{offers.list.desc.templates} : #{offers.list.desc.baskets}"></p>
+
+                <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                       th:text="${page.resultsLine()}"></p>
+                </div>
+
+                <!--/* Offers. The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
+                <table class="cl-table is-orders is-offers" th:unless="${page.offers().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{offers.list.column.offer}"></th>
+                        <th scope="col" th:text="#{offers.list.column.client}"></th>
+                        <th scope="col" th:text="#{offers.list.column.created}"></th>
+                        <th scope="col" th:text="#{offers.list.column.validity}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.list.column.actions}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.offers()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.offer}">
+                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span></span>
+                        </th>
+                        <td th:attr="data-label=#{offers.list.column.client}">
+                            <th:block th:if="${row.client() != null}">
+                                <span class="cl-cell-client" th:text="${row.client()}"></span>
+                                <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
+                            </th:block>
+                            <span class="cl-cell-client cl-table-sub" th:unless="${row.client() != null}" th:text="#{offers.list.client.none}"></span>
+                        </td>
+                        <td th:attr="data-label=#{offers.list.column.created}">
+                            <span class="cl-cell-date" th:text="${row.created()}"></span>
+                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}"></span>
+                        </td>
+                        <td th:attr="data-label=#{offers.list.column.validity}">
+                            <span class="cl-status" th:classappend="${row.validityTone()}" th:text="${row.validityLabel()}"></span>
+                            <span class="cl-table-sub cl-due-note" th:if="${row.validityNote() != null}"
+                                  th:classappend="${row.validityNoteWarn()} ? 'is-warn' : ''" th:text="${row.validityNote()}"></span>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}">
+                            <span class="cl-cell-amount" th:text="${row.gross()}"></span>
+                            <span class="cl-table-sub cl-cards-hide" th:text="${row.net()}"></span>
+                        </td>
+                        <td class="cl-table-actions">
+                            <button type="button" class="cl-button is-icon cl-tooltip cl-copy-quick"
+                                    th:attr="data-cl-copy=${row.clientUrl()}, aria-label=${row.copyLabel()}, data-tooltip=#{offers.list.copyLink}">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span>
+                            </button>
+                            <details class="cl-menu">
+                                <summary class="cl-button is-icon" th:attr="aria-label=${row.menuLabel()}">
+                                    <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
+                                </summary>
+                                <ul class="cl-menu-list">
+                                    <li><button type="button" class="cl-menu-item" th:attr="data-cl-copy=${row.clientUrl()}" th:text="#{offers.list.copyLink}"></button></li>
+                                    <li><form method="post" th:action="@{${row.copyHref()}}"><button type="submit" class="cl-menu-item" th:text="#{offers.list.duplicate}"></button></form></li>
+                                    <li><form method="post" th:action="@{${row.copyWithContactHref()}}"><button type="submit" class="cl-menu-item" th:text="#{offers.list.duplicateWithContact}"></button></form></li>
+                                    <li class="cl-menu-sep" aria-hidden="true"></li>
+                                    <li><a class="cl-menu-item is-danger" th:href="@{${row.deleteHref()}}" data-cl-confirm
+                                           th:attr="data-cl-confirm-title=${row.deleteTitle()}, data-cl-confirm-message=${row.deleteMessage()},
+                                                    data-cl-confirm-action=#{offers.delete.confirm.action}"
+                                           th:text="#{offers.list.delete}"></a></li>
+                                </ul>
+                            </details>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <table class="cl-table is-orders is-offers" th:unless="${page.templates().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{offers.list.column.template}"></th>
+                        <th scope="col" th:text="#{offers.list.column.createdM}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{offers.list.column.items}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.list.column.actions}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.templates()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.template}">
+                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span></span>
+                        </th>
+                        <td th:attr="data-label=#{offers.list.column.createdM}">
+                            <span class="cl-cell-date" th:text="${row.created()}"></span>
+                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}"></span>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-cell-client" th:text="${row.itemsText()}"></span></td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}">
+                            <span class="cl-cell-amount" th:text="${row.gross()}"></span>
+                            <span class="cl-table-sub cl-cards-hide" th:text="#{offers.list.template.priced}"></span>
+                        </td>
+                        <td class="cl-table-actions">
+                            <a class="cl-button" th:href="@{${row.createOfferHref()}}">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                                <span th:text="#{offers.list.createFromTemplate}"></span>
+                            </a>
+                            <details class="cl-menu">
+                                <summary class="cl-button is-icon" th:attr="aria-label=${row.menuLabel()}">
+                                    <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
+                                </summary>
+                                <ul class="cl-menu-list">
+                                    <li><a class="cl-menu-item" th:href="@{${row.href()}}" th:text="#{offers.list.editTemplate}"></a></li>
+                                    <li class="cl-menu-sep" aria-hidden="true"></li>
+                                    <li><a class="cl-menu-item is-danger" th:href="@{${row.deleteHref()}}" data-cl-confirm
+                                           th:attr="data-cl-confirm-title=${row.deleteTitle()}, data-cl-confirm-message=${row.deleteMessage()},
+                                                    data-cl-confirm-action=#{offers.delete.confirm.action}"
+                                           th:text="#{offers.list.delete}"></a></li>
+                                </ul>
+                            </details>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <table class="cl-table is-orders is-offers" th:unless="${page.baskets().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{offers.list.column.basket}"></th>
+                        <th scope="col" th:text="#{offers.list.column.client}"></th>
+                        <th scope="col" th:text="#{offers.list.column.createdM}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{offers.list.column.items}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.baskets()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.basket}">
+                            <a class="cl-row-link" th:href="@{${row.href()}}"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span></a>
+                        </th>
+                        <td th:attr="data-label=#{offers.list.column.client}"><span class="cl-cell-client" th:text="${row.client()}"></span></td>
+                        <td th:attr="data-label=#{offers.list.column.createdM}"><span class="cl-cell-date" th:text="${row.created()}"></span></td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-table-sub" th:text="${row.itemsText()}"></span></td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}"><span class="cl-cell-amount" th:text="${row.gross()}"></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
+                       th:text="${es.actionLabel()}" data-cl-list-nav></a>
+                </div>
+
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
+        </div>
+
+        <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+    </div>
+</section>
+
+<script th:src="@{/js/list-page.js}" defer></script>
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/copy-field.js}" defer></script>
 </div>
 
 </body>

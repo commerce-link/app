@@ -70,9 +70,10 @@
     });
     init(document);
 
-    // A code in a table cell (button.cl-copy-inline[data-cl-copy]): one click copies it, the toast says so.
+    // A button carrying a value to copy (button[data-cl-copy]: a code in a table cell, a client link in a row or a
+    // row menu): one click copies it, the toast says so.
     document.addEventListener('click', function (event) {
-        var button = event.target.closest && event.target.closest('button.cl-copy-inline[data-cl-copy]');
+        var button = event.target.closest && event.target.closest('button[data-cl-copy]');
         if (!button || !navigator.clipboard) {
             return;
         }
