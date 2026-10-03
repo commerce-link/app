@@ -88,7 +88,7 @@
                         <label class="cl-choice" th:each="s : ${statuses}">
                             <input type="radio" name="status" th:value="${s.name()}" th:checked="${form.status == s.name()}">
                             <span class="cl-choice-text">
-                                <span class="cl-choice-title" th:text="#{|FulfilmentStatus.${s.name()}|}"></span>
+                                <span class="cl-choice-title" th:text="#{|warehouse.status.${s.name()}|}"></span>
                                 <span class="cl-choice-description" th:text="#{|warehouse.item.new.status.${s.name()}.desc|}"></span>
                             </span>
                         </label>

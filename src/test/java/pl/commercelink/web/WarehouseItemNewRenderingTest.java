@@ -81,6 +81,16 @@ class WarehouseItemNewRenderingTest {
     }
 
     @Test
+    void theStatusChoicesUseTheWarehouseStatusNamesOfTheList() {
+        // when
+        String html = render(form(), Map.of(), false, null);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-choice-title\">In allocation</span>")
+                .doesNotContain("<span class=\"cl-choice-title\">Allocating</span>");
+    }
+
+    @Test
     void errorsAreListedAndMarkedOnTheirFields() {
         // when
         String html = render(form(), Map.of("cost", "warehouse.item.new.error.cost"), false, "Service said no");
