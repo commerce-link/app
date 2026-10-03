@@ -35,6 +35,10 @@
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></p>
             </div>
+            <div class="cl-alert is-bad" id="dropship-order-missing" th:if="${dropshipOrderMissing == true}">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{deliveries.approval.dropshipOrderMissing}"></p>
+            </div>
             <div class="cl-alert is-bad" id="order-options-blocked" th:if="${orderOptionsError != null}">
                 <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="|(${orderOptionsError})|"></span></p>
@@ -56,14 +60,15 @@
                         <p th:if="${approvalAddressError == null and #lists.isEmpty(approvalAddresses)}" class="cl-card-desc"
                            th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></p>
                         <th:block th:if="${!#lists.isEmpty(approvalAddresses)}">
-                            <p class="cl-card-desc">
+                            <p class="cl-card-desc" th:with="place=${suggestedAddress == null ? null : #strings.trim((suggestedAddress.postalCode ?: '') + ' ' + (suggestedAddress.city ?: ''))},
+                                    storeAddress=${suggestedAddress == null ? null : (#strings.isEmpty(suggestedAddress.streetAndNumber) ? place : (#strings.isEmpty(place) ? suggestedAddress.streetAndNumber : suggestedAddress.streetAndNumber + ', ' + place))}">
                                 <span th:text="#{deliveries.approval.address.desc(${page.supplierLabel()})}"></span>
                                 <span th:if="${suggestedAddressId != null}"
-                                      th:text="#{deliveries.approval.address.matched(${page.storeName()}, ${#strings.trim((suggestedAddress.streetAndNumber != null ? suggestedAddress.streetAndNumber + ', ' : '') + (suggestedAddress.postalCode ?: '') + ' ' + (suggestedAddress.city ?: ''))})}"></span>
+                                      th:text="#{deliveries.approval.address.matched(${page.storeName()}, ${storeAddress})}"></span>
                                 <span th:if="${suggestedAddressId == null and suggestedAddress == null}" class="is-warn"
                                       th:text="#{deliveries.approval.address.noStoreDefault(${page.storeName()})}"></span>
                                 <span th:if="${suggestedAddressId == null and suggestedAddress != null}" class="is-warn"
-                                      th:text="#{deliveries.approval.address.noMatch(${page.storeName()})}"></span>
+                                      th:text="#{deliveries.approval.address.noMatch(${page.storeName()}, ${storeAddress})}"></span>
                             </p>
                             <th:block th:replace="~{deliveries/create/parts :: addressChoices(${approvalAddresses}, ${suggestedAddressId}, ${suggestedAddressId})}"></th:block>
                         </th:block>
@@ -108,7 +113,7 @@
                         <div class="cl-card-footer is-stacked">
                             <button id="purchase-confirm-submit" type="submit" class="cl-button is-primary" disabled
                                     aria-describedby="confirm-reasons confirm-help"
-                                    th:attr="data-blocked=${approvalAddressError != null or orderOptionsError != null}"
+                                    th:attr="data-blocked=${approvalAddressError != null or orderOptionsError != null or dropshipOrderMissing == true}"
                                     th:text="#{deliveries.approval.submit(${page.supplierLabel()})}"></button>
                             <div class="cl-help is-warn" id="confirm-reasons">
                                 <span th:text="#{deliveries.create.purchase.reasons}"></span>

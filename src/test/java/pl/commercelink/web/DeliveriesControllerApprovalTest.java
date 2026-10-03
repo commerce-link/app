@@ -1532,6 +1532,7 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("deliveries/approval");
         assertThat(model.getAttribute("consignee")).isSameAs(consignee);
+        assertThat(model.getAttribute("dropshipOrderMissing")).isEqualTo(false);
         verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
     }
 
@@ -1683,6 +1684,7 @@ class DeliveriesControllerApprovalTest {
 
         // then
         assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
+        assertThat(model.getAttribute("dropshipOrderMissing")).isEqualTo(true);
     }
 
     @Test

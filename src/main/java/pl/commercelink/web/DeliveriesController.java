@@ -483,6 +483,8 @@ public class DeliveriesController {
             optionsContext = dropshipOrder != null
                     ? DropshipPurchaseService.optionsContext(dropshipOrder)
                     : SupplierOrderOptionsContext.dropship(null);
+            // approve() refuses a dropship whose order is gone, so the screen says why up front
+            model.addAttribute("dropshipOrderMissing", dropshipOrder == null);
         } else {
             addApprovalAddresses(storeId, delivery, model);
             addSuggestedAddress(store, model);

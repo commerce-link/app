@@ -67,7 +67,8 @@ class ApprovalTemplateTest {
                 .contains("id=\"validation-area\"")
                 .contains("data-validate-url=\"/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/approval/validate\"")
                 .contains("action=\"/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/approve\"")
-                .contains("Adres dostawy").contains("Adres sklepu").containsPattern("value=\"a-1\"[^>]*checked=\"checked\"")
+                .contains("Adres dostawy").contains("Adres sklepu")
+                .contains("Zaznaczony pasuje do adresu wysyłkowego sklepu Demo Store (ul. Przemysłowa 12, 02-495 Warszawa).").containsPattern("value=\"a-1\"[^>]*checked=\"checked\"")
                 .contains("Opcje zamówienia u dostawcy").contains("name=\"supplierOrderChoices[shipping]\"")
                 .contains("Towar dla").contains("#dd0e0011").contains("klient11@example.com").contains("Na stan magazynu")
                 .contains("Decyzja").contains("Zamów u Acme").contains("Zanim zamówisz:")
@@ -123,7 +124,7 @@ class ApprovalTemplateTest {
         String html = render("deliveries/approval", variables);
 
         // then
-        assertThat(html).contains("Żaden adres nie pasuje do adresu wysyłkowego sklepu Demo Store — wybierz adres ręcznie.")
+        assertThat(html).contains("Żaden adres nie pasuje do adresu wysyłkowego sklepu Demo Store (ul. Przemysłowa 12, 02-495 Warszawa) — wybierz adres ręcznie.")
                 .doesNotContain("Adres sklepu");
     }
 
@@ -171,12 +172,15 @@ class ApprovalTemplateTest {
         variables.remove("approvalAddresses");
         ((Delivery) variables.get("delivery")).setDeliveryAddress("ul. Zapasowa 7, 00-002 Warszawa");
         variables.put("page", page(true, null, false));
+        variables.put("dropshipOrderMissing", true);
 
         // when
         String html = render("deliveries/approval", variables);
 
         // then
-        assertThat(html).contains("ul. Zapasowa 7, 00-002 Warszawa").doesNotContain("??");
+        assertThat(html).contains("ul. Zapasowa 7, 00-002 Warszawa").doesNotContain("??")
+                .contains("id=\"dropship-order-missing\"").contains("Nie znaleziono zamówienia klienta")
+                .contains("data-blocked=\"true\"");
     }
 
     @Test

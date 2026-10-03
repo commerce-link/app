@@ -38,6 +38,14 @@ class ApprovalPageTest {
         return order;
     }
 
+    private static Order customerOrder(String orderId, String company, String name, String surname, String email) {
+        Order order = order(orderId, name, email);
+        BillingDetails billing = order.getBillingDetails();
+        lenient().when(billing.getCompanyName()).thenReturn(company);
+        lenient().when(billing.getSurname()).thenReturn(surname);
+        return order;
+    }
+
     private static Delivery delivery(Allocation... allocations) {
         Delivery delivery = new Delivery();
         delivery.setStoreId("uma2dqukxr");
@@ -106,5 +114,24 @@ class ApprovalPageTest {
         assertThat(page.rejectHref()).isEqualTo("/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/reject");
         assertThat(page.validateHref()).isEqualTo("/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/approval/validate");
         assertThat(page.approveHref()).isEqualTo("/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/approve");
+    }
+
+    @Test
+    void customerIsTheCompanyOrTheFullNameLikeTheOrdersList() {
+        // given
+        Delivery delivery = delivery(allocation("dd0e0021-aaaa", 1, 1.0), allocation("dd0e0022-bbbb", 1, 1.0),
+                allocation("dd0e0023-cccc", 1, 1.0), allocation("dd0e0024-dddd", 1, 1.0));
+        List<Order> orders = List.of(
+                customerOrder("dd0e0021-aaaa", "Hurtownia Bajt Sp. z o.o.", "Jan", "Kowalski", "zakupy@bajt.example"),
+                customerOrder("dd0e0022-bbbb", " ", " Zofia ", "Jankowska ", "z@example.com"),
+                customerOrder("dd0e0023-cccc", null, null, "Nowak", "n@example.com"),
+                customerOrder("dd0e0024-dddd", null, " ", null, " only@example.com "));
+
+        // when
+        ApprovalPage page = ApprovalPage.of(delivery, null, orders, "Acme", null, null, false);
+
+        // then
+        assertThat(page.requestFor()).extracting(ApprovalPage.RequestLine::customer)
+                .containsExactly("Hurtownia Bajt Sp. z o.o.", "Zofia Jankowska", "Nowak", "only@example.com");
     }
 }

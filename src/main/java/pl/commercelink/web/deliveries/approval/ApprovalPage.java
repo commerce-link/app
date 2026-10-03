@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * What the platform administrator's approval screen shows about a delivery request besides the supplier's live answer:
@@ -77,7 +78,16 @@ public record ApprovalPage(String storeId, String deliveryId, String shortDelive
         if (billing == null) {
             return null;
         }
-        return StringUtils.isNotBlank(billing.getName()) ? billing.getName().trim() : StringUtils.trimToNull(billing.getEmail());
+        // the same name as the orders list: the company, else "name surname", else the e-mail
+        String person = Stream.of(billing.getName(), billing.getSurname())
+                .map(StringUtils::trimToNull)
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining(" "));
+        return Stream.of(StringUtils.trimToNull(billing.getCompanyName()), StringUtils.trimToNull(person),
+                        StringUtils.trimToNull(billing.getEmail()))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private String base() {
