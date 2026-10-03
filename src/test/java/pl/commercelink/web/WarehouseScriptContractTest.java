@@ -193,4 +193,14 @@ class WarehouseScriptContractTest {
             assertThat(html).as(t).doesNotContain("role=\"alert\"");
         }
     }
+
+    @Test
+    void costHintFormatsTheOtherPriceInThePageLanguage() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/cost-type-field.js");
+
+        // when / then
+        // a hard-coded pl-PL printed "560,16" with a decimal comma on the English page
+        assertThat(js).contains("document.documentElement.lang").doesNotContain("'pl-PL'");
+    }
 }

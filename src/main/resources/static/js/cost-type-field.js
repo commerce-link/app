@@ -4,8 +4,11 @@
 (function () {
     'use strict';
 
+    // the page language (html lang from the server locale), so the English page prints a decimal point
+    var locale = document.documentElement.lang || undefined;
+
     function format(value) {
-        return value.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function multiplier(rate) {
