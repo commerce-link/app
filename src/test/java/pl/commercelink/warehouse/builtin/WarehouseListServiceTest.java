@@ -8,7 +8,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
+import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.orders.FulfilmentStatus;
 
 import java.util.ArrayList;
@@ -31,6 +34,8 @@ class WarehouseListServiceTest {
     private WarehouseRepository repository;
     @Mock
     private DeliveriesRepository deliveries;
+    @Mock
+    private StoresRepository stores;
 
     private WarehouseListService service;
     private final List<WarehouseItem> items = new ArrayList<>();
@@ -41,7 +46,7 @@ class WarehouseListServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
-        service = new WarehouseListService(repository, deliveries, new DeliveryRedirectResolver(), messages);
+        service = new WarehouseListService(repository, deliveries, new DeliveryRedirectResolver(), messages, new SupplierLabels(stores));
         when(repository.findAllFiltered(eq("store-1"), isNull(), anyList())).thenAnswer(inv -> {
             List<FulfilmentStatus> statuses = inv.getArgument(2);
             return items.stream().filter(i -> statuses.contains(i.getStatus())).toList();
@@ -295,5 +300,28 @@ class WarehouseListServiceTest {
         // when / then
         assertThat(page().destroyedCount()).isEqualTo(1);
         assertThat(page("statuses", "all").rows()).hasSize(1);
+    }
+
+    @Test
+    void deliveryColumnLinksOnlyToDeliveriesThatExistAndNamesTheirSupplier() {
+        // given
+        add("Known", "GPU", Delivered, 1, 1).setDeliveryId("7e7e1971-0000-0000-0000-000000000000");
+        add("Manual", "GPU", Delivered, 1, 1).setDeliveryId("Unknown");
+        add("Removed", "GPU", Delivered, 1, 1).setDeliveryId("8c124850-0000-0000-0000-000000000000");
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setDeliveryId("7e7e1971-0000-0000-0000-000000000000");
+        when(deliveries.findById("store-1", "7e7e1971-0000-0000-0000-000000000000")).thenReturn(delivery);
+
+        // when
+        List<WarehouseItemRow> rows = page().rows();
+
+        // then
+        assertThat(rows).extracting(WarehouseItemRow::name).containsExactly("Known", "Manual", "Removed");
+        assertThat(rows.get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=7e7e1971-0000-0000-0000-000000000000");
+        assertThat(rows.get(0).deliveryNumber()).isEqualTo("7e7e1971");
+        assertThat(rows.get(0).supplier()).isEqualTo("Acme");
+        assertThat(rows.get(1).deliveryHref()).isNull();
+        assertThat(rows.get(1).deliveryNumber()).isNull();
+        assertThat(rows.get(2).deliveryHref()).isNull();
     }
 }

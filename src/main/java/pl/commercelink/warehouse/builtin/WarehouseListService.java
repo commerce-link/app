@@ -9,6 +9,8 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.*;
 import pl.commercelink.web.orders.Money;
@@ -37,6 +39,7 @@ class WarehouseListService {
     private final DeliveriesRepository deliveries;
     private final DeliveryRedirectResolver redirects;
     private final MessageSource messages;
+    private final SupplierLabels supplierLabels;
 
     WarehousePageModel page(String storeId, boolean wms, boolean admin, WarehouseListQuery query, Locale locale) {
         List<FulfilmentStatus> visible = WarehouseStatuses.visible(wms);
@@ -54,7 +57,8 @@ class WarehouseListService {
 
         Pagination pagination = Pagination.of(query.page(), shown.size(), WarehouseListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         List<WarehouseItem> pageItems = shown.subList(pagination.fromIndex(), pagination.toIndex());
-        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects::resolveFor, providers(storeId, pageItems));
+        SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
+        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, deliveries(storeId, pageItems), labels::of);
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);
@@ -71,15 +75,16 @@ class WarehouseListService {
                 DESTROY_REASONS.stream().map(r -> new Option(r.name(), text(locale, "DocumentReason." + r.name()), 0, false, null)).toList());
     }
 
-    private Map<String, String> providers(String storeId, List<WarehouseItem> items) {
-        Map<String, String> byDelivery = new HashMap<>();
+    /** The store's deliveries behind the page's items, one read per distinct id; an id with no record is left out. */
+    private Map<String, Delivery> deliveries(String storeId, List<WarehouseItem> items) {
+        Map<String, Delivery> byId = new HashMap<>();
         items.stream().map(WarehouseItem::getDeliveryId).filter(StringUtils::isNotBlank).distinct().forEach(id -> {
             Delivery delivery = deliveries.findById(storeId, id);
-            if (delivery != null && delivery.getProvider() != null) {
-                byDelivery.put(id, delivery.getProvider());
+            if (delivery != null) {
+                byId.put(id, delivery);
             }
         });
-        return byDelivery;
+        return byId;
     }
 
     private List<Tile> tiles(WarehouseListQuery query, List<WarehouseItem> store, boolean wms, Locale locale) {

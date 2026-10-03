@@ -40,9 +40,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WarehouseListRenderingTest {
 
     private static WarehouseItemRow row(String id, String status, boolean selectable) {
+        return row(id, status, selectable, "/dashboard/deliveries/details?deliveryId=d1", "d1", "Acme Polska");
+    }
+
+    private static WarehouseItemRow row(String id, String status, boolean selectable, String deliveryHref, String deliveryNumber,
+                                        String supplier) {
         return new WarehouseItemRow(id, "/dashboard/warehouse/items/" + id, "RTX " + id, "EAN 590 · GV-1", "Damaged", "is-bad",
-                "comment " + id, "GPU", false, 3, "1 243,00", "gross 1 528,89", null, null, "/dashboard/deliveries/details?deliveryId=d1",
-                "d1", "S/N 1", status, status, "is-ok", selectable, "Acme");
+                "comment " + id, "GPU", false, 3, "1 243,00", "gross 1 528,89", null, null, deliveryHref,
+                deliveryNumber, supplier, "S/N 1", status, status, "is-ok", selectable, "Acme");
+    }
+
+    private static String deliveryCell(String html) {
+        Matcher cell = Pattern.compile("<td class=\"is-secondary-column\" data-label=\"Delivery\">.*?</td>", Pattern.DOTALL).matcher(html);
+        assertThat(cell.find()).isTrue();
+        return cell.group();
     }
 
     private static WarehousePageModel model(List<WarehouseItemRow> rows, boolean storeEmpty) {
@@ -234,5 +245,30 @@ class WarehouseListRenderingTest {
         assertThat(statusMenu.find()).isTrue();
         assertThat(statusMenu.group()).contains("<input type=\"hidden\" name=\"statusesMenu\" value=\"1\"/>");
         assertThat(html).containsOnlyOnce("name=\"statusesMenu\"").doesNotContain("statusesMenu=");
+    }
+
+    @Test
+    void deliveryCellShowsTheSupplierUnderTheDeliveryLinkAndTheSerialNumberLast() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String cell = deliveryCell(render(page));
+
+        // then
+        assertThat(cell).contains("<a href=\"/dashboard/deliveries/details?deliveryId=d1\">d1</a>");
+        assertThat(cell.indexOf("Acme Polska")).isGreaterThan(cell.indexOf(">d1</a>")).isLessThan(cell.indexOf("S/N 1"));
+    }
+
+    @Test
+    void deliveryThatIsNotADeliveryOfTheStoreIsADashWithoutALink() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true, null, null, null)), false);
+
+        // when
+        String cell = deliveryCell(render(page));
+
+        // then
+        assertThat(cell).doesNotContain("<a ").contains("—").contains("S/N 1");
     }
 }

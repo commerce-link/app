@@ -2,6 +2,8 @@ package pl.commercelink.warehouse.builtin;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -23,8 +25,15 @@ class WarehouseRowMapperTest {
         return source;
     }
 
-    private final WarehouseRowMapper mapper = new WarehouseRowMapper(messages(), PL,
-            item -> "/dashboard/deliveries/details?deliveryId=" + item.getDeliveryId(), Map.of("delivery-1", "Acme"));
+    private static Delivery delivery(String id, String provider) {
+        Delivery delivery = new Delivery("store-1", null, provider);
+        delivery.setDeliveryId(id);
+        return delivery;
+    }
+
+    private final WarehouseRowMapper mapper = new WarehouseRowMapper(messages(), PL, new DeliveryRedirectResolver(),
+            Map.of("delivery-1", delivery("delivery-1", "Acme"), "delivery-2", delivery("delivery-2", null)),
+            identity -> "Acme".equals(identity) ? "Acme Polska" : identity);
 
     private static WarehouseItem item() {
         WarehouseItem item = new WarehouseItem("store-1", "delivery-1", "Karty graficzne", "Gigabyte RTX 4060 Ti",
@@ -52,6 +61,8 @@ class WarehouseRowMapperTest {
         assertThat(row.selectable()).isTrue();
         assertThat(row.source()).isEqualTo("Acme");
         assertThat(row.deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-1");
+        assertThat(row.deliveryNumber()).isEqualTo("delivery");
+        assertThat(row.supplier()).isEqualTo("Acme Polska");
         assertThat(row.conditionLabel()).isNull();
         assertThat(row.systemCost()).isNull();
     }
@@ -93,5 +104,55 @@ class WarehouseRowMapperTest {
         assertThat(row.serialNo()).isEqualTo("S/N SN-1");
         assertThat(row.source()).isEqualTo("Kosatec");
         assertThat(row.selectable()).isFalse();
+    }
+
+    @Test
+    void deliveryThatIsNotARecordOfTheStoreShowsNoLinkAndNoSupplier() {
+        // given
+        WarehouseItem unknown = item();
+        unknown.setDeliveryId("Unknown");
+        WarehouseItem blank = item();
+        blank.setDeliveryId(null);
+        WarehouseItem warehouse = item();
+        warehouse.setDeliveryId("Warehouse");
+
+        // when / then
+        for (WarehouseItem item : new WarehouseItem[]{unknown, blank, warehouse}) {
+            WarehouseItemRow row = mapper.map(item);
+            assertThat(row.deliveryHref()).as(item.getDeliveryId()).isNull();
+            assertThat(row.deliveryNumber()).as(item.getDeliveryId()).isNull();
+            assertThat(row.supplier()).as(item.getDeliveryId()).isNull();
+        }
+    }
+
+    @Test
+    void deliveryWithoutProviderLinksWithoutASupplierLine() {
+        // given
+        WarehouseItem item = item();
+        item.setDeliveryId("delivery-2");
+
+        // when
+        WarehouseItemRow row = mapper.map(item);
+
+        // then
+        assertThat(row.deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-2");
+        assertThat(row.supplier()).isNull();
+    }
+
+    @Test
+    void newItemWaitingForItsSupplierLinksToThePlanningPageUnderTheSupplierLabel() {
+        // given
+        WarehouseItem item = item();
+        item.setDeliveryId("Acme");
+        item.setStatus(FulfilmentStatus.New);
+
+        // when
+        WarehouseItemRow row = mapper.map(item);
+
+        // then
+        assertThat(row.deliveryHref()).isEqualTo("/dashboard/deliveries/create/Acme");
+        assertThat(row.deliveryNumber()).isEqualTo("Acme Polska");
+        assertThat(row.supplier()).isNull();
+        assertThat(row.source()).isEqualTo("Acme");
     }
 }
