@@ -78,7 +78,12 @@
 
     function post(path, boxes, extra) {
         var form = document.getElementById('warehouse-bulk-form');
-        form.replaceChildren();
+        // the CSRF field Thymeleaf renders into the form must survive the rebuild
+        Array.prototype.slice.call(form.children).forEach(function (child) {
+            if (child.getAttribute('name') !== '_csrf') {
+                child.remove();
+            }
+        });
         form.action = path;
         boxes.forEach(function (box) {
             add(form, 'selectedItemIds', box.value);

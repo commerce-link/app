@@ -125,7 +125,7 @@
                 </div>
 
                 <th:block th:unless="${page.rows().isEmpty()}">
-                    <form id="warehouse-bulk-form" method="post" hidden></form>
+                    <form id="warehouse-bulk-form" method="post" th:action="@{/dashboard/warehouse}" hidden></form>
                     <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
                     <div class="cl-selection-row" data-cl-selection-bar hidden>
                         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
@@ -224,7 +224,7 @@
             </section>
 
             <dialog class="cl-dialog is-form" id="cl-quantity-dialog" aria-labelledby="cl-quantity-title" th:unless="${page.rows().isEmpty()}">
-                <form method="post" data-cl-quantity-form novalidate>
+                <form method="post" th:action="@{/dashboard/warehouse}" data-cl-quantity-form novalidate>
                     <h2 class="cl-dialog-title" id="cl-quantity-title" data-cl-quantity-title th:attr="data-template=#{warehouse.bulk.dialog.title('{label}', '{k}')}"></h2>
                     <div class="cl-dialog-body">
                         <table class="cl-table is-compact cl-quantity-table">

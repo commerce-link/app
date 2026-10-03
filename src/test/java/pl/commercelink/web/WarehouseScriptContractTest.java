@@ -62,4 +62,23 @@ class WarehouseScriptContractTest {
                     .doesNotContain("th:utext");
         }
     }
+
+    @Test
+    void bulkPostFormsHaveAnActionSoThymeleafInjectsTheCsrfToken() throws Exception {
+        // given
+        String html = read("src/main/resources/templates/warehouse.html");
+
+        // when / then
+        assertThat(html).contains("<form id=\"warehouse-bulk-form\" method=\"post\" th:action=\"@{/dashboard/warehouse}\"")
+                .contains("<form method=\"post\" th:action=\"@{/dashboard/warehouse}\" data-cl-quantity-form");
+    }
+
+    @Test
+    void bulkPostKeepsTheCsrfFieldWhenItRebuildsTheForm() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+
+        // when / then
+        assertThat(js).doesNotContain("form.replaceChildren()").contains("'_csrf'");
+    }
 }

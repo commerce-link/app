@@ -1,8 +1,21 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
+import org.springframework.security.web.servlet.support.csrf.CsrfRequestDataValueProcessor;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.support.StaticWebApplicationContext;
+import org.springframework.web.servlet.support.RequestContext;
 import org.thymeleaf.context.Context;
+import org.thymeleaf.context.WebContext;
+import org.thymeleaf.spring6.context.webmvc.SpringWebMvcThymeleafRequestContext;
+import org.thymeleaf.spring6.naming.SpringContextVariableNames;
+import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.warehouse.builtin.WarehouseItemRow;
 import pl.commercelink.warehouse.builtin.WarehouseListQuery;
 import pl.commercelink.warehouse.builtin.WarehousePageModel;
@@ -16,7 +29,10 @@ import pl.commercelink.web.orders.Pagination;
 
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -125,5 +141,58 @@ class WarehouseListRenderingTest {
 
         // then
         assertThat(html).contains("Nothing matches the filters.").contains("data-cl-filter-menu=\"statuses\"").doesNotContain("<table");
+    }
+
+    /**
+     * Renders like a real MVC view with Spring Security's CSRF processor in place, as it will be once CSRF is on for
+     * /dashboard/** (PR app#217): every POST form with th:action gets the hidden _csrf field.
+     */
+    private static String renderWithCsrf(WarehousePageModel page) {
+        MockServletContext servletContext = new MockServletContext();
+        StaticWebApplicationContext applicationContext = new StaticWebApplicationContext();
+        applicationContext.setServletContext(servletContext);
+        applicationContext.registerSingleton("requestDataValueProcessor", CsrfRequestDataValueProcessor.class);
+        applicationContext.refresh();
+        servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, applicationContext);
+        MockHttpServletRequest request = new MockHttpServletRequest(servletContext);
+        request.setAttribute(CsrfToken.class.getName(), new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "test-token-abc"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(servletContext);
+        WebContext context = new WebContext(application.buildExchange(request, response), Locale.ENGLISH);
+        context.setVariable("page", page);
+        context.setVariable(SpringContextVariableNames.THYMELEAF_REQUEST_CONTEXT,
+                new SpringWebMvcThymeleafRequestContext(new RequestContext(request, response, servletContext, null), request));
+        return EnglishFragmentTemplateEngine.create().process("<div th:replace=\"~{warehouse :: results}\"></div>", context);
+    }
+
+    private static String formWithId(String html, String marker) {
+        Matcher matcher = Pattern.compile("<form[^>]*" + Pattern.quote(marker) + "[^>]*>.*?</form>", Pattern.DOTALL).matcher(html);
+        assertThat(matcher.find()).as(marker).isTrue();
+        return matcher.group();
+    }
+
+    @Test
+    void bothBulkPostFormsCarryTheCsrfTokenWhenCsrfIsOn() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = renderWithCsrf(page);
+
+        // then
+        assertThat(formWithId(html, "id=\"warehouse-bulk-form\"")).contains("name=\"_csrf\"").contains("value=\"test-token-abc\"");
+        assertThat(formWithId(html, "data-cl-quantity-form")).contains("name=\"_csrf\"").contains("value=\"test-token-abc\"");
+    }
+
+    @Test
+    void filterFormsStayFreeOfTheCsrfToken() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = renderWithCsrf(page);
+
+        // then
+        assertThat(formWithId(html, "role=\"search\"")).doesNotContain("_csrf");
     }
 }
