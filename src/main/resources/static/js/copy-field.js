@@ -65,10 +65,26 @@
         });
     }
 
+    // Controls that only work with the clipboard API ([data-cl-copy-reveal][hidden], e.g. a row's quick copy icon and its
+    // "Kopiuj link" menu entry) are hidden in the markup, so without JavaScript they never show as dead buttons.
+    function revealClipboardControls(root) {
+        if (!navigator.clipboard) {
+            return;
+        }
+        root.querySelectorAll('[data-cl-copy-reveal][hidden]').forEach(function (control) {
+            control.hidden = false;
+        });
+    }
+
     document.addEventListener('cl:form-replaced', function (event) {
         init(event.target);
     });
+    // a list swapped in by list-page.js comes back with the controls hidden again
+    document.addEventListener('cl-list:swapped', function (event) {
+        revealClipboardControls(event.target);
+    });
     init(document);
+    revealClipboardControls(document);
 
     // A button carrying a value to copy (button[data-cl-copy]: a code in a table cell, a client link in a row or a
     // row menu): one click copies it, the toast says so.

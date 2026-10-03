@@ -61,6 +61,15 @@ class OffersListStylesContractTest {
     }
 
     @Test
+    void copyScriptRevealsClipboardOnlyControlsAlsoAfterAListSwap() throws Exception {
+        // given
+        String js = Files.readString(Path.of("src/main/resources/static/js/copy-field.js"));
+
+        // then
+        assertThat(js).contains("[data-cl-copy-reveal][hidden]").contains("'cl-list:swapped'").contains("revealClipboardControls(document)");
+    }
+
+    @Test
     void copyScriptCopiesAnyButtonWithACopyValue() throws Exception {
         // given
         String js = Files.readString(Path.of("src/main/resources/static/js/copy-field.js"));
