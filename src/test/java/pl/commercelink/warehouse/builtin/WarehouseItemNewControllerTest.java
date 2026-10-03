@@ -186,7 +186,7 @@ class WarehouseItemNewControllerTest {
 
         // then
         assertThat(response.getStatus()).isEqualTo(422);
-        assertThat((Map<String, String>) model.get("errors")).containsKey("supplier");
+        assertThat((Map<String, String>) model.get("errors")).containsKey("new-supplier-custom").doesNotContainKey("supplier");
         verifyNoInteractions(receipts);
     }
 
@@ -209,6 +209,62 @@ class WarehouseItemNewControllerTest {
             assertThat(view).isEqualTo("warehouse-item-new");
             assertThat(response.getStatus()).isEqualTo(422);
         }
+        verifyNoInteractions(receipts);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void anEmptySupplierChoiceIsAnErrorOfTheSelect() throws Exception {
+        // given
+        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(supplierChoice.resolve(any(), eq(""), any()))
+                .thenReturn(new SupplierChoice.Resolution(null, "order.item.assign.supplier.required", null));
+        WarehouseItemAddForm form = form("GV-N406TWF2OC");
+        form.setSupplier("");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStore(() -> controller.addItem(form, model, PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat((Map<String, String>) model.get("errors"))
+                .containsEntry("new-supplier", "order.item.assign.supplier.required").doesNotContainKey("supplier");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theCategoryListLeavesOutUncategorizedWhichTheEmptyChoiceAlreadyMeans() throws Exception {
+        // given
+        when(categories.groupsFor("store-1")).thenReturn(List.of(
+                new StoreCategories.Group("Computers", List.of("SSD drives", "Uncategorized")),
+                new StoreCategories.Group("Uncategorized", List.of("Uncategorized"))));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStore(() -> controller.newItem(model));
+
+        // then
+        assertThat((List<StoreCategories.Group>) model.get("categoryGroups"))
+                .containsExactly(new StoreCategories.Group("Computers", List.of("SSD drives")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aSecondSubmitOfAnUnknownCodeWithoutProductDataNamesTheMissingFields() throws Exception {
+        // given
+        when(taxonomy.findByMfn(any())).thenReturn(null);
+        WarehouseItemAddForm form = form("XPG-S70-2TB");
+        form.setProductDataShown(true);
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        asStore(() -> controller.addItem(form, model, PL, response, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat((Map<String, String>) model.get("errors"))
+                .containsEntry("name", "warehouse.item.new.error.name").containsEntry("ean", "warehouse.item.new.error.ean");
         verifyNoInteractions(receipts);
     }
 }

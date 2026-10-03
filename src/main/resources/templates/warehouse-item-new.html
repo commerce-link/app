@@ -6,15 +6,26 @@
 
 <div layout:fragment="content">
 <section class="cl-page">
-    <div class="cl-page-body is-wide">
+    <div class="cl-page-body is-form">
 
-        <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/warehouse', #{nav.warehouse}, #{warehouse.item.new.title}, #{warehouse.item.new.lead}, null)}"></div>
+        <!--/* Inline rather than settings-header :: subpageWithActions: that fragment is a div, because a header element in
+               settings-header.html would also be selected by its "header" fragment. */-->
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{/dashboard/warehouse}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{nav.warehouse}"></span>
+            </a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{warehouse.item.new.title}"></h1>
+            </div>
+            <p class="cl-page-lead" th:text="#{warehouse.item.new.lead}"></p>
+        </header>
 
         <form th:fragment="form" class="cl-form" id="warehouseItemNewForm" method="post" novalidate data-cl-submit-once
               th:action="@{/dashboard/warehouse/items/new}">
 
             <div th:replace="~{fragments/settings-form :: errorSummaryWithArguments('warehouse-item-errors', ${errors}, ${errorArgs})}"></div>
-            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="status">
+            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="status" tabindex="-1" data-cl-error-summary>
                 <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${errorMessage}"></p>
             </div>
@@ -23,22 +34,15 @@
                 <p class="cl-alert-text" th:text="#{warehouse.item.new.unknown(${form.manufacturerCode})}"></p>
             </div>
 
+            <input th:if="${mfnUnknown}" type="hidden" name="productDataShown" value="true">
+
             <div class="cl-card">
                 <fieldset class="cl-fieldset">
                     <legend class="cl-fieldset-title" th:text="#{warehouse.item.new.group.item}"></legend>
                     <div class="cl-form-grid">
 
-                        <div class="cl-span-3 cl-field">
-                            <label class="cl-label" for="manufacturerCode" th:text="#{warehouse.item.new.mfn}"></label>
-                            <input class="cl-input" id="manufacturerCode" name="manufacturerCode" type="text" required autocomplete="off"
-                                   th:value="${form.manufacturerCode}" th:placeholder="#{warehouse.item.new.mfn.placeholder}"
-                                   th:classappend="${errors['manufacturerCode'] != null} ? 'is-invalid'"
-                                   th:attr="aria-invalid=${errors['manufacturerCode'] != null ? 'true' : null},aria-describedby=${errors['manufacturerCode'] != null ? 'manufacturerCode-error' : null}">
-                            <p th:if="${errors['manufacturerCode'] != null}" class="cl-field-error" id="manufacturerCode-error">
-                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                <span th:text="#{${errors['manufacturerCode']}}"></span>
-                            </p>
-                        </div>
+                        <div class="cl-span-3"
+                             th:insert="~{fragments/settings-form :: textFieldWith('manufacturerCode', 'warehouse.item.new.mfn', ${form.manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null, null, #{warehouse.item.new.mfn.placeholder}, false)}"></div>
 
                         <div class="cl-span-3 cl-field">
                             <label class="cl-label" for="cost" th:text="#{warehouse.item.new.cost}"></label>
@@ -63,22 +67,15 @@
                             </p>
                         </div>
 
-                        <div class="cl-span-2 cl-field">
-                            <label class="cl-label" for="qty" th:text="#{warehouse.item.new.qty}"></label>
-                            <input class="cl-input is-qty" id="qty" name="qty" type="text" inputmode="numeric" required
-                                   th:value="${form.qty}" th:classappend="${errors['qty'] != null} ? 'is-invalid'"
-                                   th:attr="aria-invalid=${errors['qty'] != null ? 'true' : null},aria-describedby=${errors['qty'] != null ? 'qty-error' : null}">
-                            <p th:if="${errors['qty'] != null}" class="cl-field-error" id="qty-error">
-                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                <span th:text="#{${errors['qty']}}"></span>
-                            </p>
-                        </div>
+                        <div class="cl-span-2"
+                             th:insert="~{fragments/settings-form :: textFieldWith('qty', 'warehouse.item.new.qty', ${form.qty}, 'text', 'off', true, ${errors['qty']}, null, 'numeric', null, false)}"></div>
 
-                        <div class="cl-span-4" id="supplier">
+                        <div class="cl-span-4"
+                             th:with="supplierErrorField=${errors['new-supplier'] != null ? 'new-supplier' : (errors['new-supplier-custom'] != null ? 'new-supplier-custom' : null)}">
                             <div th:replace="~{fragments/supplier-choice :: clField('new-supplier', ${suppliers}, ${form.supplier}, ${form.customSupplier})}"></div>
-                            <p th:if="${errors['supplier'] != null}" class="cl-field-error" id="supplier-error">
+                            <p th:if="${supplierErrorField != null}" class="cl-field-error" id="new-supplier-error">
                                 <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                <span th:text="${#messages.msgWithParams(errors['supplier'], errorArgs['supplier'])}"></span>
+                                <span th:text="${#messages.msgWithParams(errors.get(supplierErrorField), errorArgs.get(supplierErrorField))}"></span>
                             </p>
                         </div>
                     </div>
@@ -102,26 +99,10 @@
                 <fieldset class="cl-fieldset" id="product-data" th:if="${mfnUnknown}">
                     <legend class="cl-fieldset-title" th:text="#{warehouse.item.new.group.product}"></legend>
                     <div class="cl-form-grid">
-                        <div class="cl-span-6 cl-field">
-                            <label class="cl-label" for="name" th:text="#{warehouse.item.new.name}"></label>
-                            <input class="cl-input" id="name" name="name" type="text" required autofocus
-                                   th:value="${form.name}" th:classappend="${errors['name'] != null} ? 'is-invalid'"
-                                   th:attr="aria-invalid=${errors['name'] != null ? 'true' : null},aria-describedby=${errors['name'] != null ? 'name-error' : null}">
-                            <p th:if="${errors['name'] != null}" class="cl-field-error" id="name-error">
-                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                <span th:text="#{${errors['name']}}"></span>
-                            </p>
-                        </div>
-                        <div class="cl-span-3 cl-field">
-                            <label class="cl-label" for="ean" th:text="#{warehouse.item.new.ean}"></label>
-                            <input class="cl-input" id="ean" name="ean" type="text" inputmode="numeric" required
-                                   th:value="${form.ean}" th:classappend="${errors['ean'] != null} ? 'is-invalid'"
-                                   th:attr="aria-invalid=${errors['ean'] != null ? 'true' : null},aria-describedby=${errors['ean'] != null ? 'ean-error' : null}">
-                            <p th:if="${errors['ean'] != null}" class="cl-field-error" id="ean-error">
-                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                <span th:text="#{${errors['ean']}}"></span>
-                            </p>
-                        </div>
+                        <div class="cl-span-6"
+                             th:insert="~{fragments/settings-form :: textFieldWith('name', 'warehouse.item.new.name', ${form.name}, 'text', 'off', true, ${errors['name']}, null, null, null, ${errors.isEmpty() and errorMessage == null})}"></div>
+                        <div class="cl-span-3"
+                             th:insert="~{fragments/settings-form :: textFieldWith('ean', 'warehouse.item.new.ean', ${form.ean}, 'text', 'off', true, ${errors['ean']}, null, 'numeric', null, false)}"></div>
                         <div class="cl-span-3 cl-field">
                             <label class="cl-label" for="category" th:text="#{warehouse.item.new.category}"></label>
                             <select class="cl-select" id="category" name="category">
@@ -143,6 +124,7 @@
         </form>
     </div>
 </section>
+<script th:src="@{/js/error-summary.js}" defer></script>
 <script th:src="@{/js/supplier-choice.js}" defer></script>
 <script th:src="@{/js/cost-type-field.js}" defer></script>
 <script th:src="@{/js/submit-once.js}" defer></script>

@@ -41,6 +41,8 @@ class WarehouseItemController {
             FulfilmentStatus.Allocation
     );
 
+    static final String NEW_SUPPLIER_FIELD = "new-supplier";
+
     @Autowired
     private TaxonomyCache taxonomyCache;
 
@@ -122,17 +124,19 @@ class WarehouseItemController {
         boolean known = taxonomy != null && StringUtils.isNoneBlank(taxonomy.name(), taxonomy.ean());
         boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getManufacturerCode());
         // the first submit of an unknown code only reveals the product data group, so it carries no name/ean errors yet
-        Map<String, String> errors = new LinkedHashMap<>(form.validate(productDataNeeded && hasAnyProductData(form)));
+        boolean productDataAsked = productDataNeeded && (form.isProductDataShown() || hasAnyProductData(form));
+        Map<String, String> errors = new LinkedHashMap<>(form.validate(productDataAsked));
         Map<String, Object[]> errorArgs = new HashMap<>();
         SupplierChoice.Resolution supplier = supplierChoice.resolve(
                 storesRepository.findById(getStoreId()), form.getSupplier(), form.getCustomSupplier());
         if (!supplier.accepted()) {
-            errors.put("supplier", supplier.errorCode());
+            String field = supplierField(form);
+            errors.put(field, supplier.errorCode());
             if (supplier.errorArgs() != null) {
-                errorArgs.put("supplier", supplier.errorArgs());
+                errorArgs.put(field, supplier.errorArgs());
             }
         }
-        if (!errors.isEmpty() || (productDataNeeded && !hasAnyProductData(form))) {
+        if (!errors.isEmpty() || (productDataNeeded && !productDataAsked)) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
             return newItemPage(model, form, errors, errorArgs, productDataNeeded, null);
         }
@@ -155,6 +159,23 @@ class WarehouseItemController {
         return redirectToWarehouseFilteredBy(item.getStatus());
     }
 
+    /** The id of the field a supplier error belongs to: the typed name when "Other supplier…" is chosen, else the select. */
+    private static String supplierField(WarehouseItemAddForm form) {
+        boolean typed = SupplierChoice.CUSTOM.equals(form.getSupplier())
+                || (StringUtils.isBlank(form.getSupplier()) && StringUtils.isNotBlank(form.getCustomSupplier()));
+        return typed ? NEW_SUPPLIER_FIELD + "-custom" : NEW_SUPPLIER_FIELD;
+    }
+
+    /** "Uncategorized" is what the empty choice of the category list already means, so it is not offered twice. */
+    private static List<StoreCategories.Group> withoutUncategorized(List<StoreCategories.Group> groups) {
+        return groups.stream()
+                .map(group -> new StoreCategories.Group(group.catalog(), group.names().stream()
+                        .filter(name -> !Categories.UNCATEGORIZED.equals(name))
+                        .toList()))
+                .filter(group -> !group.names().isEmpty())
+                .toList();
+    }
+
     private static boolean hasAnyProductData(WarehouseItemAddForm form) {
         return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getEan());
     }
@@ -169,7 +190,7 @@ class WarehouseItemController {
         model.addAttribute("vatRate", Price.DEFAULT_VAT_RATE);
         model.addAttribute("statuses", NEW_ITEM_STATUSES);
         model.addAttribute("suppliers", supplierLabels.forStoreId(getStoreId()).options());
-        model.addAttribute("categoryGroups", storeCategories.groupsFor(getStoreId()));
+        model.addAttribute("categoryGroups", withoutUncategorized(storeCategories.groupsFor(getStoreId())));
         return "warehouse-item-new";
     }
 

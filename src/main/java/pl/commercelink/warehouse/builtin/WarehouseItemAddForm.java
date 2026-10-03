@@ -27,6 +27,8 @@ public class WarehouseItemAddForm {
     private String name;
     private String ean;
     private String category;
+    /** The product data group was on the page this form was sent from, so empty name and EAN are errors now. */
+    private boolean productDataShown;
 
     public Map<String, String> validate(boolean productDataNeeded) {
         Map<String, String> errors = new LinkedHashMap<>();
