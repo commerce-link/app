@@ -194,7 +194,7 @@
                                 <span class="cl-table-pills" th:if="${row.conditionLabel() != null}"><span class="cl-status" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></span>
                                 <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
                             </th>
-                            <td class="is-hyphenated" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
+                            <td class="cl-cell-category" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
                             <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}">
                                 <span class="cl-cards-hide" th:text="${row.qty()}"></span>
                                 <span class="cl-cards-only cl-card-figures" th:text="#{warehouse.row.card.figures(${row.qty()}, ${row.costNet()})}"></span>
@@ -211,7 +211,7 @@
                                     <a th:if="${row.deliveryHref() != null}" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryNumber()}"></a>
                                     <span th:unless="${row.deliveryHref() != null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
                                     <span class="cl-table-sub" th:if="${row.supplier() != null}" th:text="${row.supplier()}"></span>
-                                    <span class="cl-table-sub" th:if="${row.serialNo() != null}" th:text="${row.serialNo()}"></span>
+                                    <span class="cl-table-sub cl-cell-serial" th:if="${row.serialNo() != null}" th:title="${row.serialNo()}" th:text="${row.serialNo()}"></span>
                                 </span>
                             </td>
                             <td th:attr="data-label=#{warehouse.list.column.status}"><span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span></td>

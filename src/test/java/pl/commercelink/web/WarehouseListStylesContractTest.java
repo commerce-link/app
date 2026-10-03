@@ -26,18 +26,31 @@ class WarehouseListStylesContractTest {
 
         // when / then
         // "Zarezerwowane" is a 114 px pill; 16 % of the table is narrower than that below 1366 px and the text ran out of it
-        // 8.5rem = the 114 px pill plus the cell's padding; the rest of the old 9.5rem goes to the product column
-        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 8.5rem; }")
+        // 9.5rem = the 114 px pill plus the cell's 2 × 12 px padding; 8.5rem (wave 2) left 112 px and cut "Zarezerwowane"
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }")
                 .doesNotContain(".cl-col-status { width: 16%; }");
     }
 
     @Test
-    void categoryCellHyphenatesASingleLongWordInsteadOfCuttingIt() throws Exception {
+    void categoryCellBreaksALongWordWithoutHyphenationAndTheSerialNumberStaysOneToken() throws Exception {
         // given
         String section = section();
 
         // when / then
-        assertThat(section).contains(".cl-page .cl-table.is-warehouse .is-hyphenated { hyphens: auto; }");
+        // hyphens: auto used Polish rules on English words ("Headpho-nes"); overflow-wrap still keeps a long word in its cell
+        assertThat(section).doesNotContain("hyphens").contains("overflow-wrap: break-word;");
+        String table = section.substring(section.indexOf("@media screen and (min-width: 720px) {"));
+        assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-cell-serial { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }");
+    }
+
+    @Test
+    void infoPillOfASelectedRowStandsOutFromTheRowTint() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // --cl-info-soft is the same colour as --cl-accent-soft, the tint of a checked row
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse tr.is-selected .cl-status.is-info { background: var(--cl-surface); box-shadow: inset 0 0 0 1px var(--cl-accent); }");
     }
 
     @Test
@@ -113,14 +126,17 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
-    void codesAndTheSystemCostPillStayOnOneLineFromTableWidthAndTheCommentShowsTwoLines() throws Exception {
+    void codesStayOnOneLineFromTableWidthThePillFitsItsCellAndTheCommentShowsTwoLines() throws Exception {
         // given
         String section = section();
 
         // when / then
         String table = section.substring(section.indexOf("@media screen and (min-width: 720px) {"));
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap;")
-                .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: nowrap; }");
+                .contains(".cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }");
+        // the pill may break after "syst." (the amount itself is grouped with no-break spaces), never out of its cell
+        assertThat(section).doesNotContain(".cl-table-pills .cl-status { white-space: nowrap; }")
+                .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; white-space: normal; }");
         assertThat(section).contains("-webkit-line-clamp: 2;").doesNotContain(".cl-table-code { white-space: normal; }");
     }
 

@@ -133,7 +133,7 @@ class WarehouseListRenderingTest {
     }
 
     @Test
-    void categoryCellIsMarkedForHyphenation() {
+    void categoryCellIsNotHyphenatedAndTheSerialNumberIsOneTokenWithItsTitle() {
         // given
         WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
 
@@ -141,7 +141,9 @@ class WarehouseListRenderingTest {
         String html = render(page);
 
         // then
-        assertThat(html).contains("<td class=\"is-hyphenated\" data-label=\"Category\">");
+        // Polish hyphenation split English category words ("Headpho-nes"); the serial number is cut, never broken
+        assertThat(html).contains("<td class=\"cl-cell-category\" data-label=\"Category\">").doesNotContain("is-hyphenated");
+        assertThat(html).contains("<span class=\"cl-table-sub cl-cell-serial\" title=\"S/N 1\">S/N 1</span>");
     }
 
     @Test
