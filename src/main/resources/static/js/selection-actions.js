@@ -1,0 +1,214 @@
+// Bulk actions on the rows checked in a cl-table (warehouse list). table-select.js keeps the checkboxes, the count and the
+// selection row; this script greys an action the selection does not fit (its reason as visible text: a status the action
+// is not for, or rows from different sources for an action that needs one), shows the checked units, and runs the action:
+// a quantity dialog (#cl-quantity-dialog, full quantity by default, inline validation), the page's confirmation dialog
+// (window.CL_confirmBulk) or a plain post. Every post goes to the action's own address with selectedItemIds (and
+// quantities, reason, note). Rows come and go with list-page.js swaps (cl-list:swapped), so all lookups are fresh.
+(function () {
+    'use strict';
+
+    function bar() {
+        return document.querySelector('[data-cl-selection-actions]');
+    }
+
+    function checkedBoxes() {
+        return Array.prototype.slice.call(document.querySelectorAll('table[data-cl-select-table] input[data-cl-select-row]:checked'));
+    }
+
+    // Spec §4.5: an action runs only when every checked row fits it (order-items.js skips the rows that do not; §14.8).
+    function fits(button, boxes) {
+        var allowed = (button.getAttribute('data-cl-action-for') || '').split(' ');
+        var status = boxes.every(function (box) {
+            return allowed.indexOf(box.getAttribute('data-status')) >= 0;
+        });
+        if (!status) {
+            return button.getAttribute('data-reason-status');
+        }
+        if (button.hasAttribute('data-cl-action-same-source')) {
+            var first = boxes.length ? boxes[0].getAttribute('data-source') : null;
+            var same = boxes.every(function (box) {
+                return box.getAttribute('data-source') === first;
+            });
+            if (!same) {
+                return bar().getAttribute('data-reason-source');
+            }
+        }
+        return null;
+    }
+
+    function reasonOf(button) {
+        return button.querySelector('[data-cl-action-reason]')
+            || document.getElementById(button.getAttribute('aria-describedby') || '');
+    }
+
+    function refresh() {
+        var root = bar();
+        if (!root) {
+            return;
+        }
+        var boxes = checkedBoxes();
+        root.querySelectorAll('[data-cl-action-path]').forEach(function (button) {
+            var reason = boxes.length ? fits(button, boxes) : null;
+            if (reason) {
+                button.setAttribute('aria-disabled', 'true');
+            } else {
+                button.removeAttribute('aria-disabled');
+            }
+            var target = reasonOf(button);
+            if (target) {
+                target.textContent = reason || '';
+                target.hidden = !reason;
+            }
+        });
+        var units = document.querySelector('[data-cl-selection-units]');
+        if (units) {
+            var sum = boxes.reduce(function (total, box) {
+                return total + Number(box.getAttribute('data-qty') || 0);
+            }, 0);
+            units.textContent = (units.getAttribute('data-template') || '{m}').replace('{m}', String(sum));
+        }
+    }
+
+    function post(path, boxes, extra) {
+        var form = document.getElementById('warehouse-bulk-form');
+        form.replaceChildren();
+        form.action = path;
+        boxes.forEach(function (box) {
+            add(form, 'selectedItemIds', box.value);
+        });
+        (extra || []).forEach(function (pair) {
+            add(form, pair[0], pair[1]);
+        });
+        form.submit();
+    }
+
+    function add(form, name, value) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+    }
+
+    function openQuantities(button, boxes) {
+        var dialog = document.getElementById('cl-quantity-dialog');
+        var form = dialog.querySelector('[data-cl-quantity-form]');
+        var rows = dialog.querySelector('[data-cl-quantity-rows]');
+        var template = dialog.querySelector('[data-cl-quantity-row]');
+        var destroy = button.hasAttribute('data-cl-action-destroy');
+        var title = dialog.querySelector('[data-cl-quantity-title]');
+        title.textContent = title.getAttribute('data-template')
+            .replace('{label}', button.getAttribute('data-cl-action-label')).replace('{k}', String(boxes.length));
+        rows.replaceChildren();
+        boxes.forEach(function (box) {
+            var row = template.content.firstElementChild.cloneNode(true);
+            row.querySelector('[data-name]').textContent = box.getAttribute('data-name');
+            row.querySelector('[data-meta]').textContent = box.getAttribute('data-status-label') + ' · ' + box.getAttribute('data-qty');
+            row.querySelector('input[name="selectedItemIds"]').value = box.value;
+            var qty = row.querySelector('input[name="quantities"]');
+            qty.max = box.getAttribute('data-qty');
+            qty.value = box.getAttribute('data-qty');
+            qty.setAttribute('aria-label', box.getAttribute('data-name'));
+            rows.appendChild(row);
+        });
+        var extra = dialog.querySelector('[data-cl-quantity-destroy]');
+        extra.hidden = !destroy;
+        extra.querySelectorAll('select, textarea').forEach(function (field) {
+            field.disabled = !destroy;
+        });
+        var effect = dialog.querySelector('[data-cl-quantity-effect]');
+        effect.textContent = effect.getAttribute(destroy ? 'data-effect-destroy' : 'data-effect-split');
+        var submit = dialog.querySelector('[data-cl-quantity-submit]');
+        submit.textContent = button.getAttribute('data-cl-action-label');
+        submit.classList.toggle('is-danger', destroy);
+        submit.classList.toggle('is-primary', !destroy);
+        form.action = button.getAttribute('data-cl-action-path');
+        dialog.showModal();
+        var first = rows.querySelector('input[name="quantities"]');
+        if (first) {
+            first.focus();
+            first.select();
+        }
+    }
+
+    function validate(dialog) {
+        var effect = dialog.querySelector('[data-cl-quantity-effect]');
+        var firstBad = null;
+        dialog.querySelectorAll('input[name="quantities"]').forEach(function (input) {
+            var error = input.parentElement.querySelector('.cl-field-error');
+            var value = Number(input.value);
+            var max = Number(input.max);
+            var message = !Number.isInteger(value) || value < 1 ? effect.getAttribute('data-error-min')
+                : value > max ? effect.getAttribute('data-error-max').replace('{0}', String(max)) : '';
+            error.textContent = message;
+            error.hidden = !message;
+            if (message) {
+                input.setAttribute('aria-invalid', 'true');
+                firstBad = firstBad || input;
+            } else {
+                input.removeAttribute('aria-invalid');
+            }
+        });
+        var note = dialog.querySelector('textarea[name="note"]');
+        if (note && !note.disabled) {
+            var noteError = note.parentElement.querySelector('.cl-field-error');
+            var empty = note.value.trim() === '';
+            noteError.hidden = !empty;
+            if (empty) {
+                note.setAttribute('aria-invalid', 'true');
+                firstBad = firstBad || note;
+            } else {
+                note.removeAttribute('aria-invalid');
+            }
+        }
+        if (firstBad) {
+            firstBad.focus();
+        }
+        return !firstBad;
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest) {
+            return;
+        }
+        var button = event.target.closest('[data-cl-selection-actions] [data-cl-action-path]');
+        if (!button || button.getAttribute('aria-disabled') === 'true') {
+            return;
+        }
+        var boxes = checkedBoxes();
+        if (!boxes.length) {
+            return;
+        }
+        event.preventDefault();
+        var menu = button.closest('details.cl-menu');
+        if (menu) {
+            menu.open = false;
+            menu.querySelector(':scope > summary').focus();
+        }
+        if (button.hasAttribute('data-cl-action-quantity')) {
+            openQuantities(button, boxes);
+        } else if (button.hasAttribute('data-cl-select-confirm-title')) {
+            window.CL_confirmBulk(button, String(boxes.length), function () {
+                post(button.getAttribute('data-cl-action-path'), boxes);
+            }, 'data-cl-select-confirm-title', 'data-cl-select-confirm-message', 'data-cl-select-confirm-action');
+        } else {
+            post(button.getAttribute('data-cl-action-path'), boxes);
+        }
+    });
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (form.matches && form.matches('[data-cl-quantity-form]') && !validate(form.closest('dialog'))) {
+            event.preventDefault();
+        }
+    });
+
+    // table-select.js announces every selection change (rows, select-all, clearing, filtering) after it has updated the boxes
+    document.addEventListener('cl:selection-changed', refresh);
+    document.addEventListener('cl-list:swapped', refresh);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', refresh);
+    } else {
+        refresh();
+    }
+})();

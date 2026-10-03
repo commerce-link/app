@@ -20,7 +20,8 @@
 // outside the selection row -- a live region revealed in the same frame as its text is often not read); it speaks only
 // when the count changes, never on load. The bulk form takes the page's query string along (the filter as the operator
 // left it, kept in the address by table-filter.js), so the redirect after the action can come back to it.
-// Tables that arrive with a list-page.js swap are wired on cl-list:swapped.
+// Every refresh ends with a bubbling cl:selection-changed on the table, for scripts that act on the selection
+// (selection-actions.js). Tables that arrive with a list-page.js swap are wired on cl-list:swapped.
 (function () {
     'use strict';
 
@@ -85,6 +86,11 @@
     }
 
     function refresh(table) {
+        update(table);
+        table.dispatchEvent(new CustomEvent('cl:selection-changed', { bubbles: true }));
+    }
+
+    function update(table) {
         var bar = barOf(table);
         var selected = checked(table);
         rowsOf(table).forEach(function (box) {

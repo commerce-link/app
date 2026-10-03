@@ -224,7 +224,7 @@
             </section>
 
             <dialog class="cl-dialog is-form" id="cl-quantity-dialog" aria-labelledby="cl-quantity-title" th:unless="${page.rows().isEmpty()}">
-                <form method="post" data-cl-quantity-form>
+                <form method="post" data-cl-quantity-form novalidate>
                     <h2 class="cl-dialog-title" id="cl-quantity-title" data-cl-quantity-title th:attr="data-template=#{warehouse.bulk.dialog.title('{label}', '{k}')}"></h2>
                     <div class="cl-dialog-body">
                         <table class="cl-table is-compact cl-quantity-table">
