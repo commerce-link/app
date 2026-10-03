@@ -62,6 +62,17 @@ class WarehouseRestockRenderingTest {
     }
 
     @Test
+    void thePageWithoutAnErrorHasNoErrorSummary() {
+        // when
+        String html = EnglishFragmentTemplateEngine.create()
+                .process("<div th:replace=\"~{warehouse-restock :: body}\"></div>", context(null));
+
+        // then
+        // th:replace is processed before th:if, so a guard on the replaced element alone left an empty summary
+        assertThat(html).doesNotContain("data-cl-error-summary").doesNotContain("restock-errors");
+    }
+
+    @Test
     void withoutAnErrorTheCatalogSelectIsNeitherInvalidNorDescribed() {
         // when
         String html = EnglishFragmentTemplateEngine.create()
