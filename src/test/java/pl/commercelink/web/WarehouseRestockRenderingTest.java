@@ -57,6 +57,8 @@ class WarehouseRestockRenderingTest {
                 .containsPattern("<select[^>]*id=\"restock-catalog\"[^>]*aria-describedby=\"restock-catalog-error\"")
                 .containsPattern("<select[^>]*id=\"restock-catalog\"[^>]*aria-invalid=\"true\"")
                 .contains("id=\"restock-catalog-error\"").doesNotContain("role=\"alert\"");
+        // Restock saves nothing, so the summary does not say that changes were not saved
+        assertThat(html).contains("Correct the highlighted fields:").doesNotContain("Changes were not saved");
         // inside the form, so the summary is as wide as the form card
         assertThat(html).containsPattern("<form [^>]*>\\s*<div id=\"restock-errors\"");
     }

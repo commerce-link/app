@@ -37,11 +37,16 @@
 <!--/* Error summary of a form whose messages are already translated (a message whose text carries a number the key
        cannot hold, e.g. the line of a broken brand line). Same markup as errorSummary; errors maps a field id to the
        text of its error. */-->
-<div th:fragment="errorSummaryText(id, errors)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
+<div th:fragment="errorSummaryText(id, errors)"
+     th:replace="~{fragments/settings-form :: errorSummaryTextTitled(${id}, ${errors}, 'form.errors.title')}"></div>
+
+<!--/* errorSummaryText with its own title key, for a form that saves nothing (form.errors.title says changes were not
+       saved). */-->
+<div th:fragment="errorSummaryTextTitled(id, errors, titleKey)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
      tabindex="-1" data-cl-error-summary>
     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
     <div>
-        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
         <ul class="cl-alert-list">
             <li th:each="error : ${errors}">
                 <a th:href="'#' + ${error.key}" th:text="${error.value}"></a>
