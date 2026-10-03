@@ -39,12 +39,16 @@
 
         <div th:replace="~{fragments/screen-intro :: panel('offers', 'fas fa-tags')}"></div>
 
-        <div class="cl-alert is-ok cl-page-notice" role="status" th:if="${offerNotice != null}">
-            <p class="cl-alert-text" th:text="${offerNotice}"></p>
-        </div>
-
         <div data-cl-list-results data-cl-list-path="/dashboard/offers" data-cl-list-fragment="/dashboard/offers/list"
              th:fragment="results" th:with="q=${page.query()}">
+
+            <!--/* The outcome message lives in the swapped block, as on Payments: the fragment request carries no flash, so
+                   it goes away with the next segment or filter instead of hanging over another list. list-page.js
+                   focuses it once (data-cl-list-notice), so a screen reader reads it after the reload. */-->
+            <div th:if="${offerNotice != null}" class="cl-alert is-ok" role="status" tabindex="-1" data-cl-list-notice>
+                <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${offerNotice}"></p>
+            </div>
 
             <section class="cl-card" aria-labelledby="offers-table-title">
                 <h2 class="cl-visually-hidden" id="offers-table-title" th:text="#{offers.list.table.title}"></h2>
@@ -124,8 +128,6 @@
                     </div>
                 </div>
 
-                <p class="cl-tab-desc" th:if="${q.segment().name() != 'OFFERS'}" th:text="${q.segment().name() == 'TEMPLATES'} ? #{offers.list.desc.templates} : #{offers.list.desc.baskets}"></p>
-
                 <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
@@ -138,13 +140,16 @@
                        th:text="${page.resultsLine()}"></p>
                 </div>
 
+                <!--/* Under the chips, as on pending deliveries: the chips stay next to the toolbar they come from. */-->
+                <p class="cl-tab-desc" th:if="${q.segment().name() != 'OFFERS'}" th:text="${q.segment().name() == 'TEMPLATES'} ? #{offers.list.desc.templates} : #{offers.list.desc.baskets}"></p>
+
                 <!--/* Offers. The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
                 <table class="cl-table is-orders is-offers" th:unless="${page.offers().isEmpty()}">
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{offers.list.column.offer}"></th>
                         <th scope="col" th:text="#{offers.list.column.client}"></th>
-                        <th scope="col" th:text="#{offers.list.column.created}"></th>
+                        <th scope="col" aria-sort="descending"><span th:text="#{offers.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
                         <th scope="col" th:text="#{offers.list.column.validity}"></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
                         <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.list.column.actions}"></span></th>
@@ -153,7 +158,7 @@
                     <tbody>
                     <tr th:each="row : ${page.offers()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.offer}">
-                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}" th:title="${row.name()}"></a>
                             <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span></span>
                         </th>
                         <td th:attr="data-label=#{offers.list.column.client}">
@@ -165,7 +170,7 @@
                         </td>
                         <td th:attr="data-label=#{offers.list.column.created}">
                             <span class="cl-cell-date" th:text="${row.created()}"></span>
-                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}"></span>
+                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}" th:title="${row.author()}"></span>
                         </td>
                         <td th:attr="data-label=#{offers.list.column.validity}">
                             <span class="cl-status" th:classappend="${row.validityTone()}" th:text="${row.validityLabel()}"></span>
@@ -176,8 +181,10 @@
                             <span class="cl-cell-amount" th:text="${row.gross()}"></span>
                             <span class="cl-table-sub cl-cards-hide" th:text="${row.net()}"></span>
                         </td>
+                        <!--/* Copying needs the clipboard API, so both copy controls stay hidden until copy-field.js reveals them
+                               (data-cl-copy-reveal); without JavaScript the client link is on the offer page. */-->
                         <td class="cl-table-actions">
-                            <button type="button" class="cl-button is-icon cl-tooltip cl-copy-quick"
+                            <button type="button" class="cl-button is-icon cl-tooltip cl-copy-quick" hidden data-cl-copy-reveal
                                     th:attr="data-cl-copy=${row.clientUrl()}, aria-label=${row.copyLabel()}, data-tooltip=#{offers.list.copyLink}">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span>
                             </button>
@@ -186,7 +193,9 @@
                                     <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
                                 </summary>
                                 <ul class="cl-menu-list">
-                                    <li><button type="button" class="cl-menu-item" th:attr="data-cl-copy=${row.clientUrl()}" th:text="#{offers.list.copyLink}"></button></li>
+                                    <li><a class="cl-menu-item" th:href="@{${row.href()}}" th:text="#{offers.list.open}"></a></li>
+                                    <li class="cl-menu-sep" aria-hidden="true"></li>
+                                    <li hidden data-cl-copy-reveal><button type="button" class="cl-menu-item" th:attr="data-cl-copy=${row.clientUrl()}" th:text="#{offers.list.copyLink}"></button></li>
                                     <li><form method="post" th:action="@{${row.copyHref()}}"><button type="submit" class="cl-menu-item" th:text="#{offers.list.duplicate}"></button></form></li>
                                     <li><form method="post" th:action="@{${row.copyWithContactHref()}}"><button type="submit" class="cl-menu-item" th:text="#{offers.list.duplicateWithContact}"></button></form></li>
                                     <li class="cl-menu-sep" aria-hidden="true"></li>
@@ -201,11 +210,11 @@
                     </tbody>
                 </table>
 
-                <table class="cl-table is-orders is-offers" th:unless="${page.templates().isEmpty()}">
+                <table class="cl-table is-orders is-offers is-templates" th:unless="${page.templates().isEmpty()}">
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{offers.list.column.template}"></th>
-                        <th scope="col" th:text="#{offers.list.column.createdM}"></th>
+                        <th scope="col" aria-sort="descending"><span th:text="#{offers.list.column.createdM}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.items}"></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
                         <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.list.column.actions}"></span></th>
@@ -214,20 +223,20 @@
                     <tbody>
                     <tr th:each="row : ${page.templates()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.template}">
-                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                            <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}" th:title="${row.name()}"></a>
                             <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span></span>
                         </th>
                         <td th:attr="data-label=#{offers.list.column.createdM}">
                             <span class="cl-cell-date" th:text="${row.created()}"></span>
-                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}"></span>
+                            <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}" th:title="${row.author()}"></span>
                         </td>
-                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-cell-client" th:text="${row.itemsText()}"></span></td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-cell-count" th:text="${row.itemsCount()}"></span><span class="cl-cell-count-text" th:text="${row.itemsText()}"></span></td>
                         <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}">
                             <span class="cl-cell-amount" th:text="${row.gross()}"></span>
                             <span class="cl-table-sub cl-cards-hide" th:text="#{offers.list.template.priced}"></span>
                         </td>
                         <td class="cl-table-actions">
-                            <a class="cl-button" th:href="@{${row.createOfferHref()}}">
+                            <a class="cl-link-button" th:href="@{${row.createOfferHref()}}">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                                 <span th:text="#{offers.list.createFromTemplate}"></span>
                             </a>
@@ -249,12 +258,12 @@
                     </tbody>
                 </table>
 
-                <table class="cl-table is-orders is-offers" th:unless="${page.baskets().isEmpty()}">
+                <table class="cl-table is-orders is-offers is-baskets" th:unless="${page.baskets().isEmpty()}">
                     <thead>
                     <tr>
                         <th scope="col" th:text="#{offers.list.column.basket}"></th>
                         <th scope="col" th:text="#{offers.list.column.client}"></th>
-                        <th scope="col" th:text="#{offers.list.column.createdM}"></th>
+                        <th scope="col" aria-sort="descending"><span th:text="#{offers.list.column.createdM}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.items}"></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
                     </tr>
@@ -266,7 +275,7 @@
                         </th>
                         <td th:attr="data-label=#{offers.list.column.client}"><span class="cl-cell-client" th:text="${row.client()}"></span></td>
                         <td th:attr="data-label=#{offers.list.column.createdM}"><span class="cl-cell-date" th:text="${row.created()}"></span></td>
-                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-table-sub" th:text="${row.itemsText()}"></span></td>
+                        <td class="is-numeric" th:attr="data-label=#{offers.list.column.items}"><span class="cl-cell-count" th:text="${row.itemsCount()}"></span><span class="cl-cell-count-text" th:text="${row.itemsText()}"></span></td>
                         <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}"><span class="cl-cell-amount" th:text="${row.gross()}"></span></td>
                     </tr>
                     </tbody>

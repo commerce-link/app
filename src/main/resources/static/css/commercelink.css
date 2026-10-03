@@ -8597,12 +8597,73 @@ a.cl-link-button:hover {
     margin-left: 4px;
 }
 
+/* Row actions without a frame at rest (S1, audit 2026-10-03): two framed 36 px buttons per row were the loudest thing in
+   the table. The frame comes back under the pointer, on an open menu, and the focus ring stays; the size (36 px,
+   44 px below 1024 px) does not change. */
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon {
+    border-color: transparent;
+    background: transparent;
+}
+
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon:hover,
+.cl-page .cl-table.is-offers .cl-table-actions .cl-menu[open] > summary.cl-button.is-icon {
+    border-color: var(--cl-accent);
+    background: var(--cl-surface);
+}
+
+/* A name of two lines at most; the whole name is in title. Long names made a row 168 px high at 1024 px. In the table
+   the name also stops at 26ch, so one long name does not take the client column's width on every row. */
 .cl-page .cl-table.is-offers .cl-cell-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
     font-weight: 600;
+}
+
+@media (min-width: 720px) {
+    .cl-page .cl-table.is-offers .cl-cell-name {
+        max-width: 26ch;
+    }
+}
+
+/* The author (often an e-mail address) ends in an ellipsis instead of breaking letter by letter under the date; width 0
+   keeps it out of the column's minimum, as .cl-cell-email does. */
+.cl-page .cl-table.is-offers .cl-who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 0;
+    min-width: 100%;
 }
 
 .cl-page .cl-table.is-offers .cl-status {
     white-space: nowrap;
+}
+
+/* The list is always newest first: the date header says so like a sorted header of the other lists (aria-sort on th). */
+.cl-page .cl-table.is-offers .cl-sort-mark {
+    font-size: .8em;
+}
+
+/* A neutral validity note ("do 23.10 (20 dni)", "minęła 01.10") is plain text; only the note of an expiring offer
+   (is-warn: "jutro, 04.10", "dziś, 20:10") keeps the weight of the orders' due note. On the hover row it moves to --cl-ink-2: --cl-ink-3 is 4.48:1 on --cl-surface-2. */
+.cl-page .cl-table.is-offers .cl-due-note:not(.is-warn) {
+    font-weight: 400;
+}
+
+.cl-page .cl-table.is-offers tbody tr:hover .cl-due-note:not(.is-warn) {
+    color: var(--cl-ink-2);
+}
+
+/* Items of a template or a basket: the bare number under the "Pozycje" header, "pozycje: n" on the phone card, which
+   has no header. */
+.cl-page .cl-table.is-offers .cl-cell-count {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-offers .cl-cell-count-text {
+    display: none;
 }
 
 /* A menu entry that needs a word on what happens next ("Nowa oferta ▾"); not used in row menus. */
@@ -8617,41 +8678,77 @@ a.cl-link-button:hover {
     gap: 6px;
 }
 
-/* 720-1215 px (rail or drawer): the quick copy icon goes (the same action is in the row menu), so does the item count. */
+/* 720-1215 px (rail or drawer): the quick copy icon goes (the same action is in the row menu), so do the item count and
+   the author, which gives the name and client columns their width back (short names wrapped at 1024 px). */
 @media (min-width: 720px) and (max-width: 1215px) {
     .cl-page .cl-table.is-offers .cl-copy-quick,
-    .cl-page .cl-table.is-offers .cl-offer-items {
+    .cl-page .cl-table.is-offers .cl-offer-items,
+    .cl-page .cl-table.is-offers .cl-who {
         display: none;
     }
 }
 
-/* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. "dense" lets
-   the menu fill the free right cell of the note's line. */
+/* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. The note and the
+   menu share the fifth line explicitly (auto-placement put the menu's 44 px box under the note's text). The menu keeps
+   its 44 px target, and the negative margin gives the growth back to the line above and the card padding, as the chip
+   "×" does, so the line is as high as its text. */
 @media (max-width: 719px) {
     .cl-page .cl-table.is-offers tr {
         grid-auto-flow: row dense;
     }
 
-    .cl-page .cl-table.is-offers .cl-table-actions {
-        display: block;
-        width: auto;
-        grid-column: 2;
-        order: 5;
-        justify-self: end;
+    .cl-page .cl-table.is-offers .cl-due-note {
+        grid-row: 5;
         align-self: center;
     }
 
+    .cl-page .cl-table.is-offers .cl-table-actions {
+        display: flex;
+        width: auto;
+        grid-column: 2;
+        justify-self: end;
+        align-self: center;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-offers tr:has(.cl-status) .cl-table-actions {
+        grid-row: 5;
+        margin: -12px 0 -10px;
+    }
+
+    /* template card: "Utwórz ofertę" and ⋯ as its last line; on the name's line they left the name a few letters */
+    .cl-page .cl-table.is-templates .cl-table-actions {
+        grid-column: 1 / -1;
+        order: 5;
+        justify-content: flex-end;
+    }
+
     .cl-page .cl-table.is-offers .cl-copy-quick,
-    .cl-page .cl-table.is-offers .cl-who {
+    .cl-page .cl-table.is-offers .cl-who,
+    .cl-page .cl-table.is-offers .cl-cell-count {
         display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-cell-count-text {
+        display: block;
+        font-size: 12.5px;
+        color: var(--cl-ink-3);
+    }
+
+    /* template card: under the id, like the client line of an offer; basket card: beside the id */
+    .cl-page .cl-table.is-templates .cl-cell-count-text {
+        grid-column: 1 / -1;
+        order: 2;
+    }
+
+    .cl-page .cl-table.is-baskets .cl-cell-count-text {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
     }
 
     .cl-page .cl-table.is-offers .cl-table-actions .cl-button {
         min-width: 44px;
         min-height: 44px;
     }
-}
-
-.cl-page .cl-page-notice {
-    margin-bottom: 16px;
 }

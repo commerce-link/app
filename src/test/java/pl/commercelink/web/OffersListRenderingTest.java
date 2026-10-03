@@ -57,7 +57,7 @@ class OffersListRenderingTest {
 
         // then
         assertThat(html).contains("class=\"cl-table is-orders is-offers\"")
-                .contains("<a class=\"cl-row-link cl-cell-name\" href=\"/dashboard/offer/o1\">Stacje CAD</a>")
+                .contains("<a class=\"cl-row-link cl-cell-name\" href=\"/dashboard/offer/o1\" title=\"Stacje CAD\">Stacje CAD</a>")
                 .contains("Biuro Lis s.c.").contains("biuro@lis.pl").contains("Jan Kowalski")
                 .contains("cl-status is-warn").contains("jutro, 04.10").contains("48 960,00 PLN")
                 .contains("data-cl-copy=\"https://app.example/store/s/client/offer/o1\"")
@@ -65,6 +65,34 @@ class OffersListRenderingTest {
                 .contains("href=\"/dashboard/offer/o1/delete?returnTo=%2Fdashboard%2Foffers\"").contains("data-cl-confirm")
                 .contains("aria-label=\"Akcje: Stacje CAD\"")
                 .doesNotContain("??").doesNotContain("class=\"button").doesNotContain("class=\"table");
+    }
+
+    @Test
+    void offerMenuOpensTheOfferFirstAndCopyControlsWaitForTheScript() {
+        // given
+        OfferListPage page = page(OfferSegment.OFFERS, List.of(offerRow()), List.of(), List.of(), List.of(), null);
+
+        // when
+        String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
+
+        // then — without JavaScript the copy controls would be dead buttons (and the link icon an empty square)
+        assertThat(html).containsPattern("<ul class=\"cl-menu-list\">\\s*<li><a class=\"cl-menu-item\" href=\"/dashboard/offer/o1\">Otwórz ofertę</a></li>")
+                .containsPattern("class=\"cl-button is-icon cl-tooltip cl-copy-quick\" hidden data-cl-copy-reveal")
+                .contains("aria-label=\"Kopiuj link dla klienta: Stacje CAD\"")
+                .containsPattern("<li hidden data-cl-copy-reveal><button type=\"button\" class=\"cl-menu-item\" data-cl-copy=");
+    }
+
+    @Test
+    void dateHeaderStatesTheFixedSortForAssistiveTechnology() {
+        // given
+        OfferListPage page = page(OfferSegment.OFFERS, List.of(offerRow()), List.of(), List.of(), List.of(), null);
+
+        // when
+        String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
+
+        // then
+        assertThat(html).contains("<th scope=\"col\" aria-sort=\"descending\"><span>Utworzona</span> <span class=\"cl-sort-mark\" aria-hidden=\"true\">▼</span></th>")
+                .contains("data-label=\"Utworzona\"").doesNotContain("↓");
     }
 
     @Test
@@ -76,8 +104,11 @@ class OffersListRenderingTest {
         String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
 
         // then
-        assertThat(html).contains("href=\"/dashboard/offer/new?intent=template&amp;sourceId=t1\"").contains("Utwórz ofertę")
-                .contains("Szablon to zestaw pozycji bez klienta").doesNotContain(">Klient<").doesNotContain("data-cl-filter-menu=\"validity\"");
+        assertThat(html).contains("<a class=\"cl-link-button\" href=\"/dashboard/offer/new?intent=template&amp;sourceId=t1\">").contains("Utwórz ofertę")
+                .contains("Szablon to zestaw pozycji bez klienta").doesNotContain(">Klient<").doesNotContain("data-cl-filter-menu=\"validity\"")
+                .contains("<span class=\"cl-cell-count\">9</span><span class=\"cl-cell-count-text\">pozycje: 9</span>");
+        // the segment description sits under the chips and the count line, as on pending deliveries
+        assertThat(html.indexOf("cl-tab-desc")).isGreaterThan(html.indexOf("cl-table-results"));
     }
 
     @Test
@@ -92,6 +123,7 @@ class OffersListRenderingTest {
 
         // then
         assertThat(html).contains("href=\"/dashboard/basket/view/b1\"").contains("Usuwane automatycznie po 14 dniach")
+                .contains("<span class=\"cl-cell-count\">2</span>")
                 .doesNotContain("cl-menu-glyph").doesNotContain("data-cl-confirm");
     }
 
@@ -99,14 +131,16 @@ class OffersListRenderingTest {
     void emptyFilteredListOffersClearing() {
         // given
         OfferListPage page = page(OfferSegment.OFFERS, List.of(), List.of(), List.of(),
-                List.of(new Chip("Szukane: Projektor", "/dashboard/offers", "Usuń zawężenie: Szukane: Projektor")),
-                new EmptyState("Brak wyników dla wybranych filtrów.", "Wyczyść filtry", "/dashboard/offers"));
+                List.of(new Chip("Szukane: Projektor", "/dashboard/offers", "Wyczyść: Szukane: Projektor")),
+                new EmptyState("Brak ofert dla „Projektor”.", "Wyczyść wyszukiwanie", "/dashboard/offers"));
 
         // when
         String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
 
         // then
-        assertThat(html).contains("cl-list-empty").contains("Brak wyników dla wybranych filtrów.").contains("Szukane: Projektor")
+        assertThat(html).contains("cl-list-empty").contains("Brak ofert dla „Projektor”.").contains("Szukane: Projektor")
+                .containsPattern("<a class=\"cl-link-button\" href=\"/dashboard/offers\"\\s+data-cl-list-nav>Wyczyść wyszukiwanie</a>")
+                .contains("aria-label=\"Wyczyść: Szukane: Projektor\"")
                 .doesNotContain("<table");
     }
 
@@ -123,10 +157,39 @@ class OffersListRenderingTest {
         assertThat(html).contains("summary class=\"cl-button is-primary\"").contains("Nowa oferta")
                 .contains("href=\"/dashboard/offer/new?intent=manual\"").contains("href=\"/dashboard/offers?segment=templates\"")
                 .contains("href=\"/dashboard/offer/new/csv\"").contains("cl-menu-desc")
-                .contains("cl-alert is-ok").contains("Usunięto ofertę „X”.")
                 .contains("data-cl-list-results").contains("id=\"cl-confirm-dialog\"")
                 .contains("/js/list-page.js").contains("/js/menu.js").contains("/js/confirm-dialog.js").contains("/js/copy-field.js")
                 .doesNotContain("??");
+    }
+
+    @Test
+    void outcomeNoticeLivesInTheSwappedBlockAsOnPayments() {
+        // given
+        OfferListPage page = page(OfferSegment.OFFERS, List.of(offerRow()), List.of(), List.of(), List.of(), null);
+
+        // when — the results fragment is what list-page.js swaps; the next swap carries no flash and drops the notice
+        String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page, "offerNotice", "Usunięto ofertę „X”."));
+
+        // then
+        assertThat(html).contains("<div class=\"cl-alert is-ok\" role=\"status\" tabindex=\"-1\" data-cl-list-notice>")
+                .contains("<i class=\"fas fa-check-circle cl-alert-icon\" aria-hidden=\"true\"></i>")
+                .contains("<p class=\"cl-alert-title\">Usunięto ofertę „X”.</p>")
+                .doesNotContain("cl-page-notice");
+        assertThat(html.indexOf("data-cl-list-notice")).isGreaterThan(html.indexOf("data-cl-list-results"))
+                .isLessThan(html.indexOf("cl-table-toolbar"));
+    }
+
+    @Test
+    void emptyListWithoutFiltersLinksToAnEmptyOffer() {
+        // given
+        OfferListPage page = page(OfferSegment.OFFERS, List.of(), List.of(), List.of(), List.of(),
+                new EmptyState("Nie masz jeszcze ofert.", "Utwórz pustą ofertę", "/dashboard/offer/new?intent=manual"));
+
+        // when
+        String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
+
+        // then
+        assertThat(html).containsPattern("href=\"/dashboard/offer/new\\?intent=manual\"\\s+data-cl-list-nav>Utwórz pustą ofertę</a>");
     }
 
     @Test
