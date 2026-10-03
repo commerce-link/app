@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;
@@ -1600,10 +1601,52 @@ class SupplierPurchaseServiceTest {
         // then
         assertTrue(result.isSuccess());
         InOrder order = inOrder(deliveryCreationService, deliveriesRepository, rejectionRecorder);
+        order.verify(deliveriesRepository).save(delivery);
         order.verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
         order.verify(deliveriesRepository).delete(delivery);
         order.verify(rejectionRecorder).record(STORE_ID, withAllocations, "Cena wzrosla o 20%");
-        verify(deliveriesRepository, never()).save(delivery);
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+    }
+
+    @Test
+    void rejectionThatLosesTheRaceToAnApprovalOrAnotherRejectionReleasesNothing() throws Exception {
+        // given
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Delivery withAllocations = awaitingApprovalDelivery();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(deliveriesRepository).save(delivery);
+
+        // when
+        OperationResult<String> result = service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
+        verify(deliveryCreationService, never()).releaseAllocations(any(), any());
+        verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        verifyNoInteractions(rejectionRecorder);
+    }
+
+    @Test
+    void approvalThatLosesTheRaceToARejectionQueuesNothing() throws Exception {
+        // given
+        Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
+        when(globalSupplierProvider.requiresDeliveryAddress()).thenReturn(true);
+        when(globalSupplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("5900000000001", "MFN-1", 5, 9.5, "PLN")));
+        Delivery delivery = awaitingApprovalDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(deliveriesRepository).save(delivery);
+
+        // when
+        OperationResult<String> result = service.approve(STORE_ID, DELIVERY_ID, "addr-9");
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.approval.error.state", result.getMessage());
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
 

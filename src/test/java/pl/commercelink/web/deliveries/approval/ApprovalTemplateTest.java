@@ -72,7 +72,7 @@ class ApprovalTemplateTest {
                 .contains("Opcje zamówienia u dostawcy").contains("name=\"supplierOrderChoices[shipping]\"")
                 .contains("Towar dla").contains("#dd0e0011").contains("klient11@example.com").contains("Na stan magazynu")
                 .contains("Decyzja").contains("Zamów u Acme").contains("Zanim zamówisz:")
-                .contains("Odrzuć zgłoszenie").contains("data-cl-dialog-open=\"reject-dialog\"").contains("href=\"?open=reject\"")
+                .contains("Odrzuć zgłoszenie").contains("data-cl-dialog-open=\"reject-dialog\" data-cl-locked-while-ordering").contains("href=\"?open=reject\"")
                 .contains("id=\"reject-dialog\"").contains("name=\"reason\"").contains("maxlength=\"500\"")
                 .contains("action=\"/dashboard/store/uma2dqukxr/deliveries/dd000010-0000-4000-8000-000000000010/reject\"")
                 .contains("3 szt. za 1 299,00 PLN netto")

@@ -1808,6 +1808,13 @@ a.cl-link-button:hover {
     color: var(--cl-warn);
 }
 
+/* A text link locked while an order is on its way (the "reject the request" link of the unavailability alert). */
+.cl-page .cl-alert-text a[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
 /* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a
    field label, or a part of the form that is switched off as a whole (disabled with its fieldset). */
 .cl-page .cl-choice-group {

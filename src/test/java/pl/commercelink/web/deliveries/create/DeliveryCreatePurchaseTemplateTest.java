@@ -292,7 +292,7 @@ class DeliveryCreatePurchaseTemplateTest {
         // then
         assertThat(html).contains("data-fully-available=\"false\"")
                 .contains("Dostawca nie ma teraz całej ilości, więc tego zgłoszenia nie zamówisz.")
-                .contains("href=\"?open=reject\"").contains("data-cl-dialog-open=\"reject-dialog\"")
+                .contains("href=\"?open=reject\"").contains("data-cl-dialog-open=\"reject-dialog\" data-cl-locked-while-ordering")
                 .contains("sklep złoży nowe z dostępną ilością")
                 .doesNotContain("data-cl-back-submit").doesNotContain("??");
     }

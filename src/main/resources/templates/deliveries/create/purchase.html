@@ -123,7 +123,7 @@
             <div class="cl-alert is-warn">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:if="${validationMode == 'approval'}"><span th:text="#{deliveries.approval.unavailable}"></span>
-                    <a href="?open=reject" data-cl-dialog-open="reject-dialog" th:text="#{deliveries.approval.unavailable.reject}"></a>
+                    <a href="?open=reject" data-cl-dialog-open="reject-dialog" data-cl-locked-while-ordering th:text="#{deliveries.approval.unavailable.reject}"></a>
                     <span th:text="#{deliveries.approval.unavailable.after}"></span></p>
                 <p class="cl-alert-text" th:unless="${validationMode == 'approval'}"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
                     <button type="button" class="cl-link-button" data-cl-back-submit="back-submit"
