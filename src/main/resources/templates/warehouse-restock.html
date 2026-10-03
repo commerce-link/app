@@ -6,14 +6,23 @@
 
 <div layout:fragment="content">
 <section class="cl-page">
-    <div class="cl-page-body is-wide">
+    <div class="cl-page-body is-form" th:fragment="body">
 
-        <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/warehouse', #{nav.warehouse}, #{warehouse.restock.title}, #{warehouse.restock.lead}, null)}"></div>
+        <!--/* Inline rather than settings-header :: subpageWithActions: that fragment is a div, because a header element in
+               settings-header.html would also be selected by its "header" fragment. */-->
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{/dashboard/warehouse}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{nav.warehouse}"></span>
+            </a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{warehouse.restock.title}"></h1>
+            </div>
+            <p class="cl-page-lead" th:text="#{warehouse.restock.lead}"></p>
+        </header>
 
-        <div th:if="${restock.error() != null}" class="cl-alert is-bad" role="status">
-            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-text" th:text="${restock.error()}"></p>
-        </div>
+        <div th:if="${restock.error() != null}"
+             th:replace="~{fragments/settings-form :: errorSummaryText('restock-errors', ${ {'restock-catalog': restock.error()} })}"></div>
 
         <form class="cl-form" method="post" th:action="@{/dashboard/warehouse/restock}" data-cl-submit-once>
             <div class="cl-card">
@@ -30,6 +39,7 @@
 
     </div>
 </section>
+<script th:src="@{/js/error-summary.js}" defer></script>
 <script th:src="@{/js/dependent-select.js}" defer></script>
 <script th:src="@{/js/submit-once.js}" defer></script>
 </div>

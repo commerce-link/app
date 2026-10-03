@@ -2776,6 +2776,12 @@ a.cl-link-button:hover {
     margin-top: var(--cl-gap-fields);
 }
 
+/* A checkbox under a field (the restock page: price limit, then "only products not in stock") keeps the same distance;
+   without it the box touched the help line of the field above, while the restock dialog spaces them by its grid gap. */
+.cl-page .cl-fieldset > .cl-field + .cl-check-field {
+    margin-top: var(--cl-gap-fields);
+}
+
 /* The catalog form wraps the field in a Bulma .field under a label; it lost its mt-2 and touched the label. */
 .field > .schedule-field {
     margin-top: var(--cl-gap-related);

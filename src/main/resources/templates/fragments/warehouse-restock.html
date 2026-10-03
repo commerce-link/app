@@ -10,11 +10,17 @@
         <div class="cl-span-3 cl-field">
             <label class="cl-label" for="restock-catalog" th:text="#{warehouse.restock.field.catalog}"></label>
             <select class="cl-select" id="restock-catalog" name="catalogId" required
-                    th:attr="aria-invalid=${restock.error() != null ? 'true' : null}">
+                    th:classappend="${restock.error() != null} ? 'is-invalid'"
+                    th:attr="aria-invalid=${restock.error() != null ? 'true' : null},
+                             aria-describedby=${restock.error() != null ? 'restock-catalog-error' : null}">
                 <option value="" th:text="#{warehouse.restock.field.catalog.choose}"></option>
                 <option th:each="catalog : ${restock.catalogs()}" th:value="${catalog.catalogId}" th:text="${catalog.name}"
                         th:selected="${catalog.catalogId == restock.selectedCatalogId() or restock.catalogs().size() == 1}"></option>
             </select>
+            <p th:if="${restock.error() != null}" class="cl-field-error" id="restock-catalog-error">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="${restock.error()}"></span>
+            </p>
         </div>
         <div class="cl-span-3 cl-field">
             <label class="cl-label" for="restock-category" th:text="#{warehouse.restock.field.category}"></label>
