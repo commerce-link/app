@@ -103,7 +103,8 @@ public class BasketsRepository extends DynamoDbRepository<Basket> {
             if (joined.contains(":now")) values.put(":now", new AttributeValue().withS(criteria.now().format(DATE_TIME_FORMATTER)));
             if (joined.contains(":soon")) values.put(":soon", new AttributeValue().withS(
                     criteria.now().plusDays(OfferValidity.EXPIRING_DAYS).format(DATE_TIME_FORMATTER)));
-            filter.append(" AND (").append(joined).append(")");
+            // DynamoDB rejects redundant parentheses, and EXPIRING already carries its own pair
+            filter.append(alternatives.size() == 1 ? " AND " + joined : " AND (" + joined + ")");
         }
 
         DynamoDBQueryExpression<Basket> query = new DynamoDBQueryExpression<Basket>()

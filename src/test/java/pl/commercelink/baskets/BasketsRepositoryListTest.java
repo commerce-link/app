@@ -129,6 +129,21 @@ class BasketsRepositoryListTest {
     }
 
     @Test
+    void singleValidityValueIsNotWrappedInRedundantParentheses() {
+        // given
+        indexReturns(List.of());
+
+        // when
+        repository.findForList("store-1", new OfferListCriteria(BasketType.Offer, null,
+                EnumSet.of(OfferValidity.EXPIRING), null, null, NOW), 1, 25);
+
+        // then
+        // DynamoDB rejects "((a AND b))" with "redundant parentheses"
+        assertThat(capturedQuery().getFilterExpression())
+                .isEqualTo("#type = :type AND (expiresAt >= :now AND expiresAt <= :soon)");
+    }
+
+    @Test
     void activeAndExpiredUseTheSameBoundaries() {
         // given
         indexReturns(List.of());
