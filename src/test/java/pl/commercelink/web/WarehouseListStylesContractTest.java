@@ -40,16 +40,6 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
-    void selectedUnitsAreSeparatedFromTheSelectedCountByADot() throws Exception {
-        // given
-        String section = section();
-
-        // when / then
-        // spec §4.5: "Zaznaczono {k} z {n} · {m} szt."
-        assertThat(section).contains(".cl-page .cl-selection-row [data-cl-selection-units]::before { content: \"· \"; }");
-    }
-
-    @Test
     void dockedSelectionRowLeavesRoomForTheLastCardAndThePagesOnPhones() throws Exception {
         // given
         String section = section();

@@ -89,7 +89,7 @@
         }
     }
 
-    // "{m} szt." from the selection row's server-rendered template, so the script carries no unit word of its own
+    // "· {m} szt." from the selection row's server-rendered template, so the script carries no unit word or separator
     function unitsText(count) {
         var units = document.querySelector('[data-cl-selection-units]');
         return ((units && units.getAttribute('data-template')) || '{m}').replace('{m}', String(count));
@@ -169,7 +169,9 @@
         boxes.forEach(function (box) {
             var row = template.content.firstElementChild.cloneNode(true);
             row.querySelector('[data-name]').textContent = box.getAttribute('data-name');
-            row.querySelector('[data-meta]').textContent = box.getAttribute('data-status-label') + ' · ' + unitsText(box.getAttribute('data-qty'));
+            row.querySelector('[data-meta]').textContent = rows.getAttribute('data-meta-template')
+                .replace('{status}', box.getAttribute('data-status-label'))
+                .replace('{units}', rows.getAttribute('data-units-template').replace('{m}', box.getAttribute('data-qty')));
             row.querySelector('input[name="selectedItemIds"]').value = box.value;
             var qty = row.querySelector('input[name="quantities"]');
             qty.max = box.getAttribute('data-qty');

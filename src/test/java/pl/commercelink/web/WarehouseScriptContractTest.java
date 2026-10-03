@@ -32,9 +32,9 @@ class WarehouseScriptContractTest {
         String js = read("src/main/resources/static/js/selection-actions.js");
 
         // when / then
-        // "Na stanie · 3 szt.": the unit word comes from the selection row's data-template, the script knows no texts
-        assertThat(js).contains("unitsText(box.getAttribute('data-qty'))")
-                .doesNotContain("box.getAttribute('data-status-label') + ' · ' + box.getAttribute('data-qty')");
+        // "Na stanie · 3 szt.": the row and its unit word come from server-rendered templates, the script knows no texts
+        assertThat(js).contains("data-meta-template").contains("data-units-template")
+                .doesNotContain("' · '");
     }
 
     @Test
@@ -123,5 +123,16 @@ class WarehouseScriptContractTest {
         // when / then
         assertThat(reset).contains("select[name=\"reason\"]");
         assertThat(validate).contains("select[name=\"reason\"]");
+    }
+
+    @Test
+    void separatorsComeFromTheMessagesNotFromTheTemplateOrTheStyles() throws Exception {
+        // given
+        String html = read("src/main/resources/templates/warehouse.html");
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when / then
+        assertThat(html).doesNotContain("›").doesNotContain("· ");
+        assertThat(css).doesNotContain("[data-cl-selection-units]::before");
     }
 }

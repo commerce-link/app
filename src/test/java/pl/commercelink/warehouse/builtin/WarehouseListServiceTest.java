@@ -102,7 +102,7 @@ class WarehouseListServiceTest {
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
         WarehousePageModel.Tile toReceive = model.tiles().get(1);
         assertThat(toReceive.value()).isEqualTo("6 szt.");
-        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione u dostawców");
+        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione");
         assertThat(toReceive.href()).isEqualTo("/dashboard/warehouse?statuses=Allocation&statuses=Ordered");
         assertThat(toReceive.active()).isFalse();
     }
@@ -270,7 +270,7 @@ class WarehouseListServiceTest {
         assertThat(empty.emptyState().actionLabel()).isEqualTo("Dodaj pozycję");
         assertThat(empty.emptyState().actionHref()).isEqualTo("/dashboard/warehouse/items/new");
         assertThat(filtered.chips()).extracting(WarehousePageModel.Chip::label)
-                .containsExactly("Status: Zarezerwowane", "Kategoria: GPU", "Szukaj: a");
+                .containsExactly("Status: Zarezerwowane", "Kategoria: GPU", "Szukasz: „a”");
         assertThat(page("statuses", "all").chips()).isEmpty();
         assertThat(filtered.activeFilterCount()).isEqualTo(3);
     }
@@ -340,5 +340,23 @@ class WarehouseListServiceTest {
         assertThat(results.net()).isNull();
         assertThat(results.grossLabel()).isNull();
         assertThat(results.gross()).isNull();
+    }
+
+    @Test
+    void menuSummariesAndTileHintsReadAsLabelColonValue() {
+        // given
+        add("A", "GPU", Reserved, 1, 1);
+        add("B", "CPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel all = page("statuses", "all");
+        WarehousePageModel two = page("statuses", "Reserved", "statuses", "Delivered", "categories", "GPU", "categories", "CPU");
+
+        // then
+        assertThat(all.statusSummary()).isEqualTo("wszystkie");
+        assertThat(all.categorySummary()).isEqualTo("wszystkie");
+        assertThat(two.statusSummary()).isEqualTo("wybrane: 2");
+        assertThat(two.categorySummary()).isEqualTo("wybrane: 2");
+        assertThat(all.tiles().get(0).hint()).isEqualTo("pozycje: 1");
     }
 }

@@ -8621,6 +8621,5 @@ a.cl-link-button:hover {
 }
 /* spec §4.5: "Zaznaczono {k} z {n} · {m} szt."; the two counts are filled by different scripts */
 .cl-page .cl-selection-row [data-cl-selection-units] { margin-left: 4px; }
-.cl-page .cl-selection-row [data-cl-selection-units]::before { content: "· "; }
 .cl-dialog .cl-quantity-table td.is-numeric { width: 120px; }
 .cl-dialog .cl-quantity-table .cl-input.is-qty { width: 96px; text-align: right; }

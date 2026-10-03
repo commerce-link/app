@@ -321,4 +321,17 @@ class WarehouseListRenderingTest {
         // then
         assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\">\\s*<span>Items: 0</span>\\s*</p>");
     }
+
+    @Test
+    void selectionUnitsAndQuantityRowsGetTheirSeparatorsFromTheMessages() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("data-template=\"· {m} pcs\"").contains("data-units-template=\"{m} pcs\"")
+                .contains("data-meta-template=\"{status} · {units}\"").contains("Destroyed items: 7 ›");
+    }
 }

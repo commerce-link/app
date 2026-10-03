@@ -135,7 +135,7 @@
                         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
                                th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label>
                         <span class="cl-selection-count" data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span>
-                        <span class="cl-selection-count" data-cl-selection-units th:attr="data-template=#{warehouse.selection.units('{m}')}"></span>
+                        <span class="cl-selection-count" data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span>
                         <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}">
                             <details class="cl-menu">
                                 <summary class="cl-button"><span th:text="#{warehouse.bulk.menu}"></span>
@@ -225,7 +225,7 @@
                 </div>
                 <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
                 <div class="cl-card-desc cl-card-note" th:if="${page.destroyedCount() > 0}">
-                    <a class="cl-link-button" th:href="@{/dashboard/warehouse/items/destroyed}" th:text="|#{warehouse.list.destroyed.link(${page.destroyedCount()})} ›|"></a>
+                    <a class="cl-link-button" th:href="@{/dashboard/warehouse/items/destroyed}" th:text="#{warehouse.list.destroyed.link(${page.destroyedCount()})}"></a>
                 </div>
             </section>
 
@@ -236,7 +236,7 @@
                         <table class="cl-table is-compact cl-quantity-table">
                             <caption class="cl-visually-hidden" th:text="#{warehouse.bulk.dialog.qty}"></caption>
                             <thead><tr><th scope="col" th:text="#{warehouse.bulk.dialog.item}"></th><th scope="col" class="is-numeric" th:text="#{warehouse.bulk.dialog.qty}"></th></tr></thead>
-                            <tbody data-cl-quantity-rows></tbody>
+                            <tbody data-cl-quantity-rows th:attr="data-meta-template=#{warehouse.bulk.dialog.meta('{status}', '{units}')}, data-units-template=#{warehouse.selection.units('{m}')}"></tbody>
                         </table>
                         <template data-cl-quantity-row>
                             <tr>
