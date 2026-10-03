@@ -8588,6 +8588,11 @@ a.cl-link-button:hover {
     text-align: right;
 }
 
+/* Every actions cell is its own layer; without this the next row's cell paints over the open menu and takes its clicks. */
+.cl-page .cl-table.is-offers .cl-table-actions:has(.cl-menu[open]) {
+    z-index: 2;
+}
+
 .cl-page .cl-table.is-offers .cl-table-actions > * + * {
     margin-left: 4px;
 }
