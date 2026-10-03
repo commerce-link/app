@@ -14,11 +14,11 @@
               th:action="@{/dashboard/warehouse/items/new}">
 
             <div th:replace="~{fragments/settings-form :: errorSummaryWithArguments('warehouse-item-errors', ${errors}, ${errorArgs})}"></div>
-            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="alert">
+            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="status">
                 <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${errorMessage}"></p>
             </div>
-            <div th:if="${mfnUnknown}" class="cl-alert is-warn" role="alert">
+            <div th:if="${mfnUnknown}" class="cl-alert is-warn" role="status">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="#{warehouse.item.new.unknown(${form.manufacturerCode})}"></p>
             </div>

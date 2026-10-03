@@ -382,9 +382,22 @@
     document.addEventListener('cl-list:swapped', function () { initDockedRow(); refresh(); });
     window.addEventListener('resize', measureDockedRow);
 
+    // WCAG 4.1.3: the outcome of a bulk action (the flash after the redirect) is in the page from the start, so its
+    // role=status is never announced; it takes the focus once when the page loads. A list swap leaves it alone:
+    // list-page.js focuses the count line then.
+    function focusOutcome() {
+        var outcome = document.querySelector('[data-cl-saved-alert]');
+        if (!outcome) {
+            return;
+        }
+        outcome.setAttribute('tabindex', '-1');
+        outcome.focus();
+    }
+
     function init() {
         initDockedRow();
         refresh();
+        focusOutcome();
     }
 
     if (document.readyState === 'loading') {

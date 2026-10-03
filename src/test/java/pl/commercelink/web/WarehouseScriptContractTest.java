@@ -167,4 +167,30 @@ class WarehouseScriptContractTest {
                 .contains("describe(reason, reasonError").contains("describe(note, noteError");
         assertThat(describe).contains("aria-describedby");
     }
+
+    @Test
+    void outcomeOfAnActionTakesTheFocusOnceWhenTheListLoadsSoAScreenReaderReadsIt() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String outcome = js.substring(js.indexOf("function focusOutcome("), js.indexOf("function init("));
+        String init = js.substring(js.indexOf("function init("));
+
+        // when / then
+        // a role=status message present at load is not announced; the focus on it is (list-page.js does the same after a swap)
+        assertThat(outcome).contains("'[data-cl-saved-alert]'").contains("setAttribute('tabindex', '-1')").contains(".focus(");
+        assertThat(init).contains("focusOutcome()");
+        assertThat(js).doesNotContainPattern("cl-list:swapped'[^;]*focusOutcome");
+    }
+
+    @Test
+    void serverRenderedMessagesOfTheWarehousePagesAreNotAlerts() throws Exception {
+        for (String t : new String[]{"warehouse.html", "warehouse-item-new.html", "warehouse-restock.html"}) {
+            // when
+            String html = read("src/main/resources/templates/" + t);
+
+            // then
+            // design system §6.2: a message rendered with the page is no alert (it was not raised by what the user just did)
+            assertThat(html).as(t).doesNotContain("role=\"alert\"");
+        }
+    }
 }

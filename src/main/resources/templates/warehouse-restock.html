@@ -10,7 +10,7 @@
 
         <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/warehouse', #{nav.warehouse}, #{warehouse.restock.title}, #{warehouse.restock.lead}, null)}"></div>
 
-        <div th:if="${restock.error() != null}" class="cl-alert is-bad" role="alert">
+        <div th:if="${restock.error() != null}" class="cl-alert is-bad" role="status">
             <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
             <p class="cl-alert-text" th:text="${restock.error()}"></p>
         </div>
