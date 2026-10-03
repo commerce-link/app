@@ -68,6 +68,21 @@ class OffersListRenderingTest {
     }
 
     @Test
+    void creationDateIsASecondaryColumnRepeatedUnderTheIdForTheDrawerRange() {
+        // given
+        OfferListPage page = page(OfferSegment.OFFERS, List.of(offerRow()), List.of(), List.of(), List.of(), null);
+
+        // when
+        String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
+
+        // then — 720-1023 px hides the column and shows the date after the id; the net line has its own class to go there
+        assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\" aria-sort=\"descending\">")
+                .contains("<td class=\"is-secondary-column\" data-label=\"Utworzona\">")
+                .contains("<span class=\"cl-offer-items\"> · pozycje: 9</span><span class=\"cl-narrow-only\"> · 02.10</span></span>")
+                .contains("<span class=\"cl-table-sub cl-cards-hide cl-cell-net\">netto 39 804,88 PLN</span>");
+    }
+
+    @Test
     void offerMenuOpensTheOfferFirstAndCopyControlsWaitForTheScript() {
         // given
         OfferListPage page = page(OfferSegment.OFFERS, List.of(offerRow()), List.of(), List.of(), List.of(), null);
@@ -91,7 +106,7 @@ class OffersListRenderingTest {
         String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
 
         // then
-        assertThat(html).contains("<th scope=\"col\" aria-sort=\"descending\"><span>Utworzona</span> <span class=\"cl-sort-mark\" aria-hidden=\"true\">▼</span></th>")
+        assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\" aria-sort=\"descending\"><span>Utworzona</span> <span class=\"cl-sort-mark\" aria-hidden=\"true\">▼</span></th>")
                 .contains("data-label=\"Utworzona\"").doesNotContain("↓");
     }
 

@@ -8688,28 +8688,81 @@ a.cl-link-button:hover {
     }
 }
 
-/* In the same range the client name ("Firma Testowa 1 sp. z o.o.") wrapped to two lines and made most rows 84 px instead
-   of ~63 px. It stays on one line and ends in an ellipsis (the full name is in title); the cap, like the name's 26ch,
-   keeps one long name from widening the column on every row. The phone card and 1216 px up keep their wrapping. */
+/* In the same range the offer name and the client name are one line each, ending in an ellipsis (the full text is in
+   title): wrapped, they made rows 84-103 px instead of ~66 px. Width 0 keeps them out of the column's minimum, as
+   .cl-cell-email does; a nowrap name with a ch cap pushed the table 22-146 px past its card at 720-1024 px. The two
+   columns take what the other columns leave, at least 7em, so a name never shrinks to a few letters. */
 @media (min-width: 720px) and (max-width: 1215px) {
-    .cl-page .cl-table.is-offers .cl-cell-client {
+    .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
         display: block;
-        max-width: 22ch;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 0;
+        min-width: 100%;
+    }
+
+    .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+        min-width: 7em;
+    }
+
+    .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+        width: 1%;
         white-space: nowrap;
     }
 }
 
-/* The offer name wrapped here as well ("Oferta zielona / 01"), which kept every row at 84 px. In this range it is one
-   line with an ellipsis (the full name is in title); the 26ch cap above still keeps one long name from widening the
-   column. The row link's ::after is positioned against the row, so overflow does not clip it, and the focus outline
-   belongs to the link itself. */
-@media (min-width: 720px) and (max-width: 1215px) {
-    .cl-page .cl-table.is-offers .cl-cell-name {
-        display: block;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+/* Beside the open sidebar the card is 790 px at 1216 px, narrower than at 1215 px (977 px), and rows grew to 103 px:
+   the compact row follows the card there, not the window (as the Metoda column of Payments does). Below 850 px of
+   card the quick copy icon, the item count and the author go and the names are one line, as at 720-1215 px; from
+   about 1276 px the card is wide enough for the full row. */
+.cl-page .cl-card:has(.cl-table.is-offers) {
+    container-type: inline-size;
+}
+
+@media (min-width: 1216px) {
+    @container (max-width: 849px) {
+        .cl-page .cl-table.is-offers .cl-copy-quick,
+        .cl-page .cl-table.is-offers .cl-offer-items,
+        .cl-page .cl-table.is-offers .cl-who {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 0;
+            min-width: 100%;
+        }
+
+        .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+            min-width: 7em;
+        }
+
+        .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+            width: 1%;
+            white-space: nowrap;
+        }
+    }
+}
+
+/* 720-1023 px (drawer, card 606-909 px): six columns do not fit beside one-line names. The creation date moves under
+   the offer's id ("25b6f02f · 03.10", the deliveries' collapsed-column pattern) and the net amount goes (it is on the
+   offer page; the phone card has no net line either). */
+.cl-page .cl-table.is-offers .cl-narrow-only {
+    display: none;
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-offers .is-secondary-column,
+    .cl-page .cl-table.is-offers .cl-cell-net {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-narrow-only {
+        display: inline;
     }
 }
 

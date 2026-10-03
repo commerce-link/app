@@ -79,35 +79,82 @@ class OffersListStylesContractTest {
     }
 
     @Test
-    void clientNameStaysOnOneLineOnlyBetweenTheRailAndTheFullSidebar() throws Exception {
+    void namesShrinkWithAnEllipsisInsteadOfWideningTheTableBetweenTheRailAndTheFullSidebar() throws Exception {
         // given
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
 
-        // then
+        // then — width 0 keeps one-line names out of the columns' minimum; the other columns shrink to their content
         assertThat(css).contains("""
 @media (min-width: 720px) and (max-width: 1215px) {
-    .cl-page .cl-table.is-offers .cl-cell-client {
+    .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
         display: block;
-        max-width: 22ch;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        width: 0;
+        min-width: 100%;
     }
-}""");
+
+    .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+        min-width: 7em;
+    }
+
+    .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+        width: 1%;
+        white-space: nowrap;
+    }
+}""").doesNotContain("max-width: 22ch");
     }
 
     @Test
-    void offerNameStaysOnOneLineOnlyBetweenTheRailAndTheFullSidebar() throws Exception {
+    void compactRowFollowsTheCardBesideTheOpenSidebar() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then — at 1216 px the card is 790 px; from about 1276 px (card 850 px) the full row fits
+        assertThat(css).contains("""
+.cl-page .cl-card:has(.cl-table.is-offers) {
+    container-type: inline-size;
+}
+
+@media (min-width: 1216px) {
+    @container (max-width: 849px) {
+        .cl-page .cl-table.is-offers .cl-copy-quick,
+        .cl-page .cl-table.is-offers .cl-offer-items,
+        .cl-page .cl-table.is-offers .cl-who {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 0;
+            min-width: 100%;
+        }
+""");
+    }
+
+    @Test
+    void drawerMovesTheCreationDateUnderTheIdAndDropsTheNetLine() throws Exception {
         // given
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
 
         // then
         assertThat(css).contains("""
-@media (min-width: 720px) and (max-width: 1215px) {
-    .cl-page .cl-table.is-offers .cl-cell-name {
-        display: block;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+.cl-page .cl-table.is-offers .cl-narrow-only {
+    display: none;
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-offers .is-secondary-column,
+    .cl-page .cl-table.is-offers .cl-cell-net {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-narrow-only {
+        display: inline;
     }
 }""");
     }

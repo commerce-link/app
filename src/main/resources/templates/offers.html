@@ -149,7 +149,7 @@
                     <tr>
                         <th scope="col" th:text="#{offers.list.column.offer}"></th>
                         <th scope="col" th:text="#{offers.list.column.client}"></th>
-                        <th scope="col" aria-sort="descending"><span th:text="#{offers.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
+                        <th scope="col" class="is-secondary-column" aria-sort="descending"><span th:text="#{offers.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
                         <th scope="col" th:text="#{offers.list.column.validity}"></th>
                         <th scope="col" class="is-numeric" th:text="#{offers.list.column.value}"></th>
                         <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.list.column.actions}"></span></th>
@@ -159,7 +159,7 @@
                     <tr th:each="row : ${page.offers()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.offer}">
                             <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}" th:title="${row.name()}"></a>
-                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span></span>
+                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span><span class="cl-narrow-only" th:text="| · ${row.created()}|"></span></span>
                         </th>
                         <td th:attr="data-label=#{offers.list.column.client}">
                             <th:block th:if="${row.client() != null}">
@@ -168,7 +168,7 @@
                             </th:block>
                             <span class="cl-cell-client cl-table-sub" th:unless="${row.client() != null}" th:text="#{offers.list.client.none}"></span>
                         </td>
-                        <td th:attr="data-label=#{offers.list.column.created}">
+                        <td class="is-secondary-column" th:attr="data-label=#{offers.list.column.created}">
                             <span class="cl-cell-date" th:text="${row.created()}"></span>
                             <span class="cl-table-sub cl-who" th:if="${row.author() != null}" th:text="${row.author()}" th:title="${row.author()}"></span>
                         </td>
@@ -179,7 +179,7 @@
                         </td>
                         <td class="is-numeric" th:attr="data-label=#{offers.list.column.value}">
                             <span class="cl-cell-amount" th:text="${row.gross()}"></span>
-                            <span class="cl-table-sub cl-cards-hide" th:text="${row.net()}"></span>
+                            <span class="cl-table-sub cl-cards-hide cl-cell-net" th:text="${row.net()}"></span>
                         </td>
                         <!--/* Copying needs the clipboard API, so both copy controls stay hidden until copy-field.js reveals them
                                (data-cl-copy-reveal); without JavaScript the client link is on the offer page. */-->
