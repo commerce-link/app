@@ -79,6 +79,18 @@ class WarehouseListRenderingTest {
     }
 
     @Test
+    void categoryCellIsMarkedForHyphenation() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("<td class=\"is-hyphenated\" data-label=\"Category\">");
+    }
+
+    @Test
     void wholePageRendersPastTheResultsBlock() {
         // given
         Context context = new Context();

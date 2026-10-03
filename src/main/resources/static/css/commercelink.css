@@ -8584,6 +8584,8 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-end; }
 .cl-page .cl-table.is-warehouse :is(th, td) { white-space: normal; overflow-wrap: break-word; }
 .cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; }
+/* a category is free text, often one long word ("Motherboard"): a hyphen reads better than a cut without one */
+.cl-page .cl-table.is-warehouse .is-hyphenated { hyphens: auto; }
 .cl-page .cl-table.is-warehouse .cl-table-pills { max-width: 100%; }
 .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { max-width: 100%; }
 .cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: normal; text-align: right; }
@@ -8593,7 +8595,8 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
     .cl-page .cl-table.is-warehouse .cl-col-cost { width: 15%; }
     .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 11%; }
-    .cl-page .cl-table.is-warehouse .cl-col-status { width: 16%; }
+    /* 16 % of the table is narrower than the longest status pill ("Zarezerwowane") below 1366 px */
+    .cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }
 }
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }

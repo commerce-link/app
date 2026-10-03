@@ -191,7 +191,7 @@
                                 <span class="cl-table-pills" th:if="${row.conditionLabel() != null}"><span class="cl-status" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></span>
                                 <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
                             </th>
-                            <td th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
+                            <td class="is-hyphenated" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
                             <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}" th:text="${row.qty()}"></td>
                             <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.cost}">
                                 <span class="cl-cell-stack">
