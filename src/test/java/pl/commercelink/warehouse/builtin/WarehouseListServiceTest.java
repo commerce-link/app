@@ -288,6 +288,10 @@ class WarehouseListServiceTest {
         assertThat(reserve.path()).isEqualTo("/dashboard/warehouse/markAsReserved");
         assertThat(reserve.forStatuses()).isEqualTo("Delivered");
         assertThat(reserve.statusReason()).isEqualTo("Tylko dla: Na stanie");
+        assertThat(reserve.dialogTitle()).isEqualTo("Zarezerwować {k} poz.?");
+        assertThat(model.destroyAction().dialogTitle()).isEqualTo("Zniszczyć {k} poz.?");
+        assertThat(model.menuActions()).filteredOn(a -> !a.needsQuantity()).extracting(WarehousePageModel.BulkActionView::dialogTitle)
+                .containsOnlyNulls();
         assertThat(model.destroyAction().danger()).isTrue();
         assertThat(model.destroyReasons()).extracting(WarehousePageModel.Option::value)
                 .containsExactly("StockAdjustment", "Destruction", "InternalUse", "Theft");

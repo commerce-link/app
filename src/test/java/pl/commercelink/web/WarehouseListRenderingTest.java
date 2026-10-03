@@ -63,9 +63,9 @@ class WarehouseListRenderingTest {
             headers.put(s, new SortHeader("/dashboard/warehouse?sort=" + s.param(), "none"));
         }
         BulkActionView reserve = new BulkActionView("reserve", "/dashboard/warehouse/markAsReserved", "Reserve", "Delivered",
-                true, false, false, false, "Only for: In stock", null, null, "Reserve");
+                true, false, false, false, "Only for: In stock", null, null, "Reserve", "Reserve {k} items?");
         BulkActionView destroy = new BulkActionView("destroy", "/dashboard/warehouse/markAsDestroyed", "Destroy",
-                "Delivered InRMA InExternalService", true, false, false, true, "Only for: …", null, null, "Destroy");
+                "Delivered InRMA InExternalService", true, false, false, true, "Only for: …", null, null, "Destroy", "Destroy {k} items?");
         return new WarehousePageModel(WarehouseListQuery.parse(new LinkedMultiValueMap<>(), false), true, false,
                 List.of(new Tile("In stock", "3 pcs", "in 1 items", "/dashboard/warehouse", true),
                         new Tile("To receive", "2 pcs", "in allocation and ordered from suppliers", "/dashboard/warehouse?statuses=Allocation&statuses=Ordered", false),
@@ -373,5 +373,53 @@ class WarehouseListRenderingTest {
 
         // then
         assertThat(html).contains("<nav class=\"cl-table-sortbar is-wrap\"");
+    }
+
+    @Test
+    void quantityDialogTitleIsAQuestionOfTheActionAndItsFieldsAreTextWithANumericKeyboard() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("data-cl-action-dialog-title=\"Reserve {k} items?\"").contains("data-cl-action-dialog-title=\"Destroy {k} items?\"");
+        assertThat(html).containsPattern("<h2 class=\"cl-dialog-title\" id=\"cl-quantity-title\" data-cl-quantity-title></h2>");
+        assertThat(html).contains("<input class=\"cl-input is-qty\" type=\"text\" inputmode=\"numeric\" name=\"quantities\" autocomplete=\"off\" required>")
+                .doesNotContain("type=\"number\"");
+        assertThat(html).contains("data-error-whole=\"Enter a whole number from 1 to {0}.\"")
+                .contains("If you enter fewer, the item splits: the chosen units change status, the rest stays as it is.");
+    }
+
+    @Test
+    void destroyDialogHasOneEffectLineAndARoomyNote() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).containsPattern("<textarea class=\"cl-textarea\" id=\"destroy-note\" name=\"note\" rows=\"3\" required disabled>")
+                .doesNotContain("destroy-note-help").doesNotContain("Printed on the RW document");
+        // the field errors carry ids the fields point to with aria-describedby while they are shown
+        assertThat(html).contains("<p class=\"cl-field-error\" id=\"destroy-reason-error\" hidden>")
+                .contains("<p class=\"cl-field-error\" id=\"destroy-note-error\" hidden>");
+    }
+
+    @Test
+    void restockDialogLeadStandsLevelWithTheFieldsNotIndentedTwice() {
+        // given
+        Context context = new Context();
+        context.setVariable("page", model(List.of(row("a1", "Delivered", true)), false));
+        context.setVariable("restock", new pl.commercelink.warehouse.builtin.RestockForm(List.of(), Map.of(), null, null));
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("warehouse", context);
+
+        // then
+        // .cl-dialog-message brings its own 20 px padding into the dialog body, which already has it
+        assertThat(html).containsPattern("id=\"restock-title\"[^<]*</h2>\\s*<div class=\"cl-dialog-body\">\\s*<p class=\"cl-help\">");
     }
 }

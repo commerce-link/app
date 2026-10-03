@@ -151,4 +151,20 @@ class WarehouseScriptContractTest {
         assertThat(dock).contains("offsetHeight");
         assertThat(js).containsPattern("addEventListener\\('cl-list:swapped', function \\(\\) \\{[^}]*initDockedRow\\(\\)");
     }
+
+    @Test
+    void quantityDialogTakesItsTitleFromTheActionAndLinksEachErrorToItsField() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String open = js.substring(js.indexOf("function openQuantities("), js.indexOf("function validate("));
+        String validate = js.substring(js.indexOf("function validate("), js.indexOf("document.addEventListener('click'"));
+
+        // when / then
+        assertThat(open).contains("data-cl-action-dialog-title").doesNotContain("'{label}'");
+        // "1.5" is a whole-number error, not "at least 1"; each shown error is named by its field's aria-describedby
+        String describe = js.substring(js.indexOf("function describe("), js.indexOf("function returnFocusOnClose("));
+        assertThat(validate).contains("data-error-whole").contains("/^\\d+$/").contains("describe(input, error")
+                .contains("describe(reason, reasonError").contains("describe(note, noteError");
+        assertThat(describe).contains("aria-describedby");
+    }
 }

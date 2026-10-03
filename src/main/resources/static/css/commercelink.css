@@ -8609,6 +8609,17 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse .cl-table-code { overflow-wrap: anywhere; }
     .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
 }
+/* the quantity dialog is narrow: its name / quantity table stays a two-column table on phones instead of the cards */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-dialog .cl-table.cl-quantity-table { display: table; }
+    .cl-page .cl-dialog .cl-quantity-table thead { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: table-header-group; }
+    .cl-page .cl-dialog .cl-quantity-table tbody { display: table-row-group; }
+    .cl-page .cl-dialog .cl-quantity-table tr { display: table-row; padding: 0; border-top: 0; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td) { display: table-cell; padding: 6px 10px; border-top: 1px solid var(--cl-line); vertical-align: top; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td)::before { content: none; }
+    .cl-page .cl-dialog .cl-quantity-table .is-numeric { text-align: right; }
+    .cl-page .cl-dialog .cl-quantity-table td.is-numeric { width: 108px; }
+}
 /* a checked row is tinted --cl-accent-soft, on which --cl-ink-3 is 4.04:1 ("Bez kategorii") */
 .cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }
 

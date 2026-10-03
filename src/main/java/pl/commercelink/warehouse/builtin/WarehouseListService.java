@@ -236,7 +236,9 @@ class WarehouseListService {
                 action.needsConfirm(), action.sameSource(), action.danger(), text(locale, "warehouse.bulk.reason.status", statuses),
                 action.needsConfirm() ? messages.getMessage(prefix + ".confirm.title", null, locale) : null,
                 action.needsConfirm() ? messages.getMessage(prefix + ".confirm.message", null, locale) : null,
-                text(locale, prefix + ".label"));
+                text(locale, prefix + ".label"),
+                // the quantity dialog's question, with {k} for the number of checked rows filled in by selection-actions.js
+                action.needsQuantity() ? text(locale, prefix + ".dialog.title", "{k}") : null);
     }
 
     private String text(Locale locale, String key, Object... args) {

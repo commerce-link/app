@@ -230,7 +230,7 @@
 
             <dialog class="cl-dialog is-form" id="cl-quantity-dialog" aria-labelledby="cl-quantity-title" th:unless="${page.rows().isEmpty()}">
                 <form method="post" th:action="@{/dashboard/warehouse}" data-cl-quantity-form novalidate>
-                    <h2 class="cl-dialog-title" id="cl-quantity-title" data-cl-quantity-title th:attr="data-template=#{warehouse.bulk.dialog.title('{label}', '{k}')}"></h2>
+                    <h2 class="cl-dialog-title" id="cl-quantity-title" data-cl-quantity-title></h2>
                     <div class="cl-dialog-body">
                         <table class="cl-table is-compact cl-quantity-table">
                             <caption class="cl-visually-hidden" th:text="#{warehouse.bulk.dialog.qty}"></caption>
@@ -242,7 +242,7 @@
                                 <th scope="row" class="cl-table-key"><span data-name></span><span class="cl-table-sub" data-meta></span></th>
                                 <td class="is-numeric">
                                     <input type="hidden" name="selectedItemIds">
-                                    <input class="cl-input is-qty" type="number" name="quantities" min="1" required>
+                                    <input class="cl-input is-qty" type="text" inputmode="numeric" name="quantities" autocomplete="off" required>
                                     <p class="cl-field-error" hidden></p>
                                 </td>
                             </tr>
@@ -254,18 +254,18 @@
                                     <option value="" selected th:text="#{warehouse.bulk.destroy.reason.choose}"></option>
                                     <option th:each="r : ${page.destroyReasons()}" th:value="${r.value()}" th:text="${r.label()}"></option>
                                 </select>
-                                <p class="cl-field-error" hidden th:text="#{warehouse.bulk.destroy.reason.required}"></p>
+                                <p class="cl-field-error" id="destroy-reason-error" hidden th:text="#{warehouse.bulk.destroy.reason.required}"></p>
                             </div>
                             <div class="cl-span-6 cl-field">
                                 <label class="cl-label" for="destroy-note" th:text="#{warehouse.bulk.destroy.note}"></label>
-                                <textarea class="cl-textarea" id="destroy-note" name="note" rows="2" required disabled aria-describedby="destroy-note-help"></textarea>
-                                <p class="cl-help" id="destroy-note-help" th:text="#{warehouse.bulk.destroy.note.help}"></p>
-                                <p class="cl-field-error" hidden th:text="#{warehouse.bulk.destroy.note.required}"></p>
+                                <textarea class="cl-textarea" id="destroy-note" name="note" rows="3" required disabled></textarea>
+                                <p class="cl-field-error" id="destroy-note-error" hidden th:text="#{warehouse.bulk.destroy.note.required}"></p>
                             </div>
                         </div>
                         <p class="cl-dialog-effect" data-cl-quantity-effect
                            th:attr="data-effect-split=#{warehouse.bulk.dialog.effect.split}, data-effect-destroy=#{warehouse.bulk.dialog.effect.destroy},
-                                    data-error-max=#{warehouse.bulk.dialog.max('{0}')}, data-error-min=#{warehouse.bulk.dialog.min}"></p>
+                                    data-error-max=#{warehouse.bulk.dialog.max('{0}')}, data-error-min=#{warehouse.bulk.dialog.min},
+                                    data-error-whole=#{warehouse.bulk.dialog.whole('{0}')}"></p>
                     </div>
                     <div class="cl-dialog-actions">
                         <button type="submit" class="cl-button is-primary" data-cl-quantity-submit></button>
@@ -281,7 +281,7 @@
             <form method="post" th:action="@{/dashboard/warehouse/restock}">
                 <h2 class="cl-dialog-title" id="restock-title" th:text="#{warehouse.restock.title}"></h2>
                 <div class="cl-dialog-body">
-                    <p class="cl-dialog-message" th:text="#{warehouse.restock.lead}"></p>
+                    <p class="cl-help" th:text="#{warehouse.restock.lead}"></p>
                     <th:block th:replace="~{fragments/warehouse-restock :: fields}"></th:block>
                 </div>
                 <div class="cl-dialog-actions">

@@ -26,5 +26,5 @@ public record WarehousePageModel(WarehouseListQuery query, boolean admin, boolea
     public record EmptyState(String text, String actionLabel, String actionHref) { }
     public record BulkActionView(String key, String path, String label, String forStatuses, boolean needsQuantity,
                                  boolean confirm, boolean sameSource, boolean danger, String statusReason,
-                                 String confirmTitle, String confirmMessage, String confirmAction) { }
+                                 String confirmTitle, String confirmMessage, String confirmAction, String dialogTitle) { }
 }

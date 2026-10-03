@@ -165,6 +165,22 @@
         return input;
     }
 
+    // A shown field error is named in its field's aria-describedby, and dropped from it once the error goes; other ids
+    // (a help text) stay.
+    function describe(field, error, shown) {
+        var ids = (field.getAttribute('aria-describedby') || '').split(' ').filter(function (id) {
+            return id && id !== error.id;
+        });
+        if (shown) {
+            ids.push(error.id);
+        }
+        if (ids.length) {
+            field.setAttribute('aria-describedby', ids.join(' '));
+        } else {
+            field.removeAttribute('aria-describedby');
+        }
+    }
+
     // Spec §4.6: the focus goes back to what opened the dialog, however it was closed (Cancel, Escape, a backdrop click).
     function returnFocusOnClose(dialog, opener) {
         dialog.addEventListener('close', function () {
@@ -183,6 +199,12 @@
         dialog.querySelectorAll('[aria-invalid]').forEach(function (field) {
             field.removeAttribute('aria-invalid');
         });
+        dialog.querySelectorAll('select, textarea').forEach(function (field) {
+            var error = field.parentElement.querySelector('.cl-field-error');
+            if (error && error.id) {
+                describe(field, error, false);
+            }
+        });
         var note = dialog.querySelector('textarea[name="note"]');
         if (note) {
             note.value = '';
@@ -199,13 +221,13 @@
         var rows = dialog.querySelector('[data-cl-quantity-rows]');
         var template = dialog.querySelector('[data-cl-quantity-row]');
         var destroy = button.hasAttribute('data-cl-action-destroy');
+        // the action's own question ("Zarezerwować 2 poz.?"), rendered by the server with {k} for the count
         var title = dialog.querySelector('[data-cl-quantity-title]');
-        title.textContent = title.getAttribute('data-template')
-            .replace('{label}', button.getAttribute('data-cl-action-label')).replace('{k}', String(boxes.length));
+        title.textContent = (button.getAttribute('data-cl-action-dialog-title') || '').replace('{k}', String(boxes.length));
         submitting = false;
         resetDialog(dialog);
         rows.replaceChildren();
-        boxes.forEach(function (box) {
+        boxes.forEach(function (box, index) {
             var row = template.content.firstElementChild.cloneNode(true);
             row.querySelector('[data-name]').textContent = box.getAttribute('data-name');
             row.querySelector('[data-meta]').textContent = rows.getAttribute('data-meta-template')
@@ -213,8 +235,9 @@
                 .replace('{units}', rows.getAttribute('data-units-template').replace('{m}', box.getAttribute('data-qty')));
             row.querySelector('input[name="selectedItemIds"]').value = box.value;
             var qty = row.querySelector('input[name="quantities"]');
-            qty.max = box.getAttribute('data-qty');
+            qty.setAttribute('data-max', box.getAttribute('data-qty'));
             qty.value = box.getAttribute('data-qty');
+            row.querySelector('.cl-field-error').id = 'cl-quantity-error-' + index;
             qty.setAttribute('aria-label', box.getAttribute('data-name'));
             rows.appendChild(row);
         });
@@ -250,12 +273,15 @@
         var firstBad = null;
         dialog.querySelectorAll('input[name="quantities"]').forEach(function (input) {
             var error = input.parentElement.querySelector('.cl-field-error');
-            var value = Number(input.value);
-            var max = Number(input.max);
-            var message = !Number.isInteger(value) || value < 1 ? effect.getAttribute('data-error-min')
-                : value > max ? effect.getAttribute('data-error-max').replace('{0}', String(max)) : '';
+            var raw = input.value.trim();
+            var max = Number(input.getAttribute('data-max'));
+            // a text field with a numeric keyboard: anything but digits ("1.5", "2 szt.") asks for a whole number
+            var message = !/^\d+$/.test(raw) ? effect.getAttribute('data-error-whole').replace('{0}', String(max))
+                : Number(raw) < 1 ? effect.getAttribute('data-error-min')
+                    : Number(raw) > max ? effect.getAttribute('data-error-max').replace('{0}', String(max)) : '';
             error.textContent = message;
             error.hidden = !message;
+            describe(input, error, !!message);
             if (message) {
                 input.setAttribute('aria-invalid', 'true');
                 firstBad = firstBad || input;
@@ -268,6 +294,7 @@
             var reasonError = reason.parentElement.querySelector('.cl-field-error');
             var unchosen = reason.value === '';
             reasonError.hidden = !unchosen;
+            describe(reason, reasonError, unchosen);
             if (unchosen) {
                 reason.setAttribute('aria-invalid', 'true');
                 firstBad = firstBad || reason;
@@ -280,6 +307,7 @@
             var noteError = note.parentElement.querySelector('.cl-field-error');
             var empty = note.value.trim() === '';
             noteError.hidden = !empty;
+            describe(note, noteError, empty);
             if (empty) {
                 note.setAttribute('aria-invalid', 'true');
                 firstBad = firstBad || note;

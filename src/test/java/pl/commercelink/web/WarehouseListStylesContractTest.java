@@ -98,4 +98,16 @@ class WarehouseListStylesContractTest {
         // alone in its flex row (no chips) the line fell to the left edge, next to chips it stood on the right
         assertThat(section).contains(".cl-page .cl-list-meta.is-warehouse .cl-table-results { margin-left: auto; text-align: right; }");
     }
+
+    @Test
+    void quantityTableStaysATwoColumnTableOnPhones() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // the shared card mode left an empty label column and pushed the name and the field to the right 55 %
+        assertThat(section).contains(".cl-page .cl-dialog .cl-table.cl-quantity-table { display: table; }")
+                .contains(".cl-page .cl-dialog .cl-quantity-table tr { display: table-row; padding: 0; border-top: 0; }")
+                .contains(".cl-page .cl-dialog .cl-quantity-table :is(tbody th, td)::before { content: none; }");
+    }
 }

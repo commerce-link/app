@@ -30,7 +30,7 @@
                  data-cl-action-quantity=${a.needsQuantity()} ? 'true' : null, data-cl-action-destroy=${a.danger()} ? 'true' : null,
                  data-cl-action-same-source=${a.sameSource()} ? 'true' : null, data-reason-status=${a.statusReason()},
                  data-cl-select-confirm-title=${a.confirmTitle()}, data-cl-select-confirm-message=${a.confirmMessage()},
-                 data-cl-select-confirm-action=${a.confirmAction()},
+                 data-cl-select-confirm-action=${a.confirmAction()}, data-cl-action-dialog-title=${a.dialogTitle()},
                  aria-describedby=${a.danger()} ? 'warehouse-destroy-reason' : null">
     <span data-cl-action-text th:text="${a.label()}"></span>
     <span class="cl-menu-reason" data-cl-action-reason hidden th:unless="${a.danger()}"></span>

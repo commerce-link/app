@@ -69,4 +69,24 @@ class WarehouseIntroTextTest {
         assertThat(text("warehouse.list.search.placeholder", "en")).isEqualTo("Name, EAN, code, delivery");
         assertThat(text("warehouse.tile.toReceive.hint", "en")).isEqualTo("in allocation and ordered");
     }
+
+    @Test
+    void quantityDialogAsksAQuestionPerActionAndExplainsTheSplitAndTheWholeNumber() {
+        // when / then
+        assertThat(text("warehouse.bulk.reserve.dialog.title", "pl")).isEqualTo("Zarezerwować {0} poz.?");
+        assertThat(text("warehouse.bulk.release.dialog.title", "pl")).isEqualTo("Przywrócić na stan {0} poz.?");
+        assertThat(text("warehouse.bulk.rma.dialog.title", "pl")).isEqualTo("Zgłosić do reklamacji {0} poz.?");
+        assertThat(text("warehouse.bulk.destroy.dialog.title", "pl")).isEqualTo("Zniszczyć {0} poz.?");
+        assertThat(text("warehouse.bulk.reserve.dialog.title", "en")).isEqualTo("Reserve {0} items?");
+        assertThat(text("warehouse.bulk.release.dialog.title", "en")).isEqualTo("Return {0} items to stock?");
+        assertThat(text("warehouse.bulk.rma.dialog.title", "en")).isEqualTo("File a claim for {0} items?");
+        assertThat(text("warehouse.bulk.destroy.dialog.title", "en")).isEqualTo("Destroy {0} items?");
+        assertThat(text("warehouse.bulk.dialog.effect.split", "pl"))
+                .isEqualTo("Jeśli wpiszesz mniej, pozycja się podzieli: wybrane sztuki zmienią status, reszta zostanie bez zmian.");
+        assertThat(text("warehouse.bulk.dialog.effect.split", "en"))
+                .isEqualTo("If you enter fewer, the item splits: the chosen units change status, the rest stays as it is.");
+        assertThat(text("warehouse.bulk.dialog.whole", "pl")).isEqualTo("Wpisz liczbę całkowitą od 1 do {0}.");
+        assertThat(text("warehouse.bulk.dialog.whole", "en")).isEqualTo("Enter a whole number from 1 to {0}.");
+        assertThat(text("warehouse.bulk.dialog.effect.destroy", "pl")).startsWith("Powstanie dokument RW.");
+    }
 }
