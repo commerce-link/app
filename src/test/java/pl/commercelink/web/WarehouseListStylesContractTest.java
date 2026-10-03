@@ -48,4 +48,14 @@ class WarehouseListStylesContractTest {
         // spec §4.5: "Zaznaczono {k} z {n} · {m} szt."
         assertThat(section).contains(".cl-page .cl-selection-row [data-cl-selection-units]::before { content: \"· \"; }");
     }
+
+    @Test
+    void dockedSelectionRowLeavesRoomForTheLastCardAndThePagesOnPhones() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // the fixed row at the bottom of a phone screen covered the last card and the pagination
+        assertThat(section).contains(".cl-page .cl-card:has(.cl-table.is-warehouse):has(.cl-selection-row:not([hidden])) {");
+    }
 }
