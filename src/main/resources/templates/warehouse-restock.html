@@ -21,10 +21,10 @@
             <p class="cl-page-lead" th:text="#{warehouse.restock.lead}"></p>
         </header>
 
-        <div th:if="${restock.error() != null}"
-             th:replace="~{fragments/settings-form :: errorSummaryText('restock-errors', ${ {'restock-catalog': restock.error()} })}"></div>
 
         <form class="cl-form" method="post" th:action="@{/dashboard/warehouse/restock}" data-cl-submit-once>
+            <div th:if="${restock.error() != null}"
+                 th:replace="~{fragments/settings-form :: errorSummaryText('restock-errors', ${ {'restock-catalog': restock.error()} })}"></div>
             <div class="cl-card">
                 <fieldset class="cl-fieldset">
                     <legend class="cl-visually-hidden" th:text="#{warehouse.restock.params}"></legend>

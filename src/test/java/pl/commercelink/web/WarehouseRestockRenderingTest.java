@@ -57,6 +57,8 @@ class WarehouseRestockRenderingTest {
                 .containsPattern("<select[^>]*id=\"restock-catalog\"[^>]*aria-describedby=\"restock-catalog-error\"")
                 .containsPattern("<select[^>]*id=\"restock-catalog\"[^>]*aria-invalid=\"true\"")
                 .contains("id=\"restock-catalog-error\"").doesNotContain("role=\"alert\"");
+        // inside the form, so the summary is as wide as the form card
+        assertThat(html).containsPattern("<form [^>]*>\\s*<div id=\"restock-errors\"");
     }
 
     @Test
