@@ -155,4 +155,17 @@ class WarehouseListStylesContractTest {
                 .contains(".cl-page .cl-table.is-warehouse .cl-cards-hide { display: none; }");
         assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-cards-only { display: none; }");
     }
+
+    @Test
+    void theDeliveryLinkStaysOnOneLineInTheTableAndIsCutAtTheCellEdge() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // "8c12485 / 0" broke after the id at 1024 px; a longer link text ends in an ellipsis, whole in its title
+        String table = section.substring(section.indexOf("@media screen and (min-width: 720px) {"));
+        // 12 %: an 8-character delivery id (66 px) fits the cell at 1024 px, where 11 % left 62 px and cut it
+        assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }");
+        assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }");
+    }
 }

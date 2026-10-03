@@ -8607,12 +8607,16 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
     /* a serial number is one token as well, cut at the cell's edge with the whole of it in its title */
     .cl-page .cl-table.is-warehouse .cl-cell-serial { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    /* the delivery link stays on one line ("8c12485 / 0" broke after the id at 1024 px), cut at the cell's edge with the
+       whole of it in its title */
+    .cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }
     .cl-page .cl-table.is-warehouse .cl-col-category { width: 12%; }
     .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
     /* 17 %: "syst. 1 050,00" (116 px + padding) stays on one line at 1280 px; a longer amount breaks after "syst." (the
        amount is grouped with no-break spaces), never out of the cell */
     .cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }
-    .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 11%; }
+    /* 12 %: an 8-character delivery id (66 px) fits its cell at 1024 px; 11 % left 62 px */
+    .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }
     /* 16 % of the table is narrower than the longest status pill ("Zarezerwowane", 114 px) below 1366 px; 9.5rem is that
        pill plus the cell's 12 px padding on each side, with a little room (8.5rem cut the pill's text) */
     .cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }

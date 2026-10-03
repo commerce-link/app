@@ -208,7 +208,7 @@
                             </td>
                             <td class="is-secondary-column" th:attr="data-label=#{warehouse.list.column.delivery}">
                                 <span class="cl-cell-stack">
-                                    <a th:if="${row.deliveryHref() != null}" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryNumber()}"></a>
+                                    <a th:if="${row.deliveryHref() != null}" class="cl-cell-delivery" th:href="@{${row.deliveryHref()}}" th:title="${row.deliveryNumber()}" th:text="${row.deliveryNumber()}"></a>
                                     <span th:unless="${row.deliveryHref() != null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
                                     <span class="cl-table-sub" th:if="${row.supplier() != null}" th:text="${row.supplier()}"></span>
                                     <span class="cl-table-sub cl-cell-serial" th:if="${row.serialNo() != null}" th:title="${row.serialNo()}" th:text="${row.serialNo()}"></span>

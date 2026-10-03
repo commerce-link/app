@@ -147,6 +147,18 @@ class WarehouseListRenderingTest {
     }
 
     @Test
+    void theDeliveryLinkCarriesItsWholeTextInItsTitle() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true, "/dashboard/deliveries/details?deliveryId=d1", "8c12485 / 0", null)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(deliveryCell(html)).contains("class=\"cl-cell-delivery\"").contains("title=\"8c12485 / 0\"");
+    }
+
+    @Test
     void wholePageRendersPastTheResultsBlock() {
         // given
         Context context = new Context();
@@ -260,7 +272,7 @@ class WarehouseListRenderingTest {
         String cell = deliveryCell(render(page));
 
         // then
-        assertThat(cell).contains("<a href=\"/dashboard/deliveries/details?deliveryId=d1\">d1</a>");
+        assertThat(cell).contains("<a class=\"cl-cell-delivery\" href=\"/dashboard/deliveries/details?deliveryId=d1\" title=\"d1\">d1</a>");
         assertThat(cell.indexOf("Acme Polska")).isGreaterThan(cell.indexOf(">d1</a>")).isLessThan(cell.indexOf("S/N 1"));
     }
 
