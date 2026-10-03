@@ -8608,18 +8608,43 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
     .cl-page .cl-table.is-warehouse .cl-table-code { overflow-wrap: anywhere; }
     .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
-    /* the selection row of the warehouse list docks to the bottom of the viewport on phones (proposed, spec §14.4) */
-    .cl-page .cl-card:has(.cl-table.is-warehouse) .cl-selection-row:not([hidden]) {
-        position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 30;
-        padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-        box-shadow: 0 -4px 16px rgba(15, 23, 42, .12);
+}
+/* a checked row is tinted --cl-accent-soft, on which --cl-ink-3 is 4.04:1 ("Bez kategorii") */
+.cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }
+
+/* Ruling 14 (2026-10-03): the docked selection row of PR #259 (delivery details), copied verbatim so a merge of both
+   branches leaves one identical block; selection-actions.js sets .is-in-view and --cl-docked-bar on the host. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 15;
+        margin: 0;
+        padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--cl-line);
+        border-bottom: 0;
+        box-shadow: 0 -6px 16px rgba(14, 23, 33, .12);
     }
-    /* room under the last card and the pages, so the docked row never covers them */
-    .cl-page .cl-card:has(.cl-table.is-warehouse):has(.cl-selection-row:not([hidden])) {
-        padding-bottom: calc(112px + env(safe-area-inset-bottom));
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions {
+        gap: 8px;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions .cl-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-remove {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
+        padding-bottom: var(--cl-docked-bar, 112px);
     }
 }
-/* spec §4.5: "Zaznaczono {k} z {n} · {m} szt."; the two counts are filled by different scripts */
-.cl-page .cl-selection-row [data-cl-selection-units] { margin-left: 4px; }
 .cl-dialog .cl-quantity-table td.is-numeric { width: 120px; }
 .cl-dialog .cl-quantity-table .cl-input.is-qty { width: 96px; text-align: right; }

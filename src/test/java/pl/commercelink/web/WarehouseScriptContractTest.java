@@ -135,4 +135,20 @@ class WarehouseScriptContractTest {
         assertThat(html).doesNotContain("›").doesNotContain("· ");
         assertThat(css).doesNotContain("[data-cl-selection-units]::before");
     }
+
+    @Test
+    void dockedSelectionRowIsShownOnlyWhileItsHostIsOnScreenAndTheHostKeepsItsMeasuredHeight() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+
+        // when / then
+        // the contract of delivery-details.js (PR #259), generic: any .cl-selection-row.is-docked inside a .cl-selection-host;
+        // re-done after a list swap, which replaces the card
+        String dock = js.substring(js.indexOf("function initDockedRow("));
+        assertThat(js).contains("'.cl-selection-row.is-docked'").contains("closest('.cl-selection-host')")
+                .contains("new IntersectionObserver(").contains("classList.toggle('is-in-view'").contains("'--cl-docked-bar'")
+                .contains(".disconnect()");
+        assertThat(dock).contains("offsetHeight");
+        assertThat(js).containsPattern("addEventListener\\('cl-list:swapped', function \\(\\) \\{[^}]*initDockedRow\\(\\)");
+    }
 }

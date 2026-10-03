@@ -49,7 +49,7 @@
                 </li>
             </ul>
 
-            <section class="cl-card" aria-labelledby="warehouse-table-title">
+            <section class="cl-card cl-selection-host" aria-labelledby="warehouse-table-title">
                 <h2 class="cl-visually-hidden" id="warehouse-table-title" th:text="#{warehouse.list.table.title}"></h2>
 
                 <div class="cl-table-toolbar" th:unless="${page.storeEmpty()}">
@@ -131,11 +131,10 @@
                 <th:block th:unless="${page.rows().isEmpty()}">
                     <form id="warehouse-bulk-form" method="post" th:action="@{/dashboard/warehouse}" hidden></form>
                     <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
-                    <div class="cl-selection-row" data-cl-selection-bar hidden>
+                    <div class="cl-selection-row is-docked" data-cl-selection-bar hidden>
                         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
                                th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label>
-                        <span class="cl-selection-count" data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span>
-                        <span class="cl-selection-count" data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span>
+                        <span class="cl-selection-count"><span data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span> <span data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span></span>
                         <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}">
                             <details class="cl-menu">
                                 <summary class="cl-button"><span th:text="#{warehouse.bulk.menu}"></span>
@@ -151,7 +150,7 @@
                         </div>
                     </div>
 
-                    <nav class="cl-table-sortbar" th:attr="aria-label=#{warehouse.list.sort.label}">
+                    <nav class="cl-table-sortbar is-wrap" th:attr="aria-label=#{warehouse.list.sort.label}">
                         <span class="cl-eyebrow" th:text="#{warehouse.list.sort.label}"></span>
                         <a class="cl-tab" th:each="s : ${T(pl.commercelink.warehouse.builtin.WarehouseListQuery.Sort).values()}"
                            th:with="h=${page.sortHeaders().get(s)}" th:href="@{${h.href()}}"

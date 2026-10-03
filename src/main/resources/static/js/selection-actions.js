@@ -4,7 +4,9 @@
 // a quantity dialog (#cl-quantity-dialog, full quantity by default, inline validation), the page's confirmation dialog
 // (window.CL_confirmBulk) or a plain post. Every post goes to the action's own address with selectedItemIds (and
 // quantities, reason, note) plus the list view from the address, so the server returns to the same search and
-// categories. Rows come and go with list-page.js swaps (cl-list:swapped), so all lookups are fresh.
+// categories. Rows come and go with list-page.js swaps (cl-list:swapped), so all lookups are fresh. Below 720 px the
+// selection row docks to the bottom edge while its card is on screen (the shared .cl-selection-row.is-docked of the
+// delivery details: .is-in-view and the measured --cl-docked-bar on its .cl-selection-host).
 (function () {
     'use strict';
 
@@ -60,6 +62,42 @@
             || document.getElementById(button.getAttribute('aria-describedby') || '');
     }
 
+    // Contract of delivery-details.js (PR #259), for any docked row in a host. A hidden row measures 0; writing that would
+    // override the stylesheet fallback and let the row, once shown, cover the last rows and the pages, so the height is
+    // taken whenever the selection (and so the row, with the destroy reason line) changes. A list swap replaces the card,
+    // so the observer is set up again on the new one.
+    var docked = null;
+
+    function initDockedRow() {
+        if (docked) {
+            docked.disconnect();
+            docked = null;
+        }
+        var row = document.querySelector('.cl-selection-row.is-docked');
+        var host = row && row.closest('.cl-selection-host');
+        if (!row || !host || typeof IntersectionObserver !== 'function') {
+            return;
+        }
+        docked = new IntersectionObserver(function (entries) {
+            row.classList.toggle('is-in-view', entries[entries.length - 1].isIntersecting);
+            measureDockedRow();
+        });
+        docked.observe(host);
+    }
+
+    function measureDockedRow() {
+        var row = document.querySelector('.cl-selection-row.is-docked');
+        var host = row && row.closest('.cl-selection-host');
+        if (!host) {
+            return;
+        }
+        var height = row.offsetHeight;
+        if (height === 0) {
+            return;
+        }
+        host.style.setProperty('--cl-docked-bar', (height + 8) + 'px');
+    }
+
     function refresh() {
         var root = bar();
         if (!root) {
@@ -87,6 +125,7 @@
             }, 0);
             units.textContent = unitsText(sum);
         }
+        measureDockedRow();
     }
 
     // "· {m} szt." from the selection row's server-rendered template, so the script carries no unit word or separator
@@ -312,10 +351,17 @@
 
     // table-select.js announces every selection change (rows, select-all, clearing, filtering) after it has updated the boxes
     document.addEventListener('cl:selection-changed', refresh);
-    document.addEventListener('cl-list:swapped', refresh);
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', refresh);
-    } else {
+    document.addEventListener('cl-list:swapped', function () { initDockedRow(); refresh(); });
+    window.addEventListener('resize', measureDockedRow);
+
+    function init() {
+        initDockedRow();
         refresh();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 })();

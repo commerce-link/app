@@ -40,13 +40,53 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
-    void dockedSelectionRowLeavesRoomForTheLastCardAndThePagesOnPhones() throws Exception {
+    void dockedSelectionRowIsTheSharedComponentOfTheDeliveryDetailsBelowTheDrawerScrim() throws Exception {
         // given
         String section = section();
 
         // when / then
-        // the fixed row at the bottom of a phone screen covered the last card and the pagination
-        assertThat(section).contains(".cl-page .cl-card:has(.cl-table.is-warehouse):has(.cl-selection-row:not([hidden])) {");
+        // Ruling 14: the block of PR #259 verbatim, so a merge of both branches leaves one identical block; z-index 15 sits
+        // below the drawer's scrim (--cl-z-scrim 20), and the room under the list is the measured --cl-docked-bar
+        assertThat(section).contains("""
+                    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
+                        position: fixed;
+                        top: auto;
+                        right: 0;
+                        bottom: 0;
+                        left: 0;
+                        z-index: 15;
+                        margin: 0;
+                        padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
+                        border-top: 1px solid var(--cl-line);
+                        border-bottom: 0;
+                        box-shadow: 0 -6px 16px rgba(14, 23, 33, .12);
+                    }
+                """).contains("""
+                    .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
+                        padding-bottom: var(--cl-docked-bar, 112px);
+                    }
+                """);
+        assertThat(section).doesNotContain("z-index: 30").doesNotContain(":has(.cl-selection-row:not([hidden]))")
+                .doesNotContain("rgba(15, 23, 42");
+    }
+
+    @Test
+    void mutedTextOfASelectedWarehouseRowKeepsAAContrastOnTheTint() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // --cl-ink-3 is 4.04:1 on --cl-accent-soft ("Bez kategorii" of a checked row)
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }");
+    }
+
+    @Test
+    void selectedUnitsHaveNoMarginOfTheirOwn() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        assertThat(section).doesNotContain("[data-cl-selection-units] { margin-left");
     }
 
     @Test

@@ -334,4 +334,44 @@ class WarehouseListRenderingTest {
         assertThat(html).contains("data-template=\"· {m} pcs\"").contains("data-units-template=\"{m} pcs\"")
                 .contains("data-meta-template=\"{status} · {units}\"").contains("Destroyed items: 7 ›");
     }
+
+    @Test
+    void selectionRowDocksOnPhonesInsideTheCardThatHostsIt() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        // the shared docked row of PR #259: the host keeps room for it, measured by selection-actions.js
+        assertThat(html).contains("<section class=\"cl-card cl-selection-host\" aria-labelledby=\"warehouse-table-title\">")
+                .containsPattern("<section class=\"cl-card cl-selection-host\"[^>]*>\\s*<h2[^>]*>[^<]*</h2>(?s:.*?)"
+                        + "<div class=\"cl-selection-row is-docked\" data-cl-selection-bar hidden>");
+    }
+
+    @Test
+    void selectedUnitsShareOneCountWithTheSelectedRowsSoNoGapStandsBeforeTheDot() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).containsPattern("<span class=\"cl-selection-count\"><span data-cl-selection-count data-template=\"[^\"]*\"></span> "
+                + "<span data-cl-selection-units data-template=\"· \\{m\\} pcs\"></span></span>");
+    }
+
+    @Test
+    void phoneSortBarWrapsItsFiveTabsInsteadOfScrollingThem() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("<nav class=\"cl-table-sortbar is-wrap\"");
+    }
 }
