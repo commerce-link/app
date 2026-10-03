@@ -446,9 +446,10 @@ class WarehouseListRenderingTest {
         String html = render(page);
 
         // then
-        // a line may break between the codes, never inside one ("GV-/N406TWF2OC")
-        assertThat(html).containsPattern("<span class=\"cl-table-sub\"><span class=\"cl-table-code\" title=\"EAN 590\">EAN 590</span> "
-                + "<span class=\"cl-table-code\" title=\"GV-1\">· GV-1</span> </span>");
+        // a line may break between the codes, never inside one ("GV-/N406TWF2OC"); the separator stays at the end of the
+        // first code, so a wrapped second line does not start with "·"
+        assertThat(html).containsPattern("<span class=\"cl-table-sub\"><span class=\"cl-table-code\" title=\"EAN 590\">EAN 590 ·</span> "
+                + "<span class=\"cl-table-code\" title=\"GV-1\">GV-1</span> </span>");
     }
 
     @Test

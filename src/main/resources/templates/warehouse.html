@@ -190,7 +190,7 @@
                             </td>
                             <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.list.column.product}">
                                 <a th:href="@{${row.href()}}" th:text="${row.name()}"></a>
-                                <span class="cl-table-sub" th:if="${!row.codes().isEmpty()}"><th:block th:each="code, it : ${row.codes()}"><span class="cl-table-code" th:title="${code}" th:text="${it.first} ? ${code} : #{warehouse.row.code.next(${code})}"></span> </th:block></span>
+                                <span class="cl-table-sub" th:if="${!row.codes().isEmpty()}"><th:block th:each="code, it : ${row.codes()}"><span class="cl-table-code" th:title="${code}" th:text="${it.last} ? ${code} : #{warehouse.row.code.beforeNext(${code})}"></span> </th:block></span>
                                 <span class="cl-table-pills" th:if="${row.conditionLabel() != null}"><span class="cl-status" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></span>
                                 <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
                             </th>

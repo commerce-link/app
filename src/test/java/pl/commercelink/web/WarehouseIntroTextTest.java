@@ -95,8 +95,8 @@ class WarehouseIntroTextTest {
         // when / then
         assertThat(text("warehouse.row.systemCost", "pl")).isEqualTo("syst. {0}");
         assertThat(text("warehouse.row.systemCost", "en")).isEqualTo("sys. {0}");
-        assertThat(text("warehouse.row.code.next", "pl")).isEqualTo("· {0}");
-        assertThat(text("warehouse.row.code.next", "en")).isEqualTo("· {0}");
+        assertThat(text("warehouse.row.code.beforeNext", "pl")).isEqualTo("{0} ·");
+        assertThat(text("warehouse.row.code.beforeNext", "en")).isEqualTo("{0} ·");
     }
 
     @Test
