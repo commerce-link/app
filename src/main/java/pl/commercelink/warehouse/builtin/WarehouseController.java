@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -72,6 +73,9 @@ class WarehouseController {
     @Autowired
     private SupplierLabels supplierLabels;
 
+    @Autowired
+    private MessageSource messageSource;
+
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
         addListPage(model, params, locale);
@@ -89,98 +93,150 @@ class WarehouseController {
         model.addAttribute("page", warehouseListService.page(getStoreId(), wms, isAdmin(), WarehouseListQuery.parse(params, wms), locale));
     }
 
-    @PostMapping("/dashboard/warehouse/markAsAvailable")
-    String markAsAvailable(@RequestParam("selectedItemIds") List<String> itemIds,
-                                  @RequestParam("quantities") List<Integer> quantities) {
-        warehouseInternalReservationService
-                .remove(
-                        Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities))
-                );
-        return "redirect:/dashboard/warehouse";
+    @PostMapping("/dashboard/warehouse/markAsReserved")
+    String markAsReserved(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                          @RequestParam(name = "quantities", required = false) List<Integer> quantities,
+                          Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.RESERVE, itemIds, quantities, items, locale, ra);
+        if (refused != null) return refused;
+        warehouseInternalReservationService.create(Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities)));
+        return done(WarehouseBulkAction.RESERVE, items.size(), sum(quantities), locale, ra);
     }
 
-    @PostMapping("/dashboard/warehouse/markAsReserved")
-    String markAsReserved(@RequestParam("selectedItemIds") List<String> itemIds,
-                          @RequestParam("quantities") List<Integer> quantities) {
-        warehouseInternalReservationService
-                .create(
-                        Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities))
-                );
-        return "redirect:/dashboard/warehouse?statuses=Reserved";
+    @PostMapping("/dashboard/warehouse/markAsAvailable")
+    String markAsAvailable(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                           @RequestParam(name = "quantities", required = false) List<Integer> quantities,
+                           Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.RELEASE, itemIds, quantities, items, locale, ra);
+        if (refused != null) return refused;
+        warehouseInternalReservationService.remove(Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities)));
+        return done(WarehouseBulkAction.RELEASE, items.size(), sum(quantities), locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInRMA")
-    String markAsInRMA(@RequestParam("selectedItemIds") List<String> itemIds,
-                       @RequestParam("quantities") List<Integer> quantities) {
-        warehouseInternalReservationService
-                .create(
-                        Reservation.internalRMA(getStoreId(), toReservationItems(itemIds, quantities))
-                );
-        return "redirect:/dashboard/warehouse?statuses=InRMA";
+    String markAsInRMA(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                       @RequestParam(name = "quantities", required = false) List<Integer> quantities,
+                       Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.RMA, itemIds, quantities, items, locale, ra);
+        if (refused != null) return refused;
+        warehouseInternalReservationService.create(Reservation.internalRMA(getStoreId(), toReservationItems(itemIds, quantities)));
+        return done(WarehouseBulkAction.RMA, items.size(), sum(quantities), locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInAllocation")
-    String markAsInAllocation(@RequestParam("selectedItemIds") List<String> itemIds) {
+    String markAsInAllocation(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                              Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.ALLOCATE, itemIds, null, items, locale, ra);
+        if (refused != null) return refused;
         warehouseAllocationsManager.schedule(getStoreId(), itemIds);
-        return "redirect:/dashboard/warehouse?statuses=Allocation";
+        return done(WarehouseBulkAction.ALLOCATE, items.size(), 0, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsDestroyed")
-    String markAsDestroyed(@RequestParam("selectedItemIds") List<String> itemIds,
-                                  @RequestParam("quantities") List<Integer> quantities,
-                                  @RequestParam("reason") DocumentReason reason,
-                                  @RequestParam("note") String note,
-                                  RedirectAttributes redirectAttributes) {
-        OperationResult<?> result = warehouseInternalIssueService.destroyItems(
-                getStoreId(),
-                toReservationItems(itemIds, quantities),
-                reason,
-                note,
-                CustomSecurityContext.getLoggedInUserName()
-        );
+    String markAsDestroyed(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                           @RequestParam(name = "quantities", required = false) List<Integer> quantities,
+                           @RequestParam("reason") DocumentReason reason, @RequestParam("note") String note,
+                           Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.DESTROY, itemIds, quantities, items, locale, ra);
+        if (refused != null) return refused;
+        OperationResult<?> result = warehouseInternalIssueService.destroyItems(getStoreId(), toReservationItems(itemIds, quantities),
+                reason, note, CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+            ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
+            return "redirect:/dashboard/warehouse?statuses=" + items.get(0).getStatus().name();
         }
-        return "redirect:/dashboard/warehouse";
+        return done(WarehouseBulkAction.DESTROY, items.size(), sum(quantities), locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInExternalService")
-    String markAsInExternalService(@RequestParam("selectedItemIds") List<String> itemIds,
-                                          RedirectAttributes redirectAttributes) {
-        List<WarehouseItem> warehouseItems = itemIds.stream()
-                .map(id -> warehouseRepository.findById(getStoreId(), id))
-                .toList();
-
-        if (!deliveredPredicate.isFromSameSource(getStoreId(), warehouseItems)) {
-            redirectAttributes.addFlashAttribute("errorMessage", "All selected items must have the same provider.");
-            return "redirect:/dashboard/warehouse?statuses=InRMA";
-        }
-
-        OperationResult<?> result = warehouseGoodsOutService.issueGoodsOutForExternalService(
-                getStoreId(),
-                itemIds,
-                CustomSecurityContext.getLoggedInUserName()
-        );
+    String markAsInExternalService(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                                   Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.EXTERNAL_SERVICE, itemIds, null, items, locale, ra);
+        if (refused != null) return refused;
+        OperationResult<?> result = warehouseGoodsOutService.issueGoodsOutForExternalService(getStoreId(), itemIds,
+                CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+            ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
             return "redirect:/dashboard/warehouse?statuses=InRMA";
         }
-        return "redirect:/dashboard/warehouse?statuses=InExternalService";
+        return done(WarehouseBulkAction.EXTERNAL_SERVICE, items.size(), 0, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsReceivedFromExternalService")
-    String markAsReceivedFromExternalService(@RequestParam("selectedItemIds") List<String> itemIds,
-                                                    RedirectAttributes redirectAttributes) {
-        OperationResult<?> result = warehouseGoodsInService.receiveFromExternalService(
-                getStoreId(),
-                itemIds,
-                CustomSecurityContext.getLoggedInUserName()
-        );
+    String markAsReceivedFromExternalService(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
+                                             Locale locale, RedirectAttributes ra) {
+        List<WarehouseItem> items = new ArrayList<>();
+        String refused = guard(WarehouseBulkAction.RECEIVE, itemIds, null, items, locale, ra);
+        if (refused != null) return refused;
+        OperationResult<?> result = warehouseGoodsInService.receiveFromExternalService(getStoreId(), itemIds,
+                CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+            ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
             return "redirect:/dashboard/warehouse?statuses=InExternalService";
         }
-        return "redirect:/dashboard/warehouse?statuses=Delivered";
+        return done(WarehouseBulkAction.RECEIVE, items.size(), 0, locale, ra);
+    }
+
+    /** Loads the posted items of this store and refuses the whole action on the first problem; null means "go on". */
+    private String guard(WarehouseBulkAction action, List<String> itemIds, List<Integer> quantities, List<WarehouseItem> into,
+                         Locale locale, RedirectAttributes ra) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.select.at.least.one");
+        }
+        if (action.needsQuantity() && (quantities == null || quantities.size() != itemIds.size())) {
+            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.select.at.least.one");
+        }
+        for (String id : itemIds) {
+            WarehouseItem item = warehouseRepository.findById(getStoreId(), id);
+            if (item == null) {
+                return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.not.found");
+            }
+            into.add(item);
+        }
+        Optional<WarehouseItem> refused = action.firstRefused(into);
+        if (refused.isPresent()) {
+            WarehouseItem item = refused.get();
+            String allowed = action.allowed().stream().map(s -> msg(locale, WarehouseStatuses.labelKey(s))).collect(Collectors.joining(", "));
+            return refuse(ra, locale, "/dashboard/warehouse?statuses=" + into.get(0).getStatus().name(), "warehouse.error.status",
+                    item.getName(), msg(locale, WarehouseStatuses.labelKey(item.getStatus())), msg(locale, "warehouse.bulk." + action.key() + ".label"), allowed);
+        }
+        if (action.needsQuantity()) {
+            for (int i = 0; i < into.size(); i++) {
+                Integer qty = quantities.get(i);
+                if (qty == null || qty < 1 || qty > into.get(i).getQty()) {
+                    return refuse(ra, locale, "/dashboard/warehouse?statuses=" + into.get(0).getStatus().name(), "warehouse.error.quantity",
+                            into.get(i).getName(), into.get(i).getQty());
+                }
+            }
+        }
+        if (action.sameSource() && !deliveredPredicate.isFromSameSource(getStoreId(), into)) {
+            return refuse(ra, locale, "/dashboard/warehouse?statuses=InRMA", "warehouse.error.same.source");
+        }
+        return null;
+    }
+
+    private String refuse(RedirectAttributes ra, Locale locale, String target, String key, Object... args) {
+        ra.addFlashAttribute("settingsErrorMessage", msg(locale, key, args));
+        return "redirect:" + target;
+    }
+
+    private String done(WarehouseBulkAction action, int items, int units, Locale locale, RedirectAttributes ra) {
+        ra.addFlashAttribute("settingsSavedMessage", msg(locale, "warehouse.bulk." + action.key() + ".done", items, units));
+        return "redirect:/dashboard/warehouse?statuses=" + action.after().name();
+    }
+
+    private String msg(Locale locale, String key, Object... args) {
+        return messageSource.getMessage(key, args, locale);
+    }
+
+    private static int sum(List<Integer> quantities) {
+        return quantities.stream().mapToInt(Integer::intValue).sum();
     }
 
     private List<ReservationItem> toReservationItems(List<String> itemIds, List<Integer> quantities) {
