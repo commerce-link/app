@@ -17,14 +17,21 @@ class OfferValidityTest {
     }
 
     @Test
-    void pastDateIsExpiredLikeBasketIsExpired() {
-        // given
-        Basket basket = new Basket();
-        basket.setType(BasketType.Offer);
-        basket.setExpiresAt(NOW.minusMinutes(1));
-
+    void pastDateIsExpired() {
         // when / then
         assertThat(OfferValidity.of(NOW.minusMinutes(1), NOW)).isEqualTo(OfferValidity.EXPIRED);
+    }
+
+    @Test
+    void expiredAgreesWithBasketIsExpired() {
+        // given
+        LocalDateTime now = LocalDateTime.now();
+        Basket basket = new Basket();
+        basket.setType(BasketType.Offer);
+        basket.setExpiresAt(now.minusMinutes(1));
+
+        // when / then
+        assertThat(OfferValidity.of(basket.getExpiresAt(), LocalDateTime.now())).isEqualTo(OfferValidity.EXPIRED);
         assertThat(basket.isExpired()).isTrue();
     }
 
