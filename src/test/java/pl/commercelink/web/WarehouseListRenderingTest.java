@@ -287,4 +287,20 @@ class WarehouseListRenderingTest {
                 .containsPattern("<select[^>]*>\\s*<option value=\"\" selected>Choose a reason</option>\\s*<option value=\"Theft\">");
         assertThat(html).contains("Choose a reason from the list.");
     }
+
+    @Test
+    void categoryMenuScrollsItsChecksAndKeepsTheApplyButtonBelowThem() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        Matcher menu = Pattern.compile("data-cl-filter-menu=\"categories\".*?</details>", Pattern.DOTALL).matcher(html);
+        assertThat(menu.find()).isTrue();
+        String categories = menu.group();
+        assertThat(categories).containsPattern("<div class=\"cl-filter-menu-scroll\">\\s*<div class=\"cl-filter-menu-group\"");
+        assertThat(categories.indexOf("cl-filter-menu-actions")).isGreaterThan(categories.lastIndexOf("cl-filter-menu-check"));
+    }
 }

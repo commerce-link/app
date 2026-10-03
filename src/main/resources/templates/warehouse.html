@@ -75,7 +75,9 @@
                             </summary>
                             <form method="get" th:action="@{/dashboard/warehouse}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
                                 <th:block th:replace="~{fragments/warehouse-list :: hidden('categories')}"></th:block>
-                                <th:block th:replace="~{fragments/deliveries-list :: checks('categories', null, ${page.categoryOptions()})}"></th:block>
+                                <div class="cl-filter-menu-scroll">
+                                    <th:block th:replace="~{fragments/deliveries-list :: checks('categories', null, ${page.categoryOptions()})}"></th:block>
+                                </div>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>
                                 </div>
