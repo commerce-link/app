@@ -23,6 +23,7 @@ import pl.commercelink.warehouse.builtin.WarehousePageModel.BulkActionView;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Chip;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.EmptyState;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Option;
+import pl.commercelink.warehouse.builtin.WarehousePageModel.Results;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.SortHeader;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
@@ -74,7 +75,7 @@ class WarehouseListRenderingTest {
                 List.of(new Option("GPU", "GPU", 1, false, "/dashboard/warehouse?categories=GPU"),
                         new Option("none", "No category", 0, false, "/x")), "All",
                 List.of(new Chip("Status: In stock", "/dashboard/warehouse?statuses=all", "Remove filter: Status: In stock")),
-                "Items: 2 · 6 pcs", headers, rows, Pagination.of(1, rows.size(), 50, n -> "/p" + n),
+                new Results("Items: 2 · 6 pcs · Net value:", "1.00 PLN", "· gross:", "1.23 PLN"), headers, rows, Pagination.of(1, rows.size(), 50, n -> "/p" + n),
                 rows.isEmpty() ? new EmptyState(storeEmpty ? "The warehouse is empty." : "Nothing matches the filters.",
                         "Clear filters", "/dashboard/warehouse") : null,
                 storeEmpty, 1, 7, List.of(reserve), destroy, List.of(new Option("Theft", "Theft", 0, false, null)));
@@ -113,7 +114,7 @@ class WarehouseListRenderingTest {
         // given
         WarehousePageModel withChips = model(List.of(row("a1", "Delivered", true)), false);
         WarehousePageModel noChips = new WarehousePageModel(withChips.query(), true, false, withChips.tiles(), withChips.statusOptions(),
-                "All", withChips.categoryOptions(), "All", List.of(), "Items: 2 · 6 pcs · Net value: 1.00 PLN · gross: 1.23 PLN",
+                "All", withChips.categoryOptions(), "All", List.of(), withChips.results(),
                 withChips.sortHeaders(), withChips.rows(), withChips.pagination(), null, false, 0, 0,
                 withChips.menuActions(), withChips.destroyAction(), withChips.destroyReasons());
 
@@ -124,7 +125,8 @@ class WarehouseListRenderingTest {
         assertThat(html).containsOnlyOnce("To receive");
         assertThat(Pattern.compile("<a class=\"cl-stat is-link\"").matcher(html).results().count()).isEqualTo(4);
         assertThat(html).doesNotContain("<li class=\"cl-stat\"");
-        assertThat(html).contains("Net value: 1.00 PLN · gross: 1.23 PLN");
+        assertThat(html).containsPattern("Items: 2 · 6 pcs · Net value:</span>\\s*<span class=\"cl-results-amount\">1.00 PLN</span>"
+                + "\\s*<span>· gross:</span>\\s*<span class=\"cl-results-amount\">1.23 PLN</span>");
         assertThat(html).doesNotContain("cl-table-results cl-visually-hidden");
         assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\"");
         assertThat(html).contains("class=\"cl-list-meta is-warehouse\"");
@@ -302,5 +304,21 @@ class WarehouseListRenderingTest {
         String categories = menu.group();
         assertThat(categories).containsPattern("<div class=\"cl-filter-menu-scroll\">\\s*<div class=\"cl-filter-menu-group\"");
         assertThat(categories.indexOf("cl-filter-menu-actions")).isGreaterThan(categories.lastIndexOf("cl-filter-menu-check"));
+    }
+
+    @Test
+    void zeroResultsLineIsOnlyTheCount() {
+        // given
+        WarehousePageModel base = model(List.of(), false);
+        WarehousePageModel page = new WarehousePageModel(base.query(), true, false, base.tiles(), base.statusOptions(), "All",
+                base.categoryOptions(), "All", base.chips(), new Results("Items: 0", null, null, null), base.sortHeaders(),
+                base.rows(), base.pagination(), base.emptyState(), false, 1, 0, base.menuActions(), base.destroyAction(),
+                base.destroyReasons());
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\">\\s*<span>Items: 0</span>\\s*</p>");
     }
 }

@@ -8,7 +8,7 @@ import java.util.Map;
 /** Everything the warehouse list renders, texts resolved (spec §4). */
 public record WarehousePageModel(WarehouseListQuery query, boolean admin, boolean wms, List<Tile> tiles,
                                  List<Option> statusOptions, String statusSummary, List<Option> categoryOptions,
-                                 String categorySummary, List<Chip> chips, String resultsLine,
+                                 String categorySummary, List<Chip> chips, Results results,
                                  Map<WarehouseListQuery.Sort, SortHeader> sortHeaders, List<WarehouseItemRow> rows,
                                  Pagination pagination, EmptyState emptyState, boolean storeEmpty, int activeFilterCount,
                                  long destroyedCount, List<BulkActionView> menuActions, BulkActionView destroyAction,
@@ -16,6 +16,11 @@ public record WarehousePageModel(WarehouseListQuery query, boolean admin, boolea
 
     public record Tile(String label, String value, String hint, String href, boolean active) { }
     public record Option(String value, String label, long count, boolean selected, String toggleHref) { }
+    /**
+     * The results line in parts so the template can set the amounts as cl-results-amount (Payments): count is the text
+     * up to the net amount; with nothing listed it is the bare count and the other parts are null.
+     */
+    public record Results(String count, String net, String grossLabel, String gross) { }
     public record Chip(String label, String clearHref, String clearLabel) { }
     public record SortHeader(String href, String ariaSort) { }
     public record EmptyState(String text, String actionLabel, String actionHref) { }

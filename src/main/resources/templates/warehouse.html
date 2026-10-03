@@ -118,8 +118,14 @@
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status"
-                       th:text="${page.resultsLine()}"></p>
+                    <p class="cl-table-results" role="status" th:with="r=${page.results()}">
+                        <span th:text="${r.count()}"></span>
+                        <th:block th:if="${r.net() != null}">
+                            <span class="cl-results-amount" th:text="${r.net()}"></span>
+                            <span th:text="${r.grossLabel()}"></span>
+                            <span class="cl-results-amount" th:text="${r.gross()}"></span>
+                        </th:block>
+                    </p>
                 </div>
 
                 <th:block th:unless="${page.rows().isEmpty()}">

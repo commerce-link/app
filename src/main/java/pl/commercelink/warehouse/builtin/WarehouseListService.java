@@ -65,9 +65,7 @@ class WarehouseListService {
         return new WarehousePageModel(query, admin, wms, tiles(query, store, wms, locale),
                 statusOptions(query, forStatuses, locale), statusSummary(query, locale),
                 categoryOptions(query, forCategories, collator, locale), summary(query.categories().size(), categoryLabels(query, locale), locale),
-                chips, text(locale, "warehouse.list.results", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum(),
-                        Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum()),
-                        Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())),
+                chips, results(shown, locale),
                 sortHeaders(query), rows, pagination,
                 rows.isEmpty() ? emptyState(query, store.isEmpty(), locale) : null, store.isEmpty(),
                 chips.size(), destroyed,
@@ -85,6 +83,16 @@ class WarehouseListService {
             }
         });
         return byId;
+    }
+
+    private Results results(List<WarehouseItem> shown, Locale locale) {
+        if (shown.isEmpty()) {
+            return new Results(text(locale, "warehouse.list.results.empty"), null, null, null);
+        }
+        return new Results(text(locale, "warehouse.list.results.count", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum()),
+                text(locale, "warehouse.list.results.amount", Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum())),
+                text(locale, "warehouse.list.results.gross"),
+                text(locale, "warehouse.list.results.amount", Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())));
     }
 
     private List<Tile> tiles(WarehouseListQuery query, List<WarehouseItem> store, boolean wms, Locale locale) {

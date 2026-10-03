@@ -156,8 +156,10 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(first.rows()).hasSize(50);
-        assertThat(first.resultsLine()).isEqualTo("Pozycje: 55 · 110 szt. · Wartość netto: 1\u00a0100,00\u00a0PLN · brutto: 1\u00a0353,00\u00a0PLN");
-        assertThat(everything.resultsLine()).isEqualTo("Pozycje: 56 · 111 szt. · Wartość netto: 1\u00a0200,00\u00a0PLN · brutto: 1\u00a0476,00\u00a0PLN");
+        assertThat(first.results()).isEqualTo(new WarehousePageModel.Results("Pozycje: 55 · 110 szt. · Wartość netto:",
+                "1\u00a0100,00\u00a0PLN", "· brutto:", "1\u00a0353,00\u00a0PLN"));
+        assertThat(everything.results().net()).isEqualTo("1\u00a0200,00\u00a0PLN");
+        assertThat(everything.results().gross()).isEqualTo("1\u00a0476,00\u00a0PLN");
     }
 
     @Test
@@ -251,7 +253,7 @@ class WarehouseListServiceTest {
         // then
         assertThat(first.rows()).hasSize(50);
         assertThat(first.pagination().isNeeded()).isTrue();
-        assertThat(first.resultsLine()).startsWith("Pozycje: 55 · 110 szt.");
+        assertThat(first.results().count()).startsWith("Pozycje: 55 · 110 szt.");
         assertThat(page("page", "2").rows()).hasSize(5);
     }
 
@@ -323,5 +325,20 @@ class WarehouseListServiceTest {
         assertThat(rows.get(1).deliveryHref()).isNull();
         assertThat(rows.get(1).deliveryNumber()).isNull();
         assertThat(rows.get(2).deliveryHref()).isNull();
+    }
+
+    @Test
+    void zeroResultsShowOnlyTheCount() {
+        // given
+        add("A", "GPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel.Results results = page("q", "nothing-like-this").results();
+
+        // then
+        assertThat(results.count()).isEqualTo("Pozycje: 0");
+        assertThat(results.net()).isNull();
+        assertThat(results.grossLabel()).isNull();
+        assertThat(results.gross()).isNull();
     }
 }
