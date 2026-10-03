@@ -8701,6 +8701,18 @@ a.cl-link-button:hover {
     }
 }
 
+/* The offer name wrapped here as well ("Oferta zielona / 01"), which kept every row at 84 px. In this range it is one
+   line with an ellipsis (the full name is in title); the 26ch cap above still keeps one long name from widening the
+   column. The row link's ::after is positioned against the row, so overflow does not clip it, and the focus outline
+   belongs to the link itself. */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-cell-name {
+        display: block;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
 /* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. The note and the
    menu share the fifth line explicitly (auto-placement put the menu's 44 px box under the note's text). The menu keeps
    its 44 px target, and the negative margin gives the growth back to the line above and the card padding, as the chip

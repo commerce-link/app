@@ -95,4 +95,20 @@ class OffersListStylesContractTest {
     }
 }""");
     }
+
+    @Test
+    void offerNameStaysOnOneLineOnlyBetweenTheRailAndTheFullSidebar() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then
+        assertThat(css).contains("""
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-cell-name {
+        display: block;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}""");
+    }
 }
