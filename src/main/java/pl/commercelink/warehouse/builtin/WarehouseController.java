@@ -300,6 +300,7 @@ class WarehouseController {
 
     private RestockForm restockForm(String selectedCatalogId, String error) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId()).stream()
+                .filter(catalog -> catalog.getCatalogId() != null)
                 .sorted(Comparator.comparing(ProductCatalog::getName, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
         Map<String, List<Map<String, String>>> categoriesByCatalog = catalogs.stream()

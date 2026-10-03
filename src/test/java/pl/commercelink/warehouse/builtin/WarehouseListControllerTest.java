@@ -155,7 +155,8 @@ class WarehouseListControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         ProductCatalog unnamed = catalog("c3", null, List.of(category("k2", null), category(null, "No id"), category("k3", "CPU")));
         ProductCatalog named = catalog("c1", "Komputery", List.of());
-        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of(unnamed, named));
+        ProductCatalog withoutId = catalog(null, "Bez id", List.of());
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of(unnamed, withoutId, named));
         ExtendedModelMap model = new ExtendedModelMap();
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);

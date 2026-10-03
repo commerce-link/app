@@ -23,7 +23,6 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.api.ItemCondition;
-import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -41,9 +40,6 @@ class WarehouseItemController {
             FulfilmentStatus.New,
             FulfilmentStatus.Allocation
     );
-
-    @Autowired
-    private Warehouse warehouse;
 
     @Autowired
     private TaxonomyCache taxonomyCache;
