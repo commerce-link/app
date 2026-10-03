@@ -271,4 +271,20 @@ class WarehouseListRenderingTest {
         // then
         assertThat(cell).doesNotContain("<a ").contains("—").contains("S/N 1");
     }
+
+    @Test
+    void destroyReasonStartsWithNoChoiceSoTheOperatorHasToPickOne() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        Matcher select = Pattern.compile("<select[^>]*id=\"destroy-reason\".*?</select>", Pattern.DOTALL).matcher(html);
+        assertThat(select.find()).isTrue();
+        assertThat(select.group()).contains("required")
+                .containsPattern("<select[^>]*>\\s*<option value=\"\" selected>Choose a reason</option>\\s*<option value=\"Theft\">");
+        assertThat(html).contains("Choose a reason from the list.");
+    }
 }

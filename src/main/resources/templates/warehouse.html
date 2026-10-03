@@ -244,8 +244,10 @@
                             <div class="cl-span-6 cl-field">
                                 <label class="cl-label" for="destroy-reason" th:text="#{warehouse.bulk.destroy.reason}"></label>
                                 <select class="cl-select" id="destroy-reason" name="reason" required disabled>
+                                    <option value="" selected th:text="#{warehouse.bulk.destroy.reason.choose}"></option>
                                     <option th:each="r : ${page.destroyReasons()}" th:value="${r.value()}" th:text="${r.label()}"></option>
                                 </select>
+                                <p class="cl-field-error" hidden th:text="#{warehouse.bulk.destroy.reason.required}"></p>
                             </div>
                             <div class="cl-span-6 cl-field">
                                 <label class="cl-label" for="destroy-note" th:text="#{warehouse.bulk.destroy.note}"></label>

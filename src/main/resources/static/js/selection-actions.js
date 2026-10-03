@@ -135,7 +135,8 @@
         }, { once: true });
     }
 
-    // The note's error text is server-rendered, so it is only hidden; the quantity errors are rebuilt with the rows.
+    // The reason's and the note's error texts are server-rendered, so they are only hidden; the quantity errors are
+    // rebuilt with the rows. The reason starts on its empty "choose" option every time: no destroy reason is preselected.
     function resetDialog(dialog) {
         dialog.querySelectorAll('.cl-field-error').forEach(function (error) {
             error.hidden = true;
@@ -146,6 +147,10 @@
         var note = dialog.querySelector('textarea[name="note"]');
         if (note) {
             note.value = '';
+        }
+        var reason = dialog.querySelector('select[name="reason"]');
+        if (reason) {
+            reason.value = '';
         }
     }
 
@@ -217,6 +222,18 @@
                 input.removeAttribute('aria-invalid');
             }
         });
+        var reason = dialog.querySelector('select[name="reason"]');
+        if (reason && !reason.disabled) {
+            var reasonError = reason.parentElement.querySelector('.cl-field-error');
+            var unchosen = reason.value === '';
+            reasonError.hidden = !unchosen;
+            if (unchosen) {
+                reason.setAttribute('aria-invalid', 'true');
+                firstBad = firstBad || reason;
+            } else {
+                reason.removeAttribute('aria-invalid');
+            }
+        }
         var note = dialog.querySelector('textarea[name="note"]');
         if (note && !note.disabled) {
             var noteError = note.parentElement.querySelector('.cl-field-error');

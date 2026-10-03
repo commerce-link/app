@@ -112,4 +112,16 @@ class WarehouseScriptContractTest {
         assertThat(post).contains("viewParams()");
         assertThat(open).contains("viewParams()").contains("data-cl-list-view");
     }
+
+    @Test
+    void quantityDialogClearsAndChecksTheDestroyReason() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String reset = js.substring(js.indexOf("function resetDialog("), js.indexOf("function openQuantities("));
+        String validate = js.substring(js.indexOf("function validate("), js.indexOf("document.addEventListener('click'"));
+
+        // when / then
+        assertThat(reset).contains("select[name=\"reason\"]");
+        assertThat(validate).contains("select[name=\"reason\"]");
+    }
 }
