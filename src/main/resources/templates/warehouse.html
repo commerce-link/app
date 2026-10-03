@@ -66,6 +66,7 @@
                             </summary>
                             <form method="get" th:action="@{/dashboard/warehouse}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
                                 <th:block th:replace="~{fragments/warehouse-list :: hidden('statuses')}"></th:block>
+                                <input type="hidden" th:name="${T(pl.commercelink.warehouse.builtin.WarehouseListQuery).STATUS_MENU}" value="1"/>
                                 <th:block th:replace="~{fragments/deliveries-list :: checks('statuses', null, ${page.statusOptions()})}"></th:block>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>

@@ -3,6 +3,7 @@ package pl.commercelink.warehouse.builtin;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.MultiValueMap;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.taxonomy.Categories;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +12,8 @@ import java.util.*;
 /**
  * The state of the warehouse list, read from and written back to the address (spec §4.3). Every link of the page is built
  * here so changing one filter never loses the others; unknown values are ignored so old bookmarks and redirects open.
- * The status list is never empty: no parameter means the default status, unticking the last one means all of them.
+ * The status list is never empty: no parameter means the default status, unticking the last one means all of them. The
+ * Status menu sends {@value #STATUS_MENU} with its checkboxes, which tells "nothing ticked" apart from "no parameter".
  */
 public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, List<String> categories, String q,
                                  Sort sort, Direction dir, int page) {
@@ -20,6 +22,7 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
     public static final int PAGE_SIZE = 50;
     public static final int MAX_Q = 100;
     public static final String NO_CATEGORY = "none";
+    public static final String STATUS_MENU = "statusesMenu";
     private static final String ALL = "all";
 
     public WarehouseListQuery {
@@ -30,7 +33,8 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
             statuses = WarehouseStatuses.defaults(wms);
         }
         categories = categories == null ? List.of()
-                : categories.stream().map(StringUtils::trimToNull).filter(Objects::nonNull).distinct().toList();
+                : categories.stream().map(StringUtils::trimToNull).filter(Objects::nonNull)
+                        .map(c -> Categories.UNCATEGORIZED.equals(c) ? NO_CATEGORY : c).distinct().toList();
         q = q == null ? null : StringUtils.left(StringUtils.trimToNull(q), MAX_Q);
         page = Math.max(1, page);
     }
@@ -52,7 +56,8 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
 
     public static WarehouseListQuery parse(MultiValueMap<String, String> params, boolean wms) {
         List<String> raw = values(params, "statuses");
-        boolean all = "true".equalsIgnoreCase(trim(params.getFirst("showAll"))) || raw.stream().anyMatch(v -> ALL.equalsIgnoreCase(trim(v)));
+        boolean all = "true".equalsIgnoreCase(trim(params.getFirst("showAll"))) || raw.stream().anyMatch(v -> ALL.equalsIgnoreCase(trim(v)))
+                || (params.containsKey(STATUS_MENU) && raw.isEmpty());
         List<FulfilmentStatus> statuses = all ? WarehouseStatuses.visible(wms)
                 : raw.stream().map(WarehouseListQuery::status).flatMap(Optional::stream).toList();
         return new WarehouseListQuery(wms, statuses, values(params, "categories"), params.getFirst("q"),

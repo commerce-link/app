@@ -195,4 +195,19 @@ class WarehouseListRenderingTest {
         // then
         assertThat(formWithId(html, "role=\"search\"")).doesNotContain("_csrf");
     }
+
+    @Test
+    void statusMenuCarriesItsMarkerSoUntickingEverythingMeansAll() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        Matcher statusMenu = Pattern.compile("data-cl-filter-menu=\"statuses\".*?</details>", Pattern.DOTALL).matcher(html);
+        assertThat(statusMenu.find()).isTrue();
+        assertThat(statusMenu.group()).contains("<input type=\"hidden\" name=\"statusesMenu\" value=\"1\"/>");
+        assertThat(html).containsOnlyOnce("name=\"statusesMenu\"").doesNotContain("statusesMenu=");
+    }
 }

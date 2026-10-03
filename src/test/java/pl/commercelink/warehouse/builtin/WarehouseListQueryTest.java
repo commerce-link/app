@@ -155,4 +155,40 @@ class WarehouseListQueryTest {
         assertThat(WarehouseStatuses.selectable(New)).isTrue();
         assertThat(WarehouseStatuses.labelKey(InExternalService)).isEqualTo("warehouse.status.InExternalService");
     }
+
+    @Test
+    void untickingTheLastStatusInTheMenuMeansAllStatuses() {
+        // given
+        LinkedMultiValueMap<String, String> menuWithNothingTicked = params("statusesMenu", "1", "categories", "GPU");
+
+        // when
+        WarehouseListQuery own = WarehouseListQuery.parse(menuWithNothingTicked, false);
+        WarehouseListQuery external = WarehouseListQuery.parse(menuWithNothingTicked, true);
+
+        // then
+        assertThat(own.isAllStatuses()).isTrue();
+        assertThat(external.statuses()).containsExactly(New, Allocation, Ordered);
+        assertThat(own.href()).isEqualTo("/dashboard/warehouse?statuses=all&categories=GPU");
+    }
+
+    @Test
+    void statusMenuWithTickedStatusesKeepsThemAndTheMarkerStaysOutOfLinks() {
+        // when
+        WarehouseListQuery query = WarehouseListQuery.parse(params("statusesMenu", "1", "statuses", "Reserved"), false);
+
+        // then
+        assertThat(query.statuses()).containsExactly(Reserved);
+        assertThat(query.href()).isEqualTo("/dashboard/warehouse?statuses=Reserved");
+        assertThat(query.toggleStatus(InRMA).href()).doesNotContain("statusesMenu");
+    }
+
+    @Test
+    void oldUncategorizedBookmarkMeansNoCategory() {
+        // when
+        WarehouseListQuery query = WarehouseListQuery.parse(params("categories", "Uncategorized", "categories", "none", "categories", "GPU"), false);
+
+        // then
+        assertThat(query.categories()).containsExactly("none", "GPU");
+        assertThat(query.href()).isEqualTo("/dashboard/warehouse?categories=none&categories=GPU");
+    }
 }
