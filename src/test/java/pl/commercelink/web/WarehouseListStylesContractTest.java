@@ -26,7 +26,8 @@ class WarehouseListStylesContractTest {
 
         // when / then
         // "Zarezerwowane" is a 114 px pill; 16 % of the table is narrower than that below 1366 px and the text ran out of it
-        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }")
+        // 8.5rem = the 114 px pill plus the cell's padding; the rest of the old 9.5rem goes to the product column
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 8.5rem; }")
                 .doesNotContain(".cl-col-status { width: 16%; }");
     }
 
@@ -109,5 +110,17 @@ class WarehouseListStylesContractTest {
         assertThat(section).contains(".cl-page .cl-dialog .cl-table.cl-quantity-table { display: table; }")
                 .contains(".cl-page .cl-dialog .cl-quantity-table tr { display: table-row; padding: 0; border-top: 0; }")
                 .contains(".cl-page .cl-dialog .cl-quantity-table :is(tbody th, td)::before { content: none; }");
+    }
+
+    @Test
+    void codesAndTheSystemCostPillStayOnOneLineFromTableWidthAndTheCommentShowsTwoLines() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        String table = section.substring(section.indexOf("@media screen and (min-width: 720px) {"));
+        assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap;")
+                .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: nowrap; }");
+        assertThat(section).contains("-webkit-line-clamp: 2;").doesNotContain(".cl-table-code { white-space: normal; }");
     }
 }

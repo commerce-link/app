@@ -89,4 +89,13 @@ class WarehouseIntroTextTest {
         assertThat(text("warehouse.bulk.dialog.whole", "en")).isEqualTo("Enter a whole number from 1 to {0}.");
         assertThat(text("warehouse.bulk.dialog.effect.destroy", "pl")).startsWith("Powstanie dokument RW.");
     }
+
+    @Test
+    void systemCostPillIsShortAndItsSeparatorComesFromTheMessages() {
+        // when / then
+        assertThat(text("warehouse.row.systemCost", "pl")).isEqualTo("syst. {0}");
+        assertThat(text("warehouse.row.systemCost", "en")).isEqualTo("sys. {0}");
+        assertThat(text("warehouse.row.code.next", "pl")).isEqualTo("· {0}");
+        assertThat(text("warehouse.row.code.next", "en")).isEqualTo("· {0}");
+    }
 }

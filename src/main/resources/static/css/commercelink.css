@@ -8585,20 +8585,27 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-warehouse .cl-cell-stack { display: flex; flex-direction: column; min-width: 0; }
 .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-end; }
 .cl-page .cl-table.is-warehouse :is(th, td) { white-space: normal; overflow-wrap: break-word; }
-.cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; }
 /* a category is free text, often one long word ("Motherboard"): a hyphen reads better than a cut without one */
 .cl-page .cl-table.is-warehouse .is-hyphenated { hyphens: auto; }
 .cl-page .cl-table.is-warehouse .cl-table-pills { max-width: 100%; }
 .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { max-width: 100%; }
-.cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: normal; text-align: right; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; }
+/* the comment shows two lines; the whole of it is on the item page (the name links there) and in the title */
+.cl-page .cl-table.is-warehouse .cl-table-note {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: none; white-space: normal;
+}
 @media screen and (min-width: 720px) {
     .cl-page .cl-table.is-warehouse { table-layout: fixed; width: 100%; }
+    /* a code never breaks inside ("GV-/N406TWF2OC"): the line breaks between the EAN and the code; one longer than the
+       product column ends in an ellipsis, whole in its title */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+    .cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { white-space: nowrap; }
     .cl-page .cl-table.is-warehouse .cl-col-category { width: 12%; }
     .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
     .cl-page .cl-table.is-warehouse .cl-col-cost { width: 15%; }
     .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 11%; }
     /* 16 % of the table is narrower than the longest status pill ("Zarezerwowane") below 1366 px */
-    .cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }
+    .cl-page .cl-table.is-warehouse .cl-col-status { width: 8.5rem; }
 }
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }

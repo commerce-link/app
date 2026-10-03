@@ -46,7 +46,7 @@ class WarehouseListRenderingTest {
 
     private static WarehouseItemRow row(String id, String status, boolean selectable, String deliveryHref, String deliveryNumber,
                                         String supplier) {
-        return new WarehouseItemRow(id, "/dashboard/warehouse/items/" + id, "RTX " + id, "EAN 590 · GV-1", "Damaged", "is-bad",
+        return new WarehouseItemRow(id, "/dashboard/warehouse/items/" + id, "RTX " + id, List.of("EAN 590", "GV-1"), "Damaged", "is-bad",
                 "comment " + id, "GPU", false, 3, "1 243,00", "gross 1 528,89", null, null, deliveryHref,
                 deliveryNumber, supplier, "S/N 1", status, status, "is-ok", selectable, "Acme");
     }
@@ -421,5 +421,19 @@ class WarehouseListRenderingTest {
         // then
         // .cl-dialog-message brings its own 20 px padding into the dialog body, which already has it
         assertThat(html).containsPattern("id=\"restock-title\"[^<]*</h2>\\s*<div class=\"cl-dialog-body\">\\s*<p class=\"cl-help\">");
+    }
+
+    @Test
+    void eanAndManufacturerCodeAreSeparateUnbreakablePartsWithTheSeparatorFromTheMessages() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        // a line may break between the codes, never inside one ("GV-/N406TWF2OC")
+        assertThat(html).containsPattern("<span class=\"cl-table-sub\"><span class=\"cl-table-code\" title=\"EAN 590\">EAN 590</span> "
+                + "<span class=\"cl-table-code\" title=\"GV-1\">· GV-1</span> </span>");
     }
 }

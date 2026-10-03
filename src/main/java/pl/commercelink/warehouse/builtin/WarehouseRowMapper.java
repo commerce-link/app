@@ -8,6 +8,7 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.web.orders.Money;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -51,9 +52,9 @@ class WarehouseRowMapper {
     }
 
     WarehouseItemRow map(WarehouseItem item) {
-        String codes = Stream.of(StringUtils.isBlank(item.getEan()) ? null : text("warehouse.row.ean", item.getEan()),
+        List<String> codes = Stream.of(StringUtils.isBlank(item.getEan()) ? null : text("warehouse.row.ean", item.getEan()),
                         StringUtils.trimToNull(item.getManufacturerCode()))
-                .filter(Objects::nonNull).collect(Collectors.joining(" · "));
+                .filter(Objects::nonNull).toList();
         ItemCondition condition = item.getCondition();
         boolean marked = condition == ItemCondition.OpenBox || condition == ItemCondition.Damaged;
         boolean uncategorized = uncategorized(item.getCategory());

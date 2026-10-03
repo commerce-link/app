@@ -53,7 +53,7 @@ class WarehouseRowMapperTest {
 
         // then
         assertThat(row.href()).isEqualTo("/dashboard/warehouse/items/6e01f99c-0000-0000-0000-000000000000");
-        assertThat(row.codes()).isEqualTo("EAN 5900000000065 · GV-N406TWF2OC");
+        assertThat(row.codes()).containsExactly("EAN 5900000000065", "GV-N406TWF2OC");
         assertThat(row.costNet()).isEqualTo("1 243,00");
         assertThat(row.costGross()).startsWith("brutto 1 528,");
         assertThat(row.statusLabel()).isEqualTo("Na stanie");
@@ -99,8 +99,8 @@ class WarehouseRowMapperTest {
         // then
         assertThat(row.conditionLabel()).isEqualTo("Uszkodzony");
         assertThat(row.conditionTone()).isEqualTo("is-bad");
-        assertThat(row.systemCost()).isEqualTo("systemowy 1 200,00");
-        assertThat(row.systemCostTitle()).contains("1 200,00");
+        assertThat(row.systemCost()).isEqualTo("syst. 1 200,00");
+        assertThat(row.systemCostTitle()).startsWith("Koszt systemowy: ").contains("1 200,00");
         assertThat(row.serialNo()).isEqualTo("S/N SN-1");
         assertThat(row.source()).isEqualTo("Kosatec");
         assertThat(row.selectable()).isFalse();
