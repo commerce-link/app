@@ -23,10 +23,11 @@ import java.util.regex.Pattern;
 @EnableMethodSecurity
 public class WebSecurityConfiguration {
 
-    // The order printouts (card, collection protocol) are printed from a hidden frame of the order page, so they may be
-    // framed by a page of this origin; every other page keeps Spring Security's default DENY against clickjacking.
+    // The order printouts (card, collection protocol, and the batch of cards printed from the orders list) are printed
+    // from a hidden frame of the page that asks for them, so they may be framed by a page of this origin; every other
+    // page keeps Spring Security's default DENY against clickjacking.
     static final Pattern FRAMEABLE_BY_SAME_ORIGIN =
-            Pattern.compile("/dashboard/(store/[^/]+/)?orders/[^/]+/(card|collection)");
+            Pattern.compile("/dashboard/(store/[^/]+/)?orders/[^/]+/(card|collection)|/dashboard/orders/cards");
 
     @Value("${application.env}")
     private String env;

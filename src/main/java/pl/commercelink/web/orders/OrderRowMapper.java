@@ -73,6 +73,7 @@ public class OrderRowMapper {
         }
         double unpaid = order.getUnpaidAmount();
         return new OrderRow(
+                order.getOrderId(),
                 OrderListQuery.PATH + "/" + order.getOrderId() + (returnTo == null || returnTo.equals(OrderListQuery.PATH) ? "" : "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8)),
                 order.getShortenedOrderId(),
                 sourceText(order),

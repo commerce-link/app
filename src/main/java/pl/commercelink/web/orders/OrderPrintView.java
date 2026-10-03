@@ -19,8 +19,10 @@ public final class OrderPrintView {
     private OrderPrintView() {
     }
 
+    /** scanUrl is the absolute address the card's QR code carries (OrderLinks.scanUrl); scanQrSvg draws it. */
     public record Card(String orderId, String shortId, String detailsHref, String email, String orderedAt,
-                       String comment, List<ItemRow> items, List<DocumentRow> documents, List<ShipmentRow> shipments) {
+                       String comment, List<ItemRow> items, List<DocumentRow> documents, List<ShipmentRow> shipments,
+                       String scanUrl, String scanQrSvg) {
     }
 
     /** store is the store's name: the protocol goes to the customer, who knows the store by name, not by its id. */
@@ -39,12 +41,14 @@ public final class OrderPrintView {
     public record ShipmentRow(String typeKey, String trackingNo, String carrier, String shippedAt) {
     }
 
-    public static Card card(Order order, List<OrderItem> items, OrderLinks links, SupplierLabelMap labels) {
+    public static Card card(Order order, List<OrderItem> items, OrderLinks links, SupplierLabelMap labels,
+                            String scanUrl) {
         return new Card(order.getOrderId(), order.getShortenedOrderId(), links.details(), order.getEmail(),
                 OrderFormats.dateTime(order.getOrderedAt()), StringUtils.trimToNull(order.getComment()),
                 items.stream().map(item -> row(item, labels)).toList(),
                 orEmpty(order.getDocuments()).map(OrderPrintView::document).toList(),
-                orEmpty(order.getShipments()).map(OrderPrintView::shipment).toList());
+                orEmpty(order.getShipments()).map(OrderPrintView::shipment).toList(),
+                scanUrl, QrCodeSvg.of(scanUrl));
     }
 
     /** Services are not handed over at the counter, so the protocol lists products only (unchanged from the old page). */

@@ -351,4 +351,13 @@ class OrderRowMapperTest {
                 "Advance invoice: issued FZ/3/2026",
                 "Final invoice: to be issued — blocks closing the order");
     }
+
+    @Test
+    void theRowCarriesTheBareOrderIdForTheSelection() {
+        // when
+        OrderRow row = mapper.map(order(), TODAY, "/dashboard/orders?status=New");
+
+        // then: the checkbox value is the id itself, never the link with its returnTo
+        assertThat(row.orderId()).isEqualTo("ab58c563-9f1e-4d2a-b0c1-000000000000");
+    }
 }
