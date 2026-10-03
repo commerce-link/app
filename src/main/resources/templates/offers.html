@@ -159,7 +159,7 @@
                     <tr th:each="row : ${page.offers()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.list.column.offer}">
                             <a class="cl-row-link cl-cell-name" th:href="@{${row.href()}}" th:text="${row.name()}" th:title="${row.name()}"></a>
-                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span><span class="cl-narrow-only" th:text="| · ${row.created()}|"></span></span>
+                            <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.fullId()}"></span><span class="cl-offer-items" th:text="| · ${row.itemsText()}|"></span><span class="cl-narrow-only"><span aria-hidden="true"> · </span><span class="cl-visually-hidden" th:text="#{offers.list.createdOn}"></span> <span th:text="${row.created()}"></span></span></span>
                         </th>
                         <td th:attr="data-label=#{offers.list.column.client}">
                             <th:block th:if="${row.client() != null}">

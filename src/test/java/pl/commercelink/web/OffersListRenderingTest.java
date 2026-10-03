@@ -78,7 +78,7 @@ class OffersListRenderingTest {
         // then — 720-1023 px hides the column and shows the date after the id; the net line has its own class to go there
         assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\" aria-sort=\"descending\">")
                 .contains("<td class=\"is-secondary-column\" data-label=\"Utworzona\">")
-                .contains("<span class=\"cl-offer-items\"> · pozycje: 9</span><span class=\"cl-narrow-only\"> · 02.10</span></span>")
+                .contains("<span class=\"cl-offer-items\"> · pozycje: 9</span><span class=\"cl-narrow-only\"><span aria-hidden=\"true\"> · </span><span class=\"cl-visually-hidden\">Utworzona:</span> <span>02.10</span></span></span>")
                 .contains("<span class=\"cl-table-sub cl-cards-hide cl-cell-net\">netto 39 804,88 PLN</span>");
     }
 
