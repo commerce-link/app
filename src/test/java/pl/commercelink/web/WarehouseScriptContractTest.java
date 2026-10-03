@@ -27,6 +27,17 @@ class WarehouseScriptContractTest {
     }
 
     @Test
+    void quantityDialogRowsShowTheUnitsWithTheirServerRenderedUnitWord() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+
+        // when / then
+        // "Na stanie · 3 szt.": the unit word comes from the selection row's data-template, the script knows no texts
+        assertThat(js).contains("unitsText(box.getAttribute('data-qty'))")
+                .doesNotContain("box.getAttribute('data-status-label') + ' · ' + box.getAttribute('data-qty')");
+    }
+
+    @Test
     void tableSelectAnnouncesEverySelectionChangeToTheSelectionActions() throws Exception {
         // given
         String js = read("src/main/resources/static/js/table-select.js");

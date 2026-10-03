@@ -66,8 +66,14 @@
             var sum = boxes.reduce(function (total, box) {
                 return total + Number(box.getAttribute('data-qty') || 0);
             }, 0);
-            units.textContent = (units.getAttribute('data-template') || '{m}').replace('{m}', String(sum));
+            units.textContent = unitsText(sum);
         }
+    }
+
+    // "{m} szt." from the selection row's server-rendered template, so the script carries no unit word of its own
+    function unitsText(count) {
+        var units = document.querySelector('[data-cl-selection-units]');
+        return ((units && units.getAttribute('data-template')) || '{m}').replace('{m}', String(count));
     }
 
     function post(path, boxes, extra) {
@@ -128,7 +134,7 @@
         boxes.forEach(function (box) {
             var row = template.content.firstElementChild.cloneNode(true);
             row.querySelector('[data-name]').textContent = box.getAttribute('data-name');
-            row.querySelector('[data-meta]').textContent = box.getAttribute('data-status-label') + ' · ' + box.getAttribute('data-qty');
+            row.querySelector('[data-meta]').textContent = box.getAttribute('data-status-label') + ' · ' + unitsText(box.getAttribute('data-qty'));
             row.querySelector('input[name="selectedItemIds"]').value = box.value;
             var qty = row.querySelector('input[name="quantities"]');
             qty.max = box.getAttribute('data-qty');

@@ -38,4 +38,14 @@ class WarehouseListStylesContractTest {
         // when / then
         assertThat(section).contains(".cl-page .cl-table.is-warehouse .is-hyphenated { hyphens: auto; }");
     }
+
+    @Test
+    void selectedUnitsAreSeparatedFromTheSelectedCountByADot() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // spec §4.5: "Zaznaczono {k} z {n} · {m} szt."
+        assertThat(section).contains(".cl-page .cl-selection-row [data-cl-selection-units]::before { content: \"· \"; }");
+    }
 }
