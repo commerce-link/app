@@ -81,4 +81,22 @@ class WarehouseScriptContractTest {
         // when / then
         assertThat(js).doesNotContain("form.replaceChildren()").contains("'_csrf'");
     }
+
+    @Test
+    void bulkPostsAreSentOnceEvenOnADoubleClick() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String submitHandler = js.substring(js.indexOf("document.addEventListener('submit'"));
+        String post = js.substring(js.indexOf("function post("), js.indexOf("function add("));
+        String open = js.substring(js.indexOf("function openQuantities("), js.indexOf("function validate("));
+
+        // when / then
+        // the flag is raised only after a passed validation, so a refused inline check never leaves the dialog stuck
+        assertThat(submitHandler.indexOf("submitting = true")).isGreaterThan(submitHandler.indexOf("validate("));
+        assertThat(submitHandler).contains("if (submitting)");
+        assertThat(post).contains("if (submitting)").contains("submitting = true");
+        assertThat(post.indexOf("submitting = true")).isLessThan(post.indexOf("form.submit()"));
+        assertThat(open).contains("submitting = false");
+        assertThat(js).contains("pageshow");
+    }
 }

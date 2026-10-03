@@ -7,6 +7,10 @@
 (function () {
     'use strict';
 
+    // A second click while the first post is on its way would run the action twice (two RW documents for one
+    // partial destroy); the flag drops when the dialog opens again or the page comes back from the history cache.
+    var submitting = false;
+
     function bar() {
         return document.querySelector('[data-cl-selection-actions]');
     }
@@ -77,6 +81,9 @@
     }
 
     function post(path, boxes, extra) {
+        if (submitting) {
+            return;
+        }
         var form = document.getElementById('warehouse-bulk-form');
         // the CSRF field Thymeleaf renders into the form must survive the rebuild
         Array.prototype.slice.call(form.children).forEach(function (child) {
@@ -91,6 +98,7 @@
         (extra || []).forEach(function (pair) {
             add(form, pair[0], pair[1]);
         });
+        submitting = true;
         form.submit();
     }
 
@@ -134,6 +142,7 @@
         var title = dialog.querySelector('[data-cl-quantity-title]');
         title.textContent = title.getAttribute('data-template')
             .replace('{label}', button.getAttribute('data-cl-action-label')).replace('{k}', String(boxes.length));
+        submitting = false;
         resetDialog(dialog);
         rows.replaceChildren();
         boxes.forEach(function (box) {
@@ -240,8 +249,23 @@
 
     document.addEventListener('submit', function (event) {
         var form = event.target;
-        if (form.matches && form.matches('[data-cl-quantity-form]') && !validate(form.closest('dialog'))) {
+        if (!form.matches || !form.matches('[data-cl-quantity-form]')) {
+            return;
+        }
+        if (submitting) {
             event.preventDefault();
+            return;
+        }
+        if (!validate(form.closest('dialog'))) {
+            event.preventDefault();
+            return;
+        }
+        submitting = true;
+    });
+
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+            submitting = false;
         }
     });
 
