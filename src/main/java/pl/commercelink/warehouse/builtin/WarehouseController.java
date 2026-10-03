@@ -106,44 +106,44 @@ class WarehouseController {
     @PostMapping("/dashboard/warehouse/markAsReserved")
     String markAsReserved(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
                           @RequestParam(name = "quantities", required = false) List<Integer> quantities,
-                          Locale locale, RedirectAttributes ra) {
+                          @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.RESERVE, itemIds, quantities, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.RESERVE, itemIds, quantities, items, view, locale, ra);
         if (refused != null) return refused;
         warehouseInternalReservationService.create(Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities)));
-        return done(WarehouseBulkAction.RESERVE, items.size(), sum(quantities), locale, ra);
+        return done(WarehouseBulkAction.RESERVE, items.size(), sum(quantities), view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsAvailable")
     String markAsAvailable(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
                            @RequestParam(name = "quantities", required = false) List<Integer> quantities,
-                           Locale locale, RedirectAttributes ra) {
+                           @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.RELEASE, itemIds, quantities, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.RELEASE, itemIds, quantities, items, view, locale, ra);
         if (refused != null) return refused;
         warehouseInternalReservationService.remove(Reservation.internalUse(getStoreId(), toReservationItems(itemIds, quantities)));
-        return done(WarehouseBulkAction.RELEASE, items.size(), sum(quantities), locale, ra);
+        return done(WarehouseBulkAction.RELEASE, items.size(), sum(quantities), view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInRMA")
     String markAsInRMA(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
                        @RequestParam(name = "quantities", required = false) List<Integer> quantities,
-                       Locale locale, RedirectAttributes ra) {
+                       @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.RMA, itemIds, quantities, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.RMA, itemIds, quantities, items, view, locale, ra);
         if (refused != null) return refused;
         warehouseInternalReservationService.create(Reservation.internalRMA(getStoreId(), toReservationItems(itemIds, quantities)));
-        return done(WarehouseBulkAction.RMA, items.size(), sum(quantities), locale, ra);
+        return done(WarehouseBulkAction.RMA, items.size(), sum(quantities), view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInAllocation")
     String markAsInAllocation(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
-                              Locale locale, RedirectAttributes ra) {
+                              @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.ALLOCATE, itemIds, null, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.ALLOCATE, itemIds, null, items, view, locale, ra);
         if (refused != null) return refused;
         warehouseAllocationsManager.schedule(getStoreId(), itemIds);
-        return done(WarehouseBulkAction.ALLOCATE, items.size(), 0, locale, ra);
+        return done(WarehouseBulkAction.ALLOCATE, items.size(), 0, view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsDestroyed")
@@ -151,11 +151,11 @@ class WarehouseController {
                            @RequestParam(name = "quantities", required = false) List<Integer> quantities,
                            @RequestParam(name = "reason", required = false) String reason,
                            @RequestParam(name = "note", required = false) String note,
-                           Locale locale, RedirectAttributes ra) {
+                           @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.DESTROY, itemIds, quantities, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.DESTROY, itemIds, quantities, items, view, locale, ra);
         if (refused != null) return refused;
-        String back = "/dashboard/warehouse?statuses=" + items.get(0).getStatus().name();
+        String back = back(view);
         Optional<DocumentReason> destroyReason = WarehouseListService.DESTROY_REASONS.stream()
                 .filter(r -> r.name().equals(reason)).findFirst();
         if (destroyReason.isEmpty()) {
@@ -170,56 +170,57 @@ class WarehouseController {
             ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
             return "redirect:" + back;
         }
-        return done(WarehouseBulkAction.DESTROY, items.size(), sum(quantities), locale, ra);
+        return done(WarehouseBulkAction.DESTROY, items.size(), sum(quantities), view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsInExternalService")
     String markAsInExternalService(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
-                                   Locale locale, RedirectAttributes ra) {
+                                   @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.EXTERNAL_SERVICE, itemIds, null, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.EXTERNAL_SERVICE, itemIds, null, items, view, locale, ra);
         if (refused != null) return refused;
         OperationResult<?> result = warehouseGoodsOutService.issueGoodsOutForExternalService(getStoreId(), itemIds,
                 CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
             ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
-            return "redirect:/dashboard/warehouse?statuses=InRMA";
+            return "redirect:" + back(view);
         }
-        return done(WarehouseBulkAction.EXTERNAL_SERVICE, items.size(), 0, locale, ra);
+        return done(WarehouseBulkAction.EXTERNAL_SERVICE, items.size(), 0, view, locale, ra);
     }
 
     @PostMapping("/dashboard/warehouse/markAsReceivedFromExternalService")
     String markAsReceivedFromExternalService(@RequestParam(name = "selectedItemIds", required = false) List<String> itemIds,
-                                             Locale locale, RedirectAttributes ra) {
+                                             @RequestParam MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
         List<WarehouseItem> items = new ArrayList<>();
-        String refused = guard(WarehouseBulkAction.RECEIVE, itemIds, null, items, locale, ra);
+        String refused = guard(WarehouseBulkAction.RECEIVE, itemIds, null, items, view, locale, ra);
         if (refused != null) return refused;
         OperationResult<?> result = warehouseGoodsInService.receiveFromExternalService(getStoreId(), itemIds,
                 CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
             ra.addFlashAttribute("settingsErrorMessage", result.getMessage());
-            return "redirect:/dashboard/warehouse?statuses=InExternalService";
+            return "redirect:" + back(view);
         }
-        return done(WarehouseBulkAction.RECEIVE, items.size(), 0, locale, ra);
+        return done(WarehouseBulkAction.RECEIVE, items.size(), 0, view, locale, ra);
     }
 
     /** Loads the posted items of this store and refuses the whole action on the first problem; null means "go on". */
     private String guard(WarehouseBulkAction action, List<String> itemIds, List<Integer> quantities, List<WarehouseItem> into,
-                         Locale locale, RedirectAttributes ra) {
+                         MultiValueMap<String, String> view, Locale locale, RedirectAttributes ra) {
+        String back = back(view);
         if (itemIds == null || itemIds.isEmpty()) {
-            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.select.at.least.one");
+            return refuse(ra, locale, back, "warehouse.error.select.at.least.one");
         }
         // a forged post naming one item twice would merge an item into itself or issue it twice
         if (new HashSet<>(itemIds).size() != itemIds.size()) {
-            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.duplicate");
+            return refuse(ra, locale, back, "warehouse.error.duplicate");
         }
         if (action.needsQuantity() && (quantities == null || quantities.size() != itemIds.size())) {
-            return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.quantities.mismatch");
+            return refuse(ra, locale, back, "warehouse.error.quantities.mismatch");
         }
         for (String id : itemIds) {
             WarehouseItem item = warehouseRepository.findById(getStoreId(), id);
             if (item == null) {
-                return refuse(ra, locale, "/dashboard/warehouse", "warehouse.error.not.found");
+                return refuse(ra, locale, back, "warehouse.error.not.found");
             }
             into.add(item);
         }
@@ -227,20 +228,20 @@ class WarehouseController {
         if (refused.isPresent()) {
             WarehouseItem item = refused.get();
             String allowed = action.allowed().stream().map(s -> msg(locale, WarehouseStatuses.labelKey(s))).collect(Collectors.joining(", "));
-            return refuse(ra, locale, "/dashboard/warehouse?statuses=" + into.get(0).getStatus().name(), "warehouse.error.status",
+            return refuse(ra, locale, back, "warehouse.error.status",
                     item.getName(), msg(locale, WarehouseStatuses.labelKey(item.getStatus())), msg(locale, "warehouse.bulk." + action.key() + ".label"), allowed);
         }
         if (action.needsQuantity()) {
             for (int i = 0; i < into.size(); i++) {
                 Integer qty = quantities.get(i);
                 if (qty == null || qty < 1 || qty > into.get(i).getQty()) {
-                    return refuse(ra, locale, "/dashboard/warehouse?statuses=" + into.get(0).getStatus().name(), "warehouse.error.quantity",
+                    return refuse(ra, locale, back, "warehouse.error.quantity",
                             into.get(i).getName(), into.get(i).getQty());
                 }
             }
         }
         if (action.sameSource() && !deliveredPredicate.isFromSameSource(getStoreId(), into)) {
-            return refuse(ra, locale, "/dashboard/warehouse?statuses=InRMA", "warehouse.error.same.source");
+            return refuse(ra, locale, back, "warehouse.error.same.source");
         }
         return null;
     }
@@ -250,9 +251,18 @@ class WarehouseController {
         return "redirect:" + target;
     }
 
-    private String done(WarehouseBulkAction action, int items, int units, Locale locale, RedirectAttributes ra) {
+    private String done(WarehouseBulkAction action, int items, int units, MultiValueMap<String, String> view, Locale locale,
+                        RedirectAttributes ra) {
         ra.addFlashAttribute("settingsSavedMessage", msg(locale, "warehouse.bulk." + action.key() + ".done", items, units));
-        return "redirect:/dashboard/warehouse?statuses=" + action.after().name();
+        return "redirect:" + WarehouseListQuery.parse(view, false).afterAction(action.after()).href();
+    }
+
+    /**
+     * The list view the operator acted from (statuses, categories, q, sort, dir, page), which selection-actions.js posts
+     * from the address; a refusal returns there and a done action keeps all of it but the status.
+     */
+    private static String back(MultiValueMap<String, String> view) {
+        return WarehouseListQuery.parse(view, false).href();
     }
 
     private String msg(Locale locale, String key, Object... args) {

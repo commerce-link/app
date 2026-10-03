@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
@@ -39,6 +41,8 @@ import static pl.commercelink.orders.FulfilmentStatus.Reserved;
 class WarehouseControllerBulkTest {
 
     private static final Locale PL = Locale.forLanguageTag("pl");
+    /** The posted list view of a page opened with no filters: the default status, no search, no category. */
+    private static final MultiValueMap<String, String> VIEW = new LinkedMultiValueMap<>();
 
     @Mock
     private WarehouseRepository warehouseRepository;
@@ -76,6 +80,12 @@ class WarehouseControllerBulkTest {
         return item;
     }
 
+    private static MultiValueMap<String, String> view(String... pairs) {
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        for (int i = 0; i < pairs.length; i += 2) params.add(pairs[i], pairs[i + 1]);
+        return params;
+    }
+
     private <T> T asStore(Callable<T> call) throws Exception {
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
@@ -92,7 +102,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(3, 1), PL, ra));
+        String view = asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(3, 1), VIEW, PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Reserved");
@@ -108,10 +118,10 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(1, 1), PL, ra));
+        String view = asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(1, 1), VIEW, PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
         assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage"))
                 .contains("RTX b").contains("Zarezerwowane").contains("Nic nie zmieniono");
         verifyNoInteractions(warehouseInternalReservationService);
@@ -124,7 +134,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsReserved(List.of("x"), List.of(1), PL, ra));
+        asStore(() -> controller.markAsReserved(List.of("x"), List.of(1), VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -139,7 +149,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsReserved(List.of("a"), List.of(3), PL, ra));
+        asStore(() -> controller.markAsReserved(List.of("a"), List.of(3), VIEW, PL, ra));
 
         // then
         assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage")).contains("od 1 do 2");
@@ -154,7 +164,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(1), PL, ra));
+        asStore(() -> controller.markAsReserved(List.of("a", "b"), List.of(1), VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -168,7 +178,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsReserved(null, null, PL, ra));
+        asStore(() -> controller.markAsReserved(null, null, VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage")).isEqualTo("Zaznacz co najmniej jedną pozycję.");
@@ -183,7 +193,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsInExternalService(List.of("a", "b"), PL, ra));
+        String view = asStore(() -> controller.markAsInExternalService(List.of("a", "b"), view("statuses", "InRMA"), PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
@@ -198,7 +208,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(2), "Theft", "lost", PL, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(2), "Theft", "lost", VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Zniszczono 2 szt. w 1 poz. (RW).");
@@ -211,7 +221,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsAvailable(List.of("a", "a"), List.of(1, 1), PL, ra));
+        String view = asStore(() -> controller.markAsAvailable(List.of("a", "a"), List.of(1, 1), VIEW, PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
@@ -227,7 +237,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a", "b", "a"), List.of(1, 1, 1), "Theft", "lost", PL, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a", "b", "a"), List.of(1, 1, 1), "Theft", "lost", VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -242,7 +252,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsInAllocation(List.of("a", "a"), Locale.ENGLISH, ra));
+        asStore(() -> controller.markAsInAllocation(List.of("a", "a"), VIEW, Locale.ENGLISH, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -257,10 +267,10 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), null, "lost", PL, ra));
+        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), null, "lost", view("statuses", "Delivered", "q", "rtx"), PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?q=rtx");
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
                 .isEqualTo("Wybierz powód zniszczenia z listy. Nic nie zmieniono.");
         verifyNoInteractions(warehouseInternalIssueService);
@@ -273,7 +283,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), DocumentReason.SupplierDelivery.name(), "lost", PL, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), DocumentReason.SupplierDelivery.name(), "lost", VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -288,7 +298,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Garbage", "lost", Locale.ENGLISH, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Garbage", "lost", VIEW, Locale.ENGLISH, ra));
 
         // then
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
@@ -303,10 +313,10 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", "   ", PL, ra));
+        String view = asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", "   ", view("statuses", "Delivered", "q", "rtx"), PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?q=rtx");
         assertThat(ra.getFlashAttributes().get("settingsErrorMessage"))
                 .isEqualTo("Opisz, co się stało — notatka jest wymagana. Nic nie zmieniono.");
         verifyNoInteractions(warehouseInternalIssueService);
@@ -319,7 +329,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", null, PL, ra));
+        asStore(() -> controller.markAsDestroyed(List.of("a"), List.of(1), "Destruction", null, VIEW, PL, ra));
 
         // then
         assertThat(ra.getFlashAttributes()).containsKey("settingsErrorMessage");
@@ -333,10 +343,10 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsAvailable(List.of("a"), List.of(2), PL, ra));
+        String view = asStore(() -> controller.markAsAvailable(List.of("a"), List.of(2), view("statuses", "Reserved"), PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
         assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Przywrócono na stan 2 szt. w 1 poz.");
         verify(warehouseInternalReservationService).remove(any(Reservation.class));
     }
@@ -349,7 +359,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsInRMA(List.of("a", "b"), List.of(1, 2), PL, ra));
+        String view = asStore(() -> controller.markAsInRMA(List.of("a", "b"), List.of(1, 2), VIEW, PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
@@ -365,7 +375,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsInAllocation(List.of("a", "b"), PL, ra));
+        String view = asStore(() -> controller.markAsInAllocation(List.of("a", "b"), VIEW, PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Allocation");
@@ -383,7 +393,7 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsInExternalService(List.of("a"), PL, ra));
+        String view = asStore(() -> controller.markAsInExternalService(List.of("a"), VIEW, PL, ra));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InExternalService");
@@ -399,10 +409,58 @@ class WarehouseControllerBulkTest {
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
-        String view = asStore(() -> controller.markAsReceivedFromExternalService(List.of("a"), PL, ra));
+        String view = asStore(() -> controller.markAsReceivedFromExternalService(List.of("a"), view("statuses", "InExternalService"), PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
         assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Przyjęto z serwisu 1 poz. (PZ).");
+    }
+
+    @Test
+    void successKeepsTheSearchAndCategoriesAndChangesOnlyTheStatus() throws Exception {
+        // given
+        stored("a", Delivered, 3);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+        MultiValueMap<String, String> posted = view("statuses", "Delivered", "categories", "GPU", "categories", "CPU",
+                "q", "rtx 40", "page", "2");
+
+        // when
+        String view = asStore(() -> controller.markAsReserved(List.of("a"), List.of(1), posted, PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Reserved&categories=GPU&categories=CPU&q=rtx+40");
+    }
+
+    @Test
+    void refusalReturnsToTheViewTheOperatorWasOn() throws Exception {
+        // given
+        stored("a", InRMA, 1);
+        stored("b", InRMA, 1);
+        when(deliveredPredicate.isFromSameSource(eq("store-1"), anyList())).thenReturn(false);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+        MultiValueMap<String, String> posted = view("statuses", "InRMA", "statuses", "Delivered", "q", "abc", "page", "2");
+
+        // when
+        String view = asStore(() -> controller.markAsInExternalService(List.of("a", "b"), posted, PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered&statuses=InRMA&q=abc&page=2");
+    }
+
+    @Test
+    void failedServiceCallReturnsToTheViewTheOperatorWasOn() throws Exception {
+        // given
+        stored("a", FulfilmentStatus.InExternalService, 1);
+        when(warehouseGoodsInService.receiveFromExternalService("store-1", List.of("a"), "operator"))
+                .thenReturn(OperationResult.failure("PZ failed"));
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsReceivedFromExternalService(List.of("a"),
+                view("statuses", "InExternalService", "categories", "GPU"), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InExternalService&categories=GPU");
+        assertThat(ra.getFlashAttributes().get("settingsErrorMessage")).isEqualTo("PZ failed");
     }
 }

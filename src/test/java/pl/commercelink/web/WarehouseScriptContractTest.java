@@ -99,4 +99,17 @@ class WarehouseScriptContractTest {
         assertThat(open).contains("submitting = false");
         assertThat(js).contains("pageshow");
     }
+
+    @Test
+    void bothBulkPostsCarryTheListViewFromTheAddressSoTheRedirectKeepsSearchAndCategories() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String post = js.substring(js.indexOf("function post("), js.indexOf("function add("));
+        String open = js.substring(js.indexOf("function openQuantities("), js.indexOf("function validate("));
+
+        // when / then
+        assertThat(js).contains("window.location.search").contains("'statuses'").contains("'categories'").contains("'q'");
+        assertThat(post).contains("viewParams()");
+        assertThat(open).contains("viewParams()").contains("data-cl-list-view");
+    }
 }

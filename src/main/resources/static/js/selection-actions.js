@@ -3,13 +3,28 @@
 // is not for, or rows from different sources for an action that needs one), shows the checked units, and runs the action:
 // a quantity dialog (#cl-quantity-dialog, full quantity by default, inline validation), the page's confirmation dialog
 // (window.CL_confirmBulk) or a plain post. Every post goes to the action's own address with selectedItemIds (and
-// quantities, reason, note). Rows come and go with list-page.js swaps (cl-list:swapped), so all lookups are fresh.
+// quantities, reason, note) plus the list view from the address, so the server returns to the same search and
+// categories. Rows come and go with list-page.js swaps (cl-list:swapped), so all lookups are fresh.
 (function () {
     'use strict';
 
     // A second click while the first post is on its way would run the action twice (two RW documents for one
     // partial destroy); the flag drops when the dialog opens again or the page comes back from the history cache.
     var submitting = false;
+
+    var VIEW_PARAMS = ['statuses', 'categories', 'q', 'sort', 'dir', 'page'];
+
+    // list-page.js keeps the address in step with the list, so the address is the view the operator acts from
+    function viewParams() {
+        var params = new URLSearchParams(window.location.search);
+        var pairs = [];
+        VIEW_PARAMS.forEach(function (name) {
+            params.getAll(name).forEach(function (value) {
+                pairs.push([name, value]);
+            });
+        });
+        return pairs;
+    }
 
     function bar() {
         return document.querySelector('[data-cl-selection-actions]');
@@ -95,7 +110,7 @@
         boxes.forEach(function (box) {
             add(form, 'selectedItemIds', box.value);
         });
-        (extra || []).forEach(function (pair) {
+        (extra || []).concat(viewParams()).forEach(function (pair) {
             add(form, pair[0], pair[1]);
         });
         submitting = true;
@@ -108,6 +123,7 @@
         input.name = name;
         input.value = value;
         form.appendChild(input);
+        return input;
     }
 
     // Spec §4.6: the focus goes back to what opened the dialog, however it was closed (Cancel, Escape, a backdrop click).
@@ -168,6 +184,12 @@
         submit.classList.toggle('is-danger', destroy);
         submit.classList.toggle('is-primary', !destroy);
         form.action = button.getAttribute('data-cl-action-path');
+        form.querySelectorAll('[data-cl-list-view]').forEach(function (input) {
+            input.remove();
+        });
+        viewParams().forEach(function (pair) {
+            add(form, pair[0], pair[1]).setAttribute('data-cl-list-view', '');
+        });
         returnFocusOnClose(dialog, opener);
         dialog.showModal();
         var first = rows.querySelector('input[name="quantities"]');

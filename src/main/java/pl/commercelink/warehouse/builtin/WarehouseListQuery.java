@@ -106,6 +106,11 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
         return new WarehouseListQuery(wms, statuses, next, q, sort, dir, 1);
     }
 
+    /** Where a bulk action leads: the action's target status in the same search, categories and sort, on page one. */
+    public WarehouseListQuery afterAction(FulfilmentStatus target) {
+        return new WarehouseListQuery(wms, List.of(target), categories, q, sort, dir, 1);
+    }
+
     public WarehouseListQuery withQ(String newQ) { return new WarehouseListQuery(wms, statuses, categories, newQ, sort, dir, 1); }
 
     public WarehouseListQuery withPage(int n) { return new WarehouseListQuery(wms, statuses, categories, q, sort, dir, n); }

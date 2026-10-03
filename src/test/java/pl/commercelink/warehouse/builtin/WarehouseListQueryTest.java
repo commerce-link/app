@@ -191,4 +191,17 @@ class WarehouseListQueryTest {
         assertThat(query.categories()).containsExactly("none", "GPU");
         assertThat(query.href()).isEqualTo("/dashboard/warehouse?categories=none&categories=GPU");
     }
+
+    @Test
+    void afterAnActionOnlyTheStatusChangesAndTheListStartsOnItsFirstPage() {
+        // given
+        WarehouseListQuery query = WarehouseListQuery.parse(params("statuses", "Delivered", "categories", "GPU", "q", "rtx",
+                "sort", "qty", "dir", "desc", "page", "3"), false);
+
+        // when
+        WarehouseListQuery after = query.afterAction(Reserved);
+
+        // then
+        assertThat(after.href()).isEqualTo("/dashboard/warehouse?statuses=Reserved&categories=GPU&q=rtx&sort=qty&dir=desc");
+    }
 }
