@@ -278,7 +278,8 @@
       th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{order.items.margin.unknown}
                 : #{${m.tone().key()}(${m.percent() != null ? m.percent() : '—'},
                     ${#messages.msg('general.currency.amount', m.profit())},
-                    ${#messages.msg('general.currency.amount', m.cost())}, ${m.threshold()})}"
+                    ${#messages.msg('general.currency.amount', m.cost())}, ${m.threshold()},
+                    ${#messages.msg('general.currency.amount', m.profitNet())})}"
       th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
       th:classappend="${m.tone().name() == 'LOW'} ? 'fa-exclamation-triangle' : (${m.tone().name() == 'LOSS'} ? 'fa-arrow-down' : 'fa-percent')"></i></span>
 

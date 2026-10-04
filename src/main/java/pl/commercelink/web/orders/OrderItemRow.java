@@ -67,7 +67,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
                 // the cost gross, like the price, so the margin is the same with or without VAT
-                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), context.lowMarginThreshold()),
+                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax(),
+                        context.lowMarginThreshold()),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
