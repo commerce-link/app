@@ -271,9 +271,6 @@ public class OrderPageModelFactory {
         }
         boolean canSplitOrder = order.canBeSplit() && !items.isEmpty();
         String addReason = addItemsLockedKey(order, hasDropshipItems, receiptLock);
-        List<OrderPageModel.SerialItemRow> serialItems = items.stream()
-                .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered)).filter(OrderItem::isProduct)
-                .map(i -> serialItemRow(i, labels)).toList();
         List<OrderPageModel.BulkActionButton> bulk = new ArrayList<>();
         for (BulkAction action : BulkAction.values()) {
             if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.isInvoiced()) {
@@ -289,7 +286,6 @@ public class OrderPageModelFactory {
                 .collect(Collectors.toMap(OrderItem::getItemId, i -> SplitGroupPreviewDto.from(i, this::taxonomyName)));
         return new OrderPageModel.ItemsCard(products, services, items.size(), selectable,
                 !readOnly && addReason == null, readOnly ? null : addReason,
-                !readOnly && !order.hasStatus(OrderStatus.New) && !serialItems.isEmpty(), serialItems,
                 bulk, selectable && (canSplitOrder || !hasDropshipItems),
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
                 readOnly ? List.of() : labels.options(), previews,
@@ -324,15 +320,6 @@ public class OrderPageModelFactory {
             case SPLIT, MOVE -> canSplitOrder ? null : BulkReason.SPLIT_UNAVAILABLE;
             default -> hasDropshipItems ? BulkReason.DROPSHIP_LOCKED : null;
         };
-    }
-
-    // the serial-number dialog only ever assigns serials, so it gets a slim row with no cost, not the raw item.
-    private static OrderPageModel.SerialItemRow serialItemRow(OrderItem item, SupplierLabelMap labels) {
-        String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
-        String deliveryLabel = deliveryId == null ? null
-                : labels.has(deliveryId) ? labels.of(deliveryId) : item.getShortenedDeliveryId();
-        return new OrderPageModel.SerialItemRow(item.getItemId(), item.getName(), item.getManufacturerCode(),
-                item.getQty(), deliveryLabel, item.getSerialNo());
     }
 
     /**

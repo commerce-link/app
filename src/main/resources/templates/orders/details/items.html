@@ -11,8 +11,6 @@
                     th:text="${items.lowMargin().threshold() != null} ? #{order.items.margin.threshold.button(${items.lowMargin().threshold()})}
                              : #{order.items.margin.threshold.button.unset}"></button>
             <th:block th:if="${menus}">
-                <button th:if="${items.canAddSerials()}" type="button" class="cl-link-button" data-cl-dialog-open="serials-dialog"
-                        th:text="#{order.items.serials.add}"></button>
                 <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
                         th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>

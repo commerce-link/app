@@ -152,41 +152,6 @@
         </script>
     </dialog>
 
-    <dialog th:if="${items.canAddSerials()}" class="cl-dialog is-form is-wide" id="serials-dialog" aria-labelledby="serials-title">
-        <form method="post" th:action="@{/dashboard/orders/{o}/updateSerialNumbers(o=${page.orderId()})}" data-cl-serials>
-            <h2 class="cl-dialog-title" id="serials-title" th:text="#{order.update.serial.no}"></h2>
-            <div class="cl-dialog-body">
-                <table class="cl-table is-compact is-editable">
-                    <caption class="cl-visually-hidden" th:text="#{order.update.serial.no}"></caption>
-                    <thead><tr>
-                        <th scope="col" th:text="#{order.item.name}"></th>
-                        <th scope="col" th:text="#{general.manufacturer.code}"></th>
-                        <th scope="col" class="is-numeric" th:text="#{order.item.quantity}"></th>
-                        <th scope="col" th:text="#{general.delivery.id}"></th>
-                        <th scope="col" th:text="#{order.item.serial.no}"></th>
-                    </tr></thead>
-                    <tbody>
-                    <tr th:each="item, i : ${items.serialItems()}">
-                        <th scope="row" class="cl-table-key" th:text="${item.name}"></th>
-                        <td th:attr="data-label=#{general.manufacturer.code}" th:text="${item.mfn}"></td>
-                        <td class="is-numeric" th:attr="data-label=#{order.item.quantity}" th:text="${item.qty}"></td>
-                        <td th:attr="data-label=#{general.delivery.id}" th:text="${item.deliveryLabel != null ? item.deliveryLabel : '—'}"></td>
-                        <td th:attr="data-label=#{order.item.serial.no}">
-                            <input class="cl-input" type="text" th:name="|orderItems[${i.index}].serialNo|" th:value="${item.serialNo}"
-                                   th:attr="aria-label=#{order.items.serial.for(${item.name})}">
-                            <input type="hidden" th:name="|orderItems[${i.index}].itemId|" th:value="${item.itemId}">
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="cl-dialog-actions">
-                <button type="submit" class="cl-button is-primary" th:text="#{general.save}"></button>
-                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
-            </div>
-        </form>
-    </dialog>
-
     <!--/* No form of its own: the field and the button belong to form#order-items-form (the checked rows). */-->
     <dialog class="cl-dialog is-form" id="move-dialog" aria-labelledby="move-title"
             th:attr="data-url=@{/dashboard/orders/{o}/move-target(o=${page.orderId()})}, data-not-found=#{order.move.not.found},

@@ -875,46 +875,6 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aDeliveredOrderWithSerialItemsRendersTheSerialNumbersDialog() {
-        // given: canAddSerials() needs a non-New order with a Delivered product item
-        Order order = order(OrderStatus.Delivered);
-        OrderItem cpu = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "100-100001084WOF", false, 0);
-        cpu.setStatus(FulfilmentStatus.Delivered);
-        cpu.setManufacturerCode("100-100001084WOF");
-
-        // when
-        String html = page(render(order, List.of(cpu), ADMIN, Set.of()));
-
-        // then
-        assertThat(html).contains("id=\"serials-dialog\"")
-                .containsPattern("<input[^>]*name=\"orderItems\\[0\\]\\.serialNo\"")
-                .containsPattern("<input[^>]*type=\"hidden\"[^>]*name=\"orderItems\\[0\\]\\.itemId\"");
-    }
-
-    @Test
-    void theSerialNumbersDialogNamesEachItemsDelivery() {
-        // given: two delivered pieces of one product from different deliveries
-        Order order = order(OrderStatus.Delivered);
-        OrderItem first = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "SKU-1", false, 0);
-        first.setStatus(FulfilmentStatus.Delivered);
-        first.setDeliveryId("abcd1234-0000-0000-0000-000000000001");
-        OrderItem second = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "SKU-1", false, 1);
-        second.setStatus(FulfilmentStatus.Delivered);
-
-        // when
-        String html = page(render(order, List.of(first, second), ADMIN, Set.of()));
-
-        // then
-        Matcher dialog = Pattern.compile("(?s)id=\"serials-dialog\"(.*?)</dialog>").matcher(html);
-        assertThat(dialog.find()).isTrue();
-        assertThat(dialog.group(1)).contains("<td data-label=\"Kod producenta\">")
-                .contains("<td class=\"is-numeric\" data-label=\"Ilość\">1</td>")
-                .contains("<td data-label=\"Nr dostawy\">—</td>").contains("<td data-label=\"Nr seryjny\">");
-        assertThat(dialog.group(1)).contains("<th scope=\"col\">Nr dostawy</th>")
-                .contains("<td data-label=\"Nr dostawy\">" + first.getShortenedDeliveryId() + "</td>");
-    }
-
-    @Test
     void theItemsTableCarriesTheSelectTableHookWhenItemsAreSelectable() {
         // when: table-select.js only wires up table[data-cl-select-table]; a th:attr with an empty-string true
         // value is dropped by Thymeleaf, so the value must not be the empty string
