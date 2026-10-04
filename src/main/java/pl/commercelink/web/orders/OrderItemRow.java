@@ -28,17 +28,10 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
      * store's own users have a route to the item page. dropshipLocked: the order has items in a dropship delivery, which
      * greys "Do alokacji" as it greyed the selection row's entry before it moved into the item menu.
-     * lowMarginThreshold: the store's percent below which an item's margin is marked (Store#lowMarginThreshold), or null.
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          ReceiptLock receiptLock, boolean dropshipLocked, Double lowMarginThreshold) {
-
-        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
-                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                       ReceiptLock receiptLock, boolean dropshipLocked) {
-            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, receiptLock, dropshipLocked, null);
-        }
+                          ReceiptLock receiptLock, boolean dropshipLocked) {
 
         /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
@@ -67,8 +60,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
                 // the cost gross, like the price, so the margin is the same with or without VAT
-                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax(),
-                        context.lowMarginThreshold()),
+                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax()),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),

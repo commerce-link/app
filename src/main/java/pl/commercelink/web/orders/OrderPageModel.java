@@ -48,7 +48,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                             boolean canAddItems, String addItemsReasonKey,
                             List<BulkActionButton> bulkActions, boolean bulkAvailable,
                             List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
-                            Map<String, SplitGroupPreviewDto> splitPreviews, LowMargin lowMargin) {
+                            Map<String, SplitGroupPreviewDto> splitPreviews) {
 
         /**
          * Whether addItemsReasonKey is a whole sentence shown as it is ("Trwa wystawianie e-paragonu — pozycji nie
@@ -70,14 +70,6 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
         public BulkActionButton bulkStandalone() {
             return bulkActions.stream().filter(b -> b.action().menu() == null).findFirst().orElse(null);
         }
-    }
-
-    /**
-     * The store's low-margin threshold behind the margin icons: threshold is the percent as shown ("12,5"), null while
-     * none is set; editable: whether the viewer may change it from this page (a store user, not the super admin, who
-     * sees the store read-only). The threshold is the store's, so it applies to every order, open or closed.
-     */
-    public record LowMargin(String threshold, boolean editable) {
     }
 
     public record BulkMenu(BulkAction.Menu menu, List<BulkActionButton> actions) {

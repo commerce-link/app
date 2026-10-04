@@ -474,7 +474,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aSaleBelowCostIsMarkedWithoutAThresholdAndByItsGlyphNotOnlyItsColour() {
+    void aSaleBelowCostIsMarkedByItsGlyphNotOnlyItsColour() {
         // given
         Order order = order(OrderStatus.New);
         OrderItem cheap = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 5", 1, 500, "MFN-5", false, 0);
@@ -488,23 +488,6 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("cl-margin cl-tooltip is-lines is-loss")
                 .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
                 .contains("class=\"fas fa-arrow-down\"");
-    }
-
-    @Test
-    void theLowMarginThresholdOpensItsDialogForAStoreUserEvenOnAClosedOrderButNotForTheSuperAdmin() {
-        // when
-        String open = page(render(order(OrderStatus.New), USER));
-        String closed = page(render(order(OrderStatus.Completed), USER));
-        String superAdmin = page(render(order(OrderStatus.New), SUPER_ADMIN));
-
-        // then
-        for (String html : List.of(open, closed)) {
-            assertThat(html).contains("data-cl-dialog-open=\"low-margin-dialog\">Ustaw próg małej marży</button>")
-                    .contains("id=\"low-margin-dialog\"")
-                    .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/lowMarginThreshold\"")
-                    .contains("name=\"threshold\" type=\"text\" inputmode=\"decimal\"");
-        }
-        assertThat(superAdmin).doesNotContain("low-margin-dialog").doesNotContain("Ustaw próg małej marży");
     }
 
     @Test

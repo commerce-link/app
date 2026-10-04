@@ -12,25 +12,23 @@ import java.util.Locale;
  * so the gross and the net margin are the same number.
  *
  * <p>tone: {@link Tone#UNKNOWN} when the item has no purchase cost yet (a New item, a service without one) — a 100%
- * margin would be a lie; {@link Tone#LOSS} when the price does not cover the cost, always marked; {@link Tone#LOW}
- * when the margin is below the store's threshold ({@code Store#lowMarginThreshold}), marked only once one is set.
- * percent is null when it cannot be computed (no cost, or a price of zero); profit is gross, profitNet the same profit
- * without the item's VAT (taxRate as stored on the item, e.g. 1.23); threshold is the store's, for the tooltip.
+ * margin would be a lie; {@link Tone#LOSS} when the price does not cover the cost. percent is null when it cannot be
+ * computed (no cost, or a price of zero); profit is gross, profitNet the same profit without the item's VAT (taxRate as
+ * stored on the item, e.g. 1.23).
  */
-public record ItemMargin(Tone tone, String percent, String profit, String profitNet, String cost, String threshold) {
+public record ItemMargin(Tone tone, String percent, String profit, String profitNet, String cost) {
 
     public enum Tone {
-        OK, LOW, LOSS, UNKNOWN;
+        OK, LOSS, UNKNOWN;
 
         public String key() {
             return "order.items.margin." + name().toLowerCase(Locale.ROOT);
         }
     }
 
-    public static ItemMargin of(double unitPrice, double unitCostGross, double taxRate, Double threshold) {
-        String thresholdText = thresholdText(threshold);
+    public static ItemMargin of(double unitPrice, double unitCostGross, double taxRate) {
         if (unitCostGross <= 0) {
-            return new ItemMargin(Tone.UNKNOWN, null, null, null, null, thresholdText);
+            return new ItemMargin(Tone.UNKNOWN, null, null, null, null);
         }
         BigDecimal price = BigDecimal.valueOf(unitPrice).setScale(2, RoundingMode.HALF_UP);
         BigDecimal cost = BigDecimal.valueOf(unitCostGross).setScale(2, RoundingMode.HALF_UP);
@@ -38,28 +36,16 @@ public record ItemMargin(Tone tone, String percent, String profit, String profit
         BigDecimal margin = price.signum() > 0
                 ? profit.multiply(BigDecimal.valueOf(100)).divide(price, 1, RoundingMode.HALF_UP)
                 : null;
-        Tone tone = profit.signum() < 0 ? Tone.LOSS
-                : threshold != null && margin != null && margin.compareTo(BigDecimal.valueOf(threshold)) < 0 ? Tone.LOW
-                : Tone.OK;
         BigDecimal profitNet = taxRate > 0 ? profit.divide(BigDecimal.valueOf(taxRate), 2, RoundingMode.HALF_UP) : profit;
-        return new ItemMargin(tone, margin == null ? null : percent(margin, "0.0"), Money.format(profit.doubleValue()),
-                Money.format(profitNet.doubleValue()), Money.format(cost.doubleValue()), thresholdText);
+        return new ItemMargin(profit.signum() < 0 ? Tone.LOSS : Tone.OK, margin == null ? null : percent(margin),
+                Money.format(profit.doubleValue()), Money.format(profitNet.doubleValue()), Money.format(cost.doubleValue()));
     }
 
-    /** The store's threshold as shown and typed back into its field: "20", "12,5"; null while none is set. */
-    public static String thresholdText(Double threshold) {
-        return threshold == null ? null : percent(BigDecimal.valueOf(threshold), "0.##");
-    }
-
-    /** "15,0" for a margin (always one decimal), "12,5" or "20" for a threshold (as typed). */
-    private static String percent(BigDecimal value, String pattern) {
+    /** "15,0": always one decimal. */
+    private static String percent(BigDecimal value) {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("pl-PL"));
         symbols.setDecimalSeparator(',');
-        symbols.setMinusSign('\u2212');
-        return new DecimalFormat(pattern, symbols).format(value);
-    }
-
-    public boolean marked() {
-        return tone == Tone.LOW || tone == Tone.LOSS;
+        symbols.setMinusSign('−');
+        return new DecimalFormat("0.0", symbols).format(value);
     }
 }

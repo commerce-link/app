@@ -5,24 +5,18 @@
          th:with="items=${page.items()}, menus=${!page.readOnly()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{order.card.items(${items.count()})}"></h2>
-        <div class="cl-card-actions" th:if="${menus or items.lowMargin().editable()}">
-            <!--/* the store's threshold, so it stays on a closed order too; it names the value it holds */-->
-            <button th:if="${items.lowMargin().editable()}" type="button" class="cl-link-button" data-cl-dialog-open="low-margin-dialog"
-                    th:text="${items.lowMargin().threshold() != null} ? #{order.items.margin.threshold.button(${items.lowMargin().threshold()})}
-                             : #{order.items.margin.threshold.button.unset}"></button>
-            <th:block th:if="${menus}">
-                <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
-                        th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
-                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                    <span th:text="#{order.items.add}"></span>
-                </button>
-                <!--/* greyed, still focusable, its reason under the head (like "Dodaj dokument"); opens nothing */-->
-                <button th:unless="${items.canAddItems()}" type="button" class="cl-button" aria-disabled="true"
-                        th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
-                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                    <span th:text="#{order.items.add}"></span>
-                </button>
-            </th:block>
+        <div class="cl-card-actions" th:if="${menus}">
+            <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
+                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.items.add}"></span>
+            </button>
+            <!--/* greyed, still focusable, its reason under the head (like "Dodaj dokument"); opens nothing */-->
+            <button th:unless="${items.canAddItems()}" type="button" class="cl-button" aria-disabled="true"
+                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.items.add}"></span>
+            </button>
         </div>
         <p th:if="${items.addItemsReasonKey() != null}" class="cl-help is-note" id="add-items-reason"
            th:text="${items.addItemsReasonIsSentence()} ? #{${items.addItemsReasonKey()}}
@@ -271,37 +265,16 @@
 </tr>
 
 <!--/* The margin of one unit as an icon after the price; the tooltip (and the accessible name) carries the numbers,
-       the cost included — it used to be the line under the price. A low margin and a loss change the glyph as well as
-       the colour, so the mark does not rest on colour alone. Focusable, so the tooltip opens from the keyboard and on tap. */-->
+       the cost included — it used to be the line under the price. A loss changes the glyph as well as the colour, so
+       the mark does not rest on colour alone. Focusable, so the tooltip opens from the keyboard and on tap. */-->
 <span th:fragment="margin(m)" class="cl-margin cl-tooltip is-lines" tabindex="0" role="img"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
       th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{order.items.margin.unknown}
                 : #{${m.tone().key()}(${m.percent() != null ? m.percent() : '—'},
                     ${#messages.msg('general.currency.amount', m.profit())},
-                    ${#messages.msg('general.currency.amount', m.cost())}, ${m.threshold()},
+                    ${#messages.msg('general.currency.amount', m.cost())},
                     ${#messages.msg('general.currency.amount', m.profitNet())})}"
       th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
-      th:classappend="${m.tone().name() == 'LOW'} ? 'fa-exclamation-triangle' : (${m.tone().name() == 'LOSS'} ? 'fa-arrow-down' : 'fa-percent')"></i></span>
-
-<!--/* The store's low-margin threshold; posted on its own, outside the items form. */-->
-<dialog th:fragment="lowMarginDialog" class="cl-dialog is-form" id="low-margin-dialog" aria-labelledby="low-margin-title">
-    <form method="post" th:action="@{/dashboard/orders/{o}/lowMarginThreshold(o=${page.orderId()})}">
-        <h2 class="cl-dialog-title" id="low-margin-title" th:text="#{order.items.margin.threshold.title}"></h2>
-        <div class="cl-dialog-body">
-            <p class="cl-help" th:text="#{order.items.margin.threshold.desc}"></p>
-            <div class="cl-field">
-                <label class="cl-label" for="low-margin-threshold" th:text="#{order.items.margin.threshold.label}"></label>
-                <input class="cl-input is-short" id="low-margin-threshold" name="threshold" type="text" inputmode="decimal"
-                       maxlength="6" autocomplete="off" aria-describedby="low-margin-threshold-help"
-                       th:value="${page.items().lowMargin().threshold()}">
-                <p class="cl-help" id="low-margin-threshold-help" th:text="#{order.items.margin.threshold.help}"></p>
-            </div>
-        </div>
-        <div class="cl-dialog-actions">
-            <button type="submit" class="cl-button is-primary" th:text="#{general.save}"></button>
-            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
-        </div>
-    </form>
-</dialog>
+      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-arrow-down' : 'fa-percent'"></i></span>
 </body>
 </html>

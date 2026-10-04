@@ -6800,12 +6800,6 @@ a.cl-link-button:hover {
     padding: 12px 20px 16px;
 }
 
-/* A short number typed by hand: a percent, a quantity */
-.cl-page .cl-input.is-short {
-    width: 12ch;
-    max-width: 100%;
-}
-
 /* An order number typed by hand: wide enough for a marketplace reference */
 .cl-page .cl-input.is-reference {
     width: 22ch;
@@ -9268,7 +9262,7 @@ a.cl-link-button:hover {
 }
 
 /* Order items: the margin of one unit as an icon after the price (ItemMargin); the numbers are in its tooltip. The
-   glyph changes with the colour for a low margin (triangle) and a loss (arrow down), so the mark does not rest on colour. */
+   glyph changes with the colour for a loss (arrow down), so the mark does not rest on colour. */
 .cl-page .cl-price-margin {
     display: inline-flex;
     align-items: center;
@@ -9290,7 +9284,6 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-margin.is-unknown { opacity: .55; }
-.cl-page .cl-margin.is-low { color: var(--cl-warn); background-color: var(--cl-warn-soft); }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); background-color: var(--cl-bad-soft); }
 
 .cl-page .cl-margin:focus-visible {

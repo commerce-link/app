@@ -254,7 +254,7 @@ public class OrderPageModelFactory {
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
-                receiptLock, hasDropshipItems, store == null ? null : store.getLowMarginThreshold());
+                receiptLock, hasDropshipItems);
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();
@@ -288,9 +288,7 @@ public class OrderPageModelFactory {
                 !readOnly && addReason == null, readOnly ? null : addReason,
                 bulk, selectable && (canSplitOrder || !hasDropshipItems),
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
-                readOnly ? List.of() : labels.options(), previews,
-                new OrderPageModel.LowMargin(ItemMargin.thresholdText(store == null ? null : store.getLowMarginThreshold()),
-                        !viewer.superAdmin()));
+                readOnly ? List.of() : labels.options(), previews);
     }
 
     /** Why a bulk action is unavailable for the whole order, or null; package-visible so a test can walk every case. */
