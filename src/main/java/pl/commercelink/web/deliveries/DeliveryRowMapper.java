@@ -6,7 +6,10 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryListState;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.web.deliveries.details.DeliveryBackLink;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -40,6 +43,11 @@ public class DeliveryRowMapper {
     }
 
     public DeliveryRow map(Delivery delivery, LocalDate today) {
+        return map(delivery, today, null);
+    }
+
+    /** returnTo: the list as the operator sees it, so the details page's "‹ Dostawy" leads back to it. */
+    public DeliveryRow map(Delivery delivery, LocalDate today, String returnTo) {
         DeliveryListState state = DeliveryListState.of(delivery);
         String base = superAdmin ? "/dashboard/store/" + delivery.getStoreId() : "/dashboard";
         String supplier = supplierLabel(delivery);
@@ -55,7 +63,7 @@ public class DeliveryRowMapper {
             dueTone = days == 0 ? "is-warn" : "is-bad";
         }
         return new DeliveryRow(
-                base + "/deliveries/details?deliveryId=" + delivery.getDeliveryId(),
+                base + "/deliveries/details?deliveryId=" + delivery.getDeliveryId() + returnToParam(returnTo),
                 delivery.getShortenedDeliveryId(),
                 superAdmin ? delivery.getStoreId() : null,
                 delivery.isDropship(),
@@ -71,6 +79,11 @@ public class DeliveryRowMapper {
                 text("general.currency.amount", amount.format(delivery.getTotalCostGross())),
                 text("deliveries.list.cost.netLine", text("general.currency.amount", amount.format(delivery.getTotalCost()))),
                 received ? marks(delivery) : List.of());
+    }
+
+    private static String returnToParam(String returnTo) {
+        String safe = DeliveryBackLink.sanitize(returnTo);
+        return safe.equals(DeliveryBackLink.LIST) ? "" : "&returnTo=" + URLEncoder.encode(safe, StandardCharsets.UTF_8);
     }
 
     private String supplierLabel(Delivery delivery) {

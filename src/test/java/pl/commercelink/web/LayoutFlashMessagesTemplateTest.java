@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Flash messages are rendered once, by the layout; pages decorated with it must not add their own copy. */
 class LayoutFlashMessagesTemplateTest {
 
-    private static final List<String> LAYOUT_PAGES = List.of("deliveries", "deliveryDetails", "deliveries/create/items",
+    private static final List<String> LAYOUT_PAGES = List.of("deliveries", "deliveries/details", "deliveries/create/items",
             "deliveries/create/purchase", "deliveries/create/manual", "store-categories", "store-copy");
 
     private static String read(String template) throws Exception {
