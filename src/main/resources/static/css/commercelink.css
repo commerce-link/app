@@ -4230,8 +4230,9 @@ a.cl-link-button:hover {
         height: 36px;
     }
 
-    .cl-page .cl-repeat-lines :is(.cl-input, .cl-select) {
+    .cl-page .cl-repeat-lines :is(.cl-input, .cl-select, .cl-picker-trigger) {
         height: 36px;
+        min-height: 36px;
     }
 
     .cl-page .cl-selection-row .cl-check-target,

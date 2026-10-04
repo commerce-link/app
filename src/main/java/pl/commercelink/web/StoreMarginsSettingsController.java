@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -22,8 +24,12 @@ import pl.commercelink.web.dtos.MarginSettingsForm;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Settings › Margins: what the store counts as a low margin, which marks order items on the order page (ItemMargin).
@@ -105,9 +111,21 @@ public class StoreMarginsSettingsController {
         model.addAttribute("errorLabels", form.errorLabels(
                 number -> messageSource.getMessage("store.margins.category.field", new Object[]{number}, locale),
                 number -> messageSource.getMessage("store.margins.percent.field", new Object[]{number}, locale)));
-        model.addAttribute("categoryOptions", storeCategories.namesFor(store.getStoreId()));
+        model.addAttribute("categoryOptions", categoryOptions(store.getStoreId(), form));
         model.addAttribute("formAction", SettingsPaths.store(store.getStoreId(), PATH));
         return VIEW;
+    }
+
+    /**
+     * The picker's options: the categories of the store's catalogs, then any category of the form they no longer have
+     * (a saved threshold whose category was renamed), so the picker offers what the row shows. A flat list: the
+     * picker's breadcrumbs stay empty without parents.
+     */
+    private List<PimCategoryOptions.CategoryOption> categoryOptions(String storeId, MarginSettingsForm form) {
+        Set<String> names = new LinkedHashSet<>(storeCategories.namesFor(storeId));
+        form.getCategories().stream().map(MarginSettingsForm.CategoryRow::getCategory)
+                .map(StringUtils::trimToNull).filter(Objects::nonNull).forEach(names::add);
+        return names.stream().map(name -> new PimCategoryOptions.CategoryOption(name, name, null)).toList();
     }
 
     private Store requireStore(String storeId) {

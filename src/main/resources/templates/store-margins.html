@@ -80,6 +80,7 @@
     <script th:if="${!errors.isEmpty()}">
         document.getElementById('margins-errors').focus();
     </script>
+    <div th:replace="~{fragments/category-picker :: pickerScript(${categoryOptions}, ${ {} })}"></div>
     <script th:src="@{/js/async-form.js}" defer></script>
     <script th:src="@{/js/repeat-fields.js}" defer></script>
 </div>
@@ -88,22 +89,17 @@
 <th:block th:fragment="categoryLine(index, number, row)">
     <!--/* the fields are named by their column head and this number, through ids repeat-fields.js renumbers */-->
     <span class="cl-repeat-line-no" aria-hidden="true" th:id="${'category-' + index + '-no'}"><span data-cl-repeat-number th:text="${number}"></span>.</span>
-    <!--/* a list, not free text: a threshold matches order items by the category's name, so a typo would match nothing;
-           a saved category the catalogs no longer have stays as an option, so saving the page never drops it */-->
-    <div class="cl-repeat-cell" th:with="id=${'category-' + index + '-category'}, error=${errors.get(id)},
-                                        current=${row != null ? row.category : null}">
-        <select class="cl-select" th:classappend="${error != null} ? 'is-invalid'" th:id="${id}"
-                th:name="${'categories[' + index + '].category'}"
-                th:attr="aria-labelledby=${'margins-head-category category-' + index + '-no'},
-                         aria-invalid=${error != null ? 'true' : null},
-                         aria-describedby=${error != null ? id + '-error' : null}">
-            <option value="" th:text="#{store.margins.category.choose}"></option>
-            <option th:if="${!#strings.isEmpty(current) and !#lists.contains(categoryOptions, current)}"
-                    th:value="${current}" th:text="${current}" selected></option>
-            <option th:each="name : ${categoryOptions}" th:value="${name}" th:text="${name}"
-                    th:selected="${name == current}"></option>
-        </select>
-        <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+    <!--/* the shared category picker (a combobox with a search field and a scrolling list), fed with the store's
+           catalog categories: a threshold matches order items by the category's name, so it is picked, not typed. Its
+           label is this row's own hidden "Kategoria N", whose number repeat-fields.js renumbers with the row; the cell
+           carries the field id, so the error summary's link lands on it. */-->
+    <div class="cl-repeat-cell" tabindex="-1" th:id="${'category-' + index + '-category'}"
+         th:with="error=${errors.get('category-' + index + '-category')}, labelId=${'category-' + index + '-label'}">
+        <span class="cl-visually-hidden" th:id="${labelId}"><span th:text="#{store.margins.category}"></span>
+            <span data-cl-repeat-number th:text="${number}"></span></span>
+        <div th:replace="~{fragments/category-picker :: picker(${'categories[' + index + '].category'},
+                           ${row != null ? row.category : null}, false, false, ${labelId})}"></div>
+        <p th:if="${error != null}" class="cl-field-error" th:id="${'category-' + index + '-category-error'}">
             <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
             <span th:text="#{${error}}"></span>
         </p>
