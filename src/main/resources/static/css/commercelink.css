@@ -5063,6 +5063,49 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+/* Printing several order cards (spec docs/active/order-cards-bulk-print): the checkbox cell stands above the row
+   link's ::after, which covers the whole row, so the 44 px label ticks the box and the rest of the cell is inert: neither opens the order.
+   Without table-select.js (no .is-selectable) the column is not drawn: the table is the one it was before. */
+.cl-page .cl-table.is-orders .cl-table-check {
+    position: relative;
+    z-index: 1;
+}
+
+.cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check {
+    display: none;
+}
+
+/* The first-child indent above targets the hidden check cell, so without JavaScript the first visible column takes the
+   20 px edge padding itself (specificity 0,5,1 beats the first-child rule's 0,3,1). Card mode has its own layout.
+   From 1024 px; between 720 and 1023 px the narrow-table 8 px indent applies, as before. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td) {
+        padding-left: 20px;
+    }
+}
+
+/* Card mode (< 720 px) has no selection: no checkbox cells, no selection row and no tint of a row checked at a wider
+   width. The generic card-mode rules of selectable tables (the key cell as a padded block) outrank the orders card by
+   specificity, so the key cell gets its display: contents back here. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-orders[data-cl-select-table] .cl-table-check {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders[data-cl-select-table] tbody th.cl-table-key {
+        display: contents;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-orders tr.is-selected {
+        background: transparent;
+    }
+
+    .cl-page .cl-selection-row.is-wide-only {
+        display: none;
+    }
+}
+
 .cl-page .cl-table.is-orders .cl-cell-date {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -7022,6 +7065,33 @@ a.cl-link-button:hover {
     padding-top: 16px;
 }
 
+/* The order card's QR code (orders/card): it opens the order on a phone. Stays right of the title and wraps under it
+   only when the row is too narrow (flex-wrap);
+   black modules on white whatever "print backgrounds" says, since the colours are SVG fills. */
+.cl-page .cl-page-header-row:has(.cl-print-qr) {
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* Selector outranks Bulma's `.content` margins. */
+.cl-page .cl-page-header-row div.cl-print-qr {
+    flex: none;
+    width: 120px;
+    margin: 0;
+    break-inside: avoid;
+}
+
+.cl-page .cl-print-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* A batch of order cards (orders/cards) opened as a page: the cards stand apart like separate sheets. */
+.cl-page .cl-print-card + .cl-print-card {
+    margin-top: 40px;
+}
+
 .cl-page .cl-print-section {
     padding-top: 14px;
     border-top: 1px solid var(--cl-line);
@@ -7182,6 +7252,46 @@ a.cl-link-button:hover {
 
     .cl-page.cl-print-page .cl-page-title {
         font-size: 16pt;
+    }
+
+    /* The order card's QR code leaves the title row and sits in the top-right corner of its own card (.cl-print-card:
+       the whole sheet of a single card, one card of a batch), beside both the title and the order details, so it no
+       longer makes the title row as tall as itself (more item rows fit on page 1). The title row and the details keep
+       34 mm free on the right (code + gap), so no text runs under the code. */
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) {
+        position: relative;
+    }
+
+    .cl-page.cl-print-page .cl-page-header-row div.cl-print-qr {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 30mm;
+    }
+
+    .cl-page.cl-print-page .cl-page-header-row:has(.cl-print-qr) {
+        padding-right: 34mm;
+    }
+
+    /* Beside the code the details stack in one column (order number, e-mail, ordered at), so the e-mail gets the
+       whole width left of the code: an ordinary address stays on one line, only one longer than that width breaks.
+       Title + three rows end ~32 mm down (measured in Chromium), so the first section's rule already falls ~2 mm below
+       the 30 mm code and needs no min-height. */
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
+        grid-template-columns: minmax(0, 1fr);
+        padding-right: 34mm;
+        align-content: start;
+    }
+
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) .cl-kv.cl-print-meta dd {
+        overflow-wrap: break-word;
+    }
+
+    /* A batch of cards (orders/cards): every card after the first starts on a new page. A forced break keeps the
+       margin after it, so the screen gap between the cards is dropped on paper. */
+    .cl-page.cl-print-page .cl-print-card + .cl-print-card {
+        margin-top: 0;
+        break-before: page;
     }
 
     .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {

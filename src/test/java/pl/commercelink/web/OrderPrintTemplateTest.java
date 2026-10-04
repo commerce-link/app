@@ -14,13 +14,16 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPrintView;
+import pl.commercelink.web.orders.QrCodeSvg;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +33,7 @@ import static org.mockito.Mockito.mock;
 class OrderPrintTemplateTest {
 
     static final String ORDER_ID = "3e373abc-1111-2222-3333-444455556666";
+    static final String SCAN_URL = "https://app.example.pl/dashboard/scan/orders/store-1/" + ORDER_ID;
 
     static Order order() {
         Order order = new Order("store-1");
@@ -60,7 +64,7 @@ class OrderPrintTemplateTest {
 
     static String card(Order order, List<OrderItem> items, boolean superAdmin) {
         OrderPrintView.Card view = OrderPrintView.card(order, items, OrderLinks.of(order, superAdmin),
-                noLabels());
+                noLabels(), SCAN_URL);
         return body(render("orders/card", view));
     }
 
@@ -139,7 +143,7 @@ class OrderPrintTemplateTest {
         Order order = order();
 
         // when
-        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels(), SCAN_URL));
         String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
                 LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
 
@@ -235,7 +239,7 @@ class OrderPrintTemplateTest {
         String shortId = order.getShortenedOrderId();
 
         // when
-        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels(), SCAN_URL));
         String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
                 LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
 
@@ -254,6 +258,30 @@ class OrderPrintTemplateTest {
         assertThat(html.replaceAll("\\s+", " ")).contains("<dt>Sklep</dt> <dd>Demo</dd>")
                 .contains("<dt>Numer zamówienia</dt> <dd><a href=\"/dashboard/orders/" + ORDER_ID + "\">" + shortId + "</a></dd>")
                 .doesNotContain("store-1").doesNotContain("ID sklepu").doesNotContain(">" + ORDER_ID + "<");
+    }
+
+    @Test
+    void theCardPrintsABareQrCodeOfTheOrder() {
+        // when
+        String html = card(order(), items(), false);
+
+        // then: the code is named for screen readers only; no caption, the order number is in the details beside it
+        String shortId = order().getShortenedOrderId();
+        assertThat(html).contains("class=\"cl-print-qr\"")
+                .contains("role=\"img\"").contains("aria-label=\"Kod QR zamówienia " + shortId + "\"")
+                .contains(QrCodeSvg.of(SCAN_URL))
+                .doesNotContain("<figcaption").doesNotContain("<figure")
+                .doesNotContain("Zeskanuj telefonem")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void theProtocolHasNoQrCode() {
+        // when: the protocol goes to the customer, who cannot sign in
+        String html = collection(items());
+
+        // then
+        assertThat(html).doesNotContain("cl-print-qr").doesNotContain("<svg");
     }
 
     @Test
@@ -291,4 +319,87 @@ class OrderPrintTemplateTest {
                 .doesNotContain("class=\"is-empty\"> </td>");
     }
 
+    static String cards(List<OrderPrintView.Card> cards) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("cards", cards);
+        return SettingsTemplateRenderer.render("orders/cards", variables);
+    }
+
+    static OrderPrintView.Card cardOf(String orderId) {
+        Order order = order();
+        order.setOrderId(orderId);
+        return OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels(),
+                "https://app.example.pl/dashboard/scan/orders/store-1/" + orderId);
+    }
+
+    static final String FIRST = "bbbbbbbb-1111-2222-3333-444455556666";
+    static final String SECOND = "aaaaaaaa-1111-2222-3333-444455556666";
+    static final String THIRD = "cccccccc-1111-2222-3333-444455556666";
+
+    @Test
+    void severalCardsPrintAsOneDocumentInTheGivenOrderEachWithItsOwnQrCode() {
+        // given
+        List<OrderPrintView.Card> given = List.of(cardOf(FIRST), cardOf(SECOND), cardOf(THIRD));
+
+        // when
+        String html = cards(given);
+        String body = body(html);
+
+        // then
+        assertThat(html).contains("<title>Karty zamówień (3)</title>");
+        assertThat(occurrences(body, "<div class=\"cl-print-card\">")).isEqualTo(3);
+        assertThat(occurrences(body, "<article class=\"cl-card cl-print-sheet\">")).isEqualTo(3);
+        assertThat(occurrences(body, "class=\"cl-print-qr\"")).isEqualTo(3);
+        int first = body.indexOf(QrCodeSvg.of(given.get(0).scanUrl()));
+        int second = body.indexOf(QrCodeSvg.of(given.get(1).scanUrl()));
+        int third = body.indexOf(QrCodeSvg.of(given.get(2).scanUrl()));
+        assertThat(first).isPositive().isLessThan(second);
+        assertThat(second).isLessThan(third);
+        assertThat(body.indexOf("aria-label=\"Kod QR zamówienia " + given.get(1).shortId() + "\""))
+                .isGreaterThan(first).isLessThan(second);
+        assertThat(body).doesNotContain("??").doesNotContain("null");
+    }
+
+    @Test
+    void everyIdInTheBatchIsUniqueAndLabelsItsOwnSection() {
+        // when
+        String body = body(cards(List.of(cardOf(FIRST), cardOf(SECOND))));
+
+        // then
+        Matcher ids = Pattern.compile(" id=\"([^\"]+)\"").matcher(body);
+        List<String> found = new ArrayList<>();
+        while (ids.find()) {
+            found.add(ids.group(1));
+        }
+        assertThat(found).doesNotHaveDuplicates()
+                .contains("print-items-title-1", "print-shipments-title-1", "print-items-title-2", "print-shipments-title-2");
+        assertThat(body).contains("aria-labelledby=\"print-items-title-2\"").contains("aria-labelledby=\"print-documents-title-1\"");
+    }
+
+    @Test
+    void theBatchIsTheBareSheetWithoutScriptsOrPreviewChrome() {
+        // when
+        String html = cards(List.of(cardOf(FIRST), cardOf(SECOND)));
+
+        // then: like the single card, print.js prints it from a hidden frame
+        assertThat(html).contains("<main id=\"clContent\" class=\"cl-content\">").contains("/css/commercelink.css")
+                .doesNotContain("<script").doesNotContain("data-cl-print").doesNotContain("cl-sidebar")
+                .doesNotContain("googletagmanager");
+        assertThat(occurrences(html, "<h1")).isEqualTo(2);
+    }
+
+    @Test
+    void theSingleCardKeepsItsSheetInsideOneCardBox() {
+        // when
+        String html = card(order(), items(), false);
+
+        // then: the box the printed QR code hangs off is the only child of the page body, so the card lays out as
+        // before; its section ids carry no suffix
+        assertThat(html).containsPattern("<div class=\"cl-page-body\">\\s*<div class=\"cl-print-card\">\\s*<div class=\"cl-page-header\">")
+                .containsPattern("</article>\\s*</div>\\s*</div>\\s*</section>")
+                .contains("<h2 class=\"cl-print-title\" id=\"print-items-title\">Pozycje</h2>")
+                .contains("aria-labelledby=\"print-items-title\"");
+        assertThat(occurrences(html, "cl-print-card")).isEqualTo(1);
+    }
 }
