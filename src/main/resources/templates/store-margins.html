@@ -68,10 +68,6 @@
                                       th:attr="data-template=#{store.margins.category.removed('@N@')}"></span>
                             </div>
                         </div>
-                        <!--/* the store's catalog categories, offered while typing; any other name can be typed too */-->
-                        <datalist id="margin-categories">
-                            <option th:each="name : ${categoryOptions}" th:value="${name}"></option>
-                        </datalist>
                     </fieldset>
 
                     <div class="cl-card-footer">
@@ -92,22 +88,38 @@
 <th:block th:fragment="categoryLine(index, number, row)">
     <!--/* the fields are named by their column head and this number, through ids repeat-fields.js renumbers */-->
     <span class="cl-repeat-line-no" aria-hidden="true" th:id="${'category-' + index + '-no'}"><span data-cl-repeat-number th:text="${number}"></span>.</span>
-    <th:block th:each="field : ${ {'category', 'percent'} }">
-        <div class="cl-repeat-cell" th:with="id=${'category-' + index + '-' + field}, error=${errors.get(id)}">
-            <input class="cl-input" type="text" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
-                   th:id="${id}" th:name="${'categories[' + index + '].' + field}"
-                   th:value="${row != null ? row[field] : null}"
-                   th:attr="list=${field == 'category'} ? 'margin-categories' : null,
-                            inputmode=${field == 'percent'} ? 'decimal' : null,
-                            aria-labelledby=${'margins-head-' + field + ' category-' + index + '-no'},
-                            aria-invalid=${error != null ? 'true' : null},
-                            aria-describedby=${error != null ? id + '-error' : null}">
-            <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
-                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                <span th:text="#{${error}}"></span>
-            </p>
-        </div>
-    </th:block>
+    <!--/* a list, not free text: a threshold matches order items by the category's name, so a typo would match nothing;
+           a saved category the catalogs no longer have stays as an option, so saving the page never drops it */-->
+    <div class="cl-repeat-cell" th:with="id=${'category-' + index + '-category'}, error=${errors.get(id)},
+                                        current=${row != null ? row.category : null}">
+        <select class="cl-select" th:classappend="${error != null} ? 'is-invalid'" th:id="${id}"
+                th:name="${'categories[' + index + '].category'}"
+                th:attr="aria-labelledby=${'margins-head-category category-' + index + '-no'},
+                         aria-invalid=${error != null ? 'true' : null},
+                         aria-describedby=${error != null ? id + '-error' : null}">
+            <option value="" th:text="#{store.margins.category.choose}"></option>
+            <option th:if="${!#strings.isEmpty(current) and !#lists.contains(categoryOptions, current)}"
+                    th:value="${current}" th:text="${current}" selected></option>
+            <option th:each="name : ${categoryOptions}" th:value="${name}" th:text="${name}"
+                    th:selected="${name == current}"></option>
+        </select>
+        <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${error}}"></span>
+        </p>
+    </div>
+    <div class="cl-repeat-cell" th:with="id=${'category-' + index + '-percent'}, error=${errors.get(id)}">
+        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
+               th:id="${id}" th:name="${'categories[' + index + '].percent'}"
+               th:value="${row != null ? row.percent : null}"
+               th:attr="aria-labelledby=${'margins-head-percent category-' + index + '-no'},
+                        aria-invalid=${error != null ? 'true' : null},
+                        aria-describedby=${error != null ? id + '-error' : null}">
+        <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${error}}"></span>
+        </p>
+    </div>
     <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
             th:text="#{settings.list.delete}"
             th:attr="aria-label=#{store.margins.category.remove(${number})},

@@ -4230,7 +4230,7 @@ a.cl-link-button:hover {
         height: 36px;
     }
 
-    .cl-page .cl-repeat-lines .cl-input {
+    .cl-page .cl-repeat-lines :is(.cl-input, .cl-select) {
         height: 36px;
     }
 

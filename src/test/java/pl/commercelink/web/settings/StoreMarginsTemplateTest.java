@@ -34,10 +34,10 @@ class StoreMarginsTemplateTest {
         // then
         assertThat(html).contains("<h1 class=\"cl-page-title\">Marże</h1>")
                 .containsPattern("id=\"defaultPercent\" name=\"defaultPercent\"\\s+value=\"10\"")
-                .containsPattern("id=\"category-0-category\" name=\"categories\\[0\\]\\.category\"\\s+value=\"CPU\"[^>]*list=\"margin-categories\"")
-                .containsPattern("id=\"category-0-percent\" name=\"categories\\[0\\]\\.percent\"\\s+value=\"5\"[^>]*inputmode=\"decimal\"")
+                .containsPattern("<select class=\"cl-select\" id=\"category-0-category\"\\s+name=\"categories\\[0\\]\\.category\"")
+                .containsPattern("<option value=\"\">Wybierz kategorię</option>\\s*<option value=\"CPU\" selected=\"selected\">CPU</option>\\s*<option value=\"Storage\">Storage</option>")
+                .containsPattern("inputmode=\"decimal\"[^>]*id=\"category-0-percent\"\\s+name=\"categories\\[0\\]\\.percent\"\\s+value=\"5\"")
                 .contains("aria-labelledby=\"margins-head-category category-0-no\"")
-                .contains("<datalist id=\"margin-categories\">").contains("<option value=\"Storage\"></option>")
                 .contains("data-cl-repeat=\"categories\"").contains("Dodaj kategorię").contains("Zapisz zmiany")
                 .doesNotContain("??");
     }
@@ -55,5 +55,15 @@ class StoreMarginsTemplateTest {
         assertThat(html).contains("<a href=\"#category-0-percent\">Próg 1: Podaj próg.</a>")
                 .containsPattern("id=\"category-0-percent\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"category-0-percent-error\"")
                 .contains("id=\"category-0-percent-error\"");
+    }
+
+    @Test
+    void aSavedCategoryTheCatalogsNoLongerHaveStaysSelectedSoSavingKeepsIt() {
+        // when
+        String html = render(MarginSettingsForm.from(new MarginConfiguration(null,
+                List.of(new MarginConfiguration.CategoryMargin("Monitory", 8.0)))), Map.of());
+
+        // then
+        assertThat(html).containsPattern("<option value=\"\">Wybierz kategorię</option>\\s*<option value=\"Monitory\" selected>Monitory</option>\\s*<option value=\"CPU\">CPU</option>");
     }
 }
