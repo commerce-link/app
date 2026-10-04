@@ -100,6 +100,18 @@ class DeliveryDetailsScriptsContractTest {
     }
 
     @Test
+    void destinationsStartCollapsedUnlessCheckedAndSelectAllOpensThemFirst() throws Exception {
+        // when
+        String js = read(Path.of("src/main/resources/static/js/delivery-details.js"));
+
+        // then
+        assertThat(js).containsPattern("if \\(!hasChecked\\(button\\)\\) \\{\\s*setOpen\\(button, false\\);")
+                .containsPattern("matches\\('\\[data-cl-select-all\\]'\\)[\\s\\S]*?checkedBoxes\\(\\)\\.length === 0\\) \\{\\s*expandAll\\(\\);")
+                .containsPattern("expandAll\\(\\);\\s*\\}\\s*\\}, true\\);")
+                .containsPattern("initToggles\\(\\);\\s*initSelectAllOpens\\(\\);");
+    }
+
+    @Test
     void theDialogScriptsValidateFillAndConfirm() throws Exception {
         // when
         String js = read(Path.of("src/main/resources/static/js/delivery-details.js"));
