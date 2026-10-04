@@ -3838,8 +3838,6 @@ class OrdersControllerTest {
                     .isInstanceOf(ResponseStatusException.class);
             assertThatThrownBy(() -> ordersController.clearSupplier(ORDER_ID, "i1", new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
-            assertThatThrownBy(() -> ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), new RedirectAttributesModelMap(), polish))
-                    .isInstanceOf(ResponseStatusException.class);
             verify(orderItemsRepository, never()).save(any());
         }
 
@@ -4052,48 +4050,20 @@ class OrdersControllerTest {
             review.setReview(new pl.commercelink.orders.OrderReview(OrderReviewStatus.ToBeCollected));
             RedirectAttributesModelMap reviewRedirect = new RedirectAttributesModelMap();
             RedirectAttributesModelMap shipmentsRedirect = new RedirectAttributesModelMap();
-            RedirectAttributesModelMap serialRedirect = new RedirectAttributesModelMap();
 
             // when
             ordersController.updateReview(ORDER_ID, review, reviewRedirect, polish);
             ordersController.saveShipment(ORDER_ID, null, null, ShipmentType.Courier, null, "T-1", null, null, null,
                     null, null, new MockHttpServletRequest(), new MockHttpServletResponse(),
                     new ExtendedModelMap(), shipmentsRedirect, polish);
-            ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), serialRedirect, polish);
 
             // then
             assertThat(flash(reviewRedirect)).containsEntry("errorMessage", "order.review.error.closed");
             assertThat(flash(shipmentsRedirect)).containsEntry("errorMessage", "order.shipments.error.closed");
-            assertThat(flash(serialRedirect)).containsEntry("errorMessage", "order.item.error.closed");
             assertThat(closed.getReview()).isSameAs(reviewBefore);
             verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, shipmentTrackingSubscriber);
             verify(orderItemsRepository, never()).findByOrderId(any());
             verify(orderItemsRepository, never()).save(any());
-        }
-
-        @Test
-        void updateSerialNumbersTouchesOnlyThePostedItems() {
-            // given
-            OrderItem posted = item("i1", FulfilmentStatus.Delivered, "MFN-1");
-            posted.setSerialNo("OLD");
-            OrderItem other = item("i2", FulfilmentStatus.Delivered, "MFN-2");
-            other.setSerialNo("KEEP");
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Delivered));
-            when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(posted, other));
-            OrderItem draft = new OrderItem();
-            draft.setItemId("i1");
-            draft.setSerialNo(" NEW ");
-            OrderItemsForm form = new OrderItemsForm();
-            form.setOrderItems(List.of(draft));
-
-            // when
-            ordersController.updateSerialNumbers(ORDER_ID, form, new RedirectAttributesModelMap(), polish);
-
-            // then
-            assertThat(posted.getSerialNo()).isEqualTo("NEW");
-            assertThat(other.getSerialNo()).isEqualTo("KEEP");
-            verify(orderItemsRepository).save(posted);
-            verify(orderItemsRepository, never()).save(other);
         }
 
         @Test

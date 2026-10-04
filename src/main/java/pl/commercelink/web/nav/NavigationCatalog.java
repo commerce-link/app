@@ -26,7 +26,8 @@ public final class NavigationCatalog {
                     new NavItem("deliveries", "nav.deliveries", "/dashboard/deliveries", "fa-truck", STORE_ROLES),
                     new NavItem("deliveriesQueue", "nav.deliveries.queue", "/dashboard/deliveries", "fa-truck",
                             Set.of(SUPER_ADMIN)),
-                    new NavItem("rma", "nav.rma", "/dashboard/rma", "fa-undo-alt", STORE_ROLES))),
+                    new NavItem("rma", "nav.rma", "/dashboard/rma", "fa-undo-alt", STORE_ROLES),
+                    new NavItem("itemHistory", "nav.item.history", "/dashboard/item/history", "fa-history", STORE_ROLES))),
             new NavSection("nav.group.warehouse", List.of(
                     new NavItem("warehouse", "nav.warehouse", "/dashboard/warehouse", "fa-warehouse", STORE_ROLES),
                     new NavItem("warehouseDocuments", "nav.warehouse.documents", "/dashboard/warehouse-documents",

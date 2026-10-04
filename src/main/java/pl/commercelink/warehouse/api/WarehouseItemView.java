@@ -9,6 +9,7 @@ public class WarehouseItemView {
 
     private final String storeId;
     private final String itemId;
+    private final String name;
     private final String ean;
     private final String mfn;
     private final Price price;
@@ -19,6 +20,7 @@ public class WarehouseItemView {
     public WarehouseItemView(
             String storeId,
             String itemId,
+            String name,
             String ean,
             String mfn,
             Price price,
@@ -28,6 +30,7 @@ public class WarehouseItemView {
     ) {
         this.storeId = storeId;
         this.itemId = itemId;
+        this.name = name;
         this.ean = ean;
         this.mfn = mfn;
         this.price = price;
@@ -42,6 +45,14 @@ public class WarehouseItemView {
 
     public String getItemId() {
         return itemId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public FulfilmentStatus getStatus() {
+        return status;
     }
 
     public String getEan() {
