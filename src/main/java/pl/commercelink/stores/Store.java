@@ -65,6 +65,9 @@ public class Store {
     private DemoStoreMetadata demo;
     @DynamoDBAttribute(attributeName = "createdAt")
     private String createdAt;
+    // Percent; an item sold below it is marked as low-margin on the order page. Null: only a loss is marked.
+    @DynamoDBAttribute(attributeName = "lowMarginThreshold")
+    private Double lowMarginThreshold;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -495,6 +498,14 @@ public class Store {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Double getLowMarginThreshold() {
+        return lowMarginThreshold;
+    }
+
+    public void setLowMarginThreshold(Double lowMarginThreshold) {
+        this.lowMarginThreshold = lowMarginThreshold;
     }
 
     @DynamoDBIgnore

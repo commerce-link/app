@@ -277,7 +277,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 712,17 brutto")
+                .contains("2 × 749,00").doesNotContain("koszt 712,17 brutto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -455,8 +455,56 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
-        assertThat(admin).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+    }
+
+    @Test
+    void theCostLineUnderThePriceBecameAMarginIconWhoseTooltipCarriesTheNumbers() {
+        // when
+        String html = page(render(order(OrderStatus.New), USER));
+
+        // then: 749,00 for 579 net + 23% (712,17 gross); the service has no cost, so its margin cannot be computed
+        assertThat(html).doesNotContain("koszt 712,17 brutto")
+                .containsPattern("<span class=\"cl-price-margin\"><span>2 × 749,00</span><span class=\"cl-margin cl-tooltip is-lines is-ok\" tabindex=\"0\" role=\"img\"")
+                .contains("data-tooltip=\"Marża: 4,9%\nZysk: 36,83 PLN / szt.\nKoszt: 712,17 PLN brutto / szt.\"")
+                .contains("class=\"fas fa-percent\"")
+                .contains("cl-margin cl-tooltip is-lines is-unknown")
+                .contains("Brak kosztu zakupu — marży nie da się policzyć.");
+    }
+
+    @Test
+    void aSaleBelowCostIsMarkedWithoutAThresholdAndByItsGlyphNotOnlyItsColour() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem cheap = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 5", 1, 500, "MFN-5", false, 0);
+        cheap.setStatus(FulfilmentStatus.New);
+        cheap.setCost(450);
+
+        // when
+        String html = page(render(order, List.of(cheap), USER, Set.of()));
+
+        // then: 450 net + 23% = 553,50 gross against 500,00
+        assertThat(html).contains("cl-margin cl-tooltip is-lines is-loss")
+                .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −53,50 PLN / szt.")
+                .contains("class=\"fas fa-arrow-down\"");
+    }
+
+    @Test
+    void theLowMarginThresholdOpensItsDialogForAStoreUserEvenOnAClosedOrderButNotForTheSuperAdmin() {
+        // when
+        String open = page(render(order(OrderStatus.New), USER));
+        String closed = page(render(order(OrderStatus.Completed), USER));
+        String superAdmin = page(render(order(OrderStatus.New), SUPER_ADMIN));
+
+        // then
+        for (String html : List.of(open, closed)) {
+            assertThat(html).contains("data-cl-dialog-open=\"low-margin-dialog\">Ustaw próg małej marży</button>")
+                    .contains("id=\"low-margin-dialog\"")
+                    .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/lowMarginThreshold\"")
+                    .contains("name=\"threshold\" type=\"text\" inputmode=\"decimal\"");
+        }
+        assertThat(superAdmin).doesNotContain("low-margin-dialog").doesNotContain("Ustaw próg małej marży");
     }
 
     @Test
@@ -1132,7 +1180,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 712,17 brutto")
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("Koszt: 712,17 PLN brutto / szt.")
                 .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
     }
 

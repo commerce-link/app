@@ -542,6 +542,11 @@ body.cl-drawer-open .cl-sidebar {
     z-index: 40;
 }
 
+/* a tooltip of several facts, one per line (a "\n" in the text) */
+.cl-tooltip.is-lines::after {
+    white-space: pre-line;
+}
+
 .cl-tooltip:hover::after,
 .cl-tooltip:focus::after {
     opacity: 1;
@@ -6102,7 +6107,8 @@ a.cl-link-button:hover {
 
 /* Column widths of the order items table (fixed layout) */
 .cl-page .cl-table col.cl-col-check { width: 44px; }
-.cl-page .cl-table col.cl-col-price { width: 128px; }
+/* the price and its margin icon on one line: "10 × 12 269,00" + 6 px + the 14 px icon + the cell's 2 x 10 px padding */
+.cl-page .cl-table col.cl-col-price { width: 152px; }
 /* fits the longest usual state pill ("Skompletowany", "Zarezerwowany": 124 px) plus the cell's 2 x 10 px padding */
 .cl-page .cl-table col.cl-col-state { width: 148px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
@@ -6792,6 +6798,12 @@ a.cl-link-button:hover {
     align-items: center;
     gap: 8px 12px;
     padding: 12px 20px 16px;
+}
+
+/* A short number typed by hand: a percent, a quantity */
+.cl-page .cl-input.is-short {
+    width: 12ch;
+    max-width: 100%;
 }
 
 /* An order number typed by hand: wide enough for a marketplace reference */
@@ -9253,4 +9265,58 @@ a.cl-link-button:hover {
 
 .cl-page #item-events .cl-timeline-item:not(:last-child) {
     padding-bottom: 16px;
+}
+
+/* Order items: the margin of one unit as an icon after the price (ItemMargin); the numbers are in its tooltip. The
+   glyph changes with the colour for a low margin (triangle) and a loss (arrow down), so the mark does not rest on colour. */
+.cl-page .cl-price-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.cl-page .cl-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 11px;
+    color: var(--cl-ink-3);
+    cursor: help;
+}
+
+.cl-page .cl-margin.is-unknown { opacity: .55; }
+.cl-page .cl-margin.is-low { color: var(--cl-warn); background-color: var(--cl-warn-soft); }
+.cl-page .cl-margin.is-loss { color: var(--cl-bad); background-color: var(--cl-bad-soft); }
+
+.cl-page .cl-margin:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* the tooltip opens to the left: the price column stands right of the middle and a centred box hid the state pill */
+.cl-page .cl-margin.cl-tooltip::after {
+    left: auto;
+    right: -8px;
+    transform: translateY(4px);
+    text-align: left;
+}
+
+.cl-page .cl-margin.cl-tooltip:is(:hover, :focus)::after {
+    transform: translateY(0);
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the 20 px mark without growing the row: the padding takes the taps, the background
+       stays on the content box */
+    .cl-page .cl-margin {
+        box-sizing: content-box;
+        padding: 12px;
+        margin: -12px;
+        background-clip: content-box;
+    }
 }
