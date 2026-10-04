@@ -5,18 +5,23 @@
          th:with="items=${page.items()}, menus=${!page.readOnly()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{order.card.items(${items.count()})}"></h2>
-        <div class="cl-card-actions" th:if="${menus}">
-            <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
-                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                <span th:text="#{order.items.add}"></span>
-            </button>
-            <!--/* greyed, still focusable, its reason under the head (like "Dodaj dokument"); opens nothing */-->
-            <button th:unless="${items.canAddItems()}" type="button" class="cl-button" aria-disabled="true"
-                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                <span th:text="#{order.items.add}"></span>
-            </button>
+        <div class="cl-card-actions" th:if="${menus or items.marginSettingsHref() != null}">
+            <!--/* the thresholds are the store's, set on their settings page; the link stays on a closed order too */-->
+            <a th:if="${items.marginSettingsHref() != null}" class="cl-link-button" th:href="@{${items.marginSettingsHref()}}"
+               th:text="#{order.items.margin.settings}"></a>
+            <th:block th:if="${menus}">
+                <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
+                        th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                    <span th:text="#{order.items.add}"></span>
+                </button>
+                <!--/* greyed, still focusable, its reason under the head (like "Dodaj dokument"); opens nothing */-->
+                <button th:unless="${items.canAddItems()}" type="button" class="cl-button" aria-disabled="true"
+                        th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                    <span th:text="#{order.items.add}"></span>
+                </button>
+            </th:block>
         </div>
         <p th:if="${items.addItemsReasonKey() != null}" class="cl-help is-note" id="add-items-reason"
            th:text="${items.addItemsReasonIsSentence()} ? #{${items.addItemsReasonKey()}}
@@ -265,16 +270,17 @@
 </tr>
 
 <!--/* The margin of one unit as an icon after the price; the tooltip (and the accessible name) carries the numbers,
-       the cost included — it used to be the line under the price. A loss changes the glyph (info → exclamation) as
-       well as the colour, so the mark does not rest on colour alone. Focusable, so the tooltip opens from the keyboard and on tap. */-->
+       the cost included — it used to be the line under the price. A low margin (below the threshold of Settings › Margins)
+       and a loss change the glyph (info → triangle / exclamation) as well as the colour, so the mark does not rest on
+       colour alone; a low margin's tooltip names the threshold and whether it is its category's. Focusable, so the tooltip opens from the keyboard and on tap. */-->
 <span th:fragment="margin(m)" class="cl-margin cl-tooltip is-lines" tabindex="0" role="img"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
       th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{order.items.margin.unknown}
-                : #{${m.tone().key()}(${m.percent() != null ? m.percent() : '—'},
+                : #{${m.messageKey()}(${m.percent() != null ? m.percent() : '—'},
                     ${#messages.msg('general.currency.amount', m.profit())},
                     ${#messages.msg('general.currency.amount', m.cost())},
-                    ${#messages.msg('general.currency.amount', m.profitNet())})}"
+                    ${#messages.msg('general.currency.amount', m.profitNet())}, ${m.threshold()}, ${m.thresholdCategory()})}"
       th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
-      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
+      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : (${m.tone().name() == 'LOW'} ? 'fa-exclamation-triangle' : 'fa-info-circle')"></i></span>
 </body>
 </html>

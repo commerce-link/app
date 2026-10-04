@@ -70,6 +70,9 @@ public class OrderPageModelFactory {
     private static final Set<String> KNOWN_ACTIONS = Set.of("SHIPMENT_COLLECTED", "SHIPMENT_DELIVERED", "SHIPMENT_TRACKING_FAILED",
             OrderRealizationStepBack.EVENT);
 
+    /** Settings › Margins of the signed-in admin's store (StoreMarginsSettingsController). */
+    static final String MARGIN_SETTINGS_HREF = "/dashboard/store/margins";
+
     private final StoresRepository storesRepository;
     private final OrderEventsRepository orderEventsRepository;
     private final DropshipItemLookup dropshipItemLookup;
@@ -254,7 +257,7 @@ public class OrderPageModelFactory {
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
-                receiptLock, hasDropshipItems);
+                receiptLock, hasDropshipItems, store == null ? null : store.getMarginConfiguration());
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();
@@ -288,7 +291,8 @@ public class OrderPageModelFactory {
                 !readOnly && addReason == null, readOnly ? null : addReason,
                 bulk, selectable && (canSplitOrder || !hasDropshipItems),
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
-                readOnly ? List.of() : labels.options(), previews);
+                readOnly ? List.of() : labels.options(), previews,
+                viewer.admin() && !viewer.superAdmin() ? MARGIN_SETTINGS_HREF : null);
     }
 
     /** Why a bulk action is unavailable for the whole order, or null; package-visible so a test can walk every case. */

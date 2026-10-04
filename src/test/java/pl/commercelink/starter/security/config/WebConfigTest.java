@@ -49,7 +49,9 @@ class WebConfigTest {
             "GET, /dashboard/store/fulfilment",
             "GET, /dashboard/store/receipts",
             "GET, /dashboard/store/receipts/system",
-            "GET, /dashboard/store/receipts/system/disconnect"
+            "GET, /dashboard/store/receipts/system/disconnect",
+            "GET, /dashboard/store/margins",
+            "POST, /dashboard/store/margins"
     })
     void storeAccessInterceptorDoesNotGuardTheAdminStorePages(String method, String path) {
         // given / when / then

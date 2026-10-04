@@ -44,11 +44,15 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record PrimaryAction(String labelKey, String href, String icon) {
     }
 
+    /**
+     * marginSettingsHref: Settings › Margins, where the low-margin thresholds behind the margin icons are set; only for a
+     * store admin (the page is the admin's), null for everyone else.
+     */
     public record ItemsCard(List<OrderItemRow> products, List<OrderItemRow> services, int count, boolean selectable,
                             boolean canAddItems, String addItemsReasonKey,
                             List<BulkActionButton> bulkActions, boolean bulkAvailable,
                             List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
-                            Map<String, SplitGroupPreviewDto> splitPreviews) {
+                            Map<String, SplitGroupPreviewDto> splitPreviews, String marginSettingsHref) {
 
         /**
          * Whether addItemsReasonKey is a whole sentence shown as it is ("Trwa wystawianie e-paragonu — pozycji nie

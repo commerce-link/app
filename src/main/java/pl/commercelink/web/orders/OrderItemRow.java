@@ -5,6 +5,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.receipts.ReceiptLock;
+import pl.commercelink.stores.MarginConfiguration;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.ItemCondition;
 
@@ -27,11 +28,18 @@ public record OrderItemRow(String itemId, int index, String name, String categor
     /**
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
      * store's own users have a route to the item page. dropshipLocked: the order has items in a dropship delivery, which
-     * greys "Do alokacji" as it greyed the selection row's entry before it moved into the item menu.
+     * greys "Do alokacji" as it greyed the selection row's entry before it moved into the item menu. margins: what the
+     * store counts as a low margin (Store#getMarginConfiguration), or null.
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          ReceiptLock receiptLock, boolean dropshipLocked) {
+                          ReceiptLock receiptLock, boolean dropshipLocked, MarginConfiguration margins) {
+
+        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
+                       ReceiptLock receiptLock, boolean dropshipLocked) {
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, receiptLock, dropshipLocked, null);
+        }
 
         /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
@@ -60,7 +68,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
                 // the cost gross, like the price, so the margin is the same with or without VAT
-                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax()),
+                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax(),
+                        context.margins() == null ? null : context.margins().thresholdFor(item.getCategory())),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),

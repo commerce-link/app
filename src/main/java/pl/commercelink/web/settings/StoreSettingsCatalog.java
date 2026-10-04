@@ -35,7 +35,9 @@ public final class StoreSettingsCatalog {
                     new SettingsTile("categories", "store.categories", "store.categories.description",
                             "fa-sitemap", "/categories", STORE_ADMINS),
                     new SettingsTile("reporting", "store.reporting", "store.reporting.description",
-                            "fa-chart-line", "/report", STORE_ADMINS))),
+                            "fa-chart-line", "/report", STORE_ADMINS),
+                    new SettingsTile("margins", "store.margins", "store.margins.description",
+                            "fa-percent", "/margins", STORE_ADMINS))),
             new SettingsSection("store.settings.group.fulfilment", List.of(
                     new SettingsTile("fulfilment", "store.fulfilment.settings",
                             "store.fulfilment.settings.description", "fa-box", "/fulfilment", STORE_ADMINS),

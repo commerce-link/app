@@ -1,0 +1,117 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <form th:fragment="marginsForm" id="margins-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('margins-errors', ${errors}, ${errorLabels})}"></div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.margins.default.title}"></legend>
+                        <div class="cl-field" th:with="error=${errors.get('defaultPercent')}">
+                            <label class="cl-label" for="defaultPercent">
+                                <span th:text="#{store.margins.default.label}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span>
+                            </label>
+                            <input class="cl-input cl-input-days" th:classappend="${error != null} ? 'is-invalid'" type="text"
+                                   inputmode="decimal" autocomplete="off" id="defaultPercent" name="defaultPercent"
+                                   th:value="*{defaultPercent}"
+                                   th:attr="aria-invalid=${error != null ? 'true' : null},
+                                            aria-describedby='defaultPercent-help' + (${error != null} ? ' defaultPercent-error' : '')"/>
+                            <p class="cl-help" id="defaultPercent-help" th:text="#{store.margins.default.help}"></p>
+                            <p th:if="${error != null}" class="cl-field-error" id="defaultPercent-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${error}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.margins.categories.title}"></legend>
+                        <p class="cl-help" th:text="#{store.margins.categories.help}"></p>
+                        <div class="cl-repeat cl-repeat-lines" data-cl-repeat="categories" data-cl-repeat-id="category"
+                             data-cl-repeat-min="0" id="categories" tabindex="-1">
+                            <div class="cl-repeat-line is-pair is-head" aria-hidden="true">
+                                <span></span>
+                                <span class="cl-label" id="margins-head-category" th:text="#{store.margins.category}"></span>
+                                <span class="cl-label" id="margins-head-percent" th:text="#{store.margins.percent}"></span>
+                                <span></span>
+                            </div>
+                            <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                            <th:block th:each="row, stat : *{categories}">
+                                <div class="cl-repeat-line is-pair" data-cl-repeat-item
+                                     th:insert="~{store-margins :: categoryLine(${stat.index}, ${stat.count}, ${row})}"></div>
+                            </th:block>
+                            <template data-cl-repeat-template>
+                                <div class="cl-repeat-line is-pair" data-cl-repeat-item
+                                     th:insert="~{store-margins :: categoryLine('@INDEX@', '@NUMBER@', null)}"></div>
+                            </template>
+                            <noscript>
+                                <div class="cl-repeat-line is-pair"
+                                     th:insert="~{store-margins :: categoryLine(${form.categories.size()}, ${form.categories.size() + 1}, null)}"></div>
+                            </noscript>
+                            <div class="cl-repeat-add">
+                                <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                    <span th:text="#{store.margins.category.add}"></span>
+                                </button>
+                                <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                      th:attr="data-template=#{store.margins.category.removed('@N@')}"></span>
+                            </div>
+                        </div>
+                        <!--/* the store's catalog categories, offered while typing; any other name can be typed too */-->
+                        <datalist id="margin-categories">
+                            <option th:each="name : ${categoryOptions}" th:value="${name}"></option>
+                        </datalist>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('margins-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+</div>
+
+<!--/* One category: index in the posted list, its number shown to people, and its row (null for a blank one). */-->
+<th:block th:fragment="categoryLine(index, number, row)">
+    <!--/* the fields are named by their column head and this number, through ids repeat-fields.js renumbers */-->
+    <span class="cl-repeat-line-no" aria-hidden="true" th:id="${'category-' + index + '-no'}"><span data-cl-repeat-number th:text="${number}"></span>.</span>
+    <th:block th:each="field : ${ {'category', 'percent'} }">
+        <div class="cl-repeat-cell" th:with="id=${'category-' + index + '-' + field}, error=${errors.get(id)}">
+            <input class="cl-input" type="text" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
+                   th:id="${id}" th:name="${'categories[' + index + '].' + field}"
+                   th:value="${row != null ? row[field] : null}"
+                   th:attr="list=${field == 'category'} ? 'margin-categories' : null,
+                            inputmode=${field == 'percent'} ? 'decimal' : null,
+                            aria-labelledby=${'margins-head-' + field + ' category-' + index + '-no'},
+                            aria-invalid=${error != null ? 'true' : null},
+                            aria-describedby=${error != null ? id + '-error' : null}">
+            <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="#{${error}}"></span>
+            </p>
+        </div>
+    </th:block>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{store.margins.category.remove(${number})},
+                     data-cl-repeat-label=#{store.margins.category.remove('@N@')}"></button>
+</th:block>
+</body>
+</html>

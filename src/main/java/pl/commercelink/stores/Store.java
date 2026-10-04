@@ -65,6 +65,8 @@ public class Store {
     private DemoStoreMetadata demo;
     @DynamoDBAttribute(attributeName = "createdAt")
     private String createdAt;
+    @DynamoDBAttribute(attributeName = "margins")
+    private MarginConfiguration marginConfiguration;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -455,6 +457,14 @@ public class Store {
 
     public void setRmaConfiguration(RMAConfiguration rmaConfiguration) {
         this.rmaConfiguration = rmaConfiguration;
+    }
+
+    public MarginConfiguration getMarginConfiguration() {
+        return marginConfiguration;
+    }
+
+    public void setMarginConfiguration(MarginConfiguration marginConfiguration) {
+        this.marginConfiguration = marginConfiguration;
     }
 
     public WarehouseConfiguration getWarehouseConfiguration() {

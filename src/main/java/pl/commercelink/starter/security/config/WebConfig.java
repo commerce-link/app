@@ -69,7 +69,8 @@ public class WebConfig {
                                 "/dashboard/store/email-templates/**",
                                 "/dashboard/store/rma/**",
                                 "/dashboard/store/rma-centers/**",
-                                "/dashboard/store/report/**"
+                                "/dashboard/store/report/**",
+                                "/dashboard/store/margins/**"
                         );
             }
 

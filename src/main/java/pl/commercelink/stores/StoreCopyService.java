@@ -67,6 +67,7 @@ public class StoreCopyService {
         target.setFulfilmentConfiguration(source.getFulfilmentConfiguration());
         target.setCheckoutConfiguration(source.getCheckoutConfiguration());
         target.setRmaConfiguration(source.getRmaConfiguration());
+        target.setMarginConfiguration(source.getMarginConfiguration());
         if (source.getWarehouseConfiguration() != null) {
             WarehouseConfiguration warehouseConfig = new WarehouseConfiguration();
             warehouseConfig.setWarehouseId(source.getWarehouseConfiguration().getWarehouseId());

@@ -94,10 +94,18 @@ class OrderDetailsTemplateTest {
     /** receipts: what the order's e-receipt attempts say (ReceiptAttemptService#orderState is stubbed with it). */
     static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
                                          List<OrderEvent> orderEvents, ReceiptOrderState receipts) {
+        return factory(dropshipItemIds, documentsGenerationEnabled, orderEvents, receipts, null);
+    }
+
+    /** margins: the store's low-margin thresholds (Settings › Margins), or null. */
+    static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
+                                         List<OrderEvent> orderEvents, ReceiptOrderState receipts,
+                                         pl.commercelink.stores.MarginConfiguration margins) {
         StoresRepository stores = mock(StoresRepository.class);
         Store store = new Store();
         store.setStoreId("store-1");
         store.setName("Demo");
+        store.setMarginConfiguration(margins);
         if (documentsGenerationEnabled) {
             pl.commercelink.stores.WarehouseConfiguration warehouse = new pl.commercelink.stores.WarehouseConfiguration();
             warehouse.setDocumentsGenerationEnabled(true);
@@ -471,6 +479,39 @@ class OrderDetailsTemplateTest {
                 .contains("class=\"fas fa-info-circle\"")
                 .contains("cl-margin cl-tooltip is-lines is-unknown")
                 .contains("Brak kosztu zakupu — marży nie da się policzyć.");
+    }
+
+    @Test
+    void aMarginBelowItsCategorysThresholdIsMarkedAndTheTooltipNamesTheThreshold() {
+        // given: CPU must keep 10%, the store's default is 3%; the CPU sells at 4,9%
+        Order order = order(OrderStatus.New);
+        pl.commercelink.stores.MarginConfiguration margins = new pl.commercelink.stores.MarginConfiguration(3.0,
+                List.of(new pl.commercelink.stores.MarginConfiguration.CategoryMargin("cpu", 10.0)));
+        OrderPageModel page = factory(Set.of(), false, List.of(), ReceiptOrderState.NONE, margins)
+                .build(order, items(order), USER, PL);
+
+        // when
+        String html = page(renderPage(page, order));
+
+        // then
+        assertThat(html).contains("cl-margin cl-tooltip is-lines is-low")
+                .contains("Mała marża: 4,9% (próg dla kategorii cpu: 10%)\nZysk: 29,94 PLN netto (36,83 PLN brutto) / szt.")
+                .contains("class=\"fas fa-exclamation-triangle\"");
+    }
+
+    @Test
+    void theLinkToTheThresholdsIsOnlyForTheStoreAdmin() {
+        // when
+        String admin = page(render(order(OrderStatus.New), ADMIN));
+        String closedForAdmin = page(render(order(OrderStatus.Completed), ADMIN));
+        String user = page(render(order(OrderStatus.New), USER));
+        String superAdmin = page(render(order(OrderStatus.New), SUPER_ADMIN));
+
+        // then
+        assertThat(admin).contains("<a class=\"cl-link-button\" href=\"/dashboard/store/margins\">Progi małej marży</a>");
+        assertThat(closedForAdmin).contains("href=\"/dashboard/store/margins\"");
+        assertThat(user).doesNotContain("/dashboard/store/margins");
+        assertThat(superAdmin).doesNotContain("/dashboard/store/margins");
     }
 
     @Test

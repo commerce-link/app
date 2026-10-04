@@ -4122,6 +4122,27 @@ a.cl-link-button:hover {
     grid-column: 1 / -1;
 }
 
+/* two fields per line (Settings › Margins: category and percent), with a head row naming the columns */
+/* the remove column has a fixed width, so the head row (no button) lines up with the rows */
+.cl-page .cl-repeat-line.is-pair {
+    grid-template-columns: 28px minmax(0, 1fr) 120px 56px;
+    align-items: start;
+}
+
+.cl-page .cl-help + .cl-repeat-lines {
+    margin-top: var(--cl-gap-related);
+}
+
+.cl-page .cl-repeat-line.is-pair > .cl-repeat-line-no,
+.cl-page .cl-repeat-line.is-pair > .cl-repeat-remove {
+    align-self: center;
+}
+
+.cl-page .cl-repeat-line.is-head .cl-label {
+    margin: 0;
+    text-align: left;
+}
+
 .cl-page .cl-repeat-lines .cl-repeat-add {
     margin-top: 4px;
 }
@@ -4456,6 +4477,14 @@ a.cl-link-button:hover {
     .cl-page .cl-repeat-line .cl-repeat-remove {
         grid-column: 2;
         justify-self: start;
+    }
+
+    .cl-page .cl-repeat-line.is-pair {
+        grid-template-columns: 24px minmax(0, 1fr) 96px;
+    }
+
+    .cl-page .cl-repeat-line.is-pair > .cl-repeat-remove {
+        grid-column: 2 / -1;
     }
 
     .cl-page .cl-repeat-line.is-unknown {
@@ -9262,7 +9291,8 @@ a.cl-link-button:hover {
 }
 
 /* Order items: the margin of one unit as an info icon after the price (ItemMargin); the numbers are in its tooltip. A
-   loss turns it into a red exclamation mark, so the mark does not rest on colour alone. */
+   low margin (below the threshold of Settings › Margins) turns it into an amber triangle, a loss into a red exclamation
+   mark, so the mark does not rest on colour alone. */
 .cl-page .cl-price-margin {
     display: inline-flex;
     align-items: center;
@@ -9285,6 +9315,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
 .cl-page .cl-margin.is-unknown { opacity: .55; }
+.cl-page .cl-margin.is-low { color: var(--cl-warn); }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); }
 
 .cl-page .cl-margin:focus-visible {
