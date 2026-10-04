@@ -112,6 +112,26 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     }
 
     /**
+     * The given orders of one store, in the order the ids were given, read in one batch (BatchGetItem; the mapper splits
+     * it into calls of 100 keys and retries unprocessed ones). An id that names no order of this store is left out and an
+     * id given twice counts once. The store is part of every key, so another store's order is never read; the filter
+     * below only guards against a batch answering with anything else.
+     */
+    public List<Order> findByIds(String storeId, List<String> orderIds) {
+        List<String> ids = orderIds.stream().distinct().toList();
+        if (ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<String, Order> loaded = new HashMap<>();
+        dynamoDBMapper.batchLoad(ids.stream().map(id -> orderKey(storeId, id)).toList()).values().stream()
+                .flatMap(List::stream)
+                .map(Order.class::cast)
+                .filter(order -> storeId.equals(order.getStoreId()))
+                .forEach(order -> loaded.put(order.getOrderId(), order));
+        return ids.stream().map(loaded::get).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    /**
      * A missing index ("The table does not have the specified index: StoreIdStatusIndex") or one still being built after
      * V018 ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error naming it;
      * every other error is a real failure and is not hidden behind the fallback.

@@ -2,8 +2,11 @@ package pl.commercelink.web.orders;
 
 import java.util.List;
 
-/** One row of the orders list with every text already resolved, so the template only prints (spec §8.1). */
-public record OrderRow(String href, String number, String sourceText, String externalId,
+/**
+ * One row of the orders list with every text already resolved, so the template only prints (spec §8.1). orderId is the
+ * value of the row's checkbox (printing several order cards); href carries the list's returnTo as well.
+ */
+public record OrderRow(String orderId, String href, String number, String sourceText, String externalId,
                        String clientName, String clientCity, String email,
                        String dueText, String dueNote, String dueTone,
                        String statusLabel, String statusTone,

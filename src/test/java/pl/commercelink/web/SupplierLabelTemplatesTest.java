@@ -24,7 +24,10 @@ class SupplierLabelTemplatesTest {
         assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
         assertThat(template("deliveries/pending.html")).contains("row.providerLabel()").doesNotContain("row.provider()");
         assertThat(template("deliveries/approval.html")).contains("page.supplierLabel()");
-        assertThat(template("deliveryDetails.html")).contains("supplierLabels.of(delivery.provider)");
+        // the controller takes the name from SupplierLabels, the details page prints the model's value
+        assertThat(Files.readString(Path.of("src/main/java/pl/commercelink/web/DeliveriesController.java")))
+                .contains("supplierLabels.forStoreId(storeId).of(delivery.getProvider())");
+        assertThat(template("deliveries/details/header.html")).contains("h.supplierName()").doesNotContain("delivery.provider");
         // the controller takes the name from SupplierLabels (DeliveryCreateControllerTest), the pages only print it
         assertThat(template("deliveries/create/parts.html")).contains("page.supplierName()");
         // the inventory page resolves the label once per offer in InventorySearch (OfferRow#supplierLabel),

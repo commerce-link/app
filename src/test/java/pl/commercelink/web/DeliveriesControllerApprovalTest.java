@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.ConcurrentModel;
@@ -59,10 +61,15 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.StoreSupplierConnection;
+import pl.commercelink.web.deliveries.details.DeliveryPageModel;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
+import pl.commercelink.web.dtos.DeliveryTermsForm;
 import pl.commercelink.web.dtos.RoutedOrderView;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -136,6 +143,10 @@ class DeliveriesControllerApprovalTest {
 
     @InjectMocks
     private DeliveriesController deliveriesController;
+
+    private static DeliveryPageModel page(Model model) {
+        return (DeliveryPageModel) model.getAttribute("page");
+    }
 
     @BeforeEach
     void setUpSupplierLabels() {
@@ -283,10 +294,10 @@ class DeliveriesControllerApprovalTest {
 
             // when
             String view = deliveriesController.showDeliveryDetailsForSuperAdmin(
-                    STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+                    STORE_ID, DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(view).isEqualTo("deliveries/details");
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
@@ -305,10 +316,10 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("deliveryDetails");
+            assertThat(view).isEqualTo("deliveries/details");
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
@@ -336,12 +347,12 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("deliveryDetails");
-            assertThat(model.getAttribute("dropshipContact")).isEqualTo(shippingDetails);
-            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            assertThat(view).isEqualTo("deliveries/details");
+            assertThat(page(model).consignee().name()).isEqualTo("Jan");
+            assertThat(page(model).consignee().trackingNo()).isNull();
         }
     }
 
@@ -361,12 +372,12 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("deliveryDetails");
-            assertThat(model.getAttribute("dropshipContact")).isNull();
-            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            assertThat(view).isEqualTo("deliveries/details");
+            // nothing known about the customer or the parcel: the consignee card is left out, not rendered empty
+            assertThat(page(model).consignee()).isNull();
             verifyNoInteractions(ordersRepository);
         }
     }
@@ -388,12 +399,12 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("deliveryDetails");
-            assertThat(model.getAttribute("dropshipContact")).isNull();
-            assertThat(model.getAttribute("dropshipShipment")).isNull();
+            assertThat(view).isEqualTo("deliveries/details");
+            // nothing known about the customer or the parcel: the consignee card is left out, not rendered empty
+            assertThat(page(model).consignee()).isNull();
             verifyNoInteractions(ordersRepository);
         }
     }
@@ -410,7 +421,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries");
@@ -429,7 +440,7 @@ class DeliveriesControllerApprovalTest {
 
         // when
         String view = deliveriesController.showDeliveryDetailsForSuperAdmin(
-                STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.forLanguageTag("pl"));
+                STORE_ID, DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries");
@@ -613,7 +624,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawca potwierdzil zamowienie.", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -640,7 +651,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawa oznaczona jako zamowiona.", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -658,7 +669,7 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
-        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawca potwierdzil zamowienie.", null, null));
     }
 
     @Test
@@ -712,7 +723,7 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
-        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawa oznaczona jako zamowiona.", null, null));
     }
 
     // Every purchase endpoint reports a service failure the same way: the translated message as a flash error and a
@@ -823,13 +834,14 @@ class DeliveriesControllerApprovalTest {
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
         when(messageSource.getMessage(eq("deliveries.edit.locked.awaitingApproval"), eq(null), eq(Locale.ENGLISH)))
                 .thenReturn("The delivery is awaiting approval and cannot be edited.");
-        Delivery updated = new Delivery();
-        updated.setStoreId(STORE_ID);
-        updated.setDeliveryId(DELIVERY_ID);
+        DeliveryTermsForm form = DeliveryTermsForm.of(existing);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
             // when
-            String view = deliveriesController.updateDelivery(updated, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.updateDelivery(form, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ConcurrentModel(), redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
@@ -842,20 +854,24 @@ class DeliveriesControllerApprovalTest {
     @Test
     void updateDeliveryIsAllowedForSuperAdminWhileAwaitingApproval() {
         // given
-        Delivery updated = new Delivery();
-        updated.setStoreId(STORE_ID);
-        updated.setDeliveryId(DELIVERY_ID);
+        Delivery existing = awaitingApprovalDelivery();
+        existing.setEstimatedDeliveryAt(ESTIMATED_DELIVERY_AT);
+        existing.setTax(1.23);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+        when(messageSource.getMessage(eq("deliveries.details.terms.saved"), eq(null), eq(Locale.ENGLISH))).thenReturn("Saved.");
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            String view = deliveriesController.updateDelivery(updated, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.updateDeliveryForSuperAdmin(STORE_ID, DeliveryTermsForm.of(existing), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ConcurrentModel(), redirectAttributes,
+                    Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo(
                     "redirect:/dashboard/store/" + STORE_ID + "/deliveries/details?deliveryId=" + DELIVERY_ID);
-            verify(deliveriesManager).updateDelivery(updated);
+            verify(deliveriesManager).updateDelivery(any());
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -1020,6 +1036,8 @@ class DeliveriesControllerApprovalTest {
         DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
             // when
             String view = deliveriesController.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
 
@@ -1079,7 +1097,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
@@ -1105,10 +1123,11 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.getAttribute("mergeTargetDeliveries")).isEqualTo(List.of(awaitingTarget));
+            assertThat(page(model).items().selection().mergeTargets())
+                    .extracting(DeliveryPageModel.MergeTarget::deliveryId).containsExactly("delivery-2");
         }
     }
 
@@ -1137,7 +1156,7 @@ class DeliveriesControllerApprovalTest {
                         STORE_ID, form, redirectAttributes, Locale.ENGLISH);
                 case "deleteAllocationsAsSuperAdmin" -> deliveriesController.deleteSelectedAllocationsForSuperAdmin(
                         STORE_ID, form, redirectAttributes, Locale.ENGLISH);
-                default -> deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+                default -> deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
             };
 
             // then
@@ -1353,7 +1372,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
@@ -1378,10 +1397,11 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
             // when
-            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            deliveriesController.showDeliveryDetailsForSuperAdmin(STORE_ID, DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.getAttribute("mergeTargetDeliveries")).isEqualTo(List.of(failedTarget));
+            assertThat(page(model).items().selection().mergeTargets())
+                    .extracting(DeliveryPageModel.MergeTarget::deliveryId).containsExactly("delivery-2");
         }
     }
 
@@ -1458,10 +1478,10 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+            assertThat(page(model).dialogs().suggestedEstimatedDeliveryAt()).isEqualTo("2026-09-01");
         }
     }
 
@@ -1479,10 +1499,10 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.getAttribute("suggestedEstimatedDeliveryAt")).isEqualTo(ESTIMATED_DELIVERY_AT);
+            assertThat(page(model).dialogs().suggestedEstimatedDeliveryAt()).isEqualTo("2026-09-01");
         }
     }
 
@@ -1498,10 +1518,10 @@ class DeliveriesControllerApprovalTest {
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            deliveriesController.showDeliveryDetails(DELIVERY_ID, model, redirectAttributes, Locale.ENGLISH);
+            deliveriesController.showDeliveryDetails(DELIVERY_ID, null, null, null, model, redirectAttributes, Locale.ENGLISH);
 
             // then
-            assertThat(model.containsAttribute("suggestedEstimatedDeliveryAt")).isFalse();
+            assertThat(page(model).dialogs().suggestedEstimatedDeliveryAt()).isNull();
             verify(supplierPurchaseService, never()).suggestEstimatedDeliveryAt(any());
         }
     }
