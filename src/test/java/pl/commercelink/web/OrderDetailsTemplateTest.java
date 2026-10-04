@@ -468,7 +468,7 @@ class OrderDetailsTemplateTest {
         assertThat(html).doesNotContain("koszt 712,17 brutto")
                 .containsPattern("<span class=\"cl-price-margin\"><span>2 × 749,00</span><span class=\"cl-margin cl-tooltip is-lines is-ok\" tabindex=\"0\" role=\"img\"")
                 .contains("data-tooltip=\"Marża: 4,9%\nZysk: 29,94 PLN netto (36,83 PLN brutto) / szt.\nKoszt: 712,17 PLN brutto / szt.\"")
-                .contains("class=\"fas fa-percent\"")
+                .contains("class=\"fas fa-info-circle\"")
                 .contains("cl-margin cl-tooltip is-lines is-unknown")
                 .contains("Brak kosztu zakupu — marży nie da się policzyć.");
     }
@@ -487,7 +487,7 @@ class OrderDetailsTemplateTest {
         // then: 450 net + 23% = 553,50 gross against 500,00
         assertThat(html).contains("cl-margin cl-tooltip is-lines is-loss")
                 .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
-                .contains("class=\"fas fa-arrow-down\"");
+                .contains("class=\"fas fa-exclamation-circle\"");
     }
 
     @Test

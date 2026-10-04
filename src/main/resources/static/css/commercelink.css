@@ -9261,8 +9261,8 @@ a.cl-link-button:hover {
     padding-bottom: 16px;
 }
 
-/* Order items: the margin of one unit as an icon after the price (ItemMargin); the numbers are in its tooltip. The
-   glyph changes with the colour for a loss (arrow down), so the mark does not rest on colour. */
+/* Order items: the margin of one unit as an info icon after the price (ItemMargin); the numbers are in its tooltip. A
+   loss turns it into a red exclamation mark, so the mark does not rest on colour alone. */
 .cl-page .cl-price-margin {
     display: inline-flex;
     align-items: center;
@@ -9278,13 +9278,14 @@ a.cl-link-button:hover {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    font-size: 11px;
+    font-size: 15px;
     color: var(--cl-ink-3);
     cursor: help;
 }
 
+.cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
 .cl-page .cl-margin.is-unknown { opacity: .55; }
-.cl-page .cl-margin.is-loss { color: var(--cl-bad); background-color: var(--cl-bad-soft); }
+.cl-page .cl-margin.is-loss { color: var(--cl-bad); }
 
 .cl-page .cl-margin:focus-visible {
     outline: 2px solid var(--cl-accent);
@@ -9304,12 +9305,10 @@ a.cl-link-button:hover {
 }
 
 @media screen and (max-width: 1023px) {
-    /* a 44 px tap target around the 20 px mark without growing the row: the padding takes the taps, the background
-       stays on the content box */
+    /* a 44 px tap target around the 20 px mark without growing the row */
     .cl-page .cl-margin {
         box-sizing: content-box;
         padding: 12px;
         margin: -12px;
-        background-clip: content-box;
     }
 }
