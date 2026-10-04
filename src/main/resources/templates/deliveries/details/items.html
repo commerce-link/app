@@ -1,0 +1,229 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Items (spec §6, P1): one table, a tbody per product with its destinations as rows. One form (#allocationsForm)
+       carries every destination's fields once, under its index in the delivery; the selection row covers the table
+       header while something is checked (table-select.js), and the dialogs of its actions sit inside the form, so
+       their fields post with it. Without JavaScript the noscript buttons post the selection to …/confirm/…, which
+       answers with this page and the action's dialog open. */-->
+<section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title"
+         th:with="items=${page.items()}, bar=${page.items().selection()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="items-title" th:text="#{deliveries.details.items.title(${items.products().size()})}"></h2></div>
+    <form id="allocationsForm" class="cl-card-section cl-selection-host" method="post" novalidate
+          th:action="@{${page.links().confirm('receive')}}">
+        <!--/* implicit submission (Enter) uses the first submit button; a disabled one submits nothing, and
+               delivery-details.js clicks the open dialog's own button instead */-->
+        <button type="submit" class="cl-visually-hidden" disabled tabindex="-1" aria-hidden="true" data-cl-enter-guard></button>
+        <input type="hidden" name="deliveryId" th:value="${page.deliveryId()}">
+        <th:block th:if="${items.selectable()}">
+            <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+            <div class="cl-selection-row is-docked" data-cl-selection-bar hidden>
+                <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                                                      th:attr="aria-label=#{deliveries.details.items.select.all}, data-cl-label-select=#{deliveries.details.items.select.all}, data-cl-label-clear=#{deliveries.details.items.select.none}"></label>
+                <span class="cl-selection-count" data-cl-selection-count
+                      th:attr="data-template=#{deliveries.details.items.selected('{k}', '{n}')}"></span>
+                <div class="cl-selection-actions">
+                    <th:block th:if="${bar.receive().visible()}">
+                        <span th:if="${!bar.receive().enabled()}" class="cl-help cl-selection-reason" id="selection-receive-reason"
+                              th:text="#{${bar.receive().reasonKey()}}"></span>
+                        <button type="button" class="cl-button"
+                                th:attr="data-cl-dialog-open=${bar.receive().enabled()} ? 'receive-dialog' : null,
+                                         aria-disabled=${bar.receive().enabled()} ? null : 'true',
+                                         aria-describedby=${bar.receive().enabled()} ? null : 'selection-receive-reason'">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
+                            <span th:text="#{deliveries.details.selection.receive}"></span>
+                        </button>
+                    </th:block>
+                    <th:block th:if="${bar.ship().visible()}">
+                        <span th:if="${!bar.ship().enabled()}" class="cl-help cl-selection-reason" id="selection-ship-reason"
+                              th:text="#{${bar.ship().reasonKey()}}"></span>
+                        <button type="button" class="cl-button"
+                                th:attr="data-cl-dialog-open=${bar.ship().enabled()} ? 'ship-dialog' : null,
+                                         aria-disabled=${bar.ship().enabled()} ? null : 'true',
+                                         aria-describedby=${bar.ship().enabled()} ? null : 'selection-ship-reason'">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-shipping-fast"></i></span>
+                            <span th:text="#{deliveries.details.selection.ship}"></span>
+                        </button>
+                    </th:block>
+                    <details th:if="${bar.moveVisible()}" class="cl-menu">
+                        <summary class="cl-button">
+                            <span th:text="#{deliveries.details.selection.move}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list" id="selection-move-menu">
+                            <li th:if="${bar.merge().visible()}">
+                                <button th:if="${bar.merge().enabled()}" type="button" class="cl-menu-item" data-cl-dialog-open="merge-dialog"
+                                        th:text="#{deliveries.details.selection.merge}"></button>
+                                <button th:unless="${bar.merge().enabled()}" type="button" class="cl-menu-item" aria-disabled="true">
+                                    <span th:text="#{deliveries.details.selection.merge}"></span>
+                                    <span class="cl-menu-reason" th:text="#{${bar.merge().reasonKey()}}"></span>
+                                </button>
+                            </li>
+                            <li th:if="${bar.split().visible()}">
+                                <button th:if="${bar.split().enabled()}" type="button" class="cl-menu-item" data-cl-dialog-open="split-dialog"
+                                        th:text="#{deliveries.details.selection.split}"></button>
+                                <button th:unless="${bar.split().enabled()}" type="button" class="cl-menu-item" aria-disabled="true">
+                                    <span th:text="#{deliveries.details.selection.split}"></span>
+                                    <span class="cl-menu-reason" th:text="#{${bar.split().reasonKey()}}"></span>
+                                </button>
+                            </li>
+                        </ul>
+                    </details>
+                    <th:block th:if="${bar.remove().visible()}">
+                        <span th:if="${!bar.remove().enabled()}" class="cl-help cl-selection-reason" id="selection-remove-reason"
+                              th:text="#{${bar.remove().reasonKey()}}"></span>
+                        <button th:if="${bar.remove().enabled()}" type="button" class="cl-link-button is-danger cl-selection-remove"
+                                data-cl-dialog-open="remove-dialog" th:text="#{deliveries.details.selection.remove}"></button>
+                        <button th:unless="${bar.remove().enabled()}" type="button" class="cl-link-button cl-selection-remove"
+                                aria-disabled="true" aria-describedby="selection-remove-reason"
+                                th:text="#{deliveries.details.selection.remove}"></button>
+                    </th:block>
+                </div>
+            </div>
+        </th:block>
+
+        <table th:if="${!items.products().isEmpty()}" class="cl-table is-compact is-wrap is-allocations"
+               th:attr="data-cl-select-table=${items.selectable()} ? 'true' : null">
+            <caption class="cl-visually-hidden" th:text="#{deliveries.details.items.caption}"></caption>
+            <colgroup>
+                <col th:if="${items.selectable()}" class="cl-col-check">
+                <col>
+                <col class="cl-col-received">
+                <col class="cl-col-value">
+                <col th:if="${items.anyMenu()}" class="cl-col-menu">
+            </colgroup>
+            <thead>
+            <tr>
+                <th th:if="${items.selectable()}" scope="col" class="cl-table-check">
+                    <!--/* hidden until table-select.js runs: without it the box would do nothing */-->
+                    <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all hidden
+                                                          th:attr="aria-label=#{deliveries.details.items.select.all}, data-cl-label-select=#{deliveries.details.items.select.all}, data-cl-label-clear=#{deliveries.details.items.select.none}"></label>
+                </th>
+                <th scope="col" th:text="#{deliveries.details.items.column.product}"></th>
+                <th scope="col" th:text="#{${items.receivedColumnKey()}}"></th>
+                <th scope="col" class="is-numeric"
+                    th:text="#{deliveries.details.items.column.value(${#strings.trim(#messages.msg('general.currency.amount', ''))})}"></th>
+                <th th:if="${items.anyMenu()}" scope="col" class="cl-table-actions"><span class="cl-visually-hidden"
+                        th:text="#{deliveries.details.items.column.actions}"></span></th>
+            </tr>
+            </thead>
+            <th:block th:each="product, p : ${items.products()}"><tbody th:replace="~{deliveries/details/items :: product(${product}, ${p.index})}"></tbody></th:block>
+        </table>
+        <p th:if="${items.products().isEmpty()}" class="cl-list-empty" th:text="#{deliveries.details.items.empty}"></p>
+        <!--/* the gross is null while the VAT is unset (DeliveryRules.grossOrNull) */-->
+        <p th:if="${!items.products().isEmpty()}" class="cl-list-summary"><span
+                th:text="#{deliveries.details.items.total(${#messages.msg('general.currency.amount', items.goodsNet())}, ${items.goodsGross() != null} ? ${#messages.msg('general.currency.amount', items.goodsGross())} : '—')}"></span></p>
+
+        <noscript th:if="${items.selectable()}">
+            <div class="cl-selection-actions is-static">
+                <button th:if="${bar.receive().enabled()}" type="submit" class="cl-button"
+                        th:formaction="@{${page.links().confirm('receive')}}" th:text="#{deliveries.details.selection.receive}"></button>
+                <button th:if="${bar.ship().enabled()}" type="submit" class="cl-button"
+                        th:formaction="@{${page.links().confirm('ship')}}" th:text="#{deliveries.details.selection.ship}"></button>
+                <button th:if="${bar.merge().enabled()}" type="submit" class="cl-button"
+                        th:formaction="@{${page.links().confirm('merge')}}" th:text="#{deliveries.details.selection.merge}"></button>
+                <button th:if="${bar.split().enabled()}" type="submit" class="cl-button"
+                        th:formaction="@{${page.links().confirm('split')}}" th:text="#{deliveries.details.selection.split}"></button>
+                <button th:if="${bar.remove().enabled()}" type="submit" class="cl-button is-danger"
+                        th:formaction="@{${page.links().confirm('remove-allocations')}}" th:text="#{deliveries.details.selection.remove}"></button>
+            </div>
+        </noscript>
+        <th:block th:if="${items.selectable()}"><th:block th:replace="~{deliveries/details/dialogs :: selection}"></th:block></th:block>
+    </form>
+</section>
+
+<!--/* One product and its destinations. The destination's fields sit in its cell (never directly in the tr) and are
+       rendered for every destination, received ones too, so allocations[i] binds without gaps. */-->
+<tbody th:fragment="product(product, p)" th:with="items=${page.items()}, word=#{${page.items().receivedColumnKey()}}">
+<tr class="cl-row-main is-open">
+    <td th:if="${items.selectable()}" class="cl-table-check"></td>
+    <th scope="row" class="cl-table-key" th:attr="data-label=#{deliveries.details.items.column.product}">
+        <span th:text="${product.name()}"></span>
+        <span class="cl-table-sub">
+            <th:block th:if="${product.ean() != null}"><span class="cl-label-pair"><span th:text="#{deliveries.details.items.ean}"></span>&nbsp;<button
+                    type="button" class="cl-copy-inline"
+                    th:attr="data-cl-copy=${product.ean()}, aria-label=#{deliveries.details.items.copy.ean(${product.ean()})}"><span
+                    class="cl-copy-code"><span th:text="${product.ean()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i
+                    class="far fa-copy"></i></span></span></button></span><span class="cl-table-sep"> · </span></th:block>
+            <span class="cl-label-pair"><span th:text="#{deliveries.details.items.mfn}"></span>&nbsp;<button type="button" class="cl-copy-inline"
+                    th:attr="data-cl-copy=${product.mfn()}, aria-label=#{deliveries.details.items.copy.mfn(${product.mfn()})}"><span
+                    class="cl-copy-code"><span th:text="${product.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i
+                    class="far fa-copy"></i></span></span></button></span>
+        </span>
+        <button type="button" class="cl-row-toggle" hidden aria-expanded="true" data-cl-alloc-toggle
+                th:attr="aria-controls=${product.allocationIds()}"><span
+                th:text="#{deliveries.details.items.allocations(${product.allocations().size()})}"></span><i
+                class="fas fa-chevron-down cl-row-toggle-caret" aria-hidden="true"></i></button>
+    </th>
+    <td th:attr="data-label=${word}, data-prefix=${word + ':'}"><span class="cl-received"
+            th:classappend="${product.complete()} ? 'is-complete' : ''"
+            th:text="${product.complete()} ? '✓ ' + #{deliveries.details.items.received(${product.receivedQty()}, ${product.orderedQty()})} : #{deliveries.details.items.received(${product.receivedQty()}, ${product.orderedQty()})}"></span></td>
+    <td class="is-numeric cl-value-cell"><span th:text="${product.value()}"></span><span class="cl-table-sub"
+            th:text="#{deliveries.details.items.qtyTimesPrice(${product.orderedQty()}, ${product.unitCost()})}"></span></td>
+    <td th:if="${items.anyMenu()}" class="cl-table-actions">
+        <details th:if="${product.menu()}" class="cl-menu">
+            <summary class="cl-button is-icon" th:attr="aria-label=#{deliveries.details.items.menu(${product.name()})}"><span
+                    class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+            <ul class="cl-menu-list" th:id="|item-menu-${p}|">
+                <li th:if="${product.changeQty().visible()}">
+                    <a th:if="${product.changeQty().enabled()}" class="cl-menu-item" th:href="@{${product.qtyHref()}}"
+                       data-cl-dialog-open="qty-dialog"
+                       th:attr="data-name=${product.name()}, data-ean=${product.ean()}, data-mfn=${product.mfn()},
+                                data-qty=${product.orderedQty()}, data-min-qty=${product.minQty()}"
+                       th:text="#{deliveries.details.items.changeQty}"></a>
+                    <button th:unless="${product.changeQty().enabled()}" type="button" class="cl-menu-item" aria-disabled="true">
+                        <span th:text="#{deliveries.details.items.changeQty}"></span>
+                        <span class="cl-menu-reason" th:text="#{${product.changeQty().reasonKey()}}"></span>
+                    </button>
+                </li>
+                <li th:if="${product.historyHref() != null}"><a class="cl-menu-item" th:href="@{${product.historyHref()}}"
+                                                                 th:text="#{deliveries.details.items.history}"></a></li>
+            </ul>
+        </details>
+    </td>
+</tr>
+<tr th:each="row : ${product.allocations()}" class="cl-alloc-row" th:id="|alloc-${row.index()}|"
+    th:classappend="${row.received()} ? 'is-done' : (${row.checked()} ? 'is-selected' : '')"
+    th:with="destination=${#messages.msgWithParams(row.destinationKey(), row.destinationArgs())}">
+    <td th:if="${items.selectable()}" class="cl-table-check"><label th:if="${row.checkbox()}" class="cl-check-target"><input
+            class="cl-check-input" type="checkbox" value="true" data-cl-select-row th:name="|allocations[${row.index()}].selected|"
+            th:checked="${row.checked()}"
+            th:attr="aria-label=#{deliveries.details.items.select(${row.productName()}, ${destination})},
+                     data-name=${row.productName()}, data-dest=${destination},
+                     data-qty-label=#{deliveries.details.items.qty(${row.qty()})}"></label></td>
+    <td class="cl-alloc-cell" th:attr="data-label=#{deliveries.details.items.column.product}">
+        <span class="cl-alloc-dest">
+            <span class="cl-alloc-qty" th:text="#{deliveries.details.items.qty(${row.qty()})}"></span>
+            <th:block th:replace="~{deliveries/details/items :: destination(${row}, ${row.href()})}"></th:block>
+            <span th:if="${row.directToConsumer()}" class="cl-status is-info" th:text="#{deliveries.details.items.dtc}"></span>
+        </span>
+        <input type="hidden" th:name="|allocations[${row.index()}].key.orderId|" th:value="${row.fields().orderId()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].key.itemId|" th:value="${row.fields().itemId()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].key.name|" th:value="${row.fields().keyName()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].type|" th:value="${row.fields().type()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].name|" th:value="${row.fields().name()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].qty|" th:value="${row.fields().qty()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].ean|" th:value="${row.fields().ean()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].mfn|" th:value="${row.fields().mfn()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].deliveryId|" th:value="${row.fields().deliveryId()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].inAllocation|" th:value="${row.fields().inAllocation()}">
+        <input type="hidden" th:name="|allocations[${row.index()}].unitCost|" th:value="${row.fields().unitCost()}">
+    </td>
+    <td class="cl-alloc-state" th:attr="data-label=${word}"><span class="cl-status" th:classappend="${row.stateTone()}"
+                                                               th:text="#{${row.stateKey()}}"></span></td>
+    <td class="cl-alloc-empty"></td>
+    <td th:if="${items.anyMenu()}" class="cl-alloc-empty"></td>
+</tr>
+</tbody>
+
+<!--/* Where a destination goes (DeliveryPageModel.Destination): the warehouse with its icon, or the order and its
+       customer; a link when href is given (null for a super admin and in lists that only name it). Shared by the items
+       rows, the "Odbierz całość" list and the checked lines of the selection dialogs. */-->
+<th:block th:fragment="destination(row, href)"
+          th:with="label=${#messages.msgWithParams(row.destinationKey(), row.destinationArgs())}"><span
+        th:if="${row.warehouse()}" class="cl-icon-text"><i class="fas fa-warehouse" aria-hidden="true"></i><a
+        th:if="${href != null}" th:href="@{${href}}" th:text="${label}"></a><span th:if="${href == null}"
+        th:text="${label}"></span></span><th:block th:unless="${row.warehouse()}"><a th:if="${href != null}"
+        th:href="@{${href}}" th:text="${label}"></a><span th:if="${href == null}" th:text="${label}"></span></th:block></th:block>
+</body>
+</html>
