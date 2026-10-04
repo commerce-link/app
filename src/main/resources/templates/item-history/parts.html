@@ -45,8 +45,7 @@
     <div class="cl-now" role="group" th:attr="aria-label=#{item.history.now}">
         <span class="cl-now-label" th:text="#{item.history.now}"></span>
         <span class="cl-status" th:classappend="${n.tone()}" th:text="${n.label()}"></span>
-        <span class="cl-now-text"><span th:text="${n.text()}"></span><th:block th:if="${n.href() != null}"> · <a
-                th:href="${n.href()}" th:text="${n.linkText()}"></a></th:block></span>
+        <a th:if="${n.href() != null}" th:href="${n.href()}" th:title="${n.recordId()}" th:text="${n.linkText()}"></a>
     </div>
     <dl class="cl-kv">
         <div th:if="${p.serialNo() != null}"><dt th:text="#{item.history.serial}"></dt>

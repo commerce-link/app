@@ -9204,7 +9204,7 @@ a.cl-link-button:hover {
     margin: 2px 0;
 }
 
-/* P3: the "now" band of a record card; muted text on --cl-surface-2 stays --cl-ink-2 for AA contrast */
+/* P3: the "now" band of a record card: label, state pill and a link to the record; the label on --cl-surface-2 stays --cl-ink-2 for AA contrast */
 .cl-page .cl-now {
     display: flex;
     flex-wrap: wrap;
@@ -9224,10 +9224,6 @@ a.cl-link-button:hover {
     font-weight: 600;
     letter-spacing: .12em;
     text-transform: uppercase;
-    color: var(--cl-ink-2);
-}
-
-.cl-page .cl-now-text {
     color: var(--cl-ink-2);
 }
 

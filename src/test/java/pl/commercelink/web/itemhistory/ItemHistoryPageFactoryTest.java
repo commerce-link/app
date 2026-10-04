@@ -130,7 +130,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(page.product().title()).isEqualTo("Przedmiot bez nazwy");
         assertThat(page.now().label()).isEqualTo("W magazynie");
-        assertThat(page.now().text()).isEqualTo("Na stanie magazynu");
+        assertThat(page.now().linkText()).isEqualTo("Pozycja magazynowa w-1");
         assertThat(page.now().href()).isEqualTo("/dashboard/warehouse/items/w-1");
         assertThat(page.emptyEventsText()).isEqualTo("Brak zdarzeń — przedmiot jest tylko w magazynie.");
     }
@@ -155,7 +155,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(page.warningCounts()).isEqualTo("Zamówienia z tym numerem: 12 · Różne produkty: 2");
         assertThat(page.product().title()).startsWith("Różne produkty: 2 (najnowszy: ");
-        assertThat(page.now().text()).endsWith(" · numer niejednoznaczny");
+        assertThat(page.now().linkText()).isEqualTo("Zamówienie o-11");
         assertThat(page.timelineLimit()).isEqualTo(10);
         assertThat(page.moreText()).isEqualTo("Pokaż 2 wcześniejsze zdarzenia");
         assertThat(page.eventsNote()).isEqualTo("Od najnowszego zdarzenia. Pokazano 12 najnowszych z 512.");
@@ -184,8 +184,8 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("W reklamacji");
         assertThat(now.tone()).isEqualTo("is-warn");
-        assertThat(now.text()).isEqualTo("RMA rma-1 · Wysłany do naprawy");
-        assertThat(now.linkText()).isEqualTo("RMA");
+        assertThat(now.linkText()).isEqualTo("RMA rma-1");
+        assertThat(now.recordId()).isEqualTo("rma-1");
         assertThat(now.href()).isEqualTo("/dashboard/rma/rma-1");
     }
 
@@ -200,8 +200,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("W zamówieniu");
         assertThat(now.tone()).isEqualTo("is-info");
-        assertThat(now.text()).isEqualTo("Zamówienie o-1 · W kompletacji · Pozycja: Zarezerwowany");
-        assertThat(now.linkText()).isEqualTo("Zamówienie");
+        assertThat(now.linkText()).isEqualTo("Zamówienie o-1");
         assertThat(now.href()).isEqualTo("/dashboard/orders/o-1");
     }
 
@@ -216,12 +215,12 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("U klienta");
         assertThat(now.tone()).isEqualTo("is-neutral");
-        assertThat(now.text()).startsWith("Sprzedany w zamówieniu o-1 (Dostarczone) · ");
+        assertThat(now.linkText()).isEqualTo("Zamówienie o-1");
         assertThat(now.href()).isEqualTo("/dashboard/orders/o-1");
     }
 
     @Test
-    void anAtCustomerOrderWithoutStatusDoesNotRenderEmptyParentheses() {
+    void anAtCustomerOrderWithoutStatusStillLinksTheOrder() {
         // given
         OrderLine line = order("o-1", null, FulfilmentStatus.Delivered, at(9, 2));
 
@@ -230,8 +229,9 @@ class ItemHistoryPageFactoryTest {
                 new ItemAmbiguity(false, 1, 1), new ItemNow(ItemNow.State.AT_CUSTOMER, line, null, null), List.of(), 0), PL).now();
 
         // then
-        assertThat(now.text()).startsWith("Sprzedany w zamówieniu o-1 (Nieznany)");
-        assertThat(now.text()).doesNotContain("()");
+        assertThat(now.label()).isEqualTo("U klienta");
+        assertThat(now.linkText()).isEqualTo("Zamówienie o-1");
+        assertThat(now.href()).isEqualTo("/dashboard/orders/o-1");
     }
 
     @Test
@@ -242,7 +242,8 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("Zarezerwowany");
         assertThat(now.tone()).isEqualTo("is-info");
-        assertThat(now.text()).isEqualTo("Zarezerwowany w magazynie · Stan: Otwarte opakowanie");
+        assertThat(now.linkText()).isEqualTo("Pozycja magazynowa w-Reserv");
+        assertThat(now.recordId()).isEqualTo("w-Reserved");
         assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-Reserved");
     }
 
@@ -254,7 +255,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("W drodze do magazynu");
         assertThat(now.tone()).isEqualTo("is-info");
-        assertThat(now.text()).isEqualTo("Zamówiony u dostawcy, czeka na odbiór · Stan: Otwarte opakowanie");
+        assertThat(now.linkText()).isEqualTo("Pozycja magazynowa w-Ordere");
         assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-Ordered");
     }
 
@@ -266,7 +267,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("W reklamacji");
         assertThat(now.tone()).isEqualTo("is-warn");
-        assertThat(now.text()).isEqualTo("Stan: Otwarte opakowanie");
+        assertThat(now.linkText()).isEqualTo("Pozycja magazynowa w-InRMA");
         assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-InRMA");
     }
 
@@ -292,7 +293,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("Destroyed");
         assertThat(now.tone()).isEqualTo("is-bad");
-        assertThat(now.text()).isEqualTo("Condition: Open box");
+        assertThat(now.linkText()).isEqualTo("Warehouse item w-Destro");
     }
 
     @Test
@@ -306,7 +307,7 @@ class ItemHistoryPageFactoryTest {
         // then
         assertThat(now.label()).isEqualTo("Nieznany");
         assertThat(now.tone()).isEqualTo("is-neutral");
-        assertThat(now.text()).isEqualTo("Brak rekordu, który mówi, gdzie przedmiot jest teraz");
+        assertThat(now.linkText()).isNull();
         assertThat(now.href()).isNull();
     }
 

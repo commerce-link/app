@@ -53,7 +53,7 @@ public class ItemHistoryPageFactory {
                 : t.text("item.history.events.order");
         return new ItemHistoryPage(history.serialNo(), true, true,
                 ambiguity.ambiguous() ? t.text("item.history.warning.counts", ambiguity.orderCount(), ambiguity.productCount()) : null,
-                product(history, t), now(history.now(), ambiguity.ambiguous(), t), note, events,
+                product(history, t), now(history.now(), t), note, events,
                 collapsed ? ItemHistoryPage.VISIBLE_EVENTS : null,
                 collapsed ? t.text("order.history.more." + PluralForm.of(rest), rest) : null,
                 collapsed ? t.text("order.history.shown", rest) : null,
@@ -68,64 +68,36 @@ public class ItemHistoryPageFactory {
         return new ItemHistoryPage.Product(title, history.serialNo(), blankToNull(identity.ean()), blankToNull(identity.mfn()));
     }
 
-    private ItemHistoryPage.Now now(ItemNow now, boolean ambiguous, Texts t) {
-        List<String> parts = new ArrayList<>();
-        String label = null;
-        String tone = OrderLabels.INFO;
-        String linkText = null;
-        String href = null;
-        switch (now.state()) {
+    // The band says only where the unit is and which record proves it; the record's status and facts are on the timeline.
+    private ItemHistoryPage.Now now(ItemNow now, Texts t) {
+        return switch (now.state()) {
             case IN_RMA -> {
-                RMAItem item = now.rmaLine().item();
-                parts.add(t.text("item.history.record.rma", shortId(item.getRmaId())));
-                if (item.getStatus() != null) parts.add(t.text("RMAItemStatus." + item.getStatus().name()));
-                if (item.getDesiredResolution() != null) parts.add(t.text("item.history.fact.expected", t.text("RMAResolutionType." + item.getDesiredResolution().name())));
-                label = t.text("item.history.now.IN_RMA");
-                tone = OrderLabels.WARN;
-                linkText = t.text("item.history.link.rma");
-                href = rmaHref(item.getRmaId());
+                String rmaId = now.rmaLine().item().getRmaId();
+                yield new ItemHistoryPage.Now(t.text("item.history.now.IN_RMA"), OrderLabels.WARN,
+                        t.text("item.history.record.rma", shortId(rmaId)), rmaHref(rmaId), rmaId);
             }
             case IN_ORDER, AT_CUSTOMER -> {
-                Order order = now.orderLine().order();
-                label = t.text("item.history.now." + now.state().name());
-                String status = order.getStatus() == null ? "" : t.text(OrderLabels.status(order.getStatus()));
-                if (now.state() == ItemNow.State.IN_ORDER) {
-                    parts.add(t.text("item.history.record.order", shortId(order.getOrderId())));
-                    if (!status.isEmpty()) parts.add(status);
-                    FulfilmentStatus itemStatus = now.orderLine().item().getStatus();
-                    if (itemStatus != null) parts.add(t.text("item.history.fact.itemStatus", t.text(OrderLabels.itemStatus(itemStatus))));
-                } else {
-                    parts.add(t.text("item.history.now.text.atCustomer", shortId(order.getOrderId()),
-                            status.isEmpty() ? t.text("item.history.now.UNKNOWN") : status));
-                    if (now.orderLine().placedAt() != null) parts.add(OrderFormats.date(now.orderLine().placedAt()));
-                    tone = OrderLabels.NEUTRAL;
-                }
-                linkText = t.text("item.history.link.order");
-                href = orderHref(order.getOrderId());
+                String orderId = now.orderLine().order().getOrderId();
+                yield new ItemHistoryPage.Now(t.text("item.history.now." + now.state().name()),
+                        now.state() == ItemNow.State.IN_ORDER ? OrderLabels.INFO : OrderLabels.NEUTRAL,
+                        t.text("item.history.record.order", shortId(orderId)), orderHref(orderId), orderId);
             }
             case IN_STOCK, RESERVED, INBOUND, WAREHOUSE_OTHER -> {
                 WarehouseItemView item = now.warehouseItem();
-                switch (now.state()) {
-                    case IN_STOCK -> { label = t.text("item.history.now.IN_STOCK"); parts.add(t.text("item.history.now.text.inStock")); tone = OrderLabels.OK; }
-                    case RESERVED -> { label = t.text("item.history.now.RESERVED"); parts.add(t.text("item.history.now.text.reserved")); }
-                    case INBOUND -> { label = t.text("item.history.now.INBOUND"); parts.add(t.text("item.history.now.text.inbound")); }
-                    default -> {
-                        label = item.getStatus() == null ? t.text("item.history.now.UNKNOWN") : t.text(OrderLabels.itemStatus(item.getStatus()));
-                        tone = item.getStatus() == null ? OrderLabels.NEUTRAL : OrderLabels.tone(item.getStatus());
-                    }
+                String label;
+                String tone;
+                if (now.state() == ItemNow.State.WAREHOUSE_OTHER) {
+                    label = item.getStatus() == null ? t.text("item.history.now.UNKNOWN") : t.text(OrderLabels.itemStatus(item.getStatus()));
+                    tone = item.getStatus() == null ? OrderLabels.NEUTRAL : OrderLabels.tone(item.getStatus());
+                } else {
+                    label = t.text("item.history.now." + now.state().name());
+                    tone = now.state() == ItemNow.State.IN_STOCK ? OrderLabels.OK : OrderLabels.INFO;
                 }
-                if (item.getCondition() != null) parts.add(t.text("item.history.fact.condition", t.text("ItemCondition." + item.getCondition().name())));
-                linkText = t.text("item.history.record.warehouse");
-                href = "/dashboard/warehouse/items/" + item.getItemId();
+                yield new ItemHistoryPage.Now(label, tone, t.text("item.history.record.warehouse", shortId(item.getItemId())),
+                        "/dashboard/warehouse/items/" + item.getItemId(), item.getItemId());
             }
-            case UNKNOWN -> {
-                label = t.text("item.history.now.UNKNOWN");
-                parts.add(t.text("item.history.now.text.unknown"));
-                tone = OrderLabels.NEUTRAL;
-            }
-        }
-        if (ambiguous) parts.add(t.text("item.history.now.text.ambiguous"));
-        return new ItemHistoryPage.Now(label, tone, String.join(SEP, parts), linkText, href);
+            case UNKNOWN -> new ItemHistoryPage.Now(t.text("item.history.now.UNKNOWN"), OrderLabels.NEUTRAL, null, null, null);
+        };
     }
 
     private ItemHistoryPage.Event event(ItemHistoryEvent e, Texts t) {

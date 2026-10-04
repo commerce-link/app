@@ -21,7 +21,7 @@ class ItemHistoryTemplateTest {
     static ItemHistoryPage found(List<ItemHistoryPage.Event> events, Integer limit, String warning) {
         return new ItemHistoryPage("SN-1", true, true, warning,
                 new ItemHistoryPage.Product("Samsung 980 PRO", "SN-1", "8806090295454", null),
-                new ItemHistoryPage.Now("W zamówieniu", "is-info", "Zamówienie b81c4e07 · W kompletacji", "Zamówienie", "/dashboard/orders/b81c4e07"),
+                new ItemHistoryPage.Now("W zamówieniu", "is-info", "Zamówienie b81c4e07", "/dashboard/orders/b81c4e07", "b81c4e07-full-id"),
                 "Od najnowszego zdarzenia.", events, limit, limit == null ? null : "Pokaż 2 wcześniejsze zdarzenia",
                 limit == null ? null : "Pokazano starsze zdarzenia: 2", limit == null ? null : "Ukryto starsze zdarzenia: 2", null);
     }
@@ -57,6 +57,18 @@ class ItemHistoryTemplateTest {
                 .doesNotContain("data-cl-timeline-more");
         assertThat(html.split("id=\"serial-search\"", -1)).hasSize(2);
         assertThat(html).doesNotContain("class=\"timeline");
+    }
+
+    @Test
+    void theNowBandHoldsOnlyTheStateAndTheLinkedRecord() {
+        // when
+        String html = render(found(List.of(), null, null));
+
+        // then
+        String band = html.substring(html.indexOf("class=\"cl-now\""), html.indexOf("</div>", html.indexOf("class=\"cl-now\"")));
+        assertThat(band).contains("W zamówieniu").contains("href=\"/dashboard/orders/b81c4e07\"")
+                .contains("title=\"b81c4e07-full-id\"").contains(">Zamówienie b81c4e07</a>")
+                .doesNotContain(" · ").doesNotContain("cl-now-text");
     }
 
     @Test
