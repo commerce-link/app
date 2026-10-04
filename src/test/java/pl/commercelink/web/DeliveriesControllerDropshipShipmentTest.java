@@ -34,6 +34,9 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -142,7 +145,7 @@ class DeliveriesControllerDropshipShipmentTest {
         verify(dropshipDeliveryCompletion).confirmShipped(eq(STORE_ID), same(delivery), anyList(), anyList(), shipment.capture());
         assertThat(shipment.getValue())
                 .isEqualTo(new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT));
-        verify(redirectAttributes).addFlashAttribute("successMessage", "deliveries.dropship.shipment.success");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "deliveries.dropship.shipment.success", null, null));
     }
 
     @Test
@@ -176,7 +179,7 @@ class DeliveriesControllerDropshipShipmentTest {
         controller.confirmDropshipShipment(formFor(delivery, true), redirectAttributes, Locale.ENGLISH);
 
         // then
-        verify(redirectAttributes).addFlashAttribute("successMessage", "deliveries.dropship.shipment.success.partial");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "deliveries.dropship.shipment.success.partial", null, null));
     }
 
     @Test

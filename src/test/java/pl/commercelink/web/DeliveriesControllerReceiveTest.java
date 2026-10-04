@@ -71,6 +71,7 @@ class DeliveriesControllerReceiveTest {
         DeliveryAllocationsForm form = formFor(delivery);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
@@ -92,12 +93,16 @@ class DeliveriesControllerReceiveTest {
                 .thenReturn(OperationResult.success(null));
         DeliveryAllocationsForm form = formFor(delivery);
 
-        // when
-        String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
 
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
-        verify(deliveryReceptionService).receive(any(), any(), any(), any(), any(), any());
-        verifyNoInteractions(dropshipDeliveryCompletion);
+            // when
+            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+            verify(deliveryReceptionService).receive(any(), any(), any(), any(), any(), any());
+            verifyNoInteractions(dropshipDeliveryCompletion);
+        }
     }
 }

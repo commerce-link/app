@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Record header (spec §4): back to the list as left, h1 with the short number and its copy button, the state pill
+       with the type beside it, the meta line, at most one primary action and the "Więcej" menu. The slots are defined
+       inside the replaced element, so they are never rendered twice. */-->
+<div th:fragment="header"
+     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{${page.backLabelKey()}},
+             #{deliveries.details.title(${page.shortId()})}, ~{::deliveryCopy}, ~{::deliveryStatus}, ~{::deliveryMeta}, ~{::deliveryActions})}">
+    <th:block th:fragment="deliveryCopy">
+        <button type="button" class="cl-copy-inline is-icon"
+                th:attr="data-cl-copy=${page.deliveryId()}, aria-label=#{deliveries.details.copy.id}, title=${page.deliveryId()}">
+            <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+        </button>
+    </th:block>
+    <th:block th:fragment="deliveryStatus">
+        <span class="cl-status" th:classappend="${page.header().stateTone()}" th:text="#{${page.header().stateKey()}}"></span>
+        <span class="cl-icon-text"><i class="fas" th:classappend="${page.header().typeIcon()}" aria-hidden="true"></i><span
+                th:text="#{${page.header().typeKey()}}"></span></span>
+    </th:block>
+    <th:block th:fragment="deliveryMeta" th:with="h=${page.header()}">
+        <p class="cl-record-meta">
+            <span><strong th:text="${h.supplierName()}"></strong></span>
+            <span th:if="${h.externalIdNoteKey() != null}" th:text="#{${h.externalIdNoteKey()}}"></span>
+            <span th:if="${h.externalId() != null}">
+                <span th:text="#{deliveries.details.meta.number}"></span>
+                <a th:if="${h.externalIdHref() != null}" th:href="${h.externalIdHref()}" target="_blank" rel="noopener"
+                   th:title="${h.externalId()}"><span class="cl-meta-truncate" th:text="${h.externalId()}"></span>&#8288;<span
+                        class="cl-link-icon" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span></a>
+                <span th:unless="${h.externalIdHref() != null}" class="cl-meta-truncate" th:title="${h.externalId()}"
+                      th:text="${h.externalId()}"></span>
+                <span th:if="${h.provisional()}" class="cl-status is-warn" th:text="#{deliveries.details.meta.provisional}"></span>
+            </span>
+            <span th:if="${h.orderedAt() != null}" th:text="#{deliveries.details.meta.ordered(${h.orderedAt()})}"></span>
+            <span th:if="${h.dateKey() != null and h.date() != null}" th:text="#{${h.dateKey()}(${h.date()})}"></span>
+            <span th:if="${h.showProgress()}" th:text="#{${h.progressKey()}(${h.receivedAllocations()}, ${h.totalAllocations()})}"></span>
+            <span><strong th:text="${h.totalGross() != null} ? #{general.currency.amount(${h.totalGross()})} : '—'"></strong> <span th:text="#{deliveries.details.meta.gross}"></span></span>
+        </p>
+    </th:block>
+    <th:block th:fragment="deliveryActions" th:with="h=${page.header()}">
+        <th:block th:if="${h.primary() != null}">
+            <!--/* a dialog's opener is a link to the page with the dialog open, which is what happens without JavaScript */-->
+            <a th:if="${h.primary().postAction() == null}" class="cl-button is-primary" th:href="@{${h.primary().href()}}"
+               th:attr="data-cl-dialog-open=${h.primary().dialogId()},
+                        data-cl-select-pending=${h.primary().dialogId() != null} ? 'true' : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${h.primary().icon()}"></i></span>
+                <span th:text="#{${h.primary().labelKey()}}"></span>
+            </a>
+            <form th:if="${h.primary().postAction() != null}"
+                  class="cl-page-action-form" method="post" th:action="@{${h.primary().postAction()}}">
+                <button type="submit" class="cl-button is-primary">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${h.primary().icon()}"></i></span>
+                    <span th:text="#{${h.primary().labelKey()}}"></span>
+                </button>
+            </form>
+        </th:block>
+        <details th:if="${h.more().shown()}" class="cl-menu">
+            <summary class="cl-button">
+                <span th:text="#{deliveries.details.more}"></span>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </summary>
+            <ul class="cl-menu-list" id="delivery-more-menu">
+                <li th:if="${h.more().refresh().visible()}">
+                    <button th:if="${h.more().refresh().enabled()}" type="submit" class="cl-menu-item" form="delivery-refresh-form"
+                            th:text="#{deliveries.details.more.refresh}"></button>
+                    <button th:unless="${h.more().refresh().enabled()}" type="button" class="cl-menu-item" aria-disabled="true">
+                        <span th:text="#{deliveries.details.more.refresh}"></span>
+                        <span class="cl-menu-reason" th:text="#{${h.more().refresh().reasonKey()}}"></span>
+                    </button>
+                </li>
+                <li th:if="${h.more().reject().visible()}">
+                    <a class="cl-menu-item is-danger" th:href="@{${h.more().rejectHref()}}" data-cl-dialog-open="reject-dialog"
+                       th:text="#{deliveries.details.more.reject}"></a>
+                </li>
+                <li th:if="${h.more().delete().visible() and (h.more().refresh().visible() or h.more().reject().visible())}"
+                    class="cl-menu-sep" aria-hidden="true"></li>
+                <li th:if="${h.more().delete().visible()}">
+                    <a th:if="${h.more().delete().enabled()}" class="cl-menu-item is-danger" th:href="@{${h.more().deleteHref()}}"
+                       data-cl-confirm
+                       th:attr="data-cl-confirm-title=#{deliveries.details.delete.title(${page.shortId()})},
+                                data-cl-confirm-message=#{deliveries.details.delete.message(${page.shortId()}, ${h.supplierName()})},
+                                data-cl-confirm-action=#{deliveries.details.delete.action}"
+                       th:text="#{deliveries.details.more.delete}"></a>
+                    <button th:unless="${h.more().delete().enabled()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
+                        <span th:text="#{deliveries.details.more.delete}"></span>
+                        <span class="cl-menu-reason" th:text="#{${h.more().delete().reasonKey()}}"></span>
+                    </button>
+                </li>
+            </ul>
+        </details>
+    </th:block>
+</div>
+
+<!--/* "Odśwież numer u dostawcy" posts this form from the menu (a form cannot sit inside the header's slots). */-->
+<form th:fragment="refreshForm" id="delivery-refresh-form" method="post" th:action="@{${page.header().more().refreshAction()}}"></form>
+</body>
+</html>
