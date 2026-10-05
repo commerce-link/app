@@ -45,8 +45,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     }
 
     public record ItemsCard(List<OrderItemRow> products, List<OrderItemRow> services, int count, boolean selectable,
-                            boolean canAddItems, String addItemsReasonKey,
-                            List<BulkActionButton> bulkActions, boolean bulkAvailable,
+                            boolean canAddItems, String addItemsReasonKey, boolean canAddSerials,
+                            List<SerialItemRow> serialItems, List<BulkActionButton> bulkActions, boolean bulkAvailable,
                             List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
                             Map<String, SplitGroupPreviewDto> splitPreviews) {
 
@@ -73,6 +73,10 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     }
 
     public record BulkMenu(BulkAction.Menu menu, List<BulkActionButton> actions) {
+    }
+
+    /** The serial-number dialog needs no cost, so it gets a slim row instead of the raw OrderItem. */
+    public record SerialItemRow(String itemId, String name, String mfn, int qty, String deliveryLabel, String serialNo) {
     }
 
     /** reasonKey/shortReasonKey: the sentence and the few words saying why the action is unavailable, or null. */

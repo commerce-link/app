@@ -1585,6 +1585,30 @@ public class OrdersController extends BaseController {
                 status, amount, reason));
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/updateSerialNumbers")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String updateSerialNumbers(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
+        // The dialog lists delivered products only; an item missing from the form keeps its number.
+        Map<String, String> postedByItemId = new HashMap<>();
+        form.getOrderItems().stream()
+                .filter(posted -> posted.getItemId() != null)
+                .forEach(posted -> postedByItemId.put(posted.getItemId(), StringUtils.trimToNull(posted.getSerialNo())));
+
+        for (OrderItem item : orderItemsRepository.findByOrderId(orderId)) {
+            if (item.isProduct() && postedByItemId.containsKey(item.getItemId())) {
+                item.setSerialNo(postedByItemId.get(item.getItemId()));
+                orderItemsRepository.save(item);
+            }
+        }
+
+        return details(orderId);
+    }
+
     /** The address dialog of the customer card as its own page, for a browser without JavaScript. */
     @GetMapping("/dashboard/orders/{orderId}/address")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
