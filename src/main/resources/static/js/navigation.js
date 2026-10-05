@@ -10,6 +10,8 @@
     const userMenu = document.getElementById('clUserMenu');
     const notificationsToggle = document.getElementById('clNotificationsToggle');
     const notificationsMenu = document.getElementById('clNotificationsMenu');
+    const accountStatusToggle = document.getElementById('clAccountStatusToggle');
+    const accountStatusMenu = document.getElementById('clAccountStatusMenu');
     const popovers = [];
 
     let lastFocused = null;
@@ -196,6 +198,7 @@
 
     bindPopover(userToggle, userMenu);
     bindPopover(notificationsToggle, notificationsMenu, loadNotifications);
+    bindPopover(accountStatusToggle, accountStatusMenu);
 
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {

@@ -1,5 +1,6 @@
 package pl.commercelink.registration;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,6 +12,7 @@ import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSeedingException;
+import pl.commercelink.stores.TrialPeriod;
 import pl.commercelink.users.CognitoUserService;
 
 import java.time.Clock;
@@ -19,6 +21,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 @ConditionalOnProperty(name = "app.registration.enabled", havingValue = "true")
 public class RegistrationService {
@@ -34,6 +37,7 @@ public class RegistrationService {
     private final RegistrationRateLimiter rateLimiter;
     private final Clock clock;
     private final int ttlDays;
+    private final int trialDays;
     private final boolean demoMode;
 
     @Autowired
@@ -43,9 +47,10 @@ public class RegistrationService {
                                 StoreDeletionService storeDeletionService,
                                 RegistrationRateLimiter rateLimiter,
                                 @Value("${app.registration.ttl-days}") int ttlDays,
+                                @Value("${app.registration.trial-days}") int trialDays,
                                 @Value("${app.registration.demo:false}") boolean demoMode) {
         this(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService, rateLimiter,
-                Clock.systemUTC(), ttlDays, demoMode);
+                Clock.systemUTC(), ttlDays, trialDays, demoMode);
     }
 
     RegistrationService(CognitoUserService cognitoUserService,
@@ -55,6 +60,7 @@ public class RegistrationService {
                         RegistrationRateLimiter rateLimiter,
                         Clock clock,
                         int ttlDays,
+                        int trialDays,
                         boolean demoMode) {
         this.cognitoUserService = cognitoUserService;
         this.storeSeeder = storeSeeder;
@@ -63,6 +69,7 @@ public class RegistrationService {
         this.rateLimiter = rateLimiter;
         this.clock = clock;
         this.ttlDays = ttlDays;
+        this.trialDays = trialDays;
         this.demoMode = demoMode;
     }
 
@@ -85,7 +92,7 @@ public class RegistrationService {
             throw new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS);
         }
 
-        return demoMode ? registerDemo(normalized, name, password) : registerProduction(normalized, name, password);
+        return demoMode ? registerDemo(normalized, name, password) : registerTrial(normalized, name, password);
     }
 
     public boolean isEmailVerifiedOnCreation() {
@@ -119,12 +126,13 @@ public class RegistrationService {
         return trimmed;
     }
 
-    private RegistrationResult registerProduction(String email, String storeName, String password) {
+    private RegistrationResult registerTrial(String email, String storeName, String password) {
+        TrialPeriod trial = TrialPeriod.starting(email, clock.instant(), trialDays);
         Store store;
         try {
-            store = storeCreationService.createStore(CreateStoreRequest.registered(storeName, email));
+            store = storeCreationService.createStore(CreateStoreRequest.registered(storeName, trial));
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
+            log.error("Store creation failed during registration", e);
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
         return createAdmin(email, store.getStoreId(), password, StoreDeletionService.Guard.ANY);
@@ -139,11 +147,11 @@ public class RegistrationService {
             store = storeCreationService.createStore(
                     CreateStoreRequest.seeded(storeName, metadata, storeSeeder));
         } catch (StoreSeedingException e) {
-            System.err.println("[Registration] Store seeding failed for " + email + ", rolling back store " + e.getStoreId() + ": " + e.getMessage());
+            log.error("Store seeding failed during registration, rolling back store {}", e.getStoreId(), e);
             rollBack(e.getStoreId(), StoreDeletionService.Guard.DEMO_ONLY);
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Store creation failed for " + email + ": " + e.getMessage());
+            log.error("Store creation failed during registration", e);
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
         return createAdmin(email, store.getStoreId(), password, StoreDeletionService.Guard.DEMO_ONLY);
@@ -155,7 +163,7 @@ public class RegistrationService {
             cognitoUserService.createStoreAdmin(email, storeId, password, demoMode);
             return new RegistrationResult(storeId);
         } catch (RuntimeException e) {
-            System.err.println("[Registration] User creation failed for " + email + ", rolling back store " + storeId + ": " + e.getMessage());
+            log.error("Cognito user creation failed during registration, rolling back store {}", storeId, e);
             rollBack(storeId, rollbackGuard);
             throw new RegistrationException(RegistrationException.Reason.CREATION_FAILED);
         }
@@ -165,7 +173,7 @@ public class RegistrationService {
         try {
             storeDeletionService.deleteStore(storeId, guard);
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Rollback failed for store " + storeId + ": " + e.getMessage());
+            log.error("Rollback of store {} failed after a failed registration", storeId, e);
         }
     }
 }

@@ -1,6 +1,7 @@
 package pl.commercelink.registration;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
@@ -13,6 +14,7 @@ import pl.commercelink.starter.security.model.CustomUser;
 
 import java.util.Locale;
 
+@Slf4j
 @Controller
 public class EmailVerificationController {
 
@@ -31,11 +33,15 @@ public class EmailVerificationController {
     }
 
     @GetMapping(VERIFY_EMAIL_PATH)
-    public String verifyPage(HttpServletRequest request, Model model) {
+    public String verifyPage(HttpServletRequest request, Model model, Locale locale) {
         if (emailVerificationService.isVerified(request)) {
             return "redirect:" + homeUrl;
         }
         addEmail(model);
+        if (!emailVerificationService.sendCodeOnce(request)) {
+            model.addAttribute("errorMessage",
+                    messageSource.getMessage("registration.verify.resend-failed", null, locale));
+        }
         return "register-verify-email";
     }
 
@@ -61,11 +67,11 @@ public class EmailVerificationController {
         }
         addEmail(model);
         try {
-            emailVerificationService.sendCode();
+            emailVerificationService.sendCode(request);
             model.addAttribute("infoMessage",
                     messageSource.getMessage("registration.verify.resent", null, locale));
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Verification code resend failed: " + e.getMessage());
+            log.error("Verification code resend failed", e);
             model.addAttribute("errorMessage",
                     messageSource.getMessage("registration.verify.resend-failed", null, locale));
         }

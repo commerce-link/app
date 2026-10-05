@@ -27,6 +27,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -38,9 +39,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,9 +69,15 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private Pricelist pricelist;
     @Mock private InventoryView inventoryView;
     @Mock private MarketplaceProvider provider;
+    @Mock private StoreActivity storeActivity;
 
     @InjectMocks
     private MarketplaceOfferExportEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
+    }
 
     @BeforeEach
     void setUpDefaults() {
@@ -500,5 +509,17 @@ class MarketplaceOfferExportEventListenerTest {
 
     private void noCategoriesConfigured() {
         when(catalog.getCategories()).thenReturn(List.of());
+    }
+
+    @Test
+    void exportsNothingForInactiveStore() {
+        // given
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verifyNoInteractions(provider, marketplaceExportRunService, inventory);
     }
 }

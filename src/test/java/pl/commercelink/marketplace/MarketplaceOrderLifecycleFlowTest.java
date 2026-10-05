@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,7 @@ import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
@@ -36,11 +38,13 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -68,9 +72,15 @@ class MarketplaceOrderLifecycleFlowTest {
 
     @Mock private Store store;
     @Mock private MarketplaceProvider provider;
+    @Mock private StoreActivity storeActivity;
 
     @InjectMocks private OrderLifecycle orderLifecycle;
     @InjectMocks private MarketplaceOrderLifecycleEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
+    }
 
     @Test
     void marketplaceReceivesAcceptBeforeCompleteWhenNewOrderSettlesInOnePass() {
@@ -130,4 +140,5 @@ class MarketplaceOrderLifecycleFlowTest {
         }
         types.forEach(type -> listener.handleMessage(new OrderLifecycleEvent(STORE_ID, order.getOrderId(), type)));
     }
+
 }
