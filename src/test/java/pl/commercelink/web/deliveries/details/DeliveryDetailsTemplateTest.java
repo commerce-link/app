@@ -372,6 +372,7 @@ class DeliveryDetailsTemplateTest {
                 .contains("<span class=\"cl-label-pair\"><span>Kod</span>")
                 .contains("Towar razem: netto 5\u00a0084,00 PLN · brutto 6\u00a0253,32 PLN")
                 .doesNotContain(">Alokacja<").doesNotContain("Zarezerwowano");
+        assertThat(html).contains(">Produkt / alokacje<").containsPattern(">Alokacje: \\d<").doesNotContain("rzeznaczeni");
     }
 
     @Test
@@ -558,7 +559,7 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(html).contains(">Odebrać całą dostawę 2f9eb794?<")
-                .contains("Odbierzesz wszystko, co jeszcze czeka w tej dostawie (1 z 2 przeznaczeń):")
+                .contains("Odbierzesz wszystko, co jeszcze czeka w tej dostawie (1 z 2 alokacji):")
                 .contains("<span aria-hidden=\"true\">→ </span><span>Magazyn</span>")
                 .contains("dostawa stanie się „Odebrana”");
     }

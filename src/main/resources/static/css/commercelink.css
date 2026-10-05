@@ -542,6 +542,11 @@ body.cl-drawer-open .cl-sidebar {
     z-index: 40;
 }
 
+/* a tooltip of several facts, one per line (a "\n" in the text) */
+.cl-tooltip.is-lines::after {
+    white-space: pre-line;
+}
+
 .cl-tooltip:hover::after,
 .cl-tooltip:focus::after {
     opacity: 1;
@@ -6171,7 +6176,8 @@ a.cl-link-button:hover {
 
 /* Column widths of the order items table (fixed layout) */
 .cl-page .cl-table col.cl-col-check { width: 44px; }
-.cl-page .cl-table col.cl-col-price { width: 128px; }
+/* the price and its margin icon on one line: "10 × 12 269,00" + 6 px + the 14 px icon + the cell's 2 x 10 px padding */
+.cl-page .cl-table col.cl-col-price { width: 152px; }
 /* fits the longest usual state pill ("Skompletowany", "Zarezerwowany": 124 px) plus the cell's 2 x 10 px padding */
 .cl-page .cl-table col.cl-col-state { width: 148px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
@@ -9224,5 +9230,173 @@ a.cl-link-button:hover {
 @media screen and (max-width: 719px) {
     .cl-page .cl-clamp-toggle {
         margin: 0 16px 16px;
+    }
+}
+
+/* --- Item history (/dashboard/item/history, spec docs/active/item-history-redesign/2026-10-02-item-history-design.md §7) --- */
+
+/* P1: search in the page header row; under 720 px it takes the whole row below the title */
+.cl-page .cl-page-header-row .cl-search-form.is-header {
+    margin-left: auto;
+}
+
+.cl-page .cl-page-header-row .cl-search-form.is-header .cl-search-field {
+    width: 320px;
+}
+
+.cl-page .cl-page-header.is-in-stack {
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-page-header-row .cl-search-form.is-header {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .cl-page .cl-page-header-row .cl-search-form.is-header .cl-search-field {
+        flex: 1 1 0;
+        width: auto;
+    }
+}
+
+/* P2: a search card as the page's only content, before anything is searched */
+.cl-page .cl-search-card {
+    padding: 20px;
+}
+
+.cl-page .cl-search-card .cl-search-form {
+    margin: 0;
+}
+
+.cl-page .cl-search-card .cl-search-field {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 520px;
+}
+
+.cl-page .cl-search-card .cl-card-desc.is-flush {
+    padding: 0;
+    margin: 4px 0 14px;
+}
+
+.cl-page .cl-search-card .cl-help {
+    margin: 12px 0 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-search-card ul.cl-hints {
+    margin: 6px 0 0 18px;
+    padding: 0;
+    list-style: disc;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-search-card ul.cl-hints li {
+    margin: 2px 0;
+}
+
+/* P3: the "now" band of a record card: label, state pill and a link to the record; the label on --cl-surface-2 stays --cl-ink-2 for AA contrast */
+.cl-page .cl-now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 12px 0 14px;
+    padding: 10px 20px;
+    background: var(--cl-surface-2);
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-now-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-now a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+/* P4: a timeline event pointing at a record: link and status pill on one line; Font Awesome swaps <i> for <svg> */
+.cl-page .cl-timeline-title .cl-icon-text :is(i, svg) {
+    width: 1.1em;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-timeline-desc.is-record {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 4px;
+}
+
+.cl-page .cl-timeline-desc.is-record a {
+    font-weight: 600;
+}
+
+.cl-page #item-events .cl-timeline-item:not(:last-child) {
+    padding-bottom: 16px;
+}
+
+/* Order items: the margin of one unit as an info icon after the price (ItemMargin); the numbers are in its tooltip. A
+   loss turns it into a red exclamation mark, so the mark does not rest on colour alone. */
+.cl-page .cl-price-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.cl-page .cl-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--cl-ink-3);
+    cursor: help;
+}
+
+.cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
+.cl-page .cl-margin.is-unknown { opacity: .55; }
+.cl-page .cl-margin.is-loss { color: var(--cl-bad); }
+
+.cl-page .cl-margin:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* the tooltip opens to the left: the price column stands right of the middle and a centred box hid the state pill */
+.cl-page .cl-margin.cl-tooltip::after {
+    left: auto;
+    right: -8px;
+    transform: translateY(4px);
+    text-align: left;
+}
+
+.cl-page .cl-margin.cl-tooltip:is(:hover, :focus)::after {
+    transform: translateY(0);
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the 20 px mark without growing the row */
+    .cl-page .cl-margin {
+        box-sizing: content-box;
+        padding: 12px;
+        margin: -12px;
     }
 }

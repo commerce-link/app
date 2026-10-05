@@ -1,6 +1,8 @@
 // The delivery details page (templates/deliveries/details.html). Everything works without JavaScript: an opener is a
 // link to the page with its dialog open, the selection row's noscript buttons post to …/confirm/…. This script adds:
-// the destination rows' toggles; the selection row docked to the bottom on phones while the items card is on screen
+// the destination rows' toggles (collapsed on load unless a destination of the product is already checked, and all
+// opened by a select-all box before table-select.js checks the visible rows, all closed again when it clears them);
+// the selection row docked to the bottom on phones while the items card is on screen
 // (P2); a "…-all" opener (data-cl-select-pending) checking every waiting destination before its dialog opens and
 // restoring the selection when the dialog closes unsent; the list of what a selection dialog acts on, rebuilt from
 // the checked rows; Enter inside a dialog field running that dialog's own action, never the form's first button; the
@@ -63,12 +65,59 @@
         });
     }
 
+    function collapseAll() {
+        document.querySelectorAll('[data-cl-alloc-toggle][aria-expanded="true"]').forEach(function (button) {
+            setOpen(button, false);
+        });
+    }
+
+    function hasChecked(button) {
+        return (button.getAttribute('aria-controls') || '').split(' ').some(function (id) {
+            var row = id && document.getElementById(id);
+            return !!row && !!row.querySelector('input[data-cl-select-row]:checked');
+        });
+    }
+
+    // The page renders every destination open, which is what a page without JavaScript shows. Collapsing on load keeps
+    // a product with a checked destination open: collapsing unchecks, and the selection came back from the server.
     function initToggles() {
         document.querySelectorAll('[data-cl-alloc-toggle]').forEach(function (button) {
             button.hidden = false;
+            if (!hasChecked(button)) {
+                setOpen(button, false);
+            }
             button.addEventListener('click', function () {
                 setOpen(button, button.getAttribute('aria-expanded') !== 'true');
             });
+        });
+    }
+
+    // A select-all box with nothing checked is about to check the visible rows (table-select.js, which listens on the
+    // table while this runs in the capture phase, first): open every product so "all" means all destinations. With
+    // anything checked the same box clears the selection; once table-select.js has done that (this document listener
+    // runs after the table's in the bubble phase), every product closes again.
+    function initSelectAllOpens() {
+        if (!form) {
+            return;
+        }
+        var clearing = false;
+        var isSelectAll = function (target) {
+            return target.matches && target.matches('[data-cl-select-all]') && form.contains(target);
+        };
+        document.addEventListener('change', function (event) {
+            if (!isSelectAll(event.target)) {
+                return;
+            }
+            clearing = checkedBoxes().length > 0;
+            if (!clearing) {
+                expandAll();
+            }
+        }, true);
+        document.addEventListener('change', function (event) {
+            if (isSelectAll(event.target) && clearing) {
+                clearing = false;
+                collapseAll();
+            }
         });
     }
 
@@ -365,6 +414,7 @@
 
     function init() {
         initToggles();
+        initSelectAllOpens();
         initClamp();
         initDockedBar();
         initValidation();

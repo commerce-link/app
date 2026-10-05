@@ -173,11 +173,11 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(superAdmin.finances().costs()).isNotNull();
-        assertThat(superAdmin.items().products().get(0).unitCost()).isNotNull();
+        assertThat(superAdmin.items().products().get(0).margin()).isNotNull();
         assertThat(superAdmin.readOnly()).isTrue();
         assertThat(superAdmin.admin()).isFalse();
         assertThat(user.finances().costs()).isNotNull();
-        assertThat(user.items().products().get(0).unitCost()).isNotNull();
+        assertThat(user.items().products().get(0).margin()).isNotNull();
     }
 
     @Test
@@ -230,8 +230,8 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(user.finances().costs()).isNotNull().isEqualTo(admin.finances().costs());
-        assertThat(user.items().products().get(0).unitCost()).isNotNull()
-                .isEqualTo(admin.items().products().get(0).unitCost());
+        assertThat(user.items().products().get(0).margin()).isNotNull()
+                .isEqualTo(admin.items().products().get(0).margin());
     }
 
     @Test

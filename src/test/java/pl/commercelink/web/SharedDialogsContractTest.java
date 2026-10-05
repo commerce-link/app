@@ -144,4 +144,22 @@ class SharedDialogsContractTest {
         // the fragment lists the directions by hand (no T() in templates); a third direction must be added there too
         assertThat(PaymentDirection.values()).containsExactly(PaymentDirection.Incoming, PaymentDirection.Outgoing);
     }
+
+    @Test
+    void theBackdropClosesADialogOnlyWhenThePressStartedAndEndedOnIt() throws Exception {
+        // given: every script that closes a native dialog on a backdrop click
+        List<String> scripts = List.of("dialog.js", "confirm-dialog.js", "add-payment-dialog.js", "item-add-dialog.js");
+
+        for (String name : scripts) {
+            // when
+            String script = read("src/main/resources/static/js/" + name);
+
+            // then: a press from inside the dialog to the backdrop (or back) also clicks the dialog element itself
+            assertThat(script).as(name).contains("addEventListener('pointerdown'").contains("addEventListener('pointerup'")
+                    .containsPattern("pressStart === (dialog|event\\.target) && pressEnd === (dialog|event\\.target)")
+                    .doesNotContainPattern("if \\(event\\.target === dialog\\) \\{\\s*dialog\\.close\\(\\);")
+                    .doesNotContainPattern("classList\\.contains\\('is-form'\\)\\) \\{\\s*event\\.target\\.close\\(\\);")
+                    .doesNotContain("target === dialog || (target.closest");
+        }
+    }
 }

@@ -3,7 +3,7 @@
 // from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Assign supplier offers
 // the item's own codes and turns a gross price net with the item's VAT for the hint (the server converts it); Assign
 // from warehouse lists the stock of the item's category; Split bundle keeps the rows numbered rows[0..n] and the total
-// balanced; Serial numbers never submit on Enter; Move previews the target order.
+// balanced; Move previews the target order.
 (function () {
     'use strict';
 
@@ -606,18 +606,6 @@
             recalc();
         });
         dialog.querySelector('[data-cl-split-distribute]').addEventListener('click', distribute);
-    })();
-
-    // --- Serial numbers: Enter moves on instead of submitting half-filled numbers --------------------------------------
-    (function () {
-        var form = document.querySelector('form[data-cl-serials]');
-        if (form) {
-            form.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter' && event.target.tagName === 'INPUT') {
-                    event.preventDefault();
-                }
-            });
-        }
     })();
 
     // --- Move to an existing order: preview of the target ----------------------------------------------------------

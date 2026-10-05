@@ -1,0 +1,21 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The row under a timeline whose list carries data-cl-timeline-limit: collapsed, a node on the axis that shows the
+       hidden events (the line runs on dashed down to it); expanded, a plain "collapse" link. timeline.js unhides it;
+       without JavaScript every event stays visible and this row stays hidden. */-->
+<!--/* aria-controls="x" is a static placeholder: th:aria-controls overwrites it in place, which keeps the attribute order
+       OrderDetailsTemplateTest asserts (th:attr would append it at the end). */-->
+<th:block th:fragment="more(listId, moreText, shownText, hiddenText, lessText)">
+    <div class="cl-timeline-more" hidden data-cl-timeline-more
+         th:attr="data-shown-text=${shownText}, data-hidden-text=${hiddenText}">
+        <button type="button" class="cl-link-button cl-timeline-node" aria-controls="x" th:aria-controls="${listId}" aria-expanded="false"
+                data-cl-timeline-toggle="expand"><span class="cl-timeline-node-dot" aria-hidden="true"></span><span
+                th:text="${moreText}"></span></button>
+        <button type="button" class="cl-link-button cl-timeline-less" aria-controls="x" th:aria-controls="${listId}" aria-expanded="true"
+                data-cl-timeline-toggle="collapse" hidden th:text="${lessText}"></button>
+    </div>
+    <p class="cl-visually-hidden" role="status" data-cl-timeline-status></p>
+</th:block>
+</body>
+</html>
