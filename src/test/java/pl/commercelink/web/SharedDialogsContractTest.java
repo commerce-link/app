@@ -42,6 +42,18 @@ class SharedDialogsContractTest {
     }
 
     @Test
+    void theDialogScriptGuardsFormSubmitsAndReopensServerOpenedDialogsAsModal() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/dialog.js");
+
+        // then
+        assertThat(script).contains("addEventListener('submit'").contains("event.submitter").contains("button.disabled = true")
+                .contains("event.defaultPrevented").contains("data-cl-async").contains("dialog.cl-dialog.is-form")
+                .contains("'pageshow'").contains("shown.persisted")
+                .contains("dialog.cl-dialog[open]").contains("if (!dialog.open)");
+    }
+
+    @Test
     void theAddItemsScriptKeepsThePublicFunctionOfTheOfferPage() throws Exception {
         // given
         String script = read("src/main/resources/static/js/item-add-dialog.js");

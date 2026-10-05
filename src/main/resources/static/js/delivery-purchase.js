@@ -134,13 +134,29 @@
         }
         // A second click must not place a second order while the first request is on its way. "Wróć do pozycji"
         // leaves the button alone, and a page restored from the back/forward cache gets it back as the checks allow.
+        // The approval screen's "Reject" triggers ([data-cl-locked-while-ordering]) are locked too: a rejection sent
+        // while the order is being queued would race it (the server refuses the loser, but only after the fact).
         form.addEventListener('submit', function (event) {
             if (event.submitter && event.submitter.id === 'purchase-confirm-submit') {
                 event.submitter.disabled = true;
+                document.querySelectorAll('[data-cl-locked-while-ordering]').forEach(function (trigger) {
+                    trigger.setAttribute('aria-disabled', 'true');
+                });
             }
         });
+        // capture phase: runs before dialog.js opens the dialog from the same click
+        document.addEventListener('click', function (event) {
+            var locked = event.target.closest && event.target.closest('[data-cl-locked-while-ordering][aria-disabled="true"]');
+            if (locked) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }, true);
         window.addEventListener('pageshow', function (event) {
             if (event.persisted) {
+                document.querySelectorAll('[data-cl-locked-while-ordering]').forEach(function (trigger) {
+                    trigger.removeAttribute('aria-disabled');
+                });
                 refresh(form);
             }
         });

@@ -323,7 +323,7 @@
                     <div class="cl-field">
                         <label class="cl-label" for="reject-reason"><span th:text="#{deliveries.details.reject.reason}"></span>
                             <span class="cl-optional" th:text="#{form.optional}"></span></label>
-                        <textarea class="cl-input cl-textarea" id="reject-reason" name="reason" rows="3"></textarea>
+                        <textarea class="cl-input cl-textarea" id="reject-reason" name="reason" rows="3" maxlength="500"></textarea>
                     </div>
                     <p class="cl-dialog-effect" th:text="#{deliveries.details.reject.effect}"></p>
                 </div>

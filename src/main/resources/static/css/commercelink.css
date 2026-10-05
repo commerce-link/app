@@ -1751,6 +1751,75 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* Pill next to an option title, e.g. the supplier address that matches the store's shipping address (approval screen) */
+.cl-page .cl-choice-title .cl-status {
+    margin-left: 8px;
+    vertical-align: 1px;
+}
+
+/* "Goods for": the customer orders a delivery request serves, link and customer on the left, quantity on the right */
+.cl-page .cl-request-for {
+    margin: 0;
+    padding: 4px 20px 18px;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.cl-page .cl-request-for li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0;
+}
+
+/* The order link: the accent focus ring of the link buttons, and below 1024 px a 44 px target (the row grows; the
+   quantity stays on the link's baseline). The store link in the record meta gets the same ring. */
+.cl-page .cl-request-for a:focus-visible,
+.cl-page .cl-record-meta a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+@media (max-width: 1023px) {
+    .cl-page .cl-request-for a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+}
+
+.cl-page .cl-request-for li > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-request-for li > :last-child {
+    flex: none;
+    white-space: nowrap;
+}
+
+.cl-page .cl-request-for .cl-table-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-card-desc .is-warn {
+    color: var(--cl-warn);
+}
+
+/* A text link locked while an order is on its way (the "reject the request" link of the unavailability alert). */
+.cl-page .cl-alert-text a[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
 /* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a
    field label, or a part of the form that is switched off as a whole (disabled with its fieldset). */
 .cl-page .cl-choice-group {
@@ -7556,6 +7625,25 @@ a.cl-link-button:hover {
 @media screen and (min-width: 720px) {
     .cl-page .cl-table.is-key-wrap:has(col.cl-col-key) td.is-numeric:has(.cl-status) {
         white-space: normal;
+    }
+}
+
+/* The supplier's live answer (five figures per product) in a 600 px card (1366 px, 720 px): 12 % per figure left
+   48 px of text (40 px in the last column, which keeps the card's 20 px inset), so "brakuje 9" and "−1 568,00" spilt
+   over the card's edge. The columns are sized for what they hold: the shortage pill (14 %) and the signed difference
+   (15 %) get more, the plain figures 12.5 % with 8 px between them, the product name the remaining 33.5 %. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-key { width: 33.5%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num { width: 12.5%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num:nth-child(3) { width: 14%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num:last-child { width: 15%; }
+
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) .is-numeric {
+        padding-inline: 8px;
+    }
+
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) :is(th, td).is-numeric:last-child {
+        padding-right: 20px;
     }
 }
 

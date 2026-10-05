@@ -47,6 +47,7 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.web.deliveries.approval.ApprovalPage;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
@@ -187,7 +188,7 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void approvalAvailabilityCheckRendersTheApprovalScreensOwnFragment() {
+    void approvalAvailabilityCheckRendersTheSharedFragmentInApprovalMode() {
         // given
         Model model = new ConcurrentModel();
 
@@ -195,7 +196,52 @@ class DeliveriesControllerApprovalTest {
         String view = deliveriesController.validatePendingApproval(STORE_ID, DELIVERY_ID, model, Locale.ENGLISH);
 
         // then
-        assertThat(view).isEqualTo("fragments/approval-validation :: validationResult");
+        assertThat(view).isEqualTo("deliveries/create/purchase :: validationResult");
+        assertThat(model.getAttribute("validationMode")).isEqualTo("approval");
+    }
+
+    @Test
+    void approvalScreenCarriesTheRequestContext() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor(PROVIDER, "order-1");
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Order order = new Order();
+        order.setOrderId("order-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        Store store = new Store();
+        store.setName("Demo Store");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("deliveries/approval");
+        ApprovalPage page = (ApprovalPage) model.getAttribute("page");
+        assertThat(page.storeName()).isEqualTo("Demo Store");
+        assertThat(page.requestFor()).extracting(ApprovalPage.RequestLine::href)
+                .containsExactly("/dashboard/store/store-1/orders/order-1");
+        assertThat(page.openReject()).isFalse();
+        assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
+        verify(ordersRepository).findById(STORE_ID, "order-1");
+    }
+
+    @Test
+    void openRejectIsOnlyHonouredForTheRejectDialog() {
+        // given
+        Delivery delivery = awaitingWarehouseDeliveryFor(PROVIDER);
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Model reject = new ConcurrentModel();
+        Model other = new ConcurrentModel();
+
+        // when
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, "reject", reject, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, "<script>", other, redirectAttributes);
+
+        // then
+        assertThat(((ApprovalPage) reject.getAttribute("page")).openReject()).isTrue();
+        assertThat(((ApprovalPage) other.getAttribute("page")).openReject()).isFalse();
     }
 
     @Test
@@ -253,7 +299,6 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("deliveries/details");
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
-            assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
     }
@@ -276,7 +321,6 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("deliveries/details");
             assertThat(model.containsAttribute("approvalAddresses")).isFalse();
-            assertThat(model.containsAttribute("approvalAddressOptions")).isFalse();
             verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
         }
     }
@@ -417,10 +461,10 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
-        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(view).isEqualTo("deliveries/approval");
         assertThat(model.getAttribute("delivery")).isSameAs(delivery);
         assertThat((List<?>) model.getAttribute("approvalAddresses")).hasSize(1);
     }
@@ -436,7 +480,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat(view).isEqualTo(
@@ -456,7 +500,7 @@ class DeliveriesControllerApprovalTest {
         model.addAttribute("errorMessage", "Delivery is no longer awaiting approval");
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat(view).isEqualTo(
@@ -517,7 +561,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat(model.getAttribute("suggestedAddressId")).isEqualTo("17200617");
@@ -1413,7 +1457,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat(model.getAttribute("suggestedAddressId")).isNull();
@@ -1503,11 +1547,12 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
-        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(view).isEqualTo("deliveries/approval");
         assertThat(model.getAttribute("consignee")).isSameAs(consignee);
+        assertThat(model.getAttribute("dropshipOrderMissing")).isEqualTo(false);
         verify(supplierPurchaseService, never()).deliveryAddressesForDelivery(any(), any());
     }
 
@@ -1538,11 +1583,11 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        String view = deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then — the render path must resolve the order and pass its pickup point through, not
         // just any dropship context.
-        assertThat(view).isEqualTo("deliveryApproval");
+        assertThat(view).isEqualTo("deliveries/approval");
         assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
         assertThat(context.getValue().dropship()).isTrue();
         assertThat(context.getValue().pickupPoint()).isNotNull();
@@ -1596,7 +1641,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         @SuppressWarnings("unchecked")
@@ -1618,7 +1663,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         @SuppressWarnings("unchecked")
@@ -1639,7 +1684,7 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
@@ -1655,10 +1700,11 @@ class DeliveriesControllerApprovalTest {
         Model model = new ConcurrentModel();
 
         // when
-        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, model, redirectAttributes);
+        deliveriesController.showApprovalScreen(STORE_ID, DELIVERY_ID, null, model, redirectAttributes);
 
         // then
         assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
+        assertThat(model.getAttribute("dropshipOrderMissing")).isEqualTo(true);
     }
 
     @Test

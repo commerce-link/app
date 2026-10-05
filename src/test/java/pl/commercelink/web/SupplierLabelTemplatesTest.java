@@ -23,7 +23,7 @@ class SupplierLabelTemplatesTest {
         // the list resolves the label once per row in DeliveryRowMapper, so the template never sees an identity
         assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
         assertThat(template("deliveries/pending.html")).contains("row.providerLabel()").doesNotContain("row.provider()");
-        assertThat(template("deliveryApproval.html")).contains("supplierLabels.of(delivery.provider)");
+        assertThat(template("deliveries/approval.html")).contains("page.supplierLabel()");
         // the controller takes the name from SupplierLabels, the details page prints the model's value
         assertThat(Files.readString(Path.of("src/main/java/pl/commercelink/web/DeliveriesController.java")))
                 .contains("supplierLabels.forStoreId(storeId).of(delivery.getProvider())");
