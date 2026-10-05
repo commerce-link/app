@@ -22,14 +22,14 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 /** Renders the create-delivery pages as the controller would, with Spring's request context for th:field. */
-final class DeliveryCreateTemplates {
+public final class DeliveryCreateTemplates {
 
     static final String ORDER_ID = "e2ed0004-dropship-0000-0000-000000000000";
 
     private DeliveryCreateTemplates() {
     }
 
-    static String render(String template, Map<String, Object> variables) {
+    public static String render(String template, Map<String, Object> variables) {
         MockServletContext servletContext = new MockServletContext();
         GenericWebApplicationContext applicationContext = new GenericWebApplicationContext(servletContext);
         applicationContext.refresh();
@@ -46,11 +46,11 @@ final class DeliveryCreateTemplates {
         return html.substring(start, html.indexOf("</main>", start));
     }
 
-    static String fragment(String selector, Map<String, Object> variables) {
+    public static String fragment(String selector, Map<String, Object> variables) {
         return SettingsTemplateRenderer.render("<div th:replace=\"~{" + selector + "}\"></div>", variables);
     }
 
-    static int occurrences(String html, String needle) {
+    public static int occurrences(String html, String needle) {
         return html.split(Pattern.quote(needle), -1).length - 1;
     }
 

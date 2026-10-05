@@ -56,8 +56,9 @@ class OrderItemRowTest {
         assertThat(state(row, ItemAction.CONSOLIDATE).labelKey()).isEqualTo("order.item.menu.consolidate");
         assertThat(state(row, ItemAction.EDIT).available()).isTrue();
         assertThat(row.unitPrice()).isEqualTo("749,00");
-        // the cost is gross, like the price above it, so the two compare at a glance (client request 2026-09-30)
-        assertThat(row.unitCost()).isEqualTo("712,17");
+        // the cost is gross, like the price, and moved from under the price into the margin tooltip (client 2026-10-04)
+        assertThat(row.margin().cost()).isEqualTo("712,17");
+        assertThat(row.margin().percent()).isEqualTo("4,9");
         assertThat(row.statusTone()).isEqualTo("is-neutral");
         assertThat(row.readyForAllocation()).isFalse();
         assertThat(row.removable()).isTrue();
@@ -120,7 +121,7 @@ class OrderItemRowTest {
         OrderItemRow row = OrderItemRow.of(item, 0, context());
 
         // then: 579 net + 8% VAT
-        assertThat(row.unitCost()).isEqualTo("625,32");
+        assertThat(row.margin().cost()).isEqualTo("625,32");
     }
 
     @Test
@@ -129,7 +130,7 @@ class OrderItemRowTest {
         OrderItemRow forSuperAdmin = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, true));
 
         // then
-        assertThat(forSuperAdmin.unitCost()).isEqualTo("712,17");
+        assertThat(forSuperAdmin.margin().cost()).isEqualTo("712,17");
         assertThat(forSuperAdmin.actions()).isEmpty();
         assertThat(forSuperAdmin.editHref()).isNull();
     }

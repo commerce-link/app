@@ -167,11 +167,27 @@
         }
         var status = section.querySelector('[data-cl-suggestions-status]');
         var failed = section.querySelector('[data-cl-suggestions-failed]');
-        var summary = section.querySelector('summary');
-        summary.textContent = section.getAttribute('data-summary-loading');
-        status.hidden = false;
-        failed.hidden = true;
-        section.setAttribute('aria-busy', 'true');
+        var spinners = section.querySelectorAll('[data-cl-suggestions-spinner]');
+        // looked up each time: Font Awesome swaps the mark's <i> for an <svg> (keeping its data attributes) after load
+        function failedShown(on) {
+            failed.hidden = !on;
+            section.querySelectorAll('[data-cl-suggestions-failed-mark]').forEach(function (mark) {
+                mark.toggleAttribute('hidden', !on); // an <svg> has no hidden property, only the attribute
+            });
+        }
+        function busy(on) {
+            spinners.forEach(function (spinner) {
+                spinner.hidden = !on;
+            });
+            status.hidden = !on;
+            if (on) {
+                section.setAttribute('aria-busy', 'true');
+            } else {
+                section.removeAttribute('aria-busy');
+            }
+        }
+        failedShown(false);
+        busy(true);
         fetch(section.getAttribute('data-url'), { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
             .then(function (response) {
                 if (!response.ok) {
@@ -186,15 +202,12 @@
                     throw new Error('Not a suggestion list');
                 }
                 mergeSuggestions(section, Array.prototype.slice.call(list.querySelectorAll('tr[data-cl-suggestion]')));
-                status.hidden = true;
-                section.removeAttribute('aria-busy');
+                busy(false);
                 syncTotals(form);
             })
             .catch(function () {
-                summary.textContent = section.getAttribute('data-summary-failed');
-                status.hidden = true;
-                failed.hidden = false;
-                section.removeAttribute('aria-busy');
+                busy(false);
+                failedShown(true);
             });
     }
 
@@ -229,7 +242,9 @@
                 input.name = input.name.replace(/^suggestedItems\[\d+]/, 'suggestedItems[' + index + ']');
             });
         });
-        section.querySelector('summary').textContent = section.getAttribute('data-summary').replace('{0}', String(all.length));
+        section.querySelector('[data-cl-suggestions-title]').textContent =
+            section.getAttribute('data-summary').replace('{0}', String(all.length));
+        section.querySelector('[data-cl-suggestions-table]').hidden = all.length === 0;
         section.hidden = all.length === 0;
         if (focused && focused !== document.activeElement && document.body.contains(focused)) {
             focused.focus();

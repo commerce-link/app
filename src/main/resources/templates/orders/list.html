@@ -182,9 +182,42 @@
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                 </nav>
-                <table class="cl-table is-orders">
+                <!--/* Printing several order cards (design system "Pasek zaznaczenia"): while rows are checked, this row stands
+                       in for the table header (table-select.js) and is the only place that prints more than one card —
+                       the toolbar above keeps filtering and search only. Its button loads the checked orders' cards into
+                       print.js's hidden frame, asking first above ten cards. Never shown below 720 px (card mode) nor
+                       without JavaScript (the checkbox column is not drawn then either). */-->
+                <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
+                    <label class="cl-check-target">
+                        <input type="checkbox" class="cl-check-input" data-cl-select-all autocomplete="off"
+                               th:attr="aria-label=#{orders.list.select.all}, data-cl-label-select=#{orders.list.select.all}, data-cl-label-clear=#{orders.list.select.none}">
+                    </label>
+                    <span class="cl-selection-count" data-cl-selection-count
+                          th:attr="data-template=#{orders.list.selected('{k}', '{n}')}"></span>
+                    <div class="cl-selection-actions">
+                        <button type="button" class="cl-button is-primary" data-cl-select-confirm-above="10"
+                                th:attr="data-cl-select-print=@{/dashboard/orders/cards},
+                                         data-cl-select-confirm-title-few=#{orders.list.cards.confirm.title.few('{n}')},
+                                         data-cl-select-confirm-title-many=#{orders.list.cards.confirm.title.many('{n}')},
+                                         data-cl-select-confirm-message=#{orders.list.cards.confirm.message},
+                                         data-cl-select-confirm-action-few=#{orders.list.cards.confirm.action.few('{n}')},
+                                         data-cl-select-confirm-action-many=#{orders.list.cards.confirm.action.many('{n}')}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-print"></i></span>
+                            <span data-cl-selection-text th:attr="data-template=#{orders.list.cards.print('{k}')}"></span>
+                        </button>
+                        <button type="button" class="cl-link-button" data-cl-select-clear th:text="#{orders.list.selection.clear}"></button>
+                    </div>
+                </div>
+                <table class="cl-table is-orders" data-cl-select-table="true">
                     <thead>
                     <tr>
+                        <th scope="col" class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-all hidden autocomplete="off"
+                                       th:attr="aria-label=#{orders.list.select.all}, data-cl-label-select=#{orders.list.select.all}, data-cl-label-clear=#{orders.list.select.none}">
+                            </label>
+                        </th>
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(numberSort).ariaSort()}">
                             <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(numberSort).href()}}" th:text="#{orders.list.column.order}" data-cl-list-nav></a>
                         </th>
@@ -202,6 +235,14 @@
                     </thead>
                     <tbody>
                     <tr th:each="row : ${page.rows()}">
+                        <!--/* the 44 px label is the box's target; the cell lies above the row link (commercelink.css), so a
+                               tick never opens the order */-->
+                        <td class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-row hidden autocomplete="off"
+                                       th:value="${row.orderId()}" th:attr="aria-label=#{orders.list.select.row(${row.number()})}">
+                            </label>
+                        </td>
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{orders.list.column.order}">
                             <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
                             <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}" th:title="${row.externalId()}"></span></th:block></span>
@@ -249,8 +290,16 @@
             </section>
         </div>
     </div>
+
+    <!--/* inside .cl-page (its dialog styles are scoped there) but outside the results block list-page.js swaps, so it
+           survives every swap: the confirmation above ten cards */-->
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
 </section>
 
+<!--/* the scripts of the selection row (print.js prints in a hidden frame) */-->
+<script th:src="@{/js/table-select.js}" defer></script>
+<script th:src="@{/js/print.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
 <script th:src="@{/js/list-page.js}" defer></script>
 </div>
 

@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.SerialNumbers;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.StockSummary;
@@ -55,12 +56,11 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public WarehouseItemView findBySerialNo(String storeId, String serialNo) {
-        WarehouseItem warehouseItem = warehouseRepository.findBySerialNo(storeId, serialNo);
-        if (warehouseItem == null) {
-            return null;
-        }
-        return fromInternal(warehouseItem);
+    public List<WarehouseItemView> findAllBySerialNo(String storeId, String serialNo) {
+        return warehouseRepository.findBySerialNoCandidates(storeId, serialNo).stream()
+                .filter(item -> SerialNumbers.contains(item.getSerialNo(), serialNo))
+                .map(this::fromInternal)
+                .toList();
     }
 
     @Override
@@ -104,6 +104,7 @@ class BuiltInStockQueryService implements StockQueryService {
         return new WarehouseItemView(
                 warehouseItem.getStoreId(),
                 warehouseItem.getItemId(),
+                warehouseItem.getName(),
                 warehouseItem.getEan(),
                 warehouseItem.getManufacturerCode(),
                 Price.fromNet(warehouseItem.getEffectiveUnitSystemCost(), warehouseItem.getTax()),

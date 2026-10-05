@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -67,6 +68,7 @@ public class SupplierPurchaseService {
     private final DeliveriesQueryService deliveriesQueryService;
     private final DropshipPurchaseService dropshipPurchaseService;
     private final DropshipOrderLocator dropshipOrderLocator;
+    private final DeliveryRequestRejectionRecorder rejectionRecorder;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -375,7 +377,13 @@ public class SupplierPurchaseService {
 
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.addEvent(new Event(EventType.action, PURCHASE_APPROVED_EVENT, LocalDateTime.now()));
-        deliveriesRepository.save(delivery);
+        try {
+            deliveriesRepository.save(delivery);
+        } catch (ConditionalCheckFailedException e) {
+            // a rejection (or another approval) wrote the request since it was read: nothing may be queued
+            log.warn("Approval lost the race for delivery {} of store {}", deliveryId, storeId);
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
 
         publishPurchase(delivery);
 
@@ -537,8 +545,19 @@ public class SupplierPurchaseService {
         if (delivery == null || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        // read the allocations before they are released: they name the customer orders whose history gets the reason
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        // The versioned save claims the request: an approval (or another rejection) that wrote it since it was read
+        // makes it fail, and nothing is released under an order that is already on its way to the supplier.
+        try {
+            deliveriesRepository.save(delivery);
+        } catch (ConditionalCheckFailedException e) {
+            log.warn("Rejection lost the race for delivery {} of store {}", deliveryId, storeId);
+            return OperationResult.failure("deliveries.approval.error.state");
+        }
         deliveryCreationService.releaseAllocations(storeId, delivery);
         deliveriesRepository.delete(delivery);
+        rejectionRecorder.record(storeId, withAllocations != null ? withAllocations : delivery, reason);
         return OperationResult.success(delivery.getDeliveryId());
     }
 

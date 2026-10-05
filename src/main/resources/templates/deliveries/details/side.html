@@ -1,0 +1,118 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The read-only side column (spec §10): no card is a form; a change goes through a dialog, whose opener leads to the
+       page with that dialog open when JavaScript is off. */-->
+<section th:fragment="supplier" class="cl-card" aria-labelledby="supplier-title" th:with="s=${page.supplier()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="supplier-title" th:text="#{deliveries.details.supplier.title}"></h2></div>
+    <div class="cl-collapse-body" id="supplier-body">
+        <dl class="cl-kv is-column">
+            <div><dt th:text="#{deliveries.details.supplier.name}"></dt><dd th:text="${s.supplierName()}"></dd></div>
+            <div th:if="${s.connectionKey() != null}"><dt th:text="#{deliveries.details.supplier.connection}"></dt><dd
+                    th:text="#{${s.connectionKey()}}"></dd></div>
+            <div th:if="${s.counterparty() != null}"><dt th:text="#{deliveries.details.supplier.counterparty}"></dt><dd
+                    th:text="${s.counterparty()}"></dd></div>
+            <div th:class="${s.longNumber()} ? 'cl-kv-wide' : null">
+                <dt th:text="#{deliveries.details.supplier.number}"></dt>
+                <dd th:class="${s.longNumber()} ? 'cl-kv-text is-break' : null">
+                    <th:block th:if="${s.externalId() != null}">
+                        <a th:if="${s.externalIdHref() != null}" th:href="${s.externalIdHref()}" target="_blank" rel="noopener"><span
+                                th:text="${s.externalId()}"></span>&#8288;<span class="cl-link-icon" aria-hidden="true"><i
+                                class="fas fa-external-link-alt"></i></span></a>
+                        <span th:unless="${s.externalIdHref() != null}" th:text="${s.externalId()}"></span>&#8288;<button
+                            type="button" class="cl-copy-inline is-icon"
+                            th:attr="data-cl-copy=${s.externalId()}, aria-label=#{deliveries.details.supplier.number.copy}"><span
+                            class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button>
+                        <span th:if="${s.provisional()}" class="cl-status is-warn" th:text="#{deliveries.details.meta.provisional}"></span>
+                    </th:block>
+                    <span th:if="${s.externalId() == null}"
+                          th:text="${s.externalIdNoteKey() != null} ? #{${s.externalIdNoteKey()}} : '—'"></span>
+                </dd>
+            </div>
+            <div th:if="${s.orderChoices() != null}"><dt th:text="#{deliveries.details.supplier.choices}"></dt><dd
+                    th:text="${s.orderChoices()}"></dd></div>
+            <div th:if="${s.deliveryAddress() != null}" class="cl-kv-wide"><dt th:text="#{deliveries.details.supplier.address}"></dt><dd
+                    class="cl-kv-text" th:text="${s.deliveryAddress()}"></dd></div>
+        </dl>
+    </div>
+</section>
+
+<section th:fragment="consignee" class="cl-card" aria-labelledby="consignee-title" data-cl-collapse th:with="c=${page.consignee()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="consignee-title" th:text="#{deliveries.details.consignee.title}"></h2></div>
+    <div class="cl-collapse-body" id="consignee-body">
+        <div th:if="${c.name() != null or c.orderShortId() != null}" class="cl-address">
+            <div th:if="${c.orderShortId() != null}" class="cl-address-head"><span class="cl-eyebrow"><span th:text="#{deliveries.details.consignee.order}"></span>
+                <a th:if="${c.orderHref() != null}" th:href="@{${c.orderHref()}}" th:text="${c.orderShortId()}"></a><span
+                        th:if="${c.orderHref() == null}" th:text="${c.orderShortId()}"></span></span></div>
+            <th:block th:if="${c.name() != null}"><strong th:text="${c.name()}"></strong><br></th:block>
+            <th:block th:if="${c.street() != null}"><span th:text="${c.street()}"></span><br></th:block>
+            <span th:if="${c.cityLine() != null}" th:text="${c.cityLine()}"></span>
+            <div th:if="${c.phone() != null}"><a th:href="'tel:' + ${c.phone()}" th:text="${c.phone()}"></a></div>
+            <div th:if="${c.email() != null}"><a th:href="'mailto:' + ${c.email()}" th:text="${c.email()}"></a>&#8288;<button
+                    type="button" class="cl-copy-inline is-icon"
+                    th:attr="data-cl-copy=${c.email()}, aria-label=#{deliveries.details.consignee.copy.email(${c.email()})}"><span
+                    class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></div>
+        </div>
+        <dl th:if="${c.hasShipment()}" class="cl-kv is-column">
+            <div th:if="${c.shipmentTypeKey() != null}"><dt th:text="#{deliveries.details.consignee.method}"></dt><dd
+                    th:text="${c.carrier() != null} ? #{${c.shipmentTypeKey()}} + ' · ' + ${c.carrier()} : #{${c.shipmentTypeKey()}}"></dd></div>
+            <div th:if="${c.collectionPoint() != null}"><dt th:text="#{deliveries.details.consignee.point}"></dt><dd
+                    th:text="${c.collectionPoint()}"></dd></div>
+            <div th:if="${c.trackingNo() != null}"><dt th:text="#{deliveries.details.consignee.tracking}"></dt><dd><button
+                    type="button" class="cl-copy-inline"
+                    th:attr="data-cl-copy=${c.trackingNo()}, aria-label=#{deliveries.details.consignee.tracking.copy(${c.trackingNo()})}"><span
+                    class="cl-copy-code"><span th:text="${c.trackingNo()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i
+                    class="far fa-copy"></i></span></span></button></dd></div>
+            <div th:if="${c.shippedAt() != null}"><dt th:text="#{deliveries.details.consignee.shippedAt}"></dt><dd
+                    th:text="${c.shippedAt()}"></dd></div>
+            <div th:if="${c.supplierStateKey() != null}"><dt th:text="#{deliveries.details.consignee.supplierState}"></dt><dd
+                    th:text="#{${c.supplierStateKey()}}"></dd></div>
+        </dl>
+    </div>
+</section>
+
+<section th:fragment="terms" class="cl-card" aria-labelledby="terms-title" data-cl-collapse th:with="t=${page.terms()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="terms-title" th:text="#{deliveries.details.terms.card}"></h2>
+        <a th:if="${t.edit().visible()}" class="cl-link-button" th:href="@{${t.editHref()}}" data-cl-dialog-open="terms-dialog"
+           th:attr="aria-label=#{deliveries.details.terms.edit.label}" th:text="#{deliveries.details.terms.edit}"></a>
+    </div>
+    <div class="cl-collapse-body" id="terms-body">
+        <dl class="cl-kv is-column">
+            <div><dt th:text="#{deliveries.details.terms.ordered}"></dt><dd th:text="${t.orderedAt() ?: '—'}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.eta}"></dt><dd th:text="${t.estimatedDeliveryAt() ?: '—'}"></dd></div>
+            <div th:if="${t.receivedAt() != null}"><dt th:text="#{${t.receivedLabelKey()}}"></dt><dd th:text="${t.receivedAt()}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.paymentTerms}"></dt><dd
+                    th:text="#{deliveries.details.terms.paymentTermsValue(${t.paymentTerms()})}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.goods}"></dt><dd class="is-numeric"
+                    th:text="#{general.currency.amount(${t.goodsNet()})}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.shippingNet}"></dt><dd class="is-numeric"
+                    th:text="#{general.currency.amount(${t.shippingNet()})}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.paymentNet}"></dt><dd class="is-numeric"
+                    th:text="#{general.currency.amount(${t.paymentNet()})}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.vatLabel}"></dt><dd
+                    th:text="${t.reverseCharge()} ? #{deliveries.details.terms.reverseCharge} : (${t.vatPercent() != null} ? #{deliveries.details.terms.vatValue(${t.vatPercent()})} : '—')"></dd></div>
+            <div class="cl-kv-total"><dt th:text="#{deliveries.details.terms.totalNet}"></dt><dd class="is-numeric"
+                    th:text="#{general.currency.amount(${t.totalNet()})}"></dd></div>
+            <div><dt th:text="#{deliveries.details.terms.totalGross}"></dt><dd class="is-numeric"><strong
+                    th:text="${t.totalGross() != null} ? #{general.currency.amount(${t.totalGross()})} : '—'"></strong></dd></div>
+        </dl>
+    </div>
+</section>
+
+<section th:fragment="comment" class="cl-card" aria-labelledby="comment-title" th:with="c=${page.comment()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="comment-title" th:text="#{deliveries.details.comment.card}"></h2>
+        <a th:if="${c.edit().visible()}" class="cl-link-button" th:href="@{${c.editHref()}}" data-cl-dialog-open="comment-dialog"
+           th:attr="aria-label=#{deliveries.details.comment.edit.label}" th:text="#{deliveries.details.terms.edit}"></a>
+    </div>
+    <div class="cl-collapse-body" id="comment-body">
+        <dl th:if="${c.text() != null}" class="cl-kv is-column"><div class="cl-kv-wide"><dt class="cl-visually-hidden"
+                th:text="#{deliveries.details.comment.card}"></dt><dd class="cl-kv-text cl-clamp" data-cl-clamp
+                th:attr="data-cl-label-more=#{deliveries.details.comment.more}, data-cl-label-less=#{deliveries.details.comment.less}"
+                th:text="${c.text()}"></dd></div></dl>
+        <p th:if="${c.text() == null}" class="cl-list-empty" th:text="#{deliveries.details.comment.empty}"></p>
+    </div>
+</section>
+</body>
+</html>

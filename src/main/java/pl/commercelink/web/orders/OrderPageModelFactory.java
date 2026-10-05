@@ -779,6 +779,9 @@ public class OrderPageModelFactory {
                 && Arrays.stream(EmailNotificationType.values()).anyMatch(type -> type.name().equals(name))) {
             return new OrderPageModel.EventRow(at, "order.event.type.email", "email.notification.type." + name, null);
         }
+        if (event.getType() == EventType.action && OrderEvent.DELIVERY_REQUEST_REJECTED.equals(name)) {
+            return new OrderPageModel.EventRow(at, "order.event.type.action." + name, null, event.getDetails());
+        }
         if (event.getType() == EventType.action && KNOWN_ACTIONS.contains(name)) {
             return new OrderPageModel.EventRow(at, "order.event.type.action." + name, null, null);
         }
