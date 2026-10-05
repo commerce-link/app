@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
@@ -21,7 +20,6 @@ public class ProductCleanupScheduler {
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final StoresRepository storesRepository;
-    private final StoreActivity storeActivity;
 
     @Value("${product.cleanup.days:7}")
     private int cleanupDays;
@@ -29,12 +27,10 @@ public class ProductCleanupScheduler {
     @Autowired
     public ProductCleanupScheduler(ProductCatalogRepository productCatalogRepository, 
                                    ProductRepository productRepository,
-                                   StoresRepository storesRepository,
-                                   StoreActivity storeActivity) {
+                                   StoresRepository storesRepository) {
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.storesRepository = storesRepository;
-        this.storeActivity = storeActivity;
     }
 
     @SqsListener(
@@ -47,9 +43,6 @@ public class ProductCleanupScheduler {
         LocalDateTime thresholdDate = LocalDateTime.now().minusDays(cleanupDays);
         List<Store> stores = storesRepository.findAll();
         for (Store store : stores) {
-            if (!storeActivity.isActive(store)) {
-                continue;
-            }
             List<ProductCatalog> catalogs = productCatalogRepository.findAll(store.getStoreId());
             
             for (ProductCatalog catalog : catalogs) {
