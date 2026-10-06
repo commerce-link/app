@@ -26,6 +26,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,6 +75,8 @@ class ShipmentPickupControllerTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
+        when(pickupService.pageWindows(any(), any(), anyList(), anyInt()))
+                .thenReturn(new ShipmentPickupService.PageWindows(List.of(), Map.of()));
         controller = new ShipmentPickupController(pickupService, storesRepository, providerFactory, messages);
     }
 
@@ -127,7 +130,7 @@ class ShipmentPickupControllerTest {
     void theRequestedGroupIsShownWithItsPackagesAndTheWindowsOfTheNextFourDays() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
-        when(pickupService.windows(store, "furgonetka", List.of("1", "2"), 4)).thenReturn(List.of(WINDOW));
+        when(pickupService.pageWindows(store, "furgonetka", List.of("1", "2"), 4)).thenReturn(new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of()));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -138,8 +141,8 @@ class ShipmentPickupControllerTest {
                 .containsExactly("dhl · Furgonetka · Magazyn Główny · paczek: 1", "dpd · Furgonetka · Biuro · paczek: 2");
         assertThat(page.groups()).extracting(ShipmentPickupPage.GroupOption::selected).containsExactly(false, true);
         assertThat(page.packages()).containsExactly(
-                new ShipmentPickupPage.PackageRow("1", "7a3f2c1e · TRK-1", "to zamówienie"),
-                new ShipmentPickupPage.PackageRow("2", "91c4e0b2 · TRK-2", null));
+                new ShipmentPickupPage.PackageRow("1", "7a3f2c1e · TRK-1", "to zamówienie", null),
+                new ShipmentPickupPage.PackageRow("2", "91c4e0b2 · TRK-2", null, null));
         assertThat(page.address()).isEqualTo("Biuro, Magazynowa 1, 00-001 Warszawa");
         assertThat(page.windows()).containsExactly(new ShipmentPickupPage.WindowOption(WINDOW_VALUE, "czw. 8 paź, 9:00–17:00"));
         assertThat(page.windowsError()).isNull();
@@ -156,7 +159,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(page.selectedKey()).isEqualTo(DHL.key());
-        verify(pickupService).windows(store, "furgonetka", List.of("9"), 4);
+        verify(pickupService).pageWindows(store, "furgonetka", List.of("9"), 4);
     }
 
     @Test
@@ -181,14 +184,14 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(page.hasGroups()).isFalse();
-        verify(pickupService, never()).windows(any(), any(), anyList(), anyInt());
+        verify(pickupService, never()).pageWindows(any(), any(), anyList(), anyInt());
     }
 
     @Test
     void aProviderErrorReadingTheWindowsIsShownInsteadOfThem() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.windows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingException("Brak usługi odbioru"));
+        when(pickupService.pageWindows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingException("Brak usługi odbioru"));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -202,7 +205,7 @@ class ShipmentPickupControllerTest {
     void aDisconnectedIntegrationIsNamedWhenTheWindowsAreRead() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.windows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingUnavailableException(STORE_ID));
+        when(pickupService.pageWindows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingUnavailableException(STORE_ID));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -358,5 +361,51 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders");
+    }
+
+    @Test
+    void aPackageTheCarrierRefusesIsNamedAndLeftOutWhileTheOthersKeepTheirWindows() {
+        // given: package 2 was booked in the provider's panel, so the carrier gives no windows for it
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+        when(pickupService.pageWindows(store, "furgonetka", List.of("1", "2"), 4)).thenReturn(
+                new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of("2", "Przesyłka została już zamówiona")));
+
+        // when
+        ShipmentPickupPage page = open(DPD.key(), BACK);
+
+        // then
+        assertThat(page.canOrder()).isTrue();
+        assertThat(page.packages()).extracting(ShipmentPickupPage.PackageRow::orderable).containsExactly(true, false);
+        assertThat(page.packages().get(1).refusal())
+                .isEqualTo("Przewoźnik nie poda terminu odbioru tej paczki: Przesyłka została już zamówiona. "
+                        + "Jeśli trafiła do niego inaczej, oznacz ją jako przekazaną.");
+    }
+
+    @Test
+    void aPackageHandedOverElsewhereLeavesTheListAndThePageReturnsToItsGroup() {
+        // given
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+        when(pickupService.handOver(STORE_ID, "2")).thenReturn(true);
+
+        // when
+        String view = controller.handedOver(DPD.key(), "2", BACK, redirect, POLISH);
+
+        // then
+        assertThat(view).startsWith("redirect:/dashboard/shipping/pickups/new?group=");
+        assertThat(redirect.getFlashAttributes().get("successMessage")).isEqualTo("Paczka nie czeka już na odbiór.");
+    }
+
+    @Test
+    void aPackageNoLongerWaitingCannotBeHandedOver() {
+        // given: e.g. another tab ordered its pickup meanwhile
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+        when(pickupService.handOver(STORE_ID, "2")).thenReturn(false);
+
+        // when
+        controller.handedOver(DPD.key(), "2", BACK, redirect, POLISH);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("pickupError"))
+                .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
     }
 }

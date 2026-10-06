@@ -315,4 +315,79 @@ class ShipmentPickupServiceTest {
         verifyNoInteractions(provider);
         verifyNoInteractions(orderOwner);
     }
+
+    private static ShippingException refusal(String message) {
+        return new ShippingException("HTTP 400",
+                new HttpClientException(400, "{\"errors\":[{\"message\":\"" + message + "\",\"code\":\"sent\"}]}"));
+    }
+
+    @Test
+    void aPackageTheCarrierRefusesIsLeftOutAndTheOthersGetTheirWindows() {
+        // given: the provider refuses the whole request because of package 2 alone
+        when(provider.pickupWindows(eq(List.of("1", "2", "3")), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
+        when(provider.pickupWindows(eq(List.of("1")), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("2")), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
+        when(provider.pickupWindows(eq(List.of("3")), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("1", "3")), any(), eq(4))).thenReturn(List.of(WINDOW));
+
+        // when
+        ShipmentPickupService.PageWindows result = service.pageWindows(store, "furgonetka", List.of("1", "2", "3"), 4);
+
+        // then
+        assertThat(result.windows()).containsExactly(WINDOW);
+        assertThat(result.refused()).containsOnlyKeys("2").containsValue("Przesyłka została już zamówiona");
+    }
+
+    @Test
+    void anErrorThatIsNotARefusalIsNotBlamedOnAPackage() {
+        // given: the provider is down
+        when(provider.pickupWindows(anyList(), any(), eq(4))).thenThrow(new ShippingException("HTTP 503",
+                new HttpClientException(503, "unavailable")));
+
+        // when / then: one call, the error goes to the page as before
+        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", List.of("1", "2"), 4))
+                .isInstanceOf(ShippingException.class);
+        verify(provider, times(1)).pickupWindows(anyList(), any(), eq(4));
+    }
+
+    @Test
+    void aRefusalNoSinglePackageExplainsIsShownAsBefore() {
+        // given: the packages are fine alone, only the pair is refused
+        when(provider.pickupWindows(eq(List.of("1", "2")), any(), eq(4))).thenThrow(refusal("Różne adresy"));
+        when(provider.pickupWindows(eq(List.of("1")), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("2")), any(), eq(4))).thenReturn(List.of(WINDOW));
+
+        // when / then
+        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", List.of("1", "2"), 4))
+                .isInstanceOf(ShippingException.class);
+    }
+
+    @Test
+    void aPackageHandedOverElsewhereStopsWaitingAndLeavesTheIndex() {
+        // given
+        when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "order-1")));
+        ArgumentCaptor<UnaryOperator<ShipmentPickup>> change = ArgumentCaptor.forClass(UnaryOperator.class);
+        when(orderOwner.applyPickup(eq("store-1"), eq("order-1"), eq(List.of("1")), change.capture())).thenReturn(1);
+
+        // when
+        boolean handedOver = service.handOver("store-1", "1");
+
+        // then
+        assertThat(handedOver).isTrue();
+        assertThat(change.getValue().apply(ShipmentPickup.awaiting()).getStatus())
+                .isEqualTo(pl.commercelink.orders.ShipmentPickupStatus.HANDED_OVER);
+        ShipmentPickup ordering = pending("cmd-1");
+        assertThat(change.getValue().apply(ordering)).isSameAs(ordering);
+        verify(index).remove("store-1", List.of("1"));
+    }
+
+    @Test
+    void aPackageNotInTheStoresIndexIsNotHandedOver() {
+        // given: an id of another store, or one whose pickup was ordered meanwhile
+        when(index.list("store-1")).thenReturn(List.of());
+
+        // when / then
+        assertThat(service.handOver("store-1", "foreign")).isFalse();
+        verify(orderOwner, never()).applyPickup(anyString(), anyString(), anyCollection(), any());
+    }
 }

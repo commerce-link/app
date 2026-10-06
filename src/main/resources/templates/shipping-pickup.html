@@ -50,15 +50,23 @@
                     <input type="hidden" name="group" th:value="${p.selectedKey()}">
                     <input type="hidden" name="back" th:value="${p.back()}">
                     <div class="cl-card">
-                        <fieldset class="cl-fieldset">
+                        <fieldset class="cl-fieldset" aria-describedby="pickup-packages-help">
                             <legend class="cl-fieldset-title" th:text="#{shipping.pickup.packages}"></legend>
-                            <ul class="cl-check-list" aria-describedby="pickup-packages-help">
+                            <ul class="cl-check-list has-actions">
                                 <li th:each="row : ${p.packages()}">
                                     <label class="cl-check">
-                                        <input type="checkbox" name="externalIds" th:value="${row.externalId()}" checked>
+                                        <input type="checkbox" name="externalIds" th:value="${row.externalId()}"
+                                               th:checked="${row.orderable()}" th:disabled="${!row.orderable()}">
                                         <span><span th:text="${row.label()}"></span>
                                             <span th:if="${row.marker() != null}" class="cl-optional" th:text="${row.marker()}"></span></span>
                                     </label>
+                                    <!--/* sent with the order form's group and back; the window is not needed, so no validation */-->
+                                    <button type="submit" class="cl-link-button" formnovalidate name="handedOver"
+                                            th:value="${row.externalId()}"
+                                            th:formaction="@{/dashboard/shipping/pickups/handed-over}"
+                                            th:attr="aria-label=#{shipping.pickup.handed.over.action} + ': ' + ${row.label()}"
+                                            th:text="#{shipping.pickup.handed.over.action}"></button>
+                                    <p th:if="${!row.orderable()}" class="cl-check-note is-warn" th:text="${row.refusal()}"></p>
                                 </li>
                             </ul>
                             <p class="cl-help" id="pickup-packages-help" th:text="#{shipping.pickup.packages.help}"></p>

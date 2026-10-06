@@ -17,12 +17,17 @@ class ShipmentPickupTemplateTest {
 
     private static ShipmentPickupPage page(List<ShipmentPickupPage.WindowOption> windows, String windowsError,
                                            String formError) {
+        return page(windows, windowsError, formError, null);
+    }
+
+    private static ShipmentPickupPage page(List<ShipmentPickupPage.WindowOption> windows, String windowsError,
+                                           String formError, String refusal) {
         return new ShipmentPickupPage(
                 List.of(new ShipmentPickupPage.GroupOption("furgonetka|dhl|addr-1", "dhl · Furgonetka · Magazyn · paczek: 1", false),
                         new ShipmentPickupPage.GroupOption(KEY, "dpd · Furgonetka · Magazyn · paczek: 2", true)),
                 KEY,
-                List.of(new ShipmentPickupPage.PackageRow("1", "7a3f2c1e · TRK-1", "to zamówienie"),
-                        new ShipmentPickupPage.PackageRow("2", "91c4e0b2 · TRK-2", null)),
+                List.of(new ShipmentPickupPage.PackageRow("1", "7a3f2c1e · TRK-1", "to zamówienie", null),
+                        new ShipmentPickupPage.PackageRow("2", "91c4e0b2 · TRK-2", null, refusal)),
                 "Magazyn, Magazynowa 1, 00-001 Warszawa", windows, windowsError, formError, BACK);
     }
 
@@ -55,7 +60,7 @@ class ShipmentPickupTemplateTest {
                 .contains("action=\"/dashboard/shipping/pickups\"")
                 .contains("<input type=\"hidden\" name=\"group\" value=\"furgonetka|dpd|addr-1\">")
                 .contains("<input type=\"hidden\" name=\"back\" value=\"" + BACK + "\">")
-                .contains("<input type=\"checkbox\" name=\"externalIds\" value=\"1\" checked>")
+                .contains("<input type=\"checkbox\" name=\"externalIds\" value=\"1\" checked=\"checked\">")
                 .contains("<span>7a3f2c1e · TRK-1</span> <span class=\"cl-optional\">to zamówienie</span>")
                 .contains("Magazyn, Magazynowa 1, 00-001 Warszawa")
                 .contains("class=\"cl-choice-group is-row\" aria-label=\"Dzień i godziny odbioru\"")
@@ -113,5 +118,34 @@ class ShipmentPickupTemplateTest {
         // then
         assertThat(html).contains("<p class=\"cl-list-empty\">Żadna paczka nie czeka na odbiór.</p>")
                 .doesNotContain("<form");
+    }
+
+    @Test
+    void everyPackageCanBeMarkedAsHandedOverOutsideTheApp() {
+        // when
+        String html = render(page(List.of(), null, null));
+
+        // then: the button posts the order form to its own action, without the form's validation
+        assertThat(html).contains("<button type=\"submit\" class=\"cl-link-button\" formnovalidate name=\"handedOver\" "
+                        + "value=\"1\" formaction=\"/dashboard/shipping/pickups/handed-over\" "
+                        + "aria-label=\"Przekazana poza CommerceLink: 7a3f2c1e · TRK-1\">Przekazana poza CommerceLink</button>")
+                .contains("value=\"2\" formaction=\"/dashboard/shipping/pickups/handed-over\"");
+    }
+
+    @Test
+    void aPackageTheCarrierRefusesIsUntickedDisabledAndExplained() {
+        // given
+        ShipmentPickupPage page = page(List.of(
+                new ShipmentPickupPage.WindowOption("2026-10-08|09:00|17:00|h-1", "czw. 8 paź, 9:00–17:00")), null, null,
+                "Przewoźnik nie poda terminu odbioru tej paczki: Przesyłka została już zamówiona.");
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("<input type=\"checkbox\" name=\"externalIds\" value=\"2\" disabled=\"disabled\">")
+                .contains("<p class=\"cl-check-note is-warn\">Przewoźnik nie poda terminu odbioru tej paczki: "
+                        + "Przesyłka została już zamówiona.</p>")
+                .contains("<button type=\"submit\" class=\"cl-button is-primary\">Zamów odbiór</button>");
     }
 }

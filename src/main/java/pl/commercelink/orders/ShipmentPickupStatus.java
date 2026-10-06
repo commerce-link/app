@@ -8,5 +8,7 @@ public enum ShipmentPickupStatus {
     PENDING,
     ORDERED,
     /** The last order did not work; it can be ordered again. */
-    FAILED
+    FAILED,
+    /** The operator handed it to the carrier another way (at a point, a courier booked elsewhere): nothing to order. */
+    HANDED_OVER
 }

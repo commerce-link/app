@@ -2211,6 +2211,35 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aPackageHandedOverOutsideCommerceLinkSaysSoAndOrdersNoPickup() {
+        // given
+        Shipment handedOver = furgonetkaPackage();
+        handedOver.setPickup(ShipmentPickup.handedOver());
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(handedOver), List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.handed.over");
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void aDeliveredPackageNoLongerWaitsForAPickup() {
+        // given: the carrier delivered it, so somebody brought it to the carrier whatever the pickup state says
+        Shipment delivered = furgonetkaPackage();
+        delivered.setPickup(ShipmentPickup.awaiting());
+        delivered.setDeliveredAt(java.time.LocalDateTime.of(2026, 10, 8, 12, 0));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(delivered), List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(delivered.awaitsPickup()).isFalse();
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
     void aPackageHandedInAtAPointSaysSo() {
         // given
         Shipment point = furgonetkaPackage();

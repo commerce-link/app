@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -63,12 +64,14 @@ public class ShipmentPickupController {
         String safeBack = safeBack(back);
 
         List<ShipmentPickupPage.WindowOption> windows = List.of();
+        Map<String, String> refused = Map.of();
         String windowsError = null;
         if (selected != null) {
             try {
-                windows = pickupService.windows(store, selected.provider(), externalIds(selected), DAYS_AHEAD).stream()
-                        .map(w -> windowOption(w, locale))
-                        .toList();
+                ShipmentPickupService.PageWindows pageWindows =
+                        pickupService.pageWindows(store, selected.provider(), externalIds(selected), DAYS_AHEAD);
+                windows = pageWindows.windows().stream().map(w -> windowOption(w, locale)).toList();
+                refused = pageWindows.refused();
             } catch (ShippingUnavailableException e) {
                 windowsError = messageSource.getMessage("shipping.error.no.provider", null, locale);
             } catch (RuntimeException e) {
@@ -80,7 +83,7 @@ public class ShipmentPickupController {
         model.addAttribute("pickupPage", new ShipmentPickupPage(
                 groups.stream().map(g -> groupOption(g, g == selected, store, locale)).toList(),
                 selected == null ? null : selected.key(),
-                selected == null ? List.of() : selected.entries().stream().map(e -> packageRow(e, safeBack, locale)).toList(),
+                selected == null ? List.of() : packageRows(selected, refused, safeBack, locale),
                 selected == null ? null : addressLine(store, selected.pickUpAddressId(), locale),
                 windows, windowsError, (String) model.getAttribute(FORM_ERROR), safeBack));
         return "shipping-pickup";
@@ -129,6 +132,19 @@ public class ShipmentPickupController {
         return "redirect:" + safeBack;
     }
 
+    /** The package went to the carrier without "Zamów odbiór" (a point, the provider's panel): it stops waiting. */
+    @PostMapping("/dashboard/shipping/pickups/handed-over")
+    public String handedOver(@RequestParam String group, @RequestParam String handedOver,
+                             @RequestParam(required = false) String back, RedirectAttributes redirectAttributes,
+                             Locale locale) {
+        if (pickupService.handOver(storeId(), handedOver)) {
+            redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage("shipping.pickup.handed.over.done", null, locale));
+            return redirect(PAGE, group, safeBack(back));
+        }
+        return backToPage(group, safeBack(back), "shipping.pickup.gone", redirectAttributes, locale);
+    }
+
     private String storeId() {
         return CustomSecurityContext.getStoreId();
     }
@@ -159,12 +175,21 @@ public class ShipmentPickupController {
     private String backToPage(String group, String back, String errorKey, RedirectAttributes redirectAttributes,
                               Locale locale) {
         redirectAttributes.addFlashAttribute(FORM_ERROR, message(errorKey, locale));
-        return "redirect:" + UriComponentsBuilder.fromPath(PAGE)
+        return redirect(PAGE, group, back);
+    }
+
+    private static String redirect(String page, String group, String back) {
+        return "redirect:" + UriComponentsBuilder.fromPath(page)
                 .queryParam("group", group)
                 .queryParam("back", back)
                 .encode()
                 .build()
                 .toUriString();
+    }
+
+    private List<ShipmentPickupPage.PackageRow> packageRows(PickupGroup group, Map<String, String> refused, String back,
+                                                            Locale locale) {
+        return group.entries().stream().map(e -> packageRow(e, refused.get(e.getExternalId()), back, locale)).toList();
     }
 
     private ShipmentPickupPage.GroupOption groupOption(PickupGroup group, boolean selected, Store store, Locale locale) {
@@ -178,9 +203,12 @@ public class ShipmentPickupController {
         return new ShipmentPickupPage.GroupOption(group.key(), label, selected);
     }
 
-    private ShipmentPickupPage.PackageRow packageRow(AwaitingPickup entry, String back, Locale locale) {
+    private ShipmentPickupPage.PackageRow packageRow(AwaitingPickup entry, String refusal, String back, Locale locale) {
         String label = ConversionUtil.getShortenedId(entry.getOwnerId()) + " · " + entry.getTrackingNo();
-        return new ShipmentPickupPage.PackageRow(entry.getExternalId(), label, ownerMarker(entry, back, locale));
+        String refusalLine = refusal == null ? null
+                : messageSource.getMessage("shipping.pickup.package.refused", new Object[]{refusal}, locale);
+        return new ShipmentPickupPage.PackageRow(entry.getExternalId(), label, ownerMarker(entry, back, locale),
+                refusalLine);
     }
 
     // the package of the order or RMA the operator came from reads "to zamówienie" / "to zgłoszenie"

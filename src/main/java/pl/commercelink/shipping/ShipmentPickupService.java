@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -82,6 +83,61 @@ public class ShipmentPickupService {
             return List.of();
         }
         return shippingProvider.pickupWindows(externalIds, LocalDate.now(), daysAhead);
+    }
+
+    /**
+     * Windows for the page. One package the carrier refuses (e.g. its pickup was booked in the provider's panel, or it
+     * was handed in at a point) makes the provider refuse the whole request, which would leave every package of the
+     * group without a courier: on a refusal each package is asked about alone, the refused ones are named with the
+     * provider's reason and the windows are those of the rest. An error that is not a refusal is thrown as before.
+     */
+    public PageWindows pageWindows(Store store, String provider, List<String> externalIds, int daysAhead) {
+        try {
+            return new PageWindows(windows(store, provider, externalIds, daysAhead), Map.of());
+        } catch (RuntimeException e) {
+            if (!ProviderErrors.isRefusal(e)) {
+                throw e;
+            }
+            Map<String, String> refused = new LinkedHashMap<>();
+            for (String externalId : externalIds) {
+                try {
+                    windows(store, provider, List.of(externalId), daysAhead);
+                } catch (RuntimeException single) {
+                    if (!ProviderErrors.isRefusal(single)) {
+                        throw single;
+                    }
+                    refused.put(externalId, ProviderErrors.describe(single));
+                }
+            }
+            if (refused.isEmpty()) {
+                throw e;
+            }
+            List<String> rest = externalIds.stream().filter(id -> !refused.containsKey(id)).toList();
+            return new PageWindows(windows(store, provider, rest, daysAhead), refused);
+        }
+    }
+
+    /** The windows of the packages the carrier accepts, and the refused packages with the carrier's reason. */
+    public record PageWindows(List<PickupWindow> windows, Map<String, String> refused) {
+    }
+
+    /**
+     * The operator gave the package to the carrier without "Zamów odbiór": it no longer waits for a courier and leaves
+     * the pickup list. False when it does not wait in the store's index any more.
+     */
+    public boolean handOver(String storeId, String externalId) {
+        AwaitingPickup entry = index.list(storeId).stream()
+                .filter(e -> externalId.equals(e.getExternalId()))
+                .findFirst().orElse(null);
+        if (entry == null) {
+            return false;
+        }
+        int changed = owners.get(entry.getOwnerType()).applyPickup(storeId, entry.getOwnerId(), List.of(externalId),
+                p -> p.isAwaiting() ? ShipmentPickup.handedOver() : p);
+        if (changed > 0) {
+            index.remove(storeId, List.of(externalId));
+        }
+        return changed > 0;
     }
 
     public PickupStart order(Store store, String provider, List<PickupTarget> targets, PickupWindow window) {

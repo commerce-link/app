@@ -246,7 +246,8 @@ public class Shipment {
 
     @DynamoDBIgnore
     public boolean awaitsPickup() {
-        return creation == null && pickup != null && pickup.isAwaiting();
+        // a delivered package was evidently collected, whoever brought it to the carrier
+        return creation == null && deliveredAt == null && pickup != null && pickup.isAwaiting();
     }
 
     @DynamoDBIgnore

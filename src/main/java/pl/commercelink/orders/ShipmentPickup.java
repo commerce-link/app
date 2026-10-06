@@ -68,6 +68,10 @@ public class ShipmentPickup {
         return new ShipmentPickup(ShipmentPickupStatus.NOT_REQUIRED, null, null, null, null, null, null, null, null);
     }
 
+    public static ShipmentPickup handedOver() {
+        return new ShipmentPickup(ShipmentPickupStatus.HANDED_OVER, null, null, null, null, null, null, null, null);
+    }
+
     public static ShipmentPickup awaiting() {
         return new ShipmentPickup(ShipmentPickupStatus.AWAITING, null, null, null, null, null, null, null, null);
     }

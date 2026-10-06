@@ -15,8 +15,15 @@ public record ShipmentPickupPage(List<GroupOption> groups, String selectedKey, L
     public record GroupOption(String key, String label, boolean selected) {
     }
 
-    /** A package of the chosen group: "{short owner id} · {tracking number}", marker for the owner the page came from. */
-    public record PackageRow(String externalId, String label, String marker) {
+    /**
+     * A package of the chosen group: "{short owner id} · {tracking number}", marker for the owner the page came from,
+     * refusal when the carrier gives no windows for it (it is then left out of the order).
+     */
+    public record PackageRow(String externalId, String label, String marker, String refusal) {
+
+        public boolean orderable() {
+            return refusal == null;
+        }
     }
 
     /** value: date|from|to|token, as the form posts it back. */
