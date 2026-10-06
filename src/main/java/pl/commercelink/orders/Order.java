@@ -659,12 +659,20 @@ public class Order {
      * Something is left to book a courier for: a shipment without its shipping data, or no shipment at all (the only
      * one removed; the courier booking then creates it). An order whose every shipment is sent has nothing to book. A
      * shipment with a courier order (externalId) is booked whatever its dates say: booking again would pay for a second
-     * label next to the first one, which the booking's replaced list would no longer let anyone cancel.
+     * label next to the first one, which the booking's replaced list would no longer let anyone cancel. A shipment being created is not "to book";
+     * one whose creation failed is, even with a courier order id.
      */
     @DynamoDBIgnore
     public boolean hasShipmentToBook() {
         return shipments.isEmpty() || shipments.stream()
-                .anyMatch(shipment -> shipment.getExternalId() == null && !shipment.hasShippingData());
+                .anyMatch(shipment -> shipment.creationFailed()
+                        || (!shipment.isCreating() && shipment.getExternalId() == null && !shipment.hasShippingData()));
+    }
+
+    /** A shipment is still being created at the provider: no second booking may start meanwhile. */
+    @DynamoDBIgnore
+    public boolean hasShipmentBeingCreated() {
+        return shipments.stream().anyMatch(Shipment::isCreating);
     }
 
     @DynamoDBIgnore
@@ -679,7 +687,8 @@ public class Order {
      */
     @DynamoDBIgnore
     public Optional<Shipment> courierShipmentToCancel() {
-        return shipments.stream().filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).findFirst();
+        return shipments.stream().filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null && s.getCreation() == null)
+                .findFirst();
     }
 
     /** The first shipment handed to a carrier (its carrier, tracking number and shipped date), if any. */

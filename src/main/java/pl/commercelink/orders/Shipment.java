@@ -41,6 +41,17 @@ public class Shipment {
     /** The last cancel command of the courier order; null when none was sent. */
     @DynamoDBAttribute(attributeName = "cancellation")
     private CourierCancellation cancellation;
+    /** The shipping integration that created it (e.g. "furgonetka"); null for one typed by hand. */
+    @DynamoDBAttribute(attributeName = "provider")
+    private String provider;
+    /** The store's pickup address it leaves from; null for a customer return picked up at the customer. */
+    @DynamoDBAttribute(attributeName = "pickUpAddressId")
+    private String pickUpAddressId;
+    /** The creation command while the provider has not created the shipment; null once created. */
+    @DynamoDBAttribute(attributeName = "creation")
+    private ShipmentCreationState creation;
+    @DynamoDBAttribute(attributeName = "pickup")
+    private ShipmentPickup pickup;
 
     public Shipment() {
     }
@@ -200,6 +211,40 @@ public class Shipment {
         this.cancellation = cancellation;
     }
 
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getPickUpAddressId() { return pickUpAddressId; }
+    public void setPickUpAddressId(String pickUpAddressId) { this.pickUpAddressId = pickUpAddressId; }
+    public ShipmentCreationState getCreation() { return creation; }
+    public void setCreation(ShipmentCreationState creation) { this.creation = creation; }
+    public ShipmentPickup getPickup() { return pickup; }
+    public void setPickup(ShipmentPickup pickup) { this.pickup = pickup; }
+
+    @DynamoDBIgnore
+    public boolean isCreating() {
+        return creation != null && creation.isPending();
+    }
+
+    @DynamoDBIgnore
+    public boolean creationFailed() {
+        return creation != null && creation.isFailed();
+    }
+
+    @DynamoDBIgnore
+    public boolean isCreationPendingFor(String commandId) {
+        return isCreating() && creation.hasCommand(commandId);
+    }
+
+    @DynamoDBIgnore
+    public boolean awaitsPickup() {
+        return creation == null && pickup != null && pickup.isAwaiting();
+    }
+
+    @DynamoDBIgnore
+    public boolean isPickupPendingFor(String commandId) {
+        return pickup != null && pickup.isPendingFor(commandId);
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingSubscription() {
         return trackingSubscriptionStatus != null;
@@ -267,6 +312,9 @@ public class Shipment {
         if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
             this.cancellation = previous.cancellation;
+            this.provider = previous.provider;
+            this.pickUpAddressId = previous.pickUpAddressId;
+            this.pickup = previous.pickup;
         }
     }
 
@@ -274,6 +322,6 @@ public class Shipment {
     @DynamoDBIgnore
     public boolean isPlaceholder() {
         return isEmpty(trackingNo) && isEmpty(trackingUrl) && isEmpty(externalId) && shippedAt == null
-                && deliveredAt == null;
+                && deliveredAt == null && creation == null;
     }
 }
