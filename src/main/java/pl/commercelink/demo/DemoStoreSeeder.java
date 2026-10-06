@@ -149,7 +149,6 @@ public class DemoStoreSeeder implements StoreSeeder {
     private static final String ACME_B = "AcmeB";
     /** Second AcmeB instance of the local store: same adapter, its own feed file and configuration. */
     private static final String ACME_B_SECOND = "AcmeB-h6rxcqtb";
-    private static final List<String> SIM_SUPPLIERS = List.of(ACME, ACME_B);
     private static final String SIM_MFN_PREFIX = "SIM-";
     /** AcmeB simulates dropshipping only when asked to; the demo store asks, so the OWN path is visible. */
     static final String ACME_B_DROPSHIP_KNOB = "orderingDropshipEnabled";
@@ -167,7 +166,6 @@ public class DemoStoreSeeder implements StoreSeeder {
      * refreshes that document instead of adding a duplicate next to it.
      */
     static final String DEV_PURCHASE_INVOICE_ID_PREFIX = "dev-pur-";
-    private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     /**
      * The catalog screens need what the plain seed has nowhere: an automatic category, a category with labels, a
@@ -1133,11 +1131,6 @@ public class DemoStoreSeeder implements StoreSeeder {
         demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
         mapper.save(demoOrders.delivery(), clobber);
         demoOrders.events().forEach(event -> mapper.save(event, clobber));
-
-        SimOrders simOrders = buildSimOrders(storeId, rows);
-        simOrders.orders().forEach(order -> mapper.save(order, clobber));
-        simOrders.itemsByOrderId().values().forEach(mapper::batchSave);
-        simOrders.events().forEach(event -> mapper.save(event, clobber));
     }
 
     private boolean simulationSuppliersAvailable() {
@@ -1262,34 +1255,6 @@ public class DemoStoreSeeder implements StoreSeeder {
         OrderEvent event = new OrderEvent(order.getOrderId(), type, name, createdAt);
         event.setEventId(demoId(storeId, order.getOrderId() + "-event-" + name));
         return event;
-    }
-
-    static SimOrders buildSimOrders(String storeId, List<CatalogSeedRow> rows) {
-        List<Order> orders = new ArrayList<>();
-        Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
-        List<OrderEvent> events = new ArrayList<>();
-
-        rows.stream()
-                .filter(row -> row.mfn().startsWith(SIM_MFN_PREFIX))
-                .forEach(row -> SIM_SUPPLIERS.stream()
-                        .filter(row::soldBy)
-                        .forEach(supplier -> {
-                            Order order = demoOrder(storeId, "Symulacja", simulationScenarioLabel(row),
-                                    demoId(storeId, "sim-" + row.mfn().toLowerCase(Locale.ROOT) + "-" + supplier.toLowerCase(Locale.ROOT)),
-                                    new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
-                            OrderItem item = allocationItem(order.getOrderId(), row, supplier, 1, 1);
-                            order.setTotalPrice(item.getTotalPrice());
-                            orders.add(order);
-                            itemsByOrderId.put(order.getOrderId(), List.of(item));
-                            events.add(orderEvent(storeId, order,
-                                    EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt()));
-                        }));
-
-        return new SimOrders(orders, itemsByOrderId, events);
-    }
-
-    private static String simulationScenarioLabel(CatalogSeedRow row) {
-        return row.name().startsWith(SIM_LABEL_PREFIX) ? row.name().substring(SIM_LABEL_PREFIX.length()) : row.name();
     }
 
     private static CatalogSeedRow acmeRow(List<CatalogSeedRow> catalogRows) {
