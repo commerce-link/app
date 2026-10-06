@@ -223,6 +223,10 @@ public final class OrderLabels {
         if (shipment.getProvider() == null || pickup == null || pickup.getStatus() == null) {
             return null;
         }
+        // a delivered package was collected whatever its pickup state says: no "Czeka na odbiór" next to the delivery
+        if (shipment.getDeliveredAt() != null && pickup.isAwaiting()) {
+            return null;
+        }
         return switch (pickup.getStatus()) {
             case AWAITING -> new ShipmentState("order.shipments.state.pickup.awaiting", NO_ARGS, NEUTRAL, false);
             case PENDING -> pickup.isUnconfirmed(LocalDateTime.now())

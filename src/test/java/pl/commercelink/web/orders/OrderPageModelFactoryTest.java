@@ -2237,6 +2237,7 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(delivered.awaitsPickup()).isFalse();
         assertThat(card.pickupHref()).isNull();
+        assertThat(card.rows().get(0).stateKey()).isNull();
     }
 
     @Test
