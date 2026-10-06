@@ -127,6 +127,15 @@ public class WarehouseItem extends Item {
         return Arrays.asList(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered).contains(getStatus());
     }
 
+    /**
+     * Whether a shipment may still take the item out: its goods-out has not happened yet. The warehouse offers the
+     * shipment for items in RMA (to a distributor or service); the goods-out moves them to InExternalService.
+     */
+    @DynamoDBIgnore
+    public boolean isNotShippedOut() {
+        return !hasOneOfTheStatuses(FulfilmentStatus.InExternalService);
+    }
+
     /** A shipment is being created for the item and its goods-out has not happened yet. */
     @DynamoDBIgnore
     public boolean isBeingShipped(LocalDateTime now) {

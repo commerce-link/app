@@ -126,4 +126,14 @@ class WarehouseShippingReservationsTest {
         assertThat(stored.get("w-2").isHeldBy("cmd-2")).isTrue();
         assertThat(reservations.canShip(STORE_ID, List.of("w-1"))).isTrue();
     }
+
+    @Test
+    void anItemInRmaTheWarehouseOffersToShipCanBeHeld() {
+        // given: "Wyślij do dystrybutora" is offered for items in RMA, not for items in stock
+        item("w-1", FulfilmentStatus.InRMA);
+
+        // when / then
+        assertThat(reservations.canShip(STORE_ID, List.of("w-1"))).isTrue();
+        assertThat(reservations.hold(STORE_ID, List.of("w-1"), "cmd-1")).isTrue();
+    }
 }
