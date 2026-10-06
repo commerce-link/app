@@ -576,6 +576,7 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShipments")
     public String updateShipments(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
+                                  @RequestParam(name = "shownPackages", required = false) List<String> shownPackages,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
@@ -598,10 +599,19 @@ public class RMAController {
             shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
             // a shipment being created has no data the form could show; dropping it would lose its label
             List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
+            // nor could the form show a package created after it was opened: only packages it showed may be removed
+            Set<String> shown = new HashSet<>(packages.values().stream().filter(Objects::nonNull).toList());
+            if (shownPackages != null) {
+                shown.addAll(shownPackages);
+            }
+            List<Shipment> createdMeanwhile = previous.stream()
+                    .filter(s -> s.getCreation() == null && s.getExternalId() != null && !shown.contains(s.getExternalId()))
+                    .toList();
 
-            if (shipments.isEmpty() && creations.isEmpty()) {
+            if (shipments.isEmpty() && creations.isEmpty() && createdMeanwhile.isEmpty()) {
                 shipments.add(updatedRma.getShipments().get(0));
             }
+            shipments.addAll(createdMeanwhile);
             shipments.addAll(creations);
 
             vanishedPackages = packageIds(previous);

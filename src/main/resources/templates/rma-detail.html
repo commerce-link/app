@@ -627,6 +627,10 @@
                     <form th:action="@{/dashboard/rma/{rmaId}/updateShipments(rmaId=${rma.rmaId})}"
                           th:object="${rma}"
                           method="post">
+                        <!-- packages this form shows, outside the rows a removal deletes: one created after it opened is kept -->
+                        <input type="hidden" name="shownPackages" th:each="shipment : ${rma.shipments}"
+                               th:if="${shipment.creation == null and shipment.externalId != null}"
+                               th:value="${shipment.externalId}">
 
                         <section class="modal-card-body">
                             <table class="table is-fullwidth">

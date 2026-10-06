@@ -544,7 +544,7 @@ class RMAControllerTest {
                 endpoint("updateShipments", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
-                    c.updateShipments(RMA_ID, postedRma, ra, Locale.ENGLISH);
+                    c.updateShipments(RMA_ID, postedRma, List.of(), ra, Locale.ENGLISH);
                 }));
     }
 
@@ -759,13 +759,21 @@ class RMAControllerTest {
         return shipment;
     }
 
+    /** Posts the form as the page renders it: it shows every package of the RMA that is not being created. */
     private RMA saveShipments(RMA existing, Shipment... posted) {
+        List<String> shown = existing.getShipments().stream()
+                .filter(s -> s.getCreation() == null && s.getExternalId() != null)
+                .map(Shipment::getExternalId).toList();
+        return saveShipments(existing, shown, posted);
+    }
+
+    private RMA saveShipments(RMA existing, List<String> shownPackages, Shipment... posted) {
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existing);
         RMA postedRma = new RMA(STORE_ID);
         postedRma.setShipments(new ArrayList<>(List.of(posted)));
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.updateShipments(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
+            controller.updateShipments(RMA_ID, postedRma, shownPackages, redirectAttributes, Locale.ENGLISH);
         }
         ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
         verify(rmaRepository).save(saved.capture());
@@ -830,6 +838,36 @@ class RMAControllerTest {
         saveShipments(existing, typed("T-2", "EXT-2"));
 
         // then
+        verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-1"));
+    }
+
+    @Test
+    void aPackageCreatedAfterTheFormWasOpenedSurvivesItsSave() {
+        // given: the form was rendered while EXT-2 was still being created, so it neither shows nor posts it;
+        // the creation settled in the background before the operator saved
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: the operator saves the form as it was, showing only EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1"), typed("T-1", "EXT-1"));
+
+        // then: the paid package and its pickup index row stay
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-1", "EXT-2");
+        assertThat(saved.getShipments().get(1).awaitsPickup()).isTrue();
+        verify(awaitingPickupIndex, never()).remove(any(), any());
+    }
+
+    @Test
+    void aPackageTheFormShowedCanStillBeRemoved() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: both were shown, the operator removed EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1", "EXT-2"), typed("T-2", "EXT-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
         verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-1"));
     }
 }
