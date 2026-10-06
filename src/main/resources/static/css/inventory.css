@@ -981,6 +981,12 @@
 }
 
 @media screen and (max-width: 719px) {
+    /* The button leads and the check follows, so the button keeps one left axis in every card whether or not the
+       product is already in the catalog. */
+    .cl-inv-page .cl-inv-catalog-state .cl-inv-add {
+        order: -1;
+    }
+
     /* As a card the "Katalog" line starts at the left: the check's bubble opens rightwards, the button's stays anchored
        to its right edge, and both are capped so that even hidden they never reach past the screen's edge (a hidden
        bubble still counts towards the page's width). */
