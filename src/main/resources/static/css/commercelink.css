@@ -9030,6 +9030,274 @@ a.cl-link-button:hover {
     }
 }
 
+/* Offers list (spec docs/active/offers-redesign). The row link's ::after covers the whole row, so the actions cell rises
+   above it or its menu and buttons could not be clicked. Scoped to is-offers: payments.html also has td.cl-table-actions
+   inside an is-orders table and must keep its own layout. */
+.cl-page .cl-table.is-offers .cl-table-actions {
+    position: relative;
+    z-index: 1;
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* Every actions cell is its own layer; without this the next row's cell paints over the open menu and takes its clicks. */
+.cl-page .cl-table.is-offers .cl-table-actions:has(.cl-menu[open]) {
+    z-index: 2;
+}
+
+.cl-page .cl-table.is-offers .cl-table-actions > * + * {
+    margin-left: 4px;
+}
+
+/* Row actions without a frame at rest (S1, audit 2026-10-03): two framed 36 px buttons per row were the loudest thing in
+   the table. The frame comes back under the pointer, on an open menu, and the focus ring stays; the size (36 px,
+   44 px below 1024 px) does not change. */
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon {
+    border-color: transparent;
+    background: transparent;
+}
+
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon:hover,
+.cl-page .cl-table.is-offers .cl-table-actions .cl-menu[open] > summary.cl-button.is-icon {
+    border-color: var(--cl-accent);
+    background: var(--cl-surface);
+}
+
+/* A name of two lines at most; the whole name is in title. Long names made a row 168 px high at 1024 px. In the table
+   the name also stops at 26ch, so one long name does not take the client column's width on every row. */
+.cl-page .cl-table.is-offers .cl-cell-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-weight: 600;
+}
+
+@media (min-width: 720px) {
+    .cl-page .cl-table.is-offers .cl-cell-name {
+        max-width: 26ch;
+    }
+}
+
+/* The author (often an e-mail address) ends in an ellipsis instead of breaking letter by letter under the date; width 0
+   keeps it out of the column's minimum, as .cl-cell-email does. */
+.cl-page .cl-table.is-offers .cl-who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 0;
+    min-width: 100%;
+}
+
+.cl-page .cl-table.is-offers .cl-status {
+    white-space: nowrap;
+}
+
+/* "· pozycje: n" wraps as a whole under the id, never between the label and the number */
+.cl-page .cl-table.is-offers .cl-offer-items {
+    white-space: nowrap;
+}
+
+/* The list is always newest first: the date header says so like a sorted header of the other lists (aria-sort on th). */
+.cl-page .cl-table.is-offers .cl-sort-mark {
+    font-size: .8em;
+}
+
+/* A neutral validity note ("do 23.10 (20 dni)", "minęła 01.10") is plain text; only the note of an expiring offer
+   (is-warn: "jutro, 04.10", "dziś, 20:10") keeps the weight of the orders' due note. On the hover row it moves to --cl-ink-2: --cl-ink-3 is 4.48:1 on --cl-surface-2. */
+.cl-page .cl-table.is-offers .cl-due-note:not(.is-warn) {
+    font-weight: 400;
+}
+
+.cl-page .cl-table.is-offers tbody tr:hover .cl-due-note:not(.is-warn) {
+    color: var(--cl-ink-2);
+}
+
+/* Items of a template or a basket: the bare number under the "Pozycje" header, "pozycje: n" on the phone card, which
+   has no header. */
+.cl-page .cl-table.is-offers .cl-cell-count {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-offers .cl-cell-count-text {
+    display: none;
+}
+
+/* A menu entry that needs a word on what happens next ("Nowa oferta ▾"); not used in row menus. */
+.cl-page .cl-menu-item .cl-menu-desc {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-page-actions .cl-menu > summary.is-primary {
+    gap: 6px;
+}
+
+/* 720-1215 px (rail or drawer): the quick copy icon goes (the same action is in the row menu), so do the item count and
+   the author, which gives the name and client columns their width back (short names wrapped at 1024 px). */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-copy-quick,
+    .cl-page .cl-table.is-offers .cl-offer-items,
+    .cl-page .cl-table.is-offers .cl-who {
+        display: none;
+    }
+}
+
+/* In the same range the offer name and the client name are one line each, ending in an ellipsis (the full text is in
+   title): wrapped, they made rows 84-103 px instead of ~66 px. Width 0 keeps them out of the column's minimum, as
+   .cl-cell-email does; a nowrap name with a ch cap pushed the table 22-146 px past its card at 720-1024 px. The two
+   columns take what the other columns leave, at least 7em, so a name never shrinks to a few letters. Templates follow
+   the same rule since their "Utwórz ofertę" became an icon (the dates, counts and amounts no longer take the space). */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 0;
+        min-width: 100%;
+    }
+
+    .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+        min-width: 7em;
+    }
+
+    .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+        width: 1%;
+        white-space: nowrap;
+    }
+}
+
+/* Beside the open sidebar the card is 790 px at 1216 px, narrower than at 1215 px (977 px), and rows grew to 103 px:
+   the compact row follows the card there, not the window (as the Metoda column of Payments does). Below 960 px of
+   card the quick copy icon, the item count and the author go and the names are one line, as at 720-1215 px. With an
+   850 px threshold the full row came back at 1280x720 (card 854 px) in a name column of ~130 px: "pozycje: 1" broke
+   between label and number and rows reached 147 px; 1366x768 (card 940 px) gave 105 px rows. From about 1406 px
+   (card 960 px) the full row fits. */
+.cl-page .cl-card:has(.cl-table.is-offers) {
+    container-type: inline-size;
+}
+
+@media (min-width: 1216px) {
+    @container (max-width: 959px) {
+        .cl-page .cl-table.is-offers .cl-copy-quick,
+        .cl-page .cl-table.is-offers .cl-offer-items,
+        .cl-page .cl-table.is-offers .cl-who {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 0;
+            min-width: 100%;
+        }
+
+        .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+            min-width: 7em;
+        }
+
+        .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+            width: 1%;
+            white-space: nowrap;
+        }
+    }
+}
+
+/* 720-1023 px (drawer, card 606-909 px): six columns do not fit beside one-line names. The creation date moves under
+   the offer's id ("25b6f02f · 03.10", the deliveries' collapsed-column pattern) and the net amount goes (it is on the
+   offer page; the phone card has no net line either). */
+.cl-page .cl-table.is-offers .cl-narrow-only {
+    display: none;
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-offers .is-secondary-column,
+    .cl-page .cl-table.is-offers .cl-cell-net {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-narrow-only {
+        display: inline;
+    }
+}
+
+/* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. The note and the
+   menu share the fifth line explicitly (auto-placement put the menu's 44 px box under the note's text). The menu keeps
+   its 44 px target, and the negative margin gives the growth back to the line above and the card padding, as the chip
+   "×" does, so the line is as high as its text. */
+@media (max-width: 719px) {
+    .cl-page .cl-table.is-offers tr {
+        grid-auto-flow: row dense;
+    }
+
+    .cl-page .cl-table.is-offers .cl-due-note {
+        grid-row: 5;
+        align-self: center;
+    }
+
+    .cl-page .cl-table.is-offers .cl-table-actions {
+        display: flex;
+        width: auto;
+        grid-column: 2;
+        justify-self: end;
+        align-self: center;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-offers tr:has(.cl-status) .cl-table-actions {
+        grid-row: 5;
+        margin: -12px 0 -10px;
+    }
+
+    /* template card: "Utwórz ofertę" and ⋯ as its last line; on the name's line they left the name a few letters */
+    .cl-page .cl-table.is-templates .cl-table-actions {
+        grid-column: 1 / -1;
+        order: 5;
+        justify-content: flex-end;
+    }
+
+    .cl-page .cl-table.is-offers .cl-copy-quick,
+    .cl-page .cl-table.is-offers .cl-who,
+    .cl-page .cl-table.is-offers .cl-cell-count {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-cell-count-text {
+        display: block;
+        font-size: 12.5px;
+        color: var(--cl-ink-3);
+    }
+
+    /* on the tinted hover/tap row --cl-ink-3 is 4.47:1; muted text on a toned background uses --cl-ink-2 (§9) */
+    .cl-page .cl-table.is-offers tbody tr:hover .cl-cell-count-text {
+        color: var(--cl-ink-2);
+    }
+
+    /* template card: under the id, like the client line of an offer; basket card: beside the id */
+    .cl-page .cl-table.is-templates .cl-cell-count-text {
+        grid-column: 1 / -1;
+        order: 2;
+    }
+
+    .cl-page .cl-table.is-baskets .cl-cell-count-text {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-offers .cl-table-actions .cl-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+
 /* --- Delivery details (spec docs/active/delivery-details-redesign/2026-10-01-delivery-details-design.md §13):
    P1 items table with destination rows, P2 selection row docked on phones, P3 status card with actions, P4 dialog list,
    P5 destructive link at the end of the dialog actions, P6 field under a choice, P7 long supplier number, P8 side cards

@@ -1,8 +1,9 @@
 // Action menu: details.cl-menu > summary + ul.cl-menu-list. The browser opens and closes it (and tells assistive
 // technology whether it is expanded), so without JavaScript every entry is still reachable. This script adds the rest:
 // one menu open at a time, the first usable item focused on opening, Escape and a click outside close it (Escape hands
-// the focus back to the summary), the arrow keys move between the items that can be used. An item marked
-// aria-disabled="true" stays readable (its reason sits in .cl-menu-reason) but does nothing. Near the bottom of the
+// the focus back to the summary), the arrow keys move between the items that can be used and Home/End jump to the
+// first/last of them. An item marked aria-disabled="true" stays readable (its reason sits in .cl-menu-reason) but does
+// nothing; an item inside a hidden element (an entry a script has not revealed) is skipped. Near the bottom of the
 // window the list opens upwards (.is-up) instead of changing the overflow of the table around it, and a list that
 // would leave the window on the left (right-aligned to a toggle near the left edge, e.g. "Wystaw" at 320 px) opens
 // from the toggle's left edge instead (.is-start).
@@ -25,7 +26,8 @@
     }
 
     function items(menu) {
-        return Array.prototype.slice.call(menu.querySelectorAll('.cl-menu-item:not([aria-disabled="true"])'));
+        return Array.prototype.slice.call(menu.querySelectorAll('.cl-menu-item:not([aria-disabled="true"])'))
+            .filter(function (item) { return !item.closest('[hidden]'); });
     }
 
     function summaryOf(menu) {
@@ -135,6 +137,13 @@
             var index = list.indexOf(document.activeElement);
             var next = event.key === 'ArrowDown' ? (index + 1) % list.length : (index - 1 + list.length) % list.length;
             list[next].focus();
+        } else if ((event.key === 'Home' || event.key === 'End') && !isNote(open)) {
+            var usable = items(open);
+            if (!usable.length) {
+                return;
+            }
+            event.preventDefault();
+            usable[event.key === 'Home' ? 0 : usable.length - 1].focus();
         } else if (event.key === 'Tab') {
             close(false);
         }
