@@ -3,20 +3,32 @@ package pl.commercelink.shipping;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemsRepository;
+import pl.commercelink.orders.rma.RMALifecycle;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Component
 public class RmaShipmentOwner extends StoredShipmentOwner<RMA> {
 
     private final RMARepository rmaRepository;
+    private final RMAItemsRepository rmaItemsRepository;
+    private final RMALifecycle rmaLifecycle;
+    private final ShipmentTrackingSubscriber trackingSubscriber;
 
-    public RmaShipmentOwner(RMARepository rmaRepository, OptimisticLockingExecutor optimisticLockingExecutor) {
+    public RmaShipmentOwner(RMARepository rmaRepository, OptimisticLockingExecutor optimisticLockingExecutor,
+                            RMAItemsRepository rmaItemsRepository, RMALifecycle rmaLifecycle,
+                            ShipmentTrackingSubscriber trackingSubscriber) {
         super(optimisticLockingExecutor);
         this.rmaRepository = rmaRepository;
+        this.rmaItemsRepository = rmaItemsRepository;
+        this.rmaLifecycle = rmaLifecycle;
+        this.trackingSubscriber = trackingSubscriber;
     }
 
     @Override
@@ -35,6 +47,21 @@ public class RmaShipmentOwner extends StoredShipmentOwner<RMA> {
             rma.setShipments(new ArrayList<>(List.of(placeholder)));
             return true;
         });
+    }
+
+    /** The operator's shipment: the items go to the customer or to repair, and the RMA moves on. */
+    @Override
+    protected void afterCreated(ShipmentCreationCheckRequest request) {
+        RMA rma = rmaRepository.findById(request.getStoreId(), request.getOwnerId());
+        List<String> ids = request.getItemIds() == null ? List.of() : request.getItemIds();
+        List<RMAItem> items = rmaItemsRepository.findByRmaId(rma.getRmaId()).stream()
+                .filter(item -> ids.contains(item.getItemId()))
+                .toList();
+        Consumer<RMAItem> statusUpdater = request.isToClient() ? RMAItem::markAsReturnedToClient : RMAItem::markAsSendToRepair;
+        items.forEach(statusUpdater);
+        rmaItemsRepository.batchSave(items);
+        trackingSubscriber.subscribe(request.getStoreId(), rma);
+        rmaLifecycle.update(rma, items);
     }
 
     @Override

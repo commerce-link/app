@@ -17,8 +17,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +30,9 @@ class OrderShipmentOwnerTest {
 
     @Mock private OrdersRepository ordersRepository;
     @Mock private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock private ShipmentTrackingSubscriber trackingSubscriber;
+    @Mock private OrderLifecycle orderLifecycle;
+    @Mock private OrderLifecycleEventPublisher lifecycleEventPublisher;
 
     private OrderShipmentOwner owner;
     private Order order;
@@ -38,7 +44,8 @@ class OrderShipmentOwnerTest {
         order = new Order("store-1");
         order.setOrderId("order-1");
         when(ordersRepository.findById("store-1", "order-1")).thenAnswer(i -> order);
-        owner = new OrderShipmentOwner(ordersRepository, optimisticLockingExecutor);
+        owner = new OrderShipmentOwner(ordersRepository, optimisticLockingExecutor, trackingSubscriber,
+                orderLifecycle, lifecycleEventPublisher);
     }
 
     private static ShipmentCreationCheckRequest request(String commandId) {
@@ -166,5 +173,85 @@ class OrderShipmentOwnerTest {
         assertThat(order.getShipments()).hasSize(2);
         assertThat(order.getShipments().get(0).isCreationPendingFor("cmd-0")).isTrue();
         verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    void theOrderAwaitsOnlyTheCommandOfItsCreatingShipment() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
+
+        // when / then
+        assertThat(owner.awaits(request("cmd-1"))).isTrue();
+        assertThat(owner.awaits(request("cmd-2"))).isFalse();
+    }
+
+    @Test
+    void createdShipmentsKeepThePlaceholdersDeliveryPointTypeAndCarrier() {
+        // given
+        Shipment waiting = placeholder("cmd-1");
+        waiting.setType(ShipmentType.PickupPoint);
+        waiting.setCollectionPointCode("WAW23M");
+        waiting.setCarrier("InPost Paczkomaty");
+        order.setShipments(new ArrayList<>(List.of(waiting)));
+        Shipment created = new Shipment(ShipmentType.Courier);
+        created.setExternalId("21480003");
+        created.setTrackingNo("A");
+
+        // when
+        boolean settled = owner.succeeded(request("cmd-1"), List.of(created));
+
+        // then
+        assertThat(settled).isTrue();
+        Shipment saved = order.getShipments().get(0);
+        assertThat(saved.getTrackingNo()).isEqualTo("A");
+        assertThat(saved.getType()).isEqualTo(ShipmentType.PickupPoint);
+        assertThat(saved.getCollectionPointCode()).isEqualTo("WAW23M");
+        assertThat(saved.getCarrier()).isEqualTo("InPost Paczkomaty");
+        verify(lifecycleEventPublisher).publish(any(Order.class), eq(OrderLifecycleEventType.ShipmentCreated));
+    }
+
+    @Test
+    void aSideEffectThatFailsStillLeavesTheShipmentCreated() {
+        // given: a redelivery would find no placeholder, so the creation must count as settled
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
+        doThrow(new RuntimeException("tracking down")).when(trackingSubscriber).subscribe(any(), any(Order.class));
+        Shipment created = new Shipment(ShipmentType.Courier);
+        created.setTrackingNo("A");
+
+        // when
+        boolean settled = owner.succeeded(request("cmd-1"), List.of(created));
+
+        // then
+        assertThat(settled).isTrue();
+        assertThat(order.getShipments().get(0).getTrackingNo()).isEqualTo("A");
+    }
+
+    @Test
+    void ourReasonIsKeptAsAKeyAndTheProvidersAsText() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"), placeholder("cmd-2"))));
+
+        // when
+        owner.failed(request("cmd-1"), null, "shipping.creation.unconfirmed");
+        owner.failed(request("cmd-2"), "Nieprawidłowy kod pocztowy", null);
+
+        // then
+        assertThat(order.getShipments().get(0).getCreation().getErrorKey()).isEqualTo("shipping.creation.unconfirmed");
+        assertThat(order.getShipments().get(0).getCreation().getError()).isNull();
+        assertThat(order.getShipments().get(1).getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aFailureForAnotherCommandChangesNothing() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-2"))));
+
+        // when
+        owner.failed(request("cmd-1"), "Błąd", null);
+
+        // then
+        assertThat(order.getShipments().get(0).getCreation().isPending()).isTrue();
+        verify(ordersRepository, never()).save(any());
+        verifyNoInteractions(lifecycleEventPublisher);
     }
 }

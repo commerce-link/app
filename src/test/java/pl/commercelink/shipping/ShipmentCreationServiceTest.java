@@ -147,7 +147,9 @@ class ShipmentCreationServiceTest {
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("Furgonetka nie potwierdziła nadania");
-        verify(owner).refused(argThat(r -> "21480003".equals(r.getExternalId())), eq("Furgonetka nie potwierdziła nadania"));
+        // stored as a key, so the reason is shown in the language of whoever opens the shipment later
+        verify(owner).failed(argThat(r -> "21480003".equals(r.getExternalId())), isNull(), eq("shipping.creation.unconfirmed"));
+        verify(owner, never()).refused(any(), any());
     }
 
     @Test

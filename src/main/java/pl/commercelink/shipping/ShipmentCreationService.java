@@ -108,7 +108,19 @@ public class ShipmentCreationService {
             log.error("Check of creation command {} for {} {} in store {} (package {}) could not be sent; "
                     + "the provider may have created a paid label", check.getCommandId(), check.getOwnerType(),
                     check.getOwnerId(), check.getStoreId(), check.getExternalId(), e);
-            return refused(owner, check, messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale()));
+            return unconfirmed(owner, check);
         }
+    }
+
+    /** Stored as a key, so whoever opens the shipment later reads the reason in their own language. */
+    private ShipmentCreationStart unconfirmed(ShipmentOwner owner, ShipmentCreationCheckRequest check) {
+        try {
+            owner.failed(check, null, UNCONFIRMED_KEY);
+        } catch (RuntimeException e) {
+            log.error("Creation command {} for {} {} in store {} (package {}) is unconfirmed, but its shipment stays "
+                    + "PENDING: marking it failed did not work", check.getCommandId(), check.getOwnerType(),
+                    check.getOwnerId(), check.getStoreId(), check.getExternalId(), e);
+        }
+        return ShipmentCreationStart.refused(messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale()));
     }
 }

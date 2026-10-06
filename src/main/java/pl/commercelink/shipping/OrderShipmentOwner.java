@@ -2,6 +2,9 @@ package pl.commercelink.shipping;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderLifecycleEventPublisher;
+import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
@@ -13,10 +16,18 @@ import java.util.List;
 public class OrderShipmentOwner extends StoredShipmentOwner<Order> {
 
     private final OrdersRepository ordersRepository;
+    private final ShipmentTrackingSubscriber trackingSubscriber;
+    private final OrderLifecycle orderLifecycle;
+    private final OrderLifecycleEventPublisher lifecycleEventPublisher;
 
-    public OrderShipmentOwner(OrdersRepository ordersRepository, OptimisticLockingExecutor optimisticLockingExecutor) {
+    public OrderShipmentOwner(OrdersRepository ordersRepository, OptimisticLockingExecutor optimisticLockingExecutor,
+                              ShipmentTrackingSubscriber trackingSubscriber, OrderLifecycle orderLifecycle,
+                              OrderLifecycleEventPublisher lifecycleEventPublisher) {
         super(optimisticLockingExecutor);
         this.ordersRepository = ordersRepository;
+        this.trackingSubscriber = trackingSubscriber;
+        this.orderLifecycle = orderLifecycle;
+        this.lifecycleEventPublisher = lifecycleEventPublisher;
     }
 
     @Override
@@ -48,6 +59,15 @@ public class OrderShipmentOwner extends StoredShipmentOwner<Order> {
 
     private static boolean keepsItsPlace(Shipment shipment) {
         return shipment.getExternalId() != null || shipment.hasShippingData() || shipment.hasCollectionData();
+    }
+
+    /** What a courier booking always did, now on the order as saved. */
+    @Override
+    protected void afterCreated(ShipmentCreationCheckRequest request) {
+        Order order = ordersRepository.findById(request.getStoreId(), request.getOwnerId());
+        trackingSubscriber.subscribe(request.getStoreId(), order);
+        orderLifecycle.update(order);
+        lifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
     }
 
     @Override

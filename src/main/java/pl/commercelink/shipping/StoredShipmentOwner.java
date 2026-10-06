@@ -1,9 +1,12 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentLists;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -13,6 +16,7 @@ import java.util.function.Predicate;
  * An owner that keeps its shipments on a stored record (an order, an RMA): every write re-reads the record and saves it
  * only when the change applied, so a message for a command the record no longer waits for changes nothing.
  */
+@Slf4j
 abstract class StoredShipmentOwner<T> implements ShipmentOwner {
 
     private final OptimisticLockingExecutor optimisticLockingExecutor;
@@ -27,6 +31,9 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
 
     protected abstract List<Shipment> shipments(T owner);
 
+    /** What creating the shipment sets off for the owner, once the created shipments are saved on it. */
+    protected abstract void afterCreated(ShipmentCreationCheckRequest request);
+
     @Override
     public void recordExternalId(ShipmentCreationCheckRequest request) {
         modify(request, owner -> ShipmentLists.creating(shipments(owner), request.getCommandId())
@@ -37,10 +44,51 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
     }
 
     @Override
+    public boolean awaits(ShipmentCreationCheckRequest request) {
+        T owner = load(request.getStoreId(), request.getOwnerId());
+        return owner != null && ShipmentLists.creating(shipments(owner), request.getCommandId()).isPresent();
+    }
+
+    @Override
+    public boolean succeeded(ShipmentCreationCheckRequest request, List<Shipment> created) {
+        boolean replaced = modify(request, owner -> {
+            List<Shipment> list = shipments(owner);
+            ShipmentLists.creating(list, request.getCommandId()).ifPresent(placeholder ->
+                    created.forEach(s -> takeDeliveryChoice(s, placeholder)));
+            return ShipmentLists.replaceCreating(list, request.getCommandId(), new ArrayList<>(created));
+        });
+        if (!replaced) {
+            return false;
+        }
+        try {
+            afterCreated(request);
+        } catch (RuntimeException e) {
+            // the placeholder is gone, so a redelivery would drop the message: retrying cannot bring these back
+            log.error("Shipment of creation command {} was saved on {} {} in store {}, but what it sets off failed",
+                    request.getCommandId(), request.getOwnerType(), request.getOwnerId(), request.getStoreId(), e);
+        }
+        return true;
+    }
+
+    private static void takeDeliveryChoice(Shipment created, Shipment placeholder) {
+        created.setType(placeholder.getType());
+        created.setCollectionPointCode(placeholder.getCollectionPointCode());
+        if (created.getCarrier() == null) {
+            created.setCarrier(placeholder.getCarrier());
+        }
+    }
+
+    @Override
     public void refused(ShipmentCreationCheckRequest request, String error) {
+        failed(request, error, null);
+    }
+
+    @Override
+    public void failed(ShipmentCreationCheckRequest request, String error, String errorKey) {
         modify(request, owner -> ShipmentLists.creating(shipments(owner), request.getCommandId())
                 .map(s -> {
-                    s.setCreation(s.getCreation().failed(error));
+                    ShipmentCreationState creation = s.getCreation();
+                    s.setCreation(errorKey != null ? creation.failedWithKey(errorKey) : creation.failed(error));
                     return true;
                 }).orElse(false));
     }
