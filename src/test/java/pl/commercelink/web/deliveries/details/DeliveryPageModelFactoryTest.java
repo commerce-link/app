@@ -50,6 +50,16 @@ class DeliveryPageModelFactoryTest {
     }
 
     @Test
+    void receiveDialogsStayClosedWhileTheSupplierConfirms() {
+        // given
+        Delivery awaiting = awaitingSupplier(own(warehouse()));
+
+        // when / then
+        assertThat(DeliveryPageModelFactory.build(data(awaiting, "receive-all", Set.of()), ADMIN).openDialog()).isNull();
+        assertThat(DeliveryPageModelFactory.build(data(awaiting, "receive", Set.of(0)), ADMIN).openDialog()).isNull();
+    }
+
+    @Test
     void aDialogTheViewerCannotUseIsNotOpened() {
         // when / then
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "merge", Set.of(1)), ADMIN).openDialog()).isNull();

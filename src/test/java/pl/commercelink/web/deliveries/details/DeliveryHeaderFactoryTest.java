@@ -40,6 +40,7 @@ class DeliveryHeaderFactoryTest {
                 Arguments.of("outcome unknown, store admin", (Supplier<Delivery>) () -> outcomeUnknown(own(warehouse())), ADMIN, "deliveries.details.primary.reconcile"),
                 Arguments.of("outcome unknown, user", (Supplier<Delivery>) () -> outcomeUnknown(own(warehouse())), USER, "deliveries.details.primary.receiveAll"),
                 Arguments.of("dispatched, store admin", (Supplier<Delivery>) () -> own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_DISPATCHED)), ADMIN, "deliveries.details.primary.reconcile"),
+                Arguments.of("awaiting the supplier, store admin", (Supplier<Delivery>) () -> awaitingSupplier(own(warehouse())), ADMIN, null),
                 Arguments.of("ordering", (Supplier<Delivery>) () -> own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING)), ADMIN, null),
                 Arguments.of("in transit, store admin", (Supplier<Delivery>) DeliveryFixtures::warehouse, ADMIN, "deliveries.details.primary.receiveAll"),
                 Arguments.of("in transit, user", (Supplier<Delivery>) DeliveryFixtures::warehouse, USER, "deliveries.details.primary.receiveAll"),

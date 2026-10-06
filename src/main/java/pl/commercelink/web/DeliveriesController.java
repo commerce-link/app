@@ -257,6 +257,12 @@ public class DeliveriesController {
         if (delivery.isOrderPending()) {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            // the items are claimed for the purchase: receiving now would mark the delivery received with nothing received
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.purchase.awaitingSupplier.locked", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
+        }
         if (delivery.isDropship()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.receive.error.dropship", null, locale));

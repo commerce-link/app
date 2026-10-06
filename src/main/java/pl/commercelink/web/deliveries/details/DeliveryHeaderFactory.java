@@ -64,7 +64,9 @@ final class DeliveryHeaderFactory {
             return new PrimaryAction("deliveries.details.primary.reconcile", "fa-search", null, links.reconcile(), null);
         }
         boolean waiting = !delivery.hasBeenReceived() && DeliveryRules.hasPendingAllocations(delivery);
-        boolean receivable = delivery.getOrderStatus() == null || delivery.isOrderFailed() || delivery.isOrderDispatched();
+        // while the supplier confirms the reservation the items are claimed, so receiving would only mark the delivery received
+        boolean receivable = delivery.getOrderStatus() == null || delivery.isOrderFailed()
+                || (delivery.isOrderDispatched() && !delivery.isAwaitingSupplierConfirmation());
         if (!delivery.isDropship() && waiting && receivable && !viewer.superAdmin()) {
             return new PrimaryAction("deliveries.details.primary.receiveAll", "fa-check", links.open("receive-all"), null,
                     "receive-all-dialog");

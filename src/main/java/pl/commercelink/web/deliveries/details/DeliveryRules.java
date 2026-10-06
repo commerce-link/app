@@ -15,6 +15,7 @@ import pl.commercelink.web.orders.Money;
 public final class DeliveryRules {
 
     static final String ORDERING = "deliveries.details.reason.ordering";
+    static final String AWAITING_SUPPLIER = "deliveries.details.reason.awaitingSupplier";
     static final String AWAITING = "deliveries.details.reason.awaitingApproval";
     static final String RECEIVED = "deliveries.details.reason.received";
     static final String DOCUMENTS = "deliveries.details.reason.documents";
@@ -62,6 +63,9 @@ public final class DeliveryRules {
         }
         if (delivery.isOrderPending()) {
             return ActionState.off(ORDERING);
+        }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            return ActionState.off(AWAITING_SUPPLIER);
         }
         return delivery.isAwaitingApproval() ? ActionState.off(AWAITING) : ActionState.on();
     }
