@@ -773,6 +773,8 @@ body.cl-drawer-open .cl-sidebar {
     font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
+    /* a name joined by "/" ("Profesjonalne/konsumenckie AV i foto") is one word to the browser and overflowed the tile */
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-tile-desc {
@@ -9647,7 +9649,7 @@ a.cl-link-button:hover {
 
 /* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
 .cl-page .cl-subnav {
-    padding: 4px 16px 12px;
+    padding: 4px 20px 12px;
     border-bottom: 1px solid var(--cl-line);
 }
 
@@ -9668,6 +9670,8 @@ a.cl-link-button:hover {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     min-height: 32px;
     padding: 4px 10px;
     border: 1px solid var(--cl-line);
@@ -9712,11 +9716,12 @@ a.cl-link-button:hover {
     align-items: baseline;
     justify-content: space-between;
     gap: 4px 16px;
-    padding: 16px 16px 4px;
+    padding: 20px 20px 4px;
 }
 
 .cl-page .cl-result-head h2 {
     margin: 0;
+    overflow-wrap: anywhere;
     font-size: 18px;
     font-weight: 650;
     color: var(--cl-ink);
@@ -9724,6 +9729,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-result-path {
     margin: 0;
+    overflow-wrap: anywhere;
     font-size: 13.5px;
     color: var(--cl-ink-2);
 }
@@ -9739,6 +9745,7 @@ a.cl-link-button:hover {
     font-size: 13.5px;
     line-height: 1.35;
     color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-category-path strong {
@@ -9766,5 +9773,17 @@ a.cl-link-button:hover {
 @media screen and (max-width: 1023px) {
     .cl-page .cl-subnav-item {
         min-height: 44px;
+    }
+}
+
+/* the card's side inset on a phone, like .cl-table-toolbar and .cl-list-meta */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-result-head {
+        padding: 16px 16px 4px;
+    }
+
+    .cl-page .cl-subnav {
+        padding-left: 16px;
+        padding-right: 16px;
     }
 }

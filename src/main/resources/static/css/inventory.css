@@ -21,7 +21,7 @@
     color: var(--cl-ink);
 }
 
-/* the only .cl-card here is the super admin's feed card, which follows the tiles */
+/* the super admin's feed card, which follows the tiles (the browse card resets it below) */
 .cl-inv-page .cl-card {
     margin-top: 12px;
 }
@@ -856,24 +856,65 @@
 }
 
 /* --- Supplier assortment (spec docs/active/inventory-browse) --- */
-.cl-inv-page .cl-inv-summary-slot + .cl-inv-browse {
-    margin-top: 20px;
+/* One 16 px gap between the summary and the browse card, as between the card and the tiles: the card's own .cl-card
+   margin would otherwise stack on the summary's. */
+.cl-inv-page .cl-inv-browse-card {
+    margin-top: 0;
 }
 
 .cl-inv-page .cl-inv-browse .cl-tile-grid.is-categories {
     margin-top: 16px;
 }
 
+/* The toolbar sits as far from the card's top edge (or the subcategory list's rule) as from its sides, whether it
+   opens the card or follows the category head; the second selector outranks the shared "toolbar opens its card" rule
+   (14 px). Under a bare result head (text search) the head's own 4 px bottom padding makes up the difference. */
+.cl-inv-page .cl-inv-browse-card > .cl-table-toolbar,
+.cl-inv-page .cl-card.cl-inv-browse-card > .cl-visually-hidden:first-child + .cl-table-toolbar {
+    padding-top: 20px;
+}
+
+.cl-inv-page .cl-inv-browse-card > .cl-result-head + .cl-table-toolbar {
+    padding-top: 16px;
+}
+
 .cl-inv-page .cl-inv-browse-empty {
     display: grid;
     justify-items: start;
     gap: 8px;
-    padding: 20px 16px;
+    padding: 20px;
     color: var(--cl-ink-2);
 }
 
 .cl-inv-page .cl-inv-browse-error {
-    margin: 0 16px 12px;
+    margin: 0 20px 12px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-inv-page .cl-inv-browse-card > .cl-table-toolbar,
+    .cl-inv-page .cl-card.cl-inv-browse-card > .cl-visually-hidden:first-child + .cl-table-toolbar {
+        padding-top: 16px;
+    }
+
+    .cl-inv-page .cl-inv-browse-card > .cl-result-head + .cl-table-toolbar {
+        padding-top: 12px;
+    }
+
+    .cl-inv-page .cl-inv-browse-empty {
+        padding: 16px;
+    }
+
+    .cl-inv-page .cl-inv-browse-error {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+}
+
+/* The check icon is centred under its column name in table mode; as a card field it stays at the left. */
+@media screen and (min-width: 720px) {
+    .cl-inv-page .cl-table.cl-inv-browse-table :is(th, td).cl-inv-catalog-cell {
+        text-align: center;
+    }
 }
 
 .cl-inv-page .cl-inv-add-dialog {
