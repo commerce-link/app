@@ -9381,6 +9381,19 @@ a.cl-link-button:hover {
         margin-left: 0;
     }
 
+    /* pinned to the bottom edge, the row has nothing below it: its menus always open upwards and scroll within the
+       room between it and the top bar. menu.js turns a list up only when it fits there whole, so in a short window (a
+       phone held sideways, 1280×720 at 200 %) it stayed below the row, off the screen, with every action but "Zniszcz"
+       out of reach */
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) .cl-menu-list {
+        top: auto;
+        bottom: calc(100% + 4px);
+        max-height: calc(100vh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        max-height: calc(100dvh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
     .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
         padding-bottom: var(--cl-docked-bar, 112px);
     }
