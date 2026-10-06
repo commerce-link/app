@@ -275,4 +275,38 @@ class ProductsAddTemplateTest {
         // then
         assertThat(html).containsPattern("<input type=\"hidden\" name=\"reviewId\" value=\"[0-9a-f-]{36}\"");
     }
+
+    /** From the inventory the save needs the way back and the count of products the review already dropped. */
+    @Test
+    void aReviewFromTheInventoryPostsTheWayBackAndWhatItSkipped() {
+        // given
+        Context context = baseContext();
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+        context.setVariable("errors", Map.of());
+        context.setVariable("errorSummary", Map.of());
+        context.setVariable("labels", List.of());
+        context.setVariable("pricingGroups", List.of("Default"));
+        context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of("5901234567890"));
+        context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
+        context.setVariable("backHref", "/dashboard/inventory?view=browse&cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?view=browse&cat=11");
+        context.setVariable("skippedBefore", 1);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" name=\"returnTo\" value=\"/dashboard/inventory?view=browse&amp;cat=11\"/>")
+                .contains("<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>");
+    }
+
+    @Test
+    void aReviewFromTheCatalogPostsNoSkippedCount() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).doesNotContain("name=\"skippedBefore\"");
+    }
 }

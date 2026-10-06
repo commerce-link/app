@@ -290,14 +290,15 @@ public class CatalogProductsController {
         }
         String view = renderReview(catalog, category, ProductsBulkAddForm.of(products), skipped, skippedExisting, Map.of(),
                 model, locale);
-        applyReturnTo(returnTo, model);
+        applyReturnTo(returnTo, model, skippedExisting.size());
         return view;
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/save")
     public String saveProducts(@PathVariable String catalogId, @PathVariable String categoryId,
                                @ModelAttribute ProductsBulkAddForm form,
-                               @RequestParam(required = false) String returnTo, Model model, Locale locale,
+                               @RequestParam(required = false) String returnTo,
+                               @RequestParam(defaultValue = "0") int skippedBefore, Model model, Locale locale,
                                RedirectAttributes redirectAttributes, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
@@ -309,7 +310,7 @@ public class CatalogProductsController {
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
             String view = renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
-            applyReturnTo(returnTo, model);
+            applyReturnTo(returnTo, model, skippedBefore);
             return view;
         }
         // The review skipped what the category had when it was rendered; the same review sent again (Back, a double
@@ -348,7 +349,8 @@ public class CatalogProductsController {
         }
         Optional<String> backToInventory = InventoryReturnTo.safe(returnTo);
         if (backToInventory.isPresent()) {
-            int skipped = form.getProducts().size() - added;
+            // The review already dropped what the category had then; only the inventory notice reports that number.
+            int skipped = form.getProducts().size() - added + reviewSkipped(skippedBefore);
             redirectAttributes.addFlashAttribute("inventoryNotice", messageSource.getMessage("inventory.browse.added",
                     new Object[]{category.getName(), added, skipped}, locale));
             redirectAttributes.addFlashAttribute("inventoryNoticeHref", CatalogPaths.category(catalogId, categoryId));
@@ -702,11 +704,17 @@ public class CatalogProductsController {
     }
 
     /** A review opened from the inventory list goes back there: "Back", "Cancel" and the redirect after saving. */
-    private static void applyReturnTo(String returnTo, Model model) {
+    private static void applyReturnTo(String returnTo, Model model, int skippedBefore) {
         InventoryReturnTo.safe(returnTo).ifPresent(target -> {
             model.addAttribute("backHref", target);
             model.addAttribute("returnTo", target);
+            model.addAttribute("skippedBefore", reviewSkipped(skippedBefore));
         });
+    }
+
+    /** Sent back by the review form, so a forged value only changes the text of the notice; kept within the review limit. */
+    private static int reviewSkipped(int skippedBefore) {
+        return Math.clamp(skippedBefore, 0, MAX_ADDED_PRODUCTS);
     }
 
     /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */

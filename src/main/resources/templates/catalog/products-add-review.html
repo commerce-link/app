@@ -27,6 +27,7 @@
                 <!--/* The same review sent twice saves each row under the same id, so the category gets it once (RF-6). */-->
                 <input type="hidden" name="reviewId" th:value="${form.reviewId}"/>
                 <input type="hidden" name="returnTo" th:if="${returnTo != null}" th:value="${returnTo}"/>
+                <input type="hidden" name="skippedBefore" th:if="${returnTo != null}" th:value="${skippedBefore}"/>
                 <div class="cl-card">
                     <table class="cl-table is-compact is-editable" id="products" tabindex="-1">
                         <thead>

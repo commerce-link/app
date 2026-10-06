@@ -161,7 +161,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         try {
-            return controller.saveProducts("c1", "cat-parallel", form, null, new ExtendedModelMap(), Locale.ENGLISH,
+            return controller.saveProducts("c1", "cat-parallel", form, null, 0, new ExtendedModelMap(), Locale.ENGLISH,
                     new RedirectAttributesModelMap(), new MockHttpServletResponse());
         } finally {
             SecurityContextHolder.clearContext();

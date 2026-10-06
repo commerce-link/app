@@ -640,6 +640,65 @@ class CatalogProductsControllerTest {
                 .andExpect(model().attribute("backHref", returnTo));
     }
 
+    /** The review drops what the category already has, so the save alone cannot know it for the inventory notice. */
+    @Test
+    void reviewFromTheInventoryCarriesTheCountOfProductsTheCategoryAlreadyHas() throws Exception {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
+        MatchedInventory found = mock(MatchedInventory.class);
+        when(found.isEmpty()).thenReturn(false);
+        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(found);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", "/dashboard/inventory?view=browse&cat=11"))
+                .andExpect(model().attribute("skippedBefore", 1));
+    }
+
+    /** "Pominięto (już były)" counts the products the review dropped as well as the ones the save found again. */
+    @Test
+    void saveToTheInventoryCountsProductsSkippedByTheReview() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("skippedBefore", "2")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added"), eq(new Object[]{"GPU", 1, 2}), any(Locale.class));
+    }
+
+    /** A validation round renders the review again; the count must survive it, and a forged one is not believed. */
+    @Test
+    void saveWithErrorsKeepsTheSkippedCountAndRefusesANegativeOne() throws Exception {
+        // given
+        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "3")
+                        .param("returnTo", returnTo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("skippedBefore", 3));
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "-4")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("skippedBefore", 0));
+    }
+
     /**
      * The category and the id are the application's to give: a product grown by the binder carries neither, and a
      * category or an id smuggled into the form would let it land on -- or overwrite -- somebody else's record.
