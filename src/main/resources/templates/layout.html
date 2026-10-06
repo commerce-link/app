@@ -16,7 +16,6 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css">
     <link rel="stylesheet" th:href="@{/css/commercelink.css}">
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -66,6 +65,11 @@
 
         <main id="clContent" class="cl-content" tabindex="-1">
             <section class="section">
+                <div class="container is-fluid cl-page cl-frame-notices"
+                     th:if="${accountStatus != null and accountStatus.hasAlert()}">
+                    <div th:replace="~{fragments/account-status :: alert(${accountStatus})}"></div>
+                    <script th:if="${accountStatus.dismissible()}" th:src="@{/js/dismissible-alert.js}"></script>
+                </div>
                 <div class="container content is-fluid" layout:fragment="content">
                 </div>
             </section>

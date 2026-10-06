@@ -19,7 +19,7 @@ import java.util.function.Function;
 public record OrderItemRow(String itemId, int index, String name, String category, String mfn, String sku,
                            String serialNo, String serialHref, String conditionKey, String conditionTone,
                            boolean consolidated, boolean service, String comment, int qty, String unitPrice,
-                           String unitCost, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
+                           ItemMargin margin, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
                            boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
                            boolean removable, List<ItemAction.State> actions, String editHref, double price, double tax,
                            boolean group, String viewHref) {
@@ -59,8 +59,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 showCondition ? OrderLabels.condition(item.getCondition()) : null,
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
-                // the cost gross, like the price: the operator compares the two to spot the item worth a cheaper source
-                Money.format(item.getPrice()), Money.format(item.unitCost().grossValue()),
+                // the cost gross, like the price, so the margin is the same with or without VAT
+                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax()),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),

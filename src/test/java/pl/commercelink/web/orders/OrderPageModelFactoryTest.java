@@ -173,11 +173,11 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(superAdmin.finances().costs()).isNotNull();
-        assertThat(superAdmin.items().products().get(0).unitCost()).isNotNull();
+        assertThat(superAdmin.items().products().get(0).margin()).isNotNull();
         assertThat(superAdmin.readOnly()).isTrue();
         assertThat(superAdmin.admin()).isFalse();
         assertThat(user.finances().costs()).isNotNull();
-        assertThat(user.items().products().get(0).unitCost()).isNotNull();
+        assertThat(user.items().products().get(0).margin()).isNotNull();
     }
 
     @Test
@@ -230,8 +230,8 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(user.finances().costs()).isNotNull().isEqualTo(admin.finances().costs());
-        assertThat(user.items().products().get(0).unitCost()).isNotNull()
-                .isEqualTo(admin.items().products().get(0).unitCost());
+        assertThat(user.items().products().get(0).margin()).isNotNull()
+                .isEqualTo(admin.items().products().get(0).margin());
     }
 
     @Test
@@ -773,6 +773,25 @@ class OrderPageModelFactoryTest {
                 .containsExactly("order.event.type.action.SHIPMENT_DELIVERED", "order.event.type.other", "order.event.type.email");
         assertThat(page.history().events().get(2).argKey()).isEqualTo("email.notification.type.ORDER_CONFIRMATION");
         assertThat(page.history().events().get(1).arg()).isEqualTo("SOMETHING_NEW");
+    }
+
+    @Test
+    void aRejectedDeliveryRequestShowsItsSupplierAndReasonInTheHistory() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderEvent rejected = new OrderEvent(order.getOrderId(), EventType.action, OrderEvent.DELIVERY_REQUEST_REJECTED,
+                LocalDateTime.of(2026, 10, 2, 9, 30));
+        rejected.setDetails("Acme · brak towaru");
+        when(orderEventsRepository.findByOrderId(order.getOrderId())).thenReturn(List.of(rejected));
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        OrderPageModel.EventRow row = page.history().events().get(0);
+        assertThat(row.titleKey()).isEqualTo("order.event.type.action.DELIVERY_REQUEST_REJECTED");
+        assertThat(row.argKey()).isNull();
+        assertThat(row.arg()).isEqualTo("Acme · brak towaru");
     }
 
     private static OrderPageModelFactory.Viewer viewer() {

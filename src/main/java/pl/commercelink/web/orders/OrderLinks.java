@@ -1,22 +1,40 @@
 package pl.commercelink.web.orders;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.SerialNumbers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 
 /** Addresses of an order for the one looking at it: a super admin gets the store-scoped variants. */
 public record OrderLinks(String base, String storeId, boolean superAdmin) {
 
     public static OrderLinks of(Order order, boolean superAdmin) {
-        String base = superAdmin
-                ? "/dashboard/store/" + order.getStoreId() + "/orders/" + order.getOrderId()
-                : "/dashboard/orders/" + order.getOrderId();
-        return new OrderLinks(base, order.getStoreId(), superAdmin);
+        return new OrderLinks(detailsOf(order.getStoreId(), order.getOrderId(), superAdmin), order.getStoreId(), superAdmin);
+    }
+
+    /** The order page for the one looking at it: a super admin has the store-scoped variant. */
+    public static String detailsOf(String storeId, String orderId, boolean superAdmin) {
+        return superAdmin
+                ? "/dashboard/store/" + storeId + "/orders/" + orderId
+                : "/dashboard/orders/" + orderId;
+    }
+
+    /**
+     * The address a printed order card's QR code carries. Paper outlives routes, so it is a stable address that only
+     * redirects (OrderScanController), and it names the store, so it works whoever printed the card.
+     */
+    public static String scan(String storeId, String orderId) {
+        return "/dashboard/scan/orders/" + storeId + "/" + orderId;
+    }
+
+    /** scan() on the app's public address (app.domain), as a phone needs it. */
+    public static String scanUrl(String appDomain, String storeId, String orderId) {
+        return StringUtils.removeEnd(appDomain, "/") + scan(storeId, orderId);
     }
 
     public String details() {
@@ -65,10 +83,6 @@ public record OrderLinks(String base, String storeId, boolean superAdmin) {
      * item's order; empty without a serial number.
      */
     public static List<SerialHistory> serialHistory(String serialNo) {
-        if (serialNo == null) {
-            return List.of();
-        }
-        return Arrays.stream(serialNo.split(",")).map(String::trim).filter(sn -> !sn.isEmpty()).distinct()
-                .map(sn -> new SerialHistory(sn, itemHistory(sn))).toList();
+        return SerialNumbers.parse(serialNo).stream().map(sn -> new SerialHistory(sn, itemHistory(sn))).toList();
     }
 }

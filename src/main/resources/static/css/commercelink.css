@@ -542,6 +542,11 @@ body.cl-drawer-open .cl-sidebar {
     z-index: 40;
 }
 
+/* a tooltip of several facts, one per line (a "\n" in the text) */
+.cl-tooltip.is-lines::after {
+    white-space: pre-line;
+}
+
 .cl-tooltip:hover::after,
 .cl-tooltip:focus::after {
     opacity: 1;
@@ -1746,6 +1751,75 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* Pill next to an option title, e.g. the supplier address that matches the store's shipping address (approval screen) */
+.cl-page .cl-choice-title .cl-status {
+    margin-left: 8px;
+    vertical-align: 1px;
+}
+
+/* "Goods for": the customer orders a delivery request serves, link and customer on the left, quantity on the right */
+.cl-page .cl-request-for {
+    margin: 0;
+    padding: 4px 20px 18px;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.cl-page .cl-request-for li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0;
+}
+
+/* The order link: the accent focus ring of the link buttons, and below 1024 px a 44 px target (the row grows; the
+   quantity stays on the link's baseline). The store link in the record meta gets the same ring. */
+.cl-page .cl-request-for a:focus-visible,
+.cl-page .cl-record-meta a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+@media (max-width: 1023px) {
+    .cl-page .cl-request-for a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+}
+
+.cl-page .cl-request-for li > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-request-for li > :last-child {
+    flex: none;
+    white-space: nowrap;
+}
+
+.cl-page .cl-request-for .cl-table-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-card-desc .is-warn {
+    color: var(--cl-warn);
+}
+
+/* A text link locked while an order is on its way (the "reject the request" link of the unavailability alert). */
+.cl-page .cl-alert-text a[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
 /* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a
    field label, or a part of the form that is switched off as a whole (disabled with its fieldset). */
 .cl-page .cl-choice-group {
@@ -2654,6 +2728,236 @@ a.cl-link-button:hover {
     }
 }
 
+/* Account status (trial, read-only panel): a .cl-status pill in the top bar that opens a popover like the bell, and,
+   when the state needs attention, an alert at the top of the content. The pill carries an icon instead of the dot. */
+.cl-account-status {
+    position: relative;
+}
+
+.cl-account-status-toggle {
+    position: relative;
+    padding: 4px 11px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 12.5px;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    cursor: pointer;
+}
+
+.cl-account-status-toggle::before {
+    content: none;
+}
+
+.cl-account-status-toggle:hover {
+    border-color: currentColor;
+}
+
+.cl-account-status-toggle[aria-expanded="true"] {
+    border-color: var(--cl-accent);
+}
+
+.cl-account-status-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+}
+
+.cl-account-status-icon {
+    display: inline-flex;
+}
+
+.cl-account-status-short {
+    display: none;
+}
+
+.cl-account-status-pop {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 12px);
+    z-index: var(--cl-z-pop);
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: 10px;
+    box-shadow: var(--cl-shadow);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--cl-ink-2);
+}
+
+.cl-account-status-pop[hidden] {
+    display: none;
+}
+
+.cl-account-status-pop p {
+    margin: 0;
+}
+
+.cl-account-status-pop .cl-account-status-pop-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+.cl-account-status-mail {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-account-status-mail:focus-visible,
+.cl-account-alert a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* The alert renders in the frame, above the page's own container, so it takes the .cl-page scope of the alert
+   rules without the page's bottom padding. */
+.cl-page.cl-frame-notices {
+    padding-bottom: 0;
+}
+
+/* The alert lines up with the page below it: as wide as .cl-page-body (1200 px), as wide as a wide page (1440 px),
+   and the full width of a page not built on .cl-page-body yet. */
+.cl-page.cl-frame-notices .cl-alert {
+    max-width: 1200px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.cl-content:has(.cl-page-body.is-wide) .cl-page.cl-frame-notices .cl-alert {
+    max-width: 1440px;
+}
+
+.cl-content:not(:has(.cl-page-body)) .cl-page.cl-frame-notices .cl-alert {
+    max-width: none;
+}
+
+.cl-page .cl-alert[hidden],
+.cl-alert-dismiss[hidden] {
+    display: none;
+}
+
+.cl-page .cl-account-alert.is-warn {
+    align-items: center;
+    padding: 10px 12px 10px 16px;
+}
+
+.cl-page .cl-account-alert.is-warn .cl-alert-icon {
+    margin-top: 0;
+}
+
+.cl-page .cl-account-alert .cl-account-alert-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.cl-page .cl-account-alert .cl-alert-text {
+    font-size: 14px;
+}
+
+.cl-page .cl-account-alert a {
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-account-alert .cl-account-alert-action {
+    white-space: nowrap;
+}
+
+.cl-alert-dismiss {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+}
+
+@media screen and (max-width: 1023px) {
+    /* 44 px touch target without making the pill itself taller than the 56 px top bar can carry */
+    .cl-account-status-toggle::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 44px;
+        transform: translateY(-50%);
+    }
+
+    .cl-account-status-mail,
+    .cl-page .cl-account-alert .cl-account-alert-action {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .cl-alert-dismiss {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-account-status-toggle {
+        min-width: 44px;
+        justify-content: center;
+    }
+
+    /* the full text stays the button's accessible name; only the number is shown */
+    .cl-account-status-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .cl-account-status-short {
+        display: inline;
+    }
+
+    .cl-account-status-pop {
+        position: fixed;
+        top: calc(var(--cl-topbar-height) + 4px);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+
+    .cl-page .cl-account-alert.is-warn {
+        flex-wrap: wrap;
+    }
+
+    .cl-page .cl-account-alert.is-warn .cl-account-alert-body {
+        flex-basis: calc(100% - 82px);
+    }
+
+    .cl-page .cl-account-alert .cl-alert-dismiss {
+        order: 1;
+    }
+
+    .cl-page .cl-account-alert .cl-account-alert-action {
+        order: 2;
+        flex-basis: 100%;
+        padding-left: 24px;
+        white-space: normal;
+    }
+}
+
 /* Print: the shell chrome (rail column, fixed sidebar, sticky topbar) has no place on paper. */
 @page {
     margin: 15mm;
@@ -2665,6 +2969,7 @@ a.cl-link-button:hover {
     .cl-topbar,
     .cl-scrim,
     .cl-toast,
+    .cl-frame-notices,
     .modal,
     .notification {
         display: none !important;
@@ -3927,8 +4232,8 @@ a.cl-link-button:hover {
 
 @media screen and (max-width: 1023px) {
     .cl-page .cl-list-title a:not(.cl-link-button) {
-        padding-block: 12px;
-        margin-block: -12px;
+        padding-block: 13px;
+        margin-block: -13px;
     }
 }
 
@@ -5063,6 +5368,49 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+/* Printing several order cards (spec docs/active/order-cards-bulk-print): the checkbox cell stands above the row
+   link's ::after, which covers the whole row, so the 44 px label ticks the box and the rest of the cell is inert: neither opens the order.
+   Without table-select.js (no .is-selectable) the column is not drawn: the table is the one it was before. */
+.cl-page .cl-table.is-orders .cl-table-check {
+    position: relative;
+    z-index: 1;
+}
+
+.cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check {
+    display: none;
+}
+
+/* The first-child indent above targets the hidden check cell, so without JavaScript the first visible column takes the
+   20 px edge padding itself (specificity 0,5,1 beats the first-child rule's 0,3,1). Card mode has its own layout.
+   From 1024 px; between 720 and 1023 px the narrow-table 8 px indent applies, as before. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td) {
+        padding-left: 20px;
+    }
+}
+
+/* Card mode (< 720 px) has no selection: no checkbox cells, no selection row and no tint of a row checked at a wider
+   width. The generic card-mode rules of selectable tables (the key cell as a padded block) outrank the orders card by
+   specificity, so the key cell gets its display: contents back here. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-orders[data-cl-select-table] .cl-table-check {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders[data-cl-select-table] tbody th.cl-table-key {
+        display: contents;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-orders tr.is-selected {
+        background: transparent;
+    }
+
+    .cl-page .cl-selection-row.is-wide-only {
+        display: none;
+    }
+}
+
 .cl-page .cl-table.is-orders .cl-cell-date {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -5448,8 +5796,10 @@ a.cl-link-button:hover {
     padding-top: 12px;
 }
 
+/* The label never narrows below its longest word: with minmax(0, 1fr) a long value without spaces (a supplier's terms,
+   a counterparty) squeezed the label to a few pixels and its words ran over the value. The value wraps instead. */
 .cl-page .cl-kv.is-column > div {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(min-content, 1fr) auto;
     align-items: start;
 }
 
@@ -6057,7 +6407,8 @@ a.cl-link-button:hover {
 
 /* Column widths of the order items table (fixed layout) */
 .cl-page .cl-table col.cl-col-check { width: 44px; }
-.cl-page .cl-table col.cl-col-price { width: 128px; }
+/* the price and its margin icon on one line: "10 × 12 269,00" + 6 px + the 14 px icon + the cell's 2 x 10 px padding */
+.cl-page .cl-table col.cl-col-price { width: 152px; }
 /* fits the longest usual state pill ("Skompletowany", "Zarezerwowany": 124 px) plus the cell's 2 x 10 px padding */
 .cl-page .cl-table col.cl-col-state { width: 148px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
@@ -6259,7 +6610,7 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-kv.is-column > div {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(min-content, 1fr) auto;
         gap: 8px;
     }
 
@@ -7020,6 +7371,33 @@ a.cl-link-button:hover {
     padding-top: 16px;
 }
 
+/* The order card's QR code (orders/card): it opens the order on a phone. Stays right of the title and wraps under it
+   only when the row is too narrow (flex-wrap);
+   black modules on white whatever "print backgrounds" says, since the colours are SVG fills. */
+.cl-page .cl-page-header-row:has(.cl-print-qr) {
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* Selector outranks Bulma's `.content` margins. */
+.cl-page .cl-page-header-row div.cl-print-qr {
+    flex: none;
+    width: 120px;
+    margin: 0;
+    break-inside: avoid;
+}
+
+.cl-page .cl-print-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* A batch of order cards (orders/cards) opened as a page: the cards stand apart like separate sheets. */
+.cl-page .cl-print-card + .cl-print-card {
+    margin-top: 40px;
+}
+
 .cl-page .cl-print-section {
     padding-top: 14px;
     border-top: 1px solid var(--cl-line);
@@ -7180,6 +7558,46 @@ a.cl-link-button:hover {
 
     .cl-page.cl-print-page .cl-page-title {
         font-size: 16pt;
+    }
+
+    /* The order card's QR code leaves the title row and sits in the top-right corner of its own card (.cl-print-card:
+       the whole sheet of a single card, one card of a batch), beside both the title and the order details, so it no
+       longer makes the title row as tall as itself (more item rows fit on page 1). The title row and the details keep
+       34 mm free on the right (code + gap), so no text runs under the code. */
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) {
+        position: relative;
+    }
+
+    .cl-page.cl-print-page .cl-page-header-row div.cl-print-qr {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 30mm;
+    }
+
+    .cl-page.cl-print-page .cl-page-header-row:has(.cl-print-qr) {
+        padding-right: 34mm;
+    }
+
+    /* Beside the code the details stack in one column (order number, e-mail, ordered at), so the e-mail gets the
+       whole width left of the code: an ordinary address stays on one line, only one longer than that width breaks.
+       Title + three rows end ~32 mm down (measured in Chromium), so the first section's rule already falls ~2 mm below
+       the 30 mm code and needs no min-height. */
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
+        grid-template-columns: minmax(0, 1fr);
+        padding-right: 34mm;
+        align-content: start;
+    }
+
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) .cl-kv.cl-print-meta dd {
+        overflow-wrap: break-word;
+    }
+
+    /* A batch of cards (orders/cards): every card after the first starts on a new page. A forced break keeps the
+       margin after it, so the screen gap between the cards is dropped on paper. */
+    .cl-page.cl-print-page .cl-print-card + .cl-print-card {
+        margin-top: 0;
+        break-before: page;
     }
 
     .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {
@@ -7438,6 +7856,25 @@ a.cl-link-button:hover {
 @media screen and (min-width: 720px) {
     .cl-page .cl-table.is-key-wrap:has(col.cl-col-key) td.is-numeric:has(.cl-status) {
         white-space: normal;
+    }
+}
+
+/* The supplier's live answer (five figures per product) in a 600 px card (1366 px, 720 px): 12 % per figure left
+   48 px of text (40 px in the last column, which keeps the card's 20 px inset), so "brakuje 9" and "−1 568,00" spilt
+   over the card's edge. The columns are sized for what they hold: the shortage pill (14 %) and the signed difference
+   (15 %) get more, the plain figures 12.5 % with 8 px between them, the product name the remaining 33.5 %. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-key { width: 33.5%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num { width: 12.5%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num:nth-child(3) { width: 14%; }
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) col.cl-col-num:last-child { width: 15%; }
+
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) .is-numeric {
+        padding-inline: 8px;
+    }
+
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-num:nth-child(6)) :is(th, td).is-numeric:last-child {
+        padding-right: 20px;
     }
 }
 
@@ -8574,5 +9011,623 @@ a.cl-link-button:hover {
         order: 8;
         justify-self: start;
         min-height: 44px;
+    }
+}
+
+/* --- Delivery details (spec docs/active/delivery-details-redesign/2026-10-01-delivery-details-design.md §13):
+   P1 items table with destination rows, P2 selection row docked on phones, P3 status card with actions, P4 dialog list,
+   P5 destructive link at the end of the dialog actions, P6 field under a choice, P7 long supplier number, P8 side cards
+   in two columns between the phone and the two-column layout, P9 a dialog shown in the page without JavaScript. */
+
+/* P1: one tbody per product, its destinations (an order line or a warehouse top-up) as rows of the same table, so their
+   checkboxes line up with the header's select-all and table-select.js works unchanged. */
+.cl-page .cl-table.is-allocations col.cl-col-received {
+    width: 132px;
+}
+
+.cl-page .cl-table.is-allocations col.cl-col-value {
+    width: 150px;
+}
+
+.cl-page .cl-table.is-allocations .cl-value-cell > span:first-child {
+    font-weight: 600;
+}
+
+.cl-page .cl-table.is-allocations .cl-alloc-qty {
+    min-width: 3.6em;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-allocations tbody + tbody {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-table.is-allocations tbody tr > * {
+    border-bottom: 0;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-row-main > * {
+    padding-top: 12px;
+    padding-bottom: 6px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-row-main:not(.is-open) > * {
+    padding-bottom: 12px;
+}
+
+.cl-page .cl-table.is-allocations .cl-row-toggle {
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row > * {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 13.5px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row:last-child > * {
+    padding-bottom: 12px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    margin-left: 2px;
+    padding-left: 14px;
+    border-left: 2px solid var(--cl-line);
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest a {
+    color: var(--cl-accent-ink);
+}
+
+/* a customer login has no break opportunity; as a flex item it would keep its full width and widen a 320 px page */
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest > * {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+/* a tag such as "Do klienta przez magazyn" wraps between words, never inside one */
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest > .cl-status {
+    overflow-wrap: normal;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row.is-done .cl-alloc-dest {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-allocations .cl-received {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-allocations .cl-received.is-complete {
+    color: var(--cl-ok);
+    font-weight: 600;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-allocations col.cl-col-received {
+        width: 120px;
+    }
+
+    .cl-page .cl-table.is-allocations tr > :is(th, td):not(:first-child) {
+        padding-left: 8px;
+    }
+
+    .cl-page .cl-table.is-allocations tr > :is(th, td):not(:last-child) {
+        padding-right: 8px;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest a {
+        display: inline-block;
+        min-height: 44px;
+        padding: 12px 0;
+    }
+}
+
+/* P1 on phones: the tbody is the product card (name, codes, menu; "Odebrano: …", value), its destinations below as
+   lines checkbox · destination and quantity · state. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-allocations.is-wrap tbody {
+        padding: 12px 16px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr {
+        padding: 0;
+        border-top: 0;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main {
+        grid-template-columns: minmax(0, 1fr) 44px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > .cl-table-check {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > .cl-table-key {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td:not(.cl-table-check):not(.cl-table-actions) {
+        display: block;
+        grid-column: 1;
+        padding: 1px 0;
+        font-size: 13.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td.cl-table-actions {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td[data-prefix]::before {
+        content: attr(data-prefix);
+        margin-right: 4px;
+        color: var(--cl-ink-2);
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        column-gap: 8px;
+        align-items: center;
+        min-height: 52px;
+        margin-top: 8px;
+        padding: 2px 0;
+        border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row:not(:has(.cl-check-target)) {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > * {
+        display: block;
+        padding: 6px 0;
+        font-size: 13.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-table-check {
+        grid-column: 1;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-table-check:not(:has(.cl-check-target)) {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > td.cl-alloc-cell {
+        grid-column: -3 / -2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > td.cl-alloc-state {
+        grid-column: -2 / -1;
+        grid-row: 1;
+        text-align: right;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-alloc-empty {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row::before,
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > *::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-qty {
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.is-selected {
+        background: var(--cl-accent-soft);
+    }
+}
+
+/* P2: below 720 px the selection row leaves the flow and is pinned to the bottom edge while something is checked and
+   the items card is on screen (.is-in-view, set by delivery-details.js); the form keeps room for it at its bottom. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 15;
+        margin: 0;
+        padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--cl-line);
+        border-bottom: 0;
+        box-shadow: 0 -6px 16px rgba(14, 23, 33, .12);
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions {
+        gap: 8px;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions .cl-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-remove {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
+        padding-bottom: var(--cl-docked-bar, 112px);
+    }
+}
+
+/* P3: status card with the supplier's reason and the repair actions; a tone bar on the left. */
+.cl-page .cl-card.is-status .cl-card-title .is-bad {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-card.is-status .cl-card-title .is-info {
+    color: var(--cl-info);
+}
+
+.cl-page .cl-card.is-status.is-bad {
+    box-shadow: inset 3px 0 0 var(--cl-bad);
+}
+
+.cl-page .cl-card.is-status.is-warn {
+    box-shadow: inset 3px 0 0 var(--cl-warn);
+}
+
+.cl-page .cl-card.is-status.is-info {
+    box-shadow: inset 3px 0 0 var(--cl-info);
+}
+
+.cl-page .cl-card.is-status .cl-status-reason {
+    margin: 0 20px 4px;
+    font-size: 13.5px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-card.is-status .cl-status-reason code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--cl-surface);
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card.is-status .cl-status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    padding: 8px 20px 18px;
+}
+
+.cl-page .cl-card.is-status:is(.is-bad, .is-warn, .is-info) > p:last-child {
+    margin-bottom: 18px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-card.is-status .cl-status-reason {
+        margin: 0 16px 4px;
+    }
+
+    .cl-page .cl-card.is-status .cl-status-actions {
+        padding: 8px 16px 16px;
+    }
+
+    .cl-page .cl-card.is-status .cl-status-actions .cl-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
+
+/* P4: what a confirmation acts on, inside a dialog ("Odbierz całość", "Usuń z dostawy"). */
+.cl-page .cl-dialog-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-dialog-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-dialog-list li + li {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-dialog-list .cl-dialog-list-sub {
+    grid-column: 1 / -1;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-dialog-list .is-numeric {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* P5: a destructive action at the far end of the dialog actions ("Usuń wpłatę"), away from saving. */
+.cl-page .cl-dialog-actions > .cl-dialog-actions-end {
+    align-self: center;
+    margin-left: auto;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-dialog-actions > .cl-dialog-actions-end {
+        min-height: 44px;
+        margin-left: 0;
+    }
+}
+
+/* P6: a field under its choice inside cl-choice-group ("ID faktury" under "Po ID faktury"). */
+.cl-page .cl-choice-reveal {
+    display: grid;
+    gap: var(--cl-gap-attached);
+    max-width: 320px;
+    margin: 4px 0 4px 30px;
+}
+
+/* P7: a long supplier number is cut in the record meta line (full in title) and wraps anywhere in the side card. */
+.cl-page .cl-record-meta .cl-meta-truncate {
+    display: inline-block;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+/* cl-kv-text keeps the line breaks of a comment (pre-line); the number's dd holds markup, whose indentation would
+   become blank lines */
+.cl-page .cl-kv.is-column dd.cl-kv-text.is-break {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+/* P8: between the phone and the two-column layout the side cards sit in a grid instead of full-width rows whose value
+   stands ~700 px from its label; DOM order stays (spec §10.5). Declared after the one-column rule of cl-layout-aside.
+   280 px lets two cards share the ~608 px the content keeps at 720 px with the sidebar open. */
+@media screen and (min-width: 720px) and (max-width: 1365px) {
+    .cl-page .cl-layout-side.is-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        align-items: start;
+    }
+}
+
+/* P9: without JavaScript a dialog opener leads to ?open=…, which renders the dialog open; a non-modal dialog would be
+   positioned over the page, so it takes its place in the flow instead. */
+.cl-page dialog.cl-dialog[open]:not(:modal) {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 16px 0;
+    box-shadow: var(--cl-shadow-card);
+}
+
+/* A label glued to its value ("Kod MFN-01" with the copy button): the pair moves to the next line as a whole instead of
+   leaving "Kod" at the end of a line; a value longer than the line still wraps inside (cl-copy-inline, anywhere). */
+.cl-page .cl-label-pair {
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* A summary right under a card head that wraps its actions (Płatności on a phone): the inset's top padding, which the
+   generic dl.cl-kv padding would otherwise take away, so "Dodaj wpłatę" does not touch "Do zapłaty". */
+.cl-page .cl-card-head + dl.cl-kv.cl-card-inset:not(.is-column) {
+    padding-top: 16px;
+}
+
+/* A long text in a side card (a comment) shows its first lines; delivery-details.js adds the toggle only when the text
+   is longer, so without JavaScript the whole text stays visible. */
+.cl-page .cl-clamp.is-clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 8;
+    overflow: hidden;
+}
+
+.cl-page .cl-clamp-toggle {
+    margin: 0 20px 16px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-clamp-toggle {
+        margin: 0 16px 16px;
+    }
+}
+
+/* --- Item history (/dashboard/item/history, spec docs/active/item-history-redesign/2026-10-02-item-history-design.md §7) --- */
+
+/* P1: search in the page header row; under 720 px it takes the whole row below the title */
+.cl-page .cl-page-header-row .cl-search-form.is-header {
+    margin-left: auto;
+}
+
+.cl-page .cl-page-header-row .cl-search-form.is-header .cl-search-field {
+    width: 320px;
+}
+
+.cl-page .cl-page-header.is-in-stack {
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-page-header-row .cl-search-form.is-header {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .cl-page .cl-page-header-row .cl-search-form.is-header .cl-search-field {
+        flex: 1 1 0;
+        width: auto;
+    }
+}
+
+/* P2: a search card as the page's only content, before anything is searched */
+.cl-page .cl-search-card {
+    padding: 20px;
+}
+
+.cl-page .cl-search-card .cl-search-form {
+    margin: 0;
+}
+
+.cl-page .cl-search-card .cl-search-field {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 520px;
+}
+
+.cl-page .cl-search-card .cl-card-desc.is-flush {
+    padding: 0;
+    margin: 4px 0 14px;
+}
+
+.cl-page .cl-search-card .cl-help {
+    margin: 12px 0 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-search-card ul.cl-hints {
+    margin: 6px 0 0 18px;
+    padding: 0;
+    list-style: disc;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-search-card ul.cl-hints li {
+    margin: 2px 0;
+}
+
+/* P3: the "now" band of a record card: label, state pill and a link to the record; the label on --cl-surface-2 stays --cl-ink-2 for AA contrast */
+.cl-page .cl-now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 12px 0 14px;
+    padding: 10px 20px;
+    background: var(--cl-surface-2);
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-now-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-now a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+/* P4: a timeline event pointing at a record: link and status pill on one line; Font Awesome swaps <i> for <svg> */
+.cl-page .cl-timeline-title .cl-icon-text :is(i, svg) {
+    width: 1.1em;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-timeline-desc.is-record {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 4px;
+}
+
+.cl-page .cl-timeline-desc.is-record a {
+    font-weight: 600;
+}
+
+.cl-page #item-events .cl-timeline-item:not(:last-child) {
+    padding-bottom: 16px;
+}
+
+/* Order items: the margin of one unit as an info icon after the price (ItemMargin); the numbers are in its tooltip. A
+   loss turns it into a red exclamation mark, so the mark does not rest on colour alone. */
+.cl-page .cl-price-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.cl-page .cl-margin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--cl-ink-3);
+    cursor: help;
+}
+
+.cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
+.cl-page .cl-margin.is-unknown { opacity: .55; }
+.cl-page .cl-margin.is-loss { color: var(--cl-bad); }
+
+.cl-page .cl-margin:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* the tooltip opens to the left: the price column stands right of the middle and a centred box hid the state pill */
+.cl-page .cl-margin.cl-tooltip::after {
+    left: auto;
+    right: -8px;
+    transform: translateY(4px);
+    text-align: left;
+}
+
+.cl-page .cl-margin.cl-tooltip:is(:hover, :focus)::after {
+    transform: translateY(0);
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the 20 px mark without growing the row */
+    .cl-page .cl-margin {
+        box-sizing: content-box;
+        padding: 12px;
+        margin: -12px;
     }
 }

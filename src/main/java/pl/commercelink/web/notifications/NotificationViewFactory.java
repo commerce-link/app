@@ -41,6 +41,10 @@ public class NotificationViewFactory {
             actionHref = "/dashboard/orders/" + UriUtils.encodePathSegment(
                     ReceiptAttemptKeys.orderPartOf(record.getObject()), StandardCharsets.UTF_8);
             actionKey = "store.notification.action.viewOrder";
+        } else if (type == StoreNotificationType.DELIVERY_REQUEST_REJECTED && role == UserRole.ADMIN) {
+            // the pending deliveries screen resolves the store from the logged-in admin, so only the store admin gets the link
+            actionHref = "/dashboard/deliveries/preview";
+            actionKey = "store.notification.action.viewPendingDeliveries";
         }
         return new NotificationView(record.getNotificationId(), titleKey, record.getMessage(), record.getCreatedAt(),
                 record.isUnread(), record.getSeverity() == StoreNotificationSeverity.WARNING, actionHref, actionKey,

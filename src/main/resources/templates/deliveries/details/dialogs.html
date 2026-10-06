@@ -1,0 +1,435 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The selection row's dialogs (spec §11). They sit inside #allocationsForm: their fields post with the checked
+       destinations, once each, and their submit buttons carry the action (formaction). A dialog the address asked for
+       (?open=…, what an opener leads to without JavaScript) is rendered open, in the page flow (P9). No field is
+       required here: the browser would check every dialog's fields on any submit of the form; delivery-details.js
+       checks the open dialog's fields instead, and the server refuses what is missing. */-->
+<th:block th:fragment="selection" th:with="items=${page.items()}, bar=${page.items().selection()}, d=${page.dialogs()}">
+    <th:block th:if="${bar.receive().visible()}">
+        <dialog class="cl-dialog is-form" id="receive-dialog" aria-labelledby="receive-dialog-title"
+                th:attr="open=${page.openDialog() == 'receive'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="receive-dialog-title" th:text="#{deliveries.details.receive.title}"></h2>
+            <div class="cl-dialog-body">
+                <p class="cl-dialog-message" th:text="#{deliveries.details.receive.intro}"></p>
+                <ul class="cl-dialog-list" data-cl-selection-list th:insert="~{deliveries/details/dialogs :: checkedLines}"></ul>
+                <p class="cl-dialog-effect" th:text="#{deliveries.details.receive.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-dialog-submit th:formaction="@{${page.links().receive()}}"
+                        th:text="#{deliveries.details.receive.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+        <dialog class="cl-dialog is-form" id="receive-all-dialog" aria-labelledby="receive-all-dialog-title"
+                th:attr="open=${page.openDialog() == 'receive-all'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="receive-all-dialog-title" th:text="#{deliveries.details.receiveAll.title(${page.shortId()})}"></h2>
+            <div class="cl-dialog-body">
+                <p class="cl-dialog-message" th:text="#{deliveries.details.receiveAll.intro(${items.pendingCount()}, ${items.allocationCount()})}"></p>
+                <ul class="cl-dialog-list">
+                    <li th:each="line : ${d.pending()}"><span th:text="${line.productName()}"></span><span class="is-numeric"
+                            th:text="#{deliveries.details.items.qty(${line.qty()})}"></span><span class="cl-dialog-list-sub"><span aria-hidden="true">→ </span><span
+                            th:text="${#messages.msgWithParams(line.destinationKey(), line.destinationArgs())}"></span></span></li>
+                </ul>
+                <p class="cl-dialog-effect" th:text="#{deliveries.details.receiveAll.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-dialog-submit th:formaction="@{${page.links().receive()}}"
+                        th:text="#{deliveries.details.receiveAll.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${bar.merge().visible()}">
+        <dialog class="cl-dialog is-form" id="merge-dialog" aria-labelledby="merge-dialog-title"
+                th:attr="open=${page.openDialog() == 'merge'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="merge-dialog-title" th:text="#{deliveries.details.merge.title}"></h2>
+            <div class="cl-dialog-body">
+                <div class="cl-field">
+                    <label class="cl-label" for="targetDeliveryId" th:text="#{deliveries.details.merge.target}"></label>
+                    <select class="cl-select" id="targetDeliveryId" name="targetDeliveryId"
+                            aria-describedby="targetDeliveryId-help targetDeliveryId-error">
+                        <option value="" th:text="#{deliveries.details.merge.choose}"></option>
+                        <option th:each="target : ${bar.mergeTargets()}" th:value="${target.deliveryId()}"
+                                th:text="#{deliveries.details.merge.option(${target.shortId()},
+                                        ${target.externalId() != null ? target.externalId() : #messages.msg('deliveries.details.merge.option.noNumber')},
+                                        ${target.estimatedDeliveryAt() != null ? target.estimatedDeliveryAt() : '—'})}"></option>
+                    </select>
+                    <p class="cl-help" id="targetDeliveryId-help" th:text="#{deliveries.details.merge.help}"></p>
+                    <p class="cl-field-error" id="targetDeliveryId-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+                            aria-hidden="true"></i><span th:text="#{deliveries.details.merge.error.target}"></span></p>
+                </div>
+                <ul class="cl-dialog-list" data-cl-selection-list th:insert="~{deliveries/details/dialogs :: checkedLines}"></ul>
+                <p class="cl-dialog-effect" th:text="#{deliveries.details.merge.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-dialog-submit data-cl-validate="merge"
+                        th:formaction="@{${page.links().merge()}}" th:text="#{deliveries.details.merge.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${bar.split().visible()}">
+        <dialog class="cl-dialog is-form" id="split-dialog" aria-labelledby="split-dialog-title"
+                th:attr="open=${page.openDialog() == 'split'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="split-dialog-title" th:text="#{deliveries.details.split.title}"></h2>
+            <div class="cl-dialog-body">
+                <div class="cl-form-grid cl-card-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="targetExternalDeliveryId" th:text="#{deliveries.details.split.number}"></label>
+                        <input class="cl-input" type="text" id="targetExternalDeliveryId" name="targetExternalDeliveryId" autocomplete="off"
+                               aria-describedby="targetExternalDeliveryId-help targetExternalDeliveryId-error">
+                        <p class="cl-help" id="targetExternalDeliveryId-help" th:text="#{deliveries.details.split.number.help}"></p>
+                        <p class="cl-field-error" id="targetExternalDeliveryId-error" data-cl-field-error hidden><i
+                                class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{deliveries.details.split.error.number}"></span></p>
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="targetEstimatedDeliveryAt" th:text="#{deliveries.details.split.date}"></label>
+                        <input class="cl-input" type="date" id="targetEstimatedDeliveryAt" name="targetEstimatedDeliveryAt" th:value="${d.splitDate()}">
+                    </div>
+                </div>
+                <ul class="cl-dialog-list" data-cl-selection-list th:insert="~{deliveries/details/dialogs :: checkedLines}"></ul>
+                <p class="cl-dialog-effect" th:text="#{deliveries.details.split.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-dialog-submit data-cl-validate="split"
+                        th:formaction="@{${page.links().split()}}" th:text="#{deliveries.details.split.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${bar.ship().visible()}">
+        <dialog class="cl-dialog is-form" id="ship-dialog" aria-labelledby="ship-dialog-title"
+                th:attr="open=${page.openDialog() == 'ship' or page.openDialog() == 'ship-all'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="ship-dialog-title" th:text="#{deliveries.details.ship.title}"></h2>
+            <div class="cl-dialog-body">
+                <fieldset class="cl-choice-group is-row">
+                    <legend class="cl-label" th:text="#{deliveries.details.ship.type}"></legend>
+                    <label class="cl-choice"><input type="radio" name="shipmentType" value="Courier"
+                                                    th:checked="${d.shipmentType() == 'Courier'}"><span class="cl-choice-text"><span
+                            class="cl-choice-title" th:text="#{ShipmentType.Courier}"></span></span></label>
+                    <label class="cl-choice"><input type="radio" name="shipmentType" value="PickupPoint"
+                                                    th:checked="${d.shipmentType() == 'PickupPoint'}"><span class="cl-choice-text"><span
+                            class="cl-choice-title" th:text="#{ShipmentType.PickupPoint}"></span></span></label>
+                </fieldset>
+                <div class="cl-form-grid cl-card-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="shipmentCarrier" th:text="#{deliveries.details.ship.carrier}"></label>
+                        <select th:if="${!d.carrierOptions().isEmpty()}" class="cl-select" id="shipmentCarrier" name="shipmentCarrier">
+                            <option th:each="carrier : ${d.carrierOptions()}" th:value="${carrier}" th:selected="${carrier == d.carrier()}"
+                                    th:text="${carrier}"></option>
+                        </select>
+                        <input th:if="${d.carrierOptions().isEmpty()}" class="cl-input" type="text" id="shipmentCarrier" name="shipmentCarrier"
+                               autocomplete="off" th:value="${d.carrier()}">
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="shipmentCollectionPointCode" th:text="#{deliveries.details.ship.point}"></label>
+                        <input class="cl-input" type="text" id="shipmentCollectionPointCode" name="shipmentCollectionPointCode"
+                               autocomplete="off" aria-describedby="shipmentCollectionPointCode-help" th:value="${d.collectionPoint()}">
+                        <p class="cl-help" id="shipmentCollectionPointCode-help" th:text="#{deliveries.details.ship.point.help}"></p>
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="shipmentTrackingNo" th:text="#{deliveries.details.ship.tracking}"></label>
+                        <input class="cl-input" type="text" id="shipmentTrackingNo" name="shipmentTrackingNo" autocomplete="off">
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="shipmentShippedAt" th:text="#{deliveries.details.ship.shippedAt}"></label>
+                        <input class="cl-input" type="datetime-local" id="shipmentShippedAt" name="shipmentShippedAt" th:value="${d.shippedAtDefault()}">
+                    </div>
+                </div>
+                <p class="cl-field-error" id="ship-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+                        aria-hidden="true"></i><span th:text="#{deliveries.details.ship.error.incomplete}"></span></p>
+                <ul class="cl-dialog-list" data-cl-selection-list th:insert="~{deliveries/details/dialogs :: checkedLines}"></ul>
+                <p class="cl-dialog-effect" th:text="#{deliveries.details.ship.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-dialog-submit data-cl-validate="ship"
+                        th:formaction="@{${page.links().confirmShipment()}}" th:text="#{deliveries.details.ship.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${bar.remove().visible()}">
+        <dialog class="cl-dialog is-form" id="remove-dialog" aria-labelledby="remove-dialog-title"
+                th:attr="open=${page.openDialog() == 'remove' or page.openDialog() == 'remove-all'} ? 'open' : null">
+            <h2 class="cl-dialog-title" id="remove-dialog-title" th:text="#{deliveries.details.remove.title}"></h2>
+            <div class="cl-dialog-body">
+                <div th:if="${bar.removeMessageKey() == 'deliveries.details.remove.message.unknown'}" class="cl-alert is-warn"><i
+                        class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i><p class="cl-alert-text"
+                        th:text="#{${bar.removeMessageKey()}}"></p></div>
+                <p th:unless="${bar.removeMessageKey() == 'deliveries.details.remove.message.unknown'}" class="cl-dialog-message"
+                   th:text="#{${bar.removeMessageKey()}}"></p>
+                <ul class="cl-dialog-list" data-cl-selection-list th:insert="~{deliveries/details/dialogs :: checkedLines}"></ul>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-danger" data-cl-dialog-submit
+                        th:formaction="@{${page.links().removeAllocations()}}" th:text="#{deliveries.details.remove.submit}"></button>
+                <!--/* removing is the dangerous choice: the focus starts on the safe one */-->
+                <button type="button" class="cl-button" data-cl-dialog-close autofocus th:text="#{general.cancel}"></button>
+            </div>
+        </dialog>
+    </th:block>
+</th:block>
+
+<!--/* The checked destinations, listed in a selection dialog (rebuilt by delivery-details.js when it opens, from the
+       checkbox's data-dest). The destination is plain text, as in the rebuilt list and the mockups: no icon, no link. */-->
+<th:block th:fragment="checkedLines">
+    <th:block th:each="product : ${page.items().products()}">
+        <th:block th:each="row : ${product.allocations()}">
+            <li th:if="${row.checked()}"><span th:text="${product.name()}"></span><span class="is-numeric"
+                    th:text="#{deliveries.details.items.qty(${row.qty()})}"></span><span class="cl-dialog-list-sub"><span aria-hidden="true">→ </span><span
+                    th:text="${#messages.msgWithParams(row.destinationKey(), row.destinationArgs())}"></span></span></li>
+        </th:block>
+    </th:block>
+</th:block>
+
+<!--/* Dialogs with forms of their own, outside the allocations form. */-->
+<th:block th:fragment="standalone" th:with="d=${page.dialogs()}">
+    <th:block th:if="${page.items().anyQtyChange()}">
+        <dialog class="cl-dialog is-form" id="qty-dialog" aria-labelledby="qty-dialog-title" th:with="q=${page.dialogs().qtyProduct()}"
+                th:attr="open=${page.openDialog() == 'qty'} ? 'open' : null">
+            <form method="post" th:action="@{${page.links().updateItemQty()}}">
+                <input type="hidden" name="deliveryId" th:value="${page.deliveryId()}">
+                <input type="hidden" name="mfn" id="qty-mfn" th:value="${q != null} ? ${q.mfn()} : ''">
+                <h2 class="cl-dialog-title" id="qty-dialog-title" th:text="#{deliveries.details.qty.title}"></h2>
+                <div class="cl-dialog-body">
+                    <dl class="cl-kv">
+                        <div><dt th:text="#{deliveries.details.qty.product}"></dt><dd id="qty-name" th:text="${q != null} ? ${q.name()} : ''"></dd></div>
+                        <div><dt th:text="#{deliveries.details.qty.codes}"></dt><dd id="qty-codes"
+                                th:text="${q == null} ? '' : (${q.ean() != null} ? ${q.ean() + ' · ' + q.mfn()} : ${q.mfn()})"></dd></div>
+                    </dl>
+                    <div class="cl-form-grid cl-card-grid">
+                        <div class="cl-span-2 cl-field">
+                            <label class="cl-label" for="qty" th:text="#{deliveries.details.qty.field}"></label>
+                            <input class="cl-input" type="number" step="1" id="qty" name="qty" required aria-describedby="qty-help"
+                                   th:attr="min=${q != null} ? ${q.minQty()} : '1', value=${q != null} ? ${q.orderedQty()} : ''">
+                            <p class="cl-help" id="qty-help" th:attr="data-template=#{deliveries.details.qty.help('{min}')}"
+                               th:text="${q != null} ? #{deliveries.details.qty.help(${q.minQty()})} : ''"></p>
+                        </div>
+                    </div>
+                    <p class="cl-dialog-effect" aria-live="polite"><span class="cl-status" id="qty-delta" hidden
+                            th:attr="data-up=#{deliveries.details.qty.delta.up('{n}')}, data-down=#{deliveries.details.qty.delta.down('{n}')}"></span>
+                        <span th:text="#{deliveries.details.qty.effect}"></span></p>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.qty.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${page.terms().edit().visible()}">
+        <dialog class="cl-dialog is-form" id="terms-dialog" aria-labelledby="terms-dialog-title"
+                th:attr="open=${page.openDialog() == 'terms'} ? 'open' : null">
+            <form th:replace="~{deliveries/details/dialogs :: termsForm}"></form>
+        </dialog>
+        <dialog class="cl-dialog is-form" id="comment-dialog" aria-labelledby="comment-dialog-title"
+                th:attr="open=${page.openDialog() == 'comment'} ? 'open' : null">
+            <form th:replace="~{deliveries/details/dialogs :: commentForm}"></form>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${page.documents().link().visible()}">
+        <dialog class="cl-dialog is-form" id="invoice-dialog" aria-labelledby="invoice-dialog-title"
+                th:attr="open=${page.openDialog() == 'invoice'} ? 'open' : null">
+            <form method="post" novalidate th:action="@{${page.links().linkInvoices()}}">
+                <input type="hidden" name="deliveryId" th:value="${page.deliveryId()}">
+                <h2 class="cl-dialog-title" id="invoice-dialog-title" th:text="#{deliveries.details.invoice.title}"></h2>
+                <div class="cl-dialog-body">
+                    <fieldset class="cl-choice-group">
+                        <legend class="cl-visually-hidden" th:text="#{deliveries.details.invoice.mode}"></legend>
+                        <label class="cl-choice"><input type="radio" name="linkMode" value="byOrder" checked><span class="cl-choice-text"><span
+                                class="cl-choice-title" th:text="#{deliveries.details.invoice.byOrder}"></span><span class="cl-choice-description"
+                                th:text="#{deliveries.details.invoice.byOrder.help(${page.documents().externalId() != null ? page.documents().externalId() : '—'})}"></span></span></label>
+                        <label class="cl-choice"><input type="radio" name="linkMode" value="byId"><span class="cl-choice-text"><span
+                                class="cl-choice-title" th:text="#{deliveries.details.invoice.byId}"></span><span class="cl-choice-description"
+                                th:text="#{deliveries.details.invoice.byId.help}"></span></span></label>
+                        <div class="cl-choice-reveal cl-field">
+                            <label class="cl-label" for="invoiceId" th:text="#{deliveries.details.invoice.id}"></label>
+                            <input class="cl-input" type="text" inputmode="numeric" id="invoiceId" name="invoiceId" autocomplete="off"
+                                   aria-describedby="invoiceId-error">
+                            <p class="cl-field-error" id="invoiceId-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+                                    aria-hidden="true"></i><span th:text="#{deliveries.details.invoice.error.id}"></span></p>
+                        </div>
+                    </fieldset>
+                    <p class="cl-dialog-effect" th:text="#{deliveries.details.invoice.effect}"></p>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-primary" data-cl-dialog-submit data-cl-validate="invoice"
+                            th:text="#{deliveries.details.invoice.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${page.offers('complete-dialog')}">
+        <dialog class="cl-dialog is-form" id="complete-dialog" aria-labelledby="complete-dialog-title"
+                th:attr="open=${page.openDialog() == 'complete'} ? 'open' : null">
+            <form method="post" th:action="@{${page.links().complete()}}">
+                <h2 class="cl-dialog-title" id="complete-dialog-title" th:text="#{deliveries.details.complete.title}"></h2>
+                <div class="cl-dialog-body">
+                    <div class="cl-alert is-warn"><i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i><p
+                            class="cl-alert-text" th:text="#{deliveries.details.complete.warning}"></p></div>
+                    <div class="cl-form-grid cl-card-grid">
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="complete-number" th:text="#{deliveries.details.complete.number}"></label>
+                            <input class="cl-input" type="text" id="complete-number" name="externalOrderId" required autocomplete="off"
+                                   th:value="${d.externalId()}">
+                        </div>
+                        <div class="cl-span-3 cl-field">
+                            <label class="cl-label" for="complete-date" th:text="#{deliveries.details.complete.date}"></label>
+                            <input class="cl-input" type="date" id="complete-date" name="estimatedDeliveryAt" required th:value="${d.suggestedEstimatedDeliveryAt()}">
+                        </div>
+                    </div>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.complete.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${page.offers('force-dialog')}">
+        <dialog class="cl-dialog is-form" id="force-dialog" aria-labelledby="force-dialog-title"
+                th:attr="open=${page.openDialog() == 'force'} ? 'open' : null">
+            <form method="post" th:action="@{${page.links().force()}}">
+                <h2 class="cl-dialog-title" id="force-dialog-title" th:text="#{deliveries.details.force.title}"></h2>
+                <div class="cl-dialog-body">
+                    <div class="cl-alert is-warn"><i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i><p
+                            class="cl-alert-text" th:text="#{deliveries.details.force.warning}"></p></div>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-danger" th:text="#{deliveries.details.force.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close autofocus th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+
+    <th:block th:if="${page.offers('reject-dialog')}">
+        <dialog class="cl-dialog is-form" id="reject-dialog" aria-labelledby="reject-dialog-title"
+                th:attr="open=${page.openDialog() == 'reject'} ? 'open' : null">
+            <form method="post" th:action="@{${page.links().reject()}}">
+                <h2 class="cl-dialog-title" id="reject-dialog-title" th:text="#{deliveries.details.reject.title}"></h2>
+                <div class="cl-dialog-body">
+                    <div class="cl-field">
+                        <label class="cl-label" for="reject-reason"><span th:text="#{deliveries.details.reject.reason}"></span>
+                            <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <textarea class="cl-input cl-textarea" id="reject-reason" name="reason" rows="3" maxlength="500"></textarea>
+                    </div>
+                    <p class="cl-dialog-effect" th:text="#{deliveries.details.reject.effect}"></p>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-danger" th:text="#{deliveries.details.reject.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close autofocus th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+</th:block>
+
+<!--/* "Terminy i koszty": saved by async-form.js (422 = this form with the errors at the fields, 200 = saved, the dialog
+       closes and the page reloads with the notice); without JavaScript the controller answers with the page and this
+       dialog open. The comment is not posted from here: the server keeps the stored one. */-->
+<form th:fragment="termsForm" id="delivery-terms-form" class="cl-form" method="post" novalidate data-cl-async
+      th:action="@{${termsDialog.action()}}" th:with="f=${termsDialog.form()}, e=${termsDialog.errors()}"
+      th:attr="data-success-message=${termsDialog.savedMessage()}, data-error-message=#{form.save.failed},
+               data-cl-dialog-close-on-success='true'">
+    <input type="hidden" name="source" value="terms">
+    <input type="hidden" name="deliveryId" th:value="${termsDialog.deliveryId()}">
+    <h2 class="cl-dialog-title" id="terms-dialog-title" th:text="#{deliveries.details.terms.title(${termsDialog.shortId()})}"></h2>
+    <div class="cl-dialog-body">
+        <div th:if="${termsDialog.refusal() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary><i
+                class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i><p class="cl-alert-title"
+                th:text="${termsDialog.refusal()}"></p></div>
+        <th:block th:if="${!e.isEmpty()}"><div th:replace="~{fragments/settings-form :: errorSummary('delivery-terms-errors', ${e}, ${null})}"></div></th:block>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="estimatedDeliveryAt"><span th:text="#{deliveries.details.terms.date}"></span>
+                    <span th:unless="${termsDialog.dateRequired()}" class="cl-optional" th:text="#{form.optional}"></span></label>
+                <input class="cl-input" type="date" id="estimatedDeliveryAt" name="estimatedDeliveryAt" th:value="${f.estimatedDeliveryAt}"
+                       th:classappend="${e.containsKey('estimatedDeliveryAt')} ? 'is-invalid' : ''"
+                       th:attr="aria-invalid=${e.containsKey('estimatedDeliveryAt')} ? 'true' : null,
+                                aria-describedby=${e.containsKey('estimatedDeliveryAt')} ? 'estimatedDeliveryAt-error' : null">
+                <p th:if="${e.containsKey('estimatedDeliveryAt')}" class="cl-field-error" id="estimatedDeliveryAt-error"><i
+                        class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${e.get('estimatedDeliveryAt')}}"></span></p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="paymentTerms" th:text="#{deliveries.details.terms.paymentTerms}"></label>
+                <input class="cl-input" type="text" inputmode="numeric" id="paymentTerms" name="paymentTerms" autocomplete="off"
+                       th:value="${f.paymentTerms}" th:classappend="${e.containsKey('paymentTerms')} ? 'is-invalid' : ''"
+                       th:attr="aria-invalid=${e.containsKey('paymentTerms')} ? 'true' : null,
+                                aria-describedby=${e.containsKey('paymentTerms')} ? 'paymentTerms-error' : null">
+                <p th:if="${e.containsKey('paymentTerms')}" class="cl-field-error" id="paymentTerms-error"><i
+                        class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${e.get('paymentTerms')}}"></span></p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="shippingCost" th:text="#{deliveries.details.terms.shipping}"></label>
+                <input class="cl-input" type="text" inputmode="decimal" id="shippingCost" name="shippingCost" autocomplete="off"
+                       th:value="${f.shippingCost}" th:classappend="${e.containsKey('shippingCost')} ? 'is-invalid' : ''"
+                       th:attr="aria-invalid=${e.containsKey('shippingCost')} ? 'true' : null,
+                                aria-describedby=${e.containsKey('shippingCost')} ? 'shippingCost-error' : null">
+                <p th:if="${e.containsKey('shippingCost')}" class="cl-field-error" id="shippingCost-error"><i
+                        class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${e.get('shippingCost')}}"></span></p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="paymentCost" th:text="#{deliveries.details.terms.payment}"></label>
+                <input class="cl-input" type="text" inputmode="decimal" id="paymentCost" name="paymentCost" autocomplete="off"
+                       th:value="${f.paymentCost}" th:classappend="${e.containsKey('paymentCost')} ? 'is-invalid' : ''"
+                       th:attr="aria-invalid=${e.containsKey('paymentCost')} ? 'true' : null,
+                                aria-describedby=${e.containsKey('paymentCost')} ? 'paymentCost-error' : null">
+                <p th:if="${e.containsKey('paymentCost')}" class="cl-field-error" id="paymentCost-error"><i
+                        class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${e.get('paymentCost')}}"></span></p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="vat" th:text="#{deliveries.details.terms.vat}"></label>
+                <input class="cl-input" type="text" inputmode="decimal" id="vat" name="vat" autocomplete="off" th:value="${f.vat}"
+                       th:classappend="${e.containsKey('vat')} ? 'is-invalid' : ''"
+                       th:attr="aria-invalid=${e.containsKey('vat')} ? 'true' : null,
+                                aria-describedby=${e.containsKey('vat')} ? 'vat-help vat-error' : 'vat-help'">
+                <p class="cl-help" id="vat-help" th:text="#{deliveries.details.terms.vat.help}"></p>
+                <p th:if="${e.containsKey('vat')}" class="cl-field-error" id="vat-error"><i class="fas fa-exclamation-circle"
+                        aria-hidden="true"></i><span th:text="#{${e.get('vat')}}"></span></p>
+            </div>
+        </div>
+        <p class="cl-dialog-effect" th:text="#{deliveries.details.terms.effect}"></p>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.terms.submit}"></button>
+        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+    </div>
+</form>
+
+<!--/* "Komentarz": the same endpoint and form object; only the comment is posted, the server keeps the stored terms. */-->
+<form th:fragment="commentForm" id="delivery-comment-form" class="cl-form" method="post" novalidate data-cl-async
+      th:action="@{${termsDialog.action()}}" th:with="f=${termsDialog.form()}"
+      th:attr="data-success-message=${termsDialog.savedMessage()}, data-error-message=#{form.save.failed},
+               data-cl-dialog-close-on-success='true'">
+    <input type="hidden" name="source" value="comment">
+    <input type="hidden" name="deliveryId" th:value="${termsDialog.deliveryId()}">
+    <h2 class="cl-dialog-title" id="comment-dialog-title" th:text="#{deliveries.details.comment.title(${termsDialog.shortId()})}"></h2>
+    <div class="cl-dialog-body">
+        <div th:if="${termsDialog.refusal() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary><i
+                class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i><p class="cl-alert-title"
+                th:text="${termsDialog.refusal()}"></p></div>
+        <div class="cl-field">
+            <label class="cl-label" for="comment-text"><span th:text="#{deliveries.details.comment.field}"></span>
+                <span class="cl-optional" th:text="#{form.optional}"></span></label>
+            <textarea class="cl-input cl-textarea" id="comment-text" name="comment" rows="4" th:text="${f.comment}"></textarea>
+        </div>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.comment.submit}"></button>
+        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+    </div>
+</form>
+</body>
+</html>

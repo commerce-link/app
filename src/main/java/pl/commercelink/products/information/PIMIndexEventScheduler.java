@@ -9,6 +9,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntryRequest;
 import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
@@ -32,15 +33,19 @@ class PIMIndexEventScheduler {
 
     private final ProductRecommendationEngine recommendationEngine;
 
+    private final StoreActivity storeActivity;
+
     PIMIndexEventScheduler(PimCatalog pimCatalog, ProductRepository productRepository, ProductCatalogRepository productCatalogRepository,
                            StoresRepository storesRepository,
-                           Inventory inventory, ProductRecommendationEngine recommendationEngine) {
+                           Inventory inventory, ProductRecommendationEngine recommendationEngine,
+                           StoreActivity storeActivity) {
         this.pimCatalog = pimCatalog;
         this.productRepository = productRepository;
         this.productCatalogRepository = productCatalogRepository;
         this.storesRepository = storesRepository;
         this.recommendationEngine = recommendationEngine;
         this.inventory = inventory;
+        this.storeActivity = storeActivity;
     }
 
     @SqsListener(
@@ -51,6 +56,7 @@ class PIMIndexEventScheduler {
     )
     public void scanAndStoreProductsInPimQueue(String message) {
         storesRepository.findAll().stream()
+                .filter(storeActivity::isActive)
                 .map(Store::getStoreId)
                 .map(this::scanAllProducts)
                 .flatMap(Collection::stream)

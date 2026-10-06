@@ -443,10 +443,27 @@
             return;
         }
         dialog.addEventListener('cl:dialog-open', initItemAddModal);
+        // A click is sent to the nearest element holding both ends of the press, so pressing inside the dialog (e.g. to
+        // select text) and letting go over the backdrop — or the other way round — clicks the dialog element itself, just
+        // like a click on the backdrop does. The backdrop closes the dialog only when the press both started and ended on it.
+        var pressStart = null;
+        var pressEnd = null;
+        dialog.addEventListener('pointerdown', function (event) {
+            pressStart = event.target;
+        });
+        dialog.addEventListener('pointerup', function (event) {
+            pressEnd = event.target;
+        });
         dialog.addEventListener('click', function (event) {
             var target = event.target;
-            if (target === dialog || (target.closest && target.closest('[data-cl-item-add-close]'))) {
+            var onBackdrop = target === dialog && pressStart === dialog && pressEnd === dialog;
+            pressStart = null;
+            pressEnd = null;
+            if (onBackdrop || (target.closest && target.closest('[data-cl-item-add-close]'))) {
                 toggleAddItemModal(false);
+                return;
+            }
+            if (target === dialog) {
                 return;
             }
             var tab = target.closest && target.closest('[data-item-add-tab]');

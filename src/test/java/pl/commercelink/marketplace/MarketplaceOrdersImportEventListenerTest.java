@@ -1,6 +1,7 @@
 package pl.commercelink.marketplace;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,6 +15,7 @@ import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -44,9 +47,16 @@ class MarketplaceOrdersImportEventListenerTest {
     private MarketplaceOrder order;
     @Mock
     private ScheduledExecutionCounter scheduledExecutionCounter;
+    @Mock
+    private StoreActivity storeActivity;
 
     @InjectMocks
     private MarketplaceOrdersImportEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
+    }
 
     private Store storeWithIntegration(String storeId, String marketplace, boolean loggedIn) {
         Store store = new Store();
@@ -137,5 +147,20 @@ class MarketplaceOrdersImportEventListenerTest {
         assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNull();
         verify(storesRepository, never()).save(any());
         verifyNoInteractions(scheduledExecutionCounter);
+    }
+
+    @Test
+    void skipsInactiveStore() {
+        // given
+        Store store = storeWithIntegration("store-1", "Allegro", true);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when
+        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", "store-1"));
+
+        // then
+        verifyNoInteractions(providerFactory, marketplaceOrderImporter, scheduledExecutionCounter);
+        verify(storesRepository, never()).save(any());
     }
 }

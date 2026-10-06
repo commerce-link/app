@@ -1,0 +1,78 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="pill(status)" class="cl-account-status">
+    <button type="button" class="cl-status cl-account-status-toggle" th:classappend="${status.toneClass()}"
+            id="clAccountStatusToggle" aria-expanded="false" aria-controls="clAccountStatusMenu">
+        <span class="cl-account-status-icon" aria-hidden="true">
+            <i class="fas" th:classappend="${status.readOnly()} ? 'fa-eye' : 'fa-clock'"></i>
+        </span>
+        <span class="cl-account-status-label" th:if="${status.onTrial() and !status.trialEnding()}"
+              th:text="#{account.status.pill.trial(${status.daysLeft()})}"></span>
+        <span class="cl-account-status-label" th:if="${status.trialEnding()}"
+              th:text="#{account.status.pill.ending(${status.daysLeft()})}"></span>
+        <span class="cl-account-status-label" th:if="${status.readOnly()}"
+              th:text="#{account.status.pill.readOnly}"></span>
+        <span class="cl-account-status-short" aria-hidden="true" th:if="${status.onTrial()}"
+              th:text="#{account.status.pill.short(${status.daysLeft()})}"></span>
+    </button>
+    <div class="cl-account-status-pop" id="clAccountStatusMenu" role="region"
+         th:attr="aria-label=${status.onTrial()} ? #{account.status.pop.trial.title} : #{account.status.pop.readOnly.title}"
+         hidden>
+        <p class="cl-account-status-pop-title" th:if="${status.onTrial()}" th:text="#{account.status.pop.trial.title}"></p>
+        <p class="cl-account-status-pop-title" th:if="${status.readOnly()}" th:text="#{account.status.pop.readOnly.title}"></p>
+        <p th:if="${status.onTrial()}"
+           th:text="#{account.status.pop.trial.text(${status.endDate()}, ${status.daysLeft()})}"></p>
+        <p th:if="${status.trialEnded()}"
+           th:text="#{account.status.pop.ended.text(${status.endDate()}, ${status.deletionDate()}, ${status.daysUntilDeletion()})}"></p>
+        <p th:if="${status.switchedOff()}" th:text="#{account.status.pop.off.text}"></p>
+        <th:block th:if="${status.hasContact()}">
+            <p th:if="${status.onTrial()}" th:text="#{account.status.pop.trial.contact}"></p>
+            <p th:if="${status.trialEnded()}" th:text="#{account.status.alert.ended.contact}"></p>
+            <p th:if="${status.switchedOff()}" th:text="#{account.status.alert.off.contact}"></p>
+            <a class="cl-account-status-mail" th:href="'mailto:' + ${status.contactEmail()}">
+                <span aria-hidden="true"><i class="fas fa-envelope"></i></span>
+                <span th:text="${status.contactEmail()}"></span>
+            </a>
+        </th:block>
+    </div>
+</div>
+
+<div th:fragment="alert(status)" class="cl-alert cl-account-alert" th:classappend="${status.trialEnding()} ? 'is-warn' : 'is-bad'"
+     th:attr="data-cl-dismiss-key=${status.dismissible()} ? ${status.dismissKey()} : null">
+    <span class="cl-alert-icon" aria-hidden="true">
+        <i class="fas" th:classappend="${status.trialEnding()} ? 'fa-clock' : 'fa-exclamation-triangle'"></i>
+    </span>
+
+    <th:block th:if="${status.trialEnding()}">
+        <p class="cl-alert-text cl-account-alert-body">
+            <strong th:text="#{account.status.alert.ending.title(${status.daysLeft()})}"></strong>
+            <span th:text="#{account.status.alert.ending.text(${status.endDate()})}"></span>
+        </p>
+        <a class="cl-account-alert-action" th:if="${status.hasContact()}"
+           th:href="'mailto:' + ${status.contactEmail()}" th:text="#{account.status.alert.ending.contact}"></a>
+        <button type="button" class="cl-icon-button cl-alert-dismiss" data-cl-dismiss hidden
+                th:attr="aria-label=#{account.status.alert.dismiss}, title=#{account.status.alert.dismiss}">
+            <span aria-hidden="true"><i class="fas fa-times"></i></span>
+        </button>
+    </th:block>
+
+    <div class="cl-account-alert-body" th:if="${status.readOnly()}">
+        <p class="cl-alert-title" th:if="${status.trialEnded()}"
+           th:text="#{account.status.alert.ended.title(${status.endDate()})}"></p>
+        <p class="cl-alert-text" th:if="${status.trialEnded()}">
+            <span th:text="#{account.status.alert.ended.text}"></span>
+            <strong th:text="#{account.status.alert.ended.deletion(${status.deletionDate()}, ${status.daysUntilDeletion()})}"></strong>.
+        </p>
+        <p class="cl-alert-title" th:if="${status.switchedOff()}" th:text="#{account.status.alert.off.title}"></p>
+        <p class="cl-alert-text" th:if="${status.switchedOff()}" th:text="#{account.status.alert.off.text}"></p>
+        <p class="cl-alert-text" th:if="${status.hasContact()}">
+            <span th:text="${status.trialEnded()} ? #{account.status.alert.ended.contact} : #{account.status.alert.off.contact}"></span>
+            <a th:href="'mailto:' + ${status.contactEmail()}" th:text="${status.contactEmail()}"></a>
+        </p>
+    </div>
+</div>
+
+</body>
+</html>

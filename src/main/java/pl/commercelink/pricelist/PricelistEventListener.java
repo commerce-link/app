@@ -1,34 +1,33 @@
 package pl.commercelink.pricelist;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.SupplierScope;
 
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Service
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@RequiredArgsConstructor
 class PricelistEventListener {
 
-    @Autowired
-    private Inventory inventory;
-    @Autowired
-    private PricelistRepository pricelistRepository;
-    @Autowired
-    private PricelistEventPublisher pricelistEventPublisher;
-    @Autowired
-    private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
-    @Autowired
-    private SellingPriceHistoryService sellingPriceHistoryService;
-    @Autowired
-    private ScheduledExecutionCounter scheduledExecutionCounter;
+    private final Inventory inventory;
+    private final PricelistRepository pricelistRepository;
+    private final PricelistEventPublisher pricelistEventPublisher;
+    private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    private final SellingPriceHistoryService sellingPriceHistoryService;
+    private final ScheduledExecutionCounter scheduledExecutionCounter;
+    private final StoreActivity storeActivity;
 
     @SqsListener(
             value = "catalog-pricelist-queue",
@@ -37,6 +36,11 @@ class PricelistEventListener {
             pollTimeoutSeconds = "20"
     )
     void handlePricelistEvent(PricelistEventPayload payload) throws IOException {
+        if (!storeActivity.isActive(payload.getStoreId())) {
+            log.warn("Pricelist of catalog {} skipped for store {}: the store is inactive",
+                    payload.getCatalogId(), payload.getStoreId());
+            return;
+        }
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(payload.getStoreId(), SupplierScope.PRICING);
 
         List<AvailabilityAndPrice> pricelist = availabilityAndPriceListFactory
