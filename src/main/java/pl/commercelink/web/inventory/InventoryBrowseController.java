@@ -82,7 +82,9 @@ public class InventoryBrowseController {
         model.addAttribute("mode", "browse");
         model.addAttribute("query", "");
         BrowseQuery query = BrowseQuery.parse(params);
-        model.addAttribute("browse", pageFactory.build(storeId(), query, isAdmin(), isSuperAdmin()));
+        // A super admin account may carry a store id; its browse is the global one, like its code search.
+        String scope = isSuperAdmin() ? null : storeId();
+        model.addAttribute("browse", pageFactory.build(scope, query, isAdmin(), isSuperAdmin()));
         return query;
     }
 

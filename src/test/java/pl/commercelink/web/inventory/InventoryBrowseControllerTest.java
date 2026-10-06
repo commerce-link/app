@@ -25,8 +25,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -101,6 +104,26 @@ class InventoryBrowseControllerTest {
         // then
         assertThat(adminModel.getAttribute("addDialog")).isSameAs(dialog);
         assertThat(userModel.getAttribute("addDialog")).isNull();
+    }
+
+    /**
+     * A super admin account can carry a store id (the local seed's does); the browse is still the global one, as the code
+     * search is, and never that store's own feeds or its choice of suppliers.
+     */
+    @Test
+    void superAdminBrowsesTheGlobalInventoryEvenWithAStoreInTheSession() {
+        // given
+        security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+        security.when(() -> CustomSecurityContext.hasRole(anyString())).thenAnswer(call -> "SUPER_ADMIN".equals(call.getArgument(0)));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("view", "browse");
+
+        // when
+        controller.page(params, new ConcurrentModel());
+        controller.results(params, new ConcurrentModel());
+
+        // then
+        verify(pageFactory, times(2)).build(isNull(), any(), eq(false), eq(true));
     }
 
     @Test
