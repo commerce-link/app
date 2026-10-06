@@ -52,7 +52,14 @@ public class ShipmentPickupChecker {
                     settler.failedWithKey(request, UNCONFIRMED_KEY);
                 }
             }
-            case SUCCEEDED -> settler.ordered(request, result.pickupId());
+            // the provider may book only some of the packages; an empty list names none, so it covers them all
+            case SUCCEEDED -> {
+                if (result.externalIds() == null || result.externalIds().isEmpty()) {
+                    settler.ordered(request, result.pickupId());
+                } else {
+                    settler.ordered(request, result.pickupId(), result.externalIds());
+                }
+            }
             case FAILED -> settler.failed(request, result.error());
         }
     }

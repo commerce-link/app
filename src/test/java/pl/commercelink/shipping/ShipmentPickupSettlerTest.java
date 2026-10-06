@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -89,6 +90,28 @@ class ShipmentPickupSettlerTest {
                 && "20261006800071".equals(s.getPickup().getPickupId()));
         verify(ordersRepository).save(order);
         verify(index).remove("store-1", List.of("1"));
+    }
+
+    @Test
+    void aPartialPickupOrdersOnlyTheListedPackagesAndLeavesTheOthersUnconfirmedInTheIndex() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(shipment("1", "A"), shipment("2", "B"))));
+        ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1")
+                .provider("furgonetka").commandId("cmd-1")
+                .targets(List.of(new PickupTarget(ShipmentOwnerType.ORDER, "order-1", "1", "A"),
+                        new PickupTarget(ShipmentOwnerType.ORDER, "order-1", "2", "B")))
+                .date("2026-10-07").from("09:00").to("17:00").token("h").attempt(1).build();
+
+        // when
+        settler.ordered(request, "20261006800071", List.of("1"));
+
+        // then
+        assertThat(order.getShipments().get(0).getPickup().isOrdered()).isTrue();
+        assertThat(order.getShipments().get(1).getPickup().isFailed()).isTrue();
+        assertThat(order.getShipments().get(1).getPickup().getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
+        assertThat(order.getShipments().get(1).awaitsPickup()).isTrue();
+        verify(index).remove("store-1", List.of("1"));
+        verify(index, never()).remove("store-1", List.of("2"));
     }
 
     @Test

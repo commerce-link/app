@@ -85,6 +85,19 @@ class ShipmentPickupCheckerTest {
         checker.check(request(1));
 
         // then
+        verify(settler).ordered(any(), eq("20261006800071"), eq(List.of("1")));
+    }
+
+    @Test
+    void aSuccessNamingNoPackagesCoversAllOfThem() {
+        // given
+        when(provider.checkPickupOrder("cmd-1"))
+                .thenReturn(PickupOrder.succeeded("cmd-1", "20261006800071", null, List.of()));
+
+        // when
+        checker.check(request(1));
+
+        // then
         verify(settler).ordered(any(), eq("20261006800071"));
     }
 

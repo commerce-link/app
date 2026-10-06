@@ -7,9 +7,12 @@ import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.shipping.api.PickupWindow;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 /**
  * Writes the result of a pickup command to every owner of its packages, for {@link ShipmentPickupChecker}. A write
@@ -25,25 +28,42 @@ public class ShipmentPickupSettler {
     private final AwaitingPickupIndex index;
 
     public void ordered(ShipmentPickupCheckRequest request, String pickupId) {
-        settle(request, p -> p.ordered(pickupId), true);
+        settle(request, request.getTargets(), p -> p.ordered(pickupId), true);
+    }
+
+    /**
+     * A command that succeeded for some of its packages only: the packages the provider listed are ordered, the others
+     * fail as unconfirmed and stay indexed, so the operator checks the provider's panel and can order them again.
+     */
+    public void ordered(ShipmentPickupCheckRequest request, String pickupId, Collection<String> orderedIds) {
+        Map<Boolean, List<PickupTarget>> listed = request.getTargets().stream()
+                .collect(Collectors.partitioningBy(t -> orderedIds.contains(t.externalId())));
+        settle(request, listed.get(true), p -> p.ordered(pickupId), true);
+        if (!listed.get(false).isEmpty()) {
+            List<String> left = listed.get(false).stream().map(PickupTarget::externalId).toList();
+            log.error("Pickup command {} in store {} succeeded without packages {}", request.getCommandId(),
+                    request.getStoreId(), left);
+            settle(request, listed.get(false), p -> p.failedWithKey(ShipmentPickup.UNCONFIRMED_KEY), false);
+        }
     }
 
     public void failed(ShipmentPickupCheckRequest request, String error) {
         log.warn("Pickup failed store={} command={} packages={}: {}", request.getStoreId(), request.getCommandId(),
                 externalIds(request), error);
-        settle(request, p -> p.failed(error), false);
+        settle(request, request.getTargets(), p -> p.failed(error), false);
     }
 
     /** Our own reason (never confirmed, no provider): the courier may still come, the provider's panel says. */
     public void failedWithKey(ShipmentPickupCheckRequest request, String key) {
         log.error("Pickup ended without a result store={} command={} packages={}: {}", request.getStoreId(),
                 request.getCommandId(), externalIds(request), key);
-        settle(request, p -> p.failedWithKey(key), false);
+        settle(request, request.getTargets(), p -> p.failedWithKey(key), false);
     }
 
-    private void settle(ShipmentPickupCheckRequest request, UnaryOperator<ShipmentPickup> result, boolean leaveIndex) {
+    private void settle(ShipmentPickupCheckRequest request, List<PickupTarget> targets,
+                        UnaryOperator<ShipmentPickup> result, boolean leaveIndex) {
         UnaryOperator<ShipmentPickup> change = p -> p.isPendingFor(request.getCommandId()) ? result.apply(p) : p;
-        for (PickupTarget target : request.getTargets()) {
+        for (PickupTarget target : targets) {
             ShipmentOwner owner = owners.get(target.ownerType());
             // the result the owner wrote, for its follow-up (an e-mail, a notification)
             AtomicReference<ShipmentPickup> written = new AtomicReference<>();
