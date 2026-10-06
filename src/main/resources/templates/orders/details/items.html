@@ -206,13 +206,17 @@
         <span class="cl-price-margin"><span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span><span
               th:replace="~{orders/details/items :: margin(${row.margin()})}"></span></span>
     </td>
-    <!--/* the state pill, the delivery (supplier or delivery number) as the second line under it */-->
+    <!--/* The state pill is the link to the item's delivery, or to creating one while the item waits for its supplier
+           (client 2026-10-06: the delivery number or supplier under the pill went, the pill took its link; pills are
+           links only here). The target is named for screen readers only. Without a target (the store's warehouse, no
+           supplier, no right to create a delivery) it is the plain pill. */-->
     <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
-        <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
-        <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
-            <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
-            <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
-        </span>
+        <a th:if="${row.deliveryHref() != null}" class="cl-status" th:classappend="${row.statusTone()}"
+           th:href="@{${row.deliveryHref()}}" th:with="state=#{${row.statusKey()}}"
+           th:attr="aria-label=${row.deliveryToCreate()} ? #{order.items.fulfilment.link.supplier(${state}, ${row.deliveryLabel()})}
+                                                          : #{order.items.fulfilment.link.delivery(${state}, ${row.deliveryLabel()})}"
+           th:text="${state}"></a>
+        <span th:unless="${row.deliveryHref() != null}" class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
     </td>
     <!--/* display only: the item menu toggles it. The glyph is hidden from screen readers, the hidden word says it; an
            unconsolidated item leaves the cell empty, and in card mode an empty cell is not shown at all. */-->
