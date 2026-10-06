@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryStatistics;
 import pl.commercelink.inventory.search.InventorySearch;
+import pl.commercelink.inventory.search.InventorySearchResult;
+import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -37,11 +39,16 @@ public class InventoryPageController {
     private final InventorySourcesViewFactory sourcesViewFactory;
     private final WarehouseSummaryService warehouseSummaryService;
     private final TechnicalInventoryViewFactory technicalViewFactory;
+    private final ProductCategoryViewFactory productCategoryViews;
 
     @GetMapping(PAGE_PATH)
-    public String page(@RequestParam(value = "q", required = false) String q, Model model) {
+    public String page(@RequestParam(value = "q", required = false) String q,
+                       @RequestParam(value = "from", required = false) String from, Model model) {
         addCommonAttributes(model);
         model.addAttribute("mode", "code");
+        // Only a list of the browse mode is a place to go back to; anything else is dropped.
+        InventoryReturnTo.safe(from).filter(target -> target.contains("view=browse"))
+                .ifPresent(target -> model.addAttribute("backToBrowse", target));
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!query.isEmpty()) {
@@ -112,9 +119,19 @@ public class InventoryPageController {
             model.addAttribute("validationError", true);
             return false;
         }
-        model.addAttribute("result", isSuperAdmin()
+        InventorySearchResult result = isSuperAdmin()
                 ? inventorySearch.searchGlobal(query)
-                : inventorySearch.search(CustomSecurityContext.getStoreId(), query));
+                : inventorySearch.search(CustomSecurityContext.getStoreId(), query);
+        model.addAttribute("result", result);
+        ProductHeader header = switch (result) {
+            case InventorySearchResult.Found found -> found.product();
+            case InventorySearchResult.KnownWithoutOffers known -> known.product();
+            case null, default -> null;
+        };
+        if (header != null) {
+            productCategoryViews.build(CustomSecurityContext.getStoreId(), header, CustomSecurityContext.hasRole("ADMIN"))
+                    .ifPresent(view -> model.addAttribute("productCategory", view));
+        }
         return true;
     }
 

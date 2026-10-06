@@ -897,3 +897,10 @@
 .cl-inv-page .cl-inv-product-category .cl-category-path {
     max-width: none;
 }
+
+.cl-inv-page .cl-inv-product-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}

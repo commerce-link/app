@@ -19,6 +19,8 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryStatistics;
 import pl.commercelink.inventory.search.InventorySearch;
 import pl.commercelink.inventory.search.InventorySearchResult;
+import pl.commercelink.inventory.search.MatchedBy;
+import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -27,6 +29,7 @@ import pl.commercelink.warehouse.api.StockSummary;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +60,8 @@ class InventoryPageControllerTest {
     private WarehouseSummaryService warehouseSummaryService;
     @Mock
     private TechnicalInventoryViewFactory technicalViewFactory;
+    @Mock
+    private ProductCategoryViewFactory productCategoryViews;
 
     @InjectMocks
     private InventoryPageController controller;
@@ -88,7 +93,7 @@ class InventoryPageControllerTest {
         ConcurrentModel model = new ConcurrentModel();
 
         // when
-        String view = controller.page(null, model);
+        String view = controller.page(null, null, model);
 
         // then
         assertThat(view).isEqualTo("inventory");
@@ -107,7 +112,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901234123457")).thenReturn(notFound);
 
         // when
-        controller.page("  5901234123457 ", model);
+        controller.page("  5901234123457 ", null, model);
 
         // then
         assertThat(model.getAttribute("query")).isEqualTo("5901234123457");
@@ -153,7 +158,7 @@ class InventoryPageControllerTest {
         ConcurrentModel model = new ConcurrentModel();
 
         // when
-        controller.page(null, model);
+        controller.page(null, null, model);
 
         // then
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(false);
@@ -244,5 +249,50 @@ class InventoryPageControllerTest {
                         "redirect:/dashboard/inventory?q=5901234123457"),
                 Arguments.of("no parameters redirect to the plain page", null, null, null,
                         "redirect:/dashboard/inventory"));
+    }
+
+    @Test
+    void pageFromBrowseKeepsTheBackLink() {
+        // given
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.page(null, "/dashboard/inventory?view=browse&cat=11", model);
+
+        // then
+        assertThat(model.getAttribute("backToBrowse")).isEqualTo("/dashboard/inventory?view=browse&cat=11");
+    }
+
+    @Test
+    void foreignFromIsIgnored() {
+        // given
+        ConcurrentModel evil = new ConcurrentModel();
+        ConcurrentModel notBrowse = new ConcurrentModel();
+
+        // when
+        controller.page(null, "https://evil.com", evil);
+        controller.page(null, "/dashboard/inventory?q=123", notBrowse);
+
+        // then
+        assertThat(evil.getAttribute("backToBrowse")).isNull();
+        assertThat(notBrowse.getAttribute("backToBrowse")).isNull();
+    }
+
+    @Test
+    void foundProductGetsItsCategoryBlock() {
+        // given
+        ProductHeader header = new ProductHeader("RTX 4060", "Gigabyte", "5901000000001", "GPU-1");
+        when(inventorySearch.search(STORE_ID, "5901000000001"))
+                .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
+        ProductCategoryView view = new ProductCategoryView(
+                new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", null, 0, false, null), "5901000000001", true, "/x");
+        when(productCategoryViews.build(STORE_ID, header, true)).thenReturn(Optional.of(view));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.page("5901000000001", null, model);
+
+        // then
+        assertThat(model.getAttribute("productCategory")).isSameAs(view);
     }
 }

@@ -305,4 +305,21 @@ class InventoryResultsRenderingTest {
         // then
         assertThat(html).contains("Check the price and availability of a product").contains("Enter an EAN").doesNotContain("??");
     }
+
+    @Test
+    void foundProductShowsItsCategoryLinesAndTheAddAction() {
+        // given
+        Context context = context(found(), true);
+        context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
+                new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
+                        "Komponenty komputerowe › Karty graficzne", "Podzespoły › Karta graficzna", 0, false, null),
+                "5901234123457", true, "/x"));
+
+        // when
+        String html = engine.process(RESULTS, context);
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("Karty graficzne").contains("Podzespoły › Karta graficzna").contains("data-browse-add");
+    }
 }

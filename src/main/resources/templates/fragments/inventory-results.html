@@ -19,8 +19,20 @@
             <div th:if="${product.ean() != null}"><dt th:text="#{inventory.code.ean}"></dt><dd th:text="${product.ean()}"></dd></div>
             <div th:if="${product.mfn() != null}"><dt th:text="#{inventory.code.mfn}"></dt><dd th:text="${product.mfn()}"></dd></div>
         </dl>
+        <div class="cl-inv-product-category" th:if="${productCategory != null}">
+            <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${productCategory.line()})}"></th:block>
+        </div>
     </div>
-    <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
+    <div class="cl-inv-product-actions">
+        <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
+        <a th:if="${productCategory != null and productCategory.canAdd()}" class="cl-button is-primary"
+           th:href="${productCategory.addHref()}" data-browse-add th:attr="data-ean=${productCategory.ean()}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+            <span th:text="#{inventory.browse.add}"></span>
+        </a>
+        <a th:if="${productCategory != null and productCategory.line().inCatalog()}" class="cl-status is-ok"
+           th:href="${productCategory.line().inCatalogHref()}" th:text="#{inventory.browse.inCatalog}"></a>
+    </div>
 </div>
 
 <th:block th:fragment="codeMatch(match, ean, code)">
@@ -39,6 +51,11 @@
 </th:block>
 
 <div th:fragment="results" class="cl-inv-results" data-inventory-fragment="results">
+
+    <a class="cl-back" th:if="${backToBrowse != null}" th:href="${backToBrowse}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="#{inventory.browse.back}"></span>
+    </a>
 
     <div th:if="${validationError}" class="cl-inv-state" th:attr="data-announce=#{inventory.search.tooShort}">
         <p class="cl-field-error" role="alert" tabindex="-1" data-inventory-results-heading>
