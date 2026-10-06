@@ -695,6 +695,37 @@ class RMAControllerTest {
         return templateEngine.process(tag, context);
     }
 
+    @Test
+    void aNewShipmentRowTakesAnIndexPastTheHiddenCreationRows() {
+        // given: the failed creation is not shown, yet the shipment after it keeps index 1
+        Shipment failedCreation = new Shipment(ShipmentType.Courier);
+        failedCreation.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failed("Błąd"));
+        RMA rma = rmaWithStatus(RMAStatus.Processing);
+        rma.setShipments(new ArrayList<>(List.of(failedCreation, new Shipment(ShipmentType.Courier))));
+        String template = readTemplate("templates/rma-detail.html");
+        Matcher tbody = Pattern.compile("<tbody\\b[^>]*id=\"editRmaShipmentsBody\"[^>]*>").matcher(template);
+        assertThat(tbody.find()).withFailMessage("no editRmaShipmentsBody in rma-detail.html").isTrue();
+
+        // when
+        String html = render(tbody.group() + "</tbody>", rma);
+
+        // then: two shipments, so the added row is shipments[2], not shipments[1] (which would merge into the second)
+        assertThat(html).contains("data-next-index=\"2\"");
+        assertThat(template).contains("Number(tbody.dataset.nextIndex)")
+                .doesNotContain("querySelectorAll('tr').length");
+    }
+
+    private static String render(String fragment, RMA rma) {
+        StringTemplateResolver resolver = new StringTemplateResolver();
+        resolver.setTemplateMode(TemplateMode.HTML);
+        TemplateEngine templateEngine = new TemplateEngine();
+        templateEngine.setDialect(new SpringStandardDialect());
+        templateEngine.setTemplateResolver(resolver);
+        Context context = new Context();
+        context.setVariable("rma", rma);
+        return templateEngine.process(fragment, context);
+    }
+
     private static String readTemplate(String classpathLocation) {
         try (InputStream template = RMAControllerTest.class.getClassLoader()
                 .getResourceAsStream(classpathLocation)) {

@@ -663,7 +663,8 @@
                                 </tr>
                                 </thead>
 
-                                <tbody id="editRmaShipmentsBody">
+                                <!-- rows keep their index in the whole list, hidden ones included: a new row takes the next free one -->
+                                <tbody id="editRmaShipmentsBody" th:data-next-index="${#lists.size(rma.shipments)}">
                                 <!-- a shipment being created has nothing to edit yet; the server keeps it as it is -->
                                 <tr th:each="shipment, i : *{shipments}" th:unless="${shipment.creation != null}">
                                     <td>
@@ -918,7 +919,8 @@
             const tbody = document.getElementById('editRmaShipmentsBody');
             if (!tbody) return;
 
-            const index = tbody.querySelectorAll('tr').length;
+            const index = Number(tbody.dataset.nextIndex);
+            tbody.dataset.nextIndex = String(index + 1);
             const shipmentTypes = /*[[${shipmentTypes}]]*/ [];
 
             const typeOptions = shipmentTypes
