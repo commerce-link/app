@@ -139,8 +139,8 @@ class InventoryBrowseRenderingTest {
     void dialogRendersMatchingOptionsTheOtherSelectAndTheChosenEans() {
         // given
         AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0)),
-                List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0)))),
+                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0, true)),
+                List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false)))),
                 false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
         Context context = new Context();
         context.setVariable("addDialog", dialog);
@@ -153,6 +153,41 @@ class InventoryBrowseRenderingTest {
         assertThat(html).contains("Add to catalog (2)", "value=\"c-1/cat-gpu\"", "data-browse-other-select", "value=\"c-1/cat-case\"");
         assertThat(html).contains("name=\"eans\" value=\"5901000000001\"", "name=\"returnTo\"");
         assertThat(html).doesNotContain(" open");
+    }
+
+    @Test
+    void dialogChecksThePreselectedOptionEvenWhenItIsNotTheFirst() {
+        // given
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
+                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, false),
+                        new AddToCatalogDialog.Option("c-2/cat-b2b", "Sklep B2B › Karty", 0, true)),
+                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+        Context context = new Context();
+        context.setVariable("addDialog", dialog);
+
+        // when
+        String html = engine.process(DIALOG, context);
+
+        // then
+        assertThat(html).containsPattern("value=\"c-2/cat-b2b\"\\s+checked");
+        assertThat(html).doesNotContainPattern("value=\"c-1/cat-gpu\"\\s+checked");
+    }
+
+    @Test
+    void catalogAndCategoryNamesAreEscapedInTheTooltips() {
+        // given
+        CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
+                "Komponenty komputerowe › Karty graficzne", "<b>x</b> › Fan", 1, false,
+                "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
+                List.of("<b>x</b> › Fan", "Sklep › <b>y</b>"), List.of("<b>x</b> › Fan"), true);
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
+
+        // then
+        assertThat(html).contains("title=\"Fits: &lt;b&gt;x&lt;/b&gt; › Fan · Sklep › &lt;b&gt;y&lt;/b&gt;\"",
+                "title=\"In catalog: &lt;b&gt;x&lt;/b&gt; › Fan\"");
+        assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>");
     }
 
     private static Context context(BrowsePage page) {

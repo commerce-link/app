@@ -306,8 +306,8 @@
                    th:text="${d.pimCategoryName() != null} ? #{inventory.browse.dialog.manyCommon(${d.count()}, ${d.pimCategoryName()})} : #{inventory.browse.dialog.many(${d.count()})}"></p>
                 <fieldset class="cl-choice-group" th:if="${d.anyMatching()}">
                     <legend class="cl-label"><span th:text="#{inventory.browse.dialog.target}"></span></legend>
-                    <label class="cl-choice" th:each="o, it : ${d.matching()}">
-                        <input type="radio" name="target" th:value="${o.value()}" th:checked="${it.first}">
+                    <label class="cl-choice" th:each="o : ${d.matching()}">
+                        <input type="radio" name="target" th:value="${o.value()}" th:checked="${o.preselected()}">
                         <span class="cl-choice-text">
                             <span class="cl-choice-title" th:text="${o.label()}"></span>
                             <span class="cl-choice-description" th:text="#{inventory.browse.dialog.fits(${o.alreadyIn()}, ${d.count()})}"></span>

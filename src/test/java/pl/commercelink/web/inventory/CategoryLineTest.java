@@ -72,6 +72,24 @@ class CategoryLineTest {
     }
 
     @Test
+    void sameNamedCategoriesInTwoCatalogsCountAsTwoPlacesButOneCategoryCountsOnce() {
+        // given
+        CatalogPlacement.Target first = new CatalogPlacement.Target("c-1", "Sklep", "cat-a", "Fan", List.of("11"));
+        CatalogPlacement.Target second = new CatalogPlacement.Target("c-2", "Sklep", "cat-b", "Fan", List.of("11"));
+        CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(first, second),
+                List.of(new CatalogPlacement.Existing("c-1", "cat-a", "p-1", KEY),
+                        new CatalogPlacement.Existing("c-1", "cat-a", "p-2", KEY),
+                        new CatalogPlacement.Existing("c-2", "cat-b", "p-3", KEY)));
+
+        // when
+        CategoryLine line = CategoryLine.of(tree, placement, "11", "Wentylatory", KEY, false);
+
+        // then
+        assertThat(line.inCatalogLabels()).containsExactly("Sklep › Fan", "Sklep › Fan");
+        assertThat(line.addableElsewhere()).isFalse();
+    }
+
+    @Test
     void entryInACategoryThatIsNoLongerATargetFallsBackToItsIds() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN),

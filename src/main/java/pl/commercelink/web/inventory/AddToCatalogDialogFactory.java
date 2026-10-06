@@ -57,12 +57,13 @@ public class AddToCatalogDialogFactory {
             int alreadyIn = (int) keys.stream().filter(key -> placement.isIn(target.categoryId(), key)).count();
             boolean fits = target.pimCategoryIds().stream().anyMatch(id -> categoryIds.contains(id.strip()));
             if (fits) {
-                matching.add(new AddToCatalogDialog.Option(target.value(), target.label(), alreadyIn));
+                matching.add(new AddToCatalogDialog.Option(target.value(), target.label(), alreadyIn, false));
             } else {
                 others.computeIfAbsent(target.catalogName(), name -> new ArrayList<>())
-                        .add(new AddToCatalogDialog.Option(target.value(), target.categoryName(), alreadyIn));
+                        .add(new AddToCatalogDialog.Option(target.value(), target.categoryName(), alreadyIn, false));
             }
         }
+        List<AddToCatalogDialog.Option> preselected = preselect(matching, keys.size());
         String commonCategory = categoryIds.size() == 1
                 ? tree.find(categoryIds.iterator().next()).map(PimCategory::name).orElse(null)
                 : null;
@@ -70,7 +71,27 @@ public class AddToCatalogDialogFactory {
                 .map(entry -> new AddToCatalogDialog.Group(entry.getKey(), List.copyOf(entry.getValue())))
                 .toList();
         return new AddToCatalogDialog(List.copyOf(found), found.size() == 1 ? firstName : null, commonCategory,
-                List.copyOf(matching), groups, placement.targets().isEmpty(),
+                preselected, groups, placement.targets().isEmpty(),
                 InventoryReturnTo.safe(returnTo).orElse(DEFAULT_RETURN), AddToCatalogDialog.ACTION);
+    }
+
+    /**
+     * "Dodaj do innej" opens this dialog for a product already in one matching category, so the first category that still
+     * lacks some of the products is checked; when every one has them all, the first stays checked.
+     */
+    private static List<AddToCatalogDialog.Option> preselect(List<AddToCatalogDialog.Option> matching, int count) {
+        int chosen = 0;
+        for (int i = 0; i < matching.size(); i++) {
+            if (matching.get(i).alreadyIn() < count) {
+                chosen = i;
+                break;
+            }
+        }
+        List<AddToCatalogDialog.Option> options = new ArrayList<>();
+        for (int i = 0; i < matching.size(); i++) {
+            AddToCatalogDialog.Option option = matching.get(i);
+            options.add(new AddToCatalogDialog.Option(option.value(), option.label(), option.alreadyIn(), i == chosen));
+        }
+        return List.copyOf(options);
     }
 }

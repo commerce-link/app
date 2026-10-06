@@ -65,8 +65,36 @@ class AddToCatalogDialogFactoryTest {
         assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::label)
                 .containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
         assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(0, 1);
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(true, false);
         assertThat(dialog.others()).extracting(AddToCatalogDialog.Group::catalogName).containsExactly("Podzespoły");
         assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory?cat=11");
+    }
+
+    @Test
+    void productInTheFirstMatchingCategoryOnlyHasTheNextOnePreselected() {
+        // given
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")));
+
+        // when
+        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
+
+        // then
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+    }
+
+    @Test
+    void productInEveryMatchingCategoryHasTheFirstOnePreselected() {
+        // given
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")),
+                new CatalogPlacement.Existing("c-2", "cat-b2b", "p-2", InventoryKey.fromEan("5901000000001")));
+
+        // when
+        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
+
+        // then
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(true, false);
+        assertThat(dialog.others()).flatExtracting(AddToCatalogDialog.Group::options)
+                .extracting(AddToCatalogDialog.Option::preselected).containsOnly(false);
     }
 
     @Test
@@ -91,6 +119,13 @@ class AddToCatalogDialogFactoryTest {
 
         // then
         assertThat(dialog.noManualCategories()).isTrue();
+    }
+
+    private void placement(CatalogPlacement.Existing... existing) {
+        CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
+        CatalogPlacement.Target b2b = new CatalogPlacement.Target("c-2", "Sklep B2B", "cat-b2b", "Karty", List.of("11"));
+        CatalogPlacement.Target cases = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-case", "Obudowa", List.of("40"));
+        when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu, b2b, cases), List.of(existing)));
     }
 
     private void product(String ean, String name, String categoryId) {

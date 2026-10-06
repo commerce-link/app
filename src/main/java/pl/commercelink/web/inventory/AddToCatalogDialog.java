@@ -17,7 +17,8 @@ public record AddToCatalogDialog(List<String> eans, String productName, String p
         return !matching.isEmpty();
     }
 
-    public record Option(String value, String label, int alreadyIn) {
+    /** {@code preselected}: the radio checked when the dialog opens; always false in {@link Group}. */
+    public record Option(String value, String label, int alreadyIn, boolean preselected) {
     }
 
     public record Group(String catalogName, List<Option> options) {

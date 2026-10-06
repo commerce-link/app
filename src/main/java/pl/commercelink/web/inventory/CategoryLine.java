@@ -6,7 +6,11 @@ import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
 import pl.commercelink.web.catalog.CatalogPaths;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * The "Kategoria" cell: the PIM path (ancestors grey, leaf bold) and, for an admin, the store-catalog categories the
@@ -37,7 +41,11 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
         String inCatalogHref = existing.stream().findFirst()
                 .map(entry -> CatalogPaths.product(entry.catalogId(), entry.categoryId(), entry.productId()))
                 .orElse(null);
-        List<String> inCatalogLabels = existing.stream().map(entry -> label(placement, entry)).distinct().toList();
+        // One place per catalog category: two same-named categories in different catalogs still count as two.
+        List<String> inCatalogLabels = existing.stream()
+                .filter(distinctBy(entry -> entry.catalogId() + "/" + entry.categoryId()))
+                .map(entry -> label(placement, entry))
+                .toList();
         boolean addableElsewhere = !existing.isEmpty()
                 && targets.stream().anyMatch(target -> !placement.isIn(target.categoryId(), key));
         return new CategoryLine(List.copyOf(ancestors), leaf, fullPath,
@@ -51,7 +59,12 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
                 .filter(target -> target.catalogId().equals(entry.catalogId()) && target.categoryId().equals(entry.categoryId()))
                 .findFirst()
                 .map(CatalogPlacement.Target::label)
-                // Placement lists only manual categories; an entry elsewhere still has to name some place.
+                // Defensive: existing entries are loaded from the targets themselves, so this is not expected to happen.
                 .orElse(entry.catalogId() + SEPARATOR + entry.categoryId());
+    }
+
+    private static Predicate<CatalogPlacement.Existing> distinctBy(Function<CatalogPlacement.Existing, String> key) {
+        Set<String> seen = new HashSet<>();
+        return entry -> seen.add(key.apply(entry));
     }
 }
