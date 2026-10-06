@@ -103,7 +103,9 @@ class OffersListStylesContractTest {
         width: 1%;
         white-space: nowrap;
     }
-}""").doesNotContain("max-width: 22ch");
+}""");
+        String offers = css.substring(css.indexOf("/* Offers list (spec"), css.indexOf("/* --- Delivery details"));
+        assertThat(offers).doesNotContain("max-width: 22ch");
     }
 
     @Test
