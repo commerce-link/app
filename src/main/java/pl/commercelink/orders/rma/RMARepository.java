@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
@@ -27,6 +28,20 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
 
     public RMA findById(String storeId, String rmaId) {
         return dynamoDBMapper.load(RMA.class, storeId, rmaId);
+    }
+
+    /** The store's RMAs with these ids, read in batches of 100 keys; ids not in the store are absent. */
+    public List<RMA> findAllByIds(String storeId, Collection<String> rmaIds) {
+        List<RMA> keys = rmaIds.stream().distinct().map(id -> {
+            RMA key = new RMA();
+            key.setStoreId(storeId);
+            key.setRmaId(id);
+            return key;
+        }).toList();
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(RMA.class::cast).toList();
     }
 
     public List<RMA> findAll() {

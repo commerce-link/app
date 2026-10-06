@@ -203,16 +203,20 @@
         </span>
     </th>
     <td class="is-numeric" th:attr="data-label=#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
-        <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
-        <span class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
+        <span class="cl-price-margin"><span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span><span
+              th:replace="~{orders/details/items :: margin(${row.margin()})}"></span></span>
     </td>
-    <!--/* the state pill, the delivery (supplier or delivery number) as the second line under it */-->
+    <!--/* The state pill is the link to the item's delivery, or to creating one while the item waits for its supplier
+           (client 2026-10-06: the delivery number or supplier under the pill went, the pill took its link; pills are
+           links only here). The target is named for screen readers only. Without a target (the store's warehouse, no
+           supplier, no right to create a delivery) it is the plain pill. */-->
     <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
-        <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
-        <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
-            <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
-            <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
-        </span>
+        <a th:if="${row.deliveryHref() != null}" class="cl-status" th:classappend="${row.statusTone()}"
+           th:href="@{${row.deliveryHref()}}" th:with="state=#{${row.statusKey()}}"
+           th:attr="aria-label=${row.deliveryToCreate()} ? #{order.items.fulfilment.link.supplier(${state}, ${row.deliveryLabel()})}
+                                                          : #{order.items.fulfilment.link.delivery(${state}, ${row.deliveryLabel()})}"
+           th:text="${state}"></a>
+        <span th:unless="${row.deliveryHref() != null}" class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
     </td>
     <!--/* display only: the item menu toggles it. The glyph is hidden from screen readers, the hidden word says it; an
            unconsolidated item leaves the cell empty, and in card mode an empty cell is not shown at all. */-->
@@ -265,5 +269,18 @@
         </details>
     </td>
 </tr>
+
+<!--/* The margin of one unit as an icon after the price; the tooltip (and the accessible name) carries the numbers,
+       the cost included — it used to be the line under the price. A loss changes the glyph (info → exclamation) as
+       well as the colour, so the mark does not rest on colour alone. Focusable, so the tooltip opens from the keyboard and on tap. */-->
+<span th:fragment="margin(m)" class="cl-margin cl-tooltip is-lines" tabindex="0" role="img"
+      th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
+      th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{order.items.margin.unknown}
+                : #{${m.tone().key()}(${m.percent() != null ? m.percent() : '—'},
+                    ${#messages.msg('general.currency.amount', m.profit())},
+                    ${#messages.msg('general.currency.amount', m.cost())},
+                    ${#messages.msg('general.currency.amount', m.profitNet())})}"
+      th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
+      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
 </body>
 </html>

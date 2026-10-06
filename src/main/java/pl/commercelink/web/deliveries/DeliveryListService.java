@@ -87,7 +87,7 @@ public class DeliveryListService {
         Pagination pagination = Pagination.of(query.page(), shown.size(), DeliveryListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         DeliveryRowMapper mapper = new DeliveryRowMapper(messages, locale, labels, actor.superAdmin());
         List<DeliveryRow> rows = shown.subList(pagination.fromIndex(), pagination.toIndex()).stream()
-                .map(d -> mapper.map(d, today)).toList();
+                .map(d -> mapper.map(d, today, query.href())).toList();
         List<Option> providerOptions = providerOptions(query, forProviders, labels, actor, locale);
         Map<String, String> providerNames = providerOptions.stream().collect(Collectors.toMap(Option::value, Option::label));
         List<Chip> chips = chips(query, providerNames, today, locale);

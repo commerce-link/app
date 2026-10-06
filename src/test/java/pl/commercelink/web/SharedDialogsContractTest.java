@@ -1,7 +1,6 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.web.orders.OrderLabels;
@@ -40,6 +39,18 @@ class SharedDialogsContractTest {
                 .contains("/js/item-add-dialog.js").contains("data-cl-item-add-close")
                 .doesNotContain("onclick=").doesNotContain("oninput=").doesNotContain("onchange=")
                 .doesNotContain("<style").doesNotContain("style=").doesNotContain("modal-card");
+    }
+
+    @Test
+    void theDialogScriptGuardsFormSubmitsAndReopensServerOpenedDialogsAsModal() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/dialog.js");
+
+        // then
+        assertThat(script).contains("addEventListener('submit'").contains("event.submitter").contains("button.disabled = true")
+                .contains("event.defaultPrevented").contains("data-cl-async").contains("dialog.cl-dialog.is-form")
+                .contains("'pageshow'").contains("shown.persisted")
+                .contains("dialog.cl-dialog[open]").contains("if (!dialog.open)");
     }
 
     @Test
@@ -112,52 +123,43 @@ class SharedDialogsContractTest {
     }
 
     @Test
-    void theDeliveryPaymentsSectionKeepsItsBulmaEditModalAndGetsTheNewDialog() {
-        // given
-        Map<String, Object> variables = paymentVariables();
-        variables.put("payments", List.of(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 50, 0)));
-
-        // when
-        String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/payments-section :: paymentsSection(${payments}, '/dashboard/deliveries/d-1/addPayment',"
-                        + " '/dashboard/deliveries/d-1/updatePayments', 50, ${null}, ${paymentSources}, false, true, 'delivery')}\"></div>",
-                variables);
-
-        // then
-        assertThat(html).contains("id=\"paymentsEditModal\"").contains("togglePaymentsEditModal(true)")
-                .contains("openAddPaymentModalFromButton(this)").contains("id=\"addPaymentModal\"")
-                .contains("action=\"/dashboard/deliveries/d-1/addPayment\"");
-        // the edit modal's amounts are text read on the server (AmountParser), as in "Dodaj wpłatę"
-        assertThat(html).containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.amount\"\\s+value=\"50.00\"")
-                .containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.fee\"\\s+value=\"0.00\"")
-                .doesNotContain("step=\"0.01\"");
-        // the edit modal's own <select> (payments-section.html) must read the same Option value/labelKey the add
-        // dialog does, not Option's own toString(), or no option can be preselected or saved
-        assertThat(html).doesNotContain("Option[")
-                .containsPattern("<option value=\"BankTransfer\"[^>]*selected[^>]*>Przelew bankowy<");
-    }
-
-    @Test
     void theAddPaymentScriptKeepsEveryPublicFunctionOfPaymentsAndDeliveries() throws Exception {
         // given
         String script = read("src/main/resources/static/js/add-payment-dialog.js");
         String payments = read("src/main/resources/templates/payments.html");
 
-        // then
+        // when / then
         assertThat(script).contains("window.toggleAddPaymentModal = toggleAddPaymentModal")
-                .contains("window.togglePaymentsEditModal = togglePaymentsEditModal")
-                .contains("window.openAddPaymentModalFromButton = openAddPaymentModalFromButton")
                 .contains("window.openPaymentModalForOrder = openPaymentModalForOrder")
                 .contains("window.openPaymentModalForOrderFromButton = openPaymentModalForOrderFromButton")
                 .contains("window.openPaymentModalForDelivery = openPaymentModalForDelivery")
                 .contains("window.openPaymentModalForDeliveryFromButton = openPaymentModalForDeliveryFromButton")
                 .contains("showModal").contains("cl:dialog-open").contains("'use strict'")
-                .doesNotContain("innerHTML").doesNotContain(".style.").doesNotContain("pełna wpłata");
+                .doesNotContain("innerHTML").doesNotContain(".style.").doesNotContain("pełna wpłata")
+                .doesNotContain("togglePaymentsEditModal").doesNotContain("openAddPaymentModalFromButton");
         // Payments opens the dialog from links the script finds by delegation, so the block list-page.js swaps keeps working
         assertThat(payments).contains("data-cl-payment-open").contains("data-order-id=${row.orderId()}")
                 .contains("data-delivery-id=${row.deliveryId()}");
         assertThat(script).contains("closest('[data-cl-payment-open]')");
         // the fragment lists the directions by hand (no T() in templates); a third direction must be added there too
         assertThat(PaymentDirection.values()).containsExactly(PaymentDirection.Incoming, PaymentDirection.Outgoing);
+    }
+
+    @Test
+    void theBackdropClosesADialogOnlyWhenThePressStartedAndEndedOnIt() throws Exception {
+        // given: every script that closes a native dialog on a backdrop click
+        List<String> scripts = List.of("dialog.js", "confirm-dialog.js", "add-payment-dialog.js", "item-add-dialog.js");
+
+        for (String name : scripts) {
+            // when
+            String script = read("src/main/resources/static/js/" + name);
+
+            // then: a press from inside the dialog to the backdrop (or back) also clicks the dialog element itself
+            assertThat(script).as(name).contains("addEventListener('pointerdown'").contains("addEventListener('pointerup'")
+                    .containsPattern("pressStart === (dialog|event\\.target) && pressEnd === (dialog|event\\.target)")
+                    .doesNotContainPattern("if \\(event\\.target === dialog\\) \\{\\s*dialog\\.close\\(\\);")
+                    .doesNotContainPattern("classList\\.contains\\('is-form'\\)\\) \\{\\s*event\\.target\\.close\\(\\);")
+                    .doesNotContain("target === dialog || (target.closest");
+        }
     }
 }

@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,11 +12,14 @@ import pl.commercelink.inventory.supplier.SqsFeedLoaderEventListener.FeedLoaderE
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
+import pl.commercelink.stores.StoreActivity;
 
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -29,9 +33,16 @@ class SqsFeedLoaderEventListenerTest {
     private StoreSupplierFeedScheduler feedScheduler;
     @Mock
     private ScheduledExecutionCounter scheduledExecutionCounter;
+    @Mock
+    private StoreActivity storeActivity;
 
     @InjectMocks
     private SqsFeedLoaderEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(anyString())).thenReturn(true);
+    }
 
     private FeedLoaderEventPayload payload(String supplierName, String storeId) throws Exception {
         FeedLoaderEventPayload payload = new FeedLoaderEventPayload();
@@ -134,5 +145,17 @@ class SqsFeedLoaderEventListenerTest {
         assertThrows(SupplierConfigurationNotReadyException.class,
                 () -> listener.handleMessage(payload("Wortmann", "store-1", 5)));
         verify(feedScheduler, never()).scheduleConfigurationRetry(anyString(), anyString(), anyInt());
+    }
+
+    @Test
+    void storeFeedOfInactiveStoreIsSkipped() throws Exception {
+        // given
+        when(storeActivity.isActive("store-1")).thenReturn(false);
+
+        // when
+        listener.handleMessage(payload("Wortmann", "store-1"));
+
+        // then
+        verifyNoInteractions(storeSupplierFeedService, scheduledExecutionCounter, feedScheduler);
     }
 }

@@ -1,5 +1,6 @@
 package pl.commercelink.payments;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.function.RouterFunction;
@@ -14,11 +15,13 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.payments.api.PaymentWebhookResult;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Configuration
 public class PaymentWebhookRegistry {
 
@@ -27,14 +30,17 @@ public class PaymentWebhookRegistry {
 
     private final BasketsRepository basketsRepository;
     private final OrdersManager ordersManager;
+    private final StoreActivity storeActivity;
     private final RouterFunction<ServerResponse> routes;
 
     PaymentWebhookRegistry(PaymentProviderFactory paymentProviderFactory,
                            StoresRepository storesRepository,
                            BasketsRepository basketsRepository,
-                           OrdersManager ordersManager) {
+                           OrdersManager ordersManager,
+                           StoreActivity storeActivity) {
         this.basketsRepository = basketsRepository;
         this.ordersManager = ordersManager;
+        this.storeActivity = storeActivity;
 
         this.routes = EventBindingRegistrar.forDescriptors(paymentProviderFactory.availableProviders())
                 .<PaymentWebhookResult>withWebhooks(
@@ -82,5 +88,12 @@ public class PaymentWebhookRegistry {
         ordersManager.saveWithFulfilment(order, orderItems);
 
         basketsRepository.delete(basket);
+
+        // the customer has paid and the automated steps carry on, but the owner of an inactive store cannot take the
+        // manual ones in the read-only dashboard, so someone has to step in
+        if (!storeActivity.isActive(store)) {
+            log.error("Order {} was paid in inactive store {}: its owner cannot handle it in the read-only dashboard",
+                    order.getOrderId(), store.getStoreId());
+        }
     }
 }

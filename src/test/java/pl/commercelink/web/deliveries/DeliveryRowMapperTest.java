@@ -37,6 +37,21 @@ class DeliveryRowMapperTest {
         lenient().when(labels.has("store-1", "Acme")).thenReturn(true);
     }
 
+    @Test
+    void theRowCarriesTheListItCameFromSoTheDetailsCanReturnToIt() {
+        // given
+        Delivery delivery = delivery();
+
+        // when
+        DeliveryRow filtered = mapper(false).map(delivery, TODAY, "/dashboard/deliveries?scope=all&q=MH");
+        DeliveryRow bare = mapper(false).map(delivery, TODAY, "/dashboard/deliveries");
+
+        // then
+        assertThat(filtered.href()).isEqualTo("/dashboard/deliveries/details?deliveryId=7a31c0e2-1111-2222-3333-444455556666"
+                + "&returnTo=%2Fdashboard%2Fdeliveries%3Fscope%3Dall%26q%3DMH");
+        assertThat(bare.href()).isEqualTo("/dashboard/deliveries/details?deliveryId=7a31c0e2-1111-2222-3333-444455556666");
+    }
+
     private DeliveryRowMapper mapper(boolean superAdmin) {
         return new DeliveryRowMapper(messages, new Locale("pl"), labels, superAdmin);
     }

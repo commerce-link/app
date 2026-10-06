@@ -10,6 +10,9 @@ import java.util.UUID;
 @DynamoDBTable(tableName = "OrderEvents")
 public class OrderEvent {
 
+    /** The platform administrator rejected a delivery request that carried items of this order; details = "{supplier}[ · {reason}]". */
+    public static final String DELIVERY_REQUEST_REJECTED = "DELIVERY_REQUEST_REJECTED";
+
     @DynamoDBHashKey(attributeName = "orderId")
     private String orderId;
     @DynamoDBRangeKey(attributeName = "eventId")
@@ -24,6 +27,9 @@ public class OrderEvent {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
+    /** Free text shown with the event (e.g. the supplier and the reason of a rejected delivery request); null for most events. */
+    @DynamoDBAttribute(attributeName = "details")
+    private String details;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -76,6 +82,14 @@ public class OrderEvent {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
     }
 
     public Long getVersion() {

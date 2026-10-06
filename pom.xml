@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.10.05</version>
+    <version>2026.10.13</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -69,7 +69,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>commercelink-starter</artifactId>
-            <version>0.1.11</version>
+            <version>0.1.12</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -79,7 +79,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>supplier-api</artifactId>
-            <version>0.5.2</version>
+            <version>0.6.0</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -328,6 +328,13 @@
             <version>0.9.10</version>
         </dependency>
 
+        <!-- QR codes on printouts (order card) -->
+        <dependency>
+            <groupId>io.nayuki</groupId>
+            <artifactId>qrcodegen</artifactId>
+            <version>1.8.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -343,12 +350,12 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>supplier-acme</artifactId>
-                    <version>0.3.1</version>
+                    <version>0.3.2</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>pim-dev</artifactId>
-                    <version>0.1.1</version>
+                    <version>0.1.2</version>
                 </dependency>
                 <dependency>
                     <groupId>pl.commercelink</groupId>

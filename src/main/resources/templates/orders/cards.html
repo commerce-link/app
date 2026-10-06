@@ -1,0 +1,23 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout-print}">
+<head>
+    <title th:text="#{order.print.title.cards(${#lists.size(cards)})}"></title>
+</head>
+<body>
+<!--/* The order cards of the orders checked on the orders list, one after another in one document, in the list's order:
+       print.js loads it into its hidden frame, so one print dialog prints the whole batch. Each card starts on a new
+       page and carries its own QR code at its own top-right corner (commercelink.css, @media print). The loop sits on
+       a th:block: th:replace on the same element as th:each would win and render one card. */-->
+<div layout:fragment="content">
+    <section class="cl-page cl-print-page">
+        <div class="cl-page-body">
+            <th:block th:each="c, s : ${cards}">
+                <div th:replace="~{orders/card-sheet :: sheet(${c}, ${'-' + s.count})}"></div>
+            </th:block>
+        </div>
+    </section>
+</div>
+</body>
+</html>

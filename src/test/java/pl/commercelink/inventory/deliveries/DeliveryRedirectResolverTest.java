@@ -150,6 +150,17 @@ class DeliveryRedirectResolverTest {
     }
 
     @Test
+    void anyNewDeliveryPageIsACreateLinkInTheStoreAndTheSuperAdminVariant() {
+        // when / then
+        assertThat(DeliveryRedirectResolver.isCreateLink("/dashboard/deliveries/create/Acme")).isTrue();
+        assertThat(DeliveryRedirectResolver.isCreateLink("/dashboard/deliveries/create/Acme?order=o-1&from=order")).isTrue();
+        assertThat(DeliveryRedirectResolver.isCreateLink("/dashboard/store/store-1/deliveries/create/Acme")).isTrue();
+        assertThat(DeliveryRedirectResolver.isCreateLink("/dashboard/deliveries/details?deliveryId=d-1")).isFalse();
+        assertThat(DeliveryRedirectResolver.isCreateLink("/dashboard/warehouse")).isFalse();
+        assertThat(DeliveryRedirectResolver.isCreateLink(null)).isFalse();
+    }
+
+    @Test
     void newItemWithAProviderNameRequiringEncodingLinksToTheEncodedDropshipPage() {
         // given
         Order order = order(FulfilmentType.DirectToConsumer);

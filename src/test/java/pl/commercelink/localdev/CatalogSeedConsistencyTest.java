@@ -230,7 +230,7 @@ class CatalogSeedConsistencyTest {
     @Test
     void seededDemoOrderItemsAreFulfillableFromTheAcmeFeed() {
         // when / then
-        assertThat(feedByMfn(ACME_FEED).keySet()).contains("MFN-CLEAR-01", "MFN-TWIN-01");
+        assertThat(feedByMfn(ACME_FEED).keySet()).contains("100-100001405WOF", "KF560C30BBEK2-32");
     }
 
     private static Map<String, String[]> feedByMfn(String resource) {

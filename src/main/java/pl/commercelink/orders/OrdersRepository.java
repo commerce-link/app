@@ -35,6 +35,20 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return dynamoDBMapper.load(Order.class, storeId, orderId);
     }
 
+    /** The store's orders with these ids, read in batches of 100 keys; ids not in the store are absent. */
+    public List<Order> findAllByIds(String storeId, Collection<String> orderIds) {
+        List<Order> keys = orderIds.stream().distinct().map(id -> {
+            Order key = new Order();
+            key.setStoreId(storeId);
+            key.setOrderId(id);
+            return key;
+        }).toList();
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(Order.class::cast).toList();
+    }
+
     public List<Order> findAll(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
@@ -109,6 +123,26 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 .sorted(Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toCollection(ArrayList::new));
         return orders;
+    }
+
+    /**
+     * The given orders of one store, in the order the ids were given, read in one batch (BatchGetItem; the mapper splits
+     * it into calls of 100 keys and retries unprocessed ones). An id that names no order of this store is left out and an
+     * id given twice counts once. The store is part of every key, so another store's order is never read; the filter
+     * below only guards against a batch answering with anything else.
+     */
+    public List<Order> findByIds(String storeId, List<String> orderIds) {
+        List<String> ids = orderIds.stream().distinct().toList();
+        if (ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<String, Order> loaded = new HashMap<>();
+        dynamoDBMapper.batchLoad(ids.stream().map(id -> orderKey(storeId, id)).toList()).values().stream()
+                .flatMap(List::stream)
+                .map(Order.class::cast)
+                .filter(order -> storeId.equals(order.getStoreId()))
+                .forEach(order -> loaded.put(order.getOrderId(), order));
+        return ids.stream().map(loaded::get).filter(Objects::nonNull).collect(Collectors.toCollection(ArrayList::new));
     }
 
     /**

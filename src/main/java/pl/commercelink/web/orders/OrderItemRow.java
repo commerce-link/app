@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -19,8 +20,8 @@ import java.util.function.Function;
 public record OrderItemRow(String itemId, int index, String name, String category, String mfn, String sku,
                            String serialNo, String serialHref, String conditionKey, String conditionTone,
                            boolean consolidated, boolean service, String comment, int qty, String unitPrice,
-                           String unitCost, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
-                           boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
+                           ItemMargin margin, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
+                           boolean deliveryToCreate, boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
                            boolean removable, List<ItemAction.State> actions, String editHref, double price, double tax,
                            boolean group, String viewHref) {
 
@@ -50,6 +51,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         String itemHref = "/dashboard/orders/" + context.order().getOrderId() + "/items/" + item.getItemId();
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
         String deliveryLabel = deliveryLabel(item, context.labels());
+        String deliveryHref = deliveryId == null ? null : context.deliveryHref().apply(item);
         String serial = StringUtils.trimToNull(item.getSerialNo());
         boolean showCondition = item.getCondition() != null && !item.isSealed();
         return new OrderItemRow(
@@ -59,10 +61,10 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 showCondition ? OrderLabels.condition(item.getCondition()) : null,
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
-                // the cost gross, like the price: the operator compares the two to spot the item worth a cheaper source
-                Money.format(item.getPrice()), Money.format(item.unitCost().grossValue()),
+                // the cost gross, like the price, so the margin is the same with or without VAT
+                Money.format(item.getPrice()), ItemMargin.of(item.getPrice(), item.unitCost().grossValue(), item.getTax()),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
-                deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
+                deliveryLabel, deliveryHref, DeliveryRedirectResolver.isCreateLink(deliveryHref),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
                 context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock(), context.dropshipLocked()),
@@ -73,8 +75,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
     }
 
     /**
-     * The fulfilment cell's second line on its own (the item page's header): the label and link of the table row, and
-     * whether the value is a supplier delivery's id rather than a supplier.
+     * The item's delivery on its own (the item page's header): its label, its link, and whether the value is a supplier
+     * delivery's id rather than a supplier. Unlike the table's state pill, the store's warehouse keeps its link here.
      */
     public record Delivery(String label, String href, boolean delivery) {
     }
