@@ -241,6 +241,7 @@
                                 <span th:if="${row.qty() > 0}" th:text="#{inventory.table.qtyValue(${row.qty()})}"></span>
                                 <span th:unless="${row.qty() > 0}" class="cl-table-empty" th:text="#{inventory.browse.onOrder}"></span>
                                 <span class="cl-table-sub" th:text="#{inventory.browse.suppliers(${row.suppliers()})}"></span>
+                                <span class="cl-table-sub" th:if="${row.warehouseQty() > 0}" th:text="#{inventory.browse.warehouse(${row.warehouseQty()})}"></span>
                             </td>
                             <td class="cl-table-actions" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.action}">
                                 <a th:if="${row.inCatalog()}" class="cl-status is-ok" th:href="${row.category().inCatalogHref()}"

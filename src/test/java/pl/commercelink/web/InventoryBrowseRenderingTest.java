@@ -35,6 +35,27 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
+    void rowWithWarehouseStockShowsTheWarehouseLineUnderTheSupplierQuantity() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"),
+                List.of(row(false, 6)))));
+
+        // then
+        assertThat(html).contains("Suppliers: 4", "In warehouse: 6");
+        assertThat(html.indexOf("In warehouse: 6")).isGreaterThan(html.indexOf("Suppliers: 4"));
+    }
+
+    @Test
+    void rowWithoutWarehouseStockHasNoWarehouseLine() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("Suppliers: 4");
+        assertThat(html).doesNotContain("In warehouse");
+    }
+
+    @Test
     void productAlreadyInACatalogShowsTheInCatalogLinkInsteadOfTheAction() {
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(true)))));
@@ -105,11 +126,15 @@ class InventoryBrowseRenderingTest {
     }
 
     private static BrowsePage.RowView row(boolean inCatalog) {
+        return row(inCatalog, 0);
+    }
+
+    private static BrowsePage.RowView row(boolean inCatalog, long warehouseQty) {
         CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
                 "Komponenty komputerowe › Karty graficzne", "Podzespoły › Karta graficzna", 1, false,
                 inCatalog ? "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1" : null);
         return new BrowsePage.RowView("Gigabyte RTX 4060", "Gigabyte", "5901000000001", "GV-N4060", "/dashboard/inventory/prices?q=5901000000001",
-                line, 1189.0, true, "AB", 214, 4, "/dashboard/inventory?open=add&ean=5901000000001");
+                line, 1189.0, true, "AB", 214, 4, warehouseQty, "/dashboard/inventory?open=add&ean=5901000000001");
     }
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows) {

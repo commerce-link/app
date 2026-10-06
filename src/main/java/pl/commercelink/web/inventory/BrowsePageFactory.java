@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,7 @@ public class BrowsePageFactory {
     private final PimCategoryTree tree;
     private final CatalogPlacement catalogPlacement;
     private final SupplierLabels supplierLabels;
+    private final WarehouseStockLookup warehouseStock;
 
     public BrowsePage build(@Nullable String storeId, BrowseQuery query, boolean admin, boolean superAdmin) {
         BrowseSummary summary = inventoryBrowse.summary(storeId);
@@ -65,7 +67,8 @@ public class BrowsePageFactory {
             pagination = Pagination.of(query.page(), result.total(), BrowseQuery.PAGE_SIZE,
                     page -> query.withPage(page).href());
             boolean leaf = category != null && tree.childrenOf(category).isEmpty();
-            rows = result.rows().stream().map(row -> rowView(row, query, placement, leaf, labels)).toList();
+            Map<String, Long> inStock = warehouseStock.inStockByMfn(storeId, productCodes(result.rows()));
+            rows = result.rows().stream().map(row -> rowView(row, query, placement, leaf, labels, inStock)).toList();
             total = result.total();
             truncated = result.truncated();
         }
@@ -109,14 +112,24 @@ public class BrowsePageFactory {
     }
 
     private BrowsePage.RowView rowView(BrowseRow row, BrowseQuery query, CatalogPlacement.StorePlacement placement,
-                                       boolean leafSelected, SupplierLabelMap labels) {
+                                       boolean leafSelected, SupplierLabelMap labels, Map<String, Long> inStock) {
         CategoryLine category = CategoryLine.of(tree, placement, row.categoryId(), row.categoryText(), row.catalogKey(),
                 leafSelected);
         String code = row.ean() != null ? row.ean() : row.mfn();
         String detailHref = InventoryPageController.PRICES_PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
         String addHref = query.hrefWith("open=add&ean=" + encode(code));
         return new BrowsePage.RowView(row.name(), row.brand(), row.ean(), row.mfn(), detailHref, category,
-                row.lowestDeliveredNet(), row.deliveryKnown(), labels.of(row.lowestSupplier()), row.qty(), row.suppliers(), addHref);
+                row.lowestDeliveredNet(), row.deliveryKnown(), labels.of(row.lowestSupplier()), row.qty(), row.suppliers(),
+                warehouseQty(row, inStock), addHref);
+    }
+
+    private static Set<String> productCodes(List<BrowseRow> rows) {
+        return rows.stream().flatMap(row -> row.key().getProductCodes().stream())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static long warehouseQty(BrowseRow row, Map<String, Long> inStock) {
+        return row.key().getProductCodes().stream().mapToLong(code -> inStock.getOrDefault(code, 0L)).sum();
     }
 
     private String title(String category) {

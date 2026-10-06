@@ -53,7 +53,7 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
 
     public record RowView(String name, String brand, String ean, String mfn, String detailHref, CategoryLine category,
                           double cost, boolean deliveryKnown, String costSupplier, long qty, int suppliers,
-                          String addHref) {
+                          long warehouseQty, String addHref) {
 
         public boolean inCatalog() {
             return category.inCatalog();
