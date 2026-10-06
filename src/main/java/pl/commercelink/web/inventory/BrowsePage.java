@@ -8,8 +8,7 @@ import java.util.Map;
 /** Everything the browse mode of the inventory page renders; labels that need translation travel as message keys. */
 public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, boolean noSuppliers, boolean textTooShort,
                          String title, List<Crumb> crumbs, List<NavItem> subnav, boolean subnavSiblings,
-                         List<Tile> tiles, List<MenuOption> supplierOptions, List<MenuOption> stockOptions,
-                         List<MenuOption> catalogOptions, List<Chip> chips, String clearHref,
+                         List<Tile> tiles, List<MenuOption> supplierOptions, List<Chip> chips, String clearHref,
                          List<RowView> rows, int total, boolean truncated, Pagination pagination,
                          Map<String, SortHeader> sortHeaders, String returnTo) {
 
@@ -42,10 +41,10 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
     public record Tile(String label, String labelKey, int count, String description, String href) {
     }
 
-    public record MenuOption(String value, String label, String labelKey, int count, boolean selected, String href) {
+    public record MenuOption(String value, String label, int count, boolean selected) {
     }
 
-    public record Chip(String labelKey, String value, String valueKey, String clearHref) {
+    public record Chip(String labelKey, String value, String clearHref) {
     }
 
     public record SortHeader(String href, String ariaSort) {

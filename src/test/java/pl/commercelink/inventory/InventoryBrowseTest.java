@@ -124,7 +124,7 @@ class InventoryBrowseTest {
     }
 
     @Test
-    void filtersBySupplierAndStock() {
+    void filtersBySupplier() {
         // given
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB", "Action"));
         global.replace(List.of(
@@ -133,13 +133,9 @@ class InventoryBrowseTest {
 
         // when
         BrowseResult fromAb = browse.browse(STORE_ID, BrowseCriteria.all().fromSuppliers(Set.of("AB")));
-        BrowseResult inStock = browse.browse(STORE_ID, BrowseCriteria.all().withStock(BrowseCriteria.Stock.IN_STOCK));
-        BrowseResult onOrder = browse.browse(STORE_ID, BrowseCriteria.all().withStock(BrowseCriteria.Stock.ON_ORDER));
 
         // then
         assertThat(fromAb.rows()).extracting(BrowseRow::name).containsExactly("RTX 4060");
-        assertThat(inStock.rows()).extracting(BrowseRow::name).containsExactly("RX 7600");
-        assertThat(onOrder.rows()).extracting(BrowseRow::name).containsExactly("RTX 4060");
     }
 
     @Test
@@ -208,20 +204,6 @@ class InventoryBrowseTest {
 
         // then
         assertThat(result.rows()).extracting(BrowseRow::lowestSupplier).containsExactly("AB");
-    }
-
-    @Test
-    void rowFilterNarrowsTheResult() {
-        // given
-        global.replace(List.of(
-                product("5901000000001", "GPU-1", "RTX 4060", "11", item("5901000000001", "GPU-1", "AB", 100, 5)),
-                product("5901000000002", "GPU-2", "RX 7600", "11", item("5901000000002", "GPU-2", "AB", 90, 5))));
-
-        // when
-        BrowseResult result = browse.browse(STORE_ID, BrowseCriteria.all().withRowFilter(row -> row.name().startsWith("RX")));
-
-        // then
-        assertThat(result.rows()).extracting(BrowseRow::name).containsExactly("RX 7600");
     }
 
     @Test

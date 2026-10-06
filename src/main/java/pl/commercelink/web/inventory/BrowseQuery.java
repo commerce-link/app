@@ -6,7 +6,6 @@ import pl.commercelink.inventory.BrowseCriteria;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -14,8 +13,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /** Everything the browse list shows, read from and written to its address so it survives reloads and bookmarks. */
-public record BrowseQuery(String category, List<String> suppliers, BrowseCriteria.Stock stock, CatalogFilter catalog,
-                          String q2, BrowseCriteria.Sort sort, boolean descending, int page) {
+public record BrowseQuery(String category, List<String> suppliers, String q2, BrowseCriteria.Sort sort, boolean descending,
+                          int page) {
 
     public static final String PATH = "/dashboard/inventory";
     public static final String FRAGMENT_PATH = "/dashboard/inventory/browse";
@@ -23,21 +22,8 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
     public static final int MIN_TEXT = 3;
     public static final int MAX_TEXT = 100;
 
-    public enum CatalogFilter {
-        ALL, OUT, IN, UNMATCHED;
-
-        String param() {
-            return name().toLowerCase(Locale.ROOT);
-        }
-
-        static Optional<CatalogFilter> parse(String value) {
-            return Arrays.stream(values()).filter(f -> f != ALL && f.param().equalsIgnoreCase(trim(value))).findFirst();
-        }
-    }
-
     public static BrowseQuery start() {
-        return new BrowseQuery(null, List.of(), BrowseCriteria.Stock.ALL, CatalogFilter.ALL, null,
-                BrowseCriteria.Sort.NAME, false, 1);
+        return new BrowseQuery(null, List.of(), null, BrowseCriteria.Sort.NAME, false, 1);
     }
 
     public static BrowseQuery parse(MultiValueMap<String, String> params) {
@@ -49,8 +35,6 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
         return new BrowseQuery(
                 emptyToNull(trim(params.getFirst("cat"))),
                 List.copyOf(suppliers),
-                parseStock(params.getFirst("stock")),
-                CatalogFilter.parse(params.getFirst("catalog")).orElse(CatalogFilter.ALL),
                 normalizeText(params.getFirst("q2")),
                 parseSort(params.getFirst("sort")),
                 "desc".equalsIgnoreCase(trim(params.getFirst("dir"))),
@@ -66,44 +50,35 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
     }
 
     public BrowseQuery withCategory(String newCategory) {
-        return new BrowseQuery(emptyToNull(trim(newCategory)), suppliers, stock, catalog, q2, sort, descending, 1);
+        return new BrowseQuery(emptyToNull(trim(newCategory)), suppliers, q2, sort, descending, 1);
     }
 
     public BrowseQuery withoutText() {
-        return new BrowseQuery(category, suppliers, stock, catalog, null, sort, descending, 1);
+        return new BrowseQuery(category, suppliers, null, sort, descending, 1);
     }
 
     public BrowseQuery withoutSupplier(String supplier) {
-        return new BrowseQuery(category, suppliers.stream().filter(s -> !s.equals(supplier)).toList(), stock, catalog,
-                q2, sort, descending, 1);
-    }
-
-    public BrowseQuery withStock(BrowseCriteria.Stock newStock) {
-        return new BrowseQuery(category, suppliers, newStock, catalog, q2, sort, descending, 1);
-    }
-
-    public BrowseQuery withCatalog(CatalogFilter newCatalog) {
-        return new BrowseQuery(category, suppliers, stock, newCatalog, q2, sort, descending, 1);
+        return new BrowseQuery(category, suppliers.stream().filter(s -> !s.equals(supplier)).toList(), q2, sort,
+                descending, 1);
     }
 
     public BrowseQuery cleared() {
-        return new BrowseQuery(category, List.of(), BrowseCriteria.Stock.ALL, CatalogFilter.ALL, null, sort, descending, 1);
+        return new BrowseQuery(category, List.of(), null, sort, descending, 1);
     }
 
     public BrowseQuery toggleSort(BrowseCriteria.Sort column) {
         boolean nextDescending = sort == column && !descending;
-        return new BrowseQuery(category, suppliers, stock, catalog, q2, column, nextDescending, 1);
+        return new BrowseQuery(category, suppliers, q2, column, nextDescending, 1);
     }
 
     public BrowseQuery withPage(int newPage) {
-        return new BrowseQuery(category, suppliers, stock, catalog, q2, sort, descending, Math.max(1, newPage));
+        return new BrowseQuery(category, suppliers, q2, sort, descending, Math.max(1, newPage));
     }
 
     public BrowseCriteria toCriteria(Set<String> categoryIds) {
         return BrowseCriteria.all()
                 .inCategories(categoryIds)
                 .fromSuppliers(Set.copyOf(suppliers))
-                .withStock(stock)
                 .withText(textTooShort() ? null : q2)
                 .sortedBy(sort, descending)
                 .page((page - 1) * PAGE_SIZE, PAGE_SIZE);
@@ -119,14 +94,6 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
             params.add(new Param("cat", category));
         }
         suppliers.forEach(supplier -> params.add(new Param("supplier", supplier)));
-        if (stock == BrowseCriteria.Stock.IN_STOCK) {
-            params.add(new Param("stock", "in-stock"));
-        } else if (stock == BrowseCriteria.Stock.ON_ORDER) {
-            params.add(new Param("stock", "on-order"));
-        }
-        if (catalog != CatalogFilter.ALL) {
-            params.add(new Param("catalog", catalog.param()));
-        }
         if (q2 != null) {
             params.add(new Param("q2", q2));
         }
@@ -155,14 +122,6 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
             parts.add(extraQuery);
         }
         return parts.isEmpty() ? PATH : PATH + "?" + String.join("&", parts);
-    }
-
-    private static BrowseCriteria.Stock parseStock(String value) {
-        return switch (trim(value).toLowerCase(Locale.ROOT)) {
-            case "in-stock" -> BrowseCriteria.Stock.IN_STOCK;
-            case "on-order" -> BrowseCriteria.Stock.ON_ORDER;
-            default -> BrowseCriteria.Stock.ALL;
-        };
     }
 
     private static BrowseCriteria.Sort parseSort(String value) {

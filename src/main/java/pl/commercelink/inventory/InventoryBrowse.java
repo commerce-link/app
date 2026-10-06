@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Paged browsing of the assortment a store can buy, by PIM category, supplier, stock and text. */
+/** Paged browsing of the assortment a store can buy, by PIM category, supplier and text. */
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class InventoryBrowse {
@@ -66,13 +66,10 @@ public class InventoryBrowse {
             if (!criteria.suppliers().isEmpty()) {
                 offers = offers.stream().filter(offer -> criteria.suppliers().contains(offer.supplier())).toList();
             }
-            if (offers.isEmpty() || !stockMatches(criteria.stock(), offers)) {
+            if (offers.isEmpty()) {
                 continue;
             }
             BrowseRow row = toRow(entry, offers);
-            if (!criteria.rowFilter().test(row)) {
-                continue;
-            }
             if (text != null && rows.size() == BrowseCriteria.MAX_TEXT_MATCHES) {
                 truncated = true;
                 break;
@@ -107,15 +104,6 @@ public class InventoryBrowse {
         ScopeKey key = new ScopeKey(storeId, index.version(), enabled, Inventory.ownConnectionFingerprint(store));
         return scopes.get(key, k -> BrowseScope.of(index, globalInventory.index(), enabled::contains,
                 storeInventoryProvider.ownInventory(store).items()));
-    }
-
-    private static boolean stockMatches(BrowseCriteria.Stock stock, List<InventoryItem> offers) {
-        boolean inStock = offers.stream().anyMatch(offer -> offer.qty() > 0);
-        return switch (stock) {
-            case ALL -> true;
-            case IN_STOCK -> inStock;
-            case ON_ORDER -> !inStock;
-        };
     }
 
     private BrowseRow toRow(BrowseEntry entry, List<InventoryItem> offers) {

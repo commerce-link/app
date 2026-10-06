@@ -19,8 +19,6 @@ class BrowseQueryTest {
         params.add("cat", "11");
         params.add("supplier", "AB");
         params.add("supplier", "Action");
-        params.add("stock", "in-stock");
-        params.add("catalog", "out");
         params.add("q2", "  rtx 4060 ");
         params.add("sort", "cost");
         params.add("dir", "desc");
@@ -32,22 +30,35 @@ class BrowseQueryTest {
         // then
         assertThat(query.category()).isEqualTo("11");
         assertThat(query.suppliers()).containsExactly("AB", "Action");
-        assertThat(query.stock()).isEqualTo(BrowseCriteria.Stock.IN_STOCK);
-        assertThat(query.catalog()).isEqualTo(BrowseQuery.CatalogFilter.OUT);
         assertThat(query.q2()).isEqualTo("rtx 4060");
         assertThat(query.sort()).isEqualTo(BrowseCriteria.Sort.COST);
         assertThat(query.descending()).isTrue();
         assertThat(query.page()).isEqualTo(3);
         assertThat(query.href()).isEqualTo("/dashboard/inventory?cat=11&supplier=AB&supplier=Action"
-                + "&stock=in-stock&catalog=out&q2=rtx+4060&sort=cost&dir=desc&page=3");
+                + "&q2=rtx+4060&sort=cost&dir=desc&page=3");
+    }
+
+    /** The "Dostępność" and "Katalog" filters were withdrawn; a bookmark that still carries them opens the plain list. */
+    @Test
+    void withdrawnStockAndCatalogParametersAreIgnored() {
+        // given
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "11");
+        params.add("stock", "in-stock");
+        params.add("catalog", "out");
+
+        // when
+        BrowseQuery query = BrowseQuery.parse(params);
+
+        // then
+        assertThat(query).isEqualTo(BrowseQuery.start().withCategory("11"));
+        assertThat(query.href()).isEqualTo("/dashboard/inventory?cat=11");
     }
 
     @Test
     void unknownValuesFallBackToDefaults() {
         // given
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("stock", "lots");
-        params.add("catalog", "maybe");
         params.add("sort", "price");
         params.add("dir", "sideways");
         params.add("page", "-4");
@@ -69,7 +80,7 @@ class BrowseQueryTest {
 
         // when / then
         assertThat(query.page()).isEqualTo(4);
-        assertThat(query.withStock(BrowseCriteria.Stock.IN_STOCK).page()).isEqualTo(1);
+        assertThat(query.withoutText().page()).isEqualTo(1);
         assertThat(query.toggleSort(BrowseCriteria.Sort.COST).page()).isEqualTo(1);
         assertThat(query.withCategory("12").page()).isEqualTo(1);
     }
@@ -88,8 +99,12 @@ class BrowseQueryTest {
     @Test
     void clearedKeepsTheCategoryAndTheSort() {
         // given
-        BrowseQuery query = BrowseQuery.start().withCategory("11").toggleSort(BrowseCriteria.Sort.QTY)
-                .withStock(BrowseCriteria.Stock.ON_ORDER).withCatalog(BrowseQuery.CatalogFilter.IN);
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "11");
+        params.add("supplier", "AB");
+        params.add("q2", "rtx");
+        params.add("sort", "qty");
+        BrowseQuery query = BrowseQuery.parse(params);
 
         // when
         BrowseQuery cleared = query.cleared();
@@ -97,8 +112,6 @@ class BrowseQueryTest {
         // then
         assertThat(cleared.category()).isEqualTo("11");
         assertThat(cleared.sort()).isEqualTo(BrowseCriteria.Sort.QTY);
-        assertThat(cleared.stock()).isEqualTo(BrowseCriteria.Stock.ALL);
-        assertThat(cleared.catalog()).isEqualTo(BrowseQuery.CatalogFilter.ALL);
         assertThat(cleared.suppliers()).isEmpty();
         assertThat(cleared.q2()).isNull();
     }
@@ -146,10 +159,14 @@ class BrowseQueryTest {
     @Test
     void paramsLeaveOutTheNamedOneAndThePage() {
         // given
-        BrowseQuery query = BrowseQuery.start().withCategory("11").withStock(BrowseCriteria.Stock.IN_STOCK).withPage(2);
+        MultiValueMap<String, String> address = new LinkedMultiValueMap<>();
+        address.add("cat", "11");
+        address.add("supplier", "AB");
+        address.add("page", "2");
+        BrowseQuery query = BrowseQuery.parse(address);
 
         // when
-        List<BrowseQuery.Param> params = query.params("stock");
+        List<BrowseQuery.Param> params = query.params("supplier");
 
         // then
         assertThat(params).extracting(BrowseQuery.Param::name).containsExactly("cat");

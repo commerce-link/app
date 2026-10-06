@@ -23,15 +23,25 @@ class InventoryBrowseRenderingTest {
     private final TemplateEngine engine = EnglishFragmentTemplateEngine.create();
 
     @Test
-    void categoryPageRendersRowsWithCategoryLinesAndTheAddAction() {
+    void categoryPageRendersRowsWithThePimCategoryAndTheAddAction() {
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
 
         // then
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("Komponenty komputerowe", "Karty graficzne", "Podzespoły › Karta graficzna", "+1");
+        assertThat(html).contains(">PIM category</th>", "data-label=\"PIM category\"", "Komponenty komputerowe", "Karty graficzne");
         assertThat(html).contains("data-browse-add", "data-cl-select-row", "data-cl-list-results");
-        assertThat(html).contains("Availability: in stock");
+        assertThat(html).doesNotContain("Podzespoły › Karta graficzna", "+1", "Fits:", "No matching catalog category", "fa-book");
+    }
+
+    @Test
+    void toolbarHasTheSupplierMenuAndSearchButNoAvailabilityOrCatalogFilter() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("data-cl-filter-menu=\"supplier\"", "name=\"q2\"", "Supplier: AB");
+        assertThat(html).doesNotContain("data-cl-filter-menu=\"stock\"", "data-cl-filter-menu=\"catalog\"", "Availability");
     }
 
     @Test
@@ -63,16 +73,6 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).contains("In catalog", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
         assertThat(html).doesNotContain("data-ean=\"5901000000001\"");
-    }
-
-    @Test
-    void plusOneNamesEveryMatchingCatalogCategoryForMouseAndScreenReader() {
-        // when
-        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
-
-        // then
-        assertThat(html).contains("title=\"Fits: Podzespoły › Karta graficzna · Sklep B2B › Karty\"");
-        assertThat(html).containsPattern("\\+1</span>\\s*<span class=\"cl-visually-hidden\">Fits: Podzespoły › Karta graficzna · Sklep B2B › Karty</span>");
     }
 
     @Test
@@ -174,19 +174,17 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void catalogAndCategoryNamesAreEscapedInTheTooltips() {
+    void catalogAndCategoryNamesAreEscapedInThePillTooltip() {
         // given
         CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                "Komponenty komputerowe › Karty graficzne", "<b>x</b> › Fan", 1, false,
-                "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                List.of("<b>x</b> › Fan", "Sklep › <b>y</b>"), List.of("<b>x</b> › Fan"), true);
+                "Komponenty komputerowe › Karty graficzne", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
+                List.of("<b>x</b> › Fan", "Sklep › <b>y</b>"), true);
 
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
 
         // then
-        assertThat(html).contains("title=\"Fits: &lt;b&gt;x&lt;/b&gt; › Fan · Sklep › &lt;b&gt;y&lt;/b&gt;\"",
-                "title=\"In catalog: &lt;b&gt;x&lt;/b&gt; › Fan\"");
+        assertThat(html).contains("title=\"In catalog: &lt;b&gt;x&lt;/b&gt; › Fan · Sklep › &lt;b&gt;y&lt;/b&gt;\"");
         assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>");
     }
 
@@ -208,9 +206,9 @@ class InventoryBrowseRenderingTest {
 
     private static CategoryLine line(List<String> inCatalogLabels, boolean addableElsewhere) {
         return new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                "Komponenty komputerowe › Karty graficzne", "Podzespoły › Karta graficzna", 1, false,
+                "Komponenty komputerowe › Karty graficzne",
                 inCatalogLabels.isEmpty() ? null : "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty"), inCatalogLabels, addableElsewhere);
+                inCatalogLabels, addableElsewhere);
     }
 
     private static BrowsePage.RowView row(CategoryLine line, long warehouseQty) {
@@ -226,11 +224,8 @@ class InventoryBrowseRenderingTest {
                 List.of(new BrowsePage.NavItem("Karty graficzne", null, 3, "/dashboard/inventory?cat=11", true)), true,
                 query.isStart() ? List.of(new BrowsePage.Tile("Komponenty komputerowe", null, 5, "Karty graficzne",
                         "/dashboard/inventory?cat=10")) : List.of(),
-                List.of(new BrowsePage.MenuOption("AB", "AB", null, 3, false, null)),
-                List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.stock.ALL", 0, false, "/dashboard/inventory"),
-                        new BrowsePage.MenuOption("IN_STOCK", null, "inventory.browse.stock.IN_STOCK", 0, true, "/dashboard/inventory?stock=in-stock")),
-                admin ? List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.catalog.ALL", 0, true, "/dashboard/inventory")) : List.of(),
-                List.of(new BrowsePage.Chip("inventory.browse.chip.stock", null, "inventory.browse.stock.IN_STOCK", "/dashboard/inventory")),
+                List.of(new BrowsePage.MenuOption("AB", "AB", 3, true)),
+                List.of(new BrowsePage.Chip("inventory.browse.chip.supplier", "AB", "/dashboard/inventory")),
                 "/dashboard/inventory", rows, rows.size(), false,
                 Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?page=" + p),
                 Map.of("NAME", none, "COST", none, "QTY", none), query.href());

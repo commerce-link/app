@@ -37,7 +37,7 @@ class ProductCategoryViewFactoryTest {
     }
 
     @Test
-    void foundProductGetsItsPimPathCatalogLineAndTheAddAction() {
+    void foundProductGetsItsPimPathAndTheAddAction() {
         // given
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy("5901000000001", "GPU-1", "Gigabyte", "RTX 4060", "Karty", 1,
                 null, null, null, "11"));
@@ -49,7 +49,7 @@ class ProductCategoryViewFactoryTest {
         // then
         assertThat(view).isPresent();
         assertThat(view.get().line().pimAncestors()).containsExactly("Komponenty komputerowe");
-        assertThat(view.get().line().catalogLabel()).isEqualTo("Podzespoły › Karta graficzna");
+        assertThat(view.get().line().inCatalog()).isFalse();
         assertThat(view.get().canAdd()).isTrue();
         assertThat(view.get().addHref()).isEqualTo("/dashboard/inventory?open=add&ean=5901000000001");
     }
@@ -64,7 +64,7 @@ class ProductCategoryViewFactoryTest {
     }
 
     @Test
-    void nonAdminSeesTheCategoryButNoActionAndNoCatalogLine() {
+    void nonAdminSeesTheCategoryButNoActionAndNoCatalogState() {
         // given
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy("5901000000001", "GPU-1", "Gigabyte", "RTX 4060", "Karty", 1,
                 null, null, null, "11"));
@@ -75,7 +75,8 @@ class ProductCategoryViewFactoryTest {
 
         // then
         assertThat(view.canAdd()).isFalse();
-        assertThat(view.line().catalogLabel()).isNull();
+        assertThat(view.line().inCatalog()).isFalse();
+        assertThat(view.line().pimLeaf()).isEqualTo("Karty graficzne");
     }
 
     @Test

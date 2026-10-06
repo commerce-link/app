@@ -13,12 +13,11 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * The "Kategoria" cell: the PIM path (ancestors grey, leaf bold) and, for an admin, the store-catalog categories the
- * product fits and the ones it already sits in. An id the PIM tree does not know shows the taxonomy's category text
- * instead of an empty cell.
+ * The "Kategoria w PIM" cell: the PIM path (ancestors grey, leaf bold); an id the PIM tree does not know shows the
+ * taxonomy's category text instead of an empty cell. For an admin it also carries where the product already sits in the
+ * store's catalog and whether a manual category its PIM category matches still lacks it, for the action column.
  */
-public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, String catalogLabel,
-                           int catalogMore, boolean catalogUnmatched, String inCatalogHref, List<String> catalogLabels,
+public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, String inCatalogHref,
                            List<String> inCatalogLabels, boolean addableElsewhere) {
 
     private static final String SEPARATOR = " \u203a ";
@@ -34,9 +33,8 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
         String leaf = path.isEmpty() ? categoryText : path.get(path.size() - 1);
         String fullPath = path.isEmpty() ? categoryText : String.join(SEPARATOR, path);
         if (placement == null) {
-            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, null, 0, false, null, List.of(), List.of(), false);
+            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, null, List.of(), false);
         }
-        List<CatalogPlacement.Target> targets = placement.targetsFor(categoryId);
         List<CatalogPlacement.Existing> existing = placement.existing(key);
         String inCatalogHref = existing.stream().findFirst()
                 .map(entry -> CatalogPaths.product(entry.catalogId(), entry.categoryId(), entry.productId()))
@@ -47,11 +45,8 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
                 .map(entry -> label(placement, entry))
                 .toList();
         boolean addableElsewhere = !existing.isEmpty()
-                && targets.stream().anyMatch(target -> !placement.isIn(target.categoryId(), key));
-        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath,
-                targets.isEmpty() ? null : targets.get(0).label(), Math.max(0, targets.size() - 1), targets.isEmpty(),
-                inCatalogHref, targets.stream().map(CatalogPlacement.Target::label).toList(), inCatalogLabels,
-                addableElsewhere);
+                && placement.targetsFor(categoryId).stream().anyMatch(target -> !placement.isIn(target.categoryId(), key));
+        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogHref, inCatalogLabels, addableElsewhere);
     }
 
     private static String label(CatalogPlacement.StorePlacement placement, CatalogPlacement.Existing entry) {

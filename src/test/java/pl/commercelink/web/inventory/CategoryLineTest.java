@@ -24,7 +24,7 @@ class CategoryLineTest {
     private final PimCategoryTree tree = tree();
 
     @Test
-    void catalogLineListsEveryMatchingCategory() {
+    void productOutsideTheCatalogShowsThePimPathAndNothingCatalogRelated() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN, ACCESSORIES, OTHER), List.of());
 
@@ -32,9 +32,10 @@ class CategoryLineTest {
         CategoryLine line = CategoryLine.of(tree, placement, "11", "Wentylatory", KEY, false);
 
         // then
-        assertThat(line.catalogLabel()).isEqualTo("Local Catalog › Fan");
-        assertThat(line.catalogMore()).isEqualTo(1);
-        assertThat(line.catalogLabels()).containsExactly("Local Catalog › Fan", "Local Catalog › Akcesoria");
+        assertThat(line.pimAncestors()).containsExactly("Chłodzenie");
+        assertThat(line.pimLeaf()).isEqualTo("Wentylatory");
+        assertThat(line.pimFullPath()).isEqualTo("Chłodzenie › Wentylatory");
+        assertThat(line.inCatalog()).isFalse();
         assertThat(line.inCatalogLabels()).isEmpty();
         assertThat(line.addableElsewhere()).isFalse();
     }
@@ -113,7 +114,6 @@ class CategoryLineTest {
         CategoryLine line = CategoryLine.of(tree, placement, "11", "Wentylatory", KEY, false);
 
         // then
-        assertThat(line.catalogUnmatched()).isTrue();
         assertThat(line.inCatalogLabels()).containsExactly("Sklep B2B › Inne");
         assertThat(line.addableElsewhere()).isFalse();
     }
@@ -124,7 +124,6 @@ class CategoryLineTest {
         CategoryLine line = CategoryLine.of(tree, null, "11", "Wentylatory", KEY, false);
 
         // then
-        assertThat(line.catalogLabels()).isEmpty();
         assertThat(line.inCatalogLabels()).isEmpty();
         assertThat(line.addableElsewhere()).isFalse();
         assertThat(line.inCatalog()).isFalse();

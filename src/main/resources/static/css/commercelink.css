@@ -9733,32 +9733,6 @@ a.cl-link-button:hover {
     font-weight: 600;
 }
 
-.cl-page .cl-category-catalog {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    margin-top: 4px;
-    font-size: 13px;
-    line-height: 1.35;
-    color: var(--cl-ink-2);
-}
-
-.cl-page .cl-category-catalog :is(i, svg) {
-    flex: none;
-    color: var(--cl-ink-3);
-    font-size: 11px;
-}
-
-.cl-page .cl-category-catalog .cl-more {
-    color: var(--cl-ink-3);
-    white-space: nowrap;
-}
-
-.cl-page .cl-category-catalog.is-none {
-    color: var(--cl-ink-3);
-    font-style: italic;
-}
-
 .cl-page .cl-table .cl-category-cell {
     min-width: 14rem;
     white-space: normal;

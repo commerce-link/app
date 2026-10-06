@@ -7,8 +7,8 @@ public record BrowseRow(InventoryKey key, String name, String brand, String ean,
 
     /**
      * The codes a catalog product of this row can carry: the group's and the ones the row shows and adds by. They differ
-     * when a store's own offer joined the group by one shared code and is the cheapest. Built on demand: for the rows of
-     * a page, and for every candidate only while the "Katalog" filter is on.
+     * when a store's own offer joined the group by one shared code and is the cheapest. Built on demand, for the rows of
+     * a page.
      */
     public InventoryKey catalogKey() {
         InventoryKey catalogKey = new InventoryKey();

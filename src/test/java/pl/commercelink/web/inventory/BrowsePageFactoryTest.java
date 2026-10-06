@@ -127,7 +127,7 @@ class BrowsePageFactoryTest {
     }
 
     @Test
-    void rowShowsPimPathCatalogLineAndInCatalogLinkForAdmin() {
+    void rowShowsPimPathAndWhereTheProductSitsInTheCatalogForAdmin() {
         // given
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
                 row("5901000000001", "11", "Karty graficzne")), 1, false));
@@ -139,10 +139,7 @@ class BrowsePageFactoryTest {
         BrowsePage.RowView row = page.rows().get(0);
         assertThat(row.category().pimAncestors()).containsExactly("Komponenty komputerowe");
         assertThat(row.category().pimLeaf()).isEqualTo("Karty graficzne");
-        assertThat(row.category().catalogLabel()).isEqualTo("Podzespoły › Karta graficzna");
-        assertThat(row.category().catalogMore()).isEqualTo(1);
         assertThat(row.category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
-        assertThat(row.category().catalogLabels()).containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
         assertThat(row.category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
         assertThat(row.category().addableElsewhere()).isTrue();
         assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
@@ -161,11 +158,10 @@ class BrowsePageFactoryTest {
         // then
         assertThat(page.rows().get(0).category().pimAncestors()).isEmpty();
         assertThat(page.rows().get(0).category().pimLeaf()).isEqualTo("Zasilacze awaryjne");
-        assertThat(page.rows().get(0).category().catalogUnmatched()).isTrue();
     }
 
     @Test
-    void nonAdminGetsNoCatalogLineAndNoPlacementLookup() {
+    void nonAdminGetsNoCatalogStateAndNoPlacementLookup() {
         // given
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
                 row("5901000000001", "11", "Karty graficzne")), 1, false));
@@ -174,27 +170,15 @@ class BrowsePageFactoryTest {
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), false, false);
 
         // then
-        assertThat(page.rows().get(0).category().catalogLabel()).isNull();
-        assertThat(page.rows().get(0).category().catalogUnmatched()).isFalse();
+        assertThat(page.rows().get(0).inCatalog()).isFalse();
+        assertThat(page.rows().get(0).category().addableElsewhere()).isFalse();
         verifyNoInteractions(catalogPlacement);
-    }
-
-    @Test
-    void catalogFilterOutKeepsOnlyProductsOutsideTheCatalogs() {
-        // when
-        factory.build(STORE_ID, BrowseQuery.start().withCategory("11").withCatalog(BrowseQuery.CatalogFilter.OUT), true, false);
-
-        // then
-        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
-        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
-        assertThat(criteria.getValue().rowFilter().test(row("5901000000001", "11", "x"))).isFalse();
-        assertThat(criteria.getValue().rowFilter().test(row("5909999999999", "11", "x"))).isTrue();
     }
 
     /**
      * A store's own offer joins the global product it matches by any one code, and when it is the cheapest the row shows
-     * and adds it by that offer's EAN. A product added by those codes is in the catalog: the row and the catalog filter
-     * must say so, although the group itself is keyed by the other supplier's codes.
+     * and adds it by that offer's EAN. A product added by those codes is in the catalog: the row must say so, although the
+     * group itself is keyed by the other supplier's codes.
      */
     @Test
     void productAddedByTheCodesTheRowShowsCountsAsInTheCatalog() {
@@ -204,14 +188,11 @@ class BrowsePageFactoryTest {
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(merged), 1, false));
 
         // when
-        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11").withCatalog(BrowseQuery.CatalogFilter.OUT), true, false);
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
 
         // then
         assertThat(page.rows().get(0).category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
         assertThat(page.rows().get(0).category().addableElsewhere()).isTrue();
-        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
-        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
-        assertThat(criteria.getValue().rowFilter().test(merged)).isFalse();
     }
 
     @Test

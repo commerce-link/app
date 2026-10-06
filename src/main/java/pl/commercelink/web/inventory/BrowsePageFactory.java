@@ -28,7 +28,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Component
@@ -61,7 +60,7 @@ public class BrowsePageFactory {
         Pagination pagination = Pagination.of(1, 0, BrowseQuery.PAGE_SIZE, page -> query.withPage(page).href());
         if (!query.isStart() && !query.textTooShort() && summary.total() > 0) {
             Set<String> categoryIds = categoryIds(category, unknownIds);
-            BrowseCriteria criteria = query.toCriteria(categoryIds).withRowFilter(catalogFilter(query, placement));
+            BrowseCriteria criteria = query.toCriteria(categoryIds);
             // A bookmarked page past the end comes back as the last page, and Pagination clamps to the same page.
             BrowseResult result = inventoryBrowse.browse(storeId, criteria);
             pagination = Pagination.of(query.page(), result.total(), BrowseQuery.PAGE_SIZE,
@@ -75,8 +74,7 @@ public class BrowsePageFactory {
 
         return new BrowsePage(query, admin, superAdmin, summary.total() == 0 && !superAdmin, query.textTooShort(),
                 title(category), crumbs(category), subnav(category, counts, query), isSiblings(category),
-                tiles(query, counts), supplierOptions(summary, query, labels), stockOptions(query),
-                withCatalog ? catalogOptions(query) : List.of(), chips(query, labels), query.cleared().href(),
+                tiles(query, counts), supplierOptions(summary, query, labels), chips(query, labels), query.cleared().href(),
                 rows, total, truncated, pagination, sortHeaders(query), query.href());
     }
 
@@ -97,18 +95,6 @@ public class BrowsePageFactory {
         return byCategory.keySet().stream()
                 .filter(id -> !BrowseIndex.UNASSIGNED.equals(id) && tree.find(id).isEmpty())
                 .collect(Collectors.toUnmodifiableSet());
-    }
-
-    private static Predicate<BrowseRow> catalogFilter(BrowseQuery query, CatalogPlacement.StorePlacement placement) {
-        if (placement == null) {
-            return row -> true;
-        }
-        return switch (query.catalog()) {
-            case ALL -> row -> true;
-            case IN -> row -> !placement.existing(row.catalogKey()).isEmpty();
-            case OUT -> row -> placement.existing(row.catalogKey()).isEmpty();
-            case UNMATCHED -> row -> placement.targetsFor(row.categoryId()).isEmpty();
-        };
     }
 
     private BrowsePage.RowView rowView(BrowseRow row, BrowseQuery query, CatalogPlacement.StorePlacement placement,
@@ -218,46 +204,20 @@ public class BrowsePageFactory {
                     String label = labels.of(entry.getKey());
                     // Two connections under one label would be two identical checkboxes; the identity tells them apart.
                     String shown = labelUses.get(label) > 1 ? label + " (" + entry.getKey() + ")" : label;
-                    return new BrowsePage.MenuOption(entry.getKey(), shown, null, entry.getValue(),
-                            query.suppliers().contains(entry.getKey()), null);
+                    return new BrowsePage.MenuOption(entry.getKey(), shown, entry.getValue(),
+                            query.suppliers().contains(entry.getKey()));
                 })
                 .sorted(Comparator.comparing(BrowsePage.MenuOption::label, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
-    private static List<BrowsePage.MenuOption> stockOptions(BrowseQuery query) {
-        List<BrowsePage.MenuOption> options = new ArrayList<>();
-        for (BrowseCriteria.Stock stock : BrowseCriteria.Stock.values()) {
-            options.add(new BrowsePage.MenuOption(stock.name(), null, "inventory.browse.stock." + stock.name(), 0,
-                    query.stock() == stock, query.withStock(stock).href()));
-        }
-        return options;
-    }
-
-    private static List<BrowsePage.MenuOption> catalogOptions(BrowseQuery query) {
-        List<BrowsePage.MenuOption> options = new ArrayList<>();
-        for (BrowseQuery.CatalogFilter filter : BrowseQuery.CatalogFilter.values()) {
-            options.add(new BrowsePage.MenuOption(filter.name(), null, "inventory.browse.catalog." + filter.name(), 0,
-                    query.catalog() == filter, query.withCatalog(filter).href()));
-        }
-        return options;
-    }
-
     private static List<BrowsePage.Chip> chips(BrowseQuery query, SupplierLabelMap labels) {
         List<BrowsePage.Chip> chips = new ArrayList<>();
         if (query.q2() != null) {
-            chips.add(new BrowsePage.Chip("inventory.browse.chip.text", query.q2(), null, query.withoutText().href()));
+            chips.add(new BrowsePage.Chip("inventory.browse.chip.text", query.q2(), query.withoutText().href()));
         }
         query.suppliers().forEach(supplier -> chips.add(new BrowsePage.Chip("inventory.browse.chip.supplier",
-                labels.of(supplier), null, query.withoutSupplier(supplier).href())));
-        if (query.stock() != BrowseCriteria.Stock.ALL) {
-            chips.add(new BrowsePage.Chip("inventory.browse.chip.stock", null, "inventory.browse.stock." + query.stock().name(),
-                    query.withStock(BrowseCriteria.Stock.ALL).href()));
-        }
-        if (query.catalog() != BrowseQuery.CatalogFilter.ALL) {
-            chips.add(new BrowsePage.Chip("inventory.browse.chip.catalog", null, "inventory.browse.catalog." + query.catalog().name(),
-                    query.withCatalog(BrowseQuery.CatalogFilter.ALL).href()));
-        }
+                labels.of(supplier), query.withoutSupplier(supplier).href())));
         return chips;
     }
 
