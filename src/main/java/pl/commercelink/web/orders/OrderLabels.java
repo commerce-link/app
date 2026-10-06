@@ -7,14 +7,20 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.api.ItemCondition;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Function;
 
 /** Message keys and pill tones of the enums shown on the order screens: templates read enum text and tone only through here. */
@@ -25,6 +31,8 @@ public final class OrderLabels {
     public static final String INFO = "is-info";
     public static final String BAD = "is-bad";
     public static final String NEUTRAL = "is-neutral";
+
+    private static final Object[] NO_ARGS = new Object[0];
 
     /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
     static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";
@@ -194,5 +202,62 @@ public final class OrderLabels {
      */
     public static String cancellationReasonKey(String error) {
         return CANCEL_NOT_RECEIVED.equals(error) ? "shipment.cancellation.reason.notReceived" : null;
+    }
+
+    /**
+     * The line under a shipment created through an integration: being created, failed, waiting for a pickup, pickup
+     * being ordered, ordered, handed in at a point, pickup failed; null for one typed in by hand. A stored reason of our
+     * own (errorKey) is the line itself, resolved in the viewer's language; the provider's words (error) are its
+     * argument, shown as they came.
+     */
+    public static ShipmentState shipmentState(Shipment shipment, Locale locale) {
+        if (shipment.isCreating()) {
+            return new ShipmentState("order.shipments.state.creating", NO_ARGS, INFO, true);
+        }
+        if (shipment.creationFailed()) {
+            ShipmentCreationState creation = shipment.getCreation();
+            return failure("order.shipments.state.creation.failed", creation.getError(), creation.getErrorKey());
+        }
+        ShipmentPickup pickup = shipment.getPickup();
+        if (shipment.getProvider() == null || pickup == null || pickup.getStatus() == null) {
+            return null;
+        }
+        return switch (pickup.getStatus()) {
+            case AWAITING -> new ShipmentState("order.shipments.state.pickup.awaiting", NO_ARGS, NEUTRAL, false);
+            case PENDING -> new ShipmentState("order.shipments.state.pickup.pending", NO_ARGS, INFO, true);
+            case ORDERED -> new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
+                    pickupDay(pickup.getDate(), locale), pickupHour(pickup.getFrom()), pickupHour(pickup.getTo())}, OK, false);
+            case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);
+            case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getError(), pickup.getErrorKey());
+        };
+    }
+
+    private static ShipmentState failure(String key, String error, String errorKey) {
+        return errorKey != null ? new ShipmentState(errorKey, NO_ARGS, WARN, false)
+                : new ShipmentState(key, new Object[]{error == null ? "" : error}, WARN, false);
+    }
+
+    // the day as the pickup page offered it ("czw. 8 paź"); a value that does not parse is shown as stored
+    private static String pickupDay(String date, Locale locale) {
+        try {
+            return DateTimeFormatter.ofPattern("EEE d MMM", locale).format(LocalDate.parse(date));
+        } catch (RuntimeException e) {
+            return date;
+        }
+    }
+
+    private static String pickupHour(String hour) {
+        try {
+            return DateTimeFormatter.ofPattern("H:mm").format(LocalTime.parse(hour));
+        } catch (RuntimeException e) {
+            return hour;
+        }
+    }
+
+    /**
+     * key with args: the message of the line (render with #messages.msgWithParams: a message expression would pass
+     * the array as one argument). inProgress: the line waits for the provider, shown with a spinner.
+     */
+    public record ShipmentState(String key, Object[] args, String tone, boolean inProgress) {
     }
 }

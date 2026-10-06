@@ -185,15 +185,16 @@ class OrdersScriptContractTest {
     }
 
     @Test
-    void theShipmentsCardPollsTheCancellationStateAndReloadsOnceFurgonetkaAnswers() throws Exception {
+    void theShipmentsCardPollsTheShipmentsStateAndReloadsOnceTheProviderAnswers() throws Exception {
         // given
         String script = read("src/main/resources/static/js/shipment-cancellation.js");
 
-        // then: every 5 s for about 2 minutes, a reload only once the answer is final and no dialog, open menu or
-        // row selection would be lost; a lost request is not an answer
+        // then: every 5 s for about 3 minutes (a creation is checked for up to ~2.5 minutes), a reload only once the
+        // answer is final and no dialog, open menu, RMA modal or row selection would be lost; a lost request is not an
+        // answer
         assertThat(script).contains("'use strict'").contains("[data-cl-cancellation-poll]")
-                .contains("5000").contains("120000").contains("body.inProgress === false")
-                .contains("window.location.reload()").contains("dialog[open]")
+                .contains("5000").contains("180000").contains("body.inProgress === false")
+                .contains("window.location.reload()").contains("dialog[open]").contains(".modal.is-active")
                 .contains("details.cl-menu[open]").contains("[data-cl-select-row]:checked").contains("'X-Requested-With': 'fetch'")
                 .contains("opaqueredirect")
                 .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("setInterval");

@@ -29,6 +29,8 @@ import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
@@ -52,7 +54,9 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Locale;
@@ -61,6 +65,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -1994,5 +1999,235 @@ class OrderPageModelFactoryTest {
             assertThat(messageSource.getMessage(key, null, Locale.ENGLISH)).as(key).doesNotContain("refresh");
         }
         assertThat(messageSource.getMessage("order.page.cancel.locked.receiptAttaching", null, PL)).doesNotContain("odśwież");
+    }
+
+    private static Shipment furgonetkaPackage() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("DPD");
+        shipment.setPickUpAddressId("addr-1");
+        shipment.setExternalId("21480003");
+        shipment.setTrackingNo("0000123");
+        shipment.setShippedAt(LocalDateTime.now().minusHours(1));
+        shipment.setPickup(ShipmentPickup.awaiting());
+        return shipment;
+    }
+
+    private static Shipment creating() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("DPD");
+        shipment.setPickUpAddressId("addr-1");
+        shipment.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        return shipment;
+    }
+
+    private static Order orderWith(Shipment... shipments) {
+        Order order = order(OrderStatus.Shipping);
+        order.setShipments(new java.util.ArrayList<>(List.of(shipments)));
+        return order;
+    }
+
+    @Test
+    void aShipmentBeingCreatedReadsAsCreatingAndThePagePollsWithoutEditOrRemoval() {
+        // given
+        Order order = orderWith(creating());
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("order.shipments.state.creating");
+        assertThat(row.stateTone()).isEqualTo("is-info");
+        assertThat(row.stateInProgress()).isTrue();
+        assertThat(card.cancellationPollHref())
+                .isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state");
+        assertThat(row.editHref()).isNull();
+        assertThat(row.removeHref()).isNull();
+        assertThat(row.removeReasonKey()).isEqualTo("order.shipments.remove.locked.creating");
+        assertThat(row.labelHref()).isNull();
+        assertThat(row.retryHref()).isNull();
+    }
+
+    @Test
+    void aFailedCreationShowsTheProviderReasonWithRetryAndRemove() {
+        // given
+        Shipment failed = creating();
+        failed.setCreation(failed.getCreation().failed("Brak środków na koncie"));
+        Order order = orderWith(failed);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("order.shipments.state.creation.failed");
+        assertThat(row.stateArgs()).containsExactly("Brak środków na koncie");
+        assertThat(row.stateTone()).isEqualTo("is-warn");
+        assertThat(row.stateInProgress()).isFalse();
+        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping");
+        assertThat(row.removeHref()).startsWith("/dashboard/orders/" + order.getOrderId() + "/shipments/0/remove");
+        assertThat(row.editHref()).isNull();
+        assertThat(card.cancellationPollHref()).isNull();
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnReasonShowsThatReasonInTheViewersLanguage() {
+        // given
+        Shipment failed = creating();
+        failed.setCreation(failed.getCreation().failedWithKey("shipping.creation.unconfirmed"));
+
+        // when
+        OrderPageModel.ShipmentRow row = factory.build(orderWith(failed), List.of(), ADMIN, PL).shipments().rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("shipping.creation.unconfirmed");
+        assertThat(row.stateArgs()).isEmpty();
+    }
+
+    @Test
+    void aPackageWaitingForPickupOffersItsLabelAndTheCardOffersThePickupPage() {
+        // given
+        Order order = orderWith(furgonetkaPackage());
+        when(shippingService.supportsLabels(any(), eq("furgonetka"))).thenReturn(true);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("order.shipments.state.pickup.awaiting");
+        assertThat(row.stateTone()).isEqualTo("is-neutral");
+        assertThat(row.labelHref())
+                .isEqualTo("/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId());
+        assertThat(card.pickupHref()).isEqualTo("/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&back=/dashboard/orders/"
+                + order.getOrderId());
+        assertThat(row.editHref()).isNotNull();
+    }
+
+    @Test
+    void noLabelLinkWhenTheIntegrationCannotHandOutLabels() {
+        // given
+        when(shippingService.supportsLabels(any(), any())).thenReturn(false);
+
+        // when
+        OrderPageModel.ShipmentRow row = factory.build(orderWith(furgonetkaPackage()), List.of(), ADMIN, PL)
+                .shipments().rows().get(0);
+
+        // then
+        assertThat(row.labelHref()).isNull();
+    }
+
+    @Test
+    void anOrderedPickupShowsItsDayAndHoursAndNeedsNoPickupButton() {
+        // given
+        Shipment ordered = furgonetkaPackage();
+        ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("P-1"));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(ordered), List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.ordered");
+        assertThat(card.rows().get(0).stateArgs()).containsExactly("czw. 8 paź", "9:00", "17:00");
+        assertThat(card.rows().get(0).stateTone()).isEqualTo("is-ok");
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void aPickupBeingOrderedReadsAsInProgressAndThePagePolls() {
+        // given
+        Shipment pending = furgonetkaPackage();
+        pending.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)));
+        Order order = orderWith(pending);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.pending");
+        assertThat(card.rows().get(0).stateInProgress()).isTrue();
+        assertThat(card.cancellationPollHref()).isNotNull();
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void aFailedPickupShowsTheReasonAndCanBeOrderedAgain() {
+        // given
+        Shipment failed = furgonetkaPackage();
+        failed.setPickup(ShipmentPickup.awaiting().failed("Brak kuriera w rejonie"));
+        Order order = orderWith(failed);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.failed");
+        assertThat(card.rows().get(0).stateArgs()).containsExactly("Brak kuriera w rejonie");
+        assertThat(card.pickupHref()).isNotNull();
+    }
+
+    @Test
+    void aPackageHandedInAtAPointSaysSo() {
+        // given
+        Shipment point = furgonetkaPackage();
+        point.setPickup(ShipmentPickup.notRequired());
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(point), List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.point");
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void aShipmentTypedInByHandHasNoStateLabelOrPickup() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", null);
+        when(shippingService.supportsLabels(any(), any())).thenReturn(true);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isNull();
+        assertThat(card.rows().get(0).labelHref()).isNull();
+        assertThat(card.rows().get(0).retryHref()).isNull();
+        assertThat(card.pickupHref()).isNull();
+        assertThat(card.cancellationPollHref()).isNull();
+    }
+
+    @Test
+    void aReadOnlyPageShowsTheStateWithoutActions() {
+        // given
+        when(shippingService.supportsLabels(any(), any())).thenReturn(true);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(furgonetkaPackage()), List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.awaiting");
+        assertThat(card.rows().get(0).labelHref()).isNull();
+        assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void theCourierActionIsHiddenWhileAShipmentIsBeingCreated() {
+        // given: a data-less row next to the one being created would otherwise still offer it
+        Order order = assembledOrderWithOneEmptyShipment();
+        order.getShipments().get(0).setShippedAt(null);
+        order.addShipment(creating());
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), viewer(), PL);
+
+        // then
+        assertThat(page.header().primaryAction()).isNull();
     }
 }

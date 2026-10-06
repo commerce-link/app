@@ -1,0 +1,75 @@
+package pl.commercelink.orders.rma;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingService;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.orders.OrderLabels;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Component
+@RequiredArgsConstructor
+public class RmaShipmentsViewFactory {
+
+    private final ShippingService shippingService;
+    private final StoresRepository storesRepository;
+
+    /** closed: a closed RMA keeps its record, only the label stays downloadable. */
+    public RmaShipmentsView build(RMA rma, boolean closed, Locale locale) {
+        List<Shipment> shipments = rma.getShipments() == null ? List.of() : rma.getShipments();
+        Store store = shipments.stream().anyMatch(RmaShipmentsViewFactory::hasPackage)
+                ? storesRepository.findById(rma.getStoreId()) : null;
+        String details = "/dashboard/rma/" + rma.getRmaId();
+        Set<String> labelProviders = shipments.stream().filter(RmaShipmentsViewFactory::hasPackage)
+                .map(Shipment::getProvider).distinct()
+                .filter(provider -> shippingService.supportsLabels(store, provider))
+                .collect(Collectors.toSet());
+        List<RmaShipmentsView.Row> rows = shipments.stream().map(s -> {
+            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+            return new RmaShipmentsView.Row(s,
+                    state == null ? null : state.key(), state == null ? null : state.args(),
+                    state == null ? null : state.tone(),
+                    hasPackage(s) && labelProviders.contains(s.getProvider())
+                            ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
+                    !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#rmaItemsForm" : null,
+                    !closed && s.creationFailed() ? removeAction(details, s) : null,
+                    !closed && isCustomerReturn(s) && s.awaitsPickup() && s.getExternalId() != null
+                            ? pickupRetryAction(details, s) : null);
+        }).toList();
+        LocalDateTime now = LocalDateTime.now();
+        String pollHref = shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now)) ? details + "/shipments/state" : null;
+        return new RmaShipmentsView(rows, closed ? null : ShipmentLinks.pickup(shipments, details), pollHref);
+    }
+
+    private static boolean hasPackage(Shipment s) {
+        return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
+    }
+
+    /**
+     * The customer books a return without choosing a pickup address (the courier comes to the customer), so its
+     * package is never in the store's pickup list: its pickup is ordered again here, not on the pickup page. The
+     * operator cannot book a return on the customer's behalf either, so a failed one has no "Spróbuj ponownie".
+     */
+    static boolean isCustomerReturn(Shipment s) {
+        return s.getProvider() != null && s.getPickUpAddressId() == null;
+    }
+
+    private static String removeAction(String details, Shipment s) {
+        return UriComponentsBuilder.fromPath(details + "/shipments/creations/{commandId}/remove")
+                .buildAndExpand(s.getCreation().getCommandId()).encode().toUriString();
+    }
+
+    private static String pickupRetryAction(String details, Shipment s) {
+        return UriComponentsBuilder.fromPath(details + "/shipments/{externalId}/pickup")
+                .buildAndExpand(s.getExternalId()).encode().toUriString();
+    }
+}

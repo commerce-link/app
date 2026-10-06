@@ -1,0 +1,81 @@
+package pl.commercelink.shipping;
+
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.shipping.api.Label;
+import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+
+/**
+ * "Pobierz etykietę": the label file through the store's own integration account, or back with the reason. A package
+ * of another integration than the store's is refused: its label lives on an account the store has no access to.
+ */
+@Slf4j
+@Controller
+@PreAuthorize("!hasRole('SUPER_ADMIN')")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+public class ShipmentLabelController {
+
+    private static final String UNAVAILABLE = "shipping.label.unavailable";
+
+    private final StoresRepository storesRepository;
+    private final ShippingService shippingService;
+    private final MessageSource messageSource;
+
+    @GetMapping("/dashboard/shipping/labels/{provider}/{externalId}")
+    public Object label(@PathVariable String provider, @PathVariable String externalId,
+                        @RequestParam(required = false) String back, RedirectAttributes redirectAttributes,
+                        Locale locale) {
+        String safeBack = ShipmentPickupController.safeBack(back);
+        Store store = storesRepository.findById(storeId());
+        if (store == null || !provider.equals(shippingService.providerName(store))) {
+            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
+        }
+        ShippingProvider shippingProvider;
+        try {
+            shippingProvider = shippingService.providerFor(store);
+        } catch (ShippingUnavailableException e) {
+            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
+        }
+        if (!shippingProvider.supportsLabels()) {
+            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
+        }
+        try {
+            Label label = shippingProvider.getLabel(externalId);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(label.fileName(), StandardCharsets.UTF_8).build().toString())
+                    .contentType(MediaType.parseMediaType(label.contentType()))
+                    .body(label.content());
+        } catch (RuntimeException e) {
+            log.warn("Label of package {} in store {} could not be downloaded", externalId, storeId(), e);
+            return backWith(ProviderErrors.describe(e), safeBack, redirectAttributes);
+        }
+    }
+
+    private static String backWith(String message, String back, RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("errorMessage", message);
+        return "redirect:" + back;
+    }
+
+    String storeId() {
+        return CustomSecurityContext.getStoreId();
+    }
+}

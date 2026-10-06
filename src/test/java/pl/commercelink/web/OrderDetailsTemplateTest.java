@@ -25,6 +25,8 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -125,10 +127,11 @@ class OrderDetailsTemplateTest {
         return factory;
     }
 
-    /** A store with a courier account: the page offers "Zamów kuriera" where a shipment waits for it. */
+    /** A store with a courier account: the page offers "Nadaj przesyłkę" where a shipment waits for it. */
     static ShippingService courierAvailable() {
         ShippingService shipping = mock(ShippingService.class);
         when(shipping.isAvailable(any())).thenReturn(true);
+        when(shipping.supportsLabels(any(), any())).thenReturn(true);
         return shipping;
     }
 
@@ -676,6 +679,108 @@ class OrderDetailsTemplateTest {
                 .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
                 .doesNotContain("/cancelShipment\"");
         assertThat(html).contains("/js/shipment-cancellation.js");
+    }
+
+    private static Shipment integrationShipment(Order order) {
+        Shipment shipment = order.getShipments().get(0);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("DPD");
+        shipment.setPickUpAddressId("addr-1");
+        return shipment;
+    }
+
+    @Test
+    void aShipmentBeingCreatedShowsTheSpinnerLineAndThePagePolls() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<p class=\"cl-list-desc cl-loading\"><span class=\"cl-spinner\" aria-hidden=\"true\"></span><span>Nadawanie…</span></p>")
+                .doesNotContain(">Edytuj<")
+                .contains("Przesyłka jest nadawana — poczekaj na wynik.");
+    }
+
+    @Test
+    void aFailedCreationShowsTheProviderReasonWithRetryAndRemoveButNoEdit() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment failed = integrationShipment(order);
+        failed.setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()).failed("Brak środków na koncie"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the array of arguments is spread, never printed as one value
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków na koncie</span>")
+                .doesNotContain("[Ljava")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping\"")
+                .contains(">Spróbuj ponownie</a>")
+                .contains("/shipments/0/remove")
+                .doesNotContain(">Edytuj<")
+                .doesNotContain("data-cl-cancellation-poll");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnReasonShowsThatSentence() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.unconfirmed"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Furgonetka nie potwierdziła nadania — sprawdź "
+                + "przesyłkę w jej panelu, zanim nadasz ponownie.</span>");
+    }
+
+    @Test
+    void aPackageWaitingForPickupOffersItsLabelAndThePickupPage() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-neutral\">Czeka na odbiór</span>")
+                .contains("href=\"/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&amp;back=/dashboard/orders/"
+                        + order.getOrderId() + "\"")
+                .contains("<span>Zamów odbiór</span>")
+                .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId() + "\"")
+                .contains("aria-label=\"Pobierz etykietę przesyłki 1\"")
+                .contains(">Edytuj<");
+    }
+
+    @Test
+    void anOrderedPickupShowsItsDayAndHours() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.pending("cmd-2", java.time.LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                java.time.LocalTime.of(9, 0), java.time.LocalTime.of(17, 0)).ordered("P-1"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
+                .doesNotContain("Zamów odbiór");
     }
 
     @Test

@@ -8,9 +8,13 @@
        "W realizacji"; removing the only shipment leaves the card empty. The only shipment with nothing but the
        delivery choice (the one the order was created with) reads as no shipment: a greyed row "Sposób dostawy: …",
        "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń".
-       While a courier cancellation is in progress the card carries data-cl-cancellation-poll: shipment-cancellation.js
-       asks it every few seconds and reloads the page once Furgonetka answers; without JavaScript the pill says what is
-       going on and the operator refreshes. */-->
+       While a command of a shipment waits for the provider (a courier cancellation, a creation, a pickup order) the
+       card carries data-cl-cancellation-poll: shipment-cancellation.js asks it every few seconds and reloads the page
+       once the provider answers; without JavaScript the line says what is going on and the operator refreshes.
+       A shipment created through an integration has a state line under its numbers (OrderLabels#shipmentState):
+       a spinner while it waits for the provider, else a pill. "Zamów odbiór" in the head leads to the pickup page,
+       "Pobierz etykietę" downloads the label, "Spróbuj ponownie" opens the shipping page again after a failed creation;
+       a shipment being created or whose creation failed has no "Edytuj". */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}"
          th:attr="data-cl-cancellation-poll=${shipments.cancellationPollHref() != null} ? @{${shipments.cancellationPollHref()}} : null">
@@ -27,6 +31,10 @@
             <!--/* greyed, still focusable, its reason under the head (design system: link action that cannot run) */-->
             <button th:if="${shipments.cancelCourierLockedKey() != null}" type="button" class="cl-link-button"
                     aria-disabled="true" aria-describedby="shipment-cancel-reason" th:text="#{order.shipments.cancel}"></button>
+            <a th:if="${shipments.pickupHref() != null}" class="cl-button" th:href="@{${shipments.pickupHref()}}">
+                <i class="fas fa-shipping-fast" aria-hidden="true"></i>
+                <span th:text="#{order.shipments.pickup.order}"></span>
+            </a>
             <a class="cl-button" data-cl-dialog-open="shipment-dialog-new"
                th:href="@{/dashboard/orders/{o}/shipments/new(o=${page.orderId()})}">
                 <i class="fas fa-plus" aria-hidden="true"></i>
@@ -83,11 +91,25 @@
                     <span th:if="${s.shippedAt() == null}"
                           th:with="waiting=#{order.shipments.waiting}" th:text="${lead} ? ${#strings.capitalize(waiting)} : ${waiting}"></span>
                 </p>
+                <!--/* the arguments are an array: a message expression would print it as one value, msgWithParams spreads it */-->
+                <div th:if="${s.stateInProgress()}" aria-live="polite" aria-busy="true">
+                    <p class="cl-list-desc cl-loading"><span class="cl-spinner" aria-hidden="true"></span><span
+                            th:text="${#messages.msgWithParams(s.stateKey(), s.stateArgs())}"></span></p>
+                </div>
+                <p th:if="${s.stateKey() != null and !s.stateInProgress()}" class="cl-list-desc">
+                    <span class="cl-status" th:classappend="${s.stateTone()}"
+                          th:text="${#messages.msgWithParams(s.stateKey(), s.stateArgs())}"></span>
+                </p>
                 <p th:if="${s.removeReasonKey() != null}" class="cl-list-desc" th:id="|shipment-${s.number()}-remove-reason|"
                    th:text="#{${s.removeReasonKey()}}"></p>
             </div>
-            <div class="cl-list-actions" th:if="${s.editHref() != null}">
-                <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
+            <div class="cl-list-actions" th:if="${s.hasActions()}">
+                <a th:if="${s.labelHref() != null}" class="cl-link-button" th:href="@{${s.labelHref()}}"
+                   th:attr="aria-label=#{order.shipments.label.for(${s.number()})}"><i class="fas fa-download"
+                   aria-hidden="true"></i> <span th:text="#{order.shipments.label}"></span></a>
+                <a th:if="${s.retryHref() != null}" class="cl-link-button" th:href="@{${s.retryHref()}}"
+                   th:attr="aria-label=#{order.shipments.retry.for(${s.number()})}" th:text="#{order.shipments.retry}"></a>
+                <a th:if="${s.editHref() != null}" class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
                    aria-label=#{order.shipments.edit.for(${s.number()})}" th:text="#{general.edit}"></a>
                 <a th:if="${s.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${s.removeHref()}}"
                    th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},

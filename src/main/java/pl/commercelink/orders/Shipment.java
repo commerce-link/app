@@ -287,6 +287,15 @@ public class Shipment {
         return cancellation != null && cancellation.isUnresolved();
     }
 
+    /**
+     * A command of the provider (creation, pickup order, cancellation) has not been settled yet: its result will change
+     * the shipment within moments, so a page showing it asks again until it does.
+     */
+    @DynamoDBIgnore
+    public boolean awaitsProviderAnswer(LocalDateTime now) {
+        return isCancellationInProgress(now) || isCreating() || (pickup != null && pickup.isPending());
+    }
+
     /** The shipment still waits for the result of that very cancel command. */
     @DynamoDBIgnore
     public boolean isCancellationPendingFor(String commandId) {

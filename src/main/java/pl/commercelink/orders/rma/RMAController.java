@@ -63,6 +63,8 @@ public class RMAController {
 
     private final AwaitingPickupIndex awaitingPickupIndex;
 
+    private final RmaShipmentsViewFactory rmaShipmentsViewFactory;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -176,7 +178,7 @@ public class RMAController {
     }
 
     @GetMapping("/dashboard/rma/{rmaId}")
-    public String showRmaDetail(@PathVariable String rmaId, Model model) {
+    public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
         RMAItemsForm rmaItemsForm = new RMAItemsForm(rmaItems);
@@ -194,6 +196,7 @@ public class RMAController {
         model.addAttribute("rmaItemsForm", rmaItemsForm);
         model.addAttribute("backofficeDomain", appDomain);
         model.addAttribute("isClosed", isClosed(rma));
+        model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
         model.addAttribute("refundDeliveryDefault",

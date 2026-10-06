@@ -66,6 +66,8 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -91,6 +93,7 @@ import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShippingUnavailableException;
+import pl.commercelink.shipping.ShipmentsState;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
@@ -117,6 +120,7 @@ import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.event.EventType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -4587,9 +4591,9 @@ class OrdersControllerTest {
 
             // when
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pending);
-            ResponseEntity<OrdersController.CancellationState> inProgress = ordersController.shipmentCancellationState(ORDER_ID);
+            ResponseEntity<ShipmentsState> inProgress = ordersController.shipmentsState(ORDER_ID);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(settled);
-            ResponseEntity<OrdersController.CancellationState> done = ordersController.shipmentCancellationState(ORDER_ID);
+            ResponseEntity<ShipmentsState> done = ordersController.shipmentsState(ORDER_ID);
 
             // then
             assertThat(inProgress.getBody().inProgress()).isTrue();
@@ -4598,12 +4602,37 @@ class OrdersControllerTest {
         }
 
         @Test
+        void theShipmentsStateAlsoWaitsForACreationAndAPickupOrder() {
+            // given
+            Order creating = order(OrderStatus.Shipping);
+            Shipment placeholder = new Shipment(ShipmentType.Courier);
+            placeholder.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+            creating.setShipments(new ArrayList<>(List.of(placeholder)));
+            Order pickup = order(OrderStatus.Shipping);
+            Shipment parcel = new Shipment(ShipmentType.Courier);
+            parcel.setExternalId("21480003");
+            parcel.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                    LocalTime.of(9, 0), LocalTime.of(17, 0)));
+            pickup.setShipments(new ArrayList<>(List.of(parcel)));
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(creating);
+            boolean whileCreating = ordersController.shipmentsState(ORDER_ID).getBody().inProgress();
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pickup);
+            boolean whileOrderingPickup = ordersController.shipmentsState(ORDER_ID).getBody().inProgress();
+
+            // then
+            assertThat(whileCreating).isTrue();
+            assertThat(whileOrderingPickup).isTrue();
+        }
+
+        @Test
         void theCancellationStateOfAnotherStoresOrderIsNotFound() {
             // given: the order exists only under another store; the session's store finds nothing
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
             // when / then
-            assertThatThrownBy(() -> ordersController.shipmentCancellationState(ORDER_ID))
+            assertThatThrownBy(() -> ordersController.shipmentsState(ORDER_ID))
                     .isInstanceOf(ResponseStatusException.class)
                     .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(404));
             verify(ordersRepository).findById(STORE_ID, ORDER_ID);

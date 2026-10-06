@@ -40,6 +40,7 @@ import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
+import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
@@ -114,7 +115,7 @@ public class OrderPageModelFactory {
                 header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
-                shipments(order, store, readOnly),
+                shipments(order, store, readOnly, locale),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 payments(order, readOnly, receiptLock),
@@ -145,7 +146,7 @@ public class OrderPageModelFactory {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
                     links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
                     "fa-truck");
-        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()
+        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook() && !order.hasShipmentBeingCreated()
                 && shippingService.isAvailable(store)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
             // the shipping data into the shipment, so the page would only end on its refusal
@@ -385,9 +386,11 @@ public class OrderPageModelFactory {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
+    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly, Locale locale) {
         List<Shipment> shipments = order.getShipments();
         LocalDateTime now = LocalDateTime.now();
+        String details = "/dashboard/orders/" + order.getOrderId();
+        Set<String> labelProviders = readOnly ? Set.of() : labelProviders(shipments, store);
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
@@ -399,6 +402,9 @@ public class OrderPageModelFactory {
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
+            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+            // the form rebuilds the shipment without its command: a late result would find nothing waiting for it
+            boolean editable = !readOnly && s.getCreation() == null;
             rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
                     s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                     OrderFormats.moment(s.getShippedAt()), OrderFormats.moment(s.getDeliveredAt()),
@@ -408,14 +414,19 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     OrderLabels.cancellation(s, now), OrderLabels.cancellationTone(s, now),
-                    form.dialogId(), readOnly ? null : base + i,
+                    form.dialogId(), editable ? base + i : null,
                     readOnly || removeLockedKey(order, i) != null ? null
                             : base + i + "/remove?version=" + form.version(),
                     // every parcel of one courier order carries its externalId, and cancelling it cancels them all
                     readOnly ? null : removeReasonKey(order, i, courierCancellable != null
                             && Objects.equals(s.getExternalId(), courierCancellable.getExternalId())),
                     removeShipmentMessageKey(order, i),
-                    removeShipmentActionKey(order, i), placeholder));
+                    removeShipmentActionKey(order, i), placeholder,
+                    state == null ? null : state.key(), state == null ? null : state.args(),
+                    state == null ? null : state.tone(), state != null && state.inProgress(),
+                    hasPackage(s) && labelProviders.contains(s.getProvider())
+                            ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
+                    !readOnly && s.creationFailed() ? details + "/shipping" : null));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -428,10 +439,22 @@ public class OrderPageModelFactory {
         String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
                 ? "order.shipments.cancel.locked.pending" : null;
         // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
-        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.isCancellationInProgress(now))
-                ? "/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state" : null;
+        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now))
+                ? details + "/shipments/cancellation-state" : null;
+        String pickupHref = readOnly ? null : ShipmentLinks.pickup(shipments, details);
         return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
-                readOnly ? null : OrderShipmentForm.blank(order, carriers));
+                readOnly ? null : OrderShipmentForm.blank(order, carriers), pickupHref);
+    }
+
+    private static boolean hasPackage(Shipment s) {
+        return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
+    }
+
+    // asked once per integration on the page, and only when a package could carry the link: it loads the account
+    private Set<String> labelProviders(List<Shipment> shipments, Store store) {
+        return shipments.stream().filter(OrderPageModelFactory::hasPackage).map(Shipment::getProvider).distinct()
+                .filter(provider -> shippingService.supportsLabels(store, provider))
+                .collect(Collectors.toSet());
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";

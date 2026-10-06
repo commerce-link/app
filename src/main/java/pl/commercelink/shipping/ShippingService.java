@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import pl.commercelink.stores.IntegrationType;
 
+@Slf4j
 @Service
 public class ShippingService {
 
@@ -73,6 +75,23 @@ public class ShippingService {
             throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
         }
         return shippingProvider;
+    }
+
+    /**
+     * "Pobierz etykietę" can work for a package of this integration: it is the store's own (a label lives on the
+     * account that created it) and its adapter hands out labels. Loads the account, so pages ask once per integration.
+     */
+    public boolean supportsLabels(Store store, String provider) {
+        if (store == null || provider == null || !provider.equals(providerName(store))) {
+            return false;
+        }
+        try {
+            return providerFor(store).supportsLabels();
+        } catch (RuntimeException e) {
+            // the link is left out, the page itself still shows; the label endpoint says why when asked directly
+            log.warn("Shipping provider {} of store {} could not be loaded to offer labels", provider, store.getStoreId(), e);
+            return false;
+        }
     }
 
     public String providerName(Store store) {

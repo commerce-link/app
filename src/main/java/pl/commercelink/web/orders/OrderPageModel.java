@@ -92,12 +92,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
      * cancelCourierLockedKey: why "Cancel courier order" shows greyed (its cancellation is already in progress), null
-     * when it can run or is absent. cancellationPollHref: the JSON state the page polls while a cancellation of one of
-     * its shipments is in progress, reloading once it ends; null when nothing is in progress or the page is read-only.
+     * when it can run or is absent. cancellationPollHref: the JSON shipments state the page polls while a command of
+     * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
+     * does; null when nothing waits or the page is read-only. pickupHref: "Zamów odbiór", the pickup page preset to the
+     * group of the first package waiting for a courier, with the way back here; null when none waits.
      */
     public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
                                 String cancelCourierLockedKey, String cancellationPollHref,
-                                List<OrderShipmentForm> forms, OrderShipmentForm blank) {
+                                List<OrderShipmentForm> forms, OrderShipmentForm blank, String pickupHref) {
     }
 
     /**
@@ -110,13 +112,25 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * back to Realization. placeholder: the order's only shipment holds nothing but the customer's delivery choice, so the
      * row reads as "no shipment yet" with "Uzupełnij" instead of a shipment waiting to go out.
      * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one.
+     * stateKey with stateArgs and stateTone: the line of a shipment created through an integration (OrderLabels
+     * #shipmentState), null for one typed in by hand; stateInProgress: it waits for the provider (spinner). A shipment
+     * being created or whose creation failed has no editHref: the form would rebuild it without its command.
+     * labelHref: "Pobierz etykietę", when the store's integration hands out labels of the package; retryHref: "Spróbuj
+     * ponownie" of a failed creation, the shipping page with the fields filled from the order.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
                               String trackingTone, String trackingHelpKey, String cancellationKey,
                               String cancellationTone, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
-                              String removeActionKey, boolean placeholder) {
+                              String removeActionKey, boolean placeholder, String stateKey, Object[] stateArgs,
+                              String stateTone, boolean stateInProgress, String labelHref, String retryHref) {
+
+        /** Any action of the row is offered, live or greyed with its reason. */
+        public boolean hasActions() {
+            return editHref != null || removeHref != null || removeReasonKey != null || labelHref != null
+                    || retryHref != null;
+        }
     }
 
     /**

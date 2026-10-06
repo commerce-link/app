@@ -198,6 +198,9 @@
                                     </span>
                                 </label>
                             </fieldset>
+                            <!--/* a warehouse shipment has its pickup ordered at once: no "Zamów odbiór" to point to */-->
+                            <p th:if="${priced and !servicePrices.isEmpty() and f.shippingEntityType != 'warehouse'}" class="cl-help"
+                               th:text="#{shipping.carrier.pickup.hint}"></p>
                         </fieldset>
                         <div th:if="${priced and !servicePrices.isEmpty()}" class="cl-card-footer">
                             <!--/* no name, so disabling it on submit (shipping-booking.js) drops nothing from the post */-->

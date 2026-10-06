@@ -57,6 +57,7 @@ import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
+import pl.commercelink.shipping.ShipmentsState;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
@@ -2386,18 +2387,19 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
-    /** Whether a shipment of the order is still being cancelled; the shipments card polls it (shipment-cancellation.js). */
+    /**
+     * Whether a shipment of the order still waits for the provider: a cancellation, a creation or a pickup order. The
+     * shipments card polls it (shipment-cancellation.js); the address keeps its name from when it reported
+     * cancellations only, so pages open during a deploy keep polling.
+     */
     @GetMapping("/dashboard/orders/{orderId}/shipments/cancellation-state")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     @ResponseBody
-    public ResponseEntity<CancellationState> shipmentCancellationState(@PathVariable String orderId) {
+    public ResponseEntity<ShipmentsState> shipmentsState(@PathVariable String orderId) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         LocalDateTime now = LocalDateTime.now();
-        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.isCancellationInProgress(now));
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new CancellationState(inProgress));
-    }
-
-    public record CancellationState(boolean inProgress) {
+        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.awaitsProviderAnswer(now));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new ShipmentsState(inProgress));
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,
