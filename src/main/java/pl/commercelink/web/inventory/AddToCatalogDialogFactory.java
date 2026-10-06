@@ -2,10 +2,12 @@ package pl.commercelink.web.inventory;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.BrowseRow;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
@@ -44,7 +46,7 @@ public class AddToCatalogDialogFactory {
                 continue;
             }
             found.add(ean);
-            keys.add(matched.getInventoryKey());
+            keys.add(BrowseRow.catalogKey(matched.getInventoryKey(), ean, mfnOfOfferWith(matched, ean)));
             categoryIds.add(Objects.requireNonNullElse(matched.getTaxonomy().categoryId(), ""));
             if (firstName == null) {
                 firstName = matched.getTaxonomy().name();
@@ -93,5 +95,14 @@ public class AddToCatalogDialogFactory {
             options.add(new AddToCatalogDialog.Option(option.value(), option.label(), option.alreadyIn(), i == chosen));
         }
         return List.copyOf(options);
+    }
+
+    /** The row adds by the EAN of its cheapest offer and shows that offer's MFN; the offer carrying the EAN has it. */
+    private static String mfnOfOfferWith(MatchedInventory matched, String ean) {
+        return matched.getInventoryItems().stream()
+                .filter(offer -> ean.equals(offer.ean()) && offer.mfn() != null)
+                .map(InventoryItem::mfn)
+                .findFirst()
+                .orElse(null);
     }
 }

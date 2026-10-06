@@ -11,6 +11,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
@@ -98,6 +99,52 @@ class AddToCatalogDialogFactoryTest {
     }
 
     @Test
+    void bulkPreselectsTheFirstCategoryThatDoesNotHoldEveryChosenProduct() {
+        // given
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")),
+                new CatalogPlacement.Existing("c-1", "cat-gpu", "p-2", InventoryKey.fromEan("5901000000002")),
+                new CatalogPlacement.Existing("c-2", "cat-b2b", "p-3", InventoryKey.fromEan("5901000000001")));
+
+        // when
+        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001", "5901000000002"), null);
+
+        // then
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(2, 1);
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+    }
+
+    /**
+     * A store's own offer joined a global product by one shared code and is the cheapest, so the row adds the product by
+     * that offer's EAN. The catalog holds it under that EAN only; the dialog must count it there, as the row's pill does.
+     */
+    @Test
+    void productInTheCatalogUnderTheRowsEanOnlyCountsAsThereAndTheOtherCategoryIsPreselected() {
+        // given
+        mergedProduct("5901000000077", "OWN-77");
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000077")));
+
+        // when
+        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
+
+        // then
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(1, 0);
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+    }
+
+    @Test
+    void productInTheCatalogUnderTheMfnOfTheOfferCarryingTheEanCountsAsThere() {
+        // given
+        mergedProduct("5901000000077", "OWN-77");
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromMfn("OWN-77")));
+
+        // when
+        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
+
+        // then
+        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(1, 0);
+    }
+
+    @Test
     void productOutsideEveryMappedCategoryGetsAllManualCategories() {
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000003"), "//evil.com");
@@ -126,6 +173,20 @@ class AddToCatalogDialogFactoryTest {
         CatalogPlacement.Target b2b = new CatalogPlacement.Target("c-2", "Sklep B2B", "cat-b2b", "Karty", List.of("11"));
         CatalogPlacement.Target cases = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-case", "Obudowa", List.of("40"));
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu, b2b, cases), List.of(existing)));
+    }
+
+    /** Found by the own offer's EAN, keyed by the global product's codes that the own offer joined. */
+    private void mergedProduct(String ownEan, String ownMfn) {
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        InventoryKey group = InventoryKey.fromEan("5909999999998");
+        group.addManufacturerCode("GLOBAL-98");
+        when(matched.getInventoryKey()).thenReturn(group);
+        when(matched.getInventoryItems()).thenReturn(List.of(
+                new InventoryItem("5909999999998", "GLOBAL-98", 120.0, "PLN", 5, 1, "AB"),
+                new InventoryItem(ownEan, ownMfn, 100.0, "PLN", 3, 1, "Own")));
+        when(matched.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
+        when(view.findByEan(ownEan)).thenReturn(matched);
     }
 
     private void product(String ean, String name, String categoryId) {

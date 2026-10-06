@@ -106,10 +106,11 @@ class InventoryBrowseRenderingTest {
     @Test
     void nonAdminSeesNeitherSelectionNorAction() {
         // when
-        String html = engine.process(RESULTS, context(page(false, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+        String html = engine.process(RESULTS, context(page(false, false, BrowseQuery.start().withCategory("11"),
+                List.of(row(false), row(true)))));
 
         // then
-        assertThat(html).doesNotContain("data-browse-add", "data-cl-select-row", "cl-category-catalog");
+        assertThat(html).doesNotContain("data-browse-add", "data-cl-select-row", "cl-status is-ok", "In catalog");
     }
 
     @Test
