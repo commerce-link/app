@@ -242,6 +242,7 @@ class OfferRowMapperTest {
 
         // then
         assertThat(row.createOfferHref()).isEqualTo("/dashboard/offer/new?intent=template&sourceId=" + ID);
+        assertThat(row.createOfferLabel()).isEqualTo("Utwórz ofertę z szablonu: Stacje CAD");
         assertThat(row.deleteTitle()).isEqualTo("Usunąć szablon „Stacje CAD”?");
         assertThat(row.itemsCount()).isEqualTo("2");
         assertThat(row.itemsText()).isEqualTo("pozycje: 2");

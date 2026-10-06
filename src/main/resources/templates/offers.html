@@ -236,15 +236,18 @@
                             <span class="cl-table-sub cl-cards-hide" th:text="#{offers.list.template.priced}"></span>
                         </td>
                         <td class="cl-table-actions">
-                            <a class="cl-link-button" th:href="@{${row.createOfferHref()}}">
+                            <!--/* The segment's main action stays one click away as a compact icon (the text button took 120 px and
+                                   left the template name ~155 px at 1280 px); its full name is the first entry of the menu. */-->
+                            <a class="cl-button is-icon cl-tooltip cl-row-quick" th:href="@{${row.createOfferHref()}}"
+                               th:attr="aria-label=${row.createOfferLabel()}, data-tooltip=#{offers.list.createFromTemplate}">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                                <span th:text="#{offers.list.createFromTemplate}"></span>
                             </a>
                             <details class="cl-menu">
                                 <summary class="cl-button is-icon" th:attr="aria-label=${row.menuLabel()}">
                                     <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
                                 </summary>
                                 <ul class="cl-menu-list">
+                                    <li><a class="cl-menu-item" th:href="@{${row.createOfferHref()}}" th:text="#{offers.list.createFromTemplate}"></a></li>
                                     <li><a class="cl-menu-item" th:href="@{${row.href()}}" th:text="#{offers.list.editTemplate}"></a></li>
                                     <li class="cl-menu-sep" aria-hidden="true"></li>
                                     <li><a class="cl-menu-item is-danger" th:href="@{${row.deleteHref()}}" data-cl-confirm

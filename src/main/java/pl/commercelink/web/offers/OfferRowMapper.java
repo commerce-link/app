@@ -74,7 +74,7 @@ public class OfferRowMapper {
         String name = name(basket);
         return new OfferListPage.TemplateRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
                 itemsText(basket), itemsCount(basket), date(basket.getCreatedAt()), author(basket),
-                money(value(basket)), "/dashboard/offer/new?intent=template&sourceId=" + id,
+                money(value(basket)), "/dashboard/offer/new?intent=template&sourceId=" + id, text("offers.list.createFromTemplate.aria", name),
                 deleteHref(id), text("offers.delete.confirm.titleTemplate", name), text("offers.delete.confirm.messageTemplate"),
                 text("offers.list.menu.aria", name));
     }

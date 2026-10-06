@@ -27,7 +27,7 @@ public record OfferListPage(OfferListQuery query, List<SegmentLink> segments, Li
                            String deleteMessage, String menuLabel, String copyLabel) { }
 
     public record TemplateRow(String href, String name, String shortId, String fullId, String itemsText, String itemsCount, String created,
-                              String author, String gross, String createOfferHref, String deleteHref, String deleteTitle,
+                              String author, String gross, String createOfferHref, String createOfferLabel, String deleteHref, String deleteTitle,
                               String deleteMessage, String menuLabel) { }
 
     public record BasketRow(String href, String shortId, String fullId, String client, String created, String itemsText,

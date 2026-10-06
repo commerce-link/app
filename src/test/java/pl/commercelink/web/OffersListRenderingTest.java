@@ -29,7 +29,7 @@ class OffersListRenderingTest {
 
     private static TemplateRow templateRow() {
         return new TemplateRow("/dashboard/offer/t1", "Szablon CAD", "e41c09d2", "e41c09d2-full", "pozycje: 9", "9", "28.08",
-                "Jan Kowalski", "8 160,00 PLN", "/dashboard/offer/new?intent=template&sourceId=t1",
+                "Jan Kowalski", "8 160,00 PLN", "/dashboard/offer/new?intent=template&sourceId=t1", "Utwórz ofertę z szablonu: Szablon CAD",
                 "/dashboard/offer/t1/delete?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dtemplates", "Usunąć szablon „Szablon CAD”?",
                 "Szablon zniknie z listy…", "Akcje: Szablon CAD");
     }
@@ -119,7 +119,12 @@ class OffersListRenderingTest {
         String html = SettingsTemplateRenderer.render(FRAGMENT, Map.of("page", page));
 
         // then
-        assertThat(html).contains("<a class=\"cl-link-button\" href=\"/dashboard/offer/new?intent=template&amp;sourceId=t1\">").contains("Utwórz ofertę")
+        assertThat(html).containsPattern("<a class=\"cl-button is-icon cl-tooltip cl-row-quick\" href=\"/dashboard/offer/new\\?intent=template&amp;sourceId=t1\""
+                        + "\\s+aria-label=\"Utwórz ofertę z szablonu: Szablon CAD\" data-tooltip=\"Utwórz ofertę\">")
+                // the full name of the quick action is also the first entry of the row menu, before editing the template
+                .containsPattern("<ul class=\"cl-menu-list\">\\s*<li><a class=\"cl-menu-item\" href=\"/dashboard/offer/new\\?intent=template&amp;sourceId=t1\">Utwórz ofertę</a></li>"
+                        + "\\s*<li><a class=\"cl-menu-item\" href=\"/dashboard/offer/t1\">Edytuj szablon</a></li>")
+                .doesNotContain("class=\"cl-link-button\" href=\"/dashboard/offer/new?intent=template")
                 .contains("Szablon to zestaw pozycji bez klienta").doesNotContain(">Klient<").doesNotContain("data-cl-filter-menu=\"validity\"")
                 .contains("<span class=\"cl-cell-count\">9</span><span class=\"cl-cell-count-text\">pozycje: 9</span>");
         // the segment description sits under the chips and the count line, as on pending deliveries
