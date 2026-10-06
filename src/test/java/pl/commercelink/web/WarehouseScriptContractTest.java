@@ -101,6 +101,21 @@ class WarehouseScriptContractTest {
     }
 
     @Test
+    void quantityCheckRunsBeforeTheSharedDialogDisablesItsButton() throws Exception {
+        // given
+        String js = read("src/main/resources/static/js/selection-actions.js");
+        String dialogJs = read("src/main/resources/static/js/dialog.js");
+        String submitHandler = js.substring(js.indexOf("document.addEventListener('submit'"),
+                js.indexOf("window.addEventListener('pageshow'")).strip();
+
+        // when / then
+        // dialog.js disables the submit button of any dialog form whose submit is not prevented; it is loaded first, so
+        // a bubbling check here would be too late and an invalid quantity would leave the button disabled for good
+        assertThat(dialogJs).contains("event.defaultPrevented").contains("button.disabled = true");
+        assertThat(submitHandler).endsWith("}, true);");
+    }
+
+    @Test
     void bothBulkPostsCarryTheListViewFromTheAddressSoTheRedirectKeepsSearchAndCategories() throws Exception {
         // given
         String js = read("src/main/resources/static/js/selection-actions.js");

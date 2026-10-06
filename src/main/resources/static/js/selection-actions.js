@@ -355,6 +355,8 @@
         }
     });
 
+    // capture phase: dialog.js (loaded earlier) disables the button of a dialog form whose submit is not prevented, so the
+    // quantity check must refuse first or one invalid entry would leave the dialog without a working button
     document.addEventListener('submit', function (event) {
         var form = event.target;
         if (!form.matches || !form.matches('[data-cl-quantity-form]')) {
@@ -369,7 +371,7 @@
             return;
         }
         submitting = true;
-    });
+    }, true);
 
     window.addEventListener('pageshow', function (event) {
         if (event.persisted) {
