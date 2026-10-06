@@ -26,6 +26,7 @@
             <form class="cl-form is-wide" id="bulk-add-form" method="post" th:action="@{${saveAction}}" novalidate>
                 <!--/* The same review sent twice saves each row under the same id, so the category gets it once (RF-6). */-->
                 <input type="hidden" name="reviewId" th:value="${form.reviewId}"/>
+                <input type="hidden" name="returnTo" th:if="${returnTo != null}" th:value="${returnTo}"/>
                 <div class="cl-card">
                     <table class="cl-table is-compact is-editable" id="products" tabindex="-1">
                         <thead>

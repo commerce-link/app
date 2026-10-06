@@ -28,6 +28,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -160,7 +161,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         try {
-            return controller.saveProducts("c1", "cat-parallel", form, new ExtendedModelMap(), Locale.ENGLISH,
+            return controller.saveProducts("c1", "cat-parallel", form, null, new ExtendedModelMap(), Locale.ENGLISH,
                     new RedirectAttributesModelMap(), new MockHttpServletResponse());
         } finally {
             SecurityContextHolder.clearContext();
@@ -181,6 +182,6 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         return new CatalogProductsController(access, products, mock(StoresRepository.class),
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), mock(PimCatalog.class), mock(BrandMapper.class),
-                mock(MessageSource.class), mock(OptimisticLockingExecutor.class));
+                mock(MessageSource.class), mock(OptimisticLockingExecutor.class), mock(CatalogPlacement.class));
     }
 }

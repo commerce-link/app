@@ -26,6 +26,7 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
@@ -123,6 +124,8 @@ class CatalogProductsControllerTest {
     private Store store;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private CatalogPlacement catalogPlacement;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
@@ -156,7 +159,7 @@ class CatalogProductsControllerTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, optimisticLockingExecutor)).build();
+                brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement)).build();
     }
 
     @AfterEach
@@ -580,6 +583,61 @@ class CatalogProductsControllerTest {
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).isEmpty();
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
                 .extracting(ProductsBulkAddForm.Row::getName).containsExactly("MSI RTX 5070");
+    }
+
+    @Test
+    void saveWithInventoryReturnToRedirectsBackToTheListWithANotice() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo))
+                .andExpect(flash().attribute("inventoryNotice", "inventory.browse.added"))
+                .andExpect(flash().attributeExists("inventoryNoticeHref"));
+        verify(catalogPlacement).evict(STORE_ID);
+    }
+
+    @Test
+    void saveIgnoresForeignReturnTo() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", "//evil.com"))
+                .andExpect(redirectedUrl(categoryPath()));
+    }
+
+    @Test
+    void reviewKeepsTheInventoryReturnToForTheSaveForm() throws Exception {
+        // given
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        MatchedInventory found = mock(MatchedInventory.class);
+        when(found.isEmpty()).thenReturn(false);
+        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("returnTo", returnTo))
+                .andExpect(model().attribute("backHref", returnTo));
     }
 
     /**
@@ -1671,7 +1729,7 @@ class CatalogProductsControllerTest {
                 .thenReturn("Enabled 0, skipped 1");
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create())).build();
+                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement)).build();
 
         // when / then
         real.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))

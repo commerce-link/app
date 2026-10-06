@@ -28,6 +28,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
@@ -56,6 +57,7 @@ import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.inventory.InventoryReturnTo;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
@@ -120,6 +122,7 @@ public class CatalogProductsController {
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
+    private final CatalogPlacement catalogPlacement;
 
     /**
      * Raised for the review form, whose list grows to one entry per selected proposal; Spring stops at 256 by default
@@ -248,7 +251,8 @@ public class CatalogProductsController {
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/review")
     public String reviewProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                                 @RequestParam(required = false) List<String> eans, Model model, Locale locale,
+                                 @RequestParam(required = false) List<String> eans,
+                                 @RequestParam(required = false) String returnTo, Model model, Locale locale,
                                  RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
@@ -284,13 +288,16 @@ public class CatalogProductsController {
             Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
         }
-        return renderReview(catalog, category, ProductsBulkAddForm.of(products), skipped, skippedExisting, Map.of(),
+        String view = renderReview(catalog, category, ProductsBulkAddForm.of(products), skipped, skippedExisting, Map.of(),
                 model, locale);
+        applyReturnTo(returnTo, model);
+        return view;
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/save")
     public String saveProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                               @ModelAttribute ProductsBulkAddForm form, Model model, Locale locale,
+                               @ModelAttribute ProductsBulkAddForm form,
+                               @RequestParam(required = false) String returnTo, Model model, Locale locale,
                                RedirectAttributes redirectAttributes, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
@@ -301,7 +308,9 @@ public class CatalogProductsController {
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category));
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
-            return renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
+            String view = renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
+            applyReturnTo(returnTo, model);
+            return view;
         }
         // The review skipped what the category had when it was rendered; the same review sent again (Back, a double
         // click) is decided here once more, against the category as it is now.
@@ -333,6 +342,17 @@ public class CatalogProductsController {
             }
             alreadyInCategory.add(key);
             added++;
+        }
+        if (added > 0) {
+            catalogPlacement.evict(storeId());
+        }
+        Optional<String> backToInventory = InventoryReturnTo.safe(returnTo);
+        if (backToInventory.isPresent()) {
+            int skipped = form.getProducts().size() - added;
+            redirectAttributes.addFlashAttribute("inventoryNotice", messageSource.getMessage("inventory.browse.added",
+                    new Object[]{category.getName(), added, skipped}, locale));
+            redirectAttributes.addFlashAttribute("inventoryNoticeHref", CatalogPaths.category(catalogId, categoryId));
+            return "redirect:" + backToInventory.get();
         }
         // Nothing saved is not a success: the category page shows it in its warning alert.
         if (added == 0) {
@@ -682,6 +702,14 @@ public class CatalogProductsController {
     }
 
     /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */
+    /** A review opened from the inventory list goes back there: "Back", "Cancel" and the redirect after saving. */
+    private static void applyReturnTo(String returnTo, Model model) {
+        InventoryReturnTo.safe(returnTo).ifPresent(target -> {
+            model.addAttribute("backHref", target);
+            model.addAttribute("returnTo", target);
+        });
+    }
+
     private String renderReview(ProductCatalog catalog, CategoryDefinition category, ProductsBulkAddForm form,
                                 List<String> skipped, List<String> skippedExisting, Map<String, String> errors,
                                 Model model, Locale locale) {
