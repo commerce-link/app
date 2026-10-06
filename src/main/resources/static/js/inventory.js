@@ -10,11 +10,13 @@
     const MIN_QUERY_LENGTH = 3;
     const SPINNER_DELAY_MS = 150;
 
+    // The supplier assortment page carries the summary slot, the price comparison the search form.
     const summarySlot = page.querySelector('[data-inventory-summary]');
+    if (summarySlot) {
+        loadSummary();
+    }
     const form = page.querySelector('[data-inventory-search]');
     if (!form) {
-        // browse mode has no code search form; only the summary tiles are wired
-        loadSummary();
         return;
     }
     const input = form.querySelector('#inventory-q');
@@ -321,9 +323,8 @@
         }
     });
 
-    // Arriving straight at ?q= -- a bookmark, a reload, the legacy check-price redirect -- renders the
-    // result server-side below the tiles and the sources bar, so on a laptop it starts off-screen.
-    // The fetch path already moves focus to the heading; do the same for the rendered one.
+    // Arriving straight at ?q= -- a bookmark, a reload, a browse row, the legacy redirects -- renders the
+    // result server-side. The fetch path already moves focus to the heading; do the same for the rendered one.
     function revealServerRenderedResult() {
         if (urlQuery().length < MIN_QUERY_LENGTH) {
             return;
@@ -337,5 +338,4 @@
 
     updateControls();
     revealServerRenderedResult();
-    loadSummary();
 })();

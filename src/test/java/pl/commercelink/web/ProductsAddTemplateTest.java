@@ -289,15 +289,15 @@ class ProductsAddTemplateTest {
         context.setVariable("skipped", List.of());
         context.setVariable("skippedExisting", List.of("5901234567890"));
         context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
-        context.setVariable("backHref", "/dashboard/inventory?view=browse&cat=11");
-        context.setVariable("returnTo", "/dashboard/inventory?view=browse&cat=11");
+        context.setVariable("backHref", "/dashboard/inventory?cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?cat=11");
         context.setVariable("skippedBefore", 1);
 
         // when
         String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
 
         // then
-        assertThat(html).contains("<input type=\"hidden\" name=\"returnTo\" value=\"/dashboard/inventory?view=browse&amp;cat=11\"/>")
+        assertThat(html).contains("<input type=\"hidden\" name=\"returnTo\" value=\"/dashboard/inventory?cat=11\"/>")
                 .contains("<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>");
     }
 

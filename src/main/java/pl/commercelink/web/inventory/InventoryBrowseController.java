@@ -19,7 +19,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * The browse mode of the inventory page. The eans of the dialog's form travel on to the catalog's review untouched:
+ * The supplier assortment page: browse by category and add to the catalog. The eans of the dialog's form travel on to the catalog's review untouched:
  * a forward keeps the request parameters, so "Uzupełnij dane" sees {@code eans} and {@code returnTo} as if posted to it.
  */
 @Controller
@@ -33,8 +33,12 @@ public class InventoryBrowseController {
     private final CatalogPlacement catalogPlacement;
     private final MessageSource messageSource;
 
-    @GetMapping(value = BrowseQuery.PATH, params = "view=browse")
+    @GetMapping(BrowseQuery.PATH)
     public String page(@RequestParam MultiValueMap<String, String> params, Model model) {
+        // Before the split this path was the code search; its bookmarks carry q.
+        if (params.containsKey("q")) {
+            return "redirect:" + InventoryPageController.pricesHref(params.getFirst("q"), params.getFirst("from"));
+        }
         BrowseQuery query = addBrowseAttributes(params, model);
         List<String> eans = params.getOrDefault("ean", List.of());
         if ("add".equals(params.getFirst("open")) && isAdmin() && storeId() != null && !eans.isEmpty()) {
@@ -79,7 +83,6 @@ public class InventoryBrowseController {
 
     private BrowseQuery addBrowseAttributes(MultiValueMap<String, String> params, Model model) {
         InventoryPageController.addCommonAttributes(model);
-        model.addAttribute("mode", "browse");
         model.addAttribute("query", "");
         BrowseQuery query = BrowseQuery.parse(params);
         // A super admin account may carry a store id; its browse is the global one, like its code search.

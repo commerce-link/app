@@ -13,6 +13,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -67,11 +68,10 @@ class InventoryBrowseControllerTest {
     }
 
     @Test
-    void browseViewRendersTheInventoryPageInBrowseMode() {
+    void bareInventoryPathRendersTheSupplierAssortment() {
         // given
         ConcurrentModel model = new ConcurrentModel();
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("view", "browse");
         params.add("cat", "11");
 
         // when
@@ -79,16 +79,42 @@ class InventoryBrowseControllerTest {
 
         // then
         assertThat(view).isEqualTo("inventory");
-        assertThat(model.getAttribute("mode")).isEqualTo("browse");
         assertThat(model.getAttribute("browse")).isNotNull();
         assertThat(model.getAttribute("addDialog")).isNull();
+    }
+
+    @Test
+    void oldCodeSearchBookmarkRedirectsToThePriceComparison() {
+        // given
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("q", "A+B {x}");
+
+        // when
+        String view = controller.page(params, new ConcurrentModel());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/inventory/prices?q=A%2BB+%7Bx%7D");
+        verifyNoInteractions(pageFactory);
+    }
+
+    @Test
+    void oldCodeSearchBookmarkKeepsItsWayBackToBrowsing() {
+        // given
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("q", "MX-1");
+        params.add("from", "/dashboard/inventory?cat=11&supplier=AB");
+
+        // when
+        String view = controller.page(params, new ConcurrentModel());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/inventory/prices?q=MX-1&from=%2Fdashboard%2Finventory%3Fcat%3D11%26supplier%3DAB");
     }
 
     @Test
     void openAddRendersTheDialogForAnAdminOnly() {
         // given
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("view", "browse");
         params.add("open", "add");
         params.add("ean", "5901000000001");
         AddToCatalogDialog dialog = mock(AddToCatalogDialog.class);
@@ -116,7 +142,6 @@ class InventoryBrowseControllerTest {
         security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
         security.when(() -> CustomSecurityContext.hasRole(anyString())).thenAnswer(call -> "SUPER_ADMIN".equals(call.getArgument(0)));
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("view", "browse");
 
         // when
         controller.page(params, new ConcurrentModel());
@@ -138,7 +163,7 @@ class InventoryBrowseControllerTest {
     @Test
     void addForwardsToTheCatalogReviewOfTheChosenCategory() {
         // when
-        String view = controller.add("c-1/cat-gpu", null, "/dashboard/inventory?view=browse", new RedirectAttributesModelMap(), Locale.ENGLISH);
+        String view = controller.add("c-1/cat-gpu", null, "/dashboard/inventory", new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("forward:/dashboard/catalogs/c-1/category/cat-gpu/products/add/review");
@@ -160,10 +185,10 @@ class InventoryBrowseControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.add("c-9/nope", null, "/dashboard/inventory?view=browse&cat=11", redirect, Locale.ENGLISH);
+        String view = controller.add("c-9/nope", null, "/dashboard/inventory?cat=11", redirect, Locale.ENGLISH);
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/inventory?view=browse&cat=11");
+        assertThat(view).isEqualTo("redirect:/dashboard/inventory?cat=11");
         assertThat((java.util.Map<String, Object>) redirect.getFlashAttributes()).containsEntry("inventoryError", "inventory.browse.add.noTarget");
     }
 
@@ -182,5 +207,17 @@ class InventoryBrowseControllerTest {
         assertThat(dialog.value()).isEqualTo("hasRole('ADMIN')");
         assertThat(add.value()).isEqualTo("hasRole('ADMIN')");
         verifyNoInteractions(dialogFactory);
+    }
+
+    @Test
+    void supplierAssortmentOwnsTheBareInventoryPath() throws Exception {
+        // when
+        GetMapping mapping = InventoryBrowseController.class
+                .getMethod("page", org.springframework.util.MultiValueMap.class, org.springframework.ui.Model.class)
+                .getAnnotation(GetMapping.class);
+
+        // then
+        assertThat(mapping.value()).containsExactly("/dashboard/inventory");
+        assertThat(mapping.params()).isEmpty();
     }
 }

@@ -16,7 +16,6 @@ class BrowseQueryTest {
     void parseReadsEveryParameterAndHrefWritesItBack() {
         // given
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("view", "browse");
         params.add("cat", "11");
         params.add("supplier", "AB");
         params.add("supplier", "Action");
@@ -39,7 +38,7 @@ class BrowseQueryTest {
         assertThat(query.sort()).isEqualTo(BrowseCriteria.Sort.COST);
         assertThat(query.descending()).isTrue();
         assertThat(query.page()).isEqualTo(3);
-        assertThat(query.href()).isEqualTo("/dashboard/inventory?view=browse&cat=11&supplier=AB&supplier=Action"
+        assertThat(query.href()).isEqualTo("/dashboard/inventory?cat=11&supplier=AB&supplier=Action"
                 + "&stock=in-stock&catalog=out&q2=rtx+4060&sort=cost&dir=desc&page=3");
     }
 
@@ -59,7 +58,7 @@ class BrowseQueryTest {
 
         // then
         assertThat(query).isEqualTo(BrowseQuery.start());
-        assertThat(query.href()).isEqualTo("/dashboard/inventory?view=browse");
+        assertThat(query.href()).isEqualTo("/dashboard/inventory");
         assertThat(query.isStart()).isTrue();
     }
 
@@ -153,6 +152,18 @@ class BrowseQueryTest {
         List<BrowseQuery.Param> params = query.params("stock");
 
         // then
-        assertThat(params).extracting(BrowseQuery.Param::name).containsExactly("view", "cat");
+        assertThat(params).extracting(BrowseQuery.Param::name).containsExactly("cat");
+    }
+
+    @Test
+    void firstPageWithoutFiltersIsTheBarePathAndLaterPagesStartTheQuery() {
+        // given
+        BrowseQuery start = BrowseQuery.start();
+
+        // when / then
+        assertThat(start.href()).isEqualTo("/dashboard/inventory");
+        assertThat(start.withPage(2).href()).isEqualTo("/dashboard/inventory?page=2");
+        assertThat(start.hrefWith("open=add&ean=1")).isEqualTo("/dashboard/inventory?open=add&ean=1");
+        assertThat(start.withCategory("11").hrefWith("open=add")).isEqualTo("/dashboard/inventory?cat=11&open=add");
     }
 }

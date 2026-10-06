@@ -47,7 +47,7 @@ class ProductCategoryViewFactoryTest {
         assertThat(view.get().line().pimAncestors()).containsExactly("Komponenty komputerowe");
         assertThat(view.get().line().catalogLabel()).isEqualTo("Podzespoły › Karta graficzna");
         assertThat(view.get().canAdd()).isTrue();
-        assertThat(view.get().addHref()).isEqualTo("/dashboard/inventory?view=browse&open=add&ean=5901000000001");
+        assertThat(view.get().addHref()).isEqualTo("/dashboard/inventory?open=add&ean=5901000000001");
     }
 
     @Test

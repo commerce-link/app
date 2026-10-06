@@ -115,7 +115,6 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
     /** The list's state as form fields, minus the one the form itself sets; a form always starts again at page one. */
     public List<Param> params(String except) {
         List<Param> params = new ArrayList<>();
-        params.add(new Param("view", "browse"));
         if (category != null) {
             params.add(new Param("cat", category));
         }
@@ -141,13 +140,21 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
     }
 
     public String href() {
+        return hrefWith(null);
+    }
+
+    /** The list's address with an extra, already encoded query appended, e.g. the parameters that open a dialog on it. */
+    public String hrefWith(String extraQuery) {
         List<String> parts = new ArrayList<>(params(null).stream()
                 .map(param -> param.name() + "=" + encode(param.value()))
                 .toList());
         if (page > 1) {
             parts.add("page=" + page);
         }
-        return PATH + "?" + String.join("&", parts);
+        if (extraQuery != null && !extraQuery.isEmpty()) {
+            parts.add(extraQuery);
+        }
+        return parts.isEmpty() ? PATH : PATH + "?" + String.join("&", parts);
     }
 
     private static BrowseCriteria.Stock parseStock(String value) {

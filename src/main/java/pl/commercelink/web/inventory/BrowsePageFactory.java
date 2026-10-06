@@ -113,8 +113,8 @@ public class BrowsePageFactory {
         CategoryLine category = CategoryLine.of(tree, placement, row.categoryId(), row.categoryText(), row.catalogKey(),
                 leafSelected);
         String code = row.ean() != null ? row.ean() : row.mfn();
-        String detailHref = BrowseQuery.PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
-        String addHref = query.href() + "&open=add&ean=" + encode(code);
+        String detailHref = InventoryPageController.PRICES_PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
+        String addHref = query.hrefWith("open=add&ean=" + encode(code));
         return new BrowsePage.RowView(row.name(), row.brand(), row.ean(), row.mfn(), detailHref, category,
                 row.lowestDeliveredNet(), row.deliveryKnown(), labels.of(row.lowestSupplier()), row.qty(), row.suppliers(), addHref);
     }

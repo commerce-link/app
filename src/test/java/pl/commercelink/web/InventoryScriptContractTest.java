@@ -20,6 +20,7 @@ class InventoryScriptContractTest {
         // given
         String script = read("src/main/resources/static/js/inventory.js");
         String templates = read("src/main/resources/templates/inventory.html")
+                + read("src/main/resources/templates/inventory-prices.html")
                 + read("src/main/resources/templates/fragments/inventory-summary.html")
                 + read("src/main/resources/templates/fragments/inventory-results.html")
                 + read("src/main/resources/templates/fragments/inventory-technical.html");

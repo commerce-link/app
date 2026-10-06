@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<!--/* The browse mode of the inventory page (spec docs/active/inventory-browse §4). `results` is swapped in place by
+<!--/* The supplier assortment page (spec docs/active/inventory-browse §4). `results` is swapped in place by
        list-page.js; the slot below it receives the add-to-catalog dialog that inventory-browse.js fetches. */-->
 <div th:fragment="browse" class="cl-inv-browse">
     <div th:replace="~{fragments/inventory-browse :: results}"></div>
@@ -14,7 +14,7 @@
 </div>
 
 <!--/* The two lines of the "Kategoria" cell: PIM path (ancestors grey, leaf bold, the whole path in the title) and the
-       store-catalog category for an admin. Shared with the product header of the code mode. */-->
+       store-catalog category for an admin. Shared with the product header of the price comparison. */-->
 <th:block th:fragment="categoryLines(line)">
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
     <span class="cl-category-catalog" th:if="${line.catalogLabel() != null and (browse == null or browse.admin())}">
@@ -41,7 +41,7 @@
 
     <th:block th:unless="${b.noSuppliers()}">
         <section class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
-            <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.view.browse}"></h2>
+            <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
             <div th:unless="${b.isStart()}" class="cl-result-head">
                 <h2 id="browse-title" tabindex="-1"
                     th:text="${q.category() == null} ? #{inventory.browse.textResults(${q.q2()})} : (${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned})"></h2>

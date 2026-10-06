@@ -855,9 +855,9 @@
     }
 }
 
-/* --- Browse mode (spec docs/active/inventory-browse) --- */
-.cl-inv-page .cl-inv-modes {
-    margin: 20px 0 16px;
+/* --- Supplier assortment (spec docs/active/inventory-browse) --- */
+.cl-inv-page .cl-inv-summary-slot + .cl-inv-browse {
+    margin-top: 20px;
 }
 
 .cl-inv-page .cl-inv-browse .cl-tile-grid.is-categories {

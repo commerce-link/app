@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
+import org.springframework.web.bind.annotation.GetMapping;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryStatistics;
 import pl.commercelink.inventory.search.InventorySearch;
@@ -96,7 +97,7 @@ class InventoryPageControllerTest {
         String view = controller.page(null, null, model);
 
         // then
-        assertThat(view).isEqualTo("inventory");
+        assertThat(view).isEqualTo("inventory-prices");
         assertThat(model.getAttribute("query")).isEqualTo("");
         assertThat(model.getAttribute("result")).isNull();
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(true);
@@ -238,17 +239,17 @@ class InventoryPageControllerTest {
         return Stream.of(
                 // URLEncoder encodes a space as '+'; the servlet container decodes '+' back to a space in a query string
                 Arguments.of("mfn link redirects to the new query", "MFN 1", "5901234123457", null,
-                        "redirect:/dashboard/inventory?q=MFN+1"),
+                        "redirect:/dashboard/inventory/prices?q=MFN+1"),
                 Arguments.of("a plus is encoded so it is not decoded as a space", "A+B", "5901234123457", null,
-                        "redirect:/dashboard/inventory?q=A%2BB"),
+                        "redirect:/dashboard/inventory/prices?q=A%2BB"),
                 Arguments.of("curly braces are encoded so they are not treated as a URI template variable", "{x}",
-                        "5901234123457", null, "redirect:/dashboard/inventory?q=%7Bx%7D"),
+                        "5901234123457", null, "redirect:/dashboard/inventory/prices?q=%7Bx%7D"),
                 Arguments.of("pim id is preferred over mfn", "MFN-1", "5901234123457", "PIM-7",
-                        "redirect:/dashboard/inventory?q=PIM-7"),
+                        "redirect:/dashboard/inventory/prices?q=PIM-7"),
                 Arguments.of("ean is the fallback when mfn is blank", " ", "5901234123457", "",
-                        "redirect:/dashboard/inventory?q=5901234123457"),
+                        "redirect:/dashboard/inventory/prices?q=5901234123457"),
                 Arguments.of("no parameters redirect to the plain page", null, null, null,
-                        "redirect:/dashboard/inventory"));
+                        "redirect:/dashboard/inventory/prices"));
     }
 
     @Test
@@ -257,10 +258,10 @@ class InventoryPageControllerTest {
         ConcurrentModel model = new ConcurrentModel();
 
         // when
-        controller.page(null, "/dashboard/inventory?view=browse&cat=11", model);
+        controller.page(null, "/dashboard/inventory?cat=11&page=2", model);
 
         // then
-        assertThat(model.getAttribute("backToBrowse")).isEqualTo("/dashboard/inventory?view=browse&cat=11");
+        assertThat(model.getAttribute("backToBrowse")).isEqualTo("/dashboard/inventory?cat=11&page=2");
     }
 
     @Test
@@ -271,7 +272,7 @@ class InventoryPageControllerTest {
 
         // when
         controller.page(null, "https://evil.com", evil);
-        controller.page(null, "/dashboard/inventory?q=123", notBrowse);
+        controller.page(null, "/dashboard/inventory/prices?q=123", notBrowse);
 
         // then
         assertThat(evil.getAttribute("backToBrowse")).isNull();
@@ -294,5 +295,16 @@ class InventoryPageControllerTest {
 
         // then
         assertThat(model.getAttribute("productCategory")).isSameAs(view);
+    }
+
+    @Test
+    void priceComparisonHasItsOwnPath() throws Exception {
+        // when
+        GetMapping mapping = InventoryPageController.class
+                .getMethod("page", String.class, String.class, org.springframework.ui.Model.class)
+                .getAnnotation(GetMapping.class);
+
+        // then
+        assertThat(mapping.value()).containsExactly("/dashboard/inventory/prices");
     }
 }

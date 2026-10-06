@@ -590,7 +590,7 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
-        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+        String returnTo = "/dashboard/inventory?cat=11";
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -630,7 +630,7 @@ class CatalogProductsControllerTest {
         when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
         when(inventoryView.findByEan("1")).thenReturn(found);
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
-        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+        String returnTo = "/dashboard/inventory?cat=11";
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/review")
@@ -654,7 +654,7 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/review")
                         .param("eans", "1")
-                        .param("returnTo", "/dashboard/inventory?view=browse&cat=11"))
+                        .param("returnTo", "/dashboard/inventory?cat=11"))
                 .andExpect(model().attribute("skippedBefore", 1));
     }
 
@@ -664,7 +664,7 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
-        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+        String returnTo = "/dashboard/inventory?cat=11";
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -683,7 +683,7 @@ class CatalogProductsControllerTest {
     @Test
     void saveWithErrorsKeepsTheSkippedCountAndRefusesANegativeOne() throws Exception {
         // given
-        String returnTo = "/dashboard/inventory?view=browse&cat=11";
+        String returnTo = "/dashboard/inventory?cat=11";
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")

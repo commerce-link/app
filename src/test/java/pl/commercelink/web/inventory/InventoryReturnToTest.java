@@ -11,9 +11,9 @@ class InventoryReturnToTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "/dashboard/inventory",
-            "/dashboard/inventory?view=browse",
-            "/dashboard/inventory?view=browse&cat=11&supplier=AB&page=3",
-            "  /dashboard/inventory?view=browse&q2=kabel%2Fhdmi  "})
+            "/dashboard/inventory?cat=11",
+            "/dashboard/inventory?cat=11&supplier=AB&page=3",
+            "  /dashboard/inventory?q2=kabel%2Fhdmi  "})
     void acceptsTheInventoryPage(String value) {
         // when / then
         assertThat(InventoryReturnTo.safe(value)).contains(value.strip());
@@ -24,8 +24,8 @@ class InventoryReturnToTest {
     @ValueSource(strings = {
             "", "//evil.com", "https://evil.com/dashboard/inventory", "/dashboard/inventory/../catalogs",
             "/dashboard/inventoryX", "/dashboard/catalogs", "/dashboard/inventory?next=//evil.com",
-            "/dashboard/inventory\\evil", "/dashboard/inventory?view=browse x",
-            "/dashboard/inventory?q={x}", "/dashboard/inventory?q=}"})
+            "/dashboard/inventory\\evil", "/dashboard/inventory?cat=11 x",
+            "/dashboard/inventory?q={x}", "/dashboard/inventory?q=}", "/dashboard/inventory/prices?q=123"})
     void refusesEverythingElse(String value) {
         // when / then
         assertThat(InventoryReturnTo.safe(value)).isEmpty();

@@ -32,6 +32,7 @@ public class InventoryPageController {
     static final String CONNECTION_URL_PREFIX = MANAGE_SUPPLIERS_URL + "/";
     static final String WAREHOUSE_URL = "/dashboard/warehouse";
     private static final String PAGE_PATH = "/dashboard/inventory";
+    static final String PRICES_PATH = PAGE_PATH + "/prices";
 
     private final Inventory inventory;
     private final InventorySearch inventorySearch;
@@ -41,20 +42,24 @@ public class InventoryPageController {
     private final TechnicalInventoryViewFactory technicalViewFactory;
     private final ProductCategoryViewFactory productCategoryViews;
 
-    @GetMapping(PAGE_PATH)
+    @GetMapping(PRICES_PATH)
     public String page(@RequestParam(value = "q", required = false) String q,
                        @RequestParam(value = "from", required = false) String from, Model model) {
         addCommonAttributes(model);
-        model.addAttribute("mode", "code");
-        // Only a list of the browse mode is a place to go back to; anything else is dropped.
-        InventoryReturnTo.safe(from).filter(target -> target.contains("view=browse"))
-                .ifPresent(target -> model.addAttribute("backToBrowse", target));
+        // Only the supplier assortment list is a place to go back to; anything else is dropped.
+        InventoryReturnTo.safe(from).ifPresent(target -> model.addAttribute("backToBrowse", target));
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!query.isEmpty()) {
             addSearchResult(query, model);
         }
-        return "inventory";
+        return "inventory-prices";
+    }
+
+    /** The address of the price comparison for a code, keeping the way back to a browse list when there is one. */
+    static String pricesHref(String query, String from) {
+        String href = PRICES_PATH + "?q=" + encode(normalize(query));
+        return from == null || from.isBlank() ? href : href + "&from=" + encode(from.strip());
     }
 
     @GetMapping(PAGE_PATH + "/summary")
@@ -90,7 +95,6 @@ public class InventoryPageController {
     @GetMapping(PAGE_PATH + "/search")
     public String search(@RequestParam(value = "q", required = false) String q, Model model, HttpServletResponse response) {
         addCommonAttributes(model);
-        model.addAttribute("mode", "code");
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!addSearchResult(query, model)) {
@@ -110,8 +114,8 @@ public class InventoryPageController {
                 .findFirst()
                 // UriComponentsBuilder#encode() leaves '+' unencoded (decoded as a space) and turns "{x}" into
                 // a URI template variable that RedirectView then fails to resolve
-                .map(query -> "redirect:" + PAGE_PATH + "?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
-                .orElse("redirect:" + PAGE_PATH);
+                .map(query -> "redirect:" + pricesHref(query, null))
+                .orElse("redirect:" + PRICES_PATH);
     }
 
     private boolean addSearchResult(String query, Model model) {
@@ -150,5 +154,9 @@ public class InventoryPageController {
 
     private static String normalize(String value) {
         return value == null ? "" : value.strip();
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

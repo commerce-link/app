@@ -57,7 +57,7 @@ class AddToCatalogDialogFactoryTest {
     void matchingCategoriesComeFirstWithHowManyAreAlreadyThere() {
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001", "5901000000002", "5901000000001"),
-                "/dashboard/inventory?view=browse&cat=11");
+                "/dashboard/inventory?cat=11");
 
         // then
         assertThat(dialog.count()).isEqualTo(2);
@@ -66,7 +66,7 @@ class AddToCatalogDialogFactoryTest {
                 .containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
         assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(0, 1);
         assertThat(dialog.others()).extracting(AddToCatalogDialog.Group::catalogName).containsExactly("Podzespoły");
-        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory?view=browse&cat=11");
+        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory?cat=11");
     }
 
     @Test
@@ -78,7 +78,7 @@ class AddToCatalogDialogFactoryTest {
         assertThat(dialog.productName()).isEqualTo("Freezer 360");
         assertThat(dialog.anyMatching()).isFalse();
         assertThat(dialog.others()).extracting(AddToCatalogDialog.Group::catalogName).containsExactly("Podzespoły", "Sklep B2B");
-        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory?view=browse");
+        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory");
     }
 
     @Test

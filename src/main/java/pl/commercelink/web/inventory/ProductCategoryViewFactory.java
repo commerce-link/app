@@ -32,7 +32,7 @@ public class ProductCategoryViewFactory {
         CatalogPlacement.StorePlacement placement = withCatalog ? catalogPlacement.forStore(storeId) : null;
         CategoryLine line = CategoryLine.of(tree, placement, taxonomy.categoryId(), taxonomy.category(), key, false);
         String ean = product.ean();
-        String addHref = BrowseQuery.start().href() + "&open=add&ean=" + URLEncoder.encode(ean == null ? "" : ean, StandardCharsets.UTF_8);
+        String addHref = BrowseQuery.start().hrefWith("open=add&ean=" + URLEncoder.encode(ean == null ? "" : ean, StandardCharsets.UTF_8));
         return Optional.of(new ProductCategoryView(line, ean, withCatalog && ean != null && !line.inCatalog(), addHref));
     }
 }

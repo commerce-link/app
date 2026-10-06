@@ -131,7 +131,8 @@ class BrowsePageFactoryTest {
         assertThat(row.category().catalogLabel()).isEqualTo("Podzespoły › Karta graficzna");
         assertThat(row.category().catalogMore()).isEqualTo(1);
         assertThat(row.category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
-        assertThat(row.detailHref()).startsWith("/dashboard/inventory?q=5901000000001&from=");
+        assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
+        assertThat(row.addHref()).isEqualTo("/dashboard/inventory?cat=10&open=add&ean=5901000000001");
     }
 
     @Test

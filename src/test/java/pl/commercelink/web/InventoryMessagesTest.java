@@ -20,7 +20,7 @@ class InventoryMessagesTest {
             properties.load(reader);
         }
         return properties.stringPropertyNames().stream()
-                .filter(key -> key.startsWith("inventory.") || key.startsWith("intro.inventory."))
+                .filter(key -> key.startsWith("inventory.") || key.startsWith("intro.inventory"))
                 .collect(Collectors.toSet());
     }
 

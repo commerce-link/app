@@ -22,6 +22,7 @@ class InventoryBrowseScriptContractTest {
         // given
         String script = read("src/main/resources/static/js/inventory-browse.js");
         String templates = read("src/main/resources/templates/inventory.html")
+                + read("src/main/resources/templates/inventory-prices.html")
                 + read("src/main/resources/templates/fragments/inventory-browse.html");
 
         // when / then

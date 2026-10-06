@@ -82,7 +82,7 @@ class InventoryBrowseRenderingTest {
         AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, "Karty graficzne",
                 List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0)),
                 List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0)))),
-                false, "/dashboard/inventory?view=browse&cat=11", AddToCatalogDialog.ACTION);
+                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
         Context context = new Context();
         context.setVariable("addDialog", dialog);
 
@@ -108,25 +108,25 @@ class InventoryBrowseRenderingTest {
         CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
                 "Komponenty komputerowe › Karty graficzne", "Podzespoły › Karta graficzna", 1, false,
                 inCatalog ? "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1" : null);
-        return new BrowsePage.RowView("Gigabyte RTX 4060", "Gigabyte", "5901000000001", "GV-N4060", "/dashboard/inventory?q=5901000000001",
-                line, 1189.0, true, "AB", 214, 4, "/dashboard/inventory?view=browse&open=add&ean=5901000000001");
+        return new BrowsePage.RowView("Gigabyte RTX 4060", "Gigabyte", "5901000000001", "GV-N4060", "/dashboard/inventory/prices?q=5901000000001",
+                line, 1189.0, true, "AB", 214, 4, "/dashboard/inventory?open=add&ean=5901000000001");
     }
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows) {
-        BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?view=browse&sort=cost", "none");
+        BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?sort=cost", "none");
         return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : "Karty graficzne",
-                List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory?view=browse"),
+                List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
                         new BrowsePage.Crumb("Karty graficzne", null, null)),
-                List.of(new BrowsePage.NavItem("Karty graficzne", null, 3, "/dashboard/inventory?view=browse&cat=11", true)), true,
+                List.of(new BrowsePage.NavItem("Karty graficzne", null, 3, "/dashboard/inventory?cat=11", true)), true,
                 query.isStart() ? List.of(new BrowsePage.Tile("Komponenty komputerowe", null, 5, "Karty graficzne",
-                        "/dashboard/inventory?view=browse&cat=10")) : List.of(),
+                        "/dashboard/inventory?cat=10")) : List.of(),
                 List.of(new BrowsePage.MenuOption("AB", "AB", null, 3, false, null)),
-                List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.stock.ALL", 0, false, "/dashboard/inventory?view=browse"),
-                        new BrowsePage.MenuOption("IN_STOCK", null, "inventory.browse.stock.IN_STOCK", 0, true, "/dashboard/inventory?view=browse&stock=in-stock")),
-                admin ? List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.catalog.ALL", 0, true, "/dashboard/inventory?view=browse")) : List.of(),
-                List.of(new BrowsePage.Chip("inventory.browse.chip.stock", null, "inventory.browse.stock.IN_STOCK", "/dashboard/inventory?view=browse")),
-                "/dashboard/inventory?view=browse", rows, rows.size(), false,
-                Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?view=browse&page=" + p),
+                List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.stock.ALL", 0, false, "/dashboard/inventory"),
+                        new BrowsePage.MenuOption("IN_STOCK", null, "inventory.browse.stock.IN_STOCK", 0, true, "/dashboard/inventory?stock=in-stock")),
+                admin ? List.of(new BrowsePage.MenuOption("ALL", null, "inventory.browse.catalog.ALL", 0, true, "/dashboard/inventory")) : List.of(),
+                List.of(new BrowsePage.Chip("inventory.browse.chip.stock", null, "inventory.browse.stock.IN_STOCK", "/dashboard/inventory")),
+                "/dashboard/inventory", rows, rows.size(), false,
+                Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?page=" + p),
                 Map.of("NAME", none, "COST", none, "QTY", none), query.href());
     }
 }
