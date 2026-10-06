@@ -20,12 +20,18 @@
     <span class="cl-category-catalog" th:if="${line.catalogLabel() != null and (browse == null or browse.admin())}">
         <i class="fas fa-book" aria-hidden="true"></i>
         <span><span class="cl-visually-hidden" th:text="#{inventory.browse.catalogCategory}"></span> <span th:text="${line.catalogLabel()}"></span>
-            <span class="cl-more" th:if="${line.catalogMore() > 0}" th:text="#{inventory.browse.more(${line.catalogMore()})}"></span></span>
+            <th:block th:if="${line.catalogMore() > 0}"><span class="cl-more" th:title="#{inventory.browse.catalog.all(${#strings.listJoin(line.catalogLabels(), ' · ')})}"
+                  th:text="#{inventory.browse.more(${line.catalogMore()})}"></span>
+            <span class="cl-visually-hidden" th:text="#{inventory.browse.catalog.all(${#strings.listJoin(line.catalogLabels(), ' · ')})}"></span></th:block></span>
     </span>
     <span class="cl-category-catalog is-none" th:if="${line.catalogUnmatched() and (browse == null or browse.admin())}">
         <i class="fas fa-book" aria-hidden="true"></i><span th:text="#{inventory.browse.catalog.none}"></span>
     </span>
 </th:block>
+
+<a th:fragment="inCatalogPill(line)" class="cl-status is-ok" th:href="${line.inCatalogHref()}"
+   th:title="#{inventory.browse.inCatalog.where(${#strings.listJoin(line.inCatalogLabels(), ' · ')})}"
+   th:text="${line.inCatalogLabels().size() > 1} ? #{inventory.browse.inCatalog.count(${line.inCatalogLabels().size()})} : #{inventory.browse.inCatalog}"></a>
 
 <div th:fragment="results" class="cl-inv-browse-results" data-cl-list-results
      th:attr="data-cl-list-path=${browse.pagePath()}, data-cl-list-fragment=${browse.fragmentPath()}"
@@ -244,8 +250,14 @@
                                 <span class="cl-table-sub" th:if="${row.warehouseQty() > 0}" th:text="#{inventory.browse.warehouse(${row.warehouseQty()})}"></span>
                             </td>
                             <td class="cl-table-actions" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.action}">
-                                <a th:if="${row.inCatalog()}" class="cl-status is-ok" th:href="${row.category().inCatalogHref()}"
-                                   th:text="#{inventory.browse.inCatalog}"></a>
+                                <span th:if="${row.inCatalog()}" class="cl-inv-catalog-state">
+                                    <th:block th:replace="~{fragments/inventory-browse :: inCatalogPill(${row.category()})}"></th:block>
+                                    <a th:if="${row.category().addableElsewhere()}" class="cl-link-button" th:href="${row.addHref()}" data-browse-add
+                                       th:attr="data-ean=${row.ean()}, aria-label=#{inventory.browse.addElsewhere.aria(${row.name()})}">
+                                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                                        <span th:text="#{inventory.browse.addElsewhere}"></span>
+                                    </a>
+                                </span>
                                 <a th:unless="${row.inCatalog()}" class="cl-link-button" th:href="${row.addHref()}" data-browse-add
                                    th:attr="data-ean=${row.ean()}, aria-label=#{inventory.browse.add.aria(${row.name()})}">
                                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>

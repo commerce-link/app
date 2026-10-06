@@ -66,6 +66,44 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
+    void plusOneNamesEveryMatchingCatalogCategoryForMouseAndScreenReader() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("title=\"Fits: Podzespoły › Karta graficzna · Sklep B2B › Karty\"");
+        assertThat(html).containsPattern("\\+1</span>\\s*<span class=\"cl-visually-hidden\">Fits: Podzespoły › Karta graficzna · Sklep B2B › Karty</span>");
+    }
+
+    @Test
+    void productInOneOfTwoMatchingCategoriesSaysWhereAndOffersTheOther() {
+        // given
+        BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna"), true), 0);
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row))));
+
+        // then
+        assertThat(html).contains("title=\"In catalog: Podzespoły › Karta graficzna\"", ">In catalog</a>");
+        assertThat(html).contains("Add to another", "data-ean=\"5901000000001\"",
+                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"");
+        assertThat(html).doesNotContain(">Add to catalog<");
+    }
+
+    @Test
+    void productInEveryMatchingCategoryShowsTheCountAndNoFurtherAction() {
+        // given
+        BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty"), false), 0);
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row))));
+
+        // then
+        assertThat(html).contains("In catalog: 2", "title=\"In catalog: Podzespoły › Karta graficzna · Sklep B2B › Karty\"");
+        assertThat(html).doesNotContain("Add to another", "data-ean=\"5901000000001\"");
+    }
+
+    @Test
     void nonAdminSeesNeitherSelectionNorAction() {
         // when
         String html = engine.process(RESULTS, context(page(false, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
@@ -130,9 +168,17 @@ class InventoryBrowseRenderingTest {
     }
 
     private static BrowsePage.RowView row(boolean inCatalog, long warehouseQty) {
-        CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
+        return row(line(inCatalog ? List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty") : List.of(), false), warehouseQty);
+    }
+
+    private static CategoryLine line(List<String> inCatalogLabels, boolean addableElsewhere) {
+        return new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
                 "Komponenty komputerowe › Karty graficzne", "Podzespoły › Karta graficzna", 1, false,
-                inCatalog ? "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1" : null);
+                inCatalogLabels.isEmpty() ? null : "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
+                List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty"), inCatalogLabels, addableElsewhere);
+    }
+
+    private static BrowsePage.RowView row(CategoryLine line, long warehouseQty) {
         return new BrowsePage.RowView("Gigabyte RTX 4060", "Gigabyte", "5901000000001", "GV-N4060", "/dashboard/inventory/prices?q=5901000000001",
                 line, 1189.0, true, "AB", 214, 4, warehouseQty, "/dashboard/inventory?open=add&ean=5901000000001");
     }

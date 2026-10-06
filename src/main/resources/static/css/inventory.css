@@ -904,3 +904,19 @@
     align-items: center;
     gap: 8px;
 }
+
+/* A product already in the catalog keeps its pill on the row's first line; the way to another category sits under it. */
+.cl-inv-page .cl-inv-catalog-state {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.cl-inv-page .cl-table td.cl-table-actions .cl-inv-catalog-state .cl-link-button {
+    margin-block: 0;
+}
+
+.cl-inv-page .cl-category-catalog .cl-more[title] {
+    cursor: help;
+}

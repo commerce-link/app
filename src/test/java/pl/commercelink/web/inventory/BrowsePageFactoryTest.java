@@ -142,6 +142,9 @@ class BrowsePageFactoryTest {
         assertThat(row.category().catalogLabel()).isEqualTo("Podzespoły › Karta graficzna");
         assertThat(row.category().catalogMore()).isEqualTo(1);
         assertThat(row.category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
+        assertThat(row.category().catalogLabels()).containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
+        assertThat(row.category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
+        assertThat(row.category().addableElsewhere()).isTrue();
         assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
         assertThat(row.addHref()).isEqualTo("/dashboard/inventory?cat=10&open=add&ean=5901000000001");
     }
@@ -205,6 +208,7 @@ class BrowsePageFactoryTest {
 
         // then
         assertThat(page.rows().get(0).category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
+        assertThat(page.rows().get(0).category().addableElsewhere()).isTrue();
         ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
         verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
         assertThat(criteria.getValue().rowFilter().test(merged)).isFalse();
