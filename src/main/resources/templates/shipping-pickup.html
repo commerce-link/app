@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* "Zamów odbiór": one courier for the chosen packages of one carrier at one pickup address (ShipmentPickupPage, every
+       text built by ShipmentPickupController). The group is picked with a GET form (submit-on-change.js sends it on
+       change, "Zmień" without JavaScript); the pickup is ordered with a POST. */-->
+<div layout:fragment="content">
+    <section class="cl-page" th:with="p=${pickupPage}">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${p.back()}, #{shipping.pickup.back},
+                     #{shipping.pickup.title}, #{shipping.pickup.lead}, null)}"></div>
+
+            <div class="cl-stack">
+                <div th:if="${p.formError() != null}" class="cl-alert is-bad" id="pickup-form-error" role="alert">
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${p.formError()}"></p>
+                </div>
+
+                <div th:unless="${p.hasGroups()}" class="cl-card">
+                    <p class="cl-list-empty" th:text="#{shipping.pickup.none}"></p>
+                </div>
+
+                <form th:if="${p.hasGroups()}" class="cl-form" method="get" id="pickup-group-form" th:action="@{/dashboard/shipping/pickups/new}">
+                    <input type="hidden" name="back" th:value="${p.back()}">
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{shipping.carrier}"></legend>
+                            <div class="cl-field">
+                                <label class="cl-label cl-visually-hidden" for="pickup-group" th:text="#{shipping.carrier}"></label>
+                                <select class="cl-select" id="pickup-group" name="group" aria-describedby="pickup-group-help"
+                                        data-cl-submit-on-change>
+                                    <option th:each="g : ${p.groups()}" th:value="${g.key()}" th:selected="${g.selected()}"
+                                            th:text="${g.label()}"></option>
+                                </select>
+                                <p class="cl-help" id="pickup-group-help" th:text="#{shipping.pickup.carrier.help}"></p>
+                            </div>
+                        </fieldset>
+                        <noscript>
+                            <div class="cl-card-footer">
+                                <button type="submit" class="cl-button" th:text="#{shipping.pickup.change}"></button>
+                            </div>
+                        </noscript>
+                    </div>
+                </form>
+
+                <form th:if="${p.hasGroups()}" class="cl-form" method="post" id="pickup-order-form" novalidate
+                      data-cl-submit-once th:action="@{/dashboard/shipping/pickups}">
+                    <input type="hidden" name="group" th:value="${p.selectedKey()}">
+                    <input type="hidden" name="back" th:value="${p.back()}">
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{shipping.pickup.packages}"></legend>
+                            <ul class="cl-check-list" aria-describedby="pickup-packages-help">
+                                <li th:each="row : ${p.packages()}">
+                                    <label class="cl-check">
+                                        <input type="checkbox" name="externalIds" th:value="${row.externalId()}" checked>
+                                        <span><span th:text="${row.label()}"></span>
+                                            <span th:if="${row.marker() != null}" class="cl-optional" th:text="${row.marker()}"></span></span>
+                                    </label>
+                                </li>
+                            </ul>
+                            <p class="cl-help" id="pickup-packages-help" th:text="#{shipping.pickup.packages.help}"></p>
+                        </fieldset>
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{shipping.pickup.place}"></legend>
+                            <p th:text="${p.address()}"></p>
+                        </fieldset>
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{shipping.pickup.window}"></legend>
+                            <div th:if="${p.windowsError() != null}" class="cl-alert is-warn" id="pickup-windows-error">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="${p.windowsError()}"></p>
+                            </div>
+                            <div th:if="${p.windowsError() == null and !p.canOrder()}" class="cl-alert is-warn" id="pickup-no-windows">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="#{shipping.pickup.no.windows}"></p>
+                            </div>
+                            <fieldset th:if="${p.canOrder()}" class="cl-choice-group is-row"
+                                      th:attr="aria-label=#{shipping.pickup.window}">
+                                <label class="cl-choice" th:each="w, stat : ${p.windows()}">
+                                    <input type="radio" name="window" th:value="${w.value()}" th:checked="${stat.first}">
+                                    <span class="cl-choice-text"><span class="cl-choice-title" th:text="${w.label()}"></span></span>
+                                </label>
+                            </fieldset>
+                            <p th:if="${p.canOrder()}" class="cl-help" th:text="#{shipping.pickup.effect}"></p>
+                        </fieldset>
+                        <div th:if="${p.canOrder()}" class="cl-card-footer">
+                            <button type="submit" class="cl-button is-primary" th:text="#{shipping.pickup.submit}"></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+    <script th:src="@{/js/submit-on-change.js}" defer></script>
+    <script th:src="@{/js/submit-once.js}" defer></script>
+</div>
+</body>
+</html>
