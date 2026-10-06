@@ -910,7 +910,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 8px;
 }
 
 .cl-inv-page .cl-inv-in-catalog {
@@ -933,17 +933,78 @@
     cursor: pointer;
 }
 
+/* 720-1439 px: the six columns of the browse list need about 870 px at their natural widths, more than the card beside
+   the sidebar has (it overflowed by up to 85 px at 1024 px). The column names wrap, the "+ Dodaj" button keeps only its
+   icon (its tooltip and accessible name still say what it does), and below 1216 px the cells get tighter sides and the
+   category a lower floor, so the table fits the card at every width. */
+@media screen and (min-width: 720px) and (max-width: 1439px) {
+    .cl-inv-page .cl-table.cl-inv-browse-table thead th,
+    .cl-inv-page .cl-table.cl-inv-browse-table thead th.is-numeric,
+    .cl-inv-page .cl-table.cl-inv-browse-table thead th.cl-table-actions,
+    .cl-inv-page .cl-table.cl-inv-browse-table thead .cl-table-sort {
+        white-space: normal;
+    }
+
+    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-sort {
+        text-align: inherit;
+    }
+
+    .cl-inv-page .cl-inv-add-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cl-inv-page .cl-inv-add .icon {
+        margin: 0;
+    }
+}
+
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-inv-page .cl-inv-browse-table :is(thead th, tbody th, td) {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
+        min-width: 9rem;
+    }
+}
+
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    /* without the sidebar but with 44 px targets: the check stands above the button, and the name gets a lower floor */
+    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-state {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-key {
+        min-width: 9rem;
+    }
+}
+
 @media screen and (max-width: 1023px) {
-    /* a 44 px tap target around the check, like the margin mark */
-    .cl-inv-page .cl-inv-in-catalog {
+    /* 44 px tap targets around the check and the add button, like the margin mark */
+    .cl-inv-page .cl-inv-in-catalog,
+    .cl-inv-page .cl-inv-add {
         min-width: 44px;
         min-height: 44px;
+        justify-content: center;
     }
 }
 
 @media screen and (max-width: 719px) {
-    /* as a card the "Katalog" line starts at the left edge, so its bubbles open rightwards from the mark */
-    .cl-inv-page .cl-inv-catalog-state .cl-tooltip.is-end::after {
+    /* As a card the "Katalog" line starts at the left: the check's bubble opens rightwards, the button's stays anchored
+       to its right edge, and both are capped so that even hidden they never reach past the screen's edge (a hidden
+       bubble still counts towards the page's width). */
+    .cl-inv-page .cl-inv-catalog-state .cl-tooltip::after {
+        max-width: calc(100vw - 160px);
+    }
+
+    .cl-inv-page .cl-inv-catalog-state .cl-inv-in-catalog.is-end::after {
         right: auto;
         left: -8px;
     }

@@ -29,10 +29,11 @@
             <th:block th:replace="~{fragments/inventory-browse :: inCatalogIcon(${productCategory.line()})}"></th:block>
         </th:block>
         <a th:if="${productCategory != null and productCategory.canAdd()}" class="cl-button"
-           th:classappend="${productCategory.line().inCatalog()} ? '' : 'is-primary'"
+           th:with="inCatalog=${productCategory.line().inCatalog()}"
+           th:classappend="${inCatalog} ? '' : 'is-primary'"
            th:href="${productCategory.addHref()}" data-browse-add th:attr="data-ean=${productCategory.ean()}">
             <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-            <span th:text="${productCategory.line().inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></span>
+            <span th:text="${inCatalog} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></span>
         </a>
     </div>
 </div>

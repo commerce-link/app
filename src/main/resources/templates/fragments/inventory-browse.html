@@ -216,7 +216,7 @@
                                                 aria=${row.inCatalog()} ? #{inventory.browse.addElsewhere.aria(${row.name()})} : #{inventory.browse.add.aria(${row.name()})}"
                                        th:attr="data-ean=${row.ean()}, data-tooltip=${tip}, aria-label=${aria}">
                                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                                        <span th:text="#{inventory.browse.add.short}"></span>
+                                        <span class="cl-inv-add-text" th:text="#{inventory.browse.add.short}"></span>
                                     </a>
                                 </span>
                             </td>

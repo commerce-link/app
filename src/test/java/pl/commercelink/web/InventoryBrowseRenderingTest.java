@@ -73,7 +73,7 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).contains(">Catalog</th>", "data-label=\"Catalog\"");
         assertThat(html).contains("data-tooltip=\"Add to catalog\"", "aria-label=\"Add to catalog: Gigabyte RTX 4060\"",
-                "data-ean=\"5901000000001\"", ">Add</span>");
+                "data-ean=\"5901000000001\"", "cl-inv-add-text\">Add</span>");
         assertThat(html).doesNotContain("cl-inv-in-catalog", "cl-status is-ok");
     }
 
@@ -87,11 +87,11 @@ class InventoryBrowseRenderingTest {
 
         // then
         String places = "In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty";
-        assertThat(html).containsPattern("<a class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" "
+        assertThat(html).contains("<a class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" "
                 + "href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\"");
         assertThat(html).contains("data-tooltip=\"" + places + "\"", "aria-label=\"" + places + "\"", "fa-check-circle");
         assertThat(html).contains("data-tooltip=\"Add to another category\"",
-                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"", "data-ean=\"5901000000001\"", ">Add</span>");
+                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"", "data-ean=\"5901000000001\"", "cl-inv-add-text\">Add</span>");
         assertThat(html).doesNotContain("cl-status is-ok", "In catalog: 2");
     }
 
@@ -177,7 +177,8 @@ class InventoryBrowseRenderingTest {
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
 
         // then
-        assertThat(html).contains("data-tooltip=\"In catalog:\n&lt;b&gt;x&lt;/b&gt; › Fan\nSklep › &lt;b&gt;y&lt;/b&gt;\"");
+        String escaped = "In catalog:\n&lt;b&gt;x&lt;/b&gt; › Fan\nSklep › &lt;b&gt;y&lt;/b&gt;";
+        assertThat(html).contains("data-tooltip=\"" + escaped + "\"", "aria-label=\"" + escaped + "\"");
         assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>");
     }
 
