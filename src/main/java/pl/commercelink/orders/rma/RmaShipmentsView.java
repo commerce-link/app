@@ -17,12 +17,15 @@ public record RmaShipmentsView(List<Row> rows, String pickupHref, String pollHre
      * by hand. labelHref: "Pobierz etykietę". retryHref: "Spróbuj ponownie" after a failed operator shipment, the item
      * list of the page where the items are shipped again. removeAction: the POST that drops a failed creation.
      * pickupRetryAction: the POST of "Zamów odbiór ponownie", for a customer's return whose pickup was not ordered.
+     * returnRetryAction: the POST of "Spróbuj ponownie" for a customer's return that failed to be created, booked again
+     * with what the customer chose (CustomerReturnRetry); null when that cannot be done, "Usuń" stays.
      */
     public record Row(Shipment shipment, String stateKey, Object[] stateArgs, String stateTone, String labelHref,
-                      String retryHref, String removeAction, String pickupRetryAction) {
+                      String retryHref, String removeAction, String pickupRetryAction, String returnRetryAction) {
 
         public boolean hasActions() {
-            return labelHref != null || retryHref != null || removeAction != null || pickupRetryAction != null;
+            return labelHref != null || retryHref != null || removeAction != null || pickupRetryAction != null
+                    || returnRetryAction != null;
         }
     }
 }

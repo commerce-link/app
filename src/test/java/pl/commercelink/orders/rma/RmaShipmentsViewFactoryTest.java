@@ -12,6 +12,7 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -127,13 +128,49 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
-    void aFailedCustomerReturnCanOnlyBeRemoved() {
+    void aFailedCustomerReturnIsBookedAgainWithWhatTheCustomerChose() {
+        // given
+        RMA rma = rmaWith(failedCreation(true));
+        rma.setShippingDetails(ShippingDetails._default());
+        rma.setReturnPackageTemplateId("7");
+
         // when
-        RmaShipmentsView.Row row = factory.build(rmaWith(failedCreation(true)), false, PL).rows().get(0);
+        RmaShipmentsView.Row row = factory.build(rma, false, PL).rows().get(0);
 
         // then
+        assertThat(row.returnRetryAction()).isEqualTo("/dashboard/rma/rma-1/return-shipment/retry");
         assertThat(row.retryHref()).isNull();
         assertThat(row.removeAction()).isNotNull();
+    }
+
+    @Test
+    void aFailedCustomerReturnWithoutTheChosenPackageCanOnlyBeRemoved() {
+        // given: submitted before the package template was kept on the RMA
+        RMA rma = rmaWith(failedCreation(true));
+        rma.setShippingDetails(ShippingDetails._default());
+
+        // when
+        RmaShipmentsView.Row row = factory.build(rma, false, PL).rows().get(0);
+
+        // then
+        assertThat(row.returnRetryAction()).isNull();
+        assertThat(row.retryHref()).isNull();
+        assertThat(row.removeAction()).isNotNull();
+    }
+
+    @Test
+    void aFailedOperatorShipmentGetsNoReturnRetry() {
+        // given
+        RMA rma = rmaWith(failedCreation(false));
+        rma.setShippingDetails(ShippingDetails._default());
+        rma.setReturnPackageTemplateId("7");
+
+        // when
+        RmaShipmentsView.Row row = factory.build(rma, false, PL).rows().get(0);
+
+        // then
+        assertThat(row.returnRetryAction()).isNull();
+        assertThat(row.retryHref()).isNotNull();
     }
 
     @Test
@@ -198,7 +235,10 @@ class RmaShipmentsViewFactoryTest {
         Shipment failedPickup = customerReturn();
         failedPickup.setExternalId("21480004");
         failedPickup.setPickup(ShipmentPickup.awaiting().failed("Brak kuriera"));
-        RmaShipmentsView view = factory.build(rmaWith(ordered, failedPickup, failedCreation(false)), false, PL);
+        RMA rma = rmaWith(ordered, failedPickup, failedCreation(false), failedCreation(true));
+        rma.setShippingDetails(ShippingDetails._default());
+        rma.setReturnPackageTemplateId("7");
+        RmaShipmentsView view = factory.build(rma, false, PL);
 
         // when
         String html = SettingsTemplateRenderer.render(
@@ -213,6 +253,7 @@ class RmaShipmentsViewFactoryTest {
                 .contains(">Zamów odbiór ponownie</button>")
                 .contains("action=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\"")
                 .contains("href=\"/dashboard/rma/rma-1#rmaItemsForm\"")
+                .contains("action=\"/dashboard/rma/rma-1/return-shipment/retry\"")
                 .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/rma/rma-1\"")
                 .doesNotContain("??");
     }

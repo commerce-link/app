@@ -29,6 +29,7 @@ public class RmaShipmentsViewFactory {
         Store store = shipments.stream().anyMatch(RmaShipmentsViewFactory::hasPackage)
                 ? storesRepository.findById(rma.getStoreId()) : null;
         String details = "/dashboard/rma/" + rma.getRmaId();
+        boolean returnRetry = !closed && CustomerReturnRetry.possible(rma);
         Set<String> labelProviders = shipments.stream().filter(RmaShipmentsViewFactory::hasPackage)
                 .map(Shipment::getProvider).distinct()
                 .filter(provider -> shippingService.supportsLabels(store, provider))
@@ -43,7 +44,8 @@ public class RmaShipmentsViewFactory {
                     !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#rmaItemsForm" : null,
                     !closed && s.creationFailed() ? removeAction(details, s) : null,
                     !closed && isCustomerReturn(s) && s.awaitsPickup() && s.getExternalId() != null
-                            ? pickupRetryAction(details, s) : null);
+                            ? pickupRetryAction(details, s) : null,
+                    returnRetry && isCustomerReturn(s) && s.creationFailed() ? details + "/return-shipment/retry" : null);
         }).toList();
         LocalDateTime now = LocalDateTime.now();
         String pollHref = shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now)) ? details + "/shipments/state" : null;
@@ -54,13 +56,8 @@ public class RmaShipmentsViewFactory {
         return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
     }
 
-    /**
-     * The customer books a return without choosing a pickup address (the courier comes to the customer), so its
-     * package is never in the store's pickup list: its pickup is ordered again here, not on the pickup page. The
-     * operator cannot book a return on the customer's behalf either, so a failed one has no "Spróbuj ponownie".
-     */
-    static boolean isCustomerReturn(Shipment s) {
-        return s.getProvider() != null && s.getPickUpAddressId() == null;
+    private static boolean isCustomerReturn(Shipment s) {
+        return CustomerReturnRetry.isCustomerReturn(s);
     }
 
     private static String removeAction(String details, Shipment s) {

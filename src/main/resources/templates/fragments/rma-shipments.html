@@ -6,7 +6,8 @@
        are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
        one value). "Zamów odbiór" above the table leads to the pickup page and comes back here; "Zamów odbiór ponownie"
        orders the pickup of a customer's return again at once (its package is not on the pickup page); "Spróbuj
-       ponownie" after a failed operator shipment points to the item list, where the items are shipped again; "Usuń"
+       ponownie" after a failed operator shipment points to the item list, where the items are shipped again, and after
+       a customer's failed return books it again with what the customer chose (a POST); "Usuń"
        drops the record of a failed creation. While a command waits for the provider the table's box carries
        data-cl-cancellation-poll (rma-detail.html) and shipment-cancellation.js reloads the page once it is settled. */-->
 <th:block th:fragment="table(view)">
@@ -50,6 +51,9 @@
                         </a>
                         <a th:if="${row.retryHref() != null}" class="button is-small" th:href="@{${row.retryHref()}}"
                            th:text="#{order.shipments.retry}"></a>
+                        <form th:if="${row.returnRetryAction() != null}" method="post" th:action="@{${row.returnRetryAction()}}">
+                            <button type="submit" class="button is-small is-primary" th:text="#{order.shipments.retry}"></button>
+                        </form>
                         <form th:if="${row.pickupRetryAction() != null}" method="post" th:action="@{${row.pickupRetryAction()}}">
                             <button type="submit" class="button is-small is-primary" th:text="#{rma.shipments.pickup.retry}"></button>
                         </form>

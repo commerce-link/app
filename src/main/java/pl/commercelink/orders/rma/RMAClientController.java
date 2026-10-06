@@ -104,6 +104,7 @@ public class RMAClientController {
                     fresh -> {
                         fresh.markAsWaitingForItems();
                         fresh.setShippingDetails(rmaReturnForm.getShippingDetails());
+                        fresh.setReturnPackageTemplateId(rmaReturnForm.getSelectedPackageTemplateId());
                     },
                     rmaRepository::save);
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.shipment.has.been.created", null, locale));

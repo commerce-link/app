@@ -19,6 +19,7 @@ import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.orders.rma.RMALifecycle;
 import pl.commercelink.orders.rma.RMARepository;
+import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.stores.StoreNotification;
@@ -174,5 +175,37 @@ class RmaReturnShipmentOwnerTest {
                 n.getType() == StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED && "rma-1:cmd-1".equals(n.getObject())));
         verify(messageSource).getMessage(eq("shipping.notification.return.failed"),
                 argThat(args -> "rma-1".equals(args[0]) && "Nieprawidłowy kod pocztowy".equals(args[1])), any());
+    }
+
+    @Test
+    void aRefusalWhileTheCustomerCanSubmitAgainLeavesNothingOnTheRma() {
+        // given
+        rma.setStatus(RMAStatus.Approved);
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        rma.setShipments(new ArrayList<>(List.of(placeholder)));
+
+        // when
+        owner.refused(creation("cmd-1"), "Nieprawidłowy kod pocztowy");
+
+        // then
+        assertThat(rma.getShipments()).isEmpty();
+    }
+
+    @Test
+    void aRefusedRetryOfTheOperatorLeavesAFailedRowToRetryAgain() {
+        // given: the RMA waits for the items, so only the operator books the return again
+        rma.setStatus(RMAStatus.WaitingForItems);
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setCreation(ShipmentCreationState.pending("cmd-2", LocalDateTime.now()));
+        rma.setShipments(new ArrayList<>(List.of(placeholder)));
+
+        // when
+        owner.refused(creation("cmd-2"), "Nieprawidłowy kod pocztowy");
+
+        // then
+        assertThat(rma.getShipments()).hasSize(1);
+        assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
+        assertThat(rma.getShipments().get(0).getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
     }
 }

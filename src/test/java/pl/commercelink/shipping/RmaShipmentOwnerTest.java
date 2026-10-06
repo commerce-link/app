@@ -152,7 +152,8 @@ class RmaShipmentOwnerTest {
 
     @Test
     void aCustomersRefusedReturnLeavesNothingWaitingOnTheRma() {
-        // given
+        // given: the customer submits while the RMA is Approved and may submit again
+        rma.setStatus(pl.commercelink.orders.rma.RMAStatus.Approved);
         rma.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
         RmaShipmentOwner owner = returnOwner();
 
