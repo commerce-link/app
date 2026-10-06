@@ -241,9 +241,9 @@ class DemoStoreSeederTest {
             assertTrue(definition.hasCategoryMapping(), definition.getName() + " should be mapped");
         });
         CategoryDefinition cpu = definitions.stream()
-                .filter(d -> "CPU".equals(d.getName())).findFirst().orElseThrow();
+                .filter(d -> "CPU".equals(d.getCategory())).findFirst().orElseThrow();
         assertEquals(List.of("989"), cpu.getPimCategoryIds());
-        assertEquals("CPU", cpu.getCategory());
+        assertEquals("Procesory", cpu.getName());
     }
 
     @Test
@@ -1015,7 +1015,7 @@ class DemoStoreSeederTest {
     }
 
     @Test
-    void keepsSimProductsInCatalogButSeedsNoOrdersWithThemWhenAcmeIsRegistered() {
+    void keepsSimProductsInTheFeedsOnlyWhenAcmeIsRegistered() {
         // given
         List<CatalogSeedRow> allRows = CatalogSeed.load();
         List<CatalogSeedRow> rows = DemoStoreSeeder.filterSimulationRows(allRows, true);
@@ -1024,9 +1024,12 @@ class DemoStoreSeederTest {
         DemoOrders demoOrders = DemoStoreSeeder.buildDemoOrders("store-1", rows);
         CompletedDemoOrders completed = DemoStoreSeeder.buildCompletedDemoOrders("store-1", "a@b.pl", rows);
         List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1");
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
 
         // then
-        assertTrue(products.stream().anyMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
+        assertTrue(rows.stream().anyMatch(row -> row.mfn().startsWith("SIM-")));
+        assertTrue(products.stream().noneMatch(p -> p.getManufacturerCode().startsWith("SIM-")));
+        assertTrue(definitions.stream().noneMatch(d -> "Akcesoria".equals(d.getCategory())));
         demoOrders.itemsByOrderId().values().stream()
                 .flatMap(List::stream)
                 .forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
@@ -1035,7 +1038,7 @@ class DemoStoreSeederTest {
                 .forEach(item -> assertFalse(item.getManufacturerCode().startsWith("SIM-")));
 
         String pricelist = readClasspathResource("/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv");
-        assertTrue(pricelist.contains("SIM-"));
+        assertFalse(pricelist.contains("SIM-"));
     }
 
     @Test
