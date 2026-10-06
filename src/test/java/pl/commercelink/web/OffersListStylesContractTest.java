@@ -139,6 +139,15 @@ class OffersListStylesContractTest {
     }
 
     @Test
+    void phoneItemCountKeepsContrastOnTheHoverRow() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then — "pozycje: n" in --cl-ink-3 on the hover row background was 4.47:1
+        assertThat(css).containsPattern("\\.cl-table\\.is-offers tbody tr:hover \\.cl-cell-count-text \\{\\s*color: var\\(--cl-ink-2\\);");
+    }
+
+    @Test
     void itemCountNeverBreaksBetweenLabelAndNumber() throws Exception {
         // given
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));

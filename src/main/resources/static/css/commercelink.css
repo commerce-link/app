@@ -9274,6 +9274,11 @@ a.cl-link-button:hover {
         color: var(--cl-ink-3);
     }
 
+    /* on the tinted hover/tap row --cl-ink-3 is 4.47:1; muted text on a toned background uses --cl-ink-2 (§9) */
+    .cl-page .cl-table.is-offers tbody tr:hover .cl-cell-count-text {
+        color: var(--cl-ink-2);
+    }
+
     /* template card: under the id, like the client line of an offer; basket card: beside the id */
     .cl-page .cl-table.is-templates .cl-cell-count-text {
         grid-column: 1 / -1;
