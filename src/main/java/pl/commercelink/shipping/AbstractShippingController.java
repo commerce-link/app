@@ -114,7 +114,7 @@ public abstract class AbstractShippingController {
                 return "redirect:" + form.getShippingAction();
             }
             case GONE -> redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("shipping.create.gone", null, locale));
+                    messageSource.getMessage(goneMessageKey(), null, locale));
             case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage(startedMessageKey(), null, locale));
         }
@@ -206,6 +206,11 @@ public abstract class AbstractShippingController {
 
     /** Who the shipment belongs to and what settling it needs; commandId, provider and attempt are filled in later. */
     protected abstract ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form);
+
+    /** Message key of the reason shown when the owner refused the new shipment (gone, or one is being created). */
+    protected String goneMessageKey() {
+        return "shipping.create.gone";
+    }
 
     /** Message key of the note shown once the creation started. */
     protected String startedMessageKey() {

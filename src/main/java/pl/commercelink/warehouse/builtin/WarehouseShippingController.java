@@ -25,12 +25,16 @@ import pl.commercelink.shipping.ShippingPageView;
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 public class WarehouseShippingController extends AbstractShippingController {
 
+    private static final String WAREHOUSE_TAKEN_KEY = "shipping.create.warehouse.taken";
+
     @Autowired
     private DeliveredPredicate deliveredPredicate;
 
     @Autowired
     private WarehouseRepository warehouseRepository;
 
+    @Autowired
+    private WarehouseShippingReservations reservations;
 
     @PostMapping("")
     public String initiate(@RequestParam("selectedItemIds") List<String> itemIds, Model model) {
@@ -72,6 +76,17 @@ public class WarehouseShippingController extends AbstractShippingController {
                 .itemIds(List.copyOf(form.getOrderItemIds()))
                 .receiver(form.getShippingDetails())
                 .issuedBy(CustomSecurityContext.getLoggedInUserName());
+    }
+
+    @Override
+    protected String refuseBooking(ShippingForm form) {
+        // the goods-out follows only once the shipment is confirmed: items another shipment holds are still listed
+        return reservations.canShip(getStoreId(), form.getOrderItemIds()) ? null : WAREHOUSE_TAKEN_KEY;
+    }
+
+    @Override
+    protected String goneMessageKey() {
+        return WAREHOUSE_TAKEN_KEY;
     }
 
     @Override

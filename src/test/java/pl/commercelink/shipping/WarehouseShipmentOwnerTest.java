@@ -3,6 +3,7 @@ package pl.commercelink.shipping;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -18,6 +19,7 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.warehouse.builtin.WarehouseGoodsOutService;
+import pl.commercelink.warehouse.builtin.WarehouseShippingReservations;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +31,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,6 +44,7 @@ class WarehouseShipmentOwnerTest {
     @Mock private StoreNotificationService notifications;
     @Mock private WarehouseGoodsOutService goodsOutService;
     @Mock private MessageSource messageSource;
+    @Mock private WarehouseShippingReservations reservations;
 
     private WarehouseShipmentOwner owner;
     private final ShippingDetails receiver = new ShippingDetails();
@@ -49,7 +54,7 @@ class WarehouseShipmentOwnerTest {
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
         when(goodsOutService.issueGoodsOutForExternalService(any(), any(), any(), any()))
                 .thenReturn(OperationResult.success());
-        owner = new WarehouseShipmentOwner(notifications, goodsOutService, messageSource);
+        owner = new WarehouseShipmentOwner(notifications, goodsOutService, reservations, messageSource);
     }
 
     private ShipmentCreationCheckRequest request() {
@@ -228,5 +233,59 @@ class WarehouseShipmentOwnerTest {
         verify(notifications).publish(eq("store-1"), argThat((StoreNotification n) ->
                 n.getSeverity() == StoreNotificationSeverity.INFO
                         && "shipping.notification.warehouse.pickup.carrier".equals(n.getMessage())));
+    }
+
+    @Test
+    void aNewShipmentHoldsItsItemsForItsCommand() {
+        // given
+        when(reservations.hold("store-1", List.of("w-1", "w-2"), "cmd-1")).thenReturn(true);
+
+        // when / then
+        assertThat(owner.markCreating(request(), new Shipment(ShipmentType.Courier))).isTrue();
+    }
+
+    @Test
+    void itemsAnotherShipmentHoldsRefuseTheNewOne() {
+        // given: a second tab or operator ships the same items before the first goods-out
+        when(reservations.hold("store-1", List.of("w-1", "w-2"), "cmd-1")).thenReturn(false);
+
+        // when / then: no command is sent, so no second label is paid for
+        assertThat(owner.markCreating(request(), new Shipment(ShipmentType.Courier))).isFalse();
+    }
+
+    @Test
+    void aRefusedOrFailedCreationLetsTheItemsGo() {
+        // when
+        owner.refused(request(), "Nieprawidłowy kod pocztowy");
+        owner.failed(request(), "Brak odpowiedzi", null);
+
+        // then
+        verify(reservations, org.mockito.Mockito.times(2)).release("store-1", List.of("w-1", "w-2"), "cmd-1");
+    }
+
+    @Test
+    void theItemsAreLetGoOnlyAfterTheirGoodsOut() {
+        // given
+        when(notifications.publish(eq("store-1"), any())).thenReturn(true);
+
+        // when
+        owner.succeeded(request(), List.of(created()));
+
+        // then
+        InOrder order = inOrder(goodsOutService, reservations);
+        order.verify(goodsOutService).issueGoodsOutForExternalService("store-1", List.of("w-1", "w-2"), receiver, "anna");
+        order.verify(reservations).release("store-1", List.of("w-1", "w-2"), "cmd-1");
+    }
+
+    @Test
+    void aRepeatedSuccessLeavesTheItemsAlone() {
+        // given
+        when(notifications.publish(eq("store-1"), any())).thenReturn(false);
+
+        // when
+        owner.succeeded(request(), List.of(created()));
+
+        // then
+        verify(reservations, never()).release(any(), any(), any());
     }
 }

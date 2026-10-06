@@ -14,6 +14,7 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.warehouse.builtin.WarehouseGoodsOutService;
+import pl.commercelink.warehouse.builtin.WarehouseShippingReservations;
 
 import java.util.Collection;
 import java.util.List;
@@ -21,8 +22,8 @@ import java.util.Locale;
 import java.util.function.UnaryOperator;
 
 /**
- * A shipment sent from the warehouse. Nothing is stored for it: the check message carries what settling needs, and
- * the store learns the outcome from its notifications.
+ * A shipment sent from the warehouse. No shipment is stored for it: the check message carries what settling needs, the
+ * items are held for the command until their goods-out, and the store learns the outcome from its notifications.
  */
 @Slf4j
 @Component
@@ -34,6 +35,7 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
 
     private final StoreNotificationService notifications;
     private final WarehouseGoodsOutService goodsOutService;
+    private final WarehouseShippingReservations reservations;
     private final MessageSource messageSource;
 
     @Override
@@ -43,8 +45,8 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
 
     @Override
     public boolean markCreating(ShipmentCreationCheckRequest request, Shipment placeholder) {
-        // warehouse shipments are not stored: the check message carries all that settling needs
-        return true;
+        // the shipment itself is not stored, but its items are held: a second shipment of them would pay a second label
+        return reservations.hold(request.getStoreId(), request.getItemIds(), request.getCommandId());
     }
 
     @Override
@@ -54,7 +56,8 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
 
     @Override
     public void refused(ShipmentCreationCheckRequest request, String error) {
-        // the operator sees the reason on the shipping page
+        // the operator sees the reason on the shipping page and may ship the items again
+        reservations.release(request.getStoreId(), request.getItemIds(), request.getCommandId());
     }
 
     @Override
@@ -75,6 +78,8 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
             return false;
         }
         issueGoodsOut(request);
+        // out of stock now (or to be issued by hand, see the error): the hold has done its job
+        reservations.release(request.getStoreId(), request.getItemIds(), request.getCommandId());
         return true;
     }
 
@@ -106,6 +111,7 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
 
     @Override
     public void failed(ShipmentCreationCheckRequest request, String error, String errorKey) {
+        reservations.release(request.getStoreId(), request.getItemIds(), request.getCommandId());
         notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_FAILED, request.getCommandId(),
                 message("shipping.notification.warehouse.failed", reason(error, errorKey))));

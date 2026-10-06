@@ -15,7 +15,7 @@ public final class ProviderCommandTimeout {
     private ProviderCommandTimeout() {
     }
 
-    static boolean isOverdue(LocalDateTime requestedAt, LocalDateTime now) {
+    public static boolean isOverdue(LocalDateTime requestedAt, LocalDateTime now) {
         return requestedAt == null || requestedAt.plus(UNCONFIRMED_AFTER).isBefore(now);
     }
 }
