@@ -2,8 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* The shipments table of an RMA (orders.rma.RmaShipmentsView), in the page's older Bulma look. A shipment created
-       through an integration has its state in the "Stan" column as a pill (OrderLabels#shipmentState); its arguments
-       are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
+       through an integration has its state as a pill under its number (OrderLabels#shipmentState), its actions below
+       that; the state's arguments are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
        one value). "Zamów odbiór" above the table leads to the pickup page and comes back here; "Zamów odbiór ponownie"
        orders the pickup of a customer's return again at once (its package is not on the pickup page); "Spróbuj
        ponownie" after a failed operator shipment points to the item list, where the items are shipped again, and after
@@ -18,33 +18,32 @@
         </a>
     </div>
     <div class="table-container">
-        <table class="table is-fullwidth">
+        <table class="table is-fullwidth is-narrow">
             <thead>
             <tr>
                 <th th:text="#{order.shipment.type}"></th>
                 <th th:text="#{order.shipment.tracking.no}"></th>
-                <th th:text="#{order.shipment.carrier}"></th>
                 <th th:text="#{order.shipment.shipped.at}"></th>
                 <th th:text="#{order.shipment.delivered.at}"></th>
-                <th th:text="#{rma.shipments.state}"></th>
-                <th><span class="is-sr-only" th:text="#{rma.shipments.actions}"></span></th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="row : ${view.rows()}" th:with="shipment=${row.shipment()}">
                 <td th:text="${shipment.type}"></td>
-                <td th:if="${shipment.trackingUrl}"><a th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank" rel="noopener"></a></td>
-                <td th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></td>
-                <td th:text="${shipment.carrier}"></td>
-                <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
-                <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
                 <td>
-                    <span th:if="${row.stateKey() != null}" class="cl-status" th:classappend="${row.stateTone()}"
-                          th:text="${#messages.msgWithParams(row.stateKey(), row.stateArgs())}"></span>
+                    <a th:if="${shipment.trackingUrl}" th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank" rel="noopener"></a>
+                    <span th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></span>
+                    <p th:if="${shipment.carrier}" class="is-size-7 has-text-grey">
+                        <span th:text="#{order.shipment.carrier}"></span>: <span th:text="${shipment.carrier}"></span>
+                    </p>
+                    <!--/* the carrier, the state and the actions sit under the number, not in columns of their own: the
+                           table lives in a half-width column, and separate columns pushed the page sideways at 1440 px */-->
+                    <div th:if="${row.stateKey() != null}" class="mt-1">
+                        <span class="cl-status" th:classappend="${row.stateTone()}"
+                              th:text="${#messages.msgWithParams(row.stateKey(), row.stateArgs())}"></span>
+                    </div>
                     <p th:if="${row.retryHref() != null}" class="help" th:text="#{rma.shipments.retry.help}"></p>
-                </td>
-                <td>
-                    <div th:if="${row.hasActions()}" class="buttons are-small">
+                    <div th:if="${row.hasActions()}" class="buttons are-small mt-2">
                         <a th:if="${row.labelHref() != null}" class="button is-small" th:href="@{${row.labelHref()}}">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-download"></i></span>
                             <span th:text="#{order.shipments.label}"></span>
@@ -62,6 +61,8 @@
                         </form>
                     </div>
                 </td>
+                <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
             </tr>
             </tbody>
         </table>

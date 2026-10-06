@@ -315,4 +315,21 @@ class RmaShipmentsViewFactoryTest {
                 .contains("<span class=\"cl-status is-ok\">Odbiór zamówiony przez przewoźnika (nr APP/CRIN/13023761)</span>")
                 .doesNotContain("Nadaj w punkcie");
     }
+
+    @Test
+    void theCarrierStateAndActionsSitUnderTheNumberSoTheTableKeepsFourColumns() {
+        // given
+        Shipment failedPickup = customerReturn();
+        failedPickup.setPickup(ShipmentPickup.awaiting().failed("Brak kuriera"));
+        RmaShipmentsView view = factory.build(rmaWith(failedPickup), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        String trackingCell = html.substring(html.indexOf("0000123"), html.indexOf("</td>", html.indexOf("0000123")));
+        assertThat(html.split("</th>").length - 1).isEqualTo(4);
+        assertThat(trackingCell).contains("Przewoźnik</span>: <span>DPD").contains("cl-status is-warn").contains(">Zamów odbiór ponownie</button>");
+    }
 }
