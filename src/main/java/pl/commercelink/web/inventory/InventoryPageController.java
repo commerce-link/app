@@ -41,6 +41,7 @@ public class InventoryPageController {
     @GetMapping(PAGE_PATH)
     public String page(@RequestParam(value = "q", required = false) String q, Model model) {
         addCommonAttributes(model);
+        model.addAttribute("mode", "code");
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!query.isEmpty()) {
@@ -82,6 +83,7 @@ public class InventoryPageController {
     @GetMapping(PAGE_PATH + "/search")
     public String search(@RequestParam(value = "q", required = false) String q, Model model, HttpServletResponse response) {
         addCommonAttributes(model);
+        model.addAttribute("mode", "code");
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!addSearchResult(query, model)) {
@@ -116,12 +118,13 @@ public class InventoryPageController {
         return true;
     }
 
-    private void addCommonAttributes(Model model) {
+    static void addCommonAttributes(Model model) {
         model.addAttribute("superAdmin", isSuperAdmin());
         model.addAttribute("canManageSuppliers", CustomSecurityContext.hasRole("ADMIN"));
         model.addAttribute("manageSuppliersUrl", MANAGE_SUPPLIERS_URL);
         model.addAttribute("warehouseUrl", WAREHOUSE_URL);
         model.addAttribute("connectionUrlPrefix", CONNECTION_URL_PREFIX);
+        model.addAttribute("browseDialogUrl", InventoryBrowseController.DIALOG_PATH);
     }
 
     private static boolean isSuperAdmin() {
