@@ -18,6 +18,7 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static pl.commercelink.testsupport.OptimisticLockingExecutorMocks.passThroughModifyAndSave;
 
@@ -58,5 +59,31 @@ class RMAClientControllerTest {
         assertThat(rma.getReturnPackageTemplateId()).isEqualTo("7");
         assertThat(rma.getShippingDetails()).isSameAs(address);
         assertThat(rma.getStatus()).isEqualTo(RMAStatus.WaitingForItems);
+    }
+
+    @Test
+    void aStartedReturnIsReportedAsStartedEvenWhenTheRmaCouldNotBeUpdatedAfterwards() {
+        // given
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(RMAStatus.Approved);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(storesRepository.findById("store-1")).thenReturn(new Store());
+        when(rmaShippingService.startReturnShipment(any(), any()))
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null));
+        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any())).thenThrow(new RuntimeException("DynamoDB"));
+        when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
+        RMAReturnForm form = new RMAReturnForm();
+        form.setShippingDetails(ShippingDetails._default());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.postClientBillingShippingForm("store-1", "rma-1", form, new ExtendedModelMap(),
+                redirect, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/store/store-1/client/rma/rma-1");
+        assertThat(redirect.getFlashAttributes().get("successMessage")).isEqualTo("rma.shipment.has.been.created");
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
     }
 }

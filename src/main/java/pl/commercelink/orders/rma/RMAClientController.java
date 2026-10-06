@@ -1,5 +1,6 @@
 package pl.commercelink.orders.rma;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
@@ -16,6 +17,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.List;
 import java.util.Locale;
 
+@Slf4j
 @Controller
 @RequestMapping("/store/{storeId}/client/rma/{rmaId}")
 public class RMAClientController {
@@ -99,14 +101,20 @@ public class RMAClientController {
                 return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
             }
             // the creation saved its placeholder on the RMA: these changes go onto a fresh read
-            optimisticLockingExecutor.modifyAndSave(
-                    () -> rmaRepository.findById(storeId, rmaId),
-                    fresh -> {
-                        fresh.markAsWaitingForItems();
-                        fresh.setShippingDetails(rmaReturnForm.getShippingDetails());
-                        fresh.setReturnPackageTemplateId(rmaReturnForm.getSelectedPackageTemplateId());
-                    },
-                    rmaRepository::save);
+            try {
+                optimisticLockingExecutor.modifyAndSave(
+                        () -> rmaRepository.findById(storeId, rmaId),
+                        fresh -> {
+                            fresh.markAsWaitingForItems();
+                            fresh.setShippingDetails(rmaReturnForm.getShippingDetails());
+                            fresh.setReturnPackageTemplateId(rmaReturnForm.getSelectedPackageTemplateId());
+                        },
+                        rmaRepository::save);
+            } catch (RuntimeException e) {
+                // the return is already being booked: telling the customer it failed would invite a second one
+                log.error("Return shipment of RMA {} in store {} was started, but the RMA was not moved to waiting "
+                        + "for the items nor given the customer's address", rmaId, storeId, e);
+            }
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.shipment.has.been.created", null, locale));
             return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
         } catch (InvalidReturnConfigurationException e) {
