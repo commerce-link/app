@@ -139,7 +139,6 @@ class BrowsePageFactoryTest {
         BrowsePage.RowView row = page.rows().get(0);
         assertThat(row.category().pimAncestors()).containsExactly("Komponenty komputerowe");
         assertThat(row.category().pimLeaf()).isEqualTo("Karty graficzne");
-        assertThat(row.category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
         assertThat(row.category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
         assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
         assertThat(row.addHref()).isEqualTo("/dashboard/inventory?cat=10&open=add&ean=5901000000001");
@@ -189,7 +188,8 @@ class BrowsePageFactoryTest {
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
 
         // then
-        assertThat(page.rows().get(0).category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
+        assertThat(page.rows().get(0).inCatalog()).isTrue();
+        assertThat(page.rows().get(0).category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
     }
 
     @Test

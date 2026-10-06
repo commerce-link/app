@@ -22,7 +22,6 @@ class InventoryBrowseScriptContractTest {
         // given
         String script = read("src/main/resources/static/js/inventory-browse.js");
         String templates = read("src/main/resources/templates/inventory.html")
-                + read("src/main/resources/templates/inventory-prices.html")
                 + read("src/main/resources/templates/fragments/inventory-browse.html");
 
         // when / then
@@ -31,6 +30,18 @@ class InventoryBrowseScriptContractTest {
             assertThat(script).as("script uses " + hook).containsAnyOf(hook, jsName);
             assertThat(templates).as("templates carry " + hook).contains(hook);
         }
+    }
+
+    @Test
+    void onlyTheBrowsePageLoadsTheAddToCatalogScript() throws IOException {
+        // when
+        String browse = read("src/main/resources/templates/inventory.html");
+        String prices = read("src/main/resources/templates/inventory-prices.html");
+
+        // then
+        assertThat(browse).contains("@{/js/inventory-browse.js}", "data-browse-root");
+        assertThat(prices).doesNotContain("inventory-browse.js", "data-browse-root", "data-browse-dialog-url",
+                "data-browse-dialog-slot", "data-browse-add");
     }
 
     @Test

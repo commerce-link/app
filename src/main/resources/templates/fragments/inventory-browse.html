@@ -19,7 +19,7 @@
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
 </th:block>
 
-<!--/* "In the catalog": a check icon, not a link (the entry opens from the row menu). Focusable like the margin icon, so
+<!--/* "In the catalog": a check icon, not a link. Focusable like the margin icon, so
        the tooltip opens from the keyboard and on tap; it and the accessible name list every place, one per line. Anchored
        to its right edge, so the bubble grows back over the table and never widens the page. */-->
 <span th:fragment="inCatalogIcon(line)" class="cl-inv-in-catalog cl-tooltip is-lines is-end" tabindex="0" role="img"
@@ -124,8 +124,10 @@
                                th:attr="aria-label=#{inventory.browse.chip.remove(${chip.value()})}"><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status">
-                        <span th:text="#{inventory.browse.results(${#numbers.formatInteger(b.total(), 1, 'WHITESPACE')}, ${b.pagination().page()}, ${b.pagination().totalPages()})}"></span>
+                    <!--/* as on the orders list: the count is for screen readers unless chips are drawn next to it; the page
+                           number is in the pagination footer */-->
+                    <p class="cl-table-results" role="status" th:classappend="${b.chips().isEmpty()} ? 'cl-visually-hidden' : ''">
+                        <span th:text="#{inventory.browse.results(${#numbers.formatInteger(b.total(), 1, 'WHITESPACE')})}"></span>
                         <span th:if="${b.truncated()}" th:text="#{inventory.browse.truncated(${#numbers.formatInteger(b.total(), 1, 'WHITESPACE')})}"></span>
                     </p>
                 </div>
@@ -224,8 +226,6 @@
                                     <ul class="cl-menu-list">
                                         <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"
                                                th:text="${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></a></li>
-                                        <li th:if="${row.inCatalog()}"><a class="cl-menu-item" th:href="${row.category().inCatalogHref()}"
-                                                                          th:text="#{inventory.browse.openInCatalog}"></a></li>
                                         <li><a class="cl-menu-item" th:href="${row.detailHref()}" th:text="#{inventory.browse.prices}"></a></li>
                                     </ul>
                                 </details>

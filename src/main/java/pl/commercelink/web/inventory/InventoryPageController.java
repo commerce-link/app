@@ -133,8 +133,7 @@ public class InventoryPageController {
             case null, default -> null;
         };
         if (header != null) {
-            productCategoryViews.build(CustomSecurityContext.getStoreId(), header, CustomSecurityContext.hasRole("ADMIN"))
-                    .ifPresent(view -> model.addAttribute("productCategory", view));
+            productCategoryViews.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
         }
         return true;
     }

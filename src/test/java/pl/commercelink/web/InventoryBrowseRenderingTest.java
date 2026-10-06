@@ -113,7 +113,7 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void rowMenuOfAProductInTheCatalogAddsElsewhereOpensTheEntryAndShowsPrices() {
+    void rowMenuOfAProductInTheCatalogAddsElsewhereAndShowsPricesButDoesNotOpenTheEntry() {
         // given
         BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna")), 0);
 
@@ -122,11 +122,34 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to another category</a>",
-                "<a class=\"cl-menu-item\" href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\">Open in catalog</a>",
                 ">Prices and availability</a>");
-        assertThat(html.indexOf("Add to another category")).isLessThan(html.indexOf("Open in catalog"));
-        assertThat(html.indexOf("Open in catalog")).isLessThan(html.indexOf("Prices and availability"));
-        assertThat(html).doesNotContain(">Add to catalog</a>");
+        assertThat(html.indexOf("Add to another category")).isLessThan(html.indexOf("Prices and availability"));
+        assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(3);
+        assertThat(html).doesNotContain(">Add to catalog</a>", "Open in catalog", "/dashboard/catalogs/");
+    }
+
+    @Test
+    void countLineIsOnlyForScreenReadersWithoutChips() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"),
+                List.of(row(false)), List.of())));
+
+        // then
+        assertThat(html).contains("<div class=\"cl-list-meta is-count-only\">");
+        assertThat(html).containsPattern("<p class=\"cl-table-results cl-visually-hidden\" role=\"status\">\\s*"
+                + "<span>Products: 1</span>");
+        assertThat(html).doesNotContain("page 1 of", "cl-filter-chips");
+    }
+
+    @Test
+    void countLineStandsVisibleNextToTheChips() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("cl-filter-chips", "Supplier: AB");
+        assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\">\\s*<span>Products: 1</span>");
+        assertThat(html).doesNotContain("cl-table-results cl-visually-hidden", "page 1 of");
     }
 
     @Test
@@ -233,9 +256,7 @@ class InventoryBrowseRenderingTest {
 
     private static CategoryLine line(List<String> inCatalogLabels) {
         return new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                "Komponenty komputerowe › Karty graficzne",
-                inCatalogLabels.isEmpty() ? null : "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                inCatalogLabels);
+                "Komponenty komputerowe › Karty graficzne", inCatalogLabels);
     }
 
     private static BrowsePage.RowView row(CategoryLine line, long warehouseQty) {
@@ -244,6 +265,12 @@ class InventoryBrowseRenderingTest {
     }
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows) {
+        return page(admin, noSuppliers, query, rows,
+                List.of(new BrowsePage.Chip("inventory.browse.chip.supplier", "AB", "/dashboard/inventory")));
+    }
+
+    private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
+                                   List<BrowsePage.Chip> chips) {
         BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?sort=cost", "none");
         return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : "Karty graficzne",
                 List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
@@ -252,7 +279,7 @@ class InventoryBrowseRenderingTest {
                 query.isStart() ? List.of(new BrowsePage.Tile("Komponenty komputerowe", null, 5, "Karty graficzne",
                         "/dashboard/inventory?cat=10")) : List.of(),
                 List.of(new BrowsePage.MenuOption("AB", "AB", 3, true)),
-                List.of(new BrowsePage.Chip("inventory.browse.chip.supplier", "AB", "/dashboard/inventory")),
+                chips,
                 "/dashboard/inventory", rows, rows.size(), false,
                 Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?page=" + p),
                 Map.of("NAME", none, "COST", none, "QTY", none), query.href());

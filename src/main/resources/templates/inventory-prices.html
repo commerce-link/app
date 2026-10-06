@@ -7,14 +7,19 @@
 <div layout:fragment="content">
     <link rel="stylesheet" th:href="@{/css/inventory.css}">
 
-    <div class="cl-page cl-page-body cl-inv-page" data-inventory-page data-browse-root
-         th:data-browse-dialog-url="${browseDialogUrl}"
+    <div class="cl-page cl-page-body cl-inv-page" data-inventory-page
          th:data-search-url="@{/dashboard/inventory/search}"
          th:data-page-url="@{/dashboard/inventory/prices}"
          th:data-msg-load-error="#{inventory.load.error}"
          th:data-msg-retry="#{inventory.retry}">
 
         <header class="cl-page-header">
+            <!--/* only when the page was opened from a browse list (validated "from"); outside the results region, so an
+                   in-page search keeps it */-->
+            <a class="cl-back" th:if="${backToBrowse != null}" th:href="${backToBrowse}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{inventory.title}"></span>
+            </a>
             <div class="cl-page-header-row">
                 <h1 class="cl-page-title" th:text="#{inventory.prices.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
@@ -78,11 +83,9 @@
                 </div>
             </div>
         </section>
-        <div th:if="${canManageSuppliers}" data-browse-dialog-slot></div>
     </div>
 
     <script th:src="@{/js/inventory.js}" defer></script>
-    <script th:if="${canManageSuppliers}" th:src="@{/js/inventory-browse.js}" defer></script>
 </div>
 
 </body>

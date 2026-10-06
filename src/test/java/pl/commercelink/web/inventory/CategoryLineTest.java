@@ -40,7 +40,7 @@ class CategoryLineTest {
     }
 
     @Test
-    void productInOneCategorySaysWhereAndLinksToIt() {
+    void productInOneCategorySaysWhere() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN, ACCESSORIES, OTHER),
                 List.of(new CatalogPlacement.Existing("c-1", "cat-acc", "p-1", KEY)));
@@ -51,11 +51,10 @@ class CategoryLineTest {
         // then
         assertThat(line.inCatalog()).isTrue();
         assertThat(line.inCatalogLabels()).containsExactly("Local Catalog › Akcesoria");
-        assertThat(line.inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-acc/products/p-1");
     }
 
     @Test
-    void productInTwoCategoriesListsBothOnePerLineAndLinksToTheFirst() {
+    void productInTwoCategoriesListsBothOnePerLine() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN, ACCESSORIES, OTHER),
                 List.of(new CatalogPlacement.Existing("c-1", "cat-fan", "p-1", KEY),
@@ -67,7 +66,6 @@ class CategoryLineTest {
         // then
         assertThat(line.inCatalogLabels()).containsExactly("Local Catalog › Fan", "Local Catalog › Akcesoria");
         assertThat(line.inCatalogPlaces()).isEqualTo("Local Catalog › Fan\nLocal Catalog › Akcesoria");
-        assertThat(line.inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-fan/products/p-1");
     }
 
     @Test

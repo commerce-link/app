@@ -307,40 +307,74 @@ class InventoryResultsRenderingTest {
     }
 
     @Test
-    void foundProductShowsOnlyItsPimCategoryAndTheAddAction() {
-        // given
+    void foundProductShowsItsPimCategoryButNoAddActionAndNoCatalogState() {
+        // given: even a line carrying catalog places must not bring the catalog state onto the prices page
         Context context = context(found(), true);
-        context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
-                new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                        "Komponenty komputerowe › Karty graficzne", null, List.of()),
-                "5901234123457", true, "/x"));
+        context.setVariable("productCategory", new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"),
+                "Karty graficzne", "Komponenty komputerowe › Karty graficzne", List.of("Podzespoły › Karta graficzna")));
 
         // when
         String html = engine.process(RESULTS, context);
 
         // then
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("Karty graficzne", "data-browse-add", "Add to catalog", "cl-button is-primary")
-                .doesNotContain("fa-book", "+1", "cl-inv-in-catalog", "In catalog");
+        assertThat(html).contains("cl-inv-product-category", "Komponenty komputerowe", "<strong>Karty graficzne</strong>");
+        assertThat(html).doesNotContain("data-browse-add", "Add to catalog", "Add to another category", "cl-inv-in-catalog",
+                "fa-check-circle", "In catalog");
     }
 
     @Test
-    void productInTheCatalogShowsTheCheckIconWithItsPlacesAndTheAddToAnotherCategoryButton() {
+    void resultsCarryNoBackLinkSoAnInPageSearchCannotDropOrDoubleIt() {
         // given
         Context context = context(found(), true);
-        context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
-                new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                        "Komponenty komputerowe › Karty graficzne", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                        List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty")),
-                "5901234123457", true, "/x"));
+        context.setVariable("backToBrowse", "/dashboard/inventory?cat=11");
 
         // when
         String html = engine.process(RESULTS, context);
 
         // then
-        assertThat(html).doesNotContain("??", ">Add to catalog<", "In catalog: 2", "<a class=\"cl-inv-in-catalog");
-        assertThat(html).contains("<span class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" tabindex=\"0\" role=\"img\"",
-                "data-tooltip=\"In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty\"", "fa-check-circle",
-                ">Add to another category<", "data-browse-add");
+        assertThat(html).doesNotContain("cl-back", "/dashboard/inventory?cat=11", "Supplier assortment");
+    }
+
+    @Test
+    void pricesPageHeaderLeadsBackToTheBrowseListAboveTheTitle() {
+        // given
+        Context context = pageContext();
+        context.setVariable("backToBrowse", "/dashboard/inventory?cat=11&page=2");
+
+        // when
+        String html = engine.process("inventory-prices", context);
+
+        // then
+        assertThat(html).containsPattern("<header class=\"cl-page-header\">\\s*<a class=\"cl-back\" "
+                + "href=\"/dashboard/inventory\\?cat=11&amp;page=2\">\\s*"
+                + "<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-chevron-left\"></i></span>\\s*"
+                + "<span>Supplier assortment</span>\\s*</a>\\s*<div class=\"cl-page-header-row\">");
+        assertThat(html.indexOf("cl-back")).isLessThan(html.indexOf("<h1"));
+    }
+
+    @Test
+    void pricesPageWithoutAValidatedOriginHasNoBackLink() {
+        // when
+        String html = engine.process("inventory-prices", pageContext());
+
+        // then
+        assertThat(html).doesNotContain("cl-back", "Supplier assortment");
+    }
+
+    @Test
+    void pricesPageLoadsNoAddToCatalogScriptAndHasNoDialogSlot() {
+        // when
+        String html = engine.process("inventory-prices", pageContext());
+
+        // then
+        assertThat(html).doesNotContain("inventory-browse.js", "data-browse-dialog-slot", "data-browse-root",
+                "data-browse-dialog-url");
+    }
+
+    private Context pageContext() {
+        Context context = context(null, true);
+        context.setVariable("query", "");
+        return context;
     }
 }

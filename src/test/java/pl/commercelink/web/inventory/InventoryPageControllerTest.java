@@ -285,9 +285,8 @@ class InventoryPageControllerTest {
         ProductHeader header = new ProductHeader("RTX 4060", "Gigabyte", "5901000000001", "GPU-1");
         when(inventorySearch.search(STORE_ID, "5901000000001"))
                 .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
-        ProductCategoryView view = new ProductCategoryView(
-                new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", null, List.of()), "5901000000001", true, "/x");
-        when(productCategoryViews.build(STORE_ID, header, true)).thenReturn(Optional.of(view));
+        CategoryLine view = new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", List.of());
+        when(productCategoryViews.build(header)).thenReturn(Optional.of(view));
         ConcurrentModel model = new ConcurrentModel();
 
         // when

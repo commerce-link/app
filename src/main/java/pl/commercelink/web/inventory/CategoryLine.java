@@ -4,7 +4,6 @@ import org.springframework.lang.Nullable;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
-import pl.commercelink.web.catalog.CatalogPaths;
 
 import java.util.HashSet;
 import java.util.List;
@@ -17,13 +16,12 @@ import java.util.function.Predicate;
  * taxonomy's category text instead of an empty cell. For an admin it also carries where the product already sits in the
  * store's catalog, for the check icon of the "W katalogu" column.
  */
-public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, String inCatalogHref,
-                           List<String> inCatalogLabels) {
+public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, List<String> inCatalogLabels) {
 
     private static final String SEPARATOR = " \u203a ";
 
     public boolean inCatalog() {
-        return inCatalogHref != null;
+        return !inCatalogLabels.isEmpty();
     }
 
     /** One place per line, for the tooltip of the check icon ({@code .cl-tooltip.is-lines}). */
@@ -38,18 +36,15 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
         String leaf = path.isEmpty() ? categoryText : path.get(path.size() - 1);
         String fullPath = path.isEmpty() ? categoryText : String.join(SEPARATOR, path);
         if (placement == null) {
-            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, null, List.of());
+            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, List.of());
         }
         List<CatalogPlacement.Existing> existing = placement.existing(key);
-        String inCatalogHref = existing.stream().findFirst()
-                .map(entry -> CatalogPaths.product(entry.catalogId(), entry.categoryId(), entry.productId()))
-                .orElse(null);
         // One place per catalog category: two same-named categories in different catalogs still count as two.
         List<String> inCatalogLabels = existing.stream()
                 .filter(distinctBy(entry -> entry.catalogId() + "/" + entry.categoryId()))
                 .map(entry -> label(placement, entry))
                 .toList();
-        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogHref, inCatalogLabels);
+        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogLabels);
     }
 
     private static String label(CatalogPlacement.StorePlacement placement, CatalogPlacement.Existing entry) {
