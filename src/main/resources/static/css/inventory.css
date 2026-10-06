@@ -854,3 +854,46 @@
         transition: none;
     }
 }
+
+/* --- Browse mode (spec docs/active/inventory-browse) --- */
+.cl-inv-page .cl-inv-modes {
+    margin: 20px 0 16px;
+}
+
+.cl-inv-page .cl-inv-browse .cl-tile-grid.is-categories {
+    margin-top: 16px;
+}
+
+.cl-inv-page .cl-inv-browse-empty {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    padding: 20px 16px;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-page .cl-inv-browse-error {
+    margin: 0 16px 12px;
+}
+
+.cl-inv-page .cl-inv-add-dialog {
+    width: min(520px, calc(100vw - 32px));
+}
+
+.cl-inv-page .cl-inv-add-dialog .cl-dialog-body {
+    display: grid;
+    gap: 12px;
+    padding: 4px 20px 18px;
+}
+
+.cl-inv-page .cl-inv-add-dialog .cl-dialog-body > p.cl-help {
+    margin: 0;
+}
+
+.cl-inv-page .cl-inv-product-category {
+    margin-top: 8px;
+}
+
+.cl-inv-page .cl-inv-product-category .cl-category-path {
+    max-width: none;
+}

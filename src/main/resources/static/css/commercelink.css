@@ -9631,3 +9631,153 @@ a.cl-link-button:hover {
         margin: -12px;
     }
 }
+
+/* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
+.cl-page .cl-subnav {
+    padding: 4px 16px 12px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-subnav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cl-page .cl-subnav li + li {
+    margin-top: 0;
+}
+
+.cl-page .cl-subnav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 10px;
+    border: 1px solid var(--cl-line);
+    border-radius: 16px;
+    background: var(--cl-surface);
+    color: var(--cl-ink);
+    font-size: 13.5px;
+    text-decoration: none;
+}
+
+.cl-page .cl-subnav-item:hover {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-subnav-item:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-subnav-item[aria-current="page"] {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-weight: 600;
+}
+
+.cl-page .cl-subnav-count {
+    color: var(--cl-ink-2);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-subnav-item[aria-current="page"] .cl-subnav-count {
+    color: var(--cl-accent-ink);
+}
+
+/* --- Result head: title of the current category and the path to it --- */
+.cl-page .cl-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 16px 16px 4px;
+}
+
+.cl-page .cl-result-head h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 650;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-result-path {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-result-path a {
+    color: var(--cl-accent-ink);
+}
+
+/* --- Category path in a table cell: PIM path + store-catalog line --- */
+.cl-page .cl-category-path {
+    display: block;
+    max-width: 34ch;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-category-path strong {
+    color: var(--cl-ink);
+    font-weight: 600;
+}
+
+.cl-page .cl-category-catalog {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-category-catalog :is(i, svg) {
+    flex: none;
+    color: var(--cl-ink-3);
+    font-size: 11px;
+}
+
+.cl-page .cl-category-catalog .cl-more {
+    color: var(--cl-ink-3);
+    white-space: nowrap;
+}
+
+.cl-page .cl-category-catalog.is-none {
+    color: var(--cl-ink-3);
+    font-style: italic;
+}
+
+.cl-page .cl-table .cl-category-cell {
+    min-width: 14rem;
+    white-space: normal;
+}
+
+/* --- Category tile with a count --- */
+.cl-page .cl-tile-grid.is-categories {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.cl-page .cl-tile .cl-tile-count {
+    grid-column: 2;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-subnav-item {
+        min-height: 44px;
+    }
+}

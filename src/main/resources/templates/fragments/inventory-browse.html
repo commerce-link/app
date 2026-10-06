@@ -1,0 +1,342 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The browse mode of the inventory page (spec docs/active/inventory-browse §4). `results` is swapped in place by
+       list-page.js; the slot below it receives the add-to-catalog dialog that inventory-browse.js fetches. */-->
+<div th:fragment="browse" class="cl-inv-browse">
+    <div th:replace="~{fragments/inventory-browse :: results}"></div>
+    <div data-browse-dialog-slot>
+        <th:block th:if="${addDialog != null}">
+            <dialog th:replace="~{fragments/inventory-browse :: addDialog}"></dialog>
+        </th:block>
+    </div>
+</div>
+
+<!--/* The two lines of the "Kategoria" cell: PIM path (ancestors grey, leaf bold, the whole path in the title) and the
+       store-catalog category for an admin. Shared with the product header of the code mode. */-->
+<th:block th:fragment="categoryLines(line)">
+    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span><th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
+    <span class="cl-category-catalog" th:if="${line.catalogLabel() != null and (browse == null or browse.admin())}">
+        <i class="fas fa-book" aria-hidden="true"></i>
+        <span><span class="cl-visually-hidden" th:text="#{inventory.browse.catalogCategory}"></span><span th:text="${line.catalogLabel()}"></span>
+            <span class="cl-more" th:if="${line.catalogMore() > 0}" th:text="#{inventory.browse.more(${line.catalogMore()})}"></span></span>
+    </span>
+    <span class="cl-category-catalog is-none" th:if="${line.catalogUnmatched() and (browse == null or browse.admin())}">
+        <i class="fas fa-book" aria-hidden="true"></i><span th:text="#{inventory.browse.catalog.none}"></span>
+    </span>
+</th:block>
+
+<div th:fragment="results" class="cl-inv-browse-results" data-cl-list-results
+     th:attr="data-cl-list-path=${browse.pagePath()}, data-cl-list-fragment=${browse.fragmentPath()}"
+     th:with="b=${browse}, q=${browse.query()}">
+
+    <div th:if="${b.noSuppliers()}" class="cl-alert is-info" role="status">
+        <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
+        <div class="cl-alert-text"><p>
+            <span th:text="#{inventory.browse.noSuppliers}"></span>
+            <a th:if="${canManageSuppliers}" th:href="${manageSuppliersUrl}" th:text="#{inventory.browse.noSuppliers.manage}"></a>
+        </p></div>
+    </div>
+
+    <th:block th:unless="${b.noSuppliers()}">
+        <section class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
+            <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.view.browse}"></h2>
+            <div th:unless="${b.isStart()}" class="cl-result-head">
+                <h2 id="browse-title" tabindex="-1"
+                    th:text="${q.category() == null} ? #{inventory.browse.textResults(${q.q2()})} : (${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned})"></h2>
+                <p class="cl-result-path" th:if="${q.category() == null}" th:text="#{inventory.browse.textEverywhere}"></p>
+                <p class="cl-result-path" th:if="${q.category() != null}">
+                    <th:block th:each="crumb, it : ${b.crumbs()}">
+                        <a th:if="${crumb.href() != null}" th:href="${crumb.href()}" data-cl-list-nav
+                           th:text="${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}"></a>
+                        <span th:if="${crumb.href() == null}" aria-current="page"
+                              th:text="${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}"></span>
+                        <span th:unless="${it.last}" aria-hidden="true"> › </span>
+                    </th:block>
+                </p>
+            </div>
+            <nav class="cl-subnav" th:unless="${b.subnav().isEmpty()}"
+                 th:attr="aria-label=${b.subnavSiblings()} ? #{inventory.browse.subnav.siblings} : #{inventory.browse.subnav.children}">
+                <ul>
+                    <li th:each="item : ${b.subnav()}">
+                        <a class="cl-subnav-item" th:href="${item.href()}" data-cl-list-nav
+                           th:attr="aria-current=${item.current()} ? 'page' : null">
+                            <span th:text="${item.label()}"></span>
+                            <span class="cl-subnav-count" th:text="${#numbers.formatInteger(item.count(), 1, 'WHITESPACE')}"></span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="cl-table-toolbar">
+                <div class="cl-toolbar-filters">
+                    <details class="cl-filter-menu is-status" data-cl-filter-menu="supplier" th:unless="${b.supplierOptions().isEmpty()}">
+                        <summary class="cl-filter-menu-trigger">
+                            <span class="cl-filter-menu-key" th:text="#{inventory.browse.supplier.menu}"></span>
+                            <span class="cl-filter-menu-value"
+                                  th:text="${q.suppliers().isEmpty()} ? #{inventory.browse.supplier.all} : #{inventory.browse.supplier.some(${q.suppliers().size()})}"></span>
+                        </summary>
+                        <form method="get" th:action="${b.pagePath()}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                            <input type="hidden" th:each="p : ${q.params('supplier')}" th:name="${p.name()}" th:value="${p.value()}"/>
+                            <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{inventory.browse.supplier.menu}">
+                                <label class="cl-filter-menu-check" th:each="o : ${b.supplierOptions()}">
+                                    <input type="checkbox" name="supplier" th:value="${o.value()}" th:checked="${o.selected()}"/>
+                                    <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                    <span class="cl-filter-menu-meta" th:text="${#numbers.formatInteger(o.count(), 1, 'WHITESPACE')}"></span>
+                                </label>
+                            </div>
+                            <div class="cl-filter-menu-actions">
+                                <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide
+                                        th:text="#{inventory.browse.supplier.apply}"></button>
+                            </div>
+                        </form>
+                    </details>
+                    <details class="cl-filter-menu" data-cl-filter-menu="stock">
+                        <summary class="cl-filter-menu-trigger">
+                            <span class="cl-filter-menu-key" th:text="#{inventory.browse.stock.menu}"></span>
+                            <span class="cl-filter-menu-value" th:text="#{${'inventory.browse.stock.' + q.stock().name()}}"></span>
+                        </summary>
+                        <div class="cl-filter-menu-list">
+                            <ul class="cl-filter-menu-scroll">
+                                <li th:each="o : ${b.stockOptions()}">
+                                    <a class="cl-filter-menu-item" th:href="${o.href()}" data-cl-list-nav
+                                       th:attr="aria-current=${o.selected()} ? 'true' : null">
+                                        <span class="cl-filter-menu-text" th:text="#{${o.labelKey()}}"></span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details class="cl-filter-menu" data-cl-filter-menu="catalog" th:unless="${b.catalogOptions().isEmpty()}">
+                        <summary class="cl-filter-menu-trigger">
+                            <span class="cl-filter-menu-key" th:text="#{inventory.browse.catalog.menu}"></span>
+                            <span class="cl-filter-menu-value" th:text="#{${'inventory.browse.catalog.' + q.catalog().name()}}"></span>
+                        </summary>
+                        <div class="cl-filter-menu-list">
+                            <ul class="cl-filter-menu-scroll">
+                                <li th:each="o : ${b.catalogOptions()}">
+                                    <a class="cl-filter-menu-item" th:href="${o.href()}" data-cl-list-nav
+                                       th:attr="aria-current=${o.selected()} ? 'true' : null">
+                                        <span class="cl-filter-menu-text" th:text="#{${o.labelKey()}}"></span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+                    <a th:unless="${b.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="${b.clearHref()}"
+                       th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                </div>
+                <form method="get" th:action="${b.pagePath()}" class="cl-search-form" role="search" data-cl-list-form>
+                    <input type="hidden" th:each="p : ${q.params('q2')}" th:name="${p.name()}" th:value="${p.value()}"/>
+                    <label class="cl-visually-hidden" for="browse-q2" th:text="#{inventory.browse.search.label}"></label>
+                    <div class="cl-search-field">
+                        <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                        <input class="cl-input cl-table-search" type="search" id="browse-q2" name="q2" autocomplete="off" maxlength="100"
+                               th:value="${q.q2()}"
+                               th:attr="placeholder=#{inventory.browse.search.placeholder}, aria-describedby=${b.textTooShort()} ? 'browse-q2-error' : null"/>
+                        <a th:if="${q.q2() != null}" class="cl-search-clear" th:href="${q.withoutText().href()}" data-cl-list-nav
+                           th:attr="aria-label=#{inventory.browse.search.clear}"><i class="fas fa-times" aria-hidden="true"></i></a>
+                    </div>
+                    <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{inventory.browse.search.button}">
+                        <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                        <span class="cl-search-submit-text" th:text="#{inventory.browse.search.button}"></span>
+                    </button>
+                </form>
+            </div>
+            <p id="browse-q2-error" class="cl-field-error cl-inv-browse-error" role="alert" th:if="${b.textTooShort()}">
+                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i> <span th:text="#{inventory.search.tooShort}"></span>
+            </p>
+
+            <th:block th:unless="${b.isStart() or b.textTooShort()}">
+                <div class="cl-list-meta" th:classappend="${b.chips().isEmpty()} ? 'is-count-only' : ''">
+                    <div class="cl-filter-chips" th:unless="${b.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${b.chips()}"
+                              th:with="value=${chip.value() != null} ? ${chip.value()} : #{${chip.valueKey()}}">
+                            <span th:text="#{${chip.labelKey()}(${value})}"></span>
+                            <a class="cl-filter-chip-clear" th:href="${chip.clearHref()}" data-cl-list-nav
+                               th:attr="aria-label=#{inventory.browse.chip.remove(${value})}"><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status">
+                        <span th:text="#{inventory.browse.results(${#numbers.formatInteger(b.total(), 1, 'WHITESPACE')}, ${b.pagination().page()}, ${b.pagination().totalPages()})}"></span>
+                        <span th:if="${b.truncated()}" th:text="#{inventory.browse.truncated(${#numbers.formatInteger(b.total(), 1, 'WHITESPACE')})}"></span>
+                    </p>
+                </div>
+
+                <div th:if="${b.rows().isEmpty()}" class="cl-inv-browse-empty">
+                    <p th:text="#{inventory.browse.empty}"></p>
+                    <a th:unless="${b.chips().isEmpty()}" class="cl-button" th:href="${b.clearHref()}" data-cl-list-nav
+                       th:text="#{general.clear.filters}"></a>
+                </div>
+
+                <th:block th:unless="${b.rows().isEmpty()}">
+                    <th:block th:if="${b.admin() and !b.rows().?[!inCatalog()].isEmpty()}">
+                        <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                        <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-all autocomplete="off"
+                                       th:attr="aria-label=#{inventory.browse.select.all}, data-cl-label-select=#{inventory.browse.select.all}, data-cl-label-clear=#{inventory.browse.select.none}">
+                            </label>
+                            <span class="cl-selection-count" data-cl-selection-count
+                                  th:attr="data-template=#{inventory.browse.selected('{k}', '{n}')}"></span>
+                            <div class="cl-selection-actions">
+                                <button type="button" class="cl-button is-primary" data-browse-add-selected>
+                                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                                    <span data-cl-selection-text th:attr="data-template=#{inventory.browse.add.selected('{k}')}"></span>
+                                </button>
+                                <button type="button" class="cl-link-button" data-cl-select-clear
+                                        th:text="#{inventory.browse.selection.clear}"></button>
+                            </div>
+                        </div>
+                    </th:block>
+                    <table class="cl-table is-products cl-inv-browse-table" th:attr="data-cl-select-table=${b.admin()} ? 'true' : null">
+                        <thead>
+                        <tr>
+                            <th scope="col" class="cl-table-check" th:if="${b.admin()}">
+                                <label class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" data-cl-select-all hidden autocomplete="off"
+                                           th:attr="aria-label=#{inventory.browse.select.all}, data-cl-label-select=#{inventory.browse.select.all}, data-cl-label-clear=#{inventory.browse.select.none}">
+                                </label>
+                            </th>
+                            <th scope="col" th:attr="aria-sort=${b.sortHeaders().get('NAME').ariaSort()}">
+                                <a class="cl-table-sort" th:href="${b.sortHeaders().get('NAME').href()}" data-cl-list-nav
+                                   th:text="#{inventory.browse.column.product}"></a>
+                            </th>
+                            <th scope="col" th:text="#{inventory.browse.column.category}"></th>
+                            <th scope="col" class="is-numeric" th:attr="aria-sort=${b.sortHeaders().get('COST').ariaSort()}">
+                                <a class="cl-table-sort" th:href="${b.sortHeaders().get('COST').href()}" data-cl-list-nav
+                                   th:text="#{inventory.browse.column.cost}"></a>
+                            </th>
+                            <th scope="col" class="is-numeric" th:attr="aria-sort=${b.sortHeaders().get('QTY').ariaSort()}">
+                                <a class="cl-table-sort" th:href="${b.sortHeaders().get('QTY').href()}" data-cl-list-nav
+                                   th:text="#{inventory.browse.column.qty}"></a>
+                            </th>
+                            <th scope="col" class="cl-table-actions" th:if="${b.admin()}">
+                                <span class="cl-visually-hidden" th:text="#{inventory.browse.column.action}"></span>
+                            </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${b.rows()}">
+                            <td class="cl-table-check" th:if="${b.admin()}">
+                                <label class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" data-cl-select-row hidden autocomplete="off"
+                                           th:value="${row.ean()}" th:attr="aria-label=#{inventory.browse.select.row(${row.name()})}">
+                                </label>
+                            </td>
+                            <th scope="row" class="cl-table-key">
+                                <a th:href="${row.detailHref()}" th:text="${row.name()}"></a>
+                                <span class="cl-table-sub"><span th:text="${row.brand()}"></span> · <span class="cl-table-code" th:text="${row.ean()}"></span> · <span th:text="${row.mfn()}"></span></span>
+                            </th>
+                            <td class="cl-category-cell" th:attr="data-label=#{inventory.browse.column.category}">
+                                <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${row.category()})}"></th:block>
+                            </td>
+                            <td class="is-numeric" th:attr="data-label=#{inventory.browse.column.cost}">
+                                <span th:text="${#numbers.formatDecimal(row.cost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
+                                <span class="cl-table-sub"
+                                      th:text="${row.deliveryKnown()} ? #{inventory.browse.cost.from(${row.costSupplier()})} : #{inventory.browse.cost.noDelivery(${row.costSupplier()})}"></span>
+                            </td>
+                            <td class="is-numeric" th:attr="data-label=#{inventory.browse.column.qty}">
+                                <span th:if="${row.qty() > 0}" th:text="#{inventory.table.qtyValue(${row.qty()})}"></span>
+                                <span th:unless="${row.qty() > 0}" class="cl-table-empty" th:text="#{inventory.browse.onOrder}"></span>
+                                <span class="cl-table-sub" th:text="#{inventory.browse.suppliers(${row.suppliers()})}"></span>
+                            </td>
+                            <td class="cl-table-actions" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.action}">
+                                <a th:if="${row.inCatalog()}" class="cl-status is-ok" th:href="${row.category().inCatalogHref()}"
+                                   th:text="#{inventory.browse.inCatalog}"></a>
+                                <a th:unless="${row.inCatalog()}" class="cl-link-button" th:href="${row.addHref()}" data-browse-add
+                                   th:attr="data-ean=${row.ean()}, aria-label=#{inventory.browse.add.aria(${row.name()})}">
+                                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                                    <span th:text="#{inventory.browse.add}"></span>
+                                </a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <nav th:replace="~{fragments/pagination :: pages(${b.pagination()})}"></nav>
+                </th:block>
+            </th:block>
+        </section>
+
+        <ul class="cl-tile-grid is-categories" th:if="${b.isStart()}" th:attr="aria-label=#{inventory.browse.tiles.label}">
+            <li th:each="tile : ${b.tiles()}">
+                <a class="cl-tile" th:href="${tile.href()}" data-cl-list-nav>
+                    <span class="cl-tile-icon" aria-hidden="true"><i class="fas fa-folder"></i></span>
+                    <span class="cl-tile-title" th:text="${tile.label() != null} ? ${tile.label()} : #{${tile.labelKey()}}"></span>
+                    <span class="cl-tile-count" th:text="#{inventory.browse.tile.count(${#numbers.formatInteger(tile.count(), 1, 'WHITESPACE')})}"></span>
+                    <span class="cl-tile-desc" th:if="${tile.description() != null}" th:text="${tile.description()}"></span>
+                </a>
+            </li>
+        </ul>
+    </th:block>
+</div>
+
+<!--/* One question: which manual catalog category. "Dalej" posts to /dashboard/inventory/browse/add, which forwards to
+       the catalog's own review ("Uzupełnij dane") with these eans and returnTo. Drawn open only on the no-JS page. */-->
+<dialog th:fragment="addDialog" class="cl-dialog is-form cl-inv-add-dialog" id="inventory-add-dialog"
+        aria-labelledby="inventory-add-title" th:with="d=${addDialog}" th:attr="open=${addDialogOpen} ? 'open' : null">
+    <form method="post" th:action="${d.action()}">
+        <input type="hidden" name="eans" th:each="ean : ${d.eans()}" th:value="${ean}"/>
+        <input type="hidden" name="returnTo" th:value="${d.returnTo()}"/>
+        <h2 class="cl-dialog-title" id="inventory-add-title"
+            th:text="${d.count() > 1} ? #{inventory.browse.dialog.titleMany(${d.count()})} : #{inventory.browse.dialog.title}"></h2>
+        <div class="cl-dialog-body">
+            <th:block th:if="${d.noManualCategories()}">
+                <p class="cl-dialog-effect" th:text="#{inventory.browse.dialog.noManual}"></p>
+                <p><a href="/dashboard/catalogs" th:text="#{inventory.browse.dialog.noManual.link}"></a></p>
+            </th:block>
+            <th:block th:unless="${d.noManualCategories()}">
+                <p class="cl-dialog-effect" th:if="${d.productName() != null}"
+                   th:text="${d.pimCategoryName() != null} ? #{inventory.browse.dialog.single(${d.productName()}, ${d.pimCategoryName()})} : ${d.productName()}"></p>
+                <p class="cl-dialog-effect" th:if="${d.productName() == null}"
+                   th:text="${d.pimCategoryName() != null} ? #{inventory.browse.dialog.manyCommon(${d.count()}, ${d.pimCategoryName()})} : #{inventory.browse.dialog.many(${d.count()})}"></p>
+                <fieldset class="cl-choice-group" th:if="${d.anyMatching()}">
+                    <legend class="cl-label"><span th:text="#{inventory.browse.dialog.target}"></span></legend>
+                    <label class="cl-choice" th:each="o, it : ${d.matching()}">
+                        <input type="radio" name="target" th:value="${o.value()}" th:checked="${it.first}">
+                        <span class="cl-choice-text">
+                            <span class="cl-choice-title" th:text="${o.label()}"></span>
+                            <span class="cl-choice-description" th:text="#{inventory.browse.dialog.fits(${o.alreadyIn()}, ${d.count()})}"></span>
+                        </span>
+                    </label>
+                    <label class="cl-choice" th:unless="${d.others().isEmpty()}">
+                        <input type="radio" name="target" value="other" data-browse-other-radio>
+                        <span class="cl-choice-text">
+                            <span class="cl-choice-title" th:text="#{inventory.browse.dialog.other}"></span>
+                            <span class="cl-choice-description" th:text="#{inventory.browse.dialog.other.help}"></span>
+                        </span>
+                    </label>
+                </fieldset>
+                <th:block th:unless="${d.anyMatching()}">
+                    <input type="hidden" name="target" value="other"/>
+                    <div class="cl-alert is-info">
+                        <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
+                        <div class="cl-alert-text"><p th:text="#{inventory.browse.dialog.unmatched}"></p></div>
+                    </div>
+                </th:block>
+                <div class="cl-field" th:unless="${d.others().isEmpty()}">
+                    <label class="cl-label" for="inventory-add-other"
+                           th:text="${d.anyMatching()} ? #{inventory.browse.dialog.other} : #{inventory.browse.dialog.target}"></label>
+                    <select class="cl-select" id="inventory-add-other" name="otherTarget" data-browse-other-select
+                            aria-describedby="inventory-add-other-help">
+                        <option value="" th:text="#{inventory.browse.dialog.choose}"></option>
+                        <optgroup th:each="g : ${d.others()}" th:label="${g.catalogName()}">
+                            <option th:each="o : ${g.options()}" th:value="${o.value()}" th:text="${o.label()}"></option>
+                        </optgroup>
+                    </select>
+                    <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
+                </div>
+                <p class="cl-help is-note" th:text="#{inventory.browse.dialog.effect}"></p>
+            </th:block>
+        </div>
+        <div class="cl-dialog-actions">
+            <button class="cl-button is-primary" type="submit" th:unless="${d.noManualCategories()}"
+                    th:text="#{inventory.browse.dialog.next}"></button>
+            <a class="cl-button" th:href="${d.returnTo()}" data-browse-dialog-close th:text="#{general.cancel}"></a>
+        </div>
+    </form>
+</dialog>
+
+</body>
+</html>

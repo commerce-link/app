@@ -12,6 +12,11 @@
 
     const summarySlot = page.querySelector('[data-inventory-summary]');
     const form = page.querySelector('[data-inventory-search]');
+    if (!form) {
+        // browse mode has no code search form; only the summary tiles are wired
+        loadSummary();
+        return;
+    }
     const input = form.querySelector('#inventory-q');
     const clearButton = form.querySelector('[data-inventory-clear]');
     const submitButton = form.querySelector('[data-inventory-submit]');

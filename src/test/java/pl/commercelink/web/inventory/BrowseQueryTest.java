@@ -143,4 +143,16 @@ class BrowseQueryTest {
         assertThat(BrowseQuery.parse(new LinkedMultiValueMap<>(java.util.Map.of("supplier", List.of(" ", "AB")))).suppliers())
                 .containsExactly("AB");
     }
+
+    @Test
+    void paramsLeaveOutTheNamedOneAndThePage() {
+        // given
+        BrowseQuery query = BrowseQuery.start().withCategory("11").withStock(BrowseCriteria.Stock.IN_STOCK).withPage(2);
+
+        // when
+        List<BrowseQuery.Param> params = query.params("stock");
+
+        // then
+        assertThat(params).extracting(BrowseQuery.Param::name).containsExactly("view", "cat");
+    }
 }

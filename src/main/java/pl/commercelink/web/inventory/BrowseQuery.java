@@ -109,30 +109,41 @@ public record BrowseQuery(String category, List<String> suppliers, BrowseCriteri
                 .page((page - 1) * PAGE_SIZE, PAGE_SIZE);
     }
 
-    public String href() {
-        List<String> parts = new ArrayList<>();
-        parts.add("view=browse");
+    public record Param(String name, String value) {
+    }
+
+    /** The list's state as form fields, minus the one the form itself sets; a form always starts again at page one. */
+    public List<Param> params(String except) {
+        List<Param> params = new ArrayList<>();
+        params.add(new Param("view", "browse"));
         if (category != null) {
-            parts.add("cat=" + encode(category));
+            params.add(new Param("cat", category));
         }
-        suppliers.forEach(supplier -> parts.add("supplier=" + encode(supplier)));
+        suppliers.forEach(supplier -> params.add(new Param("supplier", supplier)));
         if (stock == BrowseCriteria.Stock.IN_STOCK) {
-            parts.add("stock=in-stock");
+            params.add(new Param("stock", "in-stock"));
         } else if (stock == BrowseCriteria.Stock.ON_ORDER) {
-            parts.add("stock=on-order");
+            params.add(new Param("stock", "on-order"));
         }
         if (catalog != CatalogFilter.ALL) {
-            parts.add("catalog=" + catalog.param());
+            params.add(new Param("catalog", catalog.param()));
         }
         if (q2 != null) {
-            parts.add("q2=" + encode(q2));
+            params.add(new Param("q2", q2));
         }
         if (sort != BrowseCriteria.Sort.NAME) {
-            parts.add("sort=" + sort.name().toLowerCase(Locale.ROOT));
+            params.add(new Param("sort", sort.name().toLowerCase(Locale.ROOT)));
         }
         if (descending) {
-            parts.add("dir=desc");
+            params.add(new Param("dir", "desc"));
         }
+        return except == null ? params : params.stream().filter(param -> !param.name().equals(except)).toList();
+    }
+
+    public String href() {
+        List<String> parts = new ArrayList<>(params(null).stream()
+                .map(param -> param.name() + "=" + encode(param.value()))
+                .toList());
         if (page > 1) {
             parts.add("page=" + page);
         }
