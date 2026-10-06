@@ -216,7 +216,8 @@ public final class OrderLabels {
         }
         if (shipment.creationFailed()) {
             ShipmentCreationState creation = shipment.getCreation();
-            return failure("order.shipments.state.creation.failed", creation.getError(), creation.getErrorKey());
+            return failure("order.shipments.state.creation.failed", creation.getError(),
+                    creation.isPending() ? ShipmentCreationState.UNCONFIRMED_KEY : creation.getErrorKey());
         }
         ShipmentPickup pickup = shipment.getPickup();
         if (shipment.getProvider() == null || pickup == null || pickup.getStatus() == null) {
@@ -224,7 +225,9 @@ public final class OrderLabels {
         }
         return switch (pickup.getStatus()) {
             case AWAITING -> new ShipmentState("order.shipments.state.pickup.awaiting", NO_ARGS, NEUTRAL, false);
-            case PENDING -> new ShipmentState("order.shipments.state.pickup.pending", NO_ARGS, INFO, true);
+            case PENDING -> pickup.isUnconfirmed(LocalDateTime.now())
+                    ? failure("order.shipments.state.pickup.failed", null, ShipmentPickup.UNCONFIRMED_KEY)
+                    : new ShipmentState("order.shipments.state.pickup.pending", NO_ARGS, INFO, true);
             case ORDERED -> new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
                     pickupDay(pickup.getDate(), locale), pickupHour(pickup.getFrom()), pickupHour(pickup.getTo())}, OK, false);
             case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);

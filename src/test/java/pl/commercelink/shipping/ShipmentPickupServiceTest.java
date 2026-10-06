@@ -100,8 +100,8 @@ class ShipmentPickupServiceTest {
         // given
         when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "o-1"), entry("2", "dpd", "o-2"),
                 entry("3", "dhl", "o-3"), entry("4", "dpd", "o-4")));
-        when(orderOwner.awaitsPickup(eq("store-1"), anyString(), anyString())).thenReturn(true);
-        when(orderOwner.awaitsPickup("store-1", "o-4", "4")).thenReturn(false);
+        when(orderOwner.pickupStanding(eq("store-1"), anyString(), anyString())).thenReturn(PickupStanding.ORDERABLE);
+        when(orderOwner.pickupStanding("store-1", "o-4", "4")).thenReturn(PickupStanding.GONE);
 
         // when
         List<PickupGroup> groups = service.groups("store-1");
@@ -111,6 +111,22 @@ class ShipmentPickupServiceTest {
         assertThat(groups.get(1).entries()).extracting(AwaitingPickup::getExternalId).containsExactly("1", "2");
         assertThat(groups.get(1).key()).isEqualTo("furgonetka|dpd|addr-1");
         verify(index).remove("store-1", List.of("4"));
+    }
+
+    @Test
+    void aPackageWhosePickupIsBeingOrderedIsSkippedButStaysIndexed() {
+        // given
+        when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "o-1"), entry("2", "dpd", "o-2")));
+        when(orderOwner.pickupStanding("store-1", "o-1", "1")).thenReturn(PickupStanding.ORDERABLE);
+        when(orderOwner.pickupStanding("store-1", "o-2", "2")).thenReturn(PickupStanding.IN_FLIGHT);
+
+        // when
+        List<PickupGroup> groups = service.groups("store-1");
+
+        // then
+        assertThat(groups).hasSize(1);
+        assertThat(groups.get(0).entries()).extracting(AwaitingPickup::getExternalId).containsExactly("1");
+        verify(index, never()).remove(anyString(), anyList());
     }
 
     @Test

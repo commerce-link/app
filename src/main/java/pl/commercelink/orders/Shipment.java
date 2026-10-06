@@ -220,19 +220,28 @@ public class Shipment {
     public ShipmentPickup getPickup() { return pickup; }
     public void setPickup(ShipmentPickup pickup) { this.pickup = pickup; }
 
+    /**
+     * The creation command still waits for its result. One PENDING past ProviderCommandTimeout.UNCONFIRMED_AFTER does
+     * not: nothing will settle it, so it counts as failed and the operator can remove it or book again.
+     */
     @DynamoDBIgnore
     public boolean isCreating() {
-        return creation != null && creation.isPending();
+        return creation != null && creation.isInProgress(LocalDateTime.now());
     }
 
+    /** The creation failed, or was never confirmed (see isCreating). */
     @DynamoDBIgnore
     public boolean creationFailed() {
-        return creation != null && creation.isFailed();
+        return creation != null && (creation.isFailed() || creation.isUnconfirmed(LocalDateTime.now()));
     }
 
+    /**
+     * The placeholder of that very command, however old: a late result of a command nobody superseded still settles
+     * it, while a placeholder dropped by a new booking lets the late result go.
+     */
     @DynamoDBIgnore
     public boolean isCreationPendingFor(String commandId) {
-        return isCreating() && creation.hasCommand(commandId);
+        return creation != null && creation.isPending() && creation.hasCommand(commandId);
     }
 
     @DynamoDBIgnore
@@ -293,7 +302,8 @@ public class Shipment {
      */
     @DynamoDBIgnore
     public boolean awaitsProviderAnswer(LocalDateTime now) {
-        return isCancellationInProgress(now) || isCreating() || (pickup != null && pickup.isPending());
+        return isCancellationInProgress(now) || (creation != null && creation.isInProgress(now))
+                || (pickup != null && pickup.isInProgress(now));
     }
 
     /** The shipment still waits for the result of that very cancel command. */

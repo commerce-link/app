@@ -53,4 +53,22 @@ class ShipmentPickupTest {
         assertThat(pickup.isAwaiting()).isFalse();
         assertThat(pickup.isPending()).isFalse();
     }
+
+    @Test
+    void aPickupPendingPastTheTimeoutCanBeOrderedAgainWhileItsCommandStillMatches() {
+        // given
+        LocalDateTime now = LocalDateTime.now();
+        ShipmentPickup fresh = ShipmentPickup.pending("cmd-1", now.minusMinutes(9), LocalDate.of(2026, 10, 7),
+                LocalTime.of(9, 0), LocalTime.of(17, 0));
+        ShipmentPickup stuck = ShipmentPickup.pending("cmd-1", now.minusMinutes(11), LocalDate.of(2026, 10, 7),
+                LocalTime.of(9, 0), LocalTime.of(17, 0));
+
+        // then
+        assertThat(fresh.isAwaiting()).isFalse();
+        assertThat(fresh.isInProgress(now)).isTrue();
+        assertThat(stuck.isAwaiting()).isTrue();
+        assertThat(stuck.isInProgress(now)).isFalse();
+        assertThat(stuck.isUnconfirmed(now)).isTrue();
+        assertThat(stuck.isPendingFor("cmd-1")).isTrue();
+    }
 }

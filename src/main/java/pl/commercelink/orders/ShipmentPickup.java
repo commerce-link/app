@@ -25,6 +25,9 @@ import java.time.format.DateTimeFormatter;
 @NoArgsConstructor
 public class ShipmentPickup {
 
+    /** The reason of a pickup the provider never confirmed. */
+    public static final String UNCONFIRMED_KEY = "shipping.pickup.unconfirmed";
+
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
 
     @DynamoDBAttribute(attributeName = "status")
@@ -86,10 +89,26 @@ public class ShipmentPickup {
         return new ShipmentPickup(ShipmentPickupStatus.FAILED, commandId, null, date, from, to, requestedAt, null, messageKey);
     }
 
-    /** The pickup can be ordered: waiting for the first order, or the last one did not work. */
+    /**
+     * The pickup can be ordered: waiting for the first order, the last one did not work, or it was never confirmed (a
+     * late result of that command is dropped once a new one is sent, since it is pending for the new command only).
+     */
     @DynamoDBIgnore
     public boolean isAwaiting() {
-        return status == ShipmentPickupStatus.AWAITING || status == ShipmentPickupStatus.FAILED;
+        return status == ShipmentPickupStatus.AWAITING || status == ShipmentPickupStatus.FAILED
+                || isUnconfirmed(LocalDateTime.now());
+    }
+
+    /** PENDING and younger than ProviderCommandTimeout.UNCONFIRMED_AFTER: its result still comes. */
+    @DynamoDBIgnore
+    public boolean isInProgress(LocalDateTime now) {
+        return isPending() && !ProviderCommandTimeout.isOverdue(requestedAt, now);
+    }
+
+    /** PENDING for so long that nothing will settle it any more. */
+    @DynamoDBIgnore
+    public boolean isUnconfirmed(LocalDateTime now) {
+        return isPending() && ProviderCommandTimeout.isOverdue(requestedAt, now);
     }
 
     @DynamoDBIgnore

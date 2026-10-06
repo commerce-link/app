@@ -33,7 +33,7 @@ import java.util.function.UnaryOperator;
 @RequiredArgsConstructor
 public class ShipmentPickupService {
 
-    static final String UNCONFIRMED_KEY = "shipping.pickup.unconfirmed";
+    static final String UNCONFIRMED_KEY = ShipmentPickup.UNCONFIRMED_KEY;
     static final String NOT_SENT_KEY = "shipping.pickup.not.sent";
 
     private final AwaitingPickupIndex index;
@@ -42,13 +42,21 @@ public class ShipmentPickupService {
     private final ShipmentPickupEventPublisher publisher;
     private final MessageSource messageSource;
 
-    /** The store's waiting packages by integration, carrier and pickup address; entries that no longer wait go. */
+    /**
+     * The store's packages that can be ordered, by integration, carrier and pickup address. Entries whose pickup is
+     * being ordered are skipped but stay indexed (a failed command makes them orderable again); entries that no longer
+     * wait at all go.
+     */
     public List<PickupGroup> groups(String storeId) {
         List<String> stale = new ArrayList<>();
         Map<String, List<AwaitingPickup>> byKey = new TreeMap<>();
         for (AwaitingPickup entry : index.list(storeId)) {
-            if (!owners.get(entry.getOwnerType()).awaitsPickup(storeId, entry.getOwnerId(), entry.getExternalId())) {
+            PickupStanding standing = owners.get(entry.getOwnerType())
+                    .pickupStanding(storeId, entry.getOwnerId(), entry.getExternalId());
+            if (standing == PickupStanding.GONE) {
                 stale.add(entry.getExternalId());
+            }
+            if (standing != PickupStanding.ORDERABLE) {
                 continue;
             }
             byKey.computeIfAbsent(PickupGroup.key(entry.getProvider(), entry.getCarrier(), entry.getPickUpAddressId()),

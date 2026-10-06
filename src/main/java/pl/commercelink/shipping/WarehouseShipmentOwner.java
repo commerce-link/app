@@ -112,9 +112,9 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     }
 
     @Override
-    public boolean awaitsPickup(String storeId, String ownerId, String externalId) {
+    public PickupStanding pickupStanding(String storeId, String ownerId, String externalId) {
         // the warehouse orders its pickup right away and never lists its packages in the pickup index
-        return false;
+        return PickupStanding.GONE;
     }
 
     @Override

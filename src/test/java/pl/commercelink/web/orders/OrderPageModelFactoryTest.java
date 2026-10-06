@@ -2087,6 +2087,28 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aCreationPendingPastTheTimeoutReadsAsUnconfirmedWithRetryAndRemove() {
+        // given: the check never came (the JVM stopped before it was sent, or it kept failing)
+        Shipment stuck = creating();
+        stuck.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now().minusMinutes(11)));
+        Order order = orderWith(stuck);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("shipping.creation.unconfirmed");
+        assertThat(row.stateInProgress()).isFalse();
+        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping");
+        assertThat(row.removeHref()).startsWith("/dashboard/orders/" + order.getOrderId() + "/shipments/0/remove");
+        assertThat(OrderPageModelFactory.removeLockedKey(order, 0)).isNull();
+        assertThat(card.cancellationPollHref()).isNull();
+        assertThat(order.hasShipmentBeingCreated()).isFalse();
+        assertThat(order.hasShipmentToBook()).isTrue();
+    }
+
+    @Test
     void aPackageWaitingForPickupOffersItsLabelAndTheCardOffersThePickupPage() {
         // given
         Order order = orderWith(furgonetkaPackage());
@@ -2152,6 +2174,24 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateInProgress()).isTrue();
         assertThat(card.cancellationPollHref()).isNotNull();
         assertThat(card.pickupHref()).isNull();
+    }
+
+    @Test
+    void aPickupPendingPastTheTimeoutReadsAsUnconfirmedAndCanBeOrderedAgain() {
+        // given
+        Shipment stuck = furgonetkaPackage();
+        stuck.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now().minusMinutes(11), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)));
+        Order order = orderWith(stuck);
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("shipping.pickup.unconfirmed");
+        assertThat(card.rows().get(0).stateInProgress()).isFalse();
+        assertThat(card.cancellationPollHref()).isNull();
+        assertThat(card.pickupHref()).isNotNull();
     }
 
     @Test

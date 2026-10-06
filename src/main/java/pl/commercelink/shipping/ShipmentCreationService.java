@@ -26,7 +26,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ShipmentCreationService {
 
-    static final String UNCONFIRMED_KEY = "shipping.creation.unconfirmed";
+    static final String UNCONFIRMED_KEY = ShipmentCreationState.UNCONFIRMED_KEY;
 
     private final ShippingService shippingService;
     private final ShipmentOwners owners;

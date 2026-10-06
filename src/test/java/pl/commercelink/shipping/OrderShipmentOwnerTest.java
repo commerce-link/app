@@ -115,6 +115,42 @@ class OrderShipmentOwnerTest {
     }
 
     @Test
+    void aCreationPendingPastTheTimeoutIsDroppedByANewBookingAndItsLateResultIgnored() {
+        // given
+        Shipment stuck = new Shipment(ShipmentType.Courier);
+        stuck.setExternalId("ext-0");
+        stuck.setCreation(ShipmentCreationState.pending("cmd-0", LocalDateTime.now().minusMinutes(11)));
+        order.setShipments(new ArrayList<>(List.of(stuck)));
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+        boolean lateResult = owner.succeeded(request("cmd-0"), List.of(new Shipment(ShipmentType.Courier)));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(lateResult).isFalse();
+        assertThat(order.getShipments()).hasSize(1);
+        assertThat(order.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void aLateResultStillSettlesACreationPendingPastTheTimeoutThatNobodyReplaced() {
+        // given
+        Shipment stuck = placeholder("cmd-0");
+        stuck.setCreation(ShipmentCreationState.pending("cmd-0", LocalDateTime.now().minusMinutes(11)));
+        order.setShipments(new ArrayList<>(List.of(stuck)));
+        Shipment created = new Shipment(ShipmentType.Courier);
+        created.setExternalId("21480003");
+
+        // when
+        boolean settled = owner.succeeded(request("cmd-0"), List.of(created));
+
+        // then
+        assertThat(settled).isTrue();
+        assertThat(order.getShipments()).extracting(Shipment::getExternalId).containsExactly("21480003");
+    }
+
+    @Test
     void theExternalIdIsRecordedAndARefusalMarksTheShipmentFailed() {
         // given
         order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
@@ -286,18 +322,28 @@ class OrderShipmentOwnerTest {
         return s;
     }
 
+    private static ShipmentPickup pendingPickup(LocalDateTime requestedAt) {
+        return ShipmentPickup.pending("cmd-1", requestedAt, LocalDate.of(2026, 10, 7), LocalTime.of(9, 0),
+                LocalTime.of(17, 0));
+    }
+
     @Test
-    void aPackageAwaitsItsPickupWhileOneOfItsRowsDoes() {
+    void aPackageIsOrderableWhileOneOfItsRowsAwaitsAndInFlightWhileItsPickupIsPending() {
         // given
         Shipment ordered = awaitingPickup("2", "B");
-        ordered.setPickup(ShipmentPickup.pending("cmd-1", LocalDateTime.now(), LocalDate.of(2026, 10, 7),
-                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("P-1"));
-        order.setShipments(new ArrayList<>(List.of(awaitingPickup("1", "A"), ordered)));
+        ordered.setPickup(pendingPickup(LocalDateTime.now()).ordered("P-1"));
+        Shipment pending = awaitingPickup("4", "D");
+        pending.setPickup(pendingPickup(LocalDateTime.now()));
+        Shipment neverConfirmed = awaitingPickup("5", "E");
+        neverConfirmed.setPickup(pendingPickup(LocalDateTime.now().minusMinutes(11)));
+        order.setShipments(new ArrayList<>(List.of(awaitingPickup("1", "A"), ordered, pending, neverConfirmed)));
 
         // when / then
-        assertThat(owner.awaitsPickup("store-1", "order-1", "1")).isTrue();
-        assertThat(owner.awaitsPickup("store-1", "order-1", "2")).isFalse();
-        assertThat(owner.awaitsPickup("store-1", "order-1", "3")).isFalse();
+        assertThat(owner.pickupStanding("store-1", "order-1", "1")).isEqualTo(PickupStanding.ORDERABLE);
+        assertThat(owner.pickupStanding("store-1", "order-1", "2")).isEqualTo(PickupStanding.GONE);
+        assertThat(owner.pickupStanding("store-1", "order-1", "3")).isEqualTo(PickupStanding.GONE);
+        assertThat(owner.pickupStanding("store-1", "order-1", "4")).isEqualTo(PickupStanding.IN_FLIGHT);
+        assertThat(owner.pickupStanding("store-1", "order-1", "5")).isEqualTo(PickupStanding.ORDERABLE);
     }
 
     @Test
@@ -306,7 +352,7 @@ class OrderShipmentOwnerTest {
         when(ordersRepository.findById("store-1", "gone")).thenReturn(null);
 
         // when / then
-        assertThat(owner.awaitsPickup("store-1", "gone", "1")).isFalse();
+        assertThat(owner.pickupStanding("store-1", "gone", "1")).isEqualTo(PickupStanding.GONE);
         assertThat(owner.applyPickup("store-1", "gone", List.of("1"), p -> ShipmentPickup.notRequired())).isZero();
     }
 

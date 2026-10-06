@@ -36,8 +36,8 @@ public interface ShipmentOwner {
     /** The command did not create anything: error (the provider's words) or errorKey (our reason, a message key). */
     void failed(ShipmentCreationCheckRequest request, String error, String errorKey);
 
-    /** A shipment of this owner carrying the package still waits for "Zamów odbiór". */
-    boolean awaitsPickup(String storeId, String ownerId, String externalId);
+    /** Where the pickup of the package stands on this owner's shipments carrying it. */
+    PickupStanding pickupStanding(String storeId, String ownerId, String externalId);
 
     /**
      * Changes the pickup of every row of these packages (every parcel of a package carries its externalId); returns

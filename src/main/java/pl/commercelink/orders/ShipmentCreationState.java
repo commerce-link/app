@@ -23,6 +23,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class ShipmentCreationState {
 
+    /** The reason of a creation the provider never confirmed. */
+    public static final String UNCONFIRMED_KEY = "shipping.creation.unconfirmed";
+
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum
     private ShipmentCreationStatus status;
@@ -67,6 +70,18 @@ public class ShipmentCreationState {
     @DynamoDBIgnore
     public boolean isFailed() {
         return status == ShipmentCreationStatus.FAILED;
+    }
+
+    /** PENDING and younger than ProviderCommandTimeout.UNCONFIRMED_AFTER: its result still comes. */
+    @DynamoDBIgnore
+    public boolean isInProgress(LocalDateTime now) {
+        return isPending() && !ProviderCommandTimeout.isOverdue(requestedAt, now);
+    }
+
+    /** PENDING for so long that nothing will settle it any more: it reads and acts as a failed creation. */
+    @DynamoDBIgnore
+    public boolean isUnconfirmed(LocalDateTime now) {
+        return isPending() && ProviderCommandTimeout.isOverdue(requestedAt, now);
     }
 
     @DynamoDBIgnore

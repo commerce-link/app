@@ -195,6 +195,43 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
+    void aCustomerReturnStuckPendingPastTheTimeoutCanBeBookedAgainOrRemoved() {
+        // given
+        Shipment stuck = failedCreation(true);
+        stuck.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now().minusMinutes(11)));
+        RMA rma = rmaWith(stuck);
+        rma.setShippingDetails(ShippingDetails._default());
+        rma.setReturnPackageTemplateId("7");
+
+        // when
+        RmaShipmentsView view = factory.build(rma, false, PL);
+
+        // then
+        RmaShipmentsView.Row row = view.rows().get(0);
+        assertThat(row.stateKey()).isEqualTo("shipping.creation.unconfirmed");
+        assertThat(row.returnRetryAction()).isEqualTo("/dashboard/rma/rma-1/return-shipment/retry");
+        assertThat(row.removeAction()).isEqualTo("/dashboard/rma/rma-1/shipments/creations/cmd-1/remove");
+        assertThat(view.pollHref()).isNull();
+    }
+
+    @Test
+    void aCustomerReturnPickupPendingPastTheTimeoutIsOrderedAgainHere() {
+        // given
+        Shipment stuck = customerReturn();
+        stuck.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now().minusMinutes(11), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)));
+
+        // when
+        RmaShipmentsView view = factory.build(rmaWith(stuck), false, PL);
+
+        // then
+        RmaShipmentsView.Row row = view.rows().get(0);
+        assertThat(row.stateKey()).isEqualTo("shipping.pickup.unconfirmed");
+        assertThat(row.pickupRetryAction()).isEqualTo("/dashboard/rma/rma-1/shipments/21480003/pickup");
+        assertThat(view.pollHref()).isNull();
+    }
+
+    @Test
     void aClosedRmaKeepsOnlyTheLabel() {
         // given
         Shipment failedPickup = customerReturn();

@@ -3,6 +3,7 @@ package pl.commercelink.shipping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.shipping.api.ShipmentCreation;
 import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.stores.Store;
@@ -19,7 +20,7 @@ import pl.commercelink.stores.StoresRepository;
 public class ShipmentCreationChecker {
 
     static final int MAX_ATTEMPTS = 8;
-    static final String UNCONFIRMED_KEY = "shipping.creation.unconfirmed";
+    static final String UNCONFIRMED_KEY = ShipmentCreationState.UNCONFIRMED_KEY;
     static final String NO_PROVIDER_KEY = "shipping.creation.no.provider";
 
     private final StoresRepository storesRepository;

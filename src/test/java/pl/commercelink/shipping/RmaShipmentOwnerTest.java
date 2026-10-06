@@ -173,6 +173,23 @@ class RmaShipmentOwnerTest {
     }
 
     @Test
+    void aCreationPendingPastTheTimeoutNoLongerBlocksANewBooking() {
+        // given
+        Shipment stuck = placeholder("cmd-0");
+        stuck.setCreation(ShipmentCreationState.pending("cmd-0", LocalDateTime.now().minusMinutes(11)));
+        rma.setShipments(new ArrayList<>(List.of(stuck)));
+        RmaShipmentOwner owner = operatorOwner();
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(rma.getShipments()).hasSize(1);
+        assertThat(rma.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
     void anOperatorsRefusedShipmentStaysAsFailed() {
         // given
         rma.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
