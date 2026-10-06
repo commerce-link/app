@@ -9149,7 +9149,8 @@ a.cl-link-button:hover {
 /* In the same range the offer name and the client name are one line each, ending in an ellipsis (the full text is in
    title): wrapped, they made rows 84-103 px instead of ~66 px. Width 0 keeps them out of the column's minimum, as
    .cl-cell-email does; a nowrap name with a ch cap pushed the table 22-146 px past its card at 720-1024 px. The two
-   columns take what the other columns leave, at least 7em, so a name never shrinks to a few letters. */
+   columns take what the other columns leave, at least 7em, so a name never shrinks to a few letters. Templates follow
+   the same rule since their "Utwórz ofertę" became an icon (the dates, counts and amounts no longer take the space). */
 @media (min-width: 720px) and (max-width: 1215px) {
     .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
         display: block;
@@ -9164,7 +9165,7 @@ a.cl-link-button:hover {
         min-width: 7em;
     }
 
-    .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+    .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
         width: 1%;
         white-space: nowrap;
     }
@@ -9201,7 +9202,7 @@ a.cl-link-button:hover {
             min-width: 7em;
         }
 
-        .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+        .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
             width: 1%;
             white-space: nowrap;
         }

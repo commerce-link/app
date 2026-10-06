@@ -99,7 +99,7 @@ class OffersListStylesContractTest {
         min-width: 7em;
     }
 
-    .cl-page .cl-table.is-offers:not(.is-templates) tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+    .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
         width: 1%;
         white-space: nowrap;
     }
