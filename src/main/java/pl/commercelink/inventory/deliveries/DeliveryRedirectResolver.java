@@ -43,6 +43,14 @@ public class DeliveryRedirectResolver {
                 + "?order=" + UriUtils.encodeQueryParam(orderId, StandardCharsets.UTF_8) + "&from=order";
     }
 
+    /**
+     * Any new-delivery page, a warehouse batch or an order's dropship lines, in its store or super admin variant: the
+     * pages only an admin (DeliveryCreateController) opens.
+     */
+    public static boolean isCreateLink(String href) {
+        return href != null && href.contains("/deliveries/create/");
+    }
+
     public static boolean isDropshipCreateLink(String href) {
         return href != null && href.startsWith("/dashboard/deliveries/create/") && href.contains("?order=");
     }

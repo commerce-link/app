@@ -252,7 +252,10 @@ public class OrderPageModelFactory {
                                            ReceiptLock receiptLock, Locale locale) {
         SupplierLabelMap labels = labels(store, locale);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
-                item -> deliveryHref(order, item, viewer, links, dropship),
+                // the state pill links the delivery or the planning of one; the store's warehouse is no target there
+                // (client 2026-10-06), the item page keeps its link
+                item -> SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId()) ? null
+                        : deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
                 receiptLock, hasDropshipItems);
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
@@ -366,8 +369,12 @@ public class OrderPageModelFactory {
 
     private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links, DropshipAssessment dropship) {
         String href = deliveryRedirectResolver.resolveFor(order, item, dropship);
-        // the dropship screens are the admin's; a user or a super admin only sees the supplier's name
-        if (DeliveryRedirectResolver.isDropshipCreateLink(href) && (!viewer.admin() || viewer.superAdmin())) {
+        // creating a delivery is the admin's: a user gets no link to any new-delivery page (it answered 403); a super
+        // admin has the store-scoped warehouse planning, but not an order's dropship page
+        if (DeliveryRedirectResolver.isCreateLink(href) && !viewer.admin() && !viewer.superAdmin()) {
+            return null;
+        }
+        if (DeliveryRedirectResolver.isDropshipCreateLink(href) && viewer.superAdmin()) {
             return null;
         }
         return links.forViewer(href);
