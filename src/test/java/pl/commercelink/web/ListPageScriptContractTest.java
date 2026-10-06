@@ -45,4 +45,15 @@ class ListPageScriptContractTest {
         assertThat(payments).contains("name=\"method\"");
         assertThat(script).doesNotContainPattern("form\\.(method|action)\\b");
     }
+
+    @Test
+    void anOutcomeNoticeRenderedWithThePageIsFocusedOnce() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/list-page.js");
+        String offers = read("src/main/resources/templates/offers.html");
+
+        // then
+        assertThat(script).contains("root.querySelector('[data-cl-list-notice]')").contains("notice.focus()");
+        assertThat(offers).contains("tabindex=\"-1\" data-cl-list-notice");
+    }
 }
