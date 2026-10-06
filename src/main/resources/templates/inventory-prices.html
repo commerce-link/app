@@ -22,7 +22,7 @@
             <p class="cl-page-lead" th:text="${superAdmin} ? #{inventory.prices.tech.lead} : #{inventory.prices.lead}"></p>
         </header>
 
-        <div th:replace="~{fragments/screen-intro :: panel('inventory-prices', 'fas fa-balance-scale')}"></div>
+        <div th:replace="~{fragments/screen-intro :: panel('inventory-prices', 'fas fa-tag')}"></div>
 
         <section class="cl-inv-search-card" aria-labelledby="inventory-search-title">
             <h2 class="cl-visually-hidden" id="inventory-search-title" th:text="#{inventory.search.title}"></h2>

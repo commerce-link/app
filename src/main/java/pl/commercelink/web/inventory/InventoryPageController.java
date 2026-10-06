@@ -56,7 +56,7 @@ public class InventoryPageController {
         return "inventory-prices";
     }
 
-    /** The address of the price comparison for a code, keeping the way back to a browse list when there is one. */
+    /** The address of the prices and availability page for a code, keeping the way back to a browse list when there is one. */
     static String pricesHref(String query, String from) {
         String href = PRICES_PATH + "?q=" + encode(normalize(query));
         return from == null || from.isBlank() ? href : href + "&from=" + encode(from.strip());

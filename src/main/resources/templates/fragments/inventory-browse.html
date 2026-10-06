@@ -14,7 +14,7 @@
 </div>
 
 <!--/* The two lines of the "Kategoria" cell: PIM path (ancestors grey, leaf bold, the whole path in the title) and the
-       store-catalog category for an admin. Shared with the product header of the price comparison. */-->
+       store-catalog category for an admin. Shared with the product header of the prices and availability page. */-->
 <th:block th:fragment="categoryLines(line)">
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
     <span class="cl-category-catalog" th:if="${line.catalogLabel() != null and (browse == null or browse.admin())}">

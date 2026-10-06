@@ -10,7 +10,7 @@
     const MIN_QUERY_LENGTH = 3;
     const SPINNER_DELAY_MS = 150;
 
-    // The supplier assortment page carries the summary slot, the price comparison the search form.
+    // The supplier assortment page carries the summary slot, the prices and availability page the search form.
     const summarySlot = page.querySelector('[data-inventory-summary]');
     if (summarySlot) {
         loadSummary();

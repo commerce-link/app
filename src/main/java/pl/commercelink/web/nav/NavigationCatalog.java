@@ -37,7 +37,7 @@ public final class NavigationCatalog {
                     new NavItem("catalogs", "nav.product.catalog", "/dashboard/catalogs", "fa-book", Set.of(ADMIN)),
                     new NavItem("inventory", "nav.inventory", "/dashboard/inventory", "fa-boxes", INVENTORY_ROLES),
                     new NavItem("inventoryPrices", "nav.inventory.prices", "/dashboard/inventory/prices",
-                            "fa-balance-scale", INVENTORY_ROLES))),
+                            "fa-tag", INVENTORY_ROLES))),
             new NavSection("nav.group.finance", List.of(
                     new NavItem("payments", "nav.payments", "/dashboard/payments", "fa-credit-card", Set.of(ADMIN)),
                     new NavItem("reports", "nav.reports", "/dashboard/reports", "fa-chart-bar", Set.of(ADMIN)))),
