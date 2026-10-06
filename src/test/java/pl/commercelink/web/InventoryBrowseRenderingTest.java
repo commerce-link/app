@@ -59,7 +59,7 @@ class InventoryBrowseRenderingTest {
         String html = engine.process(RESULTS, context(page(true, true, BrowseQuery.start(), List.of())));
 
         // then
-        assertThat(html).contains("You have no suppliers switched on");
+        assertThat(html).contains("There are no products to browse yet");
         assertThat(html).doesNotContain("cl-table");
     }
 
