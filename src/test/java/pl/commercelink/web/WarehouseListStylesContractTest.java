@@ -11,8 +11,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Layout rules of the warehouse list table that the browser checks (E2E, Task 11) found missing. */
 class WarehouseListStylesContractTest {
 
+    private static String css() throws Exception {
+        return Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+    }
+
     private static String section() throws Exception {
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+        String css = css();
         int start = css.indexOf("/* --- Warehouse list");
         assertThat(start).as("section marker").isNotNegative();
         int end = css.indexOf("/* ---", start + 10);
@@ -54,14 +58,16 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
-    void dockedSelectionRowIsTheSharedComponentOfTheDeliveryDetailsBelowTheDrawerScrim() throws Exception {
+    void dockedSelectionRowIsOneSharedBlockBelowTheDrawerScrim() throws Exception {
         // given
-        String section = section();
+        String css = css();
+        String rule = ".cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {";
 
         // when / then
-        // Ruling 14: the block of PR #259 verbatim, so a merge of both branches leaves one identical block; z-index 15 sits
-        // below the drawer's scrim (--cl-z-scrim 20), and the room under the list is the measured --cl-docked-bar
-        assertThat(section).contains("""
+        // the warehouse list uses the docked row of the delivery details (PR #259) as is: one block for both pages;
+        // z-index 15 sits below the drawer's scrim (--cl-z-scrim 20), the room under the list is the measured --cl-docked-bar
+        assertThat(css.split(java.util.regex.Pattern.quote(rule), -1)).hasSize(2);
+        assertThat(css).contains("""
                     .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
                         position: fixed;
                         top: auto;
@@ -80,8 +86,26 @@ class WarehouseListStylesContractTest {
                         padding-bottom: var(--cl-docked-bar, 112px);
                     }
                 """);
-        assertThat(section).doesNotContain("z-index: 30").doesNotContain(":has(.cl-selection-row:not([hidden]))")
+        assertThat(section()).doesNotContain("z-index: 30").doesNotContain(":has(.cl-selection-row:not([hidden]))")
                 .doesNotContain("rgba(15, 23, 42");
+    }
+
+    @Test
+    void menusOfTheDockedRowOpenUpwardsAndScrollWithinTheRoomBelowTheTopBar() throws Exception {
+        // given
+        String css = css();
+
+        // when / then
+        // pinned to the bottom edge the row has nothing below it; menu.js turns a list up only when it fits above whole,
+        // so in a short window (1280x720 at 200 %) the "Zmień status" list stayed off the screen
+        assertThat(css).contains("""
+                    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) .cl-menu-list {
+                        top: auto;
+                        bottom: calc(100% + 4px);
+                        max-height: calc(100vh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+                        max-height: calc(100dvh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+                        overflow-y: auto;
+                """);
     }
 
     @Test
