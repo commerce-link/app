@@ -225,6 +225,38 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
+    void categoryNamesBreakAfterEverySlashOnTheTileInTheHeadAndInThePills() {
+        // given
+        String name = "Profesjonalne/konsumenckie AV i foto";
+        String broken = "Profesjonalne/<wbr>konsumenckie AV i foto";
+
+        // when
+        String start = engine.process(RESULTS, context(page(true, false, BrowseQuery.start(), List.of(), List.of(), name, name)));
+        String category = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"),
+                List.of(row(false)), List.of(), name, name)));
+
+        // then
+        assertThat(start).contains("<span class=\"cl-tile-title\">" + broken + "</span>");
+        assertThat(category).contains("<h2 id=\"browse-title\" tabindex=\"-1\">" + broken + "</h2>",
+                "<span aria-current=\"page\">" + broken + "</span>", "<span>" + broken + "</span>");
+        assertThat(start + category).doesNotContain("Profesjonalne/konsumenckie");
+    }
+
+    @Test
+    void categoryPathBreaksAfterSlashesKeepsEdgeSlashesAndStaysEscaped() {
+        // given
+        CategoryLine line = new CategoryLine(List.of("Audio/wideo"), "/<b>x</b>//y/", "Audio/wideo › /<b>x</b>//y/", List.of());
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
+
+        // then
+        assertThat(html).contains("<span>Audio/<wbr>wideo</span> › <strong>/<wbr>&lt;b&gt;x&lt;/<wbr>b&gt;/<wbr>/<wbr>y/<wbr></strong>",
+                "title=\"Audio/wideo › /&lt;b&gt;x&lt;/b&gt;//y/\"");
+        assertThat(html).doesNotContain("<b>x</b>");
+    }
+
+    @Test
     void catalogAndCategoryNamesAreEscapedInTheCheckTooltip() {
         // given
         CategoryLine line = line(List.of("<b>x</b> › <b>Fan</b>", "Sklep › <b>y</b>"));
@@ -271,12 +303,17 @@ class InventoryBrowseRenderingTest {
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
                                    List<BrowsePage.Chip> chips) {
+        return page(admin, noSuppliers, query, rows, chips, "Karty graficzne", "Komponenty komputerowe");
+    }
+
+    private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
+                                   List<BrowsePage.Chip> chips, String category, String tile) {
         BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?sort=cost", "none");
-        return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : "Karty graficzne",
+        return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : category,
                 List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
-                        new BrowsePage.Crumb("Karty graficzne", null, null)),
-                List.of(new BrowsePage.NavItem("Karty graficzne", null, 3, "/dashboard/inventory?cat=11", true)), true,
-                query.isStart() ? List.of(new BrowsePage.Tile("Komponenty komputerowe", null, 5, "Karty graficzne",
+                        new BrowsePage.Crumb(category, null, null)),
+                List.of(new BrowsePage.NavItem(category, null, 3, "/dashboard/inventory?cat=11", true)), true,
+                query.isStart() ? List.of(new BrowsePage.Tile(tile, null, 5, "Karty graficzne",
                         "/dashboard/inventory?cat=10")) : List.of(),
                 List.of(new BrowsePage.MenuOption("AB", "AB", 3, true)),
                 chips,

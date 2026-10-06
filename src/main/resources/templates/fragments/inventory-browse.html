@@ -13,10 +13,15 @@
     </div>
 </div>
 
+<!--/* A PIM category name with a break opportunity after every "/": "Profesjonalne/konsumenckie AV i foto" is one word to
+       the browser and otherwise breaks mid-word (overflow-wrap: anywhere stays as the last resort). The text stays escaped;
+       split with limit -1 keeps leading, trailing and doubled slashes. */-->
+<th:block th:fragment="breakable(text)"><th:block th:if="${text != null}"><th:block th:each="part, it : ${text.split('/', -1)}"><th:block th:text="${part}"></th:block><th:block th:unless="${it.last}">/<wbr></th:block></th:block></th:block></th:block>
+
 <!--/* The "Kategoria w PIM" cell: the PIM path (ancestors grey, leaf bold, the whole path in the title). Shared with the
        product header of the prices and availability page. */-->
 <th:block th:fragment="categoryLines(line)">
-    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
+    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${ancestor})}"></th:block></span> › </th:block><strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span>
 </th:block>
 
 <!--/* "In the catalog": a check icon, not a link. Focusable like the margin icon, so
@@ -42,15 +47,16 @@
         <section class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
             <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
             <div th:unless="${b.isStart()}" class="cl-result-head">
-                <h2 id="browse-title" tabindex="-1"
-                    th:text="${q.category() == null} ? #{inventory.browse.textResults(${q.q2()})} : (${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned})"></h2>
+                <h2 id="browse-title" tabindex="-1" th:if="${q.category() == null}" th:text="#{inventory.browse.textResults(${q.q2()})}"></h2>
+                <h2 id="browse-title" tabindex="-1" th:unless="${q.category() == null}"
+                    th:with="title=${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned}"><th:block th:replace="~{fragments/inventory-browse :: breakable(${title})}"></th:block></h2>
                 <p class="cl-result-path" th:if="${q.category() == null}" th:text="#{inventory.browse.textEverywhere}"></p>
                 <p class="cl-result-path" th:if="${q.category() != null}">
                     <th:block th:each="crumb, it : ${b.crumbs()}">
-                        <a th:if="${crumb.href() != null}" th:href="${crumb.href()}" data-cl-list-nav
-                           th:text="${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}"></a>
-                        <span th:if="${crumb.href() == null}" aria-current="page"
-                              th:text="${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}"></span>
+                        <th:block th:with="label=${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}">
+                        <a th:if="${crumb.href() != null}" th:href="${crumb.href()}" data-cl-list-nav><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></a>
+                        <span th:if="${crumb.href() == null}" aria-current="page"><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></span>
+                        </th:block>
                         <span th:unless="${it.last}" aria-hidden="true"> › </span>
                     </th:block>
                 </p>
@@ -61,7 +67,7 @@
                     <li th:each="item : ${b.subnav()}">
                         <a class="cl-subnav-item" th:href="${item.href()}" data-cl-list-nav
                            th:attr="aria-current=${item.current()} ? 'page' : null">
-                            <span th:text="${item.label()}"></span>
+                            <span><th:block th:replace="~{fragments/inventory-browse :: breakable(${item.label()})}"></th:block></span>
                             <span class="cl-subnav-count" th:text="${#numbers.formatInteger(item.count(), 1, 'WHITESPACE')}"></span>
                         </a>
                     </li>
@@ -242,7 +248,7 @@
             <li th:each="tile : ${b.tiles()}">
                 <a class="cl-tile" th:href="${tile.href()}" data-cl-list-nav>
                     <span class="cl-tile-icon" aria-hidden="true"><i class="fas fa-folder"></i></span>
-                    <span class="cl-tile-title" th:text="${tile.label() != null} ? ${tile.label()} : #{${tile.labelKey()}}"></span>
+                    <span class="cl-tile-title" th:with="label=${tile.label() != null} ? ${tile.label()} : #{${tile.labelKey()}}"><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></span>
                     <span class="cl-tile-count" th:text="#{inventory.browse.tile.count(${#numbers.formatInteger(tile.count(), 1, 'WHITESPACE')})}"></span>
                     <span class="cl-tile-desc" th:if="${tile.description() != null}" th:text="${tile.description()}"></span>
                 </a>

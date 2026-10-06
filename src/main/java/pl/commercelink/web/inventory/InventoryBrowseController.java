@@ -40,6 +40,7 @@ public class InventoryBrowseController {
             return "redirect:" + InventoryPageController.pricesHref(params.getFirst("q"), params.getFirst("from"));
         }
         BrowseQuery query = addBrowseAttributes(params, model);
+        model.addAttribute("browseDialogUrl", DIALOG_PATH);
         List<String> eans = params.getOrDefault("ean", List.of());
         if ("add".equals(params.getFirst("open")) && isAdmin() && storeId() != null && !eans.isEmpty()) {
             model.addAttribute("addDialog", dialogFactory.build(storeId(), eans, query.href()));

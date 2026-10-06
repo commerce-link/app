@@ -37,6 +37,20 @@
         return (new URLSearchParams(window.location.search).get('q') || '').trim();
     }
 
+    // The way back to the browse list (from=) travels with every pushed address, so a reload keeps the back link.
+    function pageAddress(query) {
+        const params = new URLSearchParams();
+        if (query) {
+            params.set('q', query);
+        }
+        const from = new URLSearchParams(window.location.search).get('from');
+        if (from) {
+            params.set('from', from);
+        }
+        const search = params.toString();
+        return page.dataset.pageUrl + (search ? '?' + search : '');
+    }
+
     function parseFragment(html, name) {
         const template = document.createElement('template');
         template.innerHTML = html;
@@ -219,7 +233,7 @@
                 results.replaceChildren(fragment);
                 failedQuery = null;
                 if (pushHistory) {
-                    window.history.pushState({q: query}, '', page.dataset.pageUrl + '?q=' + encodeURIComponent(query));
+                    window.history.pushState({q: query}, '', pageAddress(query));
                 }
                 announce(fragment);
                 const heading = fragment.querySelector('[data-inventory-results-heading]');
@@ -288,7 +302,7 @@
         searchError.hidden = true;
         showEmptyState();
         if (urlQuery()) {
-            window.history.pushState({q: ''}, '', page.dataset.pageUrl);
+            window.history.pushState({q: ''}, '', pageAddress(''));
         }
         input.focus();
     });

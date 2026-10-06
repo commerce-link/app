@@ -40,7 +40,7 @@ public class InventoryPageController {
     private final InventorySourcesViewFactory sourcesViewFactory;
     private final WarehouseSummaryService warehouseSummaryService;
     private final TechnicalInventoryViewFactory technicalViewFactory;
-    private final ProductCategoryViewFactory productCategoryViews;
+    private final ProductCategoryLineFactory productCategoryLines;
 
     @GetMapping(PRICES_PATH)
     public String page(@RequestParam(value = "q", required = false) String q,
@@ -133,7 +133,7 @@ public class InventoryPageController {
             case null, default -> null;
         };
         if (header != null) {
-            productCategoryViews.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
+            productCategoryLines.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
         }
         return true;
     }
@@ -144,7 +144,6 @@ public class InventoryPageController {
         model.addAttribute("manageSuppliersUrl", MANAGE_SUPPLIERS_URL);
         model.addAttribute("warehouseUrl", WAREHOUSE_URL);
         model.addAttribute("connectionUrlPrefix", CONNECTION_URL_PREFIX);
-        model.addAttribute("browseDialogUrl", InventoryBrowseController.DIALOG_PATH);
     }
 
     private static boolean isSuperAdmin() {

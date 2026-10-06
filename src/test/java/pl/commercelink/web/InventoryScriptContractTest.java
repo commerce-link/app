@@ -36,4 +36,15 @@ class InventoryScriptContractTest {
             assertThat(templates).as("templates render " + hook).contains(hook);
         }
     }
+
+    @Test
+    void searchOnThePricesPageKeepsTheWayBackInThePushedAddress() throws Exception {
+        // when
+        String script = read("src/main/resources/static/js/inventory.js");
+
+        // then
+        assertThat(script).contains("get('from')", "params.set('from', from)", "pushState({q: query}, '', pageAddress(query))",
+                "pushState({q: ''}, '', pageAddress(''))");
+        assertThat(script).doesNotContain("page.dataset.pageUrl + '?q='");
+    }
 }

@@ -16,7 +16,7 @@ import java.util.Optional;
  */
 @Component
 @RequiredArgsConstructor
-public class ProductCategoryViewFactory {
+public class ProductCategoryLineFactory {
 
     private final TaxonomyCache taxonomyCache;
     private final PimCategoryTree tree;

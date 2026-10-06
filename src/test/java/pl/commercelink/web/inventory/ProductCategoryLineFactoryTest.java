@@ -16,16 +16,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class ProductCategoryViewFactoryTest {
+class ProductCategoryLineFactoryTest {
 
     private final TaxonomyCache taxonomyCache = mock(TaxonomyCache.class);
-    private final ProductCategoryViewFactory factory;
+    private final ProductCategoryLineFactory factory;
 
-    ProductCategoryViewFactoryTest() {
+    ProductCategoryLineFactoryTest() {
         PimCatalog pimCatalog = mock(PimCatalog.class);
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("10", null, "Komponenty komputerowe", "pl"), new PimCategory("11", "10", "Karty graficzne", "pl")));
-        factory = new ProductCategoryViewFactory(taxonomyCache, new PimCategoryTree(pimCatalog));
+        factory = new ProductCategoryLineFactory(taxonomyCache, new PimCategoryTree(pimCatalog));
     }
 
     @Test

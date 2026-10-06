@@ -81,6 +81,7 @@ class InventoryBrowseControllerTest {
         assertThat(view).isEqualTo("inventory");
         assertThat(model.getAttribute("browse")).isNotNull();
         assertThat(model.getAttribute("addDialog")).isNull();
+        assertThat(model.getAttribute("browseDialogUrl")).isEqualTo("/dashboard/inventory/browse/add-dialog");
     }
 
     @Test

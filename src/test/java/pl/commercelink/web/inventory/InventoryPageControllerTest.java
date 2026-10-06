@@ -62,7 +62,7 @@ class InventoryPageControllerTest {
     @Mock
     private TechnicalInventoryViewFactory technicalViewFactory;
     @Mock
-    private ProductCategoryViewFactory productCategoryViews;
+    private ProductCategoryLineFactory productCategoryLines;
 
     @InjectMocks
     private InventoryPageController controller;
@@ -100,6 +100,7 @@ class InventoryPageControllerTest {
         assertThat(view).isEqualTo("inventory-prices");
         assertThat(model.getAttribute("query")).isEqualTo("");
         assertThat(model.getAttribute("result")).isNull();
+        assertThat(model.getAttribute("browseDialogUrl")).isNull();
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(true);
         assertThat(model.getAttribute("manageSuppliersUrl")).isEqualTo("/dashboard/store/suppliers");
         verifyNoInteractions(inventorySearch);
@@ -286,7 +287,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901000000001"))
                 .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
         CategoryLine view = new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", List.of());
-        when(productCategoryViews.build(header)).thenReturn(Optional.of(view));
+        when(productCategoryLines.build(header)).thenReturn(Optional.of(view));
         ConcurrentModel model = new ConcurrentModel();
 
         // when
