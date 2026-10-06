@@ -31,6 +31,14 @@ class WarehouseBulkActionTest {
     }
 
     @Test
+    void itemsReceivedFromServiceAreShownInTheClaimsTheyWereSentFrom() {
+        // given
+        // when / then
+        // WarehouseGoodsInService.receiveFromExternalService marks every received item InRMA
+        assertThat(WarehouseBulkAction.RECEIVE.after()).isEqualTo(InRMA);
+    }
+
+    @Test
     void pathsKeepTheExistingEndpoints() {
         // given
         // when / then

@@ -18,7 +18,8 @@ public enum WarehouseBulkAction {
     RMA("markAsInRMA", "rma", List.of(Delivered, Reserved), true, false, false, false, InRMA),
     ALLOCATE("markAsInAllocation", "allocate", List.of(New), false, true, false, false, Allocation),
     EXTERNAL_SERVICE("markAsInExternalService", "externalService", List.of(InRMA), false, true, true, false, InExternalService),
-    RECEIVE("markAsReceivedFromExternalService", "received", List.of(InExternalService), false, true, false, false, Delivered),
+    // goods back from an external service return to the claim they were sent out for (WarehouseGoodsInService)
+    RECEIVE("markAsReceivedFromExternalService", "received", List.of(InExternalService), false, true, false, false, InRMA),
     SHIP("shipping", "ship", List.of(InRMA), false, false, true, false, null),
     DESTROY("markAsDestroyed", "destroy", List.of(Delivered, InRMA, InExternalService), true, false, false, true, Delivered);
 

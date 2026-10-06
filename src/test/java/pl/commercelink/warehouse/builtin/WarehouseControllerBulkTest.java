@@ -410,7 +410,7 @@ class WarehouseControllerBulkTest {
     }
 
     @Test
-    void receivedFromExternalServiceSucceedsAndRedirectsToStock() throws Exception {
+    void receivedFromExternalServiceSucceedsAndRedirectsToTheClaimsTheItemsReturnTo() throws Exception {
         // given
         stored("a", FulfilmentStatus.InExternalService, 1);
         when(warehouseGoodsInService.receiveFromExternalService("store-1", List.of("a"), "operator"))
@@ -421,7 +421,7 @@ class WarehouseControllerBulkTest {
         String view = asStore(() -> controller.markAsReceivedFromExternalService(List.of("a"), view("statuses", "InExternalService"), PL, ra));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
         assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Przyjęto z serwisu 1 poz. (PZ).");
     }
 
