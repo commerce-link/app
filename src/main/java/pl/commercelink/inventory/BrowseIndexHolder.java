@@ -2,6 +2,7 @@ package pl.commercelink.inventory;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Executor;
@@ -42,16 +43,34 @@ public class BrowseIndexHolder {
         if (index == null) {
             return buildFirst();
         }
+        rebuildIfStale(index);
+        return index;
+    }
+
+    /**
+     * A stale index holds the previous inventory generation in memory until it is replaced; without this, that lasts
+     * until someone opens the browse page. Before the first browse there is no index and nothing is built here.
+     */
+    @Scheduled(fixedDelay = 60_000)
+    public void refreshIfStale() {
+        BrowseIndex index = current.get();
+        if (index != null) {
+            rebuildIfStale(index);
+        }
+    }
+
+    private void rebuildIfStale(BrowseIndex index) {
         if (index.version() != global.version() && rebuilding.compareAndSet(false, true)) {
             executor.execute(() -> {
                 try {
                     current.set(build());
+                } catch (RuntimeException e) {
+                    log.error("Browse index rebuild failed", e);
                 } finally {
                     rebuilding.set(false);
                 }
             });
         }
-        return index;
     }
 
     private synchronized BrowseIndex buildFirst() {

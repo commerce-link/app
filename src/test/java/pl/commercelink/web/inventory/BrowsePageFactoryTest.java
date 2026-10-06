@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.inventory.BrowseCriteria;
 import pl.commercelink.inventory.BrowseResult;
 import pl.commercelink.inventory.BrowseRow;
@@ -17,8 +18,15 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.products.PimCategoryTree;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
+import pl.commercelink.stores.StoresRepository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,6 +49,7 @@ class BrowsePageFactoryTest {
 
     @Mock private InventoryBrowse inventoryBrowse;
     @Mock private CatalogPlacement catalogPlacement;
+    @Mock private StoresRepository storesRepository;
     private BrowsePageFactory factory;
 
     @BeforeEach
@@ -51,7 +61,13 @@ class BrowsePageFactoryTest {
                 new PimCategory("12", "10", "Dyski SSD", "pl"),
                 new PimCategory("20", null, "Akcesoria", "pl"),
                 new PimCategory("21", "20", "Kable", "pl")));
-        factory = new BrowsePageFactory(inventoryBrowse, new PimCategoryTree(pimCatalog), catalogPlacement);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(
+                labelled("Kosatec-k7f3a9c2", "Kosatec B2B"),
+                labelled("manual-a1b2c3d4", "Hurtownia Nowak"),
+                labelled("Elko-a1b2c3d4", "Elektronika"),
+                labelled("Action-a1b2c3d4", "Elektronika")));
+        factory = new BrowsePageFactory(inventoryBrowse, new PimCategoryTree(pimCatalog), catalogPlacement,
+                new SupplierLabels(storesRepository));
         when(inventoryBrowse.summary(any())).thenReturn(new BrowseSummary(Map.of("11", 3, "12", 2, "21", 9), Map.of("AB", 14), 14));
         when(inventoryBrowse.browse(any(), any())).thenReturn(new BrowseResult(List.of(), 0, false));
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
@@ -163,12 +179,8 @@ class BrowsePageFactoryTest {
     @Test
     void pageIsClampedToLastPage() {
         // given
-        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenAnswer(call -> {
-            BrowseCriteria criteria = call.getArgument(1);
-            return criteria.offset() >= 120
-                    ? new BrowseResult(List.of(), 120, false)
-                    : new BrowseResult(List.of(row("5901000000001", "11", "x")), 120, false);
-        });
+        when(inventoryBrowse.browse(eq(STORE_ID), any()))
+                .thenReturn(new BrowseResult(List.of(row("5901000000001", "11", "x")), 120, false));
 
         // when
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11").withPage(9), true, false);
@@ -176,6 +188,93 @@ class BrowsePageFactoryTest {
         // then
         assertThat(page.pagination().page()).isEqualTo(3);
         assertThat(page.rows()).hasSize(1);
+        verify(inventoryBrowse, times(1)).browse(any(), any());
+    }
+
+    @Test
+    void supplierMenuChipsAndCostShowConnectionLabelsWhileFilteringByIdentity() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 5),
+                Map.of("Kosatec-k7f3a9c2", 3, "manual-a1b2c3d4", 2), 5));
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                row("5901000000001", "11", "Karty graficzne", "Kosatec-k7f3a9c2")), 1, false));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "11");
+        params.add("supplier", "Kosatec-k7f3a9c2");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
+        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
+        assertThat(criteria.getValue().suppliers()).containsExactly("Kosatec-k7f3a9c2");
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::value)
+                .containsExactly("manual-a1b2c3d4", "Kosatec-k7f3a9c2");
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::label)
+                .containsExactly("Hurtownia Nowak", "Kosatec B2B");
+        assertThat(page.chips()).extracting(BrowsePage.Chip::value).containsExactly("Kosatec B2B");
+        assertThat(page.rows().get(0).costSupplier()).isEqualTo("Kosatec B2B");
+    }
+
+    @Test
+    void supplierMenuTellsApartConnectionsSharingALabel() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 5),
+                Map.of("Elko-a1b2c3d4", 3, "Action-a1b2c3d4", 2), 5));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start(), true, false);
+
+        // then
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::label)
+                .containsExactly("Elektronika (Action-a1b2c3d4)", "Elektronika (Elko-a1b2c3d4)");
+    }
+
+    @Test
+    void superAdminSeesGlobalSupplierNamesAsTheyAre() {
+        // given
+        when(inventoryBrowse.summary(null)).thenReturn(new BrowseSummary(Map.of("11", 5), Map.of("AB", 5), 5));
+
+        // when
+        BrowsePage page = factory.build(null, BrowseQuery.start(), true, true);
+
+        // then
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::label).containsExactly("AB");
+        verifyNoInteractions(storesRepository);
+    }
+
+    @Test
+    void unknownPimCategoryIdsCountAndBrowseAsUnassigned() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 3, "-", 2, "777", 4),
+                Map.of("AB", 9), 9));
+
+        // when
+        BrowsePage start = factory.build(STORE_ID, BrowseQuery.start(), true, false);
+        factory.build(STORE_ID, BrowseQuery.start().withCategory("-"), true, false);
+
+        // then
+        assertThat(start.tiles()).filteredOn(tile -> "inventory.browse.unassigned".equals(tile.labelKey()))
+                .extracting(BrowsePage.Tile::count).containsExactly(6);
+        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
+        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
+        assertThat(criteria.getValue().categoryIds()).containsExactlyInAnyOrder("-", "777");
+    }
+
+    @Test
+    void onlyUnknownPimCategoryIdsStillShowTheUnassignedTile() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 3, "777", 4),
+                Map.of("AB", 7), 7));
+
+        // when
+        BrowsePage start = factory.build(STORE_ID, BrowseQuery.start(), true, false);
+
+        // then
+        assertThat(start.tiles()).extracting(BrowsePage.Tile::labelKey).contains("inventory.browse.unassigned");
+        assertThat(start.tiles()).filteredOn(tile -> "inventory.browse.unassigned".equals(tile.labelKey()))
+                .extracting(BrowsePage.Tile::count).containsExactly(4);
     }
 
     @Test
@@ -193,7 +292,7 @@ class BrowsePageFactoryTest {
     @Test
     void textTooShortSkipsTheQuery() {
         // given
-        org.springframework.util.LinkedMultiValueMap<String, String> params = new org.springframework.util.LinkedMultiValueMap<>();
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("q2", "ab");
 
         // when
@@ -205,7 +304,26 @@ class BrowsePageFactoryTest {
     }
 
     private static BrowseRow row(String ean, String categoryId, String categoryText) {
+        return row(ean, categoryId, categoryText, "AB");
+    }
+
+    private static BrowseRow row(String ean, String categoryId, String categoryText, String supplier) {
         return new BrowseRow(InventoryKey.fromEan(ean), "Produkt " + ean, "Brand", ean, "MFN-" + ean, categoryId,
-                categoryText, 120.0, true, "AB", 5, 2);
+                categoryText, 120.0, true, supplier, 5, 2);
+    }
+
+    private static Store store(StoreSupplierConnection... connections) {
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(new ArrayList<>(List.of(connections)));
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(config);
+        return store;
+    }
+
+    private static StoreSupplierConnection labelled(String identity, String label) {
+        StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.OWN);
+        connection.setLabel(label);
+        return connection;
     }
 }

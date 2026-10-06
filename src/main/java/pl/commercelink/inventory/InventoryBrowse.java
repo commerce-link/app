@@ -30,15 +30,14 @@ import java.util.stream.Collectors;
 public class InventoryBrowse {
 
     private static final Collator POLISH = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
-    private static final Comparator<BrowseRow> BY_NAME =
-            Comparator.comparing(BrowseRow::name, Comparator.nullsLast(POLISH));
 
     private final BrowseIndexHolder holder;
     private final GlobalMatchedInventory globalInventory;
     private final StoresRepository storesRepository;
     private final StoreInventoryProvider storeInventoryProvider;
     private final SupplierRegistry supplierRegistry;
-    // Same key and lifetime as Inventory.storeStatistics: a supplier change or a feed reload makes a new key.
+    // Same key and lifetime as Inventory.storeStatistics: a supplier change or a global feed reload (the index version)
+    // makes a new key; an own-feed reload keeps the key and is picked up when the entry expires after two minutes.
     private final Cache<ScopeKey, BrowseScope> scopes = Caffeine.newBuilder()
             .maximumSize(200)
             .expireAfterWrite(Duration.ofMinutes(2))
@@ -82,7 +81,12 @@ public class InventoryBrowse {
         }
         rows.sort(comparator(criteria));
         int total = rows.size();
-        int from = Math.min(criteria.offset(), total);
+        int offset = criteria.offset();
+        if (total > 0 && offset >= total) {
+            // A bookmarked page past the end shows the last page instead of an empty table.
+            offset = ((total - 1) / criteria.limit()) * criteria.limit();
+        }
+        int from = Math.min(offset, total);
         int to = Math.min(from + criteria.limit(), total);
         return new BrowseResult(List.copyOf(rows.subList(from, to)), total, truncated);
     }
@@ -125,7 +129,8 @@ public class InventoryBrowse {
         for (InventoryItem offer : candidates) {
             OfferShipping shipping = OfferShipping.forItem(supplierRegistry, offer);
             double total = offer.netPrice() + shipping.deliveryNet();
-            if (total < bestTotal) {
+            // Seeded with the first candidate: a NaN total never compares lower and would leave no offer at all.
+            if (best == null || total < bestTotal) {
                 best = offer;
                 bestTotal = total;
                 bestKnown = shipping.known();
@@ -142,15 +147,18 @@ public class InventoryBrowse {
     }
 
     private static Comparator<BrowseRow> comparator(BrowseCriteria criteria) {
+        // RuleBasedCollator.compare is synchronized: a shared instance would make concurrent sorts wait on each other.
+        Comparator<BrowseRow> byName = Comparator.comparing(BrowseRow::name,
+                Comparator.nullsLast((Collator) POLISH.clone()));
         Comparator<BrowseRow> primary = switch (criteria.sort()) {
-            case NAME -> BY_NAME;
+            case NAME -> byName;
             case COST -> Comparator.comparingDouble(BrowseRow::lowestDeliveredNet);
             case QTY -> Comparator.comparingLong(BrowseRow::qty);
         };
         if (criteria.descending()) {
             primary = primary.reversed();
         }
-        return primary.thenComparing(BY_NAME);
+        return primary.thenComparing(byName);
     }
 
     private record ScopeKey(String storeId, long version, Set<String> enabledGlobal, List<String> ownFingerprint) {

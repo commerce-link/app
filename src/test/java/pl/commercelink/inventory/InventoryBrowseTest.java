@@ -182,16 +182,32 @@ class InventoryBrowseTest {
     }
 
     @Test
-    void offsetPastEndReturnsEmptyRowsWithTotal() {
+    void offsetPastEndReturnsTheLastPage() {
         // given
-        global.replace(List.of(product("5901000000001", "GPU-1", "RTX 4060", "11", item("5901000000001", "GPU-1", "AB", 100, 5))));
+        global.replace(List.of(
+                product("5901000000001", "GPU-1", "A1", "11", item("5901000000001", "GPU-1", "AB", 100, 5)),
+                product("5901000000002", "GPU-2", "A2", "11", item("5901000000002", "GPU-2", "AB", 100, 5)),
+                product("5901000000003", "GPU-3", "A3", "11", item("5901000000003", "GPU-3", "AB", 100, 5))));
 
         // when
-        BrowseResult result = browse.browse(STORE_ID, BrowseCriteria.all().page(500, 50));
+        BrowseResult result = browse.browse(STORE_ID, BrowseCriteria.all().page(500, 2));
 
         // then
-        assertThat(result.rows()).isEmpty();
-        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.rows()).extracting(BrowseRow::name).containsExactly("A3");
+        assertThat(result.total()).isEqualTo(3);
+    }
+
+    @Test
+    void offerWithoutAComparablePriceStillMakesARow() {
+        // given
+        global.replace(List.of(product("5901000000001", "GPU-1", "RTX 4060", "11",
+                item("5901000000001", "GPU-1", "AB", Double.NaN, 5))));
+
+        // when
+        BrowseResult result = browse.browse(STORE_ID, BrowseCriteria.all());
+
+        // then
+        assertThat(result.rows()).extracting(BrowseRow::lowestSupplier).containsExactly("AB");
     }
 
     @Test
