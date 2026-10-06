@@ -1,0 +1,115 @@
+package pl.commercelink.shipping;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.api.*;
+import pl.commercelink.stores.Store;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class ShipmentCreationServiceTest {
+
+    @Mock private ShippingService shippingService;
+    @Mock private ShipmentOwners owners;
+    @Mock private ShipmentOwner owner;
+    @Mock private ShipmentCreationEventPublisher publisher;
+    @Mock private ShippingProvider provider;
+    @Mock private Store store;
+
+    private ShipmentCreationService service;
+    private final ShipmentRequest request = ShipmentRequest.builder().build();
+
+    @BeforeEach
+    void setUp() {
+        when(shippingService.providerFor(store)).thenReturn(provider);
+        when(shippingService.providerName(store)).thenReturn("furgonetka");
+        when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
+        when(owner.markCreating(any(), any())).thenReturn(true);
+        service = new ShipmentCreationService(shippingService, owners, publisher);
+    }
+
+    private ShipmentCreationCheckRequest seed() {
+        return ShipmentCreationCheckRequest.builder().storeId("store-1").ownerType(ShipmentOwnerType.ORDER)
+                .ownerId("order-1").pickUpAddressId("addr-1").build();
+    }
+
+    @Test
+    void thePlaceholderIsSavedBeforeTheProviderIsCalled() {
+        // given
+        when(provider.createShipment(eq(request), anyString()))
+                .thenAnswer(i -> ShipmentCreation.pending(i.getArgument(1), "21480003"));
+        ArgumentCaptor<Shipment> placeholder = ArgumentCaptor.forClass(Shipment.class);
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.STARTED);
+        InOrder order = inOrder(owner, provider, publisher);
+        order.verify(owner).markCreating(any(), placeholder.capture());
+        order.verify(provider).createShipment(eq(request), anyString());
+        order.verify(owner).recordExternalId(argThat(r -> "21480003".equals(r.getExternalId())));
+        order.verify(publisher).publish(argThat(r -> "21480003".equals(r.getExternalId()) && r.getAttempt() == 1
+                && "furgonetka".equals(r.getProvider())));
+        assertThat(placeholder.getValue().isCreating()).isTrue();
+        assertThat(placeholder.getValue().getProvider()).isEqualTo("furgonetka");
+        assertThat(placeholder.getValue().getPickUpAddressId()).isEqualTo("addr-1");
+    }
+
+    @Test
+    void aRefusalMarksTheShipmentFailedAndSaysWhy() {
+        // given
+        when(provider.createShipment(eq(request), anyString())).thenThrow(new ShippingException("HTTP 400",
+                new HttpClientException(400, "{\"errors\":[{\"message\":\"Nieprawidłowy kod pocztowy\"}]}")));
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
+        assertThat(start.error()).isEqualTo("Nieprawidłowy kod pocztowy");
+        verify(owner).refused(any(), eq("Nieprawidłowy kod pocztowy"));
+        verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void unknownOutcomeStaysPendingAndIsChecked() {
+        // given
+        when(provider.createShipment(eq(request), anyString())).thenThrow(new RuntimeException("HTTP request failed"));
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.STARTED);
+        verify(owner, never()).refused(any(), any());
+        verify(publisher).publish(argThat(r -> r.getExternalId() == null));
+    }
+
+    @Test
+    void aGoneOwnerIsNeverSentToTheProvider() {
+        // given
+        when(owner.markCreating(any(), any())).thenReturn(false);
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.GONE);
+        verifyNoInteractions(provider);
+    }
+}

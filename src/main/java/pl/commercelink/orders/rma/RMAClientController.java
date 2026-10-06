@@ -6,16 +6,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.orders.event.Event;
-import pl.commercelink.orders.event.EventType;
-import pl.commercelink.orders.notifications.EmailNotificationType;
+import pl.commercelink.shipping.ShipmentCreationStart;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -36,7 +33,7 @@ public class RMAClientController {
     private RMAShippingService rmaShippingService;
 
     @Autowired
-    private EmailClient emailClient;
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @Autowired
     private MessageSource messageSource;
@@ -94,21 +91,22 @@ public class RMAClientController {
         request.setInsuranceValue(rma.getShippingInsurance());
 
         try {
-            RMAShipmentResult result = rmaShippingService.createReturnShipment(request, store);
-            if (!result.getShipments().isSuccess()) {
-                redirectAttributes.addFlashAttribute("errorMessage", result.getShipments().getMessage());
+            ShipmentCreationStart start = rmaShippingService.startReturnShipment(request, store);
+            if (start.outcome() != ShipmentCreationStart.Outcome.STARTED) {
+                String reason = start.error() != null ? start.error()
+                        : messageSource.getMessage("rma.shipment.creation.failed", null, locale);
+                redirectAttributes.addFlashAttribute("errorMessage", reason);
                 return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
             }
-
-            rma.markAsWaitingForItems();
-            rma.setShippingDetails(rmaReturnForm.getShippingDetails());
-            rma.setShipments(result.getShipments().getPayload());
-
-            sendEmail(rma, result);
-
-            rmaRepository.save(rma);
+            // the creation saved its placeholder on the RMA: these changes go onto a fresh read
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> rmaRepository.findById(storeId, rmaId),
+                    fresh -> {
+                        fresh.markAsWaitingForItems();
+                        fresh.setShippingDetails(rmaReturnForm.getShippingDetails());
+                    },
+                    rmaRepository::save);
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.shipment.has.been.created", null, locale));
-
             return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
         } catch (InvalidReturnConfigurationException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
@@ -118,33 +116,4 @@ public class RMAClientController {
             return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
         }
     }
-
-    private void sendEmail(RMA rma, RMAShipmentResult result) {
-        RMACarrierConfirmationEmailNotification msg = new RMACarrierConfirmationEmailNotification(
-                rma.getEmail(),
-                rma.getEmail(),
-                rma.getRmaId(),
-                rma.getOrderId(),
-                rma.getShippingDetails()
-        );
-
-        for (String trackingUrl : result.getTrackingUrls()) {
-            msg.addTrackingUrl(trackingUrl);
-        }
-
-        boolean emailSentSuccess = emailClient.send(
-                rma.getStoreId(),
-                EmailNotificationType.RMA_CARRIER_CONFIRMATION,
-                msg
-        );
-
-        if (emailSentSuccess) {
-            rma.addEvent(new Event(
-                    EventType.email,
-                    EmailNotificationType.RMA_CARRIER_CONFIRMATION.name(),
-                    LocalDateTime.now()
-            ));
-        }
-    }
-
 }

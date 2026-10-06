@@ -4,9 +4,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.shipping.*;
 import pl.commercelink.shipping.api.Carrier;
-import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.shipping.api.ShipmentRequest;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Store;
@@ -23,6 +24,9 @@ public class RMAShippingService {
     @Autowired
     private ShippingService shippingService;
 
+    @Autowired
+    private ShipmentCreationService shipmentCreationService;
+
     public List<RMAReturnOption> getAvailableReturnOptions(Store store) {
         return store.getPackageTemplates()
                 .stream()
@@ -31,28 +35,21 @@ public class RMAShippingService {
                 .collect(Collectors.toList());
     }
 
-    public RMAShipmentResult createReturnShipment(RMAShipmentRequest request, Store store) {
+    public ShipmentCreationStart startReturnShipment(RMAShipmentRequest request, Store store) {
         validateStoreReturnConfiguration(store);
-
         AuthorizedCarrier ac = store.getRmaConfiguration().getCarrier();
         Carrier carrier = new Carrier(ac.getId(), ac.getName(), ac.getDisplayName());
-
         PackageTemplate packageTemplate = store.getPackageTemplate(request.getPackageTemplateId());
-
         List<ParcelForm> parcels = shippingService.retrieveParcelsListBasedOnPackageTemplate(
-                request.getInsuranceValue(),
-                String.valueOf(packageTemplate.getId()),
-                store
-        );
-
-        OperationResult<List<Shipment>> shipments = shippingService.createShipping(
-                request.getCustomerAddress(),
-                parcels,
-                carrier,
-                store
-        );
-
-        return new RMAShipmentResult(shipments);
+                request.getInsuranceValue(), String.valueOf(packageTemplate.getId()), store);
+        ShipmentRequest shipmentRequest = shippingService.buildReturnRequest(request.getCustomerAddress(), parcels, carrier, store);
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setCarrier(ac.getName());
+        return shipmentCreationService.start(ShipmentCreationCheckRequest.builder()
+                .storeId(store.getStoreId())
+                .ownerType(ShipmentOwnerType.RMA_RETURN)
+                .ownerId(request.getRmaId())
+                .build(), shipmentRequest, store, placeholder);
     }
 
     public void validateStoreReturnConfiguration(Store store) {

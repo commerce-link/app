@@ -61,7 +61,7 @@ class ShippingServiceAvailabilityTest {
         // when / then
         assertThatThrownBy(() -> shippingService.estimateServicePrices(form, store, target))
                 .isInstanceOf(ShippingUnavailableException.class);
-        assertThatThrownBy(() -> shippingService.createShipping(form, store, target))
+        assertThatThrownBy(() -> shippingService.buildRequest(form, store, target))
                 .isInstanceOf(ShippingUnavailableException.class);
     }
 

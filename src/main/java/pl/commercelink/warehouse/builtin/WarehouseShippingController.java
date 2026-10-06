@@ -8,10 +8,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
-import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.shipping.ShipmentCreationCheckRequest;
+import pl.commercelink.shipping.ShipmentOwnerType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.util.List;
@@ -30,8 +31,6 @@ public class WarehouseShippingController extends AbstractShippingController {
     @Autowired
     private WarehouseRepository warehouseRepository;
 
-    @Autowired
-    private WarehouseGoodsOutService warehouseGoodsOutService;
 
     @PostMapping("")
     public String initiate(@RequestParam("selectedItemIds") List<String> itemIds, Model model) {
@@ -66,13 +65,18 @@ public class WarehouseShippingController extends AbstractShippingController {
     }
 
     @Override
-    protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
-        warehouseGoodsOutService.issueGoodsOutForExternalService(
-                getStoreId(),
-                form.getOrderItemIds(),
-                form.getShippingDetails(),
-                CustomSecurityContext.getLoggedInUserName()
-        );
+    protected ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form) {
+        return ShipmentCreationCheckRequest.builder()
+                .ownerType(ShipmentOwnerType.WAREHOUSE)
+                .pickUpAddressId(form.getPickUpAddressId())
+                .itemIds(List.copyOf(form.getOrderItemIds()))
+                .receiver(form.getShippingDetails())
+                .issuedBy(CustomSecurityContext.getLoggedInUserName());
+    }
+
+    @Override
+    protected String startedMessageKey() {
+        return "shipping.create.started.warehouse";
     }
 
     @Override

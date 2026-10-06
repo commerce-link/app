@@ -1,0 +1,170 @@
+package pl.commercelink.shipping;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import pl.commercelink.orders.*;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class OrderShipmentOwnerTest {
+
+    @Mock private OrdersRepository ordersRepository;
+    @Mock private OptimisticLockingExecutor optimisticLockingExecutor;
+
+    private OrderShipmentOwner owner;
+    private Order order;
+
+    @BeforeEach
+    void setUp() {
+        when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+        order = new Order("store-1");
+        order.setOrderId("order-1");
+        when(ordersRepository.findById("store-1", "order-1")).thenAnswer(i -> order);
+        owner = new OrderShipmentOwner(ordersRepository, optimisticLockingExecutor);
+    }
+
+    private static ShipmentCreationCheckRequest request(String commandId) {
+        return ShipmentCreationCheckRequest.builder().storeId("store-1").ownerType(ShipmentOwnerType.ORDER)
+                .ownerId("order-1").commandId(commandId).externalId("21480003").build();
+    }
+
+    private static Shipment placeholder(String commandId) {
+        Shipment s = new Shipment(ShipmentType.Courier);
+        s.setCreation(ShipmentCreationState.pending(commandId, LocalDateTime.now()));
+        return s;
+    }
+
+    @Test
+    void theCreatingShipmentTakesThePlaceOfTheDeliveryChoiceAndInheritsIt() {
+        // given: the order holds only the customer's delivery choice
+        Shipment choice = new Shipment(ShipmentType.PickupPoint);
+        choice.setCollectionPointCode("WAW23M");
+        order.setShipments(new ArrayList<>(List.of(choice)));
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(order.getShipments()).hasSize(1);
+        assertThat(order.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+        assertThat(order.getShipments().get(0).getCollectionPointCode()).isEqualTo("WAW23M");
+    }
+
+    @Test
+    void aNewAttemptDropsTheFailedOne() {
+        // given
+        Shipment failed = placeholder("cmd-0");
+        failed.setCreation(failed.getCreation().failed("Błąd"));
+        order.setShipments(new ArrayList<>(List.of(failed)));
+
+        // when
+        owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(order.getShipments()).hasSize(1);
+        assertThat(order.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void theExternalIdIsRecordedAndARefusalMarksTheShipmentFailed() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
+
+        // when
+        owner.recordExternalId(request("cmd-1"));
+        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy");
+
+        // then
+        Shipment s = order.getShipments().get(0);
+        assertThat(s.getExternalId()).isEqualTo("21480003");
+        assertThat(s.creationFailed()).isTrue();
+        assertThat(s.getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aMissingOrderIsGone() {
+        // given
+        when(ordersRepository.findById("store-1", "order-1")).thenReturn(null);
+
+        // when / then
+        assertThat(owner.markCreating(request("cmd-1"), placeholder("cmd-1"))).isFalse();
+    }
+
+    @Test
+    void shipmentsWithACourierOrderOrDataStayAndOnlyTheDataLessOnesGo() {
+        // given: a booked label, a shipment sent by hand, a personal collection and a data-less row
+        Shipment booked = new Shipment(ShipmentType.Courier);
+        booked.setExternalId("ext-0");
+        Shipment sentByHand = new Shipment(ShipmentType.Courier);
+        sentByHand.setCarrier("DPD");
+        sentByHand.setTrackingNo("T-1");
+        sentByHand.setShippedAt(LocalDateTime.now());
+        Shipment collected = new Shipment(ShipmentType.PersonalCollection);
+        collected.setShippedAt(LocalDateTime.now());
+        Shipment dataLess = new Shipment(ShipmentType.Courier);
+        order.setShipments(new ArrayList<>(List.of(booked, sentByHand, collected, dataLess)));
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(order.getShipments()).hasSize(4);
+        assertThat(order.getShipments().subList(0, 3)).containsExactly(booked, sentByHand, collected);
+        assertThat(order.getShipments().get(3).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void theDeliveryChoiceIsNotCopiedOntoTheShipmentsThatStay() {
+        // given
+        Shipment choice = new Shipment(ShipmentType.PickupPoint);
+        choice.setCollectionPointCode("WAW23M");
+        Shipment booked = new Shipment(ShipmentType.Courier);
+        booked.setExternalId("ext-0");
+        order.setShipments(new ArrayList<>(List.of(choice, booked)));
+
+        // when
+        owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(order.getShipments()).hasSize(2);
+        assertThat(order.getShipments().get(0).getType()).isEqualTo(ShipmentType.Courier);
+        assertThat(order.getShipments().get(0).getCollectionPointCode()).isNull();
+        assertThat(order.getShipments().get(1).getCollectionPointCode()).isEqualTo("WAW23M");
+    }
+
+    @Test
+    void aShipmentAlreadyBeingCreatedKeepsASecondCommandFromStarting() {
+        // given: another tab started a creation between the page's check and this write
+        Shipment dataLess = new Shipment(ShipmentType.Courier);
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-0"), dataLess)));
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
+        assertThat(order.getShipments()).hasSize(2);
+        assertThat(order.getShipments().get(0).isCreationPendingFor("cmd-0")).isTrue();
+        verify(ordersRepository, never()).save(any());
+    }
+}
