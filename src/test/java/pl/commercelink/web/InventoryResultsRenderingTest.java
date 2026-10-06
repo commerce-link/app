@@ -321,11 +321,11 @@ class InventoryResultsRenderingTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("Karty graficzne", "data-browse-add", "Add to catalog", "cl-button is-primary")
-                .doesNotContain("fa-book", "+1", "cl-inv-in-catalog");
+                .doesNotContain("fa-book", "+1", "cl-inv-in-catalog", "In catalog");
     }
 
     @Test
-    void productInTheCatalogShowsTheCheckWithItsPlacesAndTheAddToAnotherCategoryButton() {
+    void productInTheCatalogShowsTheCheckIconWithItsPlacesAndTheAddToAnotherCategoryButton() {
         // given
         Context context = context(found(), true);
         context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
@@ -338,8 +338,9 @@ class InventoryResultsRenderingTest {
         String html = engine.process(RESULTS, context);
 
         // then
-        assertThat(html).doesNotContain("??", ">Add to catalog<", "In catalog: 2");
-        assertThat(html).contains("data-tooltip=\"In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty\"",
-                "href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\"", ">Add to another category<", "data-browse-add");
+        assertThat(html).doesNotContain("??", ">Add to catalog<", "In catalog: 2", "<a class=\"cl-inv-in-catalog");
+        assertThat(html).contains("<span class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" tabindex=\"0\" role=\"img\"",
+                "data-tooltip=\"In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty\"", "fa-check-circle",
+                ">Add to another category<", "data-browse-add");
     }
 }

@@ -15,7 +15,7 @@ import java.util.function.Predicate;
 /**
  * The "Kategoria w PIM" cell: the PIM path (ancestors grey, leaf bold); an id the PIM tree does not know shows the
  * taxonomy's category text instead of an empty cell. For an admin it also carries where the product already sits in the
- * store's catalog, for the "Katalog" column.
+ * store's catalog, for the check icon of the "W katalogu" column.
  */
 public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, String inCatalogHref,
                            List<String> inCatalogLabels) {

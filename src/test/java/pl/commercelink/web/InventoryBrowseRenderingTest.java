@@ -66,20 +66,37 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void catalogColumnHasAVisibleHeaderAndRowsOutsideTheCatalogOnlyTheAddButton() {
+    void catalogStatusHasAVisibleHeaderAndTheActionsColumnAVisuallyHiddenOne() {
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
 
         // then
-        assertThat(html).contains(">Catalog</th>", "data-label=\"Catalog\"");
-        assertThat(html).contains("data-tooltip=\"Add to catalog\"", "aria-label=\"Add to catalog: Gigabyte RTX 4060\"",
-                "data-ean=\"5901000000001\"", "<a class=\"cl-button is-icon cl-inv-add cl-tooltip is-end\"");
-        assertThat(html).containsPattern("<a class=\"cl-button is-icon cl-inv-add[^>]*>\\s*<i class=\"fas fa-plus\" aria-hidden=\"true\"></i></a>");
-        assertThat(html).doesNotContain("cl-inv-in-catalog", "cl-status is-ok", ">Add<");
+        assertThat(html).contains("<th scope=\"col\" class=\"cl-inv-catalog-cell\">In catalog</th>",
+                "data-label=\"In catalog\"",
+                "<th scope=\"col\" class=\"cl-table-actions\"><span class=\"cl-visually-hidden\">Actions</span></th>");
+        assertThat(html.indexOf(">In catalog</th>")).isGreaterThan(html.indexOf(">Available</a>"));
+        assertThat(html).doesNotContain(">Catalog</th>", "cl-inv-add");
     }
 
     @Test
-    void productInTheCatalogShowsTheCheckLinkWithItsPlacesOnePerLineAndTheAddButton() {
+    void productOutsideTheCatalogHasAnEmptyStatusCellAndOnlyTheAddAndPricesItemsInItsRowMenu() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).containsPattern("<td class=\"cl-inv-catalog-cell\" data-label=\"In catalog\">\\s*"
+                + "<span class=\"cl-visually-hidden\">Not in a catalog</span>\\s*</td>");
+        assertThat(html).contains("<details class=\"cl-menu\">",
+                "<summary class=\"cl-button is-icon\" aria-label=\"Actions: Gigabyte RTX 4060\">",
+                "<span class=\"cl-menu-glyph\" aria-hidden=\"true\">⋯</span>");
+        assertThat(html).contains("<a class=\"cl-menu-item\" href=\"/dashboard/inventory?open=add&amp;ean=5901000000001\" "
+                + "data-browse-add data-ean=\"5901000000001\">Add to catalog</a>");
+        assertThat(html).contains("<a class=\"cl-menu-item\" href=\"/dashboard/inventory/prices?q=5901000000001\">Prices and availability</a>");
+        assertThat(html).doesNotContain("cl-inv-in-catalog", "fa-check-circle", "Open in catalog", "Add to another category");
+    }
+
+    @Test
+    void productInTheCatalogShowsAFocusableCheckIconWithItsPlacesOnePerLineAndNoLink() {
         // given
         BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty")), 0);
 
@@ -88,23 +105,37 @@ class InventoryBrowseRenderingTest {
 
         // then
         String places = "In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty";
-        assertThat(html).contains("<a class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" "
-                + "href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\"");
-        assertThat(html).contains("data-tooltip=\"" + places + "\"", "aria-label=\"" + places + "\"", "fa-check-circle");
-        assertThat(html).contains("data-tooltip=\"Add to another category\"",
-                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"", "data-ean=\"5901000000001\"");
-        assertThat(html).containsPattern("<a class=\"cl-button is-icon cl-inv-add[^>]*>\\s*<i class=\"fas fa-plus\" aria-hidden=\"true\"></i></a>");
-        assertThat(html).doesNotContain("cl-status is-ok", "In catalog: 2");
+        assertThat(html).contains("<span class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" tabindex=\"0\" role=\"img\" "
+                + "data-tooltip=\"" + places + "\" aria-label=\"" + places + "\"><i class=\"fas fa-check-circle\" aria-hidden=\"true\"></i></span>");
+        assertThat(html).doesNotContain("<a class=\"cl-inv-in-catalog", "Not in a catalog", "Karta graficzna</span>", "+1");
     }
 
     @Test
-    void nonAdminSeesNeitherSelectionNorAction() {
+    void rowMenuOfAProductInTheCatalogAddsElsewhereOpensTheEntryAndShowsPrices() {
+        // given
+        BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna")), 0);
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row))));
+
+        // then
+        assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to another category</a>",
+                "<a class=\"cl-menu-item\" href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\">Open in catalog</a>",
+                ">Prices and availability</a>");
+        assertThat(html.indexOf("Add to another category")).isLessThan(html.indexOf("Open in catalog"));
+        assertThat(html.indexOf("Open in catalog")).isLessThan(html.indexOf("Prices and availability"));
+        assertThat(html).doesNotContain(">Add to catalog</a>");
+    }
+
+    @Test
+    void nonAdminSeesNeitherSelectionNorCatalogStatusNorRowMenu() {
         // when
         String html = engine.process(RESULTS, context(page(false, false, BrowseQuery.start().withCategory("11"),
                 List.of(row(false), row(true)))));
 
         // then
-        assertThat(html).doesNotContain("data-browse-add", "data-cl-select-row", "cl-inv-in-catalog", "In catalog", ">Catalog</th>");
+        assertThat(html).doesNotContain("data-browse-add", "data-cl-select-row", "cl-inv-in-catalog", "Not in a catalog",
+                "In catalog", "cl-menu", "Actions");
     }
 
     @Test
@@ -171,17 +202,15 @@ class InventoryBrowseRenderingTest {
     @Test
     void catalogAndCategoryNamesAreEscapedInTheCheckTooltip() {
         // given
-        CategoryLine line = new CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                "Komponenty komputerowe › Karty graficzne", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                List.of("<b>x</b> › Fan", "Sklep › <b>y</b>"));
+        CategoryLine line = line(List.of("<b>x</b> › <b>Fan</b>", "Sklep › <b>y</b>"));
 
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
 
         // then
-        String escaped = "In catalog:\n&lt;b&gt;x&lt;/b&gt; › Fan\nSklep › &lt;b&gt;y&lt;/b&gt;";
+        String escaped = "In catalog:\n&lt;b&gt;x&lt;/b&gt; › &lt;b&gt;Fan&lt;/b&gt;\nSklep › &lt;b&gt;y&lt;/b&gt;";
         assertThat(html).contains("data-tooltip=\"" + escaped + "\"", "aria-label=\"" + escaped + "\"");
-        assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>");
+        assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>", "<b>Fan</b>");
     }
 
     private static Context context(BrowsePage page) {

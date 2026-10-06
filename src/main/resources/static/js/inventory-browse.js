@@ -1,7 +1,7 @@
 /*
- * "Dodaj do katalogu" on the inventory page: fetches the dialog for one product (row link, product header) or for the
- * checked rows (selection row), and opens it. Without JavaScript the row link goes to ?open=add, where the server draws
- * the same dialog open; when the fetch fails the script falls back to that link.
+ * "Dodaj do katalogu" on the inventory page: fetches the dialog for one product (row menu item, product header) or for
+ * the checked rows (selection row), and opens it. Without JavaScript the item's link goes to ?open=add, where the server
+ * draws the same dialog open; when the fetch fails the script falls back to that link.
  */
 (function () {
     'use strict';
@@ -102,6 +102,12 @@
         }
         event.preventDefault();
         var opener = single || bulk;
+        // An item of a row menu is hidden once the menu closes: the focus goes back to the menu's trigger instead.
+        var menu = opener.closest('details.cl-menu');
+        if (menu) {
+            menu.open = false;
+            opener = menu.querySelector(':scope > summary');
+        }
         var eans = single ? [single.dataset.ean] : checkedEans();
         openDialog(eans, opener).then(function (opened) {
             if (!opened && single && single.href) {

@@ -19,11 +19,12 @@
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
 </th:block>
 
-<!--/* "In the catalog": a check linking to the first entry; the tooltip and the accessible name list every place, one per
-       line. Anchored to its right edge: the "Katalog" column is the table's last. */-->
-<a th:fragment="inCatalogIcon(line)" class="cl-inv-in-catalog cl-tooltip is-lines is-end" th:href="${line.inCatalogHref()}"
-   th:with="text=#{inventory.browse.inCatalog.where(${line.inCatalogPlaces()})}"
-   th:attr="data-tooltip=${text}, aria-label=${text}"><i class="fas fa-check-circle" aria-hidden="true"></i></a>
+<!--/* "In the catalog": a check icon, not a link (the entry opens from the row menu). Focusable like the margin icon, so
+       the tooltip opens from the keyboard and on tap; it and the accessible name list every place, one per line. Anchored
+       to its right edge, so the bubble grows back over the table and never widens the page. */-->
+<span th:fragment="inCatalogIcon(line)" class="cl-inv-in-catalog cl-tooltip is-lines is-end" tabindex="0" role="img"
+      th:with="text=#{inventory.browse.inCatalog.where(${line.inCatalogPlaces()})}"
+      th:attr="data-tooltip=${text}, aria-label=${text}"><i class="fas fa-check-circle" aria-hidden="true"></i></span>
 
 <div th:fragment="results" class="cl-inv-browse-results" data-cl-list-results
      th:attr="data-cl-list-path=${browse.pagePath()}, data-cl-list-fragment=${browse.fragmentPath()}"
@@ -177,7 +178,8 @@
                                 <a class="cl-table-sort" th:href="${b.sortHeaders().get('QTY').href()}" data-cl-list-nav
                                    th:text="#{inventory.browse.column.qty}"></a>
                             </th>
-                            <th scope="col" class="cl-table-actions" th:if="${b.admin()}" th:text="#{inventory.browse.column.catalog}"></th>
+                            <th scope="col" class="cl-inv-catalog-cell" th:if="${b.admin()}" th:text="#{inventory.browse.column.inCatalog}"></th>
+                            <th scope="col" class="cl-table-actions" th:if="${b.admin()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.column.actions}"></span></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -206,16 +208,25 @@
                                 <span class="cl-table-sub" th:text="#{inventory.browse.suppliers(${row.suppliers()})}"></span>
                                 <span class="cl-table-sub" th:if="${row.warehouseQty() > 0}" th:text="#{inventory.browse.warehouse(${row.warehouseQty()})}"></span>
                             </td>
-                            <td class="cl-table-actions" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.catalog}">
-                                <span class="cl-inv-catalog-state">
-                                    <th:block th:if="${row.inCatalog()}">
-                                        <th:block th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></th:block>
-                                    </th:block>
-                                    <a class="cl-button is-icon cl-inv-add cl-tooltip is-end" th:href="${row.addHref()}" data-browse-add
-                                       th:with="tip=${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add},
-                                                aria=${row.inCatalog()} ? #{inventory.browse.addElsewhere.aria(${row.name()})} : #{inventory.browse.add.aria(${row.name()})}"
-                                       th:attr="data-ean=${row.ean()}, data-tooltip=${tip}, aria-label=${aria}"><i class="fas fa-plus" aria-hidden="true"></i></a>
-                                </span>
+                            <td class="cl-inv-catalog-cell" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.inCatalog}">
+                                <th:block th:if="${row.inCatalog()}">
+                                    <span th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></span>
+                                </th:block>
+                                <span th:unless="${row.inCatalog()}" class="cl-visually-hidden" th:text="#{inventory.browse.notInCatalog}"></span>
+                            </td>
+                            <!--/* the row menu of the design system (details.cl-menu, menu.js); "Dodaj…" opens the add dialog through
+                                   inventory-browse.js and without JavaScript goes to the page that draws it open */-->
+                            <td class="cl-table-actions" th:if="${b.admin()}">
+                                <details class="cl-menu">
+                                    <summary class="cl-button is-icon" th:attr="aria-label=#{inventory.browse.actions.aria(${row.name()})}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+                                    <ul class="cl-menu-list">
+                                        <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"
+                                               th:text="${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></a></li>
+                                        <li th:if="${row.inCatalog()}"><a class="cl-menu-item" th:href="${row.category().inCatalogHref()}"
+                                                                          th:text="#{inventory.browse.openInCatalog}"></a></li>
+                                        <li><a class="cl-menu-item" th:href="${row.detailHref()}" th:text="#{inventory.browse.prices}"></a></li>
+                                    </ul>
+                                </details>
                             </td>
                         </tr>
                         </tbody>

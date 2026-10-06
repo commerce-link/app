@@ -33,6 +33,24 @@ class InventoryBrowseScriptContractTest {
         }
     }
 
+    @Test
+    void inventoryPageLoadsTheMenuScriptForTheRowMenu() throws IOException {
+        // when
+        String page = read("src/main/resources/templates/inventory.html");
+
+        // then
+        assertThat(page).contains("@{/js/menu.js}");
+    }
+
+    @Test
+    void addFromTheRowMenuClosesTheMenuAndReturnsTheFocusToItsTrigger() throws IOException {
+        // when
+        String script = read("src/main/resources/static/js/inventory-browse.js");
+
+        // then
+        assertThat(script).contains("closest('details.cl-menu')", "menu.open = false", "querySelector(':scope > summary')");
+    }
+
     private static String toDatasetSelector(String hook) {
         String[] parts = hook.substring("data-".length()).split("-");
         StringBuilder name = new StringBuilder(parts[0]);

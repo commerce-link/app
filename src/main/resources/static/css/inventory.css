@@ -905,32 +905,22 @@
     gap: 8px;
 }
 
-/* "Katalog" column: the check (in the catalog) and the square add button on one line, right-aligned under the header. */
-.cl-inv-page .cl-inv-catalog-state {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
+/* "W katalogu": a check icon with the places in its tooltip (not a link: the entry opens from the row menu); outside
+   the catalog the cell is empty but for a visually hidden text. */
 .cl-inv-page .cl-inv-in-catalog {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
-    min-height: 24px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 16px;
     color: var(--cl-ok);
-    font-size: 17px;
 }
 
 .cl-inv-page .cl-inv-in-catalog:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
-}
-
-/* a button that also has a tooltip still reads as a button, not as help */
-.cl-inv-page .cl-inv-add.cl-tooltip {
-    cursor: pointer;
 }
 
 /* 720-1439 px: the six columns of the browse list need about 870 px at their natural widths, more than the card beside
@@ -939,7 +929,6 @@
 @media screen and (min-width: 720px) and (max-width: 1439px) {
     .cl-inv-page .cl-table.cl-inv-browse-table thead th,
     .cl-inv-page .cl-table.cl-inv-browse-table thead th.is-numeric,
-    .cl-inv-page .cl-table.cl-inv-browse-table thead th.cl-table-actions,
     .cl-inv-page .cl-table.cl-inv-browse-table thead .cl-table-sort {
         white-space: normal;
     }
@@ -950,7 +939,8 @@
 }
 
 @media screen and (min-width: 720px) and (max-width: 1215px) {
-    .cl-inv-page .cl-inv-browse-table :is(thead th, tbody th, td) {
+    .cl-inv-page .cl-inv-browse-table :is(thead th, tbody th, td),
+    .cl-inv-page .cl-table.cl-inv-browse-table :is(th, td):last-child {
         padding-left: 8px;
         padding-right: 8px;
     }
@@ -960,42 +950,59 @@
     }
 }
 
+/* 1216-1439 px: the row menu column made the list ~18 px wider than the card at 1216 px; the PIM category, which wraps
+   anyway, gives way first */
+@media screen and (min-width: 1216px) and (max-width: 1439px) {
+    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
+        min-width: 12rem;
+    }
+}
+
 @media screen and (min-width: 720px) and (max-width: 1023px) {
-    /* without the sidebar but with 44 px targets: the check stands above the button, and the name gets a lower floor */
-    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-state {
-        flex-direction: column;
-        gap: 0;
+    /* without the sidebar but with 44 px targets: the PIM category drops to 6rem (below that its longest word binds)
+       and the name to 8.5rem, which keeps the table inside the card at 720 px */
+    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-key {
+        min-width: 8.5rem;
     }
 
-    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-key {
-        min-width: 9rem;
+    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
+        min-width: 6rem;
     }
 }
 
 @media screen and (max-width: 1023px) {
-    /* a 44 px tap target around the check, like the margin mark (the square button is 44 px by itself) */
+    /* a 44 px tap target around the 20 px check without growing the row, like the margin icon */
     .cl-inv-page .cl-inv-in-catalog {
-        min-width: 44px;
-        min-height: 44px;
+        box-sizing: content-box;
+        padding: 12px;
+        margin: -12px;
     }
 }
 
 @media screen and (max-width: 719px) {
-    /* The button leads and the check follows, so the button keeps one left axis in every card whether or not the
-       product is already in the catalog. */
-    .cl-inv-page .cl-inv-catalog-state .cl-inv-add {
-        order: -1;
+    /* As a card the row menu takes the top-right corner, level with the name, like the checkbox in the top-left one;
+       its list opens leftwards (right-aligned to the trigger). The name keeps clear of it. */
+    .cl-inv-page .cl-table.cl-inv-browse-table tbody td.cl-table-actions {
+        position: absolute;
+        top: 3px;
+        right: 0;
+        display: block;
+        padding: 0;
     }
 
-    /* As a card the "Katalog" line starts at the left: the check's bubble opens rightwards, the button's stays anchored
-       to its right edge, and both are capped so that even hidden they never reach past the screen's edge (a hidden
-       bubble still counts towards the page's width). */
-    .cl-inv-page .cl-inv-catalog-state .cl-tooltip::after {
-        max-width: calc(100vw - 160px);
+    .cl-inv-page .cl-table.cl-inv-browse-table tbody td.cl-table-actions::before {
+        display: none;
     }
 
-    .cl-inv-page .cl-inv-catalog-state .cl-inv-in-catalog.is-end::after {
+    .cl-inv-page .cl-table.cl-inv-browse-table tbody th.cl-table-key {
+        padding-right: 52px;
+    }
+
+    /* the check starts at the left of its value column: its bubble opens rightwards and is capped, because even hidden
+       it counts towards the page's width */
+    .cl-inv-page .cl-inv-in-catalog.is-end::after {
         right: auto;
         left: -8px;
+        max-width: calc(100vw - 160px);
     }
 }
