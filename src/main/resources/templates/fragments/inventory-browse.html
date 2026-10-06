@@ -208,7 +208,9 @@
                                 <span class="cl-table-sub" th:text="#{inventory.browse.suppliers(${row.suppliers()})}"></span>
                                 <span class="cl-table-sub" th:if="${row.warehouseQty() > 0}" th:text="#{inventory.browse.warehouse(${row.warehouseQty()})}"></span>
                             </td>
-                            <td class="cl-inv-catalog-cell" th:if="${b.admin()}" th:attr="data-label=#{inventory.browse.column.inCatalog}">
+                            <!--/* td.is-empty hides the field only in card mode (< 720 px), where a bare label would remain */-->
+                            <td class="cl-inv-catalog-cell" th:if="${b.admin()}" th:classappend="${row.inCatalog()} ? '' : 'is-empty'"
+                                th:attr="data-label=#{inventory.browse.column.inCatalog}">
                                 <th:block th:if="${row.inCatalog()}">
                                     <span th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></span>
                                 </th:block>

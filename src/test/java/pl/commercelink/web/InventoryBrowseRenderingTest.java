@@ -84,7 +84,7 @@ class InventoryBrowseRenderingTest {
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
 
         // then
-        assertThat(html).containsPattern("<td class=\"cl-inv-catalog-cell\" data-label=\"In catalog\">\\s*"
+        assertThat(html).containsPattern("<td class=\"cl-inv-catalog-cell is-empty\"\\s+data-label=\"In catalog\">\\s*"
                 + "<span class=\"cl-visually-hidden\">Not in a catalog</span>\\s*</td>");
         assertThat(html).contains("<details class=\"cl-menu\">",
                 "<summary class=\"cl-button is-icon\" aria-label=\"Actions: Gigabyte RTX 4060\">",
@@ -107,7 +107,9 @@ class InventoryBrowseRenderingTest {
         String places = "In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty";
         assertThat(html).contains("<span class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" tabindex=\"0\" role=\"img\" "
                 + "data-tooltip=\"" + places + "\" aria-label=\"" + places + "\"><i class=\"fas fa-check-circle\" aria-hidden=\"true\"></i></span>");
-        assertThat(html).doesNotContain("<a class=\"cl-inv-in-catalog", "Not in a catalog", "Karta graficzna</span>", "+1");
+        assertThat(html).doesNotContain("<a class=\"cl-inv-in-catalog", "Not in a catalog", "Karta graficzna</span>", "+1",
+                "cl-inv-catalog-cell is-empty");
+        assertThat(html).containsPattern("<td class=\"cl-inv-catalog-cell\"\\s+data-label=\"In catalog\">");
     }
 
     @Test
