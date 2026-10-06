@@ -41,7 +41,7 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(html).contains("In catalog", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
-        assertThat(html).doesNotContain("data-browse-add");
+        assertThat(html).doesNotContain("data-ean=\"5901000000001\"");
     }
 
     @Test

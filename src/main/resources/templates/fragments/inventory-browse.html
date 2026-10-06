@@ -16,10 +16,10 @@
 <!--/* The two lines of the "Kategoria" cell: PIM path (ancestors grey, leaf bold, the whole path in the title) and the
        store-catalog category for an admin. Shared with the product header of the code mode. */-->
 <th:block th:fragment="categoryLines(line)">
-    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span><th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
+    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span th:text="${ancestor}"></span> › </th:block><strong th:text="${line.pimLeaf()}"></strong></span>
     <span class="cl-category-catalog" th:if="${line.catalogLabel() != null and (browse == null or browse.admin())}">
         <i class="fas fa-book" aria-hidden="true"></i>
-        <span><span class="cl-visually-hidden" th:text="#{inventory.browse.catalogCategory}"></span><span th:text="${line.catalogLabel()}"></span>
+        <span><span class="cl-visually-hidden" th:text="#{inventory.browse.catalogCategory}"></span> <span th:text="${line.catalogLabel()}"></span>
             <span class="cl-more" th:if="${line.catalogMore() > 0}" th:text="#{inventory.browse.more(${line.catalogMore()})}"></span></span>
     </span>
     <span class="cl-category-catalog is-none" th:if="${line.catalogUnmatched() and (browse == null or browse.admin())}">
@@ -171,7 +171,7 @@
                 </div>
 
                 <th:block th:unless="${b.rows().isEmpty()}">
-                    <th:block th:if="${b.admin() and !b.rows().?[!inCatalog()].isEmpty()}">
+                    <th:block th:if="${b.admin()}">
                         <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
                         <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
                             <label class="cl-check-target">

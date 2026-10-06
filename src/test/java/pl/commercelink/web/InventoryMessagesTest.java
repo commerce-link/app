@@ -37,4 +37,21 @@ class InventoryMessagesTest {
                 "inventory.matchedBy.EAN", "inventory.matchedBy.MFN", "inventory.matchedBy.PIM_ID",
                 "inventory.mode.GLOBAL", "inventory.mode.OWN", "inventory.mode.MANUAL");
     }
+
+    @Test
+    void noInventoryMessageWithoutAPlaceholderDoublesItsApostrophe() throws Exception {
+        // given
+        Properties properties = new Properties();
+        try (Reader reader = Files.newBufferedReader(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+
+        // when
+        Set<String> broken = inventoryKeys("messages_en.properties").stream()
+                .filter(key -> !properties.getProperty(key).contains("{") && properties.getProperty(key).contains("''"))
+                .collect(Collectors.toSet());
+
+        // then
+        assertThat(broken).isEmpty();
+    }
 }
