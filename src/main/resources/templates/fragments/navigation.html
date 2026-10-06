@@ -64,6 +64,10 @@
     </nav>
 
     <div class="cl-bar-right">
+        <th:block th:if="${accountStatus != null}">
+            <div th:replace="~{fragments/account-status :: pill(${accountStatus})}"></div>
+        </th:block>
+
         <a class="cl-store-chip" th:if="${storeContext != null}" th:href="@{/dashboard/stores}"
            th:attr="title=#{nav.store.context.exit}">
             <span th:text="#{nav.store.context}"></span>

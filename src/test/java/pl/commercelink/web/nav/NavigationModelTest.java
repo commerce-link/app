@@ -104,4 +104,23 @@ class NavigationModelTest {
         assertThat(model.activeSectionMessageKey()).isNull();
         assertThat(model.activeMessageKey()).isNull();
     }
+
+    @Test
+    void marksItemHistoryActiveUnderFulfilment() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/item/history");
+
+        // then
+        assertThat(model.activeMessageKey()).isEqualTo("nav.item.history");
+        assertThat(model.activeSectionMessageKey()).isEqualTo("nav.group.fulfilment");
+    }
+
+    @Test
+    void hidesItemHistoryFromTheSuperAdmin() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.SUPER_ADMIN, "/dashboard/item/history");
+
+        // then
+        assertThat(model.activeMessageKey()).isNull();
+    }
 }

@@ -276,4 +276,39 @@ class DeliveryCreatePurchaseTemplateTest {
         assertThat(html).contains("cl-alert is-bad").contains("Zamówienie nie kwalifikuje się do wysyłki bezpośredniej.")
                 .doesNotContain("data-fully-available");
     }
+
+    @Test
+    void approvalModeTellsTheAdministratorToRejectInsteadOfGoingBack() {
+        // given
+        PurchaseValidation validation = new PurchaseValidation("Acme", "ref-1", "PLN", 1198.0, false, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "MFN", 2, 1, 579.5, 599.0)));
+        Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("validation", validation);
+        variables.put("validationMode", "approval");
+
+        // when
+        String html = fragment("deliveries/create/purchase :: validationResult", variables);
+
+        // then
+        assertThat(html).contains("data-fully-available=\"false\"")
+                .contains("Dostawca nie ma teraz całej ilości, więc tego zgłoszenia nie zamówisz.")
+                .contains("href=\"?open=reject\"").contains("data-cl-dialog-open=\"reject-dialog\" data-cl-locked-while-ordering")
+                .contains("sklep złoży nowe z dostępną ilością")
+                .doesNotContain("data-cl-back-submit").doesNotContain("??");
+    }
+
+    @Test
+    void sharedAddressChoicesMarkTheStoresAddress() {
+        // given
+        Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("addresses", addresses(3));
+
+        // when
+        String html = fragment("deliveries/create/parts :: addressChoices(${addresses}, 'a-2', 'a-2')", variables);
+
+        // then
+        assertThat(html).contains("id=\"address-required\"").containsPattern("value=\"a-2\"[^>]*checked=\"checked\"")
+                .contains("Adres sklepu").doesNotContain("id=\"address-filter\"");
+        assertThat(occurrences(html, "Adres sklepu")).isEqualTo(1);
+    }
 }

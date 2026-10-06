@@ -25,30 +25,33 @@ public class RegistrationController {
 
     private final RegistrationService registrationService;
     private final RegistrationAutoLoginService autoLoginService;
-    private final EmailVerificationService emailVerificationService;
     private final CaptchaVerifier captchaVerifier;
     private final MessageSource messageSource;
     private final boolean demoMode;
     private final int ttlDays;
+    private final int trialDays;
+    private final int trialRetentionDays;
     private final String termsUrl;
     private final String homeUrl;
 
     public RegistrationController(RegistrationService registrationService,
                                   RegistrationAutoLoginService autoLoginService,
-                                  EmailVerificationService emailVerificationService,
                                   CaptchaVerifier captchaVerifier,
                                   MessageSource messageSource,
                                   @Value("${app.registration.demo:false}") boolean demoMode,
                                   @Value("${app.registration.ttl-days}") int ttlDays,
+                                  @Value("${app.registration.trial-days}") int trialDays,
+                                  @Value("${app.registration.trial-retention-days}") int trialRetentionDays,
                                   @Value("${app.terms-url:}") String termsUrl,
                                   @Value("${application.home}") String homeUrl) {
         this.registrationService = registrationService;
         this.autoLoginService = autoLoginService;
-        this.emailVerificationService = emailVerificationService;
         this.captchaVerifier = captchaVerifier;
         this.messageSource = messageSource;
         this.demoMode = demoMode;
         this.ttlDays = ttlDays;
+        this.trialDays = trialDays;
+        this.trialRetentionDays = trialRetentionDays;
         this.termsUrl = termsUrl;
         this.homeUrl = homeUrl;
     }
@@ -148,7 +151,6 @@ public class RegistrationController {
             return "register-success";
         }
         if (!registrationService.isEmailVerifiedOnCreation()) {
-            emailVerificationService.sendCodeQuietly(claimed.email());
             return "redirect:" + EmailVerificationController.VERIFY_EMAIL_PATH;
         }
         return "redirect:" + homeUrl;
@@ -184,6 +186,8 @@ public class RegistrationController {
     private void addFormAttributes(Model model) {
         model.addAttribute("demoMode", demoMode);
         model.addAttribute("ttlDays", ttlDays);
+        model.addAttribute("trialDays", trialDays);
+        model.addAttribute("trialRetentionDays", trialRetentionDays);
         model.addAttribute("termsUrl", termsUrl.isBlank() ? null : termsUrl);
         model.addAttribute("captchaSiteKey", captchaVerifier.siteKey());
     }

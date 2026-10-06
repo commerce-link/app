@@ -120,6 +120,8 @@ public class Delivery {
     private boolean paid;
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
+    @DynamoDBAttribute(attributeName = "awaitingSupplierConfirmation")
+    private boolean awaitingSupplierConfirmation;
 
     @DynamoDBAttribute(attributeName = "tracking")
     private DeliveryTracking tracking;
@@ -616,6 +618,14 @@ public class Delivery {
 
     public void setExternalDeliveryIdProvisional(boolean externalDeliveryIdProvisional) {
         this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
+    }
+
+    public boolean isAwaitingSupplierConfirmation() {
+        return awaitingSupplierConfirmation;
+    }
+
+    public void setAwaitingSupplierConfirmation(boolean awaitingSupplierConfirmation) {
+        this.awaitingSupplierConfirmation = awaitingSupplierConfirmation;
     }
 
     public int getPurchaseAttempts() {

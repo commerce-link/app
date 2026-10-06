@@ -33,7 +33,7 @@ public class StoreNotificationRecord {
     @DynamoDBRangeKey(attributeName = "notificationId")
     private String notificationId;
     @DynamoDBAttribute(attributeName = "type")
-    @DynamoDBTypeConvertedEnum
+    @DynamoDBTypeConverted(converter = StoreNotificationTypeConverter.class)
     private StoreNotificationType type;
     @DynamoDBAttribute(attributeName = "severity")
     @DynamoDBTypeConvertedEnum

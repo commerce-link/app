@@ -277,7 +277,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 712,17 brutto")
+                .contains("2 × 749,00").doesNotContain("koszt 712,17 brutto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -349,19 +349,59 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theDeliveryStandsUnderTheItemStatePill() {
+    void theItemStatePillIsTheLinkToItsDelivery() {
         // given
         Order order = order(OrderStatus.Assembly);
-        OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+        OrderItem ordered = inDelivery(order, "90fd6ba3-1111-2222-3333-444455556666", FulfilmentStatus.Ordered);
 
         // when
-        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+        String cell = fulfilmentCell(page(render(order, List.of(ordered), ADMIN, Set.of())));
 
-        // then: the delivery is the cell's second line, under the pill (client request 2026-09-30: the number beside the
-        // pill read worse than under it)
-        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">"
-                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">")
-                .doesNotContain("cl-table-state");
+        // then: the pill took the link of the delivery number that stood under it (client 2026-10-06); the number is
+        // gone from sight and named for screen readers only
+        assertThat(cell).containsPattern("^<a class=\"cl-status is-info\" "
+                        + "href=\"/dashboard/deliveries/details\\?deliveryId=90fd6ba3-1111-2222-3333-444455556666\" "
+                        + "aria-label=\"Zamówiony, dostawa 90fd6ba3\">Zamówiony</a>$")
+                .doesNotContain("cl-table-sub").doesNotContain("cl-table-link");
+    }
+
+    @Test
+    void anItemWaitingForItsSupplierLinksCreatingTheDeliveryForAnAdminOnly() {
+        // given: a warehouse order's item waiting for AcmeB, not yet in a delivery
+        Order order = order(OrderStatus.Assembly);
+        OrderItem awaiting = inDelivery(order, "AcmeB", FulfilmentStatus.Allocation);
+
+        // when
+        String admin = fulfilmentCell(page(render(order, List.of(awaiting), ADMIN, Set.of())));
+        String user = fulfilmentCell(page(render(order, List.of(awaiting), USER, Set.of())));
+
+        // then: creating a delivery is the admin's; a user sees the plain pill, never the supplier's name
+        assertThat(admin).contains("href=\"/dashboard/deliveries/create/AcmeB\"")
+                .contains("aria-label=\"W alokacji, dostawca: AcmeB\"");
+        assertThat(user).isEqualTo("<span class=\"cl-status is-info\">W alokacji</span>");
+    }
+
+    @Test
+    void theStoresWarehouseAndAnItemWithoutSupplierKeepThePlainPill() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem fromWarehouse = inDelivery(order, OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Delivered);
+        OrderItem unassigned = inDelivery(order, null, FulfilmentStatus.New);
+
+        // when
+        String warehouse = fulfilmentCell(page(render(order, List.of(fromWarehouse), ADMIN, Set.of())));
+        String none = fulfilmentCell(page(render(order, List.of(unassigned), ADMIN, Set.of())));
+
+        // then: the client wants the pill to lead to a delivery or its creation and nothing else
+        assertThat(warehouse).isEqualTo("<span class=\"cl-status is-ok\">Skompletowany</span>");
+        assertThat(none).isEqualTo("<span class=\"cl-status is-neutral\">Nowy</span>");
+    }
+
+    /** The inside of the first item's state cell, trimmed. */
+    private static String fulfilmentCell(String html) {
+        String open = "<td class=\"cl-table-fulfilment\" data-label=\"Stan\">";
+        int start = html.indexOf(open) + open.length();
+        return html.substring(start, html.indexOf("</td>", start)).strip().replaceAll("\\s+", " ");
     }
 
     @Test
@@ -455,8 +495,39 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
-        assertThat(admin).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+    }
+
+    @Test
+    void theCostLineUnderThePriceBecameAMarginIconWhoseTooltipCarriesTheNumbers() {
+        // when
+        String html = page(render(order(OrderStatus.New), USER));
+
+        // then: 749,00 for 579 net + 23% (712,17 gross); the service has no cost, so its margin cannot be computed
+        assertThat(html).doesNotContain("koszt 712,17 brutto")
+                .containsPattern("<span class=\"cl-price-margin\"><span>2 × 749,00</span><span class=\"cl-margin cl-tooltip is-lines is-ok\" tabindex=\"0\" role=\"img\"")
+                .contains("data-tooltip=\"Marża: 4,9%\nZysk: 29,94 PLN netto (36,83 PLN brutto) / szt.\nKoszt: 712,17 PLN brutto / szt.\"")
+                .contains("class=\"fas fa-info-circle\"")
+                .contains("cl-margin cl-tooltip is-lines is-unknown")
+                .contains("Brak kosztu zakupu — marży nie da się policzyć.");
+    }
+
+    @Test
+    void aSaleBelowCostIsMarkedByItsGlyphNotOnlyItsColour() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem cheap = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 5", 1, 500, "MFN-5", false, 0);
+        cheap.setStatus(FulfilmentStatus.New);
+        cheap.setCost(450);
+
+        // when
+        String html = page(render(order, List.of(cheap), USER, Set.of()));
+
+        // then: 450 net + 23% = 553,50 gross against 500,00
+        assertThat(html).contains("cl-margin cl-tooltip is-lines is-loss")
+                .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
+                .contains("class=\"fas fa-exclamation-circle\"");
     }
 
     @Test
@@ -1132,7 +1203,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 712,17 brutto")
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("Koszt: 712,17 PLN brutto / szt.")
                 .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
     }
 
@@ -1513,7 +1584,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, List.of(awaiting), ADMIN, Set.of()));
 
         // then: the rendered link is the order-aware one, not the item-only fallback a regression would produce
-        assertThat(html).contains("class=\"cl-table-link\"").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
+        assertThat(html).contains("<a class=\"cl-status").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
                 .doesNotContain("href=\"" + itemOnly.replace("&", "&amp;") + "\"");
     }
 

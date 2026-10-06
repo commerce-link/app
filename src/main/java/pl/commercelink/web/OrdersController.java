@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.CacheControl;
@@ -118,12 +119,16 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 @Controller
 public class OrdersController extends BaseController {
+
+    @Value("${app.domain}")
+    private String appDomain;
 
     @Autowired
     private Inventory inventory;
@@ -859,6 +864,49 @@ public class OrdersController extends BaseController {
         return renderOrderCard(requireOrder(ordersRepository, storeId, orderId), true, model);
     }
 
+    /** One page of the orders list: the selection that prints the cards never spans pages. */
+    static final int MAX_CARDS = OrderListQuery.PAGE_SIZE;
+    // the alphabet of order ids (UUIDs, demo and test ids), the same as on the scan address (OrderScanController)
+    private static final Pattern CARD_ORDER_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+
+    /**
+     * The order cards of the orders checked on the orders list, as one document that print.js prints from its hidden
+     * frame: one print dialog for the whole batch. The cards follow the order of the ids (the list's order) and an id
+     * given twice prints once. Ids that name no order of the user's store are skipped, so another store's order never
+     * prints and an order removed since the list was shown does not stop the rest; none found answers 404. A missing,
+     * malformed or longer-than-a-page list answers 400 before anything is read. No super admin variant: a super admin
+     * has no orders list to check orders on.
+     */
+    @GetMapping("/dashboard/orders/cards")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String getOrderCards(@RequestParam(name = "ids", required = false) List<String> ids, Model model) {
+        List<String> wanted = cardIds(ids);
+        String storeId = getStoreId();
+        List<Order> orders = ordersRepository.findByIds(storeId, wanted);
+        if (orders.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        Map<String, List<OrderItem>> items = orderItemsRepository.findByOrderIds(
+                orders.stream().map(Order::getOrderId).toList());
+        SupplierLabelMap labels = supplierLabels.forStoreId(storeId).withWarehouse(warehouseLabel());
+        // every QR code carries the store's scan address, as on the single card
+        model.addAttribute("cards", orders.stream()
+                .map(order -> OrderPrintView.card(order, items.getOrDefault(order.getOrderId(), List.of()),
+                        OrderLinks.of(order, false), labels,
+                        OrderLinks.scanUrl(appDomain, storeId, order.getOrderId())))
+                .toList());
+        return "orders/cards";
+    }
+
+    /** 1..MAX_CARDS ids (counted before duplicates are dropped, so no list is unbounded work), each in CARD_ORDER_ID. */
+    private static List<String> cardIds(List<String> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > MAX_CARDS
+                || ids.stream().anyMatch(id -> id == null || !CARD_ORDER_ID.matcher(id).matches())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return ids.stream().distinct().toList();
+    }
+
     /** The store's own warehouse as the printouts name an item's supplier, in the request's language. */
     private String warehouseLabel() {
         return OrderPageModelFactory.warehouseLabel(messageSource, LocaleContextHolder.getLocale());
@@ -866,8 +914,10 @@ public class OrdersController extends BaseController {
 
     private String renderOrderCard(Order order, boolean superAdmin, Model model) {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        // the QR code always carries the store's scan address: the card is scanned in the store's warehouse
         model.addAttribute("print", OrderPrintView.card(order, orderItems, OrderLinks.of(order, superAdmin),
-                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel())));
+                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel()),
+                OrderLinks.scanUrl(appDomain, order.getStoreId(), order.getOrderId())));
         return "orders/card";
     }
 

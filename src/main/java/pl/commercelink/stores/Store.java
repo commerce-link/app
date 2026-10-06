@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import lombok.Getter;
+import lombok.Setter;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -63,6 +65,19 @@ public class Store {
     private ShippingConfiguration shippingConfiguration;
     @DynamoDBAttribute(attributeName = "demo")
     private DemoStoreMetadata demo;
+    @DynamoDBAttribute(attributeName = "trial")
+    @Getter
+    @Setter
+    private TrialPeriod trial;
+    // No value means active: the stores created before the flag existed never got one.
+    @DynamoDBAttribute(attributeName = "active")
+    @Getter
+    @Setter
+    private Boolean active;
+    @DynamoDBAttribute(attributeName = "deactivation")
+    @Getter
+    @Setter
+    private StoreDeactivation deactivation;
     @DynamoDBAttribute(attributeName = "createdAt")
     private String createdAt;
     @DynamoDBVersionAttribute
@@ -500,6 +515,17 @@ public class Store {
     @DynamoDBIgnore
     public boolean isDemoExpired(Instant now) {
         return demo != null && demo.getExpiresAt() != null && Instant.parse(demo.getExpiresAt()).isBefore(now);
+    }
+
+    /** A trial store stops being active the moment its trial ends, before anything marks it as deactivated. */
+    @DynamoDBIgnore
+    public boolean isActive(Instant now) {
+        return !Boolean.FALSE.equals(active) && !isTrialExpired(now);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrialExpired(Instant now) {
+        return trial != null && trial.isExpired(now);
     }
 
     @DynamoDBIgnore

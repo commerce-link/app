@@ -1,7 +1,7 @@
 // Dialogs with a form (dialog.cl-dialog.is-form). An element with data-cl-dialog-open="id" opens dialog#id with
 // showModal (focus stays inside, Escape closes); before that the dialog receives cl:dialog-open with detail.trigger, so
 // a page script can fill it from the opener's data attributes. [data-cl-dialog-close] and a click on the backdrop close
-// it; the focus goes back to the opener, or to its menu's summary when the opener sat in an action menu (the menu is
+// it (a press that started or ended inside the dialog is not such a click); the focus goes back to the opener, or to its menu's summary when the opener sat in an action menu (the menu is
 // closed by then). Without dialog support the opener's href, when it has one, is followed.
 (function () {
     'use strict';
@@ -14,6 +14,18 @@
         var menu = trigger.closest('details.cl-menu');
         return menu ? menu.querySelector(':scope > summary') : trigger;
     }
+
+    // A click is sent to the nearest element holding both ends of the press, so pressing inside the dialog (e.g. to
+    // select text) and letting go over the backdrop — or the other way round — clicks the dialog element itself, just
+    // like a click on the backdrop does. The backdrop closes the dialog only when the press both started and ended on it.
+    var pressStart = null;
+    var pressEnd = null;
+    document.addEventListener('pointerdown', function (event) {
+        pressStart = event.target;
+    }, true);
+    document.addEventListener('pointerup', function (event) {
+        pressEnd = event.target;
+    }, true);
 
     document.addEventListener('click', function (event) {
         if (!event.target.closest) {
@@ -28,7 +40,9 @@
             event.preventDefault();
             returnTo.set(dialog, focusTarget(trigger));
             dialog.dispatchEvent(new CustomEvent('cl:dialog-open', { detail: { trigger: trigger } }));
-            dialog.showModal();
+            if (!dialog.open) {
+                dialog.showModal();
+            }
             var first = dialog.querySelector('[autofocus]') || dialog.querySelector(FOCUSABLE);
             if (first) {
                 first.focus();
@@ -42,9 +56,40 @@
             return;
         }
         // a click on the backdrop lands on the dialog element itself; the confirmation dialog handles its own
-        if (event.target instanceof HTMLDialogElement && event.target.classList.contains('is-form')) {
+        var onBackdrop = event.target instanceof HTMLDialogElement && event.target.classList.contains('is-form')
+            && pressStart === event.target && pressEnd === event.target;
+        pressStart = null;
+        pressEnd = null;
+        if (onBackdrop) {
             event.target.close();
         }
+    });
+
+    // A dialog rendered open (no-JS fallback such as ?open=reject) is non-modal: no backdrop, no focus trap, and a
+    // later showModal() on it would throw. Reopen it as a modal once the script runs.
+    document.querySelectorAll('dialog.cl-dialog[open]').forEach(function (dialog) {
+        if (typeof dialog.showModal === 'function') {
+            dialog.close();
+            dialog.showModal();
+        }
+    });
+
+    // A second click must not send a second request while the first is on its way (a rejected delivery would answer
+    // the repeat with a state error page). Forms that handle their own submit (preventDefault, data-cl-async) are left
+    // alone; a page restored from the back/forward cache gets its button back.
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        var button = event.submitter;
+        if (event.defaultPrevented || !button || !form.closest || !form.closest('dialog.cl-dialog.is-form')
+            || form.hasAttribute('data-cl-async')) {
+            return;
+        }
+        button.disabled = true;
+        window.addEventListener('pageshow', function (shown) {
+            if (shown.persisted) {
+                button.disabled = false;
+            }
+        }, { once: true });
     });
 
     // close does not bubble

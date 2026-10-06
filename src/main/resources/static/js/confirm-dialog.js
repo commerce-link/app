@@ -40,9 +40,22 @@
         dialog.close();
     });
 
-    // A click on the backdrop lands on the dialog element itself, outside its content box.
+    // A click is sent to the nearest element holding both ends of the press, so pressing inside the dialog (e.g. to
+    // select text) and letting go over the backdrop — or the other way round — clicks the dialog element itself, just
+    // like a click on the backdrop does. The backdrop closes the dialog only when the press both started and ended on it.
+    var pressStart = null;
+    var pressEnd = null;
+    dialog.addEventListener('pointerdown', function (event) {
+        pressStart = event.target;
+    });
+    dialog.addEventListener('pointerup', function (event) {
+        pressEnd = event.target;
+    });
     dialog.addEventListener('click', function (event) {
-        if (event.target === dialog) {
+        var onBackdrop = event.target === dialog && pressStart === dialog && pressEnd === dialog;
+        pressStart = null;
+        pressEnd = null;
+        if (onBackdrop) {
             dialog.close();
         }
     });

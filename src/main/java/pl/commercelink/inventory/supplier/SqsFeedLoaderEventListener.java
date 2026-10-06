@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
+import pl.commercelink.stores.StoreActivity;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -23,6 +24,7 @@ public class SqsFeedLoaderEventListener {
     private final GlobalSupplierFeedService globalSupplierFeedService;
     private final StoreSupplierFeedScheduler feedScheduler;
     private final ScheduledExecutionCounter scheduledExecutionCounter;
+    private final StoreActivity storeActivity;
 
     @SqsListener(
             value = "supplier-feed-import-queue",
@@ -39,6 +41,11 @@ public class SqsFeedLoaderEventListener {
     }
 
     private void loadStoreFeed(FeedLoaderEventPayload payload) throws Exception {
+        if (!storeActivity.isActive(payload.getStoreId())) {
+            log.warn("Supplier {} feed import skipped for store {}: the store is inactive",
+                    payload.getSupplierName(), payload.getStoreId());
+            return;
+        }
         try {
             storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
             scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());

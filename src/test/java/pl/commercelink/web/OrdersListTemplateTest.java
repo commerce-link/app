@@ -84,4 +84,86 @@ class OrdersListTemplateTest {
         assertThat(html).contains("th:value=\"${filterForm?.label}\"")
                 .contains("${statuses.![name()]}, ${filterForm?.status})");
     }
+
+    private static int occurrences(String html, String needle) {
+        return html.split(Pattern.quote(needle), -1).length - 1;
+    }
+
+    /** Printing several cards: a checkbox column before the order number, with the order's id as its value. */
+    @Test
+    void everyRowHasACheckboxOfItsOrderBeforeTheRowLink() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int table = html.indexOf("<table class=\"cl-table is-orders\"");
+        String tag = html.substring(table, html.indexOf('>', table));
+        int headCheck = html.indexOf("<th scope=\"col\" class=\"cl-table-check\">", table);
+        int firstSortHead = html.indexOf("aria-sort=${page.sortHeaders().get(numberSort).ariaSort()}", table);
+        int rowCheck = html.indexOf("<td class=\"cl-table-check\">", table);
+        String row = html.substring(rowCheck, html.indexOf("</td>", rowCheck));
+
+        // then
+        assertThat(tag).contains("data-cl-select-table=\"true\"");
+        assertThat(headCheck).isPositive().isLessThan(firstSortHead);
+        assertThat(rowCheck).isPositive().isLessThan(html.indexOf("class=\"cl-row-link\""));
+        assertThat(html.substring(headCheck, html.indexOf("</th>", headCheck)))
+                .contains("data-cl-select-all hidden").contains("#{orders.list.select.all}").contains("#{orders.list.select.none}");
+        assertThat(row).contains("<label class=\"cl-check-target\">").contains("data-cl-select-row hidden")
+                .contains("autocomplete=\"off\"").contains("th:value=\"${row.orderId()}\"")
+                .contains("#{orders.list.select.row(${row.number()})}");
+    }
+
+    /** The selection row (design system "Pasek zaznaczenia") is the only place that prints several cards. */
+    @Test
+    void theSelectionRowPrintsTheCardsAndIsTheOnlyPrintAction() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int bar = html.indexOf("data-cl-selection-bar");
+        int table = html.indexOf("<table class=\"cl-table is-orders\"");
+        String row = html.substring(html.lastIndexOf("<div", bar), table);
+        String toolbar = html.substring(html.indexOf("<div class=\"cl-table-toolbar\">"), html.indexOf("<div class=\"cl-list-meta\""));
+
+        // then
+        assertThat(bar).isGreaterThan(html.indexOf("<nav class=\"cl-table-sortbar\"")).isLessThan(table);
+        assertThat(row).contains("<div class=\"cl-selection-row is-wide-only\" hidden data-cl-selection-bar>")
+                .contains("data-cl-selection-count").contains("#{orders.list.selected('{k}', '{n}')}")
+                .contains("<button type=\"button\" class=\"cl-button is-primary\" data-cl-select-confirm-above=\"10\"")
+                .contains("data-cl-select-print=@{/dashboard/orders/cards}")
+                .contains("#{orders.list.cards.confirm.title.few('{n}')}").contains("#{orders.list.cards.confirm.title.many('{n}')}")
+                .contains("#{orders.list.cards.confirm.message}")
+                .contains("#{orders.list.cards.confirm.action.few('{n}')}").contains("#{orders.list.cards.confirm.action.many('{n}')}")
+                .contains("fas fa-print").contains("data-cl-selection-text").contains("#{orders.list.cards.print('{k}')}")
+                .contains("data-cl-select-clear").contains("#{orders.list.selection.clear}");
+        assertThat(html.substring(html.lastIndexOf("<p", bar), bar)).contains("role=\"status\" data-cl-selection-status");
+        assertThat(toolbar).doesNotContain("data-cl-select");
+        assertThat(occurrences(html, "/dashboard/orders/cards")).isEqualTo(1);
+    }
+
+    /**
+     * The dialog sits inside section.cl-page (its title and message are styled by `.cl-page .cl-dialog ...`) but after
+     * the results block list-page.js swaps, so it survives every swap; the scripts follow the page.
+     */
+    @Test
+    void theDialogSitsInsideThePageButOutsideTheSwappedResults() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int results = html.indexOf("data-cl-list-results");
+        int pageEnd = html.lastIndexOf("</section>");
+        int dialog = html.indexOf("<dialog th:replace=\"~{fragments/confirm-dialog :: dialog}\"></dialog>");
+        int resultsEnd = html.lastIndexOf("</div>", html.lastIndexOf("</div>", pageEnd) - 1);
+        int listPage = html.indexOf("<script th:src=\"@{/js/list-page.js}\" defer></script>");
+
+        // then
+        assertThat(dialog).isGreaterThan(resultsEnd).isLessThan(pageEnd);
+        assertThat(results).isLessThan(resultsEnd);
+        assertThat(pageEnd).isLessThan(listPage);
+        assertThat(html.substring(pageEnd)).contains("<script th:src=\"@{/js/table-select.js}\" defer></script>")
+                .contains("<script th:src=\"@{/js/print.js}\" defer></script>")
+                .contains("<script th:src=\"@{/js/confirm-dialog.js}\" defer></script>");
+    }
 }

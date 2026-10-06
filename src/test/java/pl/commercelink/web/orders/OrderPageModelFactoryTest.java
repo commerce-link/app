@@ -173,11 +173,11 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(superAdmin.finances().costs()).isNotNull();
-        assertThat(superAdmin.items().products().get(0).unitCost()).isNotNull();
+        assertThat(superAdmin.items().products().get(0).margin()).isNotNull();
         assertThat(superAdmin.readOnly()).isTrue();
         assertThat(superAdmin.admin()).isFalse();
         assertThat(user.finances().costs()).isNotNull();
-        assertThat(user.items().products().get(0).unitCost()).isNotNull();
+        assertThat(user.items().products().get(0).margin()).isNotNull();
     }
 
     @Test
@@ -230,8 +230,8 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(user.finances().costs()).isNotNull().isEqualTo(admin.finances().costs());
-        assertThat(user.items().products().get(0).unitCost()).isNotNull()
-                .isEqualTo(admin.items().products().get(0).unitCost());
+        assertThat(user.items().products().get(0).margin()).isNotNull()
+                .isEqualTo(admin.items().products().get(0).margin());
     }
 
     @Test
@@ -775,6 +775,25 @@ class OrderPageModelFactoryTest {
         assertThat(page.history().events().get(1).arg()).isEqualTo("SOMETHING_NEW");
     }
 
+    @Test
+    void aRejectedDeliveryRequestShowsItsSupplierAndReasonInTheHistory() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderEvent rejected = new OrderEvent(order.getOrderId(), EventType.action, OrderEvent.DELIVERY_REQUEST_REJECTED,
+                LocalDateTime.of(2026, 10, 2, 9, 30));
+        rejected.setDetails("Acme · brak towaru");
+        when(orderEventsRepository.findByOrderId(order.getOrderId())).thenReturn(List.of(rejected));
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        OrderPageModel.EventRow row = page.history().events().get(0);
+        assertThat(row.titleKey()).isEqualTo("order.event.type.action.DELIVERY_REQUEST_REJECTED");
+        assertThat(row.argKey()).isNull();
+        assertThat(row.arg()).isEqualTo("Acme · brak towaru");
+    }
+
     private static OrderPageModelFactory.Viewer viewer() {
         return new OrderPageModelFactory.Viewer(false, true, null);
     }
@@ -885,6 +904,41 @@ class OrderPageModelFactoryTest {
         // then: the technical id "Warehouse" never reaches the items table or the item page
         assertThat(page.items().products().get(0).deliveryLabel()).isEqualTo("Magazyn sklepu");
         assertThat(delivery.label()).isEqualTo("Magazyn sklepu");
+        // the table's state pill leads nowhere for the warehouse (client 2026-10-06); the item page keeps its link
+        assertThat(page.items().products().get(0).deliveryHref()).isNull();
+        assertThat(delivery.href()).isEqualTo("/dashboard/warehouse");
+    }
+
+    @Test
+    void onlyAnAdminGetsTheLinkToCreatingADeliveryWhileEveryoneGetsTheDelivery() {
+        // given: a warehouse order, one item waiting for AcmeB, one already in a delivery
+        Order order = order(OrderStatus.Realization);
+        OrderItem awaiting = item(FulfilmentStatus.Allocation);
+        awaiting.setDeliveryId("AcmeB");
+        OrderItem ordered = item(FulfilmentStatus.Ordered);
+        ordered.setDeliveryId("2f9eb794-74ee-4122-aff2-cc614b6d417d");
+        OrderPageModelFactory.Viewer admin = viewer();
+        OrderPageModelFactory.Viewer user = new OrderPageModelFactory.Viewer(false, false, null);
+        OrderPageModelFactory.Viewer superAdmin = new OrderPageModelFactory.Viewer(true, false, null);
+
+        // when
+        List<OrderItemRow> asAdmin = factory.build(order, List.of(awaiting, ordered), admin, PL).items().products();
+        List<OrderItemRow> asUser = factory.build(order, List.of(awaiting, ordered), user, PL).items().products();
+        List<OrderItemRow> asSuperAdmin = factory.build(order, List.of(awaiting, ordered), superAdmin, PL).items().products();
+        OrderItemRow.Delivery itemPageAsUser = factory.delivery(order, awaiting, List.of(awaiting, ordered), user, PL);
+
+        // then: creating a delivery is the admin's (DeliveryCreateController), so a user's link would answer 403 — on
+        // the items table and on the item page alike; the delivery itself is everyone's
+        assertThat(asAdmin.get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/create/AcmeB");
+        assertThat(asAdmin.get(0).deliveryToCreate()).isTrue();
+        assertThat(asUser.get(0).deliveryHref()).isNull();
+        assertThat(itemPageAsUser.href()).isNull();
+        assertThat(asSuperAdmin.get(0).deliveryHref()).isEqualTo("/dashboard/store/store-1/deliveries/create/AcmeB");
+        assertThat(asUser.get(1).deliveryHref())
+                .isEqualTo("/dashboard/deliveries/details?deliveryId=2f9eb794-74ee-4122-aff2-cc614b6d417d");
+        assertThat(asUser.get(1).deliveryToCreate()).isFalse();
+        assertThat(asSuperAdmin.get(1).deliveryHref())
+                .isEqualTo("/dashboard/store/store-1/deliveries/details?deliveryId=2f9eb794-74ee-4122-aff2-cc614b6d417d");
     }
 
     @Test
