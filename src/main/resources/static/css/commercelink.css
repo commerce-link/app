@@ -8641,6 +8641,11 @@ a.cl-link-button:hover {
     white-space: nowrap;
 }
 
+/* "· pozycje: n" wraps as a whole under the id, never between the label and the number */
+.cl-page .cl-table.is-offers .cl-offer-items {
+    white-space: nowrap;
+}
+
 /* The list is always newest first: the date header says so like a sorted header of the other lists (aria-sort on th). */
 .cl-page .cl-table.is-offers .cl-sort-mark {
     font-size: .8em;
@@ -8713,15 +8718,17 @@ a.cl-link-button:hover {
 }
 
 /* Beside the open sidebar the card is 790 px at 1216 px, narrower than at 1215 px (977 px), and rows grew to 103 px:
-   the compact row follows the card there, not the window (as the Metoda column of Payments does). Below 850 px of
-   card the quick copy icon, the item count and the author go and the names are one line, as at 720-1215 px; from
-   about 1276 px the card is wide enough for the full row. */
+   the compact row follows the card there, not the window (as the Metoda column of Payments does). Below 960 px of
+   card the quick copy icon, the item count and the author go and the names are one line, as at 720-1215 px. With an
+   850 px threshold the full row came back at 1280x720 (card 854 px) in a name column of ~130 px: "pozycje: 1" broke
+   between label and number and rows reached 147 px; 1366x768 (card 940 px) gave 105 px rows. From about 1406 px
+   (card 960 px) the full row fits. */
 .cl-page .cl-card:has(.cl-table.is-offers) {
     container-type: inline-size;
 }
 
 @media (min-width: 1216px) {
-    @container (max-width: 849px) {
+    @container (max-width: 959px) {
         .cl-page .cl-table.is-offers .cl-copy-quick,
         .cl-page .cl-table.is-offers .cl-offer-items,
         .cl-page .cl-table.is-offers .cl-who {

@@ -111,14 +111,14 @@ class OffersListStylesContractTest {
         // given
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
 
-        // then — at 1216 px the card is 790 px; from about 1276 px (card 850 px) the full row fits
+        // then — at 1216 px the card is 790 px, at 1280x720 854 px and at 1366x768 940 px: all compact; from about 1406 px (card 960 px) the full row fits
         assertThat(css).contains("""
 .cl-page .cl-card:has(.cl-table.is-offers) {
     container-type: inline-size;
 }
 
 @media (min-width: 1216px) {
-    @container (max-width: 849px) {
+    @container (max-width: 959px) {
         .cl-page .cl-table.is-offers .cl-copy-quick,
         .cl-page .cl-table.is-offers .cl-offer-items,
         .cl-page .cl-table.is-offers .cl-who {
@@ -134,6 +134,18 @@ class OffersListStylesContractTest {
             min-width: 100%;
         }
 """);
+    }
+
+    @Test
+    void itemCountNeverBreaksBetweenLabelAndNumber() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then — at 1280x720 the full row used to split "pozycje:" and "1" over two lines
+        assertThat(css).contains("""
+.cl-page .cl-table.is-offers .cl-offer-items {
+    white-space: nowrap;
+}""");
     }
 
     @Test
