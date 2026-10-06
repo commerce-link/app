@@ -24,7 +24,8 @@ class InventoryReturnToTest {
     @ValueSource(strings = {
             "", "//evil.com", "https://evil.com/dashboard/inventory", "/dashboard/inventory/../catalogs",
             "/dashboard/inventoryX", "/dashboard/catalogs", "/dashboard/inventory?next=//evil.com",
-            "/dashboard/inventory\\evil", "/dashboard/inventory?view=browse x"})
+            "/dashboard/inventory\\evil", "/dashboard/inventory?view=browse x",
+            "/dashboard/inventory?q={x}", "/dashboard/inventory?q=}"})
     void refusesEverythingElse(String value) {
         // when / then
         assertThat(InventoryReturnTo.safe(value)).isEmpty();

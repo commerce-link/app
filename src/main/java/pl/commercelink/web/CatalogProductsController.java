@@ -701,7 +701,6 @@ public class CatalogProductsController {
         return "redirect:" + nextPath;
     }
 
-    /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */
     /** A review opened from the inventory list goes back there: "Back", "Cancel" and the redirect after saving. */
     private static void applyReturnTo(String returnTo, Model model) {
         InventoryReturnTo.safe(returnTo).ifPresent(target -> {
@@ -710,6 +709,7 @@ public class CatalogProductsController {
         });
     }
 
+    /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */
     private String renderReview(ProductCatalog catalog, CategoryDefinition category, ProductsBulkAddForm form,
                                 List<String> skipped, List<String> skippedExisting, Map<String, String> errors,
                                 Model model, Locale locale) {
