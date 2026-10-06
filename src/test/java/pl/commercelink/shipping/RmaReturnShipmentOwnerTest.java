@@ -208,4 +208,15 @@ class RmaReturnShipmentOwnerTest {
         assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
         assertThat(rma.getShipments().get(0).getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
     }
+
+    @Test
+    void aCourierTheCarrierBookedSendsTheReturnEmailOnce() {
+        // when
+        owner.onPickupSettled("store-1", "furgonetka", target(), ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
+        owner.onPickupSettled("store-1", "furgonetka", target(), ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
+
+        // then
+        verify(emailClient, times(1)).send(eq("store-1"), eq(EmailNotificationType.RMA_CARRIER_CONFIRMATION), any());
+        verify(notifications, never()).publish(any(), any());
+    }
 }

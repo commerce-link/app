@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import pl.commercelink.orders.ShipmentPickup;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
@@ -44,5 +45,26 @@ class ShipmentResultsTest {
         assertThat(first.awaitsPickup()).isTrue();
         assertThat(created.get(1).getCarrier()).isEqualTo("DPD Classic");
         assertThat(created.get(1).awaitsPickup()).isFalse();
+    }
+
+    @Test
+    void aParcelWhoseCourierTheCarrierBookedIsOrderedUnderItsPickupNumberAndWaitsForNothing() {
+        // given
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setProvider("furgonetka");
+        ShipmentResult result = new ShipmentResult("21486850", List.of(
+                new ShipmentResult.ShipmentParcelResult("0000014898901T", "dpd", null, false, "APP/CRIN/13023761")),
+                null);
+
+        // when
+        List<Shipment> created = ShipmentResults.toShipments(result, placeholder);
+
+        // then
+        ShipmentPickup pickup = created.get(0).getPickup();
+        assertThat(pickup.isOrdered()).isTrue();
+        assertThat(pickup.isBookedByCarrier()).isTrue();
+        assertThat(pickup.getPickupId()).isEqualTo("APP/CRIN/13023761");
+        assertThat(pickup.getDate()).isNull();
+        assertThat(created.get(0).awaitsPickup()).isFalse();
     }
 }

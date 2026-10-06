@@ -126,11 +126,12 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
 
     @Override
     public void onPickupSettled(String storeId, String provider, PickupTarget target, ShipmentPickup result) {
-        String key = result.isOrdered() ? "shipping.notification.warehouse.pickup.ordered"
+        String key = result.isBookedByCarrier() ? "shipping.notification.warehouse.pickup.carrier"
+                : result.isOrdered() ? "shipping.notification.warehouse.pickup.ordered"
                 : result.isFailed() ? "shipping.notification.warehouse.pickup.failed"
                 : "shipping.notification.warehouse.pickup.point";
         String message = message(key, target.trackingNo(), result.getDate(), result.getFrom(), result.getTo(),
-                reason(result.getError(), result.getErrorKey()));
+                reason(result.getError(), result.getErrorKey()), result.getPickupId());
         notifications.publish(storeId, new StoreNotification(
                 result.isFailed() ? StoreNotificationSeverity.WARNING : StoreNotificationSeverity.INFO,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP, packageObject(provider, target.externalId()), message));

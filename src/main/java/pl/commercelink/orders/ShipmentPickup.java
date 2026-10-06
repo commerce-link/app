@@ -72,6 +72,14 @@ public class ShipmentPickup {
         return new ShipmentPickup(ShipmentPickupStatus.AWAITING, null, null, null, null, null, null, null, null);
     }
 
+    /**
+     * A courier the carrier (or the provider) booked together with the shipment, e.g. for a return collected from a
+     * customer: ordered from the start under the carrier's pickup number, with no window we know of.
+     */
+    public static ShipmentPickup bookedByCarrier(String pickupId) {
+        return new ShipmentPickup(ShipmentPickupStatus.ORDERED, null, pickupId, null, null, null, null, null, null);
+    }
+
     public static ShipmentPickup pending(String commandId, LocalDateTime now, LocalDate date, LocalTime from, LocalTime to) {
         return new ShipmentPickup(ShipmentPickupStatus.PENDING, commandId, null, date.toString(), from.format(HOUR),
                 to.format(HOUR), now, null, null);
@@ -124,6 +132,12 @@ public class ShipmentPickup {
     @DynamoDBIgnore
     public boolean isOrdered() {
         return status == ShipmentPickupStatus.ORDERED;
+    }
+
+    /** Ordered without a command of ours: the carrier booked it with the shipment, so no window is known. */
+    @DynamoDBIgnore
+    public boolean isBookedByCarrier() {
+        return isOrdered() && commandId == null && date == null;
     }
 
     @DynamoDBIgnore

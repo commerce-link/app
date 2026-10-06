@@ -2270,4 +2270,20 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(page.header().primaryAction()).isNull();
     }
+
+    @Test
+    void aPickupTheCarrierBookedShowsItsNumberAndNeedsNoPickupButton() {
+        // given
+        Shipment booked = furgonetkaPackage();
+        booked.setPickup(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(orderWith(booked), List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.carrier");
+        assertThat(card.rows().get(0).stateArgs()).containsExactly("APP/CRIN/13023761");
+        assertThat(card.rows().get(0).stateTone()).isEqualTo("is-ok");
+        assertThat(card.pickupHref()).isNull();
+    }
 }

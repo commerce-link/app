@@ -71,4 +71,28 @@ class ShipmentPickupTest {
         assertThat(stuck.isUnconfirmed(now)).isTrue();
         assertThat(stuck.isPendingFor("cmd-1")).isTrue();
     }
+
+    @Test
+    void aPickupTheCarrierBookedIsOrderedWithoutAWindowAndCannotBeOrderedAgain() {
+        // when
+        ShipmentPickup booked = ShipmentPickup.bookedByCarrier("APP/CRIN/13023761");
+
+        // then
+        assertThat(booked.isOrdered()).isTrue();
+        assertThat(booked.isBookedByCarrier()).isTrue();
+        assertThat(booked.isAwaiting()).isFalse();
+        assertThat(booked.getPickupId()).isEqualTo("APP/CRIN/13023761");
+        assertThat(booked.getDate()).isNull();
+        assertThat(booked.getCommandId()).isNull();
+    }
+
+    @Test
+    void aPickupWeOrderedIsNotTakenForOneTheCarrierBooked() {
+        // when
+        ShipmentPickup ordered = ShipmentPickup.pending("cmd-1", NOW, LocalDate.of(2026, 10, 7),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("20261006800071");
+
+        // then
+        assertThat(ordered.isBookedByCarrier()).isFalse();
+    }
 }

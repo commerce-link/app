@@ -73,4 +73,14 @@ class AwaitingPickupIndexTest {
         // then
         verify(repository, never()).batchSave(any());
     }
+
+    @Test
+    void aPackageWhoseCourierTheCarrierBookedIsNotIndexed() {
+        // when
+        index.add("store-1", ShipmentOwnerType.ORDER, "order-1",
+                List.of(shipment("21486850", "A", ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"))));
+
+        // then
+        verify(repository, never()).batchSave(any());
+    }
 }

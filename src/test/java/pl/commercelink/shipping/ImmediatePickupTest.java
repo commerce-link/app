@@ -182,4 +182,18 @@ class ImmediatePickupTest {
         verify(owner, never()).onPickupSettled(any(), any(), any(), any());
         assertThat(ImmediatePickup.DAYS_AHEAD).isEqualTo(3);
     }
+
+    @Test
+    void aCourierTheCarrierBookedIsNotOrderedAgainAndTheOwnerHearsItOnce() {
+        // when
+        immediate.orderFor(creation(), List.of(created(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761")),
+                created(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"))));
+
+        // then
+        verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"),
+                argThat(t -> "21480003".equals(t.externalId())),
+                argThat(p -> p.isBookedByCarrier() && "APP/CRIN/13023761".equals(p.getPickupId())));
+        verifyNoInteractions(pickupService);
+        verifyNoInteractions(storesRepository);
+    }
 }

@@ -16,7 +16,8 @@ import java.util.Objects;
 /**
  * Orders the pickup right after creation for shipments nobody books a courier for by hand: a customer's return
  * (picked up at the customer's address) and a warehouse shipment. The first window the carrier offers within
- * {@link #DAYS_AHEAD} days is taken; no window means the package is handed in at a carrier point. An ordered pickup is
+ * {@link #DAYS_AHEAD} days is taken; no window means the package is handed in at a carrier point, and a courier the
+ * carrier booked with the shipment is not ordered again. An ordered pickup is
  * settled by its check, like one ordered on the page; every other outcome is told to the owner here.
  */
 @Slf4j
@@ -35,9 +36,10 @@ public class ImmediatePickup {
         List<String> externalIds = created.stream().filter(Shipment::awaitsPickup)
                 .map(Shipment::getExternalId).distinct().toList();
         if (externalIds.isEmpty()) {
+            // handed in at a point, or the carrier booked the courier itself: the owner hears the pickup as created
             created.stream().map(Shipment::getExternalId).distinct().forEach(id -> owner.onPickupSettled(
                     creation.getStoreId(), creation.getProvider(), target(creation, id, created),
-                    ShipmentPickup.notRequired()));
+                    createdPickup(id, created)));
             return;
         }
         Store store = storesRepository.findById(creation.getStoreId());
@@ -90,6 +92,12 @@ public class ImmediatePickup {
     private static void tellAll(ShipmentCreationCheckRequest creation, ShipmentOwner owner, List<PickupTarget> targets,
                                 ShipmentPickup result) {
         targets.forEach(t -> owner.onPickupSettled(creation.getStoreId(), creation.getProvider(), t, result));
+    }
+
+    private static ShipmentPickup createdPickup(String externalId, List<Shipment> created) {
+        return created.stream().filter(s -> Objects.equals(externalId, s.getExternalId()))
+                .map(Shipment::getPickup).filter(p -> p != null && p.isBookedByCarrier())
+                .findFirst().orElseGet(ShipmentPickup::notRequired);
     }
 
     private static PickupTarget target(ShipmentCreationCheckRequest creation, String externalId, List<Shipment> created) {

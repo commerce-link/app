@@ -294,4 +294,25 @@ class RmaShipmentsViewFactoryTest {
                 .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/rma/rma-1\"")
                 .doesNotContain("??");
     }
+
+    @Test
+    void aReturnWhoseCourierTheCarrierBookedReadsAsOrderedWithItsNumberAndOffersNoPickup() {
+        // given
+        Shipment booked = customerReturn();
+        booked.setPickup(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
+        RmaShipmentsView view = factory.build(rmaWith(booked), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        RmaShipmentsView.Row row = view.rows().get(0);
+        assertThat(row.stateKey()).isEqualTo("order.shipments.state.pickup.carrier");
+        assertThat(row.pickupRetryAction()).isNull();
+        assertThat(view.pickupHref()).isNull();
+        assertThat(html)
+                .contains("<span class=\"cl-status is-ok\">Odbiór zamówiony przez przewoźnika (nr APP/CRIN/13023761)</span>")
+                .doesNotContain("Nadaj w punkcie");
+    }
 }

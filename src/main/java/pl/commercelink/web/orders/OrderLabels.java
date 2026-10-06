@@ -206,9 +206,9 @@ public final class OrderLabels {
 
     /**
      * The line under a shipment created through an integration: being created, failed, waiting for a pickup, pickup
-     * being ordered, ordered, handed in at a point, pickup failed; null for one typed in by hand. A stored reason of our
-     * own (errorKey) is the line itself, resolved in the viewer's language; the provider's words (error) are its
-     * argument, shown as they came.
+     * being ordered, ordered (by us, or by the carrier with the shipment), handed in at a point, pickup failed; null
+     * for one typed in by hand. A stored reason of our own (errorKey) is the line itself, resolved in the viewer's
+     * language; the provider's words (error) are its argument, shown as they came.
      */
     public static ShipmentState shipmentState(Shipment shipment, Locale locale) {
         if (shipment.isCreating()) {
@@ -228,7 +228,10 @@ public final class OrderLabels {
             case PENDING -> pickup.isUnconfirmed(LocalDateTime.now())
                     ? failure("order.shipments.state.pickup.failed", null, ShipmentPickup.UNCONFIRMED_KEY)
                     : new ShipmentState("order.shipments.state.pickup.pending", NO_ARGS, INFO, true);
-            case ORDERED -> new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
+            case ORDERED -> pickup.isBookedByCarrier()
+                    ? new ShipmentState("order.shipments.state.pickup.carrier", new Object[]{pickup.getPickupId()}, OK,
+                    false)
+                    : new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
                     pickupDay(pickup.getDate(), locale), pickupHour(pickup.getFrom()), pickupHour(pickup.getTo())}, OK, false);
             case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);
             case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getError(), pickup.getErrorKey());

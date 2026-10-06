@@ -25,8 +25,15 @@ public final class ShipmentResults {
             s.setCarrier(parcel.carrier() != null ? parcel.carrier() : placeholder.getCarrier());
             s.setTrackingUrl(parcel.trackingUrl());
             s.setShippedAt(now);
-            s.setPickup(parcel.pickupRequired() ? ShipmentPickup.awaiting() : ShipmentPickup.notRequired());
+            s.setPickup(pickupOf(parcel));
             return s;
         }).toList();
+    }
+
+    private static ShipmentPickup pickupOf(ShipmentResult.ShipmentParcelResult parcel) {
+        if (parcel.pickupNumber() != null) {
+            return ShipmentPickup.bookedByCarrier(parcel.pickupNumber());
+        }
+        return parcel.pickupRequired() ? ShipmentPickup.awaiting() : ShipmentPickup.notRequired();
     }
 }

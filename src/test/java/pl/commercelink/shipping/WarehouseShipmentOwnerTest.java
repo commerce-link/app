@@ -216,4 +216,17 @@ class WarehouseShipmentOwnerTest {
                 n.getSeverity() == StoreNotificationSeverity.WARNING
                         && "shipping.notification.warehouse.pickup.failed".equals(n.getMessage())));
     }
+
+    @Test
+    void aCourierTheCarrierBookedIsReportedAsOrderedWithItsNumber() {
+        // when
+        owner.onPickupSettled("store-1", "furgonetka", target(), ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
+
+        // then
+        verify(messageSource).getMessage(eq("shipping.notification.warehouse.pickup.carrier"),
+                argThat(args -> args.length == 6 && "APP/CRIN/13023761".equals(args[5])), any());
+        verify(notifications).publish(eq("store-1"), argThat((StoreNotification n) ->
+                n.getSeverity() == StoreNotificationSeverity.INFO
+                        && "shipping.notification.warehouse.pickup.carrier".equals(n.getMessage())));
+    }
 }
