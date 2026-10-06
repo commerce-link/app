@@ -40,6 +40,7 @@ class DeliveryHeaderFactoryTest {
                 Arguments.of("outcome unknown, store admin", (Supplier<Delivery>) () -> outcomeUnknown(own(warehouse())), ADMIN, "deliveries.details.primary.reconcile"),
                 Arguments.of("outcome unknown, user", (Supplier<Delivery>) () -> outcomeUnknown(own(warehouse())), USER, "deliveries.details.primary.receiveAll"),
                 Arguments.of("dispatched, store admin", (Supplier<Delivery>) () -> own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_DISPATCHED)), ADMIN, "deliveries.details.primary.reconcile"),
+                Arguments.of("awaiting the supplier, store admin", (Supplier<Delivery>) () -> awaitingSupplier(own(warehouse())), ADMIN, null),
                 Arguments.of("ordering", (Supplier<Delivery>) () -> own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING)), ADMIN, null),
                 Arguments.of("in transit, store admin", (Supplier<Delivery>) DeliveryFixtures::warehouse, ADMIN, "deliveries.details.primary.receiveAll"),
                 Arguments.of("in transit, user", (Supplier<Delivery>) DeliveryFixtures::warehouse, USER, "deliveries.details.primary.receiveAll"),
@@ -271,6 +272,36 @@ class DeliveryHeaderFactoryTest {
         assertThat(card.reason()).isEqualTo("HTTP 502 Bad Gateway");
         assertThat(card.actions()).extracting(DeliveryPageModel.CardAction::dialogId).containsExactly("complete-dialog", "force-dialog");
         assertThat(card.actions().get(1).danger()).isTrue();
+    }
+
+    @Test
+    void aPurchaseAwaitingTheSupplierShowsAnInfoCardWithoutRepairs() {
+        // when
+        List<DeliveryPageModel.StatusCard> cards = cards(awaitingSupplier(own(warehouse())), ADMIN);
+
+        // then
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).tone()).isEqualTo("is-info");
+        assertThat(cards.get(0).titleKey()).isEqualTo("deliveries.details.status.awaitingSupplier.title");
+        assertThat(cards.get(0).textKey()).isEqualTo("deliveries.details.status.awaitingSupplier.text");
+        assertThat(cards.get(0).actions()).isEmpty();
+    }
+
+    @Test
+    void whileTheSupplierConfirmsNeitherReconcileNorTheNumberRefreshIsOffered() {
+        // given
+        Delivery awaiting = awaitingSupplier(own(warehouse()));
+        Delivery unconfirmed = own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_DISPATCHED));
+        unconfirmed.setExternalDeliveryIdProvisional(true);
+
+        // when
+        DeliveryPageModel.Header header = header(awaiting, ADMIN);
+
+        // then
+        assertThat(header.primary() == null ? null : header.primary().labelKey())
+                .isNotEqualTo("deliveries.details.primary.reconcile");
+        assertThat(header.more().refresh().visible()).isFalse();
+        assertThat(header(unconfirmed, ADMIN).more().refresh().visible()).isTrue();
     }
 
     @Test

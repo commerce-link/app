@@ -15,6 +15,7 @@ import pl.commercelink.web.orders.Money;
 public final class DeliveryRules {
 
     static final String ORDERING = "deliveries.details.reason.ordering";
+    static final String AWAITING_SUPPLIER = "deliveries.details.reason.awaitingSupplier";
     static final String AWAITING = "deliveries.details.reason.awaitingApproval";
     static final String RECEIVED = "deliveries.details.reason.received";
     static final String DOCUMENTS = "deliveries.details.reason.documents";
@@ -62,6 +63,9 @@ public final class DeliveryRules {
         }
         if (delivery.isOrderPending()) {
             return ActionState.off(ORDERING);
+        }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            return ActionState.off(AWAITING_SUPPLIER);
         }
         return delivery.isAwaitingApproval() ? ActionState.off(AWAITING) : ActionState.on();
     }
@@ -130,7 +134,8 @@ public final class DeliveryRules {
     }
 
     public static ActionState refresh(DeliveryViewer viewer, Delivery delivery) {
-        if (!delivery.isExternalDeliveryIdProvisional() || !viewer.manages()) {
+        // while the supplier confirms the reservation the number cannot be refreshed - the server refuses it too
+        if (!delivery.isExternalDeliveryIdProvisional() || !viewer.manages() || delivery.isAwaitingSupplierConfirmation()) {
             return ActionState.hidden();
         }
         return delivery.hasBeenReceived() ? ActionState.off(RECEIVED) : ActionState.on();

@@ -38,7 +38,8 @@ final class DeliveryCardsFactory {
     private static final Set<String> KNOWN_EVENTS = Set.of("DELIVERY_CREATED", "DELIVERY_ORDERED_AUTOMATICALLY",
             MANUALLY, "DELIVERY_PURCHASE_APPROVED", "DELIVERY_PURCHASE_RETRIED", "DELIVERY_ORDER_RECONCILED",
             "DELIVERY_ORDER_ID_CONFIRMED", "DELIVERY_ORDER_ID_UNCONFIRMED", "DELIVERY_UPDATED", "DELIVERY_DELAYED",
-            "DELIVERY_ITEM_QTY_UPDATED", "DELIVERY_RECEIVED");
+            "DELIVERY_ITEM_QTY_UPDATED", "DELIVERY_RECEIVED", "DELIVERY_AWAITING_SUPPLIER_CONFIRMATION",
+            "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT");
     private static final Set<DeliveryTrackingState> IN_STATUS_CARD = Set.of(DeliveryTrackingState.CANCELLED_BY_SUPPLIER,
             DeliveryTrackingState.SHIPPED_WITHOUT_DATA, DeliveryTrackingState.GIVEN_UP);
     private static final DateTimeFormatter DATE_TIME_LOCAL = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");

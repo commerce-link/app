@@ -72,8 +72,9 @@ public final class DeliveryPageModelFactory {
                     .anyMatch(product -> product.changeQty().enabled() && Objects.equals(product.mfn(), data.openMfn()));
             case "terms", "comment" -> terms.edit().visible();
             case "invoice" -> documents.link().visible();
-            case "complete" -> repairable && (delivery.isOrderFailed() || delivery.isOrderDispatched());
-            case "force" -> repairable && delivery.isOrderDispatched();
+            case "complete" -> repairable && !delivery.isAwaitingSupplierConfirmation()
+                    && (delivery.isOrderFailed() || delivery.isOrderDispatched());
+            case "force" -> repairable && delivery.isOrderDispatched() && !delivery.isAwaitingSupplierConfirmation();
             case "reject" -> header.more().reject().visible();
             default -> paymentIndex(requested) >= 0 && payments.editable() && paymentIndex(requested) < payments.rows().size();
         };

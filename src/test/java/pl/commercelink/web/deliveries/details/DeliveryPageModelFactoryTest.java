@@ -50,6 +50,16 @@ class DeliveryPageModelFactoryTest {
     }
 
     @Test
+    void receiveDialogsStayClosedWhileTheSupplierConfirms() {
+        // given
+        Delivery awaiting = awaitingSupplier(own(warehouse()));
+
+        // when / then
+        assertThat(DeliveryPageModelFactory.build(data(awaiting, "receive-all", Set.of()), ADMIN).openDialog()).isNull();
+        assertThat(DeliveryPageModelFactory.build(data(awaiting, "receive", Set.of(0)), ADMIN).openDialog()).isNull();
+    }
+
+    @Test
     void aDialogTheViewerCannotUseIsNotOpened() {
         // when / then
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "merge", Set.of(1)), ADMIN).openDialog()).isNull();
@@ -59,6 +69,8 @@ class DeliveryPageModelFactoryTest {
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "terms", Set.of()), ADMIN).openDialog()).isEqualTo("terms");
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "force", Set.of()), ADMIN).openDialog()).isNull();
         assertThat(DeliveryPageModelFactory.build(data(outcomeUnknown(own(warehouse())), "force", Set.of()), ADMIN).openDialog()).isEqualTo("force");
+        assertThat(DeliveryPageModelFactory.build(data(awaitingSupplier(own(warehouse())), "force", Set.of()), ADMIN).openDialog()).isNull();
+        assertThat(DeliveryPageModelFactory.build(data(awaitingSupplier(own(warehouse())), "complete", Set.of()), ADMIN).openDialog()).isNull();
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "reject", Set.of()), SUPER_ADMIN).openDialog()).isNull();
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "<script>", Set.of()), ADMIN).openDialog()).isNull();
         assertThat(DeliveryPageModelFactory.build(data(warehouse(), "payment-0", Set.of()), ADMIN).openDialog()).isNull();

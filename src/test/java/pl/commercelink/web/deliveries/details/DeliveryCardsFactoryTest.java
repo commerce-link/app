@@ -165,6 +165,23 @@ class DeliveryCardsFactoryTest {
     }
 
     @Test
+    void theSupplierConfirmationEventsHaveTheirOwnHistoryLabels() {
+        // given
+        Delivery delivery = awaitingSupplier(own(warehouse()));
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_AWAITING_SUPPLIER_CONFIRMATION", LocalDateTime.of(2026, 10, 2, 12, 42)));
+        delivery.addEvent(new Event(EventType.action, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT", LocalDateTime.of(2026, 10, 2, 12, 52)));
+
+        // when
+        DeliveryPageModel.HistoryCard history = DeliveryCardsFactory.history(delivery);
+
+        // then
+        assertThat(history.events()).extracting(DeliveryPageModel.EventRow::labelKey).containsExactly(
+                "deliveries.history.event.DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT",
+                "deliveries.history.event.DELIVERY_AWAITING_SUPPLIER_CONFIRMATION",
+                "deliveries.history.event.DELIVERY_CREATED");
+    }
+
+    @Test
     void historyIsNewestFirstWithAPolishLabelForEveryKnownEvent() {
         // given
         Delivery delivery = received(dropship());

@@ -75,6 +75,15 @@ final class DeliveryFixtures {
         return delivery;
     }
 
+    /** The supplier accepted the order and is still confirming it (Action reserves asynchronously). */
+    static Delivery awaitingSupplier(Delivery delivery) {
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setExternalDeliveryId("ZA/IE-26/01615674");
+        delivery.setExternalDeliveryIdProvisional(true);
+        delivery.setAwaitingSupplierConfirmation(true);
+        return delivery;
+    }
+
     static Delivery global(Delivery delivery) {
         delivery.setConnectionMode(ConnectionMode.GLOBAL);
         return delivery;

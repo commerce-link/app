@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -7,6 +8,8 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
@@ -17,6 +20,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Component
@@ -35,6 +39,8 @@ public class DeliveryCreationService {
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Autowired
     private DeliveryCostSync deliveryCostSync;
+    @Autowired
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     /**
      * Records a delivery the operator ordered outside the system. The supplier order number and date are required:
@@ -104,6 +110,83 @@ public class DeliveryCreationService {
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        completePending(storeId, delivery, form, unchanged -> {
+        });
+    }
+
+    /**
+     * Completes a pending purchase. {@code callerChanges} repeats what the caller already set on {@code delivery}
+     * (flags, events): when the save loses an optimistic-locking race to a concurrent edit, the completion is
+     * applied again to the delivery as stored now, and the caller's changes must travel with it.
+     *
+     * <p>The confirmed unit costs are written to the items before the delivery is saved, so a second cost sync
+     * would find nothing left to change and return zero - the delta computed here is the only record of it. That
+     * is why a lost race is resolved here, with the same delta, instead of being left to the caller's retry (an SQS
+     * redelivery would complete the delivery at list prices). Unless the retries are exhausted: that is logged at
+     * ERROR with the lost delta and rethrown, and the total then has to be repaired by hand.
+     *
+     * <p>After a lost race the {@code delivery} passed in is NOT the stored state: callers may only read its
+     * identifiers afterwards.
+     */
+    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form,
+                                Consumer<Delivery> callerChanges) {
+        double costChange = deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form));
+        applyCompletion(delivery, form, costChange);
+        try {
+            deliveriesRepository.save(delivery);
+        } catch (ConditionalCheckFailedException conflict) {
+            log.warn("Pending purchase save lost an optimistic-locking race, re-applying the completion: " +
+                            "store={} delivery={} costChange={}", storeId, delivery.getDeliveryId(), costChange);
+            reapplyCompletion(storeId, delivery.getDeliveryId(), form, costChange, callerChanges);
+        }
+
+        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
+    }
+
+    private void reapplyCompletion(String storeId, String deliveryId, DeliveryCreationForm form, double costChange,
+                                   Consumer<Delivery> callerChanges) {
+        // A closure that throws anything but ConditionalCheckFailedException comes out of the retrying executor
+        // wrapped, so a vanished delivery is flagged here and raised after the executor returns.
+        boolean[] gone = {false};
+        try {
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> deliveriesRepository.findByIdConsistently(storeId, deliveryId),
+                    current -> {
+                        if (current == null) {
+                            gone[0] = true;
+                            return;
+                        }
+                        if (current.getOrderStatus() == null) {
+                            // completed by someone else in the meantime: adding the delta again would count it twice
+                            log.warn("Pending purchase already completed by a concurrent writer: store={} delivery={}",
+                                    storeId, deliveryId);
+                            return;
+                        }
+                        // Any other state (e.g. FAILED set meanwhile) is completed too: the supplier did place the
+                        // order, and the first attempt would have overwritten the status the same way.
+                        callerChanges.accept(current);
+                        applyCompletion(current, form, costChange);
+                    },
+                    saved -> {
+                        if (saved != null) {
+                            deliveriesRepository.save(saved);
+                        }
+                    });
+        } catch (OptimisticLockingExhaustedException e) {
+            log.error("Pending purchase completion lost the save race on every retry, the cost delta is NOT applied " +
+                            "and needs repairing by hand: store={} delivery={} supplierOrderNumber={} costChange={}",
+                    storeId, deliveryId, form.getExternalDeliveryId(), costChange, e);
+            throw e;
+        }
+        if (gone[0]) {
+            String message = "Supplier holds the order, the delivery is gone: store=" + storeId + " delivery=" + deliveryId
+                    + " supplierOrderNumber=" + form.getExternalDeliveryId();
+            log.error(message);
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private static void applyCompletion(Delivery delivery, DeliveryCreationForm form, double costChange) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         if (!delivery.isDropship()) {
@@ -116,11 +199,7 @@ public class DeliveryCreationService {
             delivery.setTax(form.getTax());
         }
         delivery.setOrderStatus(null);
-
-        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
-        deliveriesRepository.save(delivery);
-
-        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
+        delivery.increaseTotalCost(costChange);
     }
 
     /**

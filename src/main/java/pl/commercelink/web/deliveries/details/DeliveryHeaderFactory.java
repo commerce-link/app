@@ -59,11 +59,14 @@ final class DeliveryHeaderFactory {
         if (delivery.isOrderFailed() && DeliveryRules.purchaseRepairable(viewer, delivery)) {
             return new PrimaryAction("deliveries.details.primary.retry", "fa-redo-alt", null, links.retry(), null);
         }
-        if (delivery.isOrderDispatched() && DeliveryRules.purchaseRepairable(viewer, delivery)) {
+        if (delivery.isOrderDispatched() && !delivery.isAwaitingSupplierConfirmation()
+                && DeliveryRules.purchaseRepairable(viewer, delivery)) {
             return new PrimaryAction("deliveries.details.primary.reconcile", "fa-search", null, links.reconcile(), null);
         }
         boolean waiting = !delivery.hasBeenReceived() && DeliveryRules.hasPendingAllocations(delivery);
-        boolean receivable = delivery.getOrderStatus() == null || delivery.isOrderFailed() || delivery.isOrderDispatched();
+        // while the supplier confirms the reservation the items are claimed, so receiving would only mark the delivery received
+        boolean receivable = delivery.getOrderStatus() == null || delivery.isOrderFailed()
+                || (delivery.isOrderDispatched() && !delivery.isAwaitingSupplierConfirmation());
         if (!delivery.isDropship() && waiting && receivable && !viewer.superAdmin()) {
             return new PrimaryAction("deliveries.details.primary.receiveAll", "fa-check", links.open("receive-all"), null,
                     "receive-all-dialog");
@@ -91,6 +94,11 @@ final class DeliveryHeaderFactory {
             cards.add(new StatusCard(OrderLabels.BAD, "fa-exclamation-circle", "deliveries.details.status.failed.title",
                     repair ? "deliveries.details.status.failed.text" : noRepairKey(viewer, delivery), reason,
                     repair ? List.of(complete) : List.of()));
+        } else if (delivery.isOrderDispatched() && delivery.isAwaitingSupplierConfirmation()) {
+            // the system is still settling the purchase itself (supplier confirming a reservation): nothing to act on,
+            // and the server refuses every repair until it finishes
+            cards.add(new StatusCard(OrderLabels.INFO, "fa-hourglass-half", "deliveries.details.status.awaitingSupplier.title",
+                    "deliveries.details.status.awaitingSupplier.text", null, List.of()));
         } else if (delivery.isOrderOutcomeUnknown()) {
             cards.add(new StatusCard(OrderLabels.WARN, "fa-exclamation-triangle", "deliveries.details.status.unknown.title",
                     "deliveries.details.status.unknown.text", reason, repair ? List.of(complete, force) : List.of()));

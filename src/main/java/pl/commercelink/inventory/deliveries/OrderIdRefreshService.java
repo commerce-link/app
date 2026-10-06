@@ -59,6 +59,9 @@ public class OrderIdRefreshService {
             if (!delivery.isExternalDeliveryIdProvisional()) {
                 return ManualRefreshOutcome.UNAVAILABLE;
             }
+            if (delivery.isAwaitingSupplierConfirmation()) {
+                return ManualRefreshOutcome.UNAVAILABLE;
+            }
             SupplierProvider provider = resolveProvider(storeId, delivery.getProvider());
             if (provider == null) {
                 return ManualRefreshOutcome.UNAVAILABLE;

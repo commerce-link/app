@@ -159,6 +159,21 @@ class DeliveryItemsFactoryTest {
     }
 
     @Test
+    void receivingWaitsForTheSupplierToConfirmTheReservation() {
+        // given
+        Delivery awaiting = awaitingSupplier(own(warehouse()));
+
+        // when
+        DeliveryPageModel.ItemsCard card = items(awaiting, ADMIN);
+        DeliveryPageModel.ItemsCard dispatched = items(own(withStatus(warehouse(), DeliveryOrderStatus.ORDER_DISPATCHED)), ADMIN);
+
+        // then
+        assertThat(card.selection().receive().enabled()).isFalse();
+        assertThat(card.selection().receive()).isEqualTo(ActionState.off("deliveries.details.reason.awaitingSupplier"));
+        assertThat(dispatched.selection().receive()).isEqualTo(ActionState.on());
+    }
+
+    @Test
     void theUserOnlyReceives() {
         // when
         DeliveryPageModel.ItemsCard card = items(warehouse(), USER);
