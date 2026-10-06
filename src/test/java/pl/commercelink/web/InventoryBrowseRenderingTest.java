@@ -73,8 +73,9 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).contains(">Catalog</th>", "data-label=\"Catalog\"");
         assertThat(html).contains("data-tooltip=\"Add to catalog\"", "aria-label=\"Add to catalog: Gigabyte RTX 4060\"",
-                "data-ean=\"5901000000001\"", "cl-inv-add-text\">Add</span>");
-        assertThat(html).doesNotContain("cl-inv-in-catalog", "cl-status is-ok");
+                "data-ean=\"5901000000001\"", "<a class=\"cl-button is-icon cl-inv-add cl-tooltip is-end\"");
+        assertThat(html).containsPattern("<a class=\"cl-button is-icon cl-inv-add[^>]*>\\s*<i class=\"fas fa-plus\" aria-hidden=\"true\"></i></a>");
+        assertThat(html).doesNotContain("cl-inv-in-catalog", "cl-status is-ok", ">Add<");
     }
 
     @Test
@@ -91,7 +92,8 @@ class InventoryBrowseRenderingTest {
                 + "href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\"");
         assertThat(html).contains("data-tooltip=\"" + places + "\"", "aria-label=\"" + places + "\"", "fa-check-circle");
         assertThat(html).contains("data-tooltip=\"Add to another category\"",
-                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"", "data-ean=\"5901000000001\"", "cl-inv-add-text\">Add</span>");
+                "aria-label=\"Add to another catalog category: Gigabyte RTX 4060\"", "data-ean=\"5901000000001\"");
+        assertThat(html).containsPattern("<a class=\"cl-button is-icon cl-inv-add[^>]*>\\s*<i class=\"fas fa-plus\" aria-hidden=\"true\"></i></a>");
         assertThat(html).doesNotContain("cl-status is-ok", "In catalog: 2");
     }
 

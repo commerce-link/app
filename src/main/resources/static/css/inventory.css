@@ -905,7 +905,7 @@
     gap: 8px;
 }
 
-/* "Katalog" column: the check (in the catalog) and the add button on one line, right-aligned. */
+/* "Katalog" column: the check (in the catalog) and the square add button on one line, right-aligned under the header. */
 .cl-inv-page .cl-inv-catalog-state {
     display: inline-flex;
     align-items: center;
@@ -934,9 +934,8 @@
 }
 
 /* 720-1439 px: the six columns of the browse list need about 870 px at their natural widths, more than the card beside
-   the sidebar has (it overflowed by up to 85 px at 1024 px). The column names wrap, the "+ Dodaj" button keeps only its
-   icon (its tooltip and accessible name still say what it does), and below 1216 px the cells get tighter sides and the
-   category a lower floor, so the table fits the card at every width. */
+   the sidebar has (it overflowed by up to 85 px at 1024 px). The column names wrap, and below 1216 px the cells get
+   tighter sides and the category a lower floor, so the table fits the card at every width. */
 @media screen and (min-width: 720px) and (max-width: 1439px) {
     .cl-inv-page .cl-table.cl-inv-browse-table thead th,
     .cl-inv-page .cl-table.cl-inv-browse-table thead th.is-numeric,
@@ -947,19 +946,6 @@
 
     .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-sort {
         text-align: inherit;
-    }
-
-    .cl-inv-page .cl-inv-add-text {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-    }
-
-    .cl-inv-page .cl-inv-add .icon {
-        margin: 0;
     }
 }
 
@@ -987,12 +973,10 @@
 }
 
 @media screen and (max-width: 1023px) {
-    /* 44 px tap targets around the check and the add button, like the margin mark */
-    .cl-inv-page .cl-inv-in-catalog,
-    .cl-inv-page .cl-inv-add {
+    /* a 44 px tap target around the check, like the margin mark (the square button is 44 px by itself) */
+    .cl-inv-page .cl-inv-in-catalog {
         min-width: 44px;
         min-height: 44px;
-        justify-content: center;
     }
 }
 

@@ -211,13 +211,11 @@
                                     <th:block th:if="${row.inCatalog()}">
                                         <th:block th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></th:block>
                                     </th:block>
-                                    <a class="cl-link-button cl-inv-add cl-tooltip is-end" th:href="${row.addHref()}" data-browse-add
+                                    <a class="cl-button is-icon cl-inv-add cl-tooltip is-end" th:href="${row.addHref()}" data-browse-add
                                        th:with="tip=${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add},
                                                 aria=${row.inCatalog()} ? #{inventory.browse.addElsewhere.aria(${row.name()})} : #{inventory.browse.add.aria(${row.name()})}"
                                        th:attr="data-ean=${row.ean()}, data-tooltip=${tip}, aria-label=${aria}">
-                                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                                        <span class="cl-inv-add-text" th:text="#{inventory.browse.add.short}"></span>
-                                    </a>
+<i class="fas fa-plus" aria-hidden="true"></i></a>
                                 </span>
                             </td>
                         </tr>
