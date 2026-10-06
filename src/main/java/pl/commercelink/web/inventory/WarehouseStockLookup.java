@@ -1,5 +1,7 @@
 package pl.commercelink.web.inventory;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
@@ -7,14 +9,12 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
-import java.util.ArrayList;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
@@ -25,13 +25,16 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 @RequiredArgsConstructor
 public class WarehouseStockLookup {
 
-    // DynamoDB rejects an IN list longer than 100 values, and a page of 50 products can carry more codes than that.
-    private static final int CODES_PER_QUERY = 100;
+    // the warehouse query scans the whole table and the list refreshes on every filter, sort and page click
+    private final Cache<String, Map<String, Long>> inStockByStore = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(1))
+            .maximumSize(1_000)
+            .build();
 
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
 
-    /** Quantity in stock (not in delivery) per unified manufacturer code; empty when there is no own warehouse to ask. */
+    /** Quantity in stock (not in delivery) per requested manufacturer code; empty when there is no own warehouse to ask. */
     public Map<String, Long> inStockByMfn(@Nullable String storeId, Collection<String> mfns) {
         if (storeId == null || mfns.isEmpty()) {
             return Map.of();
@@ -40,23 +43,32 @@ public class WarehouseStockLookup {
         if (store == null || store.hasIntegration(IntegrationType.WMS_PROVIDER)) {
             return Map.of();
         }
+        Map<String, Long> storeStock;
         try {
-            StockQueryService stock = warehouse.stockQueryService(storeId);
-            Map<String, Long> qty = new HashMap<>();
-            List<String> codes = new ArrayList<>(mfns);
-            for (int from = 0; from < codes.size(); from += CODES_PER_QUERY) {
-                List<String> chunk = codes.subList(from, Math.min(from + CODES_PER_QUERY, codes.size()));
-                for (WarehouseItemView item : stock.searchAllAvailableByMfns(storeId, chunk)) {
-                    String mfn = unifyMfn(item.getMfn());
-                    if (mfn != null && !item.isInDelivery()) {
-                        qty.merge(mfn, (long) item.getQty(), Long::sum);
-                    }
-                }
-            }
-            return qty;
+            storeStock = inStockByStore.get(storeId, this::loadInStock);
         } catch (RuntimeException e) {
-            log.warn("Warehouse stock unavailable for the inventory browse page of store {}: {}", storeId, e.getMessage());
+            log.warn("Warehouse stock unavailable for the inventory browse page of store {}", storeId, e);
             return Map.of();
         }
+        Map<String, Long> qty = new HashMap<>();
+        for (String code : mfns) {
+            String mfn = unifyMfn(code);
+            Long inStock = mfn == null ? null : storeStock.get(mfn);
+            if (inStock != null) {
+                qty.put(code, inStock);
+            }
+        }
+        return qty;
+    }
+
+    private Map<String, Long> loadInStock(String storeId) {
+        Map<String, Long> qty = new HashMap<>();
+        for (WarehouseItemView item : warehouse.stockQueryService(storeId).searchAllAvailable(storeId)) {
+            String mfn = unifyMfn(item.getMfn());
+            if (mfn != null && !item.isInDelivery()) {
+                qty.merge(mfn, (long) item.getQty(), Long::sum);
+            }
+        }
+        return Map.copyOf(qty);
     }
 }

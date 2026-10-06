@@ -35,13 +35,11 @@ import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -344,11 +342,12 @@ class BrowsePageFactoryTest {
         // given
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
                 mfnRow("MFN-A"), mfnRow("MFN-B"), mfnRow("MFN-C")), 3, false));
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of(
+        when(stock.searchAllAvailable(STORE_ID)).thenReturn(List.of(
                 warehouseItem("mfn-a", 4, FulfilmentStatus.Delivered),
                 warehouseItem("MFN-A", 2, FulfilmentStatus.Delivered),
                 warehouseItem("MFN-A", 7, FulfilmentStatus.Ordered),
-                warehouseItem("MFN-B", 3, FulfilmentStatus.Ordered)));
+                warehouseItem("MFN-B", 3, FulfilmentStatus.Ordered),
+                warehouseItem("MFN-Z", 9, FulfilmentStatus.Delivered)));
 
         // when
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
@@ -356,29 +355,7 @@ class BrowsePageFactoryTest {
         // then
         assertThat(page.rows()).extracting(BrowsePage.RowView::warehouseQty).containsExactly(6L, 0L, 0L);
         assertThat(page.rows()).extracting(BrowsePage.RowView::qty).containsExactly(5L, 5L, 5L);
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<String>> codes = ArgumentCaptor.forClass(Collection.class);
-        verify(stock, times(1)).searchAllAvailableByMfns(eq(STORE_ID), codes.capture());
-        assertThat(codes.getValue()).containsExactlyInAnyOrder("MFN-A", "MFN-B", "MFN-C");
-    }
-
-    @Test
-    void pageWithMoreCodesThanOneWarehouseQueryTakesSplitsThemIntoBatches() {
-        // given
-        List<BrowseRow> rows = new ArrayList<>();
-        for (int i = 0; i < 101; i++) {
-            rows.add(mfnRow("MFN-" + i));
-        }
-        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(rows, 101, false));
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of())
-                .thenReturn(List.of(warehouseItem("MFN-100", 2, FulfilmentStatus.Delivered)));
-
-        // when
-        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
-
-        // then
-        verify(stock, times(2)).searchAllAvailableByMfns(eq(STORE_ID), anyCollection());
-        assertThat(page.rows().get(100).warehouseQty()).isEqualTo(2L);
+        verify(stock, times(1)).searchAllAvailable(STORE_ID);
     }
 
     @Test
@@ -414,7 +391,7 @@ class BrowsePageFactoryTest {
     void failingWarehouseLeavesThePageWithoutTheLine() {
         // given
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(mfnRow("MFN-A")), 1, false));
-        when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenThrow(new IllegalStateException("scan failed"));
+        when(stock.searchAllAvailable(STORE_ID)).thenThrow(new IllegalStateException("scan failed"));
 
         // when
         BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
