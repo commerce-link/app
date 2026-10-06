@@ -28,6 +28,15 @@
         }
     }
 
+    // The page the dialog returns to after saving, without the parameters that would open the dialog again.
+    function returnTo() {
+        var params = new URLSearchParams(window.location.search);
+        params.delete('open');
+        params.delete('ean');
+        var query = params.toString();
+        return window.location.pathname + (query ? '?' + query : '');
+    }
+
     async function openDialog(eans, opener) {
         var page = root();
         var slot = document.querySelector('[data-browse-dialog-slot]');
@@ -36,20 +45,28 @@
         }
         var url = new URL(page.dataset.browseDialogUrl, window.location.origin);
         eans.forEach(function (ean) { url.searchParams.append('ean', ean); });
-        url.searchParams.set('returnTo', window.location.pathname + window.location.search);
+        url.searchParams.set('returnTo', returnTo());
+        var dialog;
         try {
             var response = await fetch(url, { headers: { 'X-Requested-With': 'fetch' } });
             if (!response.ok) {
                 return false;
             }
-            slot.innerHTML = await response.text();
+            var template = document.createElement('template');
+            template.innerHTML = await response.text();
+            dialog = template.content.querySelector('dialog');
         } catch (error) {
             return false;
         }
-        var dialog = slot.querySelector('dialog');
-        if (!dialog || typeof dialog.showModal !== 'function') {
+        if (!dialog) {
+            // An OK answer without the dialog is another page, e.g. the login form after the session expired.
+            window.location.reload();
+            return true;
+        }
+        if (typeof dialog.showModal !== 'function') {
             return false;
         }
+        slot.replaceChildren(dialog);
         wireOther(dialog);
         dialog.addEventListener('close', function () {
             if (opener && document.contains(opener)) {
@@ -72,6 +89,10 @@
         if (close && close.closest('dialog')) {
             event.preventDefault();
             close.closest('dialog').close();
+            return;
+        }
+        // A modified or non-primary click keeps the browser's own behaviour, e.g. the row link in a new tab.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
             return;
         }
         var single = event.target.closest('[data-browse-add]');
