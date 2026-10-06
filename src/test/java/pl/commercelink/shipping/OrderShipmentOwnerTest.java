@@ -94,6 +94,27 @@ class OrderShipmentOwnerTest {
     }
 
     @Test
+    void aFailedCreationWithAPackageIdIsReplacedSoTheOrderHasNothingLeftToBook() {
+        // given: Furgonetka gave a package id, then failed the command
+        Shipment failed = placeholder("cmd-0");
+        failed.setExternalId("ext-0");
+        failed.setCreation(failed.getCreation().failed("Błąd"));
+        order.setShipments(new ArrayList<>(List.of(failed)));
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+        Shipment created = new Shipment(ShipmentType.Courier);
+        created.setExternalId("21480003");
+        created.setTrackingNo("A");
+        owner.succeeded(request("cmd-1"), List.of(created));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(order.getShipments()).extracting(Shipment::getExternalId).containsExactly("21480003");
+        assertThat(order.hasShipmentToBook()).isFalse();
+    }
+
+    @Test
     void theExternalIdIsRecordedAndARefusalMarksTheShipmentFailed() {
         // given
         order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));

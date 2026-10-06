@@ -38,6 +38,16 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
     /** What creating the shipment sets off for the owner, once the created shipments are saved on it. */
     protected abstract void afterCreated(ShipmentCreationCheckRequest request);
 
+    /**
+     * Whether a shipment stays next to a new creation: one with a courier order or with data does, since dropping it
+     * would lose a paid label nobody could cancel any more. A failed creation goes even with a package id: the retry
+     * replaces it, and kept beside the created one it would still offer "Nadaj przesyłkę" (a second paid label).
+     */
+    protected static boolean keepsItsPlace(Shipment shipment) {
+        return !shipment.creationFailed()
+                && (shipment.getExternalId() != null || shipment.hasShippingData() || shipment.hasCollectionData());
+    }
+
     @Override
     public void recordExternalId(ShipmentCreationCheckRequest request) {
         modify(request, owner -> ShipmentLists.creating(shipments(owner), request.getCommandId())

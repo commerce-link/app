@@ -36,9 +36,8 @@ public class OrderShipmentOwner extends StoredShipmentOwner<Order> {
     }
 
     /**
-     * The new shipment takes the place of the ones without any data (the customer's bare delivery choice, a failed
-     * creation) and inherits the delivery choice, as a courier booking always did. Shipments with a courier order or
-     * with data stay as they were: dropping them would lose a paid label nobody could cancel any more.
+     * The new shipment takes the place of the ones {@link #keepsItsPlace} lets go and inherits the delivery choice, as
+     * a courier booking always did.
      */
     @Override
     public boolean markCreating(ShipmentCreationCheckRequest request, Shipment placeholder) {
@@ -55,10 +54,6 @@ public class OrderShipmentOwner extends StoredShipmentOwner<Order> {
             order.setShipments(next);
             return true;
         });
-    }
-
-    private static boolean keepsItsPlace(Shipment shipment) {
-        return shipment.getExternalId() != null || shipment.hasShippingData() || shipment.hasCollectionData();
     }
 
     /** What a courier booking always did, now on the order as saved. */

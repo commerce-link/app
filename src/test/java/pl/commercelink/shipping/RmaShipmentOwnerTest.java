@@ -121,6 +121,42 @@ class RmaShipmentOwnerTest {
     }
 
     @Test
+    void aSecondBookingKeepsTheShipmentStillWaitingForItsCourier() {
+        // given
+        rma.setShipments(new ArrayList<>(List.of(createdShipment())));
+        RmaShipmentOwner owner = operatorOwner();
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(rma.getShipments()).hasSize(2);
+        assertThat(rma.getShipments().get(0).getExternalId()).isEqualTo("21480003");
+        assertThat(rma.getShipments().get(0).awaitsPickup()).isTrue();
+        assertThat(rma.getShipments().get(1).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void aRetryOfAFailedCustomerReturnDropsTheFailedRowAndKeepsAnUnrelatedCreatedOne() {
+        // given
+        Shipment failed = placeholder("cmd-0");
+        failed.setExternalId("ext-0");
+        failed.setCreation(failed.getCreation().failed("Błąd"));
+        rma.setShipments(new ArrayList<>(List.of(createdShipment(), failed)));
+        RmaShipmentOwner owner = returnOwner();
+
+        // when
+        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(rma.getShipments()).hasSize(2);
+        assertThat(rma.getShipments().get(0).getExternalId()).isEqualTo("21480003");
+        assertThat(rma.getShipments().get(1).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
     void anRmaWithAShipmentBeingCreatedIsNotSentASecondCommand() {
         // given: replacing the list would lose the first command's placeholder and with it a paid label
         rma.setShipments(new ArrayList<>(List.of(placeholder("cmd-0"))));

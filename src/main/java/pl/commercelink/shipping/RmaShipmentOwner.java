@@ -36,15 +36,21 @@ public class RmaShipmentOwner extends StoredShipmentOwner<RMA> {
         return ShipmentOwnerType.RMA;
     }
 
-    /** An RMA shipment replaces the earlier ones, as booking it always did, unless one is still being created. */
+    /**
+     * An RMA shipment takes the place of the ones {@link #keepsItsPlace} lets go, unless one is still being created; a
+     * shipment already created (e.g. still waiting for its courier) stays.
+     */
     @Override
     public boolean markCreating(ShipmentCreationCheckRequest request, Shipment placeholder) {
         return modify(request, rma -> {
-            // replacing the list would drop the first command's placeholder, and with it a paid label
+            // a second command next to one in flight would pay for a second label
             if (rma.getShipments().stream().anyMatch(Shipment::isCreating)) {
                 return false;
             }
-            rma.setShipments(new ArrayList<>(List.of(placeholder)));
+            List<Shipment> next = new ArrayList<>(rma.getShipments().stream()
+                    .filter(StoredShipmentOwner::keepsItsPlace).toList());
+            next.add(placeholder);
+            rma.setShipments(next);
             return true;
         });
     }
