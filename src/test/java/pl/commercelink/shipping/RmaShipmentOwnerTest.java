@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.MessageSource;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
@@ -18,6 +20,7 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.orders.rma.RMALifecycle;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.time.LocalDateTime;
@@ -42,6 +45,9 @@ class RmaShipmentOwnerTest {
     @Mock private RMAItemsRepository rmaItemsRepository;
     @Mock private RMALifecycle rmaLifecycle;
     @Mock private ShipmentTrackingSubscriber trackingSubscriber;
+    @Mock private EmailClient emailClient;
+    @Mock private StoreNotificationService notifications;
+    @Mock private MessageSource messageSource;
 
     private RMA rma;
 
@@ -61,7 +67,7 @@ class RmaShipmentOwnerTest {
 
     private RmaShipmentOwner returnOwner() {
         return new RmaReturnShipmentOwner(rmaRepository, optimisticLockingExecutor, rmaItemsRepository, rmaLifecycle,
-                trackingSubscriber);
+                trackingSubscriber, emailClient, notifications, messageSource);
     }
 
     private static ShipmentCreationCheckRequest settled(boolean toClient) {

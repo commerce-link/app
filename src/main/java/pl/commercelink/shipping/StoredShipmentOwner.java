@@ -120,7 +120,7 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
         return modify(request.getStoreId(), request.getOwnerId(), change);
     }
 
-    private boolean modify(String storeId, String ownerId, Predicate<T> change) {
+    protected boolean modify(String storeId, String ownerId, Predicate<T> change) {
         AtomicBoolean changed = new AtomicBoolean();
         optimisticLockingExecutor.modifyAndSave(
                 () -> load(storeId, ownerId),

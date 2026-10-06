@@ -33,6 +33,8 @@ class ShipmentCreationSettlerTest {
     @Mock private OrderLifecycleEventPublisher lifecycleEventPublisher;
     @Mock private AwaitingPickupIndex index;
     @Mock private ShipmentOwners owners;
+    @Mock private ImmediatePickup immediatePickup;
+    @Mock private ShipmentOwner returnOwner;
 
     private ShipmentCreationSettler settler;
     private Order order;
@@ -53,7 +55,8 @@ class ShipmentCreationSettlerTest {
         OrderShipmentOwner owner = new OrderShipmentOwner(ordersRepository, optimisticLockingExecutor,
                 trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
-        settler = new ShipmentCreationSettler(owners, index);
+        when(owners.get(ShipmentOwnerType.RMA_RETURN)).thenReturn(returnOwner);
+        settler = new ShipmentCreationSettler(owners, index, immediatePickup);
     }
 
     private static ShipmentCreationCheckRequest request() {
@@ -118,5 +121,57 @@ class ShipmentCreationSettlerTest {
         Shipment s = order.getShipments().get(0);
         assertThat(s.creationFailed()).isTrue();
         assertThat(s.getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aReturnOrdersItsPickupRightAway() {
+        // given
+        when(returnOwner.succeeded(any(), anyList())).thenReturn(true);
+        ShipmentCreationCheckRequest request = request().toBuilder().ownerType(ShipmentOwnerType.RMA_RETURN).build();
+
+        // when
+        settler.succeeded(request, result());
+
+        // then
+        verify(immediatePickup).orderFor(eq(request), anyList());
+        verifyNoInteractions(index);
+    }
+
+    @Test
+    void anOrderLeavesItsPickupToTheOperator() {
+        // when
+        settler.succeeded(request(), result());
+
+        // then
+        verifyNoInteractions(immediatePickup);
+    }
+
+    @Test
+    void aDroppedReturnResultOrdersNoPickup() {
+        // given
+        when(returnOwner.succeeded(any(), anyList())).thenReturn(false);
+
+        // when
+        settler.succeeded(request().toBuilder().ownerType(ShipmentOwnerType.RMA_RETURN).build(), result());
+
+        // then
+        verifyNoInteractions(immediatePickup);
+    }
+
+    @Test
+    void anImmediatePickupThatBreaksOffIsAnErrorAndNotRetried() {
+        // given
+        when(returnOwner.succeeded(any(), anyList())).thenReturn(true);
+        doThrow(new RuntimeException("dynamo down")).when(immediatePickup).orderFor(any(), anyList());
+
+        // when
+        List<String> errors;
+        try (CapturedLogs logs = CapturedLogs.of(ShipmentCreationSettler.class)) {
+            settler.succeeded(request().toBuilder().ownerType(ShipmentOwnerType.RMA_RETURN).build(), result());
+            errors = logs.errors();
+        }
+
+        // then
+        assertThat(errors).singleElement().asString().contains("21480003", "RMA_RETURN", "ordering its pickup failed");
     }
 }

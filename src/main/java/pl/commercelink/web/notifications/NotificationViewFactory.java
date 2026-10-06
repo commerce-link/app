@@ -45,6 +45,23 @@ public class NotificationViewFactory {
             // the pending deliveries screen resolves the store from the logged-in admin, so only the store admin gets the link
             actionHref = "/dashboard/deliveries/preview";
             actionKey = "store.notification.action.viewPendingDeliveries";
+        } else if ((type == StoreNotificationType.WAREHOUSE_SHIPMENT_CREATED
+                || type == StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP) && role == UserRole.ADMIN
+                && StringUtils.contains(record.getObject(), ':')) {
+            // the label is fetched with the logged-in admin's store integration; an error there returns to the bell
+            String provider = StringUtils.substringBefore(record.getObject(), ":");
+            String externalId = StringUtils.substringAfter(record.getObject(), ":");
+            actionHref = "/dashboard/shipping/labels/" + UriUtils.encodePathSegment(provider, StandardCharsets.UTF_8)
+                    + "/" + UriUtils.encodePathSegment(externalId, StandardCharsets.UTF_8)
+                    + "?back=/dashboard/notifications";
+            actionKey = "store.notification.action.downloadLabel";
+        } else if ((type == StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED
+                || type == StoreNotificationType.RMA_RETURN_PICKUP_FAILED) && role == UserRole.ADMIN
+                && StringUtils.isNotBlank(record.getObject())) {
+            // the object is rmaId:attempt, so each failed attempt is its own notification
+            actionHref = "/dashboard/rma/" + UriUtils.encodePathSegment(
+                    StringUtils.substringBefore(record.getObject(), ":"), StandardCharsets.UTF_8);
+            actionKey = "store.notification.action.viewReturn";
         }
         return new NotificationView(record.getNotificationId(), titleKey, record.getMessage(), record.getCreatedAt(),
                 record.isUnread(), record.getSeverity() == StoreNotificationSeverity.WARNING, actionHref, actionKey,

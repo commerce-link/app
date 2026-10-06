@@ -137,7 +137,7 @@ public class ShipmentPickupService {
             // the check asks the provider about the refused command and settles what could not be marked failed here
             publishCheck(check);
         }
-        return PickupStart.refused(reason);
+        return PickupStart.refused(check.getCommandId(), reason);
     }
 
     /**
@@ -153,7 +153,7 @@ public class ShipmentPickupService {
                     + "ordered", check.getCommandId(), check.getStoreId(), externalIds(check), e);
             settle(check.getStoreId(), check.getTargets(), check.getCommandId(), p -> p.failedWithKey(UNCONFIRMED_KEY));
             String reason = messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale());
-            return PickupStart.refused(reason);
+            return PickupStart.refused(check.getCommandId(), reason);
         }
     }
 
