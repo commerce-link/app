@@ -9699,7 +9699,12 @@ a.cl-link-button:hover {
     font-weight: 600;
 }
 
+/* the count is one unit: it never wraps or shrinks, only the label beside it wraps (it broke "12" into two lines at
+   390 px, inheriting the pill's overflow-wrap: anywhere) */
 .cl-page .cl-subnav-count {
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow-wrap: normal;
     color: var(--cl-ink-2);
     font-size: 12.5px;
     font-variant-numeric: tabular-nums;
@@ -9736,6 +9741,42 @@ a.cl-link-button:hover {
 
 .cl-page .cl-result-path a {
     color: var(--cl-accent-ink);
+}
+
+/* --- Collapsed path: "…" stands for the middle crumbs of a long path (collapse-path.js) --- */
+.cl-page .cl-path-crumb[hidden] {
+    display: none;
+}
+
+.cl-page .cl-path-more {
+    padding: 0 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    line-height: inherit;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+.cl-page .cl-path-more:hover {
+    text-decoration: underline;
+}
+
+.cl-page .cl-path-more:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px target around the inline "…" without growing the line */
+    .cl-page .cl-path-more {
+        box-sizing: content-box;
+        min-width: 20px;
+        padding: 13px 12px;
+        margin: -13px -8px;
+    }
 }
 
 /* --- Category path in a table cell: PIM path + store-catalog line --- */

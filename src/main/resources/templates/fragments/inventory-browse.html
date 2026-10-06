@@ -51,14 +51,12 @@
                 <h2 id="browse-title" tabindex="-1" th:unless="${q.category() == null}"
                     th:with="title=${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned}"><th:block th:replace="~{fragments/inventory-browse :: breakable(${title})}"></th:block></h2>
                 <p class="cl-result-path" th:if="${q.category() == null}" th:text="#{inventory.browse.textEverywhere}"></p>
-                <p class="cl-result-path" th:if="${q.category() != null}">
-                    <th:block th:each="crumb, it : ${b.crumbs()}">
-                        <th:block th:with="label=${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}">
-                        <a th:if="${crumb.href() != null}" th:href="${crumb.href()}" data-cl-list-nav><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></a>
-                        <span th:if="${crumb.href() == null}" aria-current="page"><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></span>
-                        </th:block>
-                        <span th:unless="${it.last}" aria-hidden="true"> › </span>
-                    </th:block>
+                <!--/* every crumb with the separator after it, so collapse-path.js can hide the middle of a long path (first
+                       › "…" › parent › current); without the script the whole path stays */-->
+                <p class="cl-result-path" th:if="${q.category() != null}" data-cl-collapse-path
+                   th:attr="data-cl-collapse-label=#{inventory.browse.path.expand}">
+                    <span class="cl-path-crumb" data-cl-path-crumb th:each="crumb, it : ${b.crumbs()}"
+                          th:with="label=${crumb.label() != null} ? ${crumb.label()} : #{${crumb.labelKey()}}"><a th:if="${crumb.href() != null}" th:href="${crumb.href()}" data-cl-list-nav><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></a><span th:if="${crumb.href() == null}" aria-current="page"><th:block th:replace="~{fragments/inventory-browse :: breakable(${label})}"></th:block></span><span th:unless="${it.last}" aria-hidden="true"> › </span></span>
                 </p>
             </div>
             <nav class="cl-subnav" th:unless="${b.subnav().isEmpty()}"

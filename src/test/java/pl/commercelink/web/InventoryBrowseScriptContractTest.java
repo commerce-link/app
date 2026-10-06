@@ -45,6 +45,21 @@ class InventoryBrowseScriptContractTest {
     }
 
     @Test
+    void longCategoryPathIsCollapsedByAScriptEveryVisitorLoadsAlsoAfterAListSwap() throws IOException {
+        // when
+        String script = read("src/main/resources/static/js/collapse-path.js");
+        String page = read("src/main/resources/templates/inventory.html");
+        String fragment = read("src/main/resources/templates/fragments/inventory-browse.html");
+
+        // then
+        assertThat(page).containsPattern("<script th:src=\"@\\{/js/collapse-path.js}\" defer></script>");
+        assertThat(page).doesNotContain("th:if=\"${canManageSuppliers}\" th:src=\"@{/js/collapse-path.js}\"");
+        assertThat(fragment).contains("data-cl-collapse-path", "data-cl-collapse-label=#{inventory.browse.path.expand}", "data-cl-path-crumb");
+        assertThat(script).contains("[data-cl-collapse-path]", "[data-cl-path-crumb]", "data-cl-collapse-label", "MAX_VISIBLE = 4",
+                "crumbs.slice(1, crumbs.length - 2)", "aria-expanded", "'cl-list:swapped'", "'DOMContentLoaded'", ".focus()");
+    }
+
+    @Test
     void inventoryPageLoadsTheMenuScriptForTheRowMenu() throws IOException {
         // when
         String page = read("src/main/resources/templates/inventory.html");

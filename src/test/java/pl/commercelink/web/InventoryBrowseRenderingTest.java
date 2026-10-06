@@ -257,6 +257,29 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
+    void longCategoryPathIsRenderedWholeWithEachCrumbCarryingItsSeparatorForTheScriptToCollapse() {
+        // given
+        List<BrowsePage.Crumb> crumbs = List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
+                new BrowsePage.Crumb("Komputery", null, "/dashboard/inventory?cat=1"),
+                new BrowsePage.Crumb("Komponenty", null, "/dashboard/inventory?cat=2"),
+                new BrowsePage.Crumb("Chłodzenie", null, "/dashboard/inventory?cat=3"),
+                new BrowsePage.Crumb("Wentylatory", null, null));
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("4"), List.of(row(false)),
+                List.of(), "Wentylatory", "Komputery", crumbs)));
+
+        // then
+        assertThat(html).contains("<p class=\"cl-result-path\" data-cl-collapse-path data-cl-collapse-label=\"Show the full category path\">");
+        assertThat(html.split("data-cl-path-crumb", -1)).hasSize(6);
+        assertThat(html).contains("<span class=\"cl-path-crumb\" data-cl-path-crumb><a href=\"/dashboard/inventory?cat=2\" data-cl-list-nav>"
+                        + "Komponenty</a><span aria-hidden=\"true\"> › </span></span>",
+                "<span class=\"cl-path-crumb\" data-cl-path-crumb><span aria-current=\"page\">Wentylatory</span></span>",
+                ">All categories</a>");
+        assertThat(html).doesNotContain("data-cl-collapsed", "cl-path-more", "hidden>");
+    }
+
+    @Test
     void catalogAndCategoryNamesAreEscapedInTheCheckTooltip() {
         // given
         CategoryLine line = line(List.of("<b>x</b> › <b>Fan</b>", "Sklep › <b>y</b>"));
@@ -308,10 +331,16 @@ class InventoryBrowseRenderingTest {
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
                                    List<BrowsePage.Chip> chips, String category, String tile) {
+        return page(admin, noSuppliers, query, rows, chips, category, tile,
+                List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
+                        new BrowsePage.Crumb(category, null, null)));
+    }
+
+    private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
+                                   List<BrowsePage.Chip> chips, String category, String tile, List<BrowsePage.Crumb> crumbs) {
         BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?sort=cost", "none");
         return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : category,
-                List.of(new BrowsePage.Crumb(null, "inventory.browse.all", "/dashboard/inventory"),
-                        new BrowsePage.Crumb(category, null, null)),
+                crumbs,
                 List.of(new BrowsePage.NavItem(category, null, 3, "/dashboard/inventory?cat=11", true)), true,
                 query.isStart() ? List.of(new BrowsePage.Tile(tile, null, 5, "Karty graficzne",
                         "/dashboard/inventory?cat=10")) : List.of(),
