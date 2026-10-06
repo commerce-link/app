@@ -69,4 +69,10 @@ class InventoryPageTemplateTest {
         // when / then
         assertThat(script).contains("if (summarySlot)");
     }
+
+    @Test
+    void priceComparisonPromisesTheSuperAdminNoWarehouse() throws Exception {
+        // when / then
+        assertThat(prices()).contains("th:text=\"${superAdmin} ? #{inventory.prices.tech.lead} : #{inventory.prices.lead}\"");
+    }
 }

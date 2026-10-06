@@ -33,4 +33,15 @@ class ScreenIntroFragmentTest {
         assertThat(items(technical)).isEqualTo(3);
         assertThat(assortment + prices + technical).doesNotContain("??");
     }
+
+    @Test
+    void screenWithThreeItemsStillListsExactlyThree() {
+        // when
+        String orders = panel("orders");
+
+        // then
+        assertThat(items(orders)).isEqualTo(3);
+        assertThat(orders.split("<li>", -1)).hasSize(4);
+        assertThat(orders).doesNotContain("??").doesNotContainPattern("<li>\\s*</li>");
+    }
 }
