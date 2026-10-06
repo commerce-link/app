@@ -905,14 +905,46 @@
     gap: 8px;
 }
 
-/* A product already in the catalog keeps its pill on the row's first line; the way to another category sits under it. */
+/* "Katalog" column: the check (in the catalog) and the add button on one line, right-aligned. */
 .cl-inv-page .cl-inv-catalog-state {
     display: inline-flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
 }
 
-.cl-inv-page .cl-table td.cl-table-actions .cl-inv-catalog-state .cl-link-button {
-    margin-block: 0;
+.cl-inv-page .cl-inv-in-catalog {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    color: var(--cl-ok);
+    font-size: 17px;
+}
+
+.cl-inv-page .cl-inv-in-catalog:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* a button that also has a tooltip still reads as a button, not as help */
+.cl-inv-page .cl-inv-add.cl-tooltip {
+    cursor: pointer;
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the check, like the margin mark */
+    .cl-inv-page .cl-inv-in-catalog {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    /* as a card the "Katalog" line starts at the left edge, so its bubbles open rightwards from the mark */
+    .cl-inv-page .cl-inv-catalog-state .cl-tooltip.is-end::after {
+        right: auto;
+        left: -8px;
+    }
 }

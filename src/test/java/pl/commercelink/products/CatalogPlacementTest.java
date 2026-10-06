@@ -37,14 +37,13 @@ class CatalogPlacementTest {
     }
 
     @Test
-    void targetsForMatchesManagedCategoriesOnlyOrderedByCatalogName() {
+    void targetsAreManagedCategoriesOnlyOrderedByCatalogName() {
         // when
-        List<CatalogPlacement.Target> targets = placement.forStore(STORE_ID).targetsFor("11");
+        List<CatalogPlacement.Target> targets = placement.forStore(STORE_ID).targets();
 
         // then
         assertThat(targets).extracting(CatalogPlacement.Target::label)
                 .containsExactly("Podzespoły komputerowe › Karta graficzna", "Sklep B2B › Karty graficzne");
-        assertThat(placement.forStore(STORE_ID).targetsFor("99")).isEmpty();
     }
 
     @Test

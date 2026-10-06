@@ -547,11 +547,24 @@ body.cl-drawer-open .cl-sidebar {
     white-space: pre-line;
 }
 
+/* the bubble grows leftwards from the mark's right edge: for marks in a table's last column, where a centred bubble
+   would run past the page edge and scroll it sideways */
+.cl-tooltip.is-end::after {
+    left: auto;
+    right: -8px;
+    transform: translateY(4px);
+}
+
 .cl-tooltip:hover::after,
 .cl-tooltip:focus::after {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
+}
+
+.cl-tooltip.is-end:hover::after,
+.cl-tooltip.is-end:focus::after {
+    transform: translateY(0);
 }
 
 .cl-tooltip:hover::before,

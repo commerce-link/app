@@ -33,6 +33,6 @@ public class ProductCategoryViewFactory {
         CategoryLine line = CategoryLine.of(tree, placement, taxonomy.categoryId(), taxonomy.category(), key, false);
         String ean = product.ean();
         String addHref = BrowseQuery.start().hrefWith("open=add&ean=" + URLEncoder.encode(ean == null ? "" : ean, StandardCharsets.UTF_8));
-        return Optional.of(new ProductCategoryView(line, ean, withCatalog && ean != null && (!line.inCatalog() || line.addableElsewhere()), addHref));
+        return Optional.of(new ProductCategoryView(line, ean, withCatalog && ean != null, addHref));
     }
 }

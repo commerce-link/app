@@ -25,18 +25,14 @@
     </div>
     <div class="cl-inv-product-actions">
         <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
-        <a th:if="${productCategory != null and productCategory.canAdd() and !productCategory.line().inCatalog()}" class="cl-button is-primary"
-           th:href="${productCategory.addHref()}" data-browse-add th:attr="data-ean=${productCategory.ean()}">
-            <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-            <span th:text="#{inventory.browse.add}"></span>
-        </a>
         <th:block th:if="${productCategory != null and productCategory.line().inCatalog()}">
-            <th:block th:replace="~{fragments/inventory-browse :: inCatalogPill(${productCategory.line()})}"></th:block>
+            <th:block th:replace="~{fragments/inventory-browse :: inCatalogIcon(${productCategory.line()})}"></th:block>
         </th:block>
-        <a th:if="${productCategory != null and productCategory.canAdd() and productCategory.line().inCatalog()}" class="cl-button"
+        <a th:if="${productCategory != null and productCategory.canAdd()}" class="cl-button"
+           th:classappend="${productCategory.line().inCatalog()} ? '' : 'is-primary'"
            th:href="${productCategory.addHref()}" data-browse-add th:attr="data-ean=${productCategory.ean()}">
             <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-            <span th:text="#{inventory.prices.addElsewhere}"></span>
+            <span th:text="${productCategory.line().inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></span>
         </a>
     </div>
 </div>

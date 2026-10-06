@@ -286,7 +286,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901000000001"))
                 .thenReturn(new InventorySearchResult.KnownWithoutOffers(MatchedBy.EAN, header));
         ProductCategoryView view = new ProductCategoryView(
-                new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", null, List.of(), false), "5901000000001", true, "/x");
+                new CategoryLine(List.of(), "Karty graficzne", "Karty graficzne", null, List.of()), "5901000000001", true, "/x");
         when(productCategoryViews.build(STORE_ID, header, true)).thenReturn(Optional.of(view));
         ConcurrentModel model = new ConcurrentModel();
 

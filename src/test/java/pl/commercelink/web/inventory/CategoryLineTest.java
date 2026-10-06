@@ -37,11 +37,10 @@ class CategoryLineTest {
         assertThat(line.pimFullPath()).isEqualTo("Chłodzenie › Wentylatory");
         assertThat(line.inCatalog()).isFalse();
         assertThat(line.inCatalogLabels()).isEmpty();
-        assertThat(line.addableElsewhere()).isFalse();
     }
 
     @Test
-    void productInOneOfTwoMatchingCategoriesSaysWhereAndCanBeAddedToTheOther() {
+    void productInOneCategorySaysWhereAndLinksToIt() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN, ACCESSORIES, OTHER),
                 List.of(new CatalogPlacement.Existing("c-1", "cat-acc", "p-1", KEY)));
@@ -53,11 +52,10 @@ class CategoryLineTest {
         assertThat(line.inCatalog()).isTrue();
         assertThat(line.inCatalogLabels()).containsExactly("Local Catalog › Akcesoria");
         assertThat(line.inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-acc/products/p-1");
-        assertThat(line.addableElsewhere()).isTrue();
     }
 
     @Test
-    void productInEveryMatchingCategoryListsThemAllAndOffersNoOtherOne() {
+    void productInTwoCategoriesListsBothOnePerLineAndLinksToTheFirst() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(FAN, ACCESSORIES, OTHER),
                 List.of(new CatalogPlacement.Existing("c-1", "cat-fan", "p-1", KEY),
@@ -68,8 +66,8 @@ class CategoryLineTest {
 
         // then
         assertThat(line.inCatalogLabels()).containsExactly("Local Catalog › Fan", "Local Catalog › Akcesoria");
+        assertThat(line.inCatalogPlaces()).isEqualTo("Local Catalog › Fan\nLocal Catalog › Akcesoria");
         assertThat(line.inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-fan/products/p-1");
-        assertThat(line.addableElsewhere()).isFalse();
     }
 
     @Test
@@ -87,7 +85,6 @@ class CategoryLineTest {
 
         // then
         assertThat(line.inCatalogLabels()).containsExactly("Sklep › Fan", "Sklep › Fan");
-        assertThat(line.addableElsewhere()).isFalse();
     }
 
     @Test
@@ -101,11 +98,10 @@ class CategoryLineTest {
 
         // then
         assertThat(line.inCatalogLabels()).containsExactly("c-9 › cat-gone");
-        assertThat(line.addableElsewhere()).isTrue();
     }
 
     @Test
-    void productWhosePimCategoryMatchesNoCatalogCategoryIsNotAddableElsewhere() {
+    void productInACategoryItsPimCategoryDoesNotMatchStillSaysWhere() {
         // given
         CatalogPlacement.StorePlacement placement = new CatalogPlacement.StorePlacement(List.of(OTHER),
                 List.of(new CatalogPlacement.Existing("c-2", "cat-other", "p-1", KEY)));
@@ -115,7 +111,6 @@ class CategoryLineTest {
 
         // then
         assertThat(line.inCatalogLabels()).containsExactly("Sklep B2B › Inne");
-        assertThat(line.addableElsewhere()).isFalse();
     }
 
     @Test
@@ -125,7 +120,6 @@ class CategoryLineTest {
 
         // then
         assertThat(line.inCatalogLabels()).isEmpty();
-        assertThat(line.addableElsewhere()).isFalse();
         assertThat(line.inCatalog()).isFalse();
     }
 

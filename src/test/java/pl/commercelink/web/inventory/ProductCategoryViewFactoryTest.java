@@ -96,7 +96,7 @@ class ProductCategoryViewFactoryTest {
     }
 
     @Test
-    void productInEveryMatchingCategoryCannotBeAddedAgain() {
+    void productInEveryMatchingCategoryCanStillBeAddedToAnotherOne() {
         // given
         givenTaxonomy();
         when(catalogPlacement.forStore("store-1")).thenReturn(new CatalogPlacement.StorePlacement(List.of(GPU, B2B),
@@ -109,7 +109,7 @@ class ProductCategoryViewFactoryTest {
 
         // then
         assertThat(view.line().inCatalog()).isTrue();
-        assertThat(view.canAdd()).isFalse();
+        assertThat(view.canAdd()).isTrue();
     }
 
     private void givenTaxonomy() {

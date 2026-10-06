@@ -312,7 +312,7 @@ class InventoryResultsRenderingTest {
         Context context = context(found(), true);
         context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
                 new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                        "Komponenty komputerowe › Karty graficzne", null, List.of(), false),
+                        "Komponenty komputerowe › Karty graficzne", null, List.of()),
                 "5901234123457", true, "/x"));
 
         // when
@@ -320,41 +320,26 @@ class InventoryResultsRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("Karty graficzne", "data-browse-add", "Add to catalog").doesNotContain("fa-book", "+1");
+        assertThat(html).contains("Karty graficzne", "data-browse-add", "Add to catalog", "cl-button is-primary")
+                .doesNotContain("fa-book", "+1", "cl-inv-in-catalog");
     }
 
     @Test
-    void productInOneOfTwoMatchingCategoriesShowsWhereItIsAndTheAddToAnotherButton() {
+    void productInTheCatalogShowsTheCheckWithItsPlacesAndTheAddToAnotherCategoryButton() {
         // given
         Context context = context(found(), true);
         context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
                 new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
                         "Komponenty komputerowe › Karty graficzne", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                        List.of("Podzespoły › Karta graficzna"), true),
+                        List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty")),
                 "5901234123457", true, "/x"));
 
         // when
         String html = engine.process(RESULTS, context);
 
         // then
-        assertThat(html).doesNotContain("??", ">Add to catalog<");
-        assertThat(html).contains("Add to another category", "data-browse-add", "title=\"In catalog: Podzespoły › Karta graficzna\"");
-    }
-
-    @Test
-    void productInTwoCategoriesShowsTheCountWithoutAnAction() {
-        // given
-        Context context = context(found(), true);
-        context.setVariable("productCategory", new pl.commercelink.web.inventory.ProductCategoryView(
-                new pl.commercelink.web.inventory.CategoryLine(List.of("Komponenty komputerowe"), "Karty graficzne",
-                        "Komponenty komputerowe › Karty graficzne", "/dashboard/catalogs/c-1/category/cat-gpu/products/p-1",
-                        List.of("Podzespoły › Karta graficzna", "Sklep B2B › Karty"), false),
-                "5901234123457", false, "/x"));
-
-        // when
-        String html = engine.process(RESULTS, context);
-
-        // then
-        assertThat(html).contains("In catalog: 2").doesNotContain("data-browse-add", "Add to another");
+        assertThat(html).doesNotContain("??", ">Add to catalog<", "In catalog: 2");
+        assertThat(html).contains("data-tooltip=\"In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty\"",
+                "href=\"/dashboard/catalogs/c-1/category/cat-gpu/products/p-1\"", ">Add to another category<", "data-browse-add");
     }
 }

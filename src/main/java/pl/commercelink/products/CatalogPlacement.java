@@ -98,15 +98,6 @@ public class CatalogPlacement {
             return targets;
         }
 
-        public List<Target> targetsFor(String pimCategoryId) {
-            if (pimCategoryId == null) {
-                return List.of();
-            }
-            return targets.stream()
-                    .filter(target -> target.pimCategoryIds().stream().anyMatch(id -> pimCategoryId.equals(id.strip())))
-                    .toList();
-        }
-
         public Optional<Target> target(String value) {
             return targets.stream().filter(target -> target.value().equals(value)).findFirst();
         }

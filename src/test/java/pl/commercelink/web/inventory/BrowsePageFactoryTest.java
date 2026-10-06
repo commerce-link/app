@@ -141,7 +141,6 @@ class BrowsePageFactoryTest {
         assertThat(row.category().pimLeaf()).isEqualTo("Karty graficzne");
         assertThat(row.category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
         assertThat(row.category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
-        assertThat(row.category().addableElsewhere()).isTrue();
         assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
         assertThat(row.addHref()).isEqualTo("/dashboard/inventory?cat=10&open=add&ean=5901000000001");
     }
@@ -171,7 +170,6 @@ class BrowsePageFactoryTest {
 
         // then
         assertThat(page.rows().get(0).inCatalog()).isFalse();
-        assertThat(page.rows().get(0).category().addableElsewhere()).isFalse();
         verifyNoInteractions(catalogPlacement);
     }
 
@@ -192,7 +190,6 @@ class BrowsePageFactoryTest {
 
         // then
         assertThat(page.rows().get(0).category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
-        assertThat(page.rows().get(0).category().addableElsewhere()).isTrue();
     }
 
     @Test

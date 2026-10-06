@@ -15,15 +15,20 @@ import java.util.function.Predicate;
 /**
  * The "Kategoria w PIM" cell: the PIM path (ancestors grey, leaf bold); an id the PIM tree does not know shows the
  * taxonomy's category text instead of an empty cell. For an admin it also carries where the product already sits in the
- * store's catalog and whether a manual category its PIM category matches still lacks it, for the action column.
+ * store's catalog, for the "Katalog" column.
  */
 public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pimFullPath, String inCatalogHref,
-                           List<String> inCatalogLabels, boolean addableElsewhere) {
+                           List<String> inCatalogLabels) {
 
     private static final String SEPARATOR = " \u203a ";
 
     public boolean inCatalog() {
         return inCatalogHref != null;
+    }
+
+    /** One place per line, for the tooltip of the check icon ({@code .cl-tooltip.is-lines}). */
+    public String inCatalogPlaces() {
+        return String.join("\n", inCatalogLabels);
     }
 
     public static CategoryLine of(PimCategoryTree tree, @Nullable CatalogPlacement.StorePlacement placement,
@@ -33,7 +38,7 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
         String leaf = path.isEmpty() ? categoryText : path.get(path.size() - 1);
         String fullPath = path.isEmpty() ? categoryText : String.join(SEPARATOR, path);
         if (placement == null) {
-            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, null, List.of(), false);
+            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, null, List.of());
         }
         List<CatalogPlacement.Existing> existing = placement.existing(key);
         String inCatalogHref = existing.stream().findFirst()
@@ -44,9 +49,7 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
                 .filter(distinctBy(entry -> entry.catalogId() + "/" + entry.categoryId()))
                 .map(entry -> label(placement, entry))
                 .toList();
-        boolean addableElsewhere = !existing.isEmpty()
-                && placement.targetsFor(categoryId).stream().anyMatch(target -> !placement.isIn(target.categoryId(), key));
-        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogHref, inCatalogLabels, addableElsewhere);
+        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogHref, inCatalogLabels);
     }
 
     private static String label(CatalogPlacement.StorePlacement placement, CatalogPlacement.Existing entry) {
