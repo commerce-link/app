@@ -176,6 +176,28 @@ class BrowsePageFactoryTest {
         assertThat(criteria.getValue().rowFilter().test(row("5909999999999", "11", "x"))).isTrue();
     }
 
+    /**
+     * A store's own offer joins the global product it matches by any one code, and when it is the cheapest the row shows
+     * and adds it by that offer's EAN. A product added by those codes is in the catalog: the row and the catalog filter
+     * must say so, although the group itself is keyed by the other supplier's codes.
+     */
+    @Test
+    void productAddedByTheCodesTheRowShowsCountsAsInTheCatalog() {
+        // given
+        BrowseRow merged = new BrowseRow(InventoryKey.fromEan("5909999999998"), "Produkt", "Brand", "5901000000001",
+                "MFN-OWN", "11", "Karty graficzne", 120.0, true, "AB", 5, 2);
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(merged), 1, false));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11").withCatalog(BrowseQuery.CatalogFilter.OUT), true, false);
+
+        // then
+        assertThat(page.rows().get(0).category().inCatalogHref()).isEqualTo("/dashboard/catalogs/c-1/category/cat-gpu/products/p-1");
+        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
+        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
+        assertThat(criteria.getValue().rowFilter().test(merged)).isFalse();
+    }
+
     @Test
     void pageIsClampedToLastPage() {
         // given

@@ -102,15 +102,15 @@ public class BrowsePageFactory {
         }
         return switch (query.catalog()) {
             case ALL -> row -> true;
-            case IN -> row -> !placement.existing(row.key()).isEmpty();
-            case OUT -> row -> placement.existing(row.key()).isEmpty();
+            case IN -> row -> !placement.existing(row.catalogKey()).isEmpty();
+            case OUT -> row -> placement.existing(row.catalogKey()).isEmpty();
             case UNMATCHED -> row -> placement.targetsFor(row.categoryId()).isEmpty();
         };
     }
 
     private BrowsePage.RowView rowView(BrowseRow row, BrowseQuery query, CatalogPlacement.StorePlacement placement,
                                        boolean leafSelected, SupplierLabelMap labels) {
-        CategoryLine category = CategoryLine.of(tree, placement, row.categoryId(), row.categoryText(), row.key(),
+        CategoryLine category = CategoryLine.of(tree, placement, row.categoryId(), row.categoryText(), row.catalogKey(),
                 leafSelected);
         String code = row.ean() != null ? row.ean() : row.mfn();
         String detailHref = BrowseQuery.PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
