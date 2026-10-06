@@ -664,8 +664,10 @@
                                 </thead>
 
                                 <tbody id="editRmaShipmentsBody">
-                                <tr th:each="shipment, i : *{shipments}">
+                                <!-- a shipment being created has nothing to edit yet; the server keeps it as it is -->
+                                <tr th:each="shipment, i : *{shipments}" th:unless="${shipment.creation != null}">
                                     <td>
+                                        <input type="hidden" th:field="*{shipments[__${i.index}__].externalId}">
                                         <div class="select is-fullwidth">
                                             <select th:field="*{shipments[__${i.index}__].type}">
                                                 <option th:each="type : ${shipmentTypes}"

@@ -1,8 +1,11 @@
 package pl.commercelink.shipping;
 
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentPickup;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * Where a shipment lives and what its creation sets off: an order, an RMA, a customer return or the warehouse. Every
@@ -32,4 +35,21 @@ public interface ShipmentOwner {
 
     /** The command did not create anything: error (the provider's words) or errorKey (our reason, a message key). */
     void failed(ShipmentCreationCheckRequest request, String error, String errorKey);
+
+    /** A shipment of this owner carrying the package still waits for "Zamów odbiór". */
+    boolean awaitsPickup(String storeId, String ownerId, String externalId);
+
+    /**
+     * Changes the pickup of every row of these packages (every parcel of a package carries its externalId); returns
+     * how many rows changed, 0 when nothing applied. A change that does not concern a pickup returns it unchanged.
+     */
+    int applyPickup(String storeId, String ownerId, Collection<String> externalIds,
+                    UnaryOperator<ShipmentPickup> change);
+
+    /**
+     * What the owner does once a pickup of its package is settled (an e-mail, a notification); nothing by default.
+     * Called by ShipmentPickupSettler and by the immediate pickup, which may settle without a command (no windows).
+     */
+    default void onPickupSettled(String storeId, String provider, PickupTarget target, ShipmentPickup result) {
+    }
 }

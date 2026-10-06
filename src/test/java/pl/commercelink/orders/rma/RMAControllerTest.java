@@ -31,6 +31,9 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
+import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -44,6 +47,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -95,6 +99,8 @@ class RMAControllerTest {
     private RedirectAttributes redirectAttributes;
     @Mock
     private OpenRmaCoverage openRmaCoverage;
+    @Mock
+    private AwaitingPickupIndex awaitingPickupIndex;
 
     @InjectMocks
     private RMAController controller;
@@ -699,5 +705,100 @@ class RMAControllerTest {
         } catch (IOException e) {
             throw new IllegalStateException("cannot read " + classpathLocation, e);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // updateShipments: the form edits what it shows, the courier order stays
+    // ------------------------------------------------------------------
+
+    private static Shipment typed(String trackingNo, String externalId) {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo(trackingNo);
+        shipment.setShippedAt(LocalDateTime.of(2026, 10, 6, 9, 0));
+        shipment.setExternalId(externalId);
+        return shipment;
+    }
+
+    private static Shipment courierOrder(String trackingNo, String externalId) {
+        Shipment shipment = typed(trackingNo, externalId);
+        shipment.setProvider("furgonetka");
+        shipment.setPickUpAddressId("addr-1");
+        shipment.setPickup(ShipmentPickup.awaiting());
+        return shipment;
+    }
+
+    private RMA saveShipments(RMA existing, Shipment... posted) {
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existing);
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setShipments(new ArrayList<>(List.of(posted)));
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateShipments(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
+        }
+        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
+        verify(rmaRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void aShipmentBeingCreatedSurvivesAnEditOfTheOthers() {
+        // given: it has no shipping data yet, and losing it would drop the label its command pays for
+        Shipment inFlight = new Shipment(ShipmentType.Courier);
+        inFlight.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null), inFlight)));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1-fixed", null), new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(saved.getShipments()).hasSize(2);
+        assertThat(saved.getShipments().get(0).getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(saved.getShipments().get(1)).isSameAs(inFlight);
+    }
+
+    @Test
+    void theCourierOrderAndItsPickupStayWithTheirPackage() {
+        // given: the form carries the package id, not the courier order
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"))));
+
+        // when: the operator corrects the tracking number
+        RMA saved = saveShipments(existing, typed("T-1-fixed", "EXT-1"));
+
+        // then
+        Shipment shipment = saved.getShipments().get(0);
+        assertThat(shipment.getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(shipment.getProvider()).isEqualTo("furgonetka");
+        assertThat(shipment.getPickUpAddressId()).isEqualTo("addr-1");
+        assertThat(shipment.awaitsPickup()).isTrue();
+        verify(awaitingPickupIndex, never()).remove(any(), any());
+    }
+
+    @Test
+    void aPackageIdTheRmaNeverHadIsNotTakenFromTheForm() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null))));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1", "FORGED"));
+
+        // then
+        assertThat(saved.getShipments().get(0).getExternalId()).isNull();
+    }
+
+    @Test
+    void aRemovedPackageLeavesThePickupList() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when
+        saveShipments(existing, typed("T-2", "EXT-2"));
+
+        // then
+        verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-1"));
     }
 }

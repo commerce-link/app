@@ -32,6 +32,7 @@ public class ShipmentCancellationSettler {
     private final OrderEventsRepository orderEventsRepository;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final OrderRealizationStepBack realizationStepBack;
+    private final AwaitingPickupIndex awaitingPickupIndex;
 
     /** What a confirmed cancellation did: whether the shipments were cleared and whether the order went back. */
     public record Success(boolean cleared, boolean backToRealization) {
@@ -42,7 +43,7 @@ public class ShipmentCancellationSettler {
      * removed and the other shipments stay as they are. When no shipment is left, a bare one of the same type keeps the
      * customer's delivery choice (replaceShipments). When what is left of a Shipping order has nothing shipped it goes
      * back to Realization (OrderRealizationStepBack, no e-mail to the customer), and the shipping e-mail is forgotten
-     * once no other shipment carries it.
+     * once no other shipment carries it. The package no longer waits for a courier pickup either.
      */
     public Success succeed(ShipmentCancellationCheckRequest request) {
         AtomicBoolean backToRealization = new AtomicBoolean();
@@ -75,7 +76,20 @@ public class ShipmentCancellationSettler {
         if (cleared && nothingAnnounced.get()) {
             orderEventsRepository.deleteByOrderIdAndName(request.getOrderId(), EmailNotificationType.ORDER_SHIPPING.name());
         }
+        if (cleared) {
+            leavePickupIndex(request);
+        }
         return new Success(cleared, cleared && backToRealization.get());
+    }
+
+    private void leavePickupIndex(ShipmentCancellationCheckRequest request) {
+        try {
+            awaitingPickupIndex.remove(request.getStoreId(), List.of(request.getExternalId()));
+        } catch (RuntimeException e) {
+            // the shipment is gone, so the pickup page drops the entry when it reads it
+            log.warn("Cancelled package {} of store={} order={} is still in the pickup index", request.getExternalId(),
+                    request.getStoreId(), request.getOrderId(), e);
+        }
     }
 
     /** The provider refused the command. The reason is not stored on the shipment: this log is where it is kept. */

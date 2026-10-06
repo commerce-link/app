@@ -4,13 +4,17 @@ import lombok.extern.slf4j.Slf4j;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentLists;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 /**
  * An owner that keeps its shipments on a stored record (an order, an RMA): every write re-reads the record and saves it
@@ -93,11 +97,33 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
                 }).orElse(false));
     }
 
+    @Override
+    public boolean awaitsPickup(String storeId, String ownerId, String externalId) {
+        T owner = load(storeId, ownerId);
+        return owner != null && shipments(owner).stream()
+                .anyMatch(s -> externalId.equals(s.getExternalId()) && s.awaitsPickup());
+    }
+
+    @Override
+    public int applyPickup(String storeId, String ownerId, Collection<String> externalIds,
+                           UnaryOperator<ShipmentPickup> change) {
+        AtomicInteger changed = new AtomicInteger();
+        modify(storeId, ownerId, owner -> {
+            changed.set(ShipmentLists.applyPickup(shipments(owner), externalIds, change));
+            return changed.get() > 0;
+        });
+        return changed.get();
+    }
+
     /** False for a missing record or when the change did not apply; then nothing is saved. */
     protected boolean modify(ShipmentCreationCheckRequest request, Predicate<T> change) {
+        return modify(request.getStoreId(), request.getOwnerId(), change);
+    }
+
+    private boolean modify(String storeId, String ownerId, Predicate<T> change) {
         AtomicBoolean changed = new AtomicBoolean();
         optimisticLockingExecutor.modifyAndSave(
-                () -> load(request.getStoreId(), request.getOwnerId()),
+                () -> load(storeId, ownerId),
                 (Consumer<T>) fresh -> changed.set(fresh != null && change.test(fresh)),
                 fresh -> {
                     if (changed.get()) {

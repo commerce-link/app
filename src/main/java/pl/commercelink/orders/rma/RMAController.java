@@ -1,6 +1,7 @@
 package pl.commercelink.orders.rma;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
+import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+@Slf4j
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 @Controller
 @RequestMapping
@@ -57,6 +60,8 @@ public class RMAController {
     private final MessageSource messageSource;
 
     private final OpenRmaCoverage openRmaCoverage;
+
+    private final AwaitingPickupIndex awaitingPickupIndex;
 
     @Value("${app.domain}")
     private String appDomain;
@@ -574,19 +579,56 @@ public class RMAController {
         if (blocked.isPresent()) {
             return blocked.get();
         }
+        Set<String> vanishedPackages = Set.of();
         if (updatedRma.getShipments() != null) {
+            List<Shipment> previous = existingRma.getShipments();
+            // the form carries only what the operator edits and the package id: the courier order, its cancellation
+            // and pickup are taken from the shipment of that package, never from the form
+            Map<Shipment, String> packages = new IdentityHashMap<>();
+            updatedRma.getShipments().forEach(s -> {
+                packages.put(s, s.getExternalId());
+                s.setExternalId(null);
+            });
             List<Shipment> shipments = updatedRma.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
                     .collect(Collectors.toList());
+            shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            // a shipment being created has no data the form could show; dropping it would lose its label
+            List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
 
-            if (shipments.isEmpty()) {
+            if (shipments.isEmpty() && creations.isEmpty()) {
                 shipments.add(updatedRma.getShipments().get(0));
             }
+            shipments.addAll(creations);
 
+            vanishedPackages = packageIds(previous);
+            vanishedPackages.removeAll(packageIds(shipments));
             existingRma.setShipments(shipments);
         }
         rmaRepository.save(existingRma);
+        if (!vanishedPackages.isEmpty()) {
+            leavePickupIndex(vanishedPackages);
+        }
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private void leavePickupIndex(Set<String> externalIds) {
+        try {
+            awaitingPickupIndex.remove(getStoreId(), List.copyOf(externalIds));
+        } catch (RuntimeException e) {
+            // the shipments are gone, so the pickup page drops the entries when it reads them
+            log.warn("Removed packages {} of store {} are still in the pickup index", externalIds, getStoreId(), e);
+        }
+    }
+
+    private static Shipment shipmentOfPackage(List<Shipment> shipments, String externalId) {
+        return externalId == null ? null
+                : shipments.stream().filter(s -> externalId.equals(s.getExternalId())).findFirst().orElse(null);
+    }
+
+    private static Set<String> packageIds(List<Shipment> shipments) {
+        return shipments.stream().map(Shipment::getExternalId).filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/split")

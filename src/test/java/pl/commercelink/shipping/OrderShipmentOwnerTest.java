@@ -11,7 +11,9 @@ import pl.commercelink.orders.*;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -253,5 +255,65 @@ class OrderShipmentOwnerTest {
         assertThat(order.getShipments().get(0).getCreation().isPending()).isTrue();
         verify(ordersRepository, never()).save(any());
         verifyNoInteractions(lifecycleEventPublisher);
+    }
+
+    private static Shipment awaitingPickup(String externalId, String trackingNo) {
+        Shipment s = new Shipment(ShipmentType.Courier);
+        s.setExternalId(externalId);
+        s.setTrackingNo(trackingNo);
+        s.setPickup(ShipmentPickup.awaiting());
+        return s;
+    }
+
+    @Test
+    void aPackageAwaitsItsPickupWhileOneOfItsRowsDoes() {
+        // given
+        Shipment ordered = awaitingPickup("2", "B");
+        ordered.setPickup(ShipmentPickup.pending("cmd-1", LocalDateTime.now(), LocalDate.of(2026, 10, 7),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("P-1"));
+        order.setShipments(new ArrayList<>(List.of(awaitingPickup("1", "A"), ordered)));
+
+        // when / then
+        assertThat(owner.awaitsPickup("store-1", "order-1", "1")).isTrue();
+        assertThat(owner.awaitsPickup("store-1", "order-1", "2")).isFalse();
+        assertThat(owner.awaitsPickup("store-1", "order-1", "3")).isFalse();
+    }
+
+    @Test
+    void aMissingOrderAwaitsNoPickup() {
+        // given
+        when(ordersRepository.findById("store-1", "gone")).thenReturn(null);
+
+        // when / then
+        assertThat(owner.awaitsPickup("store-1", "gone", "1")).isFalse();
+        assertThat(owner.applyPickup("store-1", "gone", List.of("1"), p -> ShipmentPickup.notRequired())).isZero();
+    }
+
+    @Test
+    void aPickupChangeLandsOnEveryRowOfThePackageOnly() {
+        // given: two parcels of package 1 and another package
+        order.setShipments(new ArrayList<>(List.of(awaitingPickup("1", "A"), awaitingPickup("1", "B"),
+                awaitingPickup("2", "C"))));
+
+        // when
+        int changed = owner.applyPickup("store-1", "order-1", List.of("1"), p -> p.failed("x"));
+
+        // then
+        assertThat(changed).isEqualTo(2);
+        assertThat(order.getShipments()).extracting(s -> s.getPickup().isFailed()).containsExactly(true, true, false);
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    void aPickupChangeThatAppliesNowhereSavesNothing() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(awaitingPickup("1", "A"))));
+
+        // when
+        int changed = owner.applyPickup("store-1", "order-1", List.of("1"), p -> p);
+
+        // then
+        assertThat(changed).isZero();
+        verify(ordersRepository, never()).save(any());
     }
 }

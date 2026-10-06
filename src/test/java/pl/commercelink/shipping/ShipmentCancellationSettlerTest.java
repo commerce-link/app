@@ -37,6 +37,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +57,8 @@ class ShipmentCancellationSettlerTest {
     private OrderEventsRepository orderEventsRepository;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private AwaitingPickupIndex awaitingPickupIndex;
 
     private ShipmentCancellationSettler settler;
 
@@ -66,7 +69,7 @@ class ShipmentCancellationSettlerTest {
                 .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
         // the step back is a rule of the settlement, so it runs for real over the mocked events
         settler = new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                new OrderRealizationStepBack(orderEventsRepository));
+                new OrderRealizationStepBack(orderEventsRepository), awaitingPickupIndex);
     }
 
     private static Shipment pendingShipment(String commandId) {
@@ -104,6 +107,43 @@ class ShipmentCancellationSettlerTest {
         assertThat(order.getShipments().get(0).getTrackingNo()).isNull();
         assertThat(order.getShipments().get(0).getCancellation()).isNull();
         verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+    }
+
+    @Test
+    void aCancelledPackageNoLongerWaitsForAPickup() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWith(pendingShipment(COMMAND_ID)));
+
+        // when
+        settler.succeed(REQUEST);
+
+        // then
+        verify(awaitingPickupIndex).remove(STORE_ID, List.of(EXTERNAL_ID));
+    }
+
+    @Test
+    void aPickupIndexThatCannotBeUpdatedDoesNotUndoTheCancellation() {
+        // given: the entry heals itself when the pickup page reads it
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWith(pendingShipment(COMMAND_ID)));
+        doThrow(new RuntimeException("DynamoDB down")).when(awaitingPickupIndex).remove(any(), any());
+
+        // when
+        boolean cleared = settler.succeed(REQUEST).cleared();
+
+        // then
+        assertThat(cleared).isTrue();
+    }
+
+    @Test
+    void aStaleCancellationLeavesThePickupIndexAlone() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWith(pendingShipment("cmd-2")));
+
+        // when
+        settler.succeed(REQUEST);
+
+        // then
+        verifyNoInteractions(awaitingPickupIndex);
     }
 
     @Test

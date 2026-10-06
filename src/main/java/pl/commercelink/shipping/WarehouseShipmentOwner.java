@@ -2,8 +2,11 @@ package pl.commercelink.shipping;
 
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentPickup;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 @Component
 public class WarehouseShipmentOwner implements ShipmentOwner {
@@ -43,5 +46,18 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     @Override
     public void failed(ShipmentCreationCheckRequest request, String error, String errorKey) {
         // nothing stored
+    }
+
+    @Override
+    public boolean awaitsPickup(String storeId, String ownerId, String externalId) {
+        // the warehouse orders its pickup right away and never lists its packages in the pickup index
+        return false;
+    }
+
+    @Override
+    public int applyPickup(String storeId, String ownerId, Collection<String> externalIds,
+                           UnaryOperator<ShipmentPickup> change) {
+        // nothing stored: counted as applied, so ordering and settling the pickup go on
+        return externalIds.size();
     }
 }

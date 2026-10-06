@@ -200,6 +200,8 @@ class OrdersControllerTest {
     @Mock
     private ShipmentCancelService shipmentCancelService;
     @Mock
+    private pl.commercelink.shipping.AwaitingPickupIndex awaitingPickupIndex;
+    @Mock
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock
     private ReceiptAttemptService receiptAttemptService;
@@ -1055,6 +1057,111 @@ class OrdersControllerTest {
             // then
             assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.courier");
             verifyNoInteractions(orderLifecycle);
+        }
+
+        private Shipment creating(String commandId) {
+            Shipment shipment = new Shipment(ShipmentType.Courier);
+            shipment.setCreation(pl.commercelink.orders.ShipmentCreationState.pending(commandId, LocalDateTime.now()));
+            return shipment;
+        }
+
+        private Shipment withUnresolvedCancellation(Shipment shipment, String externalId) {
+            shipment.setExternalId(externalId);
+            shipment.setCancellation(pl.commercelink.orders.CourierCancellation.pending("cmd-c", LocalDateTime.now()).failed());
+            return shipment;
+        }
+
+        @Test
+        void aShipmentBeingCreatedIsNotRemoved() {
+            // given: its result still comes, and with a placeholder gone a paid label would be lost
+            Shipment shipped = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment inFlight = creating("cmd-1");
+            Order order = orderWith(shipped, inFlight);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(inFlight), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.locked.creating");
+            assertThat(order.getShipments()).containsExactly(shipped, inFlight);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aFailedCreationIsRemovedThoughItHasAPackage() {
+            // given: the package stayed unpaid in the provider's basket
+            Shipment shipped = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment failed = creating("cmd-1");
+            failed.setExternalId("EXT-9");
+            failed.setCreation(failed.getCreation().failed("Nieprawidłowy kod pocztowy"));
+            Order order = orderWith(shipped, failed);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(failed), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getShipments()).containsExactly(shipped);
+        }
+
+        @Test
+        void removingTheLastRowOfAPackageTakesItOffThePickupList() {
+            // given
+            Shipment other = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment unresolved = withUnresolvedCancellation(courier("TRACK-2", null), "EXT-2");
+            orderWith(other, unresolved);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(unresolved), redirect, Locale.ENGLISH);
+
+            // then
+            verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-2"));
+        }
+
+        @Test
+        void anotherParcelOfThePackageKeepsItOnThePickupList() {
+            // given
+            Shipment first = withUnresolvedCancellation(courier("TRACK-1", null), "EXT-2");
+            Shipment second = withUnresolvedCancellation(courier("TRACK-2", null), "EXT-2");
+            orderWith(first, second);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(second), redirect, Locale.ENGLISH);
+
+            // then
+            verifyNoInteractions(awaitingPickupIndex);
+        }
+
+        @Test
+        void aShipmentBeingCreatedIsNotEdited() {
+            // given: the form rebuilds the shipment without its command, whose result would then be dropped
+            Shipment inFlight = creating("cmd-1");
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)), inFlight);
+            Shipment typed = courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0));
+
+            // when
+            save(1, OrderShipmentForm.version(inFlight), typed);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.edit.locked.creating");
+            assertThat(order.getShipments().get(1)).isSameAs(inFlight);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aFailedCreationIsNotEditedIntoAShipment() {
+            // given: its package would turn the row into a courier order nobody can remove
+            Shipment failed = creating("cmd-1");
+            failed.setExternalId("EXT-9");
+            failed.setCreation(failed.getCreation().failedWithKey("shipping.creation.unconfirmed"));
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)), failed);
+
+            // when
+            save(1, OrderShipmentForm.version(failed), courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.edit.locked.creating");
+            assertThat(order.getShipments().get(1)).isSameAs(failed);
         }
 
         @Test

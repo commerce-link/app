@@ -57,6 +57,8 @@ class ShipmentCancellationCheckerTest {
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
     @Mock
+    private AwaitingPickupIndex awaitingPickupIndex;
+    @Mock
     private Store store;
     @Mock
     private ShippingProvider provider;
@@ -72,7 +74,7 @@ class ShipmentCancellationCheckerTest {
         // the real settler: its own write rules are pinned in ShipmentCancellationSettlerTest
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                        new OrderRealizationStepBack(orderEventsRepository));
+                        new OrderRealizationStepBack(orderEventsRepository), awaitingPickupIndex);
         checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviderFactory, publisher, settler);
     }
 

@@ -435,6 +435,7 @@ public class OrderPageModelFactory {
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";
+    private static final String CREATING_LOCKED = "order.shipments.remove.locked.creating";
 
     /**
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
@@ -464,20 +465,27 @@ public class OrderPageModelFactory {
      * label at the carrier, never by dropping the record; after a failed or unconfirmed cancellation the operator settles
      * the label in the provider's panel and may drop the record. The only shipment with nothing but the customer's choice
      * of delivery (the one every order is created with) is not removed either: its row reads as "no shipment yet" with
-     * "Uzupełnij", and removing it would only lose the choice.
+     * "Uzupełnij", and removing it would only lose the choice. A shipment being created waits for its result; one
+     * whose creation failed can go, its package is settled in the provider's panel as after an unresolved
+     * cancellation.
      */
     public static String removeLockedKey(Order order, int index) {
         if (order.getStatus() == OrderStatus.Delivered) {
             return "order.shipments.remove.error.delivered";
         }
+        Shipment shipment = order.getShipments().get(index);
+        // the result still comes: without the shipment waiting for it, a paid label would be lost
+        if (shipment.isCreating()) {
+            return CREATING_LOCKED;
+        }
         if (order.onlyPlaceholder().isPresent()) {
             return PLACEHOLDER_LOCKED;
         }
-        Shipment shipment = order.getShipments().get(index);
         if (shipment.getDeliveredAt() != null) {
             return "order.shipments.remove.error.shipmentDelivered";
         }
-        return shipment.getExternalId() != null && !shipment.isCancellationUnresolved()
+        // a failed creation has no courier order to cancel here: its package is left in the provider's basket
+        return shipment.getExternalId() != null && !shipment.creationFailed() && !shipment.isCancellationUnresolved()
                 ? "order.shipments.remove.error.courier" : null;
     }
 

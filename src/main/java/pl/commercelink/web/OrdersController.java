@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,7 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
@@ -124,6 +126,7 @@ import java.util.regex.Pattern;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
+@Slf4j
 @Controller
 public class OrdersController extends BaseController {
 
@@ -180,6 +183,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+    @Autowired
+    private AwaitingPickupIndex awaitingPickupIndex;
     @Autowired
     private OrderRealizationStepBack realizationStepBack;
 
@@ -1996,7 +2001,11 @@ public class OrdersController extends BaseController {
                 shipmentCarriers(existingOrder), null, null, before != null && before.getExternalId() != null, null);
         // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one
         String refusal = existingOrder.isClosed() ? "order.shipments.error.closed"
-                : stale ? "order.shipments.error.stale" : null;
+                : stale ? "order.shipments.error.stale"
+                // the form rebuilds the shipment without its creation command: a late result would be dropped and a
+                // failed one, with its package, would turn into a courier order nobody can remove
+                : before != null && (before.isCreating() || before.creationFailed())
+                        ? "order.shipments.edit.locked.creating" : null;
         if (refusal != null) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -2099,12 +2108,27 @@ public class OrdersController extends BaseController {
         Shipment removed = shipments.remove(index);
         boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
         forgetShipmentEmails(existingOrder, removed);
+        leavePickupIndex(removed, shipments);
         String notice = messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale);
         if (backToRealization) {
             notice += " " + backToRealizationNotice(locale);
         }
         OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
+    }
+
+    /** The index lists packages: another parcel row of the same package keeps it waiting for a pickup. */
+    private void leavePickupIndex(Shipment removed, List<Shipment> remaining) {
+        String externalId = removed.getExternalId();
+        if (externalId == null || remaining.stream().anyMatch(s -> externalId.equals(s.getExternalId()))) {
+            return;
+        }
+        try {
+            awaitingPickupIndex.remove(getStoreId(), List.of(externalId));
+        } catch (RuntimeException e) {
+            // the shipment is gone, so the pickup page drops the entry when it reads it
+            log.warn("Removed package {} of store {} is still in the pickup index", externalId, getStoreId(), e);
+        }
     }
 
     /** "new" is a new shipment (null); anything else must be the index of one of the order's shipments. */
