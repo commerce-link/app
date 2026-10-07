@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.web.orders.Pagination;
 import pl.commercelink.web.warehousedocuments.DocumentKind;
 import pl.commercelink.web.warehousedocuments.DocumentRowMapper;
@@ -39,7 +40,7 @@ public class WarehouseDocumentListService {
                 q.kind() == null ? null : q.kind().type(), new LinkedHashSet<>(q.reasons()),
                 q.from() == null ? null : q.from().atStartOfDay(),
                 q.to() == null ? null : q.to().atTime(LocalTime.MAX),
-                q.numberFragments());
+                q.numberFragments(warehouseId(store)));
         List<WarehouseDocument> found = search.search(criteria, q.productCode(), q.page(), WarehouseDocumentListQuery.PAGE_SIZE);
         boolean hasNext = found.size() > WarehouseDocumentListQuery.PAGE_SIZE;
         List<WarehouseDocument> shown = hasNext ? found.subList(0, WarehouseDocumentListQuery.PAGE_SIZE) : found;
@@ -71,6 +72,11 @@ public class WarehouseDocumentListService {
         return new WarehouseDocumentListPage(q, superAdmin, true, fragmentPath,
                 segments(q, locale), reasonOptions(q, locale), reasonSummary(q, locale), dates(q, locale),
                 chips(q, locale), resultsLine, rows, pagination, emptyState, SETTINGS_HREF);
+    }
+
+    private static String warehouseId(Store store) {
+        WarehouseConfiguration warehouse = store.getWarehouseConfiguration();
+        return warehouse == null ? null : warehouse.getWarehouseId();
     }
 
     private List<SegmentLink> segments(WarehouseDocumentListQuery q, Locale locale) {

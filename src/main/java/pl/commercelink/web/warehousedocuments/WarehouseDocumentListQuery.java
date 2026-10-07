@@ -70,12 +70,41 @@ public record WarehouseDocumentListQuery(String path, DocumentKind kind, List<Do
     }
 
     /**
-     * The fragment as typed and in capitals: the sequence is stored in capitals ("PZ/MAG1/2026/000214") but a warehouse id
-     * may carry lower-case letters ("PZ/MAG-uma2dqukxr/..."), and the number search is case-sensitive.
+     * The alternatives a document number may contain, as typed and in capitals: the sequence is stored in capitals
+     * ("PZ/MAG1/2026/000214") and the number search is case-sensitive. A warehouse id is free text from the store settings
+     * and may carry lower-case letters ("PZ/MAG-uma2dqukxr/..."), so a query with "/" also gets a capitals variant with the
+     * warehouse id in its stored casing ({@link #withWarehouseIdCase}).
      */
-    public List<String> numberFragments() {
+    public List<String> numberFragments(String warehouseId) {
         if (searchMode() != SearchMode.NUMBER) return List.of();
-        return List.of(q, q.toUpperCase(Locale.ROOT)).stream().distinct().toList();
+        List<String> variants = new ArrayList<>(List.of(q, q.toUpperCase(Locale.ROOT)));
+        if (q.contains("/")) variants.add(withWarehouseIdCase(q, warehouseId));
+        return variants.stream().distinct().toList();
+    }
+
+    /**
+     * The query in capitals, split on "/", with the warehouse id given back its stored casing: a segment equal to it
+     * (ignoring case) becomes the warehouse id, the last segment that starts it becomes that prefix and the first segment
+     * that ends it becomes that suffix ("pz/mag-uma2" → "PZ/MAG-uma2", "dqukxr/2026" → "dqukxr/2026").
+     */
+    static String withWarehouseIdCase(String query, String warehouseId) {
+        String[] segments = query.toUpperCase(Locale.ROOT).split("/", -1);
+        String id = StringUtils.trimToNull(warehouseId);
+        if (id == null) return String.join("/", segments);
+        int last = segments.length - 1;
+        for (int i = 0; i < segments.length; i++) {
+            String segment = segments[i];
+            int length = segment.length();
+            if (length == 0 || length > id.length()) continue;
+            if (segment.equalsIgnoreCase(id)) {
+                segments[i] = id;
+            } else if (i == last && id.regionMatches(true, 0, segment, 0, length)) {
+                segments[i] = id.substring(0, length);
+            } else if (i == 0 && id.regionMatches(true, id.length() - length, segment, 0, length)) {
+                segments[i] = id.substring(id.length() - length);
+            }
+        }
+        return String.join("/", segments);
     }
 
     public String productCode() {

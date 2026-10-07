@@ -10,6 +10,7 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.web.warehousedocuments.DocumentKind;
 import pl.commercelink.web.warehousedocuments.TestMessages;
 import pl.commercelink.web.warehousedocuments.WarehouseDocumentListPage;
@@ -284,9 +285,30 @@ class WarehouseDocumentListServiceTest {
         }).toList();
     }
 
-    private void givenStore(boolean documentsEnabled) {
+    @Test
+    void numberSearchRestoresTheStoredCasingOfTheStoreWarehouseId() {
+        // given
+        Store store = givenStore(true);
+        WarehouseConfiguration warehouse = new WarehouseConfiguration();
+        warehouse.setWarehouseId("MAG-uma2dqukxr");
+        when(store.getWarehouseConfiguration()).thenReturn(warehouse);
+        ArgumentCaptor<WarehouseDocumentCriteria> criteria = ArgumentCaptor.forClass(WarehouseDocumentCriteria.class);
+        when(search.search(criteria.capture(), any(), eq(1), eq(25))).thenReturn(List.of());
+        WarehouseDocumentListQuery q = new WarehouseDocumentListQuery(PATH, null, List.of(), null, null,
+                "pz/mag-uma2dqukxr/2026/000214", 1);
+
+        // when
+        service.page("s1", false, q, PL);
+
+        // then
+        assertThat(criteria.getValue().numberFragments()).containsExactly("pz/mag-uma2dqukxr/2026/000214",
+                "PZ/MAG-UMA2DQUKXR/2026/000214", "PZ/MAG-uma2dqukxr/2026/000214");
+    }
+
+    private Store givenStore(boolean documentsEnabled) {
         Store store = mock(Store.class);
         when(store.hasDocumentsGenerationEnabled()).thenReturn(documentsEnabled);
         when(stores.findById("s1")).thenReturn(store);
+        return store;
     }
 }
