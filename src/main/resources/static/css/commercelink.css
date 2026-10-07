@@ -9901,6 +9901,61 @@ a.cl-link-button:hover {
     white-space: normal;
 }
 
+/* A path deeper than two levels collapsed to "first › … › leaf" (fragment inventory-browse :: categoryPath). The "…" is
+   the tooltip trigger (focusable, so the keyboard and a tap open it); the bubble is laid out against the whole path, not
+   the one-character trigger: it starts at the path's left edge and is at most as wide as the path, so it stays inside
+   the cell or card at every width. Hovering anywhere on the path opens it too. No arrow: it could not point at the "…". */
+.cl-page .cl-category-path.is-collapsed {
+    position: relative;
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip {
+    position: static;
+    display: inline-block;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-category-path .cl-category-more:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip::after {
+    left: 0;
+    max-width: 100%;
+    transform: translateY(4px);
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip::before {
+    display: none;
+}
+
+.cl-page .cl-category-path.is-collapsed:hover .cl-category-more.cl-tooltip::after,
+.cl-page .cl-category-path .cl-category-more.cl-tooltip:focus::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* as a table column (from 1216 px) the path is narrow but has the remaining columns to its right: the bubble may take
+   the tooltip's usual 320 px instead of a tall strip as wide as the cell */
+@media screen and (min-width: 1216px) {
+    .cl-page .cl-table td.cl-category-cell .cl-category-more.cl-tooltip::after {
+        max-width: 320px;
+    }
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the "…" without moving the text around it or growing the row */
+    .cl-page .cl-category-path .cl-category-more.cl-tooltip {
+        padding: 12px 14px;
+        margin: -12px -11px;
+    }
+}
+
 /* --- Category tile with a count --- */
 .cl-page .cl-tile-grid.is-categories {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

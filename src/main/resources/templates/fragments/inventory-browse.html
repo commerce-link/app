@@ -18,10 +18,15 @@
        split with limit -1 keeps leading, trailing and doubled slashes. */-->
 <th:block th:fragment="breakable(text)"><th:block th:if="${text != null}"><th:block th:each="part, it : ${text.split('/', -1)}"><th:block th:text="${part}"></th:block><th:block th:unless="${it.last}">/<wbr></th:block></th:block></th:block></th:block>
 
-<!--/* The PIM path (ancestors grey, leaf bold, the whole path in the title): the "Kategoria PIM" cell, the line under the
-       product name below 1216 px and the product header of the prices and availability page. */-->
-<th:block th:fragment="categoryPath(line)">
-    <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${ancestor})}"></th:block></span> › </th:block><strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span>
+<!--/* The PIM path (ancestors grey, leaf bold): the "Kategoria PIM" cell, the line under the product name below 1216 px
+       and the product header of the prices and availability page. With `collapse` (list rows) a path deeper than two
+       levels shows "first › … › leaf": the visible text is hidden from screen readers and the "…" is the one focusable
+       tooltip trigger whose accessible name and tooltip carry the whole path (design system "Znak z dymkiem"), so only
+       collapsed rows add a tab stop. The prices page shows one product and keeps the whole path visible. */-->
+<th:block th:fragment="categoryPath(line, collapse)">
+    <span th:if="${collapse and line.collapsed()}" class="cl-category-path is-collapsed"><span aria-hidden="true"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimFirst()})}"></th:block></span> › </span><span class="cl-category-more cl-tooltip is-lines" tabindex="0" role="img"
+          th:attr="data-tooltip=#{inventory.browse.pimCategory.tooltip(${line.pimFullPath()})},aria-label=#{inventory.browse.pimCategory} + ' ' + ${line.pimFullPath()}">…</span><span aria-hidden="true"> › <strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span></span>
+    <span th:unless="${collapse and line.collapsed()}" class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${ancestor})}"></th:block></span> › </th:block><strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span>
 </th:block>
 
 <!--/* "In the catalog": a check mark, not a link. Focusable like the margin mark, so
@@ -242,10 +247,10 @@
                                 <a th:href="${row.detailHref()}" th:text="${row.name()}"></a>
                                 <span class="cl-table-sub"><span th:text="${row.brand()}"></span> · <span class="cl-table-code" th:text="${row.ean()}"></span> · <span class="cl-table-code" th:text="${row.mfn()}"></span></span>
                                 <!--/* below 1216 px the PIM category column folds under the product (design system "Kolumna zwijana pod klucz") */-->
-                                <span class="cl-table-sub cl-narrow-only"><th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()})}"></th:block></span>
+                                <span class="cl-table-sub cl-narrow-only"><th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()}, true)}"></th:block></span>
                             </th>
                             <td class="cl-category-cell is-secondary-column" th:attr="data-label=#{inventory.browse.column.category}">
-                                <th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()})}"></th:block>
+                                <th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()}, true)}"></th:block>
                             </td>
                             <td class="is-numeric cl-inv-cost-cell" th:attr="data-label=#{inventory.browse.column.cost.card}">
                                 <span th:text="${#numbers.formatDecimal(row.cost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
@@ -272,7 +277,7 @@
                                     <summary class="cl-button is-icon" th:attr="aria-label=#{inventory.browse.actions.aria(${row.name()})}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
                                     <ul class="cl-menu-list">
                                         <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"
-                                               th:text="${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></a></li>
+                                               th:text="#{inventory.browse.add}"></a></li>
                                     </ul>
                                 </details>
                             </td>

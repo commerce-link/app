@@ -116,7 +116,7 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void rowMenuOfAProductInTheCatalogOnlyAddsElsewhereBecauseTheNameAlreadyLeadsToThePrices() {
+    void rowMenuOfAProductInTheCatalogSaysAddToCatalogLikeAnyOtherRow() {
         // given
         BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna")), 0);
 
@@ -124,10 +124,10 @@ class InventoryBrowseRenderingTest {
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row))));
 
         // then
-        assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to another category</a>",
+        assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to catalog</a>",
                 "<a href=\"/dashboard/inventory/prices?q=5901000000001\">Gigabyte RTX 4060</a>");
         assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(2);
-        assertThat(html).doesNotContain(">Add to catalog</a>", "Prices and availability", "Open in catalog", "/dashboard/catalogs/");
+        assertThat(html).doesNotContain("Add to another category", "Prices and availability", "Open in catalog", "/dashboard/catalogs/");
     }
 
     @Test
@@ -331,6 +331,54 @@ class InventoryBrowseRenderingTest {
         assertThat(html).contains("<span>Audio/<wbr>wideo</span> › <strong>/<wbr>&lt;b&gt;x&lt;/<wbr>b&gt;/<wbr>/<wbr>y/<wbr></strong>",
                 "title=\"Audio/wideo › /&lt;b&gt;x&lt;/b&gt;//y/\"");
         assertThat(html).doesNotContain("<b>x</b>");
+    }
+
+    @Test
+    void twoLevelPimPathIsShownWholeWithoutATooltipTrigger() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-category-path\" title=\"Komponenty komputerowe › Karty graficzne\">"
+                + "<span class=\"cl-visually-hidden\">PIM category:</span> <span>Komponenty komputerowe</span> › "
+                + "<strong>Karty graficzne</strong></span>");
+        assertThat(html).doesNotContain("is-collapsed", "cl-category-more", "…");
+    }
+
+    @Test
+    void deeperPimPathCollapsesToFirstAndLeafWithTheWholePathInTheTooltipAndForScreenReaders() {
+        // given
+        CategoryLine line = new CategoryLine(List.of("Komputery", "Komponenty", "Chłodzenie"), "Wentylatory",
+                "Komputery › Komponenty › Chłodzenie › Wentylatory", List.of());
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
+
+        // then
+        String collapsed = "<span class=\"cl-category-path is-collapsed\"><span aria-hidden=\"true\"><span>Komputery</span> › </span>"
+                + "<span class=\"cl-category-more cl-tooltip is-lines\" tabindex=\"0\" role=\"img\" "
+                + "data-tooltip=\"PIM category:\nKomputery › Komponenty › Chłodzenie › Wentylatory\" "
+                + "aria-label=\"PIM category: Komputery › Komponenty › Chłodzenie › Wentylatory\">…</span>"
+                + "<span aria-hidden=\"true\"> › <strong>Wentylatory</strong></span></span>";
+        // the column and the line under the product name (below 1216 px) are the same collapsed path
+        assertThat(html.split(java.util.regex.Pattern.quote(collapsed), -1)).hasSize(3);
+        assertThat(html).doesNotContain("<span>Komponenty</span>", "<span>Chłodzenie</span>", "title=\"Komputery");
+    }
+
+    @Test
+    void collapsedPimPathEscapesQuotesAndAngleBracketsInTheVisibleTextTheTooltipAndTheName() {
+        // given
+        CategoryLine line = new CategoryLine(List.of("A \"<b>\" & 'x'", "Środek", "Dalej"), "<i>Liść</i>/2",
+                "A \"<b>\" & 'x' › Środek › Dalej › <i>Liść</i>/2", List.of());
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(line, 0)))));
+
+        // then
+        String full = "A &quot;&lt;b&gt;&quot; &amp; &#39;x&#39; › Środek › Dalej › &lt;i&gt;Liść&lt;/i&gt;/2";
+        assertThat(html).contains("data-tooltip=\"PIM category:\n" + full + "\"", "aria-label=\"PIM category: " + full + "\"",
+                "<strong>&lt;i&gt;Liść&lt;/<wbr>i&gt;/<wbr>2</strong>");
+        assertThat(html).doesNotContain("<b>", "<i>Liść");
     }
 
     @Test

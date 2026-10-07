@@ -20,6 +20,19 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
 
     private static final String SEPARATOR = " \u203a ";
 
+    /**
+     * A path deeper than two levels collapses its middle in a list row: "first › … › leaf", with the whole path in the
+     * tooltip and the accessible name of the "…".
+     */
+    public boolean collapsed() {
+        return pimAncestors.size() > 1;
+    }
+
+    /** The top level of a collapsed path, the part shown before the "…". */
+    public String pimFirst() {
+        return pimAncestors.isEmpty() ? pimLeaf : pimAncestors.get(0);
+    }
+
     public boolean inCatalog() {
         return !inCatalogLabels.isEmpty();
     }

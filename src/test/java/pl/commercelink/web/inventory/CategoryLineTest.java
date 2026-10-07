@@ -31,7 +31,8 @@ class CategoryLineTest {
     @BeforeEach
     void setUp() {
         when(pimCatalog.allCategories()).thenReturn(List.of(
-                new PimCategory("10", null, "Chłodzenie", "pl"), new PimCategory("11", "10", "Wentylatory", "pl")));
+                new PimCategory("10", null, "Chłodzenie", "pl"), new PimCategory("11", "10", "Wentylatory", "pl"),
+                new PimCategory("12", "11", "Wentylatory 120 mm", "pl"), new PimCategory("13", "12", "PWM", "pl")));
         tree = new PimCategoryTree(pimCatalog);
     }
 
@@ -133,4 +134,34 @@ class CategoryLineTest {
         assertThat(line.inCatalog()).isFalse();
     }
 
+    @Test
+    void twoLevelPathStaysWhole() {
+        // when
+        CategoryLine line = CategoryLine.of(tree, "11", "Wentylatory", false);
+
+        // then
+        assertThat(line.collapsed()).isFalse();
+    }
+
+    @Test
+    void deeperPathCollapsesToTheTopLevelAndTheLeafKeepingTheFullPath() {
+        // when
+        CategoryLine line = CategoryLine.of(tree, "13", "PWM", false);
+
+        // then
+        assertThat(line.collapsed()).isTrue();
+        assertThat(line.pimFirst()).isEqualTo("Chłodzenie");
+        assertThat(line.pimLeaf()).isEqualTo("PWM");
+        assertThat(line.pimFullPath()).isEqualTo("Chłodzenie › Wentylatory › Wentylatory 120 mm › PWM");
+    }
+
+    @Test
+    void leafOnlyLineOfADeepCategoryDoesNotCollapse() {
+        // when
+        CategoryLine line = CategoryLine.of(tree, "13", "PWM", true);
+
+        // then
+        assertThat(line.collapsed()).isFalse();
+        assertThat(line.pimFirst()).isEqualTo("PWM");
+    }
 }

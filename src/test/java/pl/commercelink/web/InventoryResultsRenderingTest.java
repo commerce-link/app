@@ -324,6 +324,22 @@ class InventoryResultsRenderingTest {
     }
 
     @Test
+    void pricesPageHeaderShowsADeepPimPathWholeBecauseItIsOneProduct() {
+        // given
+        Context context = context(found(), true);
+        context.setVariable("productCategory", new pl.commercelink.web.inventory.CategoryLine(
+                List.of("Komputery", "Komponenty", "Chłodzenie"), "Wentylatory",
+                "Komputery › Komponenty › Chłodzenie › Wentylatory", List.of()));
+
+        // when
+        String html = engine.process(RESULTS, context);
+
+        // then
+        assertThat(html).contains("<span>Komputery</span> › <span>Komponenty</span> › <span>Chłodzenie</span> › <strong>Wentylatory</strong>");
+        assertThat(html).doesNotContain("is-collapsed", "cl-category-more", "…");
+    }
+
+    @Test
     void resultsCarryNoBackLinkSoAnInPageSearchCannotDropOrDoubleIt() {
         // given
         Context context = context(found(), true);
