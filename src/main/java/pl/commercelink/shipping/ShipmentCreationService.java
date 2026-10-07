@@ -27,6 +27,7 @@ import java.util.UUID;
 public class ShipmentCreationService {
 
     static final String UNCONFIRMED_KEY = ShipmentCreationState.UNCONFIRMED_KEY;
+    static final String NOT_CREATED_KEY = "shipping.creation.notCreated";
 
     private final ShippingService shippingService;
     private final ShipmentOwners owners;
@@ -58,7 +59,13 @@ public class ShipmentCreationService {
             creation = provider.createShipment(request, commandId);
         } catch (RuntimeException e) {
             if (ProviderErrors.isRefusal(e)) {
-                return refused(owner, check, ProviderErrors.describe(e), ProviderErrors.isProviderAnswer(e));
+                if (ProviderErrors.isProviderAnswer(e)) {
+                    return refused(owner, check, ProviderErrors.describe(e), null);
+                }
+                // the adapter's own words (e.g. a 5xx it gave up on before ordering): technical, so they stay here
+                log.warn("Creation command {} of {} {} in store {} was refused before the provider answered: {}",
+                        commandId, check.getOwnerType(), check.getOwnerId(), check.getStoreId(), e.getMessage());
+                return refused(owner, check, null, NOT_CREATED_KEY);
             }
             log.warn("Creation command {} of {} {} in store {} has an unknown outcome; it stays PENDING and is checked",
                     commandId, check.getOwnerType(), check.getOwnerId(), check.getStoreId(), e);
@@ -69,7 +76,7 @@ public class ShipmentCreationService {
             recordExternalId(owner, check);
         }
         if (creation.status() == CommandStatus.FAILED) {
-            return refused(owner, check, creation.error(), true);
+            return refused(owner, check, creation.error(), null);
         }
         return publishCheck(owner, check);
     }
@@ -85,16 +92,24 @@ public class ShipmentCreationService {
         }
     }
 
+    /**
+     * reason is the provider's own answer, shown as it is; reasonKey our reason for a refusal the provider never
+     * answered, stored as a key so whoever opens the shipment later reads it in their own language.
+     */
     private ShipmentCreationStart refused(ShipmentOwner owner, ShipmentCreationCheckRequest check, String reason,
-                                          boolean providerAnswer) {
+                                          String reasonKey) {
         try {
-            owner.refused(check, reason);
+            owner.refused(check, reason, reasonKey);
         } catch (RuntimeException e) {
             log.error("Creation command {} for {} {} in store {} (package {}) was refused ({}), but its shipment stays "
                     + "PENDING: marking it failed did not work", check.getCommandId(), check.getOwnerType(),
-                    check.getOwnerId(), check.getStoreId(), check.getExternalId(), reason, e);
+                    check.getOwnerId(), check.getStoreId(), check.getExternalId(), reasonKey != null ? reasonKey : reason, e);
         }
-        return ShipmentCreationStart.refused(reason, providerAnswer);
+        if (reasonKey != null) {
+            return ShipmentCreationStart.refused(messageSource.getMessage(reasonKey, null, LocaleContextHolder.getLocale()),
+                    false);
+        }
+        return ShipmentCreationStart.refused(reason, true);
     }
 
     /**

@@ -275,7 +275,7 @@ class WarehouseShipmentOwnerTest {
     @Test
     void aRefusedOrFailedCreationLetsTheItemsGo() {
         // when
-        owner.refused(request(), "Nieprawidłowy kod pocztowy");
+        owner.refused(request(), "Nieprawidłowy kod pocztowy", null);
         owner.failed(request(), "Brak odpowiedzi", null);
 
         // then

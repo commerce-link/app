@@ -155,13 +155,28 @@ class OrderShipmentOwnerTest {
 
         // when
         owner.recordExternalId(request("cmd-1"));
-        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy");
+        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy", null);
 
         // then
         Shipment s = order.getShipments().get(0);
         assertThat(s.getExternalId()).isEqualTo("21480003");
         assertThat(s.creationFailed()).isTrue();
         assertThat(s.getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aRefusalInOurOwnWordsIsStoredAsAKey() {
+        // given
+        order.setShipments(new ArrayList<>(List.of(placeholder("cmd-1"))));
+
+        // when
+        owner.refused(request("cmd-1"), null, "shipping.creation.notCreated");
+
+        // then
+        Shipment s = order.getShipments().get(0);
+        assertThat(s.creationFailed()).isTrue();
+        assertThat(s.getCreation().getErrorKey()).isEqualTo("shipping.creation.notCreated");
+        assertThat(s.getCreation().getError()).isNull();
     }
 
     @Test

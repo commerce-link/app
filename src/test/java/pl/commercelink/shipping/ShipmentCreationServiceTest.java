@@ -45,6 +45,8 @@ class ShipmentCreationServiceTest {
         when(owner.markCreating(any(), any())).thenReturn(true);
         when(messageSource.getMessage(eq("shipping.creation.unconfirmed"), any(), any(Locale.class)))
                 .thenReturn("Furgonetka nie potwierdziła nadania");
+        when(messageSource.getMessage(eq("shipping.creation.notCreated"), any(), any(Locale.class)))
+                .thenReturn("Furgonetka nie utworzyła paczki");
         service = new ShipmentCreationService(shippingService, owners, publisher, messageSource);
     }
 
@@ -89,7 +91,7 @@ class ShipmentCreationServiceTest {
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("Nieprawidłowy kod pocztowy");
         assertThat(start.providerAnswer()).isTrue();
-        verify(owner).refused(any(), eq("Nieprawidłowy kod pocztowy"));
+        verify(owner).refused(any(), eq("Nieprawidłowy kod pocztowy"), isNull());
         verify(publisher, never()).publish(any());
     }
 
@@ -104,8 +106,10 @@ class ShipmentCreationServiceTest {
 
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
-        assertThat(start.error()).isEqualTo("could not create the package: no parcels");
+        assertThat(start.error()).isEqualTo("Furgonetka nie utworzyła paczki");
         assertThat(start.providerAnswer()).isFalse();
+        // stored as a key: the adapter's English words are for the log, not for whoever opens the shipment
+        verify(owner).refused(any(), isNull(), eq("shipping.creation.notCreated"));
     }
 
     @Test
@@ -132,7 +136,7 @@ class ShipmentCreationServiceTest {
 
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.STARTED);
-        verify(owner, never()).refused(any(), any());
+        verify(owner, never()).refused(any(), any(), any());
         verify(publisher).publish(argThat(r -> r.getExternalId() == null));
     }
 
@@ -179,7 +183,7 @@ class ShipmentCreationServiceTest {
         assertThat(start.error()).isEqualTo("Furgonetka nie potwierdziła nadania");
         // stored as a key, so the reason is shown in the language of whoever opens the shipment later
         verify(owner).failed(argThat(r -> "21480003".equals(r.getExternalId())), isNull(), eq("shipping.creation.unconfirmed"));
-        verify(owner, never()).refused(any(), any());
+        verify(owner, never()).refused(any(), any(), any());
     }
 
     @Test
@@ -187,7 +191,7 @@ class ShipmentCreationServiceTest {
         // given
         when(provider.createShipment(eq(request), anyString())).thenThrow(new ShippingException("HTTP 400",
                 new HttpClientException(400, "{\"errors\":[{\"message\":\"Nieprawidłowy kod pocztowy\"}]}")));
-        doThrow(new RuntimeException("optimistic locking exhausted")).when(owner).refused(any(), any());
+        doThrow(new RuntimeException("optimistic locking exhausted")).when(owner).refused(any(), any(), any());
 
         // when
         ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));

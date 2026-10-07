@@ -56,7 +56,7 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     }
 
     @Override
-    public void refused(ShipmentCreationCheckRequest request, String error) {
+    public void refused(ShipmentCreationCheckRequest request, String error, String errorKey) {
         // the operator sees the reason on the shipping page and may ship the items again
         reservations.release(request.getStoreId(), request.getItemIds(), request.getCommandId());
     }

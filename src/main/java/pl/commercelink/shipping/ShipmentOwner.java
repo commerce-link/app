@@ -21,8 +21,11 @@ public interface ShipmentOwner {
     /** Records the provider's package id on the waiting shipment. */
     void recordExternalId(ShipmentCreationCheckRequest request);
 
-    /** The provider refused the command right away: nothing was created. */
-    void refused(ShipmentCreationCheckRequest request, String error);
+    /**
+     * The command was refused right away: nothing was created. error (the provider's words) or errorKey (our reason,
+     * a message key), as in failed.
+     */
+    void refused(ShipmentCreationCheckRequest request, String error, String errorKey);
 
     /** The owner still has a shipment waiting for this command; a check for anything else is dropped. */
     boolean awaits(ShipmentCreationCheckRequest request);

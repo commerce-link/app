@@ -73,7 +73,7 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
     }
 
     @Override
-    public void refused(ShipmentCreationCheckRequest request, String error) {
+    public void refused(ShipmentCreationCheckRequest request, String error, String errorKey) {
         modify(request, rma -> {
             // the customer sees the reason on the return page and submits again while the RMA is still Approved;
             // once it waits for the items only the operator books it again, from the failed row on the RMA page
@@ -81,7 +81,7 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
                 return rma.getShipments().removeIf(s -> s.isCreationPendingFor(request.getCommandId()));
             }
             return ShipmentLists.creating(rma.getShipments(), request.getCommandId()).map(s -> {
-                s.setCreation(s.getCreation().failed(error));
+                s.setCreation(errorKey != null ? s.getCreation().failedWithKey(errorKey) : s.getCreation().failed(error));
                 return true;
             }).orElse(false);
         });

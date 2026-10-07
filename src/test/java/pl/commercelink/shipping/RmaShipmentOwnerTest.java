@@ -318,7 +318,7 @@ class RmaShipmentOwnerTest {
         RmaShipmentOwner owner = operatorOwner();
 
         // when
-        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy");
+        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy", null);
 
         // then
         assertThat(rma.getShipments()).hasSize(1);
@@ -333,7 +333,7 @@ class RmaShipmentOwnerTest {
         RmaShipmentOwner owner = returnOwner();
 
         // when
-        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy");
+        owner.refused(request("cmd-1"), "Nieprawidłowy kod pocztowy", null);
 
         // then
         assertThat(rma.getShipments()).isEmpty();

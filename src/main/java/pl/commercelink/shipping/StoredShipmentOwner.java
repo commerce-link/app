@@ -93,8 +93,8 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
     }
 
     @Override
-    public void refused(ShipmentCreationCheckRequest request, String error) {
-        failed(request, error, null);
+    public void refused(ShipmentCreationCheckRequest request, String error, String errorKey) {
+        failed(request, error, errorKey);
     }
 
     @Override

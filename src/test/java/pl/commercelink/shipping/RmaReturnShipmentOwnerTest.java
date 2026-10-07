@@ -212,7 +212,7 @@ class RmaReturnShipmentOwnerTest {
         rma.setShipments(new ArrayList<>(List.of(placeholder)));
 
         // when
-        owner.refused(creation("cmd-1"), "Nieprawidłowy kod pocztowy");
+        owner.refused(creation("cmd-1"), "Nieprawidłowy kod pocztowy", null);
 
         // then
         assertThat(rma.getShipments()).isEmpty();
@@ -227,12 +227,29 @@ class RmaReturnShipmentOwnerTest {
         rma.setShipments(new ArrayList<>(List.of(placeholder)));
 
         // when
-        owner.refused(creation("cmd-2"), "Nieprawidłowy kod pocztowy");
+        owner.refused(creation("cmd-2"), "Nieprawidłowy kod pocztowy", null);
 
         // then
         assertThat(rma.getShipments()).hasSize(1);
         assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
         assertThat(rma.getShipments().get(0).getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aRefusedRetryInOurOwnWordsKeepsTheKeyOnTheFailedRow() {
+        // given
+        rma.setStatus(RMAStatus.WaitingForItems);
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setCreation(ShipmentCreationState.pending("cmd-2", LocalDateTime.now()));
+        rma.setShipments(new ArrayList<>(List.of(placeholder)));
+
+        // when
+        owner.refused(creation("cmd-2"), null, "shipping.creation.notCreated");
+
+        // then
+        assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
+        assertThat(rma.getShipments().get(0).getCreation().getErrorKey()).isEqualTo("shipping.creation.notCreated");
+        assertThat(rma.getShipments().get(0).getCreation().getError()).isNull();
     }
 
     @Test
