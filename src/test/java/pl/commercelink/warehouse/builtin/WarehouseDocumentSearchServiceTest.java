@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -48,6 +49,22 @@ class WarehouseDocumentSearchServiceTest {
         // then
         assertThat(result).isEqualTo(documents);
         verify(warehouseDocumentRepository, never()).findAllMatching(any());
+    }
+
+    @Test
+    @DisplayName("documents are counted with the same criteria, but not for a product code that would read every item")
+    void countDelegatesToRepositoryOnlyWithoutProductCode() {
+        // given
+        when(warehouseDocumentRepository.count(CRITERIA)).thenReturn(180);
+
+        // when
+        OptionalInt counted = warehouseDocumentSearchService.count(CRITERIA, " ");
+        OptionalInt byProduct = warehouseDocumentSearchService.count(CRITERIA, "5901234123457");
+
+        // then
+        assertThat(counted).hasValue(180);
+        assertThat(byProduct).isEmpty();
+        verify(warehouseDocumentRepository).count(CRITERIA);
     }
 
     @Test

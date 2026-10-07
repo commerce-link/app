@@ -30,6 +30,11 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
         return queryWithPagination(buildSearchQuery(criteria), page, pageSize, WarehouseDocument.class);
     }
 
+    /** How many documents match, for the "26–50 z 180" under the list: a COUNT query over the same index range and filter. */
+    int count(WarehouseDocumentCriteria criteria) {
+        return dynamoDBMapper.count(WarehouseDocument.class, buildSearchQuery(criteria));
+    }
+
     List<WarehouseDocument> findAllMatching(WarehouseDocumentCriteria criteria) {
         return dynamoDBMapper.query(WarehouseDocument.class, buildSearchQuery(criteria));
     }

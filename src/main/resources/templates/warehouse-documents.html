@@ -51,7 +51,7 @@
                             <form method="get" th:action="@{${q.path()}}" class="cl-search-form" role="search" data-cl-list-form>
                                 <th:block th:replace="~{fragments/warehouse-documents-list :: hidden('search')}"></th:block>
                                 <label class="cl-visually-hidden" for="documents-search" th:text="#{warehouse.documents.list.search.label}"></label>
-                                <div class="cl-search-field">
+                                <div class="cl-search-field is-wide">
                                     <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
                                     <input class="cl-input cl-table-search" type="search" id="documents-search" name="q" autocomplete="off"
                                            th:value="${q.q()}" th:attr="placeholder=#{warehouse.documents.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
@@ -124,7 +124,8 @@
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results cl-visually-hidden" role="status" th:text="${page.resultsLine()}"></p>
+                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                       th:text="${page.resultsLine()}"></p>
                 </div>
 
                 <!--/* Below 720 px the table turns into cards without a header row, so the order is stated on this bar. */-->
@@ -136,12 +137,12 @@
                 <table class="cl-table is-orders is-documents" th:unless="${page.isEmpty()}">
                     <thead>
                     <tr>
-                        <th scope="col" th:text="#{warehouse.documents.list.column.document}"></th>
-                        <th scope="col" th:if="${page.superAdmin()}" th:text="#{warehouse.documents.list.column.store}"></th>
-                        <th scope="col" th:text="#{warehouse.documents.list.column.reason}"></th>
-                        <th scope="col" class="is-secondary-column" th:text="#{warehouse.documents.list.column.source}"></th>
-                        <th scope="col" th:text="#{warehouse.documents.list.column.counterparty}"></th>
-                        <th scope="col" aria-sort="descending"><span th:text="#{warehouse.documents.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
+                        <th scope="col" class="cl-col-document" th:text="#{warehouse.documents.list.column.document}"></th>
+                        <th scope="col" class="cl-col-store" th:if="${page.superAdmin()}" th:text="#{warehouse.documents.list.column.store}"></th>
+                        <th scope="col" class="cl-col-reason" th:text="#{warehouse.documents.list.column.reason}"></th>
+                        <th scope="col" class="cl-col-source is-secondary-column" th:text="#{warehouse.documents.list.column.source}"></th>
+                        <th scope="col" class="cl-col-counterparty" th:text="#{warehouse.documents.list.column.counterparty}"></th>
+                        <th scope="col" class="cl-col-created" aria-sort="descending"><span th:text="#{warehouse.documents.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
                     </tr>
                     </thead>
                     <tbody>

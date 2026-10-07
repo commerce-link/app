@@ -7,6 +7,7 @@ import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -21,6 +22,14 @@ class WarehouseDocumentSearchService {
      * One page of documents, newest first, plus one more when a next page exists. A product code is matched against
      * every document's items (EAN or manufacturer code, normalised like stored items); the read stops at the page + 1.
      */
+    /**
+     * How many documents match, or empty for a product code: that would read the items of every document in the range,
+     * so the list then only knows whether a next page exists.
+     */
+    OptionalInt count(WarehouseDocumentCriteria criteria, String productCode) {
+        return isBlank(productCode) ? OptionalInt.of(warehouseDocumentRepository.count(criteria)) : OptionalInt.empty();
+    }
+
     List<WarehouseDocument> search(WarehouseDocumentCriteria criteria, String productCode, int page, int pageSize) {
         if (isBlank(productCode)) {
             return warehouseDocumentRepository.search(criteria, page, pageSize);

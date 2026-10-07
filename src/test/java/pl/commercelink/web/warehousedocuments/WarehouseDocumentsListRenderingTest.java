@@ -58,7 +58,7 @@ class WarehouseDocumentsListRenderingTest {
         // then
         assertThat(html).contains("data-cl-list-results").contains("data-cl-list-fragment=\"/dashboard/warehouse-documents/list\"")
                 .containsPattern("<a class=\"cl-segment\" href=\"/dashboard/warehouse-documents\\?type=PZ\"\\s+data-cl-list-nav title=\"Przyjęcie zewnętrzne\" aria-current=\"page\"")
-                .contains("placeholder=\"Numer dokumentu, EAN albo kod producenta\"");
+                .contains("placeholder=\"Nr dokumentu, EAN, kod producenta\"");
     }
 
     @Test
@@ -123,12 +123,13 @@ class WarehouseDocumentsListRenderingTest {
     }
 
     @Test
-    void documentNumberBreaksInACardAndStaysOnOneLineFromTheTableWidth() throws Exception {
+    void documentNumberBreaksUntilTheRailIsGoneAndColumnsKeepTheirWidthsAcrossKinds() throws Exception {
         // given
         String css = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/css/commercelink.css"));
 
         // then
         assertThat(css).containsPattern("\\.cl-table\\.is-documents \\.cl-doc-no \\{[^}]*overflow-wrap: anywhere[^}]*\\}")
-                .containsPattern("@media screen and \\(min-width: 720px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\.cl-doc-no \\{ white-space: nowrap; \\}");
+                .containsPattern("@media screen and \\(min-width: 1216px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\.cl-doc-no \\{ white-space: nowrap; \\}")
+                .containsPattern("@media screen and \\(min-width: 720px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\{ table-layout: fixed; \\}");
     }
 }

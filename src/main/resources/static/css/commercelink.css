@@ -1383,6 +1383,7 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink);
 }
 
+.cl-page .cl-card .cl-card-head + .cl-table,
 .cl-page .cl-card .cl-card-head + .cl-list,
 .cl-page .cl-card .cl-card-desc + .cl-list,
 .cl-page .cl-card .cl-card-head + .cl-list-empty,
@@ -5195,6 +5196,14 @@ a.cl-link-button:hover {
     transform: translateY(-50%);
     color: var(--cl-ink-3);
     pointer-events: none;
+}
+
+/* A field whose placeholder names three things (warehouse documents: number, EAN, manufacturer code) did not fit in 300 px;
+   below 720 px every field takes the row anyway. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-search-field.is-wide {
+        width: 360px;
+    }
 }
 
 .cl-page .cl-search-field .cl-table-search {
@@ -9036,7 +9045,23 @@ a.cl-link-button:hover {
    a card breaks it rather than run under the reason text), the direction icon
    repeats the type name in colour (the name carries the meaning) */
 .cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* Fixed column widths from 720 px: with auto layout each kind segment (PZ, WZ, …) sized the columns to its own texts and
+   the table jumped between tabs. The number keeps one line once the rail is gone and the column is wide enough. */
 @media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-documents { table-layout: fixed; }
+    .cl-page .cl-table.is-documents .cl-col-document { width: 27%; }
+    .cl-page .cl-table.is-documents .cl-col-reason { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-source { width: 17%; }
+    .cl-page .cl-table.is-documents .cl-col-counterparty { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-created { width: 16%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-document { width: 24%; }
+    .cl-page .cl-table.is-documents .cl-col-store { width: 11%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-reason { width: 17%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-source { width: 15%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-counterparty { width: 18%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-created { width: 15%; }
+}
+@media screen and (min-width: 1216px) {
     .cl-page .cl-table.is-documents .cl-doc-no { white-space: nowrap; }
 }
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }

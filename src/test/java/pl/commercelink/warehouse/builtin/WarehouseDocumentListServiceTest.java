@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.OptionalInt;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +61,68 @@ class WarehouseDocumentListServiceTest {
         assertThat(page.pagination().nextHref()).isEqualTo("/dashboard/warehouse-documents?page=2");
         assertThat(page.pagination().openEnded()).isTrue();
         assertThat(page.fragmentPath()).isEqualTo("/dashboard/warehouse-documents/list");
+    }
+
+    @Test
+    void firstOfSeveralPagesShowsTheCountedTotal() {
+        // given
+        givenStore(true);
+        when(search.search(any(), any(), eq(1), eq(25))).thenReturn(documents(26));
+        when(search.count(any(), isNull())).thenReturn(OptionalInt.of(45));
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, query(), PL);
+
+        // then
+        assertThat(page.pagination().openEnded()).isFalse();
+        assertThat(page.pagination().totalItems()).isEqualTo(45);
+        assertThat(page.resultsLine()).isEqualTo("Dokumenty: 45");
+    }
+
+    @Test
+    void lastPageKnowsTheTotalWithoutCounting() {
+        // given
+        givenStore(true);
+        when(search.search(any(), any(), eq(2), eq(25))).thenReturn(documents(20));
+        WarehouseDocumentListQuery q = new WarehouseDocumentListQuery(PATH, null, List.of(), null, null, null, 2);
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, q, PL);
+
+        // then
+        assertThat(page.pagination().totalItems()).isEqualTo(45);
+        assertThat(page.pagination().fromIndex()).isEqualTo(25);
+        verify(search, never()).count(any(), any());
+    }
+
+    @Test
+    void productCodeSearchWithANextPageIsNotCounted() {
+        // given
+        givenStore(true);
+        when(search.search(any(), eq("5901234123457"), eq(1), eq(25))).thenReturn(documents(26));
+        when(search.count(any(), eq("5901234123457"))).thenReturn(OptionalInt.empty());
+        WarehouseDocumentListQuery q = new WarehouseDocumentListQuery(PATH, null, List.of(), null, null, "5901234123457", 1);
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, q, PL);
+
+        // then
+        assertThat(page.pagination().openEnded()).isTrue();
+        assertThat(page.resultsLine()).isEqualTo("Dokumenty: ponad 25");
+    }
+
+    @Test
+    void countTakenBeforeANewDocumentNeverHidesTheNextPage() {
+        // given
+        givenStore(true);
+        when(search.search(any(), any(), eq(1), eq(25))).thenReturn(documents(26));
+        when(search.count(any(), isNull())).thenReturn(OptionalInt.of(25));
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, query(), PL);
+
+        // then
+        assertThat(page.pagination().nextHref()).isEqualTo("/dashboard/warehouse-documents?page=2");
     }
 
     @Test

@@ -47,16 +47,27 @@ public class WarehouseDocumentListService {
         String detailsBase = superAdmin ? "/dashboard/store/" + storeId : "/dashboard";
         DocumentRowMapper mapper = new DocumentRowMapper(messages, locale, superAdmin, detailsBase);
         List<DocumentRow> rows = shown.stream().map(mapper::row).toList();
+        // the last page also knows the total of a product-code search, which is not counted up front
+        OptionalInt total = hasNext ? search.count(criteria, q.productCode())
+                : OptionalInt.of((Math.max(q.page(), 1) - 1) * WarehouseDocumentListQuery.PAGE_SIZE + rows.size());
         // a page past the end (hand-typed page=9) is an empty list, not "201-200" with a link back
-        Pagination pagination = rows.isEmpty()
-                ? Pagination.openEnded(1, WarehouseDocumentListQuery.PAGE_SIZE, 0, false, n -> q.withPage(n).href())
-                : Pagination.openEnded(q.page(), WarehouseDocumentListQuery.PAGE_SIZE, rows.size(), hasNext,
-                n -> q.withPage(n).href());
+        Pagination pagination;
+        if (rows.isEmpty()) {
+            pagination = Pagination.openEnded(1, WarehouseDocumentListQuery.PAGE_SIZE, 0, false, n -> q.withPage(n).href());
+        } else if (total.isPresent()) {
+            // the count is a second read: a document saved in between cannot leave the current page without a next link
+            int totalItems = Math.max(total.getAsInt(), (q.page() - 1) * WarehouseDocumentListQuery.PAGE_SIZE + rows.size() + (hasNext ? 1 : 0));
+            pagination = Pagination.of(q.page(), totalItems, WarehouseDocumentListQuery.PAGE_SIZE, n -> q.withPage(n).href());
+        } else {
+            pagination = Pagination.openEnded(q.page(), WarehouseDocumentListQuery.PAGE_SIZE, rows.size(), hasNext,
+                    n -> q.withPage(n).href());
+        }
 
         EmptyState emptyState = rows.isEmpty() ? emptyState(q, locale) : null;
-        // an empty list would read "Dokumenty: 0–0" to a screen reader; it hears the empty-state text instead
+        // an empty list would read "Dokumenty: 0" to a screen reader; it hears the empty-state text instead
         String resultsLine = emptyState != null ? emptyState.text()
-                : text(locale, "warehouse.documents.list.results", pagination.fromIndex() + 1, pagination.toIndex());
+                : pagination.openEnded() ? text(locale, "warehouse.documents.list.results.more", pagination.toIndex())
+                : text(locale, "warehouse.documents.list.results", pagination.totalItems());
         return new WarehouseDocumentListPage(q, superAdmin, true, fragmentPath,
                 segments(q, locale), reasonOptions(q, locale), reasonSummary(q, locale), dates(q, locale),
                 chips(q, locale), resultsLine, rows, pagination, emptyState, SETTINGS_HREF);

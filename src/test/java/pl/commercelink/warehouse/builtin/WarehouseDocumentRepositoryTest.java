@@ -72,6 +72,26 @@ class WarehouseDocumentRepositoryTest {
     }
 
     @Test
+    @DisplayName("count runs the list's query: the same index, key range and filter")
+    void countUsesTheSearchQuery() {
+        // given
+        ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocument>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
+        when(dynamoDBMapper.count(eq(WarehouseDocument.class), queryCaptor.capture())).thenReturn(180);
+        WarehouseDocumentCriteria criteria = new WarehouseDocumentCriteria("store-1", DocumentType.GoodsIssue,
+                Set.of(), LocalDateTime.of(2026, 8, 1, 0, 0), null, List.of());
+
+        // when
+        int count = warehouseDocumentRepository.count(criteria);
+
+        // then
+        assertThat(count).isEqualTo(180);
+        DynamoDBQueryExpression<WarehouseDocument> query = queryCaptor.getValue();
+        assertThat(query.getIndexName()).isEqualTo("CreatedAtIndex");
+        assertThat(query.getKeyConditionExpression()).isEqualTo("storeId = :storeId AND createdAt >= :dateFrom");
+        assertThat(query.getFilterExpression()).isEqualTo("#type = :type");
+    }
+
+    @Test
     @DisplayName("a number typed with lower-case letters is searched as typed or in capitals")
     void numberFragmentVariantsAreOrConditions() {
         // given
