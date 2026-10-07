@@ -51,6 +51,8 @@ class WarehouseDocumentsControllerTest {
     private WarehouseDocumentRepository warehouseDocumentRepository;
     @Mock
     private WarehouseDocumentItemRepository warehouseDocumentItemRepository;
+    @Mock
+    private WarehouseDocumentMfnHistoryService historyService;
     @Spy
     private MessageSource messageSource = TestMessages.polish();
     @InjectMocks
@@ -170,6 +172,57 @@ class WarehouseDocumentsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("warehouse-document-details"))
                 .andExpect(model().attributeExists("page"));
+    }
+
+    @Test
+    void itemHistoryWithoutFromGoesBackToTheDelivery() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1")).andExpect(status().isOk())
+                .andExpect(view().name("warehouse-document-mfn-history")).andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del-1");
+    }
+
+    @Test
+    void itemHistoryFromADocumentOfTheStoreGoesBackToTheDocument() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(warehouseDocumentRepository.findByDocumentId("s1", "doc-1")).thenReturn(receipt());
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "document").param("documentId", "doc-1"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/warehouse-documents/details?documentId=doc-1");
+        assertThat(page.backLabel()).isEqualTo("PZ/MAG1/2026/000214");
+    }
+
+    @Test
+    void itemHistoryFromAForeignDocumentFallsBackToTheDelivery() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(warehouseDocumentRepository.findByDocumentId("s1", "foreign")).thenReturn(null);
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "document").param("documentId", "foreign"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del-1");
     }
 
     private static Store storeWithDocuments() {

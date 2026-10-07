@@ -9934,3 +9934,8 @@ a.cl-link-button:hover {
 @media screen and (max-width: 719px) {
     .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: auto; }
 }
+
+/* Signed quantity change (item history): the sign carries the direction, the colour only repeats it */
+.cl-page .cl-qty-change { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cl-page .cl-qty-change.is-in { color: var(--cl-ok); }
+.cl-page .cl-qty-change.is-out { color: var(--cl-ink); }

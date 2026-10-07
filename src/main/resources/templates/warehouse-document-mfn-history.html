@@ -3,75 +3,50 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <div class="level mb-4">
-                <div class="level-left">
-                    <div class="level-item">
-                        <h1>
-                            <span th:text="#{warehouse.documents.mfn.history}">MFN History</span>
-                        </h1>
-                    </div>
-                </div>
-            </div>
+<section class="cl-page" th:fragment="body" th:with="p=${page}">
+    <div class="cl-page-body is-wide">
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{${p.backHref()}}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="${p.backLabel()}"></span>
+            </a>
+            <div class="cl-page-header-row"><h1 class="cl-page-title" th:text="#{warehouse.documents.history.title}"></h1></div>
+            <p class="cl-record-meta">
+                <span th:if="${p.productName() != null}"><strong th:text="${p.productName()}"></strong></span>
+                <span th:text="#{warehouse.documents.history.mfn(${p.mfn()})}"></span>
+                <span><span th:text="#{warehouse.documents.history.delivery}"></span> <a th:href="@{${p.deliveryHref()}}" th:text="${p.deliveryShortId()}"></a></span>
+            </p>
+        </header>
 
-            <div class="box mb-5">
-                <div class="columns">
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.delivery.id}"></p>
-                        <p class="title is-5" th:text="${deliveryId}"></p>
-                    </div>
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.item.mfn}"></p>
-                        <p class="title is-5" th:text="${mfn}"></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="box">
-                <table class="table is-fullwidth is-narrow">
-                    <thead>
-                    <tr>
-                        <th th:text="#{warehouse.documents.document.no}"></th>
-                        <th th:text="#{warehouse.documents.type}"></th>
-                        <th th:text="#{warehouse.documents.date}"></th>
-                        <th th:text="#{warehouse.documents.item.quantity}"></th>
-                        <th th:text="#{warehouse.documents.stock.change}"></th>
-                        <th th:text="#{warehouse.documents.stock.after}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="row : ${rows}">
-                        <td>
-                            <a th:href="@{/dashboard/warehouse-documents/details(documentId=${row.documentId()})}"
-                               th:text="${row.documentNo()}"></a>
-                        </td>
-                        <td>
-                            <span class="tag is-info" th:text="${enumI18n.localize(row.documentType())}"></span>
-                        </td>
-                        <td th:text="${row.createdAt() != null} ? ${#temporals.format(row.createdAt(), 'yyyy-MM-dd HH:mm')} : '-'"></td>
-                        <td th:text="${row.qty()}"></td>
-                        <td>
-                            <span th:if="${row.stockChange() > 0}" class="has-text-success" th:text="'+' + ${row.stockChange()}"></span>
-                            <span th:if="${row.stockChange() <= 0}" class="has-text-danger" th:text="${row.stockChange()}"></span>
-                        </td>
-                        <td th:text="${row.stockAfter()}"></td>
-                    </tr>
-                    </tbody>
-                </table>
-                <p th:if="${rows.isEmpty()}" class="has-text-grey" th:text="#{warehouse.documents.no.documents}"></p>
-            </div>
-
-            <div class="field">
-                <div class="control">
-                    <a th:href="@{/dashboard/deliveries/details(deliveryId=${deliveryId})}"
-                       class="button is-light" th:text="#{general.back}"></a>
-                </div>
-            </div>
-        </div>
-    </section>
+        <section class="cl-card" aria-labelledby="moves-title">
+            <div class="cl-card-head"><h2 class="cl-card-title" id="moves-title" th:text="${p.movesTitle()}"></h2></div>
+            <table class="cl-table is-compact is-wrap" th:unless="${p.moves().isEmpty()}">
+                <thead><tr>
+                    <th scope="col" th:text="#{warehouse.documents.history.column.document}"></th>
+                    <th scope="col" th:text="#{warehouse.documents.history.column.date}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{warehouse.documents.history.column.change}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{warehouse.documents.history.column.after}"></th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="m : ${p.moves()}">
+                    <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.documents.history.column.document}">
+                        <a th:href="@{${m.documentHref()}}" th:text="${m.documentNo()}"></a>
+                        <span class="cl-table-sub"><span class="cl-icon-text"><i class="fas" th:classappend="${m.incoming()} ? 'fa-sign-in-alt' : 'fa-sign-out-alt'" aria-hidden="true"></i><th:block th:text="${m.typeName()}"></th:block></span></span>
+                    </th>
+                    <td th:attr="data-label=#{warehouse.documents.history.column.date}" th:text="${m.date()}"></td>
+                    <td class="is-numeric" th:attr="data-label=#{warehouse.documents.history.column.change}">
+                        <span class="cl-qty-change" th:classappend="${m.changeTone()}" th:text="${m.change()}"></span>
+                    </td>
+                    <td class="is-numeric" th:attr="data-label=#{warehouse.documents.history.column.after}" th:text="${m.after()}"></td>
+                </tr>
+                </tbody>
+            </table>
+            <p class="cl-list-summary" th:if="${p.summary() != null}" th:text="${p.summary()}"></p>
+            <p class="cl-list-empty" th:if="${p.emptyText() != null}" th:text="${p.emptyText()}"></p>
+        </section>
+    </div>
+</section>
 </div>
 </body>
 </html>

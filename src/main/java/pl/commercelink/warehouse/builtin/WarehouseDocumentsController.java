@@ -15,6 +15,9 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.Printer;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.deliveries.details.DeliveryLinks;
+import pl.commercelink.web.warehousedocuments.DocumentRowMapper;
+import pl.commercelink.web.warehousedocuments.ItemHistoryPage;
 import pl.commercelink.web.warehousedocuments.WarehouseDocumentListQuery;
 import pl.commercelink.web.warehousedocuments.WarehouseDocumentPageMapper;
 
@@ -139,10 +142,23 @@ class WarehouseDocumentsController {
 
     @GetMapping("/dashboard/warehouse-documents/delivery-mfn-history")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn, Model model) {
-        model.addAttribute("rows", warehouseDocumentMfnHistoryService.getMfnHistory(getStoreId(), deliveryId, mfn));
-        model.addAttribute("deliveryId", deliveryId);
-        model.addAttribute("mfn", mfn);
+    String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn,
+                              @RequestParam(required = false) String from, @RequestParam(required = false) String documentId,
+                              Locale locale, Model model) {
+        String storeId = getStoreId();
+        String backHref = DeliveryLinks.of(false, storeId, deliveryId).details();
+        String backLabel = messageSource.getMessage("warehouse.documents.history.back.delivery",
+                new Object[]{DocumentRowMapper.shortId(deliveryId)}, locale);
+        // back to the document only when it is one of this store's documents (the parameter comes from the address)
+        if ("document".equals(from) && documentId != null) {
+            WarehouseDocument source = warehouseDocumentRepository.findByDocumentId(storeId, documentId);
+            if (source != null) {
+                backHref = DocumentRowMapper.detailsHref("/dashboard", documentId);
+                backLabel = source.getDocumentNo();
+            }
+        }
+        model.addAttribute("page", ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
+                deliveryId, mfn, backHref, backLabel, messageSource, locale));
         return "warehouse-document-mfn-history";
     }
 
