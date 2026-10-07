@@ -8,7 +8,6 @@ import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.util.List;
 
 /**
  * Reads the result of a pickup command sent by {@link ShipmentPickupService}. A result still being computed is asked
@@ -42,7 +41,7 @@ public class ShipmentPickupChecker {
         } catch (RuntimeException e) {
             log.warn("Pickup check failed store={} command={} attempt={}: {}", request.getStoreId(),
                     request.getCommandId(), request.getAttempt(), e.getMessage(), e);
-            result = PickupOrder.pending(request.getCommandId(), List.of(), null);
+            result = PickupOrder.pending(request.getCommandId());
         }
         switch (result.status()) {
             case PENDING -> {

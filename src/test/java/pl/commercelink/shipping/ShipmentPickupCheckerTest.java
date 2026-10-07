@@ -52,7 +52,7 @@ class ShipmentPickupCheckerTest {
     @Test
     void pendingIsAskedAgainWithTheNextAttempt() {
         // given
-        when(provider.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1", List.of(), null));
+        when(provider.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1"));
 
         // when
         checker.check(request(1));
@@ -65,7 +65,7 @@ class ShipmentPickupCheckerTest {
     @Test
     void theLastPendingAttemptFailsAsUnconfirmed() {
         // given
-        when(provider.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1", List.of(), null));
+        when(provider.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1"));
 
         // when
         checker.check(request(ShipmentPickupChecker.MAX_ATTEMPTS));
@@ -79,7 +79,7 @@ class ShipmentPickupCheckerTest {
     void aSuccessIsSettledWithThePickupId() {
         // given
         when(provider.checkPickupOrder("cmd-1"))
-                .thenReturn(PickupOrder.succeeded("cmd-1", "20261006800071", null, List.of("1")));
+                .thenReturn(PickupOrder.succeeded("cmd-1", "20261006800071", List.of("1")));
 
         // when
         checker.check(request(1));
@@ -92,7 +92,7 @@ class ShipmentPickupCheckerTest {
     void aSuccessNamingNoPackagesCoversAllOfThem() {
         // given
         when(provider.checkPickupOrder("cmd-1"))
-                .thenReturn(PickupOrder.succeeded("cmd-1", "20261006800071", null, List.of()));
+                .thenReturn(PickupOrder.succeeded("cmd-1", "20261006800071", List.of()));
 
         // when
         checker.check(request(1));
@@ -105,7 +105,7 @@ class ShipmentPickupCheckerTest {
     void aFailureIsSettledWithItsReason() {
         // given
         when(provider.checkPickupOrder("cmd-1"))
-                .thenReturn(PickupOrder.failed("cmd-1", List.of(), "Brak możliwości podjazdu"));
+                .thenReturn(PickupOrder.failed("cmd-1", "Brak możliwości podjazdu"));
 
         // when
         checker.check(request(1));

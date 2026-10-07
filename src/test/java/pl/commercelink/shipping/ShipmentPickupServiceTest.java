@@ -155,7 +155,7 @@ class ShipmentPickupServiceTest {
     void orderingMarksTheShipmentsPendingThenSendsOneCommand() {
         // given
         when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2), i.getArgument(0), WINDOW));
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
 
         // when
         PickupStart start = service.order(store, "furgonetka", List.of(target("1"), target("2")), WINDOW);
@@ -173,7 +173,7 @@ class ShipmentPickupServiceTest {
     void aPickupAlreadyPendingOrOrderedIsNotMarkedAgain() {
         // given
         when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2), i.getArgument(0), WINDOW));
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
         service.order(store, "furgonetka", List.of(target("1")), WINDOW);
 
         // when
@@ -210,7 +210,7 @@ class ShipmentPickupServiceTest {
     void aFailedCommandResultMarksThePickupsFailed() {
         // given
         when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.failed(i.getArgument(2), i.getArgument(0), "Brak podjazdu"));
+                .thenAnswer(i -> PickupOrder.failed(i.getArgument(2), "Brak podjazdu"));
 
         // when
         PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
@@ -240,7 +240,7 @@ class ShipmentPickupServiceTest {
     void aCheckThatCannotBeSentSettlesThePickupsUnconfirmed() {
         // given: the courier may be ordered, but nothing would ever check it
         when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2), i.getArgument(0), WINDOW));
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
         doThrow(new RuntimeException("SQS down")).when(publisher).publish(any());
 
         // when

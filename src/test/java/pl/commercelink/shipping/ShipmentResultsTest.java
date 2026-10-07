@@ -24,8 +24,8 @@ class ShipmentResultsTest {
         placeholder.setCarrier("DPD Classic");
         placeholder.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
         ShipmentResult result = new ShipmentResult("21480003", List.of(
-                new ShipmentResult.ShipmentParcelResult("A", "dpd", "https://t/A", true),
-                new ShipmentResult.ShipmentParcelResult("B", null, null, false)), null);
+                new ShipmentResult.ShipmentParcelResult("A", "dpd", "https://t/A", true, null),
+                new ShipmentResult.ShipmentParcelResult("B", null, null, false, null)), null);
 
         // when
         List<Shipment> created = ShipmentResults.toShipments(result, placeholder);

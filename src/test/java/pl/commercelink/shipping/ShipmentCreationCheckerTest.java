@@ -89,7 +89,7 @@ class ShipmentCreationCheckerTest {
     void aSuccessIsSettled() {
         // given
         ShipmentResult result = new ShipmentResult("21480003",
-                List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", null, true)), null);
+                List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", null, true, null)), null);
         when(provider.checkShipmentCreation("cmd-1", "21480003")).thenReturn(ShipmentCreation.succeeded("cmd-1", result));
 
         // when
@@ -141,7 +141,7 @@ class ShipmentCreationCheckerTest {
     void aSuccessFoundByTheCommandCarriesThePackageIdIntoSettling() {
         // given: the provider answered the command without a package id, the check finds it
         ShipmentResult result = new ShipmentResult("21480009",
-                List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", null, true)), null);
+                List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", null, true, null)), null);
         when(provider.checkShipmentCreation("cmd-1", "21480003")).thenReturn(ShipmentCreation.succeeded("cmd-1", result));
 
         // when

@@ -65,7 +65,7 @@ class ShipmentCreationSettlerTest {
     }
 
     private static ShipmentResult result() {
-        return new ShipmentResult("21480003", List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", "https://t/A", true)), null);
+        return new ShipmentResult("21480003", List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", "https://t/A", true, null)), null);
     }
 
     @Test
