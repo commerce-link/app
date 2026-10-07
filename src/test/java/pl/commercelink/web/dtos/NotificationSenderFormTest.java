@@ -19,9 +19,20 @@ class NotificationSenderFormTest {
     }
 
     @Test
-    void bothFieldsAreOptional() {
+    void bothFieldsAreRequired() {
+        // when
+        Map<String, String> errors = form(null, "  ").validate();
+
+        // then
+        assertThat(errors).containsExactly(
+                Map.entry("senderName", "store.notification.senderName.required"),
+                Map.entry("replyToEmail", "store.notification.replyToEmail.required"));
+    }
+
+    @Test
+    void acceptsASenderNameAndAReplyToAddress() {
         // when / then
-        assertThat(form(null, "  ").validate()).isEmpty();
+        assertThat(form("Sklep Demo", "kontakt@sklep-demo.pl").validate()).isEmpty();
     }
 
     @Test
@@ -45,11 +56,11 @@ class NotificationSenderFormTest {
     void rejectsAnOverlongSenderName() {
         // when / then
         assertThat(form("S".repeat(101), null).validate()).containsEntry("senderName", "store.notification.senderName.too.long");
-        assertThat(form("S".repeat(100), null).validate()).isEmpty();
+        assertThat(form("S".repeat(100), "kontakt@sklep-demo.pl").validate()).isEmpty();
     }
 
     @Test
-    void savesTrimmedValuesAndBlankAsNoneKeepingTheEnabledTemplates() {
+    void savesTrimmedValuesKeepingTheEnabledTemplates() {
         // given
         Store store = new Store();
         ClientNotificationsConfiguration configuration = new ClientNotificationsConfiguration();
@@ -58,11 +69,11 @@ class NotificationSenderFormTest {
         store.setClientNotificationsConfiguration(configuration);
 
         // when
-        form("  Sklep Demo  ", "   ").applyTo(store);
+        form("  Sklep Demo  ", " kontakt@sklep-demo.pl ").applyTo(store);
 
         // then
         assertThat(store.getClientNotificationsConfiguration().getSenderName()).isEqualTo("Sklep Demo");
-        assertThat(store.getClientNotificationsConfiguration().getReplyToEmail()).isNull();
+        assertThat(store.getClientNotificationsConfiguration().getReplyToEmail()).isEqualTo("kontakt@sklep-demo.pl");
         assertThat(store.supportsNotification(EmailNotificationType.ORDER_SHIPPING)).isTrue();
     }
 
