@@ -51,7 +51,21 @@ class InventoryScriptContractTest {
         // when / then
         for (String hook : List.of("data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add",
                 "data-browse-add-selected", "data-browse-add-error", "data-browse-other-select", "data-browse-other-radio",
-                "data-browse-other-field", "data-cl-select-row", "data-browse-building")) {
+                "data-browse-other-field", "data-cl-select-row")) {
+            assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
+            assertThat(templates).as("templates render " + hook).contains(hook);
+        }
+    }
+
+    @Test
+    void buildingScriptUsesOnlyHooksTheTemplatesRender() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/inventory-building.js");
+        String templates = read("src/main/resources/templates/fragments/inventory-browse.html");
+
+        // when / then
+        for (String hook : List.of("data-browse-building", "data-browse-building-stalled", "data-cl-list-results",
+                "data-cl-list-fragment", "data-cl-list-focus")) {
             assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
             assertThat(templates).as("templates render " + hook).contains(hook);
         }

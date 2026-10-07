@@ -35,13 +35,17 @@
      th:attr="data-cl-list-path=${browse.pagePath()}, data-cl-list-fragment=${browse.fragmentPath()}"
      th:with="b=${browse}, q=${browse.query()}">
 
-    <!--/* §4.7 "Indeks się buduje": inventory-browse.js fetches the block again until the list is ready; without
-           JavaScript a reload does */-->
+    <!--/* §4.7 "Indeks się buduje": inventory-building.js fetches the block again until the list is ready and shows
+           the reload link when it gives up; without JavaScript a reload does */-->
     <section th:if="${b.building()}" class="cl-card cl-inv-browse-card" aria-labelledby="browse-title" aria-busy="true"
              data-browse-building>
         <h2 id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
-        <p role="status" th:text="#{inventory.browse.building}"></p>
+        <p role="status" tabindex="-1" data-cl-list-focus th:text="#{inventory.browse.building}"></p>
         <noscript><p class="cl-inv-muted" th:text="#{inventory.browse.building.reload}"></p></noscript>
+        <p class="cl-inv-muted" role="status" data-browse-building-stalled hidden>
+            <span th:text="#{inventory.browse.building.stalled}"></span>
+            <a th:href="${b.query().href()}" th:text="#{inventory.browse.building.reloadLink}"></a>
+        </p>
         <ul class="cl-tile-grid is-categories" aria-hidden="true">
             <li th:each="i : ${#numbers.sequence(1, 6)}"><div class="cl-tile">
                 <span class="cl-skeleton cl-inv-skeleton-label"></span>

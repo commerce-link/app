@@ -110,6 +110,17 @@ class InventoryPageTemplateTest {
     }
 
     @Test
+    void everyRoleGetsTheScriptThatReloadsTheListOnceTheIndexIsBuilt() {
+        // when
+        String user = assortment(false);
+        String admin = assortment(true);
+
+        // then
+        assertThat(user).contains("<script src=\"/js/inventory-building.js\" defer></script>");
+        assertThat(admin).contains("<script src=\"/js/inventory-building.js\" defer></script>");
+    }
+
+    @Test
     void storeAdminGetsTheAddScriptAfterTheSharedDialogScriptAndTheDialogAddress() {
         // when
         String html = assortment(true);

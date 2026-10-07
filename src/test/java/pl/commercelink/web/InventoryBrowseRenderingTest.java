@@ -183,9 +183,23 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("aria-busy=\"true\"", "data-browse-building", "cl-skeleton",
-                "<p role=\"status\">Preparing the assortment for browsing \u2014 this takes a few seconds.</p>",
+                "<p role=\"status\" tabindex=\"-1\" data-cl-list-focus>Preparing the assortment for browsing \u2014 this takes a few seconds.</p>",
                 "<noscript><p class=\"cl-inv-muted\">Reload the page in a moment.</p></noscript>", "data-cl-list-results");
         assertThat(html).doesNotContain("There are no products to browse yet", "cl-table", "No products for these filters");
+    }
+
+    @Test
+    void buildingIndexCarriesAHiddenReloadLinkForWhenTheWaitingGivesUpForEveryRole() {
+        // given
+        BrowseQuery query = BrowseQuery.start().withCategory("11");
+
+        // when
+        String user = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.BUILDING, query, false)));
+
+        // then
+        assertThat(user).doesNotContain("??");
+        assertThat(user).contains("<p class=\"cl-inv-muted\" role=\"status\" data-browse-building-stalled hidden>",
+                "This is taking longer than usual.", "<a href=\"/dashboard/inventory?cat=11\">Reload the page</a>");
     }
 
     @Test
