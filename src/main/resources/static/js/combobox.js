@@ -1,5 +1,6 @@
-// The single-choice combobox of fragments/combobox: swaps the native select for a trigger with a searchable, grouped
-// listbox. The options are drawn by the server; the script only filters, moves the highlight and picks.
+// The single-choice combobox of fragments/combobox: swaps the native select for an editable combobox -- one text field
+// that shows the chosen label and filters the server-drawn options as the operator types (APG "editable combobox with
+// list autocomplete"). The script only filters, moves the highlight and picks.
 // A pick (Enter, a click) fires "cl:combobox-change" on the .cl-combobox with {value, label}; the arrows only move the
 // highlight, so nothing that listens for a pick runs while the operator is still looking (WCAG 3.2.2).
 (function () {
@@ -26,41 +27,48 @@
         var select = root.querySelector('[data-combobox-select]');
         var field = root.querySelector('[data-combobox-value]');
         var box = root.querySelector('[data-combobox]');
-        var trigger = root.querySelector('[data-combobox-trigger]');
-        var label = root.querySelector('[data-combobox-label]');
+        var input = root.querySelector('[data-combobox-input]');
+        var toggle = root.querySelector('[data-combobox-toggle]');
         var menu = box.querySelector('.cl-picker-menu');
-        var search = root.querySelector('[data-combobox-search]');
         var list = root.querySelector('[data-combobox-list]');
         var empty = root.querySelector('[data-combobox-empty]');
         var counter = root.querySelector('[data-combobox-count]');
-        var groups = Array.prototype.slice.call(list.querySelectorAll('[role="group"]'));
         var options = Array.prototype.slice.call(list.querySelectorAll('[role="option"]'));
         var haystacks = new Map(options.map(function (option) {
-            var group = option.closest('[role="group"]');
-            var heading = group ? group.querySelector('.cl-picker-group-label') : null;
-            // A group's heading is searchable too: typing a catalog's name lists its categories.
-            return [option, normalize(option.dataset.label + ' ' + (heading ? heading.textContent : ''))];
+            // The grey line is searchable too: typing a catalog's name lists its categories.
+            return [option, normalize(option.textContent.replace(/\s+/g, ' '))];
         }));
+        var chosenLabel = input.value;
         var visible = options;
         var active = -1;
         var announceTimer = null;
+        var quiet = false;
+        var selectOnMouseUp = false;
         var hadFocus = document.activeElement === select;
 
-        // The combobox takes over: the label points at the trigger, the select no longer posts or validates.
+        // The combobox takes over: the label points at the text field, the select no longer posts or validates.
         var fieldLabel = document.querySelector('label[for="' + select.id + '"]');
         if (fieldLabel) {
-            fieldLabel.htmlFor = trigger.id;
+            fieldLabel.htmlFor = input.id;
         }
         // An error summary links to the field by its id; the hidden select would take no focus.
         document.querySelectorAll('a[href="#' + select.id + '"]').forEach(function (link) {
-            link.setAttribute('href', '#' + trigger.id);
+            link.setAttribute('href', '#' + input.id);
         });
         select.hidden = true;
         select.disabled = true;
         field.disabled = false;
         box.hidden = false;
+
+        // Focus that the operator did not ask for (the page's autofocus, a pick, Escape) must not open the list.
+        function focusQuietly() {
+            quiet = true;
+            input.focus();
+            quiet = false;
+        }
+
         if (hadFocus || select.hasAttribute('autofocus')) {
-            trigger.focus();
+            focusQuietly();
         }
 
         function isOpen() {
@@ -81,39 +89,42 @@
                 option.classList.remove('is-active');
             });
             if (active < 0 || !visible[active]) {
-                search.removeAttribute('aria-activedescendant');
+                input.removeAttribute('aria-activedescendant');
                 return;
             }
             visible[active].classList.add('is-active');
             visible[active].scrollIntoView({ block: 'nearest' });
-            search.setAttribute('aria-activedescendant', visible[active].id);
+            input.setAttribute('aria-activedescendant', visible[active].id);
         }
 
-        function filter() {
-            var query = normalize(search.value.trim());
+        function filter(text) {
+            var query = normalize(text.trim());
             visible = options.filter(function (option) {
                 var match = !query || haystacks.get(option).indexOf(query) !== -1;
                 option.hidden = !match;
                 return match;
             });
-            groups.forEach(function (group) {
-                group.hidden = !group.querySelector('[role="option"]:not([hidden])');
-            });
             empty.hidden = visible.length > 0;
             list.scrollTop = 0;
             highlight(-1);
-            announce();
         }
 
-        function open() {
-            menu.hidden = false;
-            trigger.setAttribute('aria-expanded', 'true');
-            search.setAttribute('aria-expanded', 'true');
-            search.value = '';
-            filter();
+        function setExpanded(expanded) {
+            menu.hidden = !expanded;
+            input.setAttribute('aria-expanded', String(expanded));
+            toggle.setAttribute('aria-expanded', String(expanded));
+        }
+
+        // Opening shows the whole list with the chosen option highlighted. Opened by a focus or a click, the text is
+        // selected, so typing replaces it; opened by typing, the caret stays after what was typed.
+        function open(selectText) {
+            if (isOpen()) {
+                return;
+            }
+            setExpanded(true);
+            filter('');
             counter.textContent = '';
             clearTimeout(announceTimer);
-            search.focus();
             // A field low on a phone screen would open its list below the fold.
             menu.scrollIntoView({ block: 'nearest' });
             var chosen = visible.findIndex(function (option) {
@@ -122,32 +133,34 @@
             if (chosen >= 0) {
                 highlight(chosen);
             }
+            if (selectText !== false) {
+                input.select();
+            }
         }
 
-        function close(focusTrigger) {
-            var focusInside = menu.contains(document.activeElement);
-            menu.hidden = true;
-            trigger.setAttribute('aria-expanded', 'false');
-            search.setAttribute('aria-expanded', 'false');
-            search.removeAttribute('aria-activedescendant');
+        // Closing without a pick puts the chosen label back: a half-typed text is never the field's value.
+        function close() {
+            setExpanded(false);
+            input.removeAttribute('aria-activedescendant');
             clearTimeout(announceTimer);
-            // Hiding the menu with the focus in it would drop the focus onto <body>.
-            if (focusTrigger || focusInside) {
-                trigger.focus();
-            }
+            input.value = chosenLabel;
         }
 
         function pick(option) {
             var changed = option.dataset.value !== field.value;
             field.value = option.dataset.value;
-            label.textContent = option.dataset.label;
+            chosenLabel = option.dataset.label;
             options.forEach(function (candidate) {
                 var isSelected = candidate === option;
                 candidate.classList.toggle('is-selected', isSelected);
                 candidate.setAttribute('aria-selected', String(isSelected));
             });
-            trigger.classList.remove('is-invalid');
-            close(true);
+            input.classList.remove('is-invalid');
+            input.removeAttribute('aria-invalid');
+            close();
+            if (document.activeElement !== input) {
+                focusQuietly();
+            }
             if (changed) {
                 root.dispatchEvent(new CustomEvent('cl:combobox-change', {
                     bubbles: true,
@@ -156,48 +169,76 @@
             }
         }
 
-        trigger.addEventListener('click', function () {
-            if (isOpen()) {
-                close(true);
-            } else {
+        input.addEventListener('focus', function () {
+            if (!quiet) {
                 open();
             }
         });
-        trigger.addEventListener('keydown', function (event) {
+        input.addEventListener('mousedown', function () {
+            // A click that focuses the field would put the caret where it landed and undo the selected text.
+            selectOnMouseUp = document.activeElement !== input;
+        });
+        input.addEventListener('mouseup', function (event) {
+            if (selectOnMouseUp) {
+                event.preventDefault();
+                selectOnMouseUp = false;
+            }
+        });
+        input.addEventListener('click', function () {
+            open();
+        });
+        input.addEventListener('input', function () {
+            open(false);
+            filter(input.value);
+            announce();
+        });
+        input.addEventListener('keydown', function (event) {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
-                open();
-            } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && event.key !== ' ') {
-                // Typing on the closed field starts the search with that letter.
-                event.preventDefault();
-                open();
-                search.value = event.key;
-                filter();
-            }
-        });
-        search.addEventListener('input', filter);
-        search.addEventListener('keydown', function (event) {
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                highlight(Math.min(active + 1, visible.length - 1));
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                highlight(Math.max(active - 1, 0));
-            } else if ((event.key === 'Home' || event.key === 'End') && active >= 0) {
+                if (!isOpen() || event.altKey) {
+                    open();
+                } else if (event.key === 'ArrowDown') {
+                    highlight(Math.min(active + 1, visible.length - 1));
+                } else {
+                    highlight(Math.max(active - 1, 0));
+                }
+            } else if ((event.key === 'Home' || event.key === 'End') && isOpen() && active >= 0) {
                 // While an option is highlighted Home and End move through the list; otherwise they move the caret.
                 event.preventDefault();
                 highlight(event.key === 'Home' ? 0 : visible.length - 1);
             } else if (event.key === 'Enter') {
+                // Never the form's implicit submit: its first button is "Zmień kategorię", the no-script reload.
                 event.preventDefault();
+                if (!isOpen()) {
+                    return;
+                }
                 if (active >= 0) {
                     pick(visible[active]);
                 } else if (visible.length === 1) {
                     pick(visible[0]);
                 }
+            } else if (event.key === 'Escape') {
+                if (isOpen() || input.value !== chosenLabel) {
+                    event.preventDefault();
+                    close();
+                }
+            }
+        });
+        toggle.addEventListener('mousedown', function (event) {
+            // The focus stays in the text field, so pressing the chevron does not count as leaving it.
+            event.preventDefault();
+        });
+        toggle.addEventListener('click', function () {
+            if (isOpen()) {
+                close();
+                focusQuietly();
+            } else {
+                focusQuietly();
+                open();
             }
         });
         list.addEventListener('mousedown', function (event) {
-            // The focus stays in the search, so a click on an option does not count as leaving the field.
+            // The focus stays in the text field, so a click on an option does not count as leaving the field.
             event.preventDefault();
         });
         list.addEventListener('click', function (event) {
@@ -206,35 +247,37 @@
                 pick(option);
             }
         });
-        trigger.addEventListener('mousedown', function (event) {
-            // Safari does not focus a pressed button: the menu would close on the press and open again on the click.
-            if (isOpen()) {
-                event.preventDefault();
-            }
-        });
-        root.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && isOpen()) {
-                event.preventDefault();
-                close(true);
-            }
-        });
         root.addEventListener('focusout', function (event) {
-            if (isOpen() && !root.contains(event.relatedTarget)) {
-                close(false);
+            if (!root.contains(event.relatedTarget) && (isOpen() || input.value !== chosenLabel)) {
+                close();
             }
         });
         document.addEventListener('click', function (event) {
             if (isOpen() && !root.contains(event.target)) {
-                close(false);
+                close();
             }
         });
+        input.addEventListener('invalid', function () {
+            input.classList.add('is-invalid');
+            input.setAttribute('aria-invalid', 'true');
+            // The browser focuses the field to show its message; the list would cover it.
+            quiet = true;
+            setTimeout(function () {
+                quiet = false;
+            });
+        });
 
+        // A form with novalidate (the server's error summary) skips the browser's check, so an empty required field is
+        // stopped here; reportValidity still shows the browser's own message on the text field and focuses it.
         if (field.form && select.required) {
             field.form.addEventListener('submit', function (event) {
                 if (!field.value && !(event.submitter && event.submitter.formNoValidate)) {
                     event.preventDefault();
-                    trigger.classList.add('is-invalid');
-                    open();
+                    input.classList.add('is-invalid');
+                    input.setAttribute('aria-invalid', 'true');
+                    if (input.reportValidity()) {
+                        input.focus();
+                    }
                 }
             });
         }

@@ -22,6 +22,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.when;
@@ -66,11 +67,14 @@ class CatalogTargetOptionsFactoryTest {
         // then
         assertThat(options.count()).isEqualTo(2);
         assertThat(options.pimCategoryName()).isEqualTo("Karty graficzne");
-        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::label)
-                .containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::value)
+                .containsExactly("c-1/cat-gpu", "c-2/cat-b2b");
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::catalogName, CatalogTargetOptions.Option::categoryName)
+                .containsExactly(tuple("Podzespoły", "Karta graficzna"), tuple("Sklep B2B", "Karty"));
         assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 1);
         assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
-        assertThat(options.others()).extracting(CatalogTargetOptions.Group::catalogName).containsExactly("Podzespoły");
+        assertThat(options.others()).extracting(CatalogTargetOptions.Option::value).containsExactly("c-1/cat-case");
+        assertThat(options.oneCatalog()).isFalse();
     }
 
     @Test
@@ -153,7 +157,41 @@ class CatalogTargetOptionsFactoryTest {
         assertThat(options.unmatched()).isTrue();
         assertThat(options.preselectedValue()).isNull();
         assertThat(options.pimCategoryName()).isEqualTo("Chłodzenie");
-        assertThat(options.others()).extracting(CatalogTargetOptions.Group::catalogName).containsExactly("Podzespoły", "Sklep B2B");
+        assertThat(options.others()).extracting(CatalogTargetOptions.Option::value)
+                .containsExactly("c-1/cat-gpu", "c-1/cat-case", "c-2/cat-b2b");
+    }
+
+    /** One flat list: the categories that do not match by catalog name, then category name, in Polish order. */
+    @Test
+    void otherCategoriesAreSortedByCatalogAndThenCategoryInPolishOrder() {
+        // given
+        when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(
+                new CatalogPlacement.Target("c-3", "Zestawy", "z1", "Akcesoria", List.of()),
+                new CatalogPlacement.Target("c-2", "Łączność", "l1", "Routery", List.of()),
+                new CatalogPlacement.Target("c-1", "Lampy", "a2", "Żarówki", List.of()),
+                new CatalogPlacement.Target("c-1", "Lampy", "a1", "Świetlówki", List.of()),
+                new CatalogPlacement.Target("c-1", "Lampy", "a3", "Oprawy", List.of())), List.of()));
+
+        // when
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000003"));
+
+        // then
+        assertThat(options.others()).extracting(CatalogTargetOptions.Option::categoryName)
+                .containsExactly("Oprawy", "Świetlówki", "Żarówki", "Routery", "Akcesoria");
+    }
+
+    @Test
+    void storeWithManualCategoriesInOneCatalogIsOneCatalog() {
+        // given
+        when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(
+                new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11")),
+                new CatalogPlacement.Target("c-1", "Podzespoły", "cat-case", "Obudowa", List.of("40"))), List.of()));
+
+        // when
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001"));
+
+        // then
+        assertThat(options.oneCatalog()).isTrue();
     }
 
     @Test

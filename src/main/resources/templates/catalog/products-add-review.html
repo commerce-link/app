@@ -58,7 +58,7 @@
                                        and the arrows only move through the list (WCAG 3.2.2). Without it the select
                                        changes nothing until "Zmień kategorię" or "Dalej" sends the form. */-->
                                 <div th:remove="${category == null} ? 'tag' : 'none'" th:class="${category != null} ? 'cl-input-row'">
-                                <div th:replace="~{fragments/combobox :: combobox('review-target', 'target', ${targetGroups}, ${selectedTarget},
+                                <div th:replace="~{fragments/combobox :: combobox('review-target', 'target', ${targetChoices}, ${selectedTarget},
                                         #{catalog.products.review.target.choose}, true, ${errors.isEmpty()}, ${targetDescribedBy}, ${targetError != null})}"></div>
                                 <button th:if="${category != null}" class="cl-button" type="submit" formnovalidate data-review-change
                                         th:attr="formaction=${changeAction}" th:text="#{catalog.products.review.target.change}"></button>

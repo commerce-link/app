@@ -353,16 +353,16 @@ class ProductsAddTemplateTest {
     }
 
     /**
-     * From the inventory the category is the first field: a combobox over the native select it enhances -- the matching
-     * categories first, noting how many products each holds, then the other manual ones by catalog. Without the script
+     * From the inventory the category is the first field: a combobox over the native select it enhances -- one flat list,
+     * the matching categories first, the catalog's name on a grey line under each. Without the script
      * the select and "Zmień kategorię" beside it do the job; nothing is sent when the select changes (WCAG 3.2.2).
      */
     @Test
     void aReviewFromTheInventoryAsksForTheCategoryAboveTheRows() {
         // given
         Context context = inventoryContext(new CatalogTargetOptions(2,
-                List.of(new CatalogTargetOptions.Option("c1/k1", "Parts › GPU", 1)),
-                List.of(new CatalogTargetOptions.Group("Parts", List.of(new CatalogTargetOptions.Option("c1/k2", "Cases", 0)))),
+                List.of(new CatalogTargetOptions.Option("c1", "k1", "Parts", "GPU", 1)),
+                List.of(new CatalogTargetOptions.Option("c2", "k2", "Garden", "Tools", 0)),
                 "c1/k1", false, "Graphics cards"), "c1/k1", Map.of());
 
         // when
@@ -378,10 +378,10 @@ class ProductsAddTemplateTest {
                 "autofocus=\"autofocus\"");
         assertThat(html).containsPattern("</div>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate data-review-change\\s+"
                 + "formaction=\"/dashboard/inventory/add\">Change category</button>\\s*</div>");
-        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">Parts › GPU \\(already here: 1 of 2\\)</option>");
-        assertThat(html).contains("<optgroup label=\"Matching the PIM category &quot;Graphics cards&quot;\">",
-                "<optgroup label=\"Parts\">", "<option value=\"c1/k2\">Parts › Cases</option>",
-                "<span class=\"cl-picker-meta\">already here: 1 of 2</span>",
+        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">GPU — Parts · matches</option>");
+        assertThat(html).contains("<option value=\"c2/k2\">Tools — Garden</option>",
+                "<span class=\"cl-picker-name\">GPU</span>", "<span class=\"cl-picker-meta\">Parts · matches</span>",
+                "<span class=\"cl-picker-meta\">Garden</span>", "value=\"GPU\"",
                 "PIM category: Graphics cards. Manual categories only",
                 "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
@@ -389,7 +389,7 @@ class ProductsAddTemplateTest {
                 "<script src=\"/js/combobox.js\" defer></script>", "<script src=\"/js/review-target.js\" defer></script>",
                 "data-review-status=\"Category: Parts › GPU. Rows: 1.\"",
                 ">Add</button>");
-        assertThat(html).doesNotContain("Next</button>", "Add products");
+        assertThat(html).doesNotContain("Next</button>", "Add products", "optgroup", "already here");
         assertThat(html.indexOf("id=\"review-target\"")).isLessThan(html.indexOf("id=\"review-area\""));
         assertThat(html.indexOf("id=\"review-area\"")).isLessThan(html.indexOf("id=\"products\""));
         assertThat(html).contains("<div class=\"cl-stack is-wide\">");
@@ -400,7 +400,7 @@ class ProductsAddTemplateTest {
     void theRedrawnPartCarriesTheRowsTheirNotesAndTheReviewedCategory() {
         // given
         Context context = inventoryContext(new CatalogTargetOptions(2,
-                List.of(new CatalogTargetOptions.Option("c1/k1", "Parts › GPU", 1)), List.of(), "c1/k1", false, null),
+                List.of(new CatalogTargetOptions.Option("c1", "k1", "Parts", "GPU", 1)), List.of(), "c1/k1", false, null),
                 "c1/k1", Map.of());
         context.setVariable("skippedExisting", List.of("5901234567891"));
         context.setVariable("skippedBefore", 1);
@@ -426,8 +426,7 @@ class ProductsAddTemplateTest {
     void anInventoryReviewWithoutACategoryHasOnlyTheFieldWithNextAsItsMainButton() {
         // given
         Context context = inventoryContext(new CatalogTargetOptions(1, List.of(),
-                List.of(new CatalogTargetOptions.Group("Parts", List.of(new CatalogTargetOptions.Option("c1/k2", "Cases", 0)))),
-                null, false, null), "", Map.of());
+                List.of(new CatalogTargetOptions.Option("c1", "k2", "Parts", "Cases", 0)), null, false, null), "", Map.of());
         context.setVariable("category", null);
         context.setVariable("catalog", null);
         context.setVariable("form", ProductsBulkAddForm.of(List.of()));
@@ -436,12 +435,16 @@ class ProductsAddTemplateTest {
         String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
 
         // then
-        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "Matching",
+        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "matches",
                 ">Change category</button>", "cl-input-row", "data-review-status=");
         assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a category…</option>");
-        assertThat(html).contains("<span data-combobox-label id=\"review-target-value\">Choose a category…</span>",
+        assertThat(html).contains("placeholder=\"Choose a category…\"",
                 "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-combobox-value>",
-                "aria-required=\"true\"");
+                "<option value=\"c1/k2\">Cases</option>");
+        // one catalog: no catalog line under the options, and nothing matches, so no grey line at all
+        assertThat(html).doesNotContain("cl-picker-meta", "Cases — Parts");
+        assertThat(tagsOf(html, "input").stream().filter(tag -> tag.contains("data-combobox-input")).findFirst().orElseThrow())
+                .contains("required=\"required\"", "value=\"\"");
         assertThat(html).contains(
                 "This product&#39;s PIM category is not mapped to any catalog category.",
                 "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\">Cancel</a>",
@@ -512,7 +515,7 @@ class ProductsAddTemplateTest {
         context.setVariable("skippedBefore", 0);
         context.setVariable("resetRows", 0);
         context.setVariable("targetOptions", options);
-        context.setVariable("targetGroups", InventoryAddController.targetGroups(options, englishMessages(), Locale.ENGLISH));
+        context.setVariable("targetChoices", InventoryAddController.targetOptions(options, englishMessages(), Locale.ENGLISH));
         context.setVariable("selectedTarget", selected);
         context.setVariable("eans", List.of("5901234567890", "5901234567891"));
         context.setVariable("reviewCount", options.count());

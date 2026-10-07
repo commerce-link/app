@@ -4432,29 +4432,94 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-/* Single-choice combobox (fragments/combobox): the tree picker's skin with group headings and a note under an option. */
-/* A landscape phone keeps the search and some options on screen at once. */
+/* Single-choice combobox (fragments/combobox): one text field over a flat list, an option being a name with a grey
+   second line. Lighter than the tree picker: no search box of its own, no group headings, the menu as wide as the field. */
+.cl-page .cl-combobox-input {
+    padding-right: 40px;
+    text-overflow: ellipsis;
+}
+
+.cl-page .cl-combobox-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--cl-ink-3);
+    cursor: pointer;
+}
+
+.cl-page .cl-combobox-toggle i {
+    transition: transform .15s ease;
+}
+
+.cl-page .cl-combobox-toggle[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+
+.cl-page .cl-combobox .cl-picker-menu {
+    min-width: 100%;
+    padding: 4px 0;
+}
+
+/* A landscape phone keeps the field and some options on screen at once. */
 .cl-page .cl-combobox .cl-picker-list {
     max-height: min(20rem, 50vh);
+    margin-top: 0;
+    border: 0;
 }
 
-.cl-page .cl-picker-group + .cl-picker-group {
-    border-top: 1px solid var(--cl-line);
+.cl-page .cl-combobox .cl-picker-option {
+    align-items: center;
+    padding: 6px 12px;
 }
 
-.cl-page .cl-picker-group-label {
-    padding: 8px 16px 4px;
+/* The chosen option is told by a tick, not by bold type: the name stays the plain first line. */
+.cl-page .cl-combobox .cl-picker-option.is-selected {
+    font-weight: 400;
+}
+
+.cl-page .cl-combobox-check {
+    flex: none;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--cl-ink-2);
+    color: var(--cl-accent);
+    visibility: hidden;
 }
 
-/* --cl-ink-2, not -3: the note stays legible on the tinted row under the mouse or the arrows. */
+.cl-page .cl-picker-option.is-selected .cl-combobox-check {
+    visibility: visible;
+}
+
+/* Still rendered when empty (a live region shown only once it has text may not be read), just without its margin. */
+.cl-page .cl-combobox .cl-picker-count:empty {
+    margin: 0;
+}
+
+/* --cl-ink-3 is 4.76:1 on the white menu; on the tinted row under the mouse or the arrows it is 4.04:1, below AA for
+   12 px, so that row takes --cl-ink-2 (as the tree picker's path does). */
 .cl-page .cl-picker-meta {
     display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 12px;
     font-weight: 400;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-option:is(:hover, .is-active) .cl-picker-meta {
     color: var(--cl-ink-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-combobox-toggle i {
+        transition: none;
+    }
 }
 
 /* The combobox redraws the rows itself, so the "Zmień kategorię" next to it is hidden and the field takes the row. */

@@ -25,7 +25,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
-import pl.commercelink.web.dtos.ComboboxGroup;
+import pl.commercelink.web.dtos.ComboboxOption;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
@@ -214,40 +214,44 @@ class InventoryAddControllerTest {
                 .andExpect(redirectedUrl(LIST));
     }
 
-    /** The combobox reads "Katalog › Kategoria" in every group, notes "already here" only where some products are. */
+    /**
+     * One flat list: the matching categories first, as the factory ordered them, then the others. The name is the first
+     * line; the catalog, with "matches" on a matching one, the grey second line. No "already here" count any more.
+     */
     @Test
-    void comboboxGroupsPutTheMatchingCategoriesFirstAndNameEveryOptionWithItsCatalog() {
+    void comboboxOptionsPutTheMatchingCategoriesFirstWithTheirCatalogAndMatchesOnTheSecondLine() {
         // given
         CatalogTargetOptions options = new CatalogTargetOptions(3,
-                List.of(new CatalogTargetOptions.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 2)),
-                List.of(new CatalogTargetOptions.Group("Podzespoły", List.of(new CatalogTargetOptions.Option("c-1/cat-case", "Obudowa", 0)))),
+                List.of(new CatalogTargetOptions.Option("c-2", "cat-b2b", "Sklep B2B", "Karty", 2),
+                        new CatalogTargetOptions.Option("c-1", "cat-gpu", "Podzespoły", "Karta graficzna", 0)),
+                List.of(new CatalogTargetOptions.Option("c-1", "cat-case", "Podzespoły", "Obudowa", 3)),
                 "c-1/cat-gpu", false, "Karty graficzne");
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0)
                 + (call.getArgument(1) == null ? "" : List.of((Object[]) call.getArgument(1)).toString()));
 
         // when
-        List<ComboboxGroup> groups = InventoryAddController.targetGroups(options, messageSource, Locale.ENGLISH);
+        List<ComboboxOption> choices = InventoryAddController.targetOptions(options, messageSource, Locale.ENGLISH);
 
         // then
-        assertThat(groups).containsExactly(
-                new ComboboxGroup("catalog.products.review.target.matching.named[Karty graficzne]", List.of(
-                        new ComboboxGroup.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", "catalog.products.review.target.in.many[2, 3]"))),
-                new ComboboxGroup("Podzespoły", List.of(new ComboboxGroup.Option("c-1/cat-case", "Podzespoły › Obudowa", null))));
+        assertThat(choices).containsExactly(
+                new ComboboxOption("c-2/cat-b2b", "Karty", "catalog.products.review.target.matches.in[Sklep B2B]"),
+                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "catalog.products.review.target.matches.in[Podzespoły]"),
+                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły"));
     }
 
+    /** With every manual category in one catalog its name would repeat on every line: only "matches" stays. */
     @Test
-    void comboboxOfOneProductInMixedPimCategoriesSaysAlreadyHereWithoutCounts() {
+    void comboboxOptionsOfASingleCatalogLeaveTheCatalogOut() {
         // given
-        CatalogTargetOptions options = new CatalogTargetOptions(1,
-                List.of(new CatalogTargetOptions.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1)), List.of(),
-                "c-1/cat-gpu", false, null);
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
 
         // when
-        List<ComboboxGroup> groups = InventoryAddController.targetGroups(options, messageSource, Locale.ENGLISH);
+        List<ComboboxOption> choices = InventoryAddController.targetOptions(options("c-1/cat-gpu"), messageSource, Locale.ENGLISH);
 
         // then
-        assertThat(groups).containsExactly(new ComboboxGroup("catalog.products.review.target.matching", List.of(
-                new ComboboxGroup.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", "catalog.products.review.target.in.one"))));
+        assertThat(choices).containsExactly(
+                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "catalog.products.review.target.matches"),
+                new ComboboxOption("c-1/cat-case", "Obudowa", null));
     }
 
     /** The rows were checked against the category they were drawn for; another one may skip or reset some of them. */
@@ -347,9 +351,9 @@ class InventoryAddControllerTest {
 
     private static CatalogTargetOptions options(String preselected) {
         List<CatalogTargetOptions.Option> matching = preselected == null ? List.of()
-                : List.of(new CatalogTargetOptions.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0));
+                : List.of(new CatalogTargetOptions.Option("c-1", "cat-gpu", "Podzespoły", "Karta graficzna", 0));
         return new CatalogTargetOptions(1, matching,
-                List.of(new CatalogTargetOptions.Group("Podzespoły", List.of(new CatalogTargetOptions.Option("c-1/cat-case", "Obudowa", 0)))),
+                List.of(new CatalogTargetOptions.Option("c-1", "cat-case", "Podzespoły", "Obudowa", 0)),
                 preselected, false, "Karty graficzne");
     }
 

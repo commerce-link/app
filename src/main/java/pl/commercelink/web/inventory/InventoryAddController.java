@@ -25,7 +25,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
-import pl.commercelink.web.dtos.ComboboxGroup;
+import pl.commercelink.web.dtos.ComboboxOption;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.settings.SettingsPaths;
 
@@ -223,7 +223,7 @@ public class InventoryAddController {
     private void inventoryAttributes(CatalogTargetOptions options, List<String> eans, String selected, String back,
                                      int skippedBefore, int resetRows, @Nullable String notice, Model model, Locale locale) {
         model.addAttribute("targetOptions", options);
-        model.addAttribute("targetGroups", targetGroups(options, messageSource, locale));
+        model.addAttribute("targetChoices", targetOptions(options, messageSource, locale));
         model.addAttribute("selectedTarget", selected);
         model.addAttribute("eans", eans);
         model.addAttribute("reviewCount", options.count());
@@ -237,38 +237,23 @@ public class InventoryAddController {
     }
 
     /**
-     * The options of the category combobox: the categories matching the products' PIM category first, then the other
-     * manual ones by catalog. Every option reads "Katalog › Kategoria", so the search finds it by either name.
+     * The options of the category combobox, one flat list: the categories matching the products' PIM category first, then
+     * the other manual ones. Each reads as the category's name, with its catalog in grey under it ("· pasuje" after it on
+     * a matching one); with a single catalog only "pasuje" stays.
      */
-    public static List<ComboboxGroup> targetGroups(CatalogTargetOptions options, MessageSource messages, Locale locale) {
-        List<ComboboxGroup> groups = new ArrayList<>();
-        if (!options.unmatched()) {
-            String heading = options.pimCategoryName() == null
-                    ? messages.getMessage("catalog.products.review.target.matching", null, locale)
-                    : messages.getMessage("catalog.products.review.target.matching.named",
-                    new Object[]{options.pimCategoryName()}, locale);
-            groups.add(new ComboboxGroup(heading, options.matching().stream()
-                    .map(option -> new ComboboxGroup.Option(option.value(), option.label(),
-                            alreadyIn(option.alreadyIn(), options.count(), messages, locale)))
-                    .toList()));
+    public static List<ComboboxOption> targetOptions(CatalogTargetOptions options, MessageSource messages, Locale locale) {
+        boolean oneCatalog = options.oneCatalog();
+        List<ComboboxOption> result = new ArrayList<>();
+        for (CatalogTargetOptions.Option option : options.matching()) {
+            String meta = oneCatalog
+                    ? messages.getMessage("catalog.products.review.target.matches", null, locale)
+                    : messages.getMessage("catalog.products.review.target.matches.in", new Object[]{option.catalogName()}, locale);
+            result.add(new ComboboxOption(option.value(), option.categoryName(), meta));
         }
-        for (CatalogTargetOptions.Group group : options.others()) {
-            groups.add(new ComboboxGroup(group.catalogName(), group.options().stream()
-                    .map(option -> new ComboboxGroup.Option(option.value(), group.catalogName() + " › " + option.label(),
-                            alreadyIn(option.alreadyIn(), options.count(), messages, locale)))
-                    .toList()));
+        for (CatalogTargetOptions.Option option : options.others()) {
+            result.add(new ComboboxOption(option.value(), option.categoryName(), oneCatalog ? null : option.catalogName()));
         }
-        return groups;
-    }
-
-    /** "już tu: x z n" -- only when the category holds some of the products already. */
-    private static String alreadyIn(int alreadyIn, int count, MessageSource messages, Locale locale) {
-        if (alreadyIn == 0) {
-            return null;
-        }
-        return count > 1
-                ? messages.getMessage("catalog.products.review.target.in.many", new Object[]{alreadyIn, count}, locale)
-                : messages.getMessage("catalog.products.review.target.in.one", null, locale);
+        return result;
     }
 
     private String noStore(String returnTo, Locale locale, RedirectAttributes redirectAttributes) {

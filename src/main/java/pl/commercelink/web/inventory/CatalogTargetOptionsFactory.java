@@ -12,11 +12,12 @@ import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
 
+import java.text.Collator;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -25,6 +26,7 @@ import java.util.Set;
 public class CatalogTargetOptionsFactory {
 
     static final int MAX_PRODUCTS = 500;
+    private static final Locale POLISH = Locale.forLanguageTag("pl");
 
     private final Inventory inventory;
     private final CatalogPlacement catalogPlacement;
@@ -47,25 +49,22 @@ public class CatalogTargetOptionsFactory {
         }
         CatalogPlacement.StorePlacement placement = catalogPlacement.forStore(storeId);
         List<CatalogTargetOptions.Option> matching = new ArrayList<>();
-        Map<String, List<CatalogTargetOptions.Option>> others = new LinkedHashMap<>();
+        List<CatalogTargetOptions.Option> others = new ArrayList<>();
         for (CatalogPlacement.Target target : placement.targets()) {
             int alreadyIn = (int) keys.stream().filter(key -> placement.isIn(target.categoryId(), key)).count();
             boolean fits = target.pimCategoryIds().stream().anyMatch(id -> categoryIds.contains(id.strip()));
-            if (fits) {
-                matching.add(new CatalogTargetOptions.Option(target.value(), target.label(), alreadyIn));
-            } else {
-                others.computeIfAbsent(target.catalogName(), name -> new ArrayList<>())
-                        .add(new CatalogTargetOptions.Option(target.value(), target.categoryName(), alreadyIn));
-            }
+            (fits ? matching : others).add(new CatalogTargetOptions.Option(target.catalogId(), target.categoryId(),
+                    target.catalogName(), target.categoryName(), alreadyIn));
         }
+        // One flat list without headings: the operator scans it by catalog and then by category, in Polish order.
+        Collator collator = Collator.getInstance(POLISH);
+        others.sort(Comparator.comparing(CatalogTargetOptions.Option::catalogName, collator)
+                .thenComparing(CatalogTargetOptions.Option::categoryName, collator));
         String commonCategory = categoryIds.size() == 1
                 ? tree.find(categoryIds.iterator().next()).map(PimCategory::name).orElse(null)
                 : null;
-        List<CatalogTargetOptions.Group> groups = others.entrySet().stream()
-                .map(entry -> new CatalogTargetOptions.Group(entry.getKey(), List.copyOf(entry.getValue())))
-                .toList();
-        return new CatalogTargetOptions(keys.size(), List.copyOf(matching), groups, preselect(matching, keys.size()),
-                placement.targets().isEmpty(), commonCategory);
+        return new CatalogTargetOptions(keys.size(), List.copyOf(matching), List.copyOf(others),
+                preselect(matching, keys.size()), placement.targets().isEmpty(), commonCategory);
     }
 
     /**
