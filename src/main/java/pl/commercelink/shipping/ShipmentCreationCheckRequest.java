@@ -38,7 +38,7 @@ public class ShipmentCreationCheckRequest {
     private int attempt;
     /**
      * Customer's return: the operator books a failed return again ("Spróbuj ponownie") in place of its failed row. A
-     * customer's own submission never replaces a return already there (RmaReturnShipmentOwner#markCreating). Read only
+     * customer's own submission never replaces a return already there (RmaReturnShipmentOwner#refusesNewCreation). Read only
      * before the provider is called, so it is not sent with the check.
      */
     @JsonIgnore

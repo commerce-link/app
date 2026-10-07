@@ -27,7 +27,9 @@ public class PickupCandidates {
     public List<PickupCandidate> of(String storeId) {
         Map<String, PickupCandidate> byPackage = new LinkedHashMap<>();
         // the open statuses hold every order whose package can wait: Completed needs every shipment delivered
-        // (Order.hasNothingLeftToDeliver), and Cancelled needs it Delivered with every product returned
+        // (Order.hasNothingLeftToDeliver), and Cancelled needs it Delivered with every product returned; a manual
+        // "Dostarczone" plus all items returned can cancel an order whose parcel still waits, which then drops off this
+        // page on purpose: nothing is left to collect
         ordersRepository.findByStoreAndStatuses(storeId, OrderListService.OPEN).forEach(order ->
                 add(byPackage, ShipmentOwnerType.ORDER, order.getOrderId(), order.getShipments()));
         // every status: the operator may close an RMA right after its shipment was created, the package still waits
