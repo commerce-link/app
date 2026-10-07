@@ -55,7 +55,7 @@ public class RmaShipmentsViewFactory {
 
     private static String removeAction(String details, Shipment s) {
         return UriComponentsBuilder.fromPath(details + "/shipments/creations/{commandId}/remove")
-                .buildAndExpand(s.getCreation().getCommandId()).encode().toUriString();
+                .buildAndExpand(s.getCreation().getCommand().getCommandId()).encode().toUriString();
     }
 
     private static String pickupRetryAction(String details, Shipment s) {

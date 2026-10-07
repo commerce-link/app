@@ -234,7 +234,7 @@ class RmaReturnShipmentOwnerTest {
         // then
         assertThat(rma.getShipments()).hasSize(1);
         assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
-        assertThat(rma.getShipments().get(0).getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+        assertThat(rma.getShipments().get(0).getCreation().getCommand().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
     }
 
     @Test
@@ -250,8 +250,8 @@ class RmaReturnShipmentOwnerTest {
 
         // then
         assertThat(rma.getShipments().get(0).creationFailed()).isTrue();
-        assertThat(rma.getShipments().get(0).getCreation().getErrorKey()).isEqualTo("shipping.creation.notCreated");
-        assertThat(rma.getShipments().get(0).getCreation().getError()).isNull();
+        assertThat(rma.getShipments().get(0).getCreation().getCommand().getErrorKey()).isEqualTo("shipping.creation.notCreated");
+        assertThat(rma.getShipments().get(0).getCreation().getCommand().getError()).isNull();
     }
 
     @Test

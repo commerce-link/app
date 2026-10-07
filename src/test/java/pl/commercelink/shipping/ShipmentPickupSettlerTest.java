@@ -104,7 +104,7 @@ class ShipmentPickupSettlerTest {
         // then
         assertThat(order.getShipments().get(0).getPickup().isOrdered()).isTrue();
         assertThat(order.getShipments().get(1).getPickup().isFailed()).isTrue();
-        assertThat(order.getShipments().get(1).getPickup().getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
+        assertThat(order.getShipments().get(1).getPickup().getCommand().getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
         assertThat(order.getShipments().get(1).awaitsPickup()).isTrue();
     }
 
@@ -129,7 +129,7 @@ class ShipmentPickupSettlerTest {
 
         // then
         assertThat(order.getShipments()).allMatch(s -> s.getPickup().isFailed() && s.awaitsPickup()
-                && "Brak możliwości podjazdu".equals(s.getPickup().getError()));
+                && "Brak możliwości podjazdu".equals(s.getPickup().getCommand().getError()));
     }
 
     @Test
@@ -143,7 +143,7 @@ class ShipmentPickupSettlerTest {
 
         // then
         assertThat(order.getShipments()).allMatch(s -> s.getPickup().isFailed()
-                && "shipping.pickup.unconfirmed".equals(s.getPickup().getErrorKey()));
+                && "shipping.pickup.unconfirmed".equals(s.getPickup().getCommand().getErrorKey()));
         assertThat(errors).singleElement().satisfies(m -> assertThat(m).contains("cmd-1", "store-1", "1"));
     }
 
@@ -159,7 +159,7 @@ class ShipmentPickupSettlerTest {
 
         // then
         verify(warehouseOwner).onPickupSettled(eq("store-1"), eq("furgonetka"), eq(target),
-                argThat(p -> p.isOrdered() && "P-7".equals(p.getPickupId()) && "2026-10-07".equals(p.getDate())));
+                argThat(p -> p.isOrdered() && "P-7".equals(p.getPickupId()) && "2026-10-07".equals(p.getWindow().getDate())));
     }
 
     @Test

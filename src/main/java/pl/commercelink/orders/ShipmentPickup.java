@@ -3,21 +3,20 @@ package pl.commercelink.orders;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 /**
- * The courier pickup of a shipment's package. The window is kept as text (date yyyy-MM-dd, hours HH:mm) the way it is
- * shown. <p>Treat it as immutable: transitions return new objects; the setters exist only for the DynamoDB mapper.
+ * The courier pickup of a shipment's package: where it stands, the carrier's pickup number once ordered, the window it
+ * was ordered for and the last command we sent for it (with the failure reason when it did not work). Waiting for the
+ * first order, handed in at a point or booked by the carrier with the shipment, it has neither window nor command.
+ * <p>Treat it as immutable: transitions return new objects; the setters exist only for the DynamoDB mapper.
  */
 @DynamoDBDocument
 @Getter
@@ -28,48 +27,30 @@ public class ShipmentPickup {
     /** The reason of a pickup the provider never confirmed. */
     public static final String UNCONFIRMED_KEY = "shipping.pickup.unconfirmed";
 
-    private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
-
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum
     private ShipmentPickupStatus status;
-    @DynamoDBAttribute(attributeName = "commandId")
-    private String commandId;
     @DynamoDBAttribute(attributeName = "pickupId")
     private String pickupId;
-    @DynamoDBAttribute(attributeName = "date")
-    private String date;
-    @DynamoDBAttribute(attributeName = "from")
-    private String from;
-    @DynamoDBAttribute(attributeName = "to")
-    private String to;
-    @DynamoDBAttribute(attributeName = "requestedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime requestedAt;
-    @DynamoDBAttribute(attributeName = "error")
-    private String error;
-    @DynamoDBAttribute(attributeName = "errorKey")
-    private String errorKey;
+    @DynamoDBAttribute(attributeName = "window")
+    private ShipmentPickupWindow window;
+    @DynamoDBAttribute(attributeName = "command")
+    private ProviderCommand command;
 
-    private ShipmentPickup(ShipmentPickupStatus status, String commandId, String pickupId, String date, String from,
-                           String to, LocalDateTime requestedAt, String error, String errorKey) {
+    private ShipmentPickup(ShipmentPickupStatus status, String pickupId, ShipmentPickupWindow window,
+                           ProviderCommand command) {
         this.status = status;
-        this.commandId = commandId;
         this.pickupId = pickupId;
-        this.date = date;
-        this.from = from;
-        this.to = to;
-        this.requestedAt = requestedAt;
-        this.error = error;
-        this.errorKey = errorKey;
+        this.window = window;
+        this.command = command;
     }
 
     public static ShipmentPickup notRequired() {
-        return new ShipmentPickup(ShipmentPickupStatus.NOT_REQUIRED, null, null, null, null, null, null, null, null);
+        return new ShipmentPickup(ShipmentPickupStatus.NOT_REQUIRED, null, null, null);
     }
 
     public static ShipmentPickup awaiting() {
-        return new ShipmentPickup(ShipmentPickupStatus.AWAITING, null, null, null, null, null, null, null, null);
+        return new ShipmentPickup(ShipmentPickupStatus.AWAITING, null, null, null);
     }
 
     /**
@@ -77,24 +58,29 @@ public class ShipmentPickup {
      * customer: ordered from the start under the carrier's pickup number, with no window we know of.
      */
     public static ShipmentPickup bookedByCarrier(String pickupId) {
-        return new ShipmentPickup(ShipmentPickupStatus.ORDERED, null, pickupId, null, null, null, null, null, null);
+        return new ShipmentPickup(ShipmentPickupStatus.ORDERED, pickupId, null, null);
     }
 
     public static ShipmentPickup pending(String commandId, LocalDateTime now, LocalDate date, LocalTime from, LocalTime to) {
-        return new ShipmentPickup(ShipmentPickupStatus.PENDING, commandId, null, date.toString(), from.format(HOUR),
-                to.format(HOUR), now, null, null);
+        return new ShipmentPickup(ShipmentPickupStatus.PENDING, null, ShipmentPickupWindow.of(date, from, to),
+                ProviderCommand.sent(commandId, now));
     }
 
     public ShipmentPickup ordered(String id) {
-        return new ShipmentPickup(ShipmentPickupStatus.ORDERED, commandId, id, date, from, to, requestedAt, null, null);
+        return new ShipmentPickup(ShipmentPickupStatus.ORDERED, id, window, command);
     }
 
+    /** Refused in the provider's words; one that failed before any command was sent keeps the reason only. */
     public ShipmentPickup failed(String reason) {
-        return new ShipmentPickup(ShipmentPickupStatus.FAILED, commandId, null, date, from, to, requestedAt, reason, null);
+        return new ShipmentPickup(ShipmentPickupStatus.FAILED, null, window, commandOrNotSent().failed(reason));
     }
 
     public ShipmentPickup failedWithKey(String messageKey) {
-        return new ShipmentPickup(ShipmentPickupStatus.FAILED, commandId, null, date, from, to, requestedAt, null, messageKey);
+        return new ShipmentPickup(ShipmentPickupStatus.FAILED, null, window, commandOrNotSent().failedWithKey(messageKey));
+    }
+
+    private ProviderCommand commandOrNotSent() {
+        return command != null ? command : ProviderCommand.notSent();
     }
 
     /**
@@ -110,13 +96,13 @@ public class ShipmentPickup {
     /** PENDING and younger than ProviderCommandTimeout.UNCONFIRMED_AFTER: its result still comes. */
     @DynamoDBIgnore
     public boolean isInProgress(LocalDateTime now) {
-        return isPending() && !ProviderCommandTimeout.isOverdue(requestedAt, now);
+        return isPending() && !isOverdue(now);
     }
 
     /** PENDING for so long that nothing will settle it any more. */
     @DynamoDBIgnore
     public boolean isUnconfirmed(LocalDateTime now) {
-        return isPending() && ProviderCommandTimeout.isOverdue(requestedAt, now);
+        return isPending() && isOverdue(now);
     }
 
     @DynamoDBIgnore
@@ -126,7 +112,7 @@ public class ShipmentPickup {
 
     @DynamoDBIgnore
     public boolean isPendingFor(String id) {
-        return isPending() && commandId != null && commandId.equals(id);
+        return isPending() && command != null && command.hasId(id);
     }
 
     @DynamoDBIgnore
@@ -137,11 +123,16 @@ public class ShipmentPickup {
     /** Ordered without a command of ours: the carrier booked it with the shipment, so no window is known. */
     @DynamoDBIgnore
     public boolean isBookedByCarrier() {
-        return isOrdered() && commandId == null && date == null;
+        return isOrdered() && command == null && window == null;
     }
 
     @DynamoDBIgnore
     public boolean isFailed() {
         return status == ShipmentPickupStatus.FAILED;
+    }
+
+    // a PENDING pickup without its command (never written so) counts as overdue, like one without a request time
+    private boolean isOverdue(LocalDateTime now) {
+        return command == null || command.isOverdue(now);
     }
 }

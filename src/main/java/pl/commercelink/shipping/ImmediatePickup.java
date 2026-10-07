@@ -62,7 +62,7 @@ public class ImmediatePickup {
         }
 
         static Outcome of(ShipmentPickup failedPickup) {
-            return failed(failedPickup.getError(), failedPickup.getErrorKey());
+            return failed(failedPickup.getCommand().getError(), failedPickup.getCommand().getErrorKey());
         }
     }
 

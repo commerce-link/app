@@ -25,9 +25,9 @@ class ShipmentPickupTest {
         assertThat(pending.isPendingFor("cmd-1")).isTrue();
         assertThat(ordered.isOrdered()).isTrue();
         assertThat(ordered.getPickupId()).isEqualTo("20261006800071");
-        assertThat(ordered.getDate()).isEqualTo("2026-10-07");
-        assertThat(ordered.getFrom()).isEqualTo("09:00");
-        assertThat(ordered.getTo()).isEqualTo("17:00");
+        assertThat(ordered.getWindow().getDate()).isEqualTo("2026-10-07");
+        assertThat(ordered.getWindow().getFrom()).isEqualTo("09:00");
+        assertThat(ordered.getWindow().getTo()).isEqualTo("17:00");
         assertThat(pending.getPickupId()).isNull();
     }
 
@@ -40,7 +40,7 @@ class ShipmentPickupTest {
         // then
         assertThat(failed.isAwaiting()).isTrue();
         assertThat(failed.isFailed()).isTrue();
-        assertThat(failed.getError()).isEqualTo("Termin niedostępny");
+        assertThat(failed.getCommand().getError()).isEqualTo("Termin niedostępny");
         assertThat(failed.isPendingFor("cmd-1")).isFalse();
     }
 
@@ -82,8 +82,8 @@ class ShipmentPickupTest {
         assertThat(booked.isBookedByCarrier()).isTrue();
         assertThat(booked.isAwaiting()).isFalse();
         assertThat(booked.getPickupId()).isEqualTo("APP/CRIN/13023761");
-        assertThat(booked.getDate()).isNull();
-        assertThat(booked.getCommandId()).isNull();
+        assertThat(booked.getWindow()).isNull();
+        assertThat(booked.getCommand()).isNull();
     }
 
     @Test

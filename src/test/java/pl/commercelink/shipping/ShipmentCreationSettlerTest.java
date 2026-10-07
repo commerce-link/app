@@ -106,7 +106,7 @@ class ShipmentCreationSettlerTest {
         // then
         Shipment s = order.getShipments().get(0);
         assertThat(s.creationFailed()).isTrue();
-        assertThat(s.getCreation().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+        assertThat(s.getCreation().getCommand().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
     }
 
     @Test

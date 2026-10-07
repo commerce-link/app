@@ -125,14 +125,15 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
 
     private void reportFailedPickup(String storeId, PickupTarget target, ShipmentPickup result) {
         log.error("Pickup of the return of RMA {} in store {} (package {}) was not ordered: {}", target.ownerId(),
-                storeId, target.externalId(), result.getErrorKey() != null ? result.getErrorKey() : result.getError());
+                storeId, target.externalId(), result.getCommand().failureReason());
         // keyed by the pickup command, so ordering it again and failing again is heard of again; a pickup that failed
         // before any command was sent (no windows read) is tied to its package
-        String attempt = result.getCommandId() != null ? result.getCommandId() : target.externalId();
+        String attempt = result.getCommand().getCommandId() != null ? result.getCommand().getCommandId()
+                : target.externalId();
         notifications.publish(storeId, new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.RMA_RETURN_PICKUP_FAILED, target.ownerId() + ":" + attempt,
                 message(messageSource, "shipping.notification.return.pickup.failed", target.ownerId(),
-                        reason(messageSource, result.getError(), result.getErrorKey()))));
+                        reason(messageSource, result.getCommand()))));
     }
 
     // the e-mail the customer got when the return was booked in one step, unchanged

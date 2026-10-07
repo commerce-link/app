@@ -50,7 +50,7 @@ class ShipmentResultsTest {
         assertThat(pickup.isOrdered()).isTrue();
         assertThat(pickup.isBookedByCarrier()).isTrue();
         assertThat(pickup.getPickupId()).isEqualTo("APP/CRIN/13023761");
-        assertThat(pickup.getDate()).isNull();
+        assertThat(pickup.getWindow()).isNull();
         assertThat(created.get(0).awaitsPickup()).isFalse();
     }
 }

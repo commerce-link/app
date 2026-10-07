@@ -98,7 +98,7 @@ class ImmediatePickupTest {
         verify(owner).applyPickup(eq("store-1"), eq("rma-1"), eq(List.of("21480003")), any());
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), argThat(t -> "21480003".equals(t.externalId())),
                 argThat(p -> p.isFailed() && p.isAwaiting()
-                        && ImmediatePickup.NO_WINDOWS_KEY.equals(p.getErrorKey())));
+                        && ImmediatePickup.NO_WINDOWS_KEY.equals(p.getCommand().getErrorKey())));
         verify(pickupService, never()).order(any(), any(), any(), any());
     }
 
@@ -142,8 +142,8 @@ class ImmediatePickupTest {
         // then
         assertThat(outcome).isEqualTo(ImmediatePickup.Outcome.failed("Brak kuriera", null));
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), argThat(t -> "21480003".equals(t.externalId())),
-                argThat(p -> p.isFailed() && "pick-1".equals(p.getCommandId()) && "Brak kuriera".equals(p.getError())
-                        && "2026-10-06".equals(p.getDate())));
+                argThat(p -> p.isFailed() && "pick-1".equals(p.getCommand().getCommandId()) && "Brak kuriera".equals(p.getCommand().getError())
+                        && "2026-10-06".equals(p.getWindow().getDate())));
     }
 
     @Test
@@ -188,7 +188,7 @@ class ImmediatePickupTest {
         // then
         assertThat(outcome).isEqualTo(ImmediatePickup.Outcome.failed(null, ShipmentPickupService.NOT_SENT_KEY));
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), any(), argThat(p -> p.isFailed()
-                && ShipmentPickupService.NOT_SENT_KEY.equals(p.getErrorKey())));
+                && ShipmentPickupService.NOT_SENT_KEY.equals(p.getCommand().getErrorKey())));
     }
 
     @Test

@@ -173,10 +173,10 @@ class ShipmentPickupServiceTest {
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("Termin niedostępny");
         List<UnaryOperator<ShipmentPickup>> changes = changesApplied(2);
-        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommandId();
+        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommand().getCommandId();
         ShipmentPickup failed = changes.get(1).apply(pending(commandId));
         assertThat(failed.isFailed()).isTrue();
-        assertThat(failed.getError()).isEqualTo("Termin niedostępny");
+        assertThat(failed.getCommand().getError()).isEqualTo("Termin niedostępny");
         verify(publisher, never()).publish(any());
     }
 
@@ -229,10 +229,10 @@ class ShipmentPickupServiceTest {
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("shipping.pickup.unconfirmed");
         List<UnaryOperator<ShipmentPickup>> changes = changesApplied(2);
-        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommandId();
+        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommand().getCommandId();
         ShipmentPickup settled = changes.get(1).apply(pending(commandId));
         assertThat(settled.isFailed()).isTrue();
-        assertThat(settled.getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
+        assertThat(settled.getCommand().getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
         assertThat(errors).singleElement().satisfies(m -> assertThat(m).contains(commandId, "store-1", "1"));
     }
 
@@ -264,8 +264,8 @@ class ShipmentPickupServiceTest {
         verifyNoInteractions(provider);
         verify(publisher, never()).publish(any());
         List<UnaryOperator<ShipmentPickup>> changes = changesApplied(4);
-        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommandId();
-        assertThat(changes.get(2).apply(pending(commandId)).getErrorKey()).isEqualTo("shipping.pickup.not.sent");
+        String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommand().getCommandId();
+        assertThat(changes.get(2).apply(pending(commandId)).getCommand().getErrorKey()).isEqualTo("shipping.pickup.not.sent");
     }
 
     @Test

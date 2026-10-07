@@ -15,10 +15,7 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.api.ItemCondition;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -228,8 +225,8 @@ public final class OrderLabels {
         }
         if (shipment.creationFailed()) {
             ShipmentCreationState creation = shipment.getCreation();
-            return failure("order.shipments.state.creation.failed", creation.getError(),
-                    creation.isPending() ? ShipmentCreationState.UNCONFIRMED_KEY : creation.getErrorKey());
+            return failure("order.shipments.state.creation.failed", creation.getCommand().getError(),
+                    creation.isPending() ? ShipmentCreationState.UNCONFIRMED_KEY : creation.getCommand().getErrorKey());
         }
         ShipmentPickup pickup = shipment.getPickup();
         if (shipment.getProvider() == null || pickup == null || pickup.getStatus() == null) {
@@ -248,9 +245,11 @@ public final class OrderLabels {
                     ? new ShipmentState("order.shipments.state.pickup.carrier", new Object[]{pickup.getPickupId()}, OK,
                     false)
                     : new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
-                    pickupDay(pickup.getDate(), locale), pickupHour(pickup.getFrom()), pickupHour(pickup.getTo())}, OK, false);
+                    pickup.getWindow().formatDay(locale), pickup.getWindow().formatFrom(), pickup.getWindow().formatTo()},
+                    OK, false);
             case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);
-            case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getError(), pickup.getErrorKey());
+            case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getCommand().getError(),
+                    pickup.getCommand().getErrorKey());
         };
     }
 
@@ -261,23 +260,6 @@ public final class OrderLabels {
         // the message source resolves a resolvable argument in the locale of the line itself
         Object reason = errorKey != null ? new DefaultMessageSourceResolvable(errorKey) : error == null ? "" : error;
         return new ShipmentState(key, new Object[]{reason}, WARN, false);
-    }
-
-    // the day as the pickup page offered it ("czw. 8 paź"); a value that does not parse is shown as stored
-    private static String pickupDay(String date, Locale locale) {
-        try {
-            return DateTimeFormatter.ofPattern("EEE d MMM", locale).format(LocalDate.parse(date));
-        } catch (RuntimeException e) {
-            return date;
-        }
-    }
-
-    private static String pickupHour(String hour) {
-        try {
-            return DateTimeFormatter.ofPattern("H:mm").format(LocalTime.parse(hour));
-        } catch (RuntimeException e) {
-            return hour;
-        }
     }
 
     /**

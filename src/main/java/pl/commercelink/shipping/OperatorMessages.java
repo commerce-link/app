@@ -1,6 +1,7 @@
 package pl.commercelink.shipping;
 
 import org.springframework.context.MessageSource;
+import pl.commercelink.orders.ProviderCommand;
 
 import java.util.Locale;
 
@@ -23,5 +24,10 @@ final class OperatorMessages {
             return messageSource.getMessage(errorKey, null, OPERATOR_LOCALE);
         }
         return error != null ? error : "";
+    }
+
+    /** The failure reason of a command, as above; none for no command. */
+    static String reason(MessageSource messageSource, ProviderCommand command) {
+        return command == null ? "" : reason(messageSource, command.getError(), command.getErrorKey());
     }
 }

@@ -189,7 +189,7 @@ class ShipmentPickupFlowTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/order-1");
         verify(provider).orderPickup(eq(List.of("1", "2")), eq(WINDOW), anyString());
         assertThat(listed()).isEmpty();
-        String commandId = order.getShipments().get(0).getPickup().getCommandId();
+        String commandId = order.getShipments().get(0).getPickup().getCommand().getCommandId();
 
         // when: the command succeeds
         settler.ordered(ShipmentPickupCheckRequest.of("store-1", "furgonetka", commandId, List.of(

@@ -9,6 +9,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentPickup;
+import pl.commercelink.orders.ShipmentPickupWindow;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
@@ -133,8 +134,10 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
                 : result.isOrdered() ? "shipping.notification.warehouse.pickup.ordered"
                 : result.isFailed() ? "shipping.notification.warehouse.pickup.failed"
                 : "shipping.notification.warehouse.pickup.point";
-        String message = message(messageSource, key, target.trackingNo(), result.getDate(), result.getFrom(),
-                result.getTo(), reason(messageSource, result.getError(), result.getErrorKey()), result.getPickupId());
+        ShipmentPickupWindow window = result.getWindow();
+        String message = message(messageSource, key, target.trackingNo(), window != null ? window.getDate() : null,
+                window != null ? window.getFrom() : null, window != null ? window.getTo() : null,
+                reason(messageSource, result.getCommand()), result.getPickupId());
         notifications.publish(storeId, new StoreNotification(
                 result.isFailed() ? StoreNotificationSeverity.WARNING : StoreNotificationSeverity.INFO,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP, packageObject(provider, target.externalId()), message));
