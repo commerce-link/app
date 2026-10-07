@@ -461,6 +461,7 @@ class CatalogProductsControllerTest {
         mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "p1"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"));
         verify(productRepository).deleteWhateverItsVersion(a);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test
@@ -1497,10 +1498,12 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(get(categoryPath() + "/products/p1/delete")).andExpect(view().name("settings-confirm"));
         verify(productRepository, never()).delete(any(Product.class));
+        verify(catalogPlacement, never()).evict(any());
         mvc.perform(post(categoryPath() + "/products/p1/delete"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.deleted"));
         verify(productRepository).deleteWhateverItsVersion(existing);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package pl.commercelink.web.inventory;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.BrowseCriteria;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class BrowsePageFactory {
@@ -41,14 +43,35 @@ public class BrowsePageFactory {
     private final WarehouseStockLookup warehouseStock;
 
     public BrowsePage build(@Nullable String storeId, BrowseQuery query, boolean admin, boolean superAdmin) {
+        return build(storeId, query, admin, superAdmin, false);
+    }
+
+    /** @param freshPlacement read "W katalogu" past the cache: the request comes back from a save of products */
+    public BrowsePage build(@Nullable String storeId, BrowseQuery query, boolean admin, boolean superAdmin,
+                            boolean freshPlacement) {
+        if (!inventoryBrowse.isReady()) {
+            return BrowsePage.of(BrowsePage.Status.BUILDING, query, admin, superAdmin);
+        }
+        try {
+            // Read once here, so a PIM that does not answer is a state of the page rather than an error halfway through.
+            tree.topLevels();
+        } catch (RuntimeException e) {
+            log.warn("PIM category tree unavailable for the inventory page: {}", e.getMessage());
+            return BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, admin, superAdmin);
+        }
         BrowseSummary summary = inventoryBrowse.summary(storeId);
         Set<String> unknownIds = unknownCategoryIds(summary.byCategory());
         Map<String, Integer> counts = counts(summary.byCategory(), unknownIds);
         // Offers carry connection identities (Kosatec-k7f3a9c2); without a store they read as their legacy shape.
         SupplierLabelMap labels = storeId == null ? supplierLabels.forStore(null) : supplierLabels.forStoreId(storeId);
         boolean withCatalog = admin && !superAdmin && storeId != null;
-        CatalogPlacement.StorePlacement placement = withCatalog ? catalogPlacement.forStore(storeId) : null;
         String category = query.category();
+        boolean noSuppliers = summary.total() == 0 && !superAdmin;
+        if (!noSuppliers && category != null && !BrowseIndex.UNASSIGNED.equals(category) && tree.find(category).isEmpty()) {
+            return BrowsePage.of(BrowsePage.Status.UNKNOWN_CATEGORY, query, admin, superAdmin);
+        }
+        CatalogPlacement.StorePlacement placement = !withCatalog ? null
+                : freshPlacement ? catalogPlacement.forStoreFresh(storeId) : catalogPlacement.forStore(storeId);
         // Every count beside the list follows the filters its links carry; without filters the store's summary is exact.
         Filters filters = new Filters(storeId, Set.copyOf(query.suppliers()), query.textTooShort() ? null : query.q2(),
                 unknownIds, summary.total() > 0);
@@ -71,11 +94,11 @@ public class BrowsePageFactory {
             truncated = result.truncated();
         }
 
-        return new BrowsePage(query, admin, superAdmin, summary.total() == 0 && !superAdmin, query.textTooShort(),
+        return new BrowsePage(query, admin, superAdmin, noSuppliers, query.textTooShort(),
                 title(category), crumbs(category, query), subnav(category, counts, filters, query), isSiblings(category),
                 tiles(query, counts, filters), supplierOptions(summary, supplierCounts(summary, category, filters), query, labels),
                 chips(query, labels), query.cleared().href(),
-                rows, total, truncated, pagination, sortHeaders(query), query.href());
+                rows, total, truncated, pagination, sortHeaders(query), query.href(), BrowsePage.Status.READY);
     }
 
     private record Filters(String storeId, Set<String> suppliers, String text, Set<String> unknownIds, boolean any) {
@@ -134,7 +157,7 @@ public class BrowsePageFactory {
                 leafSelected);
         String code = row.ean() != null ? row.ean() : row.mfn();
         String detailHref = InventoryPageController.PRICES_PATH + "?q=" + encode(code) + "&from=" + encode(query.href());
-        String addHref = query.hrefWith("open=add&ean=" + encode(code));
+        String addHref = row.ean() == null || row.ean().isBlank() ? null : query.hrefWith("open=add&ean=" + encode(row.ean()));
         return new BrowsePage.RowView(row.name(), row.brand(), row.ean(), row.mfn(), detailHref, category,
                 row.lowestDeliveredNet(), row.deliveryKnown(), labels.of(row.lowestSupplier()), row.qty(), row.suppliers(),
                 warehouseQty(row, inStock), addHref);

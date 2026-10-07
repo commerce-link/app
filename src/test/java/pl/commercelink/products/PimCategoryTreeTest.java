@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -77,5 +79,46 @@ class PimCategoryTreeTest {
 
         // then
         verify(pimCatalog, times(1)).allCategories();
+    }
+
+    @Test
+    void categoryWhoseParentIsMissingIsUnknownWithItsSubtree() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("10", null, "Komponenty komputerowe", "pl"),
+                new PimCategory("30", "99", "Sierota", "pl"),
+                new PimCategory("31", "30", "Dziecko sieroty", "pl"),
+                new PimCategory("40", "41", "Cykl A", "pl"),
+                new PimCategory("41", "40", "Cykl B", "pl")));
+        PimCategoryTree orphans = new PimCategoryTree(pimCatalog);
+
+        // when / then
+        assertThat(orphans.find("30")).isEmpty();
+        assertThat(orphans.find("31")).isEmpty();
+        assertThat(orphans.find("40")).isEmpty();
+        assertThat(orphans.childrenOf("30")).isEmpty();
+        assertThat(orphans.selfAndDescendants("30")).isEmpty();
+        assertThat(orphans.find("10")).isPresent();
+    }
+
+    @Test
+    void emptyTreeIsAskedForAgainAfterSecondsWhileAFullOneIsKeptForMinutes() {
+        // given
+        AtomicLong nanos = new AtomicLong();
+        when(pimCatalog.allCategories()).thenReturn(List.of())
+                .thenReturn(List.of(new PimCategory("10", null, "Komponenty komputerowe", "pl")));
+        PimCategoryTree ticking = new PimCategoryTree(pimCatalog, nanos::get);
+
+        // when
+        boolean emptyFirst = ticking.topLevels().isEmpty();
+        nanos.addAndGet(Duration.ofSeconds(11).toNanos());
+        List<PimCategory> afterRetry = ticking.topLevels();
+        nanos.addAndGet(Duration.ofMinutes(5).toNanos());
+        ticking.topLevels();
+
+        // then
+        assertThat(emptyFirst).isTrue();
+        assertThat(afterRetry).extracting(PimCategory::id).containsExactly("10");
+        verify(pimCatalog, times(2)).allCategories();
     }
 }

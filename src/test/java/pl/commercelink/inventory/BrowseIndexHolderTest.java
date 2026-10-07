@@ -131,6 +131,84 @@ class BrowseIndexHolderTest {
         assertThat(seen).containsExactly(4L);
     }
 
+    @Test
+    void notReadyUntilTheFirstIndexIsBuiltInTheBackground() {
+        // given
+        when(global.version()).thenReturn(3L);
+        when(global.generation()).thenAnswer(call -> generation());
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+
+        // when
+        boolean before = holder.isReady();
+        boolean askedAgain = holder.isReady();
+        int builds = queued.size();
+        queued.forEach(Runnable::run);
+
+        // then
+        assertThat(before).isFalse();
+        assertThat(askedAgain).isFalse();
+        assertThat(builds).isEqualTo(1);
+        assertThat(holder.isReady()).isTrue();
+        assertThat(holder.current().version()).isEqualTo(3);
+    }
+
+    @Test
+    void startupStartsTheFirstBuildOnlyOnce() {
+        // given
+        when(global.version()).thenReturn(3L);
+        when(global.generation()).thenAnswer(call -> generation());
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+
+        // when
+        holder.buildFirstInBackground();
+        holder.buildFirstInBackground();
+        holder.isReady();
+
+        // then
+        assertThat(queued).hasSize(1);
+        verify(global, never()).generation();
+    }
+
+    @Test
+    void indexOfAnInventoryNotLoadedYetIsNotReady() {
+        // given
+        when(global.version()).thenReturn(0L);
+        when(global.generation()).thenAnswer(call -> generation());
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        holder.buildFirstInBackground();
+        queued.forEach(Runnable::run);
+        queued.clear();
+
+        // when
+        boolean beforeLoad = holder.isReady();
+        when(global.version()).thenReturn(1L);
+        holder.isReady();
+        queued.forEach(Runnable::run);
+
+        // then
+        assertThat(beforeLoad).isFalse();
+        assertThat(holder.isReady()).isTrue();
+    }
+
+    @Test
+    void failedFirstBuildIsStartedAgainByTheNextRequest() {
+        // given
+        when(global.version()).thenReturn(3L);
+        doThrow(new IllegalStateException("feed broken")).doAnswer(call -> generation()).when(global).generation();
+        BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
+        holder.buildFirstInBackground();
+        queued.forEach(Runnable::run);
+        queued.clear();
+
+        // when
+        boolean afterFailure = holder.isReady();
+        queued.forEach(Runnable::run);
+
+        // then
+        assertThat(afterFailure).isFalse();
+        assertThat(holder.isReady()).isTrue();
+    }
+
     private GlobalMatchedInventory.Generation generation() {
         return new GlobalMatchedInventory.Generation(global.version(), List.of(), InventoryIndex.of(List.of()));
     }

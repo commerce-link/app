@@ -21,6 +21,7 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
@@ -1003,7 +1004,8 @@ class CatalogCategoryControllerTest {
      * the service's exception has to leave the executor as itself for the controller to answer it.
      */
     private MockMvc overTheRealExecutor(ProductCatalogRepository catalogs) {
-        CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create());
+        CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create(),
+                mock(CatalogPlacement.class));
         return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
                 storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
     }

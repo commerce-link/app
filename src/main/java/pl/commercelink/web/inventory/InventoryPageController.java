@@ -107,15 +107,17 @@ public class InventoryPageController {
     @GetMapping(PAGE_PATH + "/check-price")
     public String legacyCheckPrice(@RequestParam(value = "mfn", required = false) String mfn,
                                    @RequestParam(value = "ean", required = false) String ean,
-                                   @RequestParam(value = "pimId", required = false) String pimId) {
+                                   @RequestParam(value = "pimId", required = false) String pimId,
+                                   @RequestParam(value = "from", required = false) String from) {
+        String back = InventoryReturnTo.safe(from).orElse(null);
         return Stream.of(pimId, mfn, ean)
                 .map(InventoryPageController::normalize)
                 .filter(value -> !value.isEmpty())
                 .findFirst()
                 // UriComponentsBuilder#encode() leaves '+' unencoded (decoded as a space) and turns "{x}" into
                 // a URI template variable that RedirectView then fails to resolve
-                .map(query -> "redirect:" + pricesHref(query, null))
-                .orElse("redirect:" + PRICES_PATH);
+                .map(query -> "redirect:" + pricesHref(query, back))
+                .orElse("redirect:" + PRICES_PATH + (back == null ? "" : "?from=" + encode(back)));
     }
 
     private boolean addSearchResult(String query, Model model) {

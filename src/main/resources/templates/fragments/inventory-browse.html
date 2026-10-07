@@ -35,6 +35,39 @@
      th:attr="data-cl-list-path=${browse.pagePath()}, data-cl-list-fragment=${browse.fragmentPath()}"
      th:with="b=${browse}, q=${browse.query()}">
 
+    <!--/* §4.7 "Indeks się buduje": inventory-browse.js fetches the block again until the list is ready; without
+           JavaScript a reload does */-->
+    <section th:if="${b.building()}" class="cl-card cl-inv-browse-card" aria-labelledby="browse-title" aria-busy="true"
+             data-browse-building>
+        <h2 id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
+        <p role="status" th:text="#{inventory.browse.building}"></p>
+        <noscript><p class="cl-inv-muted" th:text="#{inventory.browse.building.reload}"></p></noscript>
+        <ul class="cl-tile-grid is-categories" aria-hidden="true">
+            <li th:each="i : ${#numbers.sequence(1, 6)}"><div class="cl-tile">
+                <span class="cl-skeleton cl-inv-skeleton-label"></span>
+                <span class="cl-skeleton cl-inv-skeleton-hint"></span>
+            </div></li>
+        </ul>
+    </section>
+
+    <div th:if="${b.pimUnavailable()}" class="cl-alert is-bad" role="alert">
+        <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
+        <div class="cl-alert-text"><p>
+            <span th:text="#{inventory.browse.pimUnavailable}"></span>
+            <a th:href="${b.query().href()}" th:text="#{inventory.browse.retry}"></a>
+        </p></div>
+    </div>
+
+    <section th:if="${b.unknownCategory()}" class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
+        <div class="cl-result-head">
+            <h2 id="browse-title" tabindex="-1" th:text="#{inventory.browse.unknownCategory}"></h2>
+        </div>
+        <div class="cl-inv-browse-empty">
+            <p th:text="#{inventory.browse.unknownCategory.text}"></p>
+            <a class="cl-button" th:href="${b.startHref()}" data-cl-list-nav th:text="#{inventory.browse.all}"></a>
+        </div>
+    </section>
+
     <div th:if="${b.noSuppliers()}" class="cl-alert is-info" role="status">
         <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
         <div class="cl-alert-text"><p>
@@ -43,7 +76,7 @@
         </p></div>
     </div>
 
-    <th:block th:unless="${b.noSuppliers()}">
+    <th:block th:if="${b.ready() && !b.noSuppliers()}">
         <section class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
             <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
             <div th:unless="${b.isStart()}" class="cl-result-head">
@@ -191,7 +224,8 @@
                         <tbody>
                         <tr th:each="row : ${b.rows()}">
                             <td class="cl-table-check" th:if="${b.admin()}">
-                                <label class="cl-check-target">
+                                <!--/* a row without an EAN cannot be added (BrowsePage.RowView#addable) */-->
+                                <label class="cl-check-target" th:if="${row.addable()}">
                                     <input type="checkbox" class="cl-check-input" data-cl-select-row hidden autocomplete="off"
                                            th:value="${row.ean()}" th:attr="aria-label=#{inventory.browse.select.row(${row.name()})}">
                                 </label>
@@ -225,7 +259,7 @@
                             <!--/* the row menu of the design system (details.cl-menu, menu.js); "Dodaj…" opens the add dialog through
                                    inventory-browse.js and without JavaScript goes to the page that draws it open */-->
                             <td class="cl-table-actions" th:if="${b.admin()}">
-                                <details class="cl-menu">
+                                <details class="cl-menu" th:if="${row.addable()}">
                                     <summary class="cl-button is-icon" th:attr="aria-label=#{inventory.browse.actions.aria(${row.name()})}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
                                     <ul class="cl-menu-list">
                                         <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"

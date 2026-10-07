@@ -2,6 +2,8 @@ package pl.commercelink.inventory;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +16,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Keeps the browse index in step with the global inventory. Nothing announces a feed reload, so each call compares the
- * inventory's version: the first call builds the index in place, later versions are rebuilt on a background thread
- * while the previous index keeps answering — a page never waits for a reload of the feeds.
+ * inventory's version: later versions are rebuilt on a background thread while the previous index keeps answering — a
+ * page never waits for a reload of the feeds. The first index is built in the background once the application is up;
+ * until it is in place {@link #isReady()} says so and the page shows that it is being built instead of waiting.
  */
 @Slf4j
 @Component
@@ -48,6 +51,38 @@ public class BrowseIndexHolder {
         }
         rebuildIfStale(index);
         return index;
+    }
+
+    /**
+     * Whether an index of a loaded global inventory is in place. Version 0 is the inventory before its first load, which
+     * holds no products yet; an index of it would read as a store without suppliers. Asking starts the first build if
+     * nothing has started it yet.
+     */
+    public boolean isReady() {
+        BrowseIndex index = current.get();
+        if (index == null) {
+            buildFirstInBackground();
+            return false;
+        }
+        rebuildIfStale(index);
+        return index.version() > 0;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void buildFirstInBackground() {
+        if (current.get() == null && rebuilding.compareAndSet(false, true)) {
+            executor.execute(() -> {
+                try {
+                    if (current.get() == null) {
+                        current.compareAndSet(null, build());
+                    }
+                } catch (RuntimeException e) {
+                    log.error("Browse index build failed", e);
+                } finally {
+                    rebuilding.set(false);
+                }
+            });
+        }
     }
 
     /** Runs after a rebuilt index replaced the previous one, so whoever holds results of the old one can drop them. */

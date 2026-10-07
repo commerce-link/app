@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
@@ -87,7 +88,8 @@ class CatalogsControllerTest {
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
-                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)))).build();
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
+                        mock(CatalogPlacement.class)))).build();
     }
 
     @AfterEach
@@ -130,7 +132,8 @@ class CatalogsControllerTest {
         // given
         CatalogsController controller = new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
-                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)));
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
+                        mock(CatalogPlacement.class)));
         Locale polish = Locale.forLanguageTag("pl");
         when(messageSource.getMessage(eq("store.supplier.schedule.summary.every.minutes"), any(), eq(polish)))
                 .thenReturn("Co 30 min");
@@ -497,10 +500,12 @@ class CatalogsControllerTest {
         doAnswer(call -> stored.put(call.<ProductCatalog>getArgument(0).getCatalogId(), call.getArgument(0)))
                 .when(catalogRepository).save(any(ProductCatalog.class));
         PricelistEventScheduler scheduler = mock(PricelistEventScheduler.class);
-        ProductCatalogDetailsService realDetails = new ProductCatalogDetailsService(catalogRepository, productRepository, scheduler, 5);
+        ProductCatalogDetailsService realDetails = new ProductCatalogDetailsService(catalogRepository, productRepository, scheduler,
+                mock(CatalogPlacement.class), 5);
         MockMvc withRealDetails = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource,
                 realDetails, access, productRepository, pimCategoryOptions, marketplaces,
-                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)))).build();
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
+                        mock(CatalogPlacement.class)))).build();
         when(messageSource.getMessage(eq("catalog.created"), any(), any(Locale.class))).thenReturn("Created");
         var create = post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000001");
 

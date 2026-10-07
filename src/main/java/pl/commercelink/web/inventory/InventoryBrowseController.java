@@ -27,6 +27,8 @@ import java.util.Optional;
 public class InventoryBrowseController {
 
     static final String DIALOG_PATH = "/dashboard/inventory/browse/add-dialog";
+    /** The flash "Uzupełnij dane" leaves when it sends the operator back to this page. */
+    public static final String NOTICE_FLASH = "inventoryNotice";
 
     private final BrowsePageFactory pageFactory;
     private final AddToCatalogDialogFactory dialogFactory;
@@ -35,11 +37,14 @@ public class InventoryBrowseController {
 
     @GetMapping(BrowseQuery.PATH)
     public String page(@RequestParam MultiValueMap<String, String> params, Model model) {
-        // Before the split this path was the code search; its bookmarks carry q.
-        if (params.containsKey("q")) {
-            return "redirect:" + InventoryPageController.pricesHref(params.getFirst("q"), params.getFirst("from"));
+        // Before the split this path was the code search; its bookmarks carry q. An empty one searched nothing: start here.
+        String legacyQuery = params.getFirst("q");
+        if (legacyQuery != null && !legacyQuery.isBlank()) {
+            return "redirect:" + InventoryPageController.pricesHref(legacyQuery, params.getFirst("from"));
         }
-        BrowseQuery query = addBrowseAttributes(params, model);
+        // Back from "Uzupełnij dane", which may have saved on another instance: its "W katalogu" is read again.
+        boolean afterSave = model.containsAttribute(NOTICE_FLASH);
+        BrowseQuery query = addBrowseAttributes(params, model, afterSave);
         model.addAttribute("browseDialogUrl", DIALOG_PATH);
         List<String> eans = params.getOrDefault("ean", List.of());
         if ("add".equals(params.getFirst("open")) && isAdmin() && storeId() != null && !eans.isEmpty()) {
@@ -52,7 +57,7 @@ public class InventoryBrowseController {
 
     @GetMapping(BrowseQuery.FRAGMENT_PATH)
     public String results(@RequestParam MultiValueMap<String, String> params, Model model) {
-        addBrowseAttributes(params, model);
+        addBrowseAttributes(params, model, false);
         return "fragments/inventory-browse :: results";
     }
 
@@ -82,13 +87,13 @@ public class InventoryBrowseController {
         return "forward:" + CatalogPaths.productsAddReview(resolved.get().catalogId(), resolved.get().categoryId());
     }
 
-    private BrowseQuery addBrowseAttributes(MultiValueMap<String, String> params, Model model) {
+    private BrowseQuery addBrowseAttributes(MultiValueMap<String, String> params, Model model, boolean freshPlacement) {
         InventoryPageController.addCommonAttributes(model);
         model.addAttribute("query", "");
         BrowseQuery query = BrowseQuery.parse(params);
         // A super admin account may carry a store id; its browse is the global one, like its code search.
         String scope = isSuperAdmin() ? null : storeId();
-        model.addAttribute("browse", pageFactory.build(scope, query, isAdmin(), isSuperAdmin()));
+        model.addAttribute("browse", pageFactory.build(scope, query, isAdmin(), isSuperAdmin(), freshPlacement));
         return query;
     }
 

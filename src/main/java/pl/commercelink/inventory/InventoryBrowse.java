@@ -61,6 +61,11 @@ public class InventoryBrowse {
         holder.onReplaced(this::forgetResults);
     }
 
+    /** False while the first index is being built; nothing below waits for it then. */
+    public boolean isReady() {
+        return holder.isReady();
+    }
+
     public BrowseSummary summary(@Nullable String storeId) {
         BrowseScope scope = scope(storeId);
         return scope == null ? BrowseSummary.EMPTY : scope.summary();

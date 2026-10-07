@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,12 +37,15 @@ class ProductCatalogDetailsServiceTest {
     private ProductRepository productRepository;
     @Mock
     private PricelistEventScheduler pricelistEventScheduler;
+    @Mock
+    private CatalogPlacement placement;
 
     private ProductCatalogDetailsService service;
 
     @BeforeEach
     void setUp() {
-        service = new ProductCatalogDetailsService(productCatalogRepository, productRepository, pricelistEventScheduler, 5);
+        service = new ProductCatalogDetailsService(productCatalogRepository, productRepository, pricelistEventScheduler,
+                placement, 5);
         when(pricelistEventScheduler.snapshot(any(), any())).thenReturn(Optional.empty());
     }
 
@@ -96,6 +100,20 @@ class ProductCatalogDetailsServiceTest {
         // then
         verify(pricelistEventScheduler, never()).schedule(any(), any(), any());
         verify(productCatalogRepository).save(existing);
+    }
+
+    @Test
+    void savedOrDeletedCatalogDropsTheStoresCatalogPlacement() {
+        // given
+        ProductCatalog existing = submittedCatalog("0 5 * * ? *");
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(existing);
+
+        // when
+        service.save(STORE_ID, CATALOG_ID, submittedCatalog("0 5 * * ? *"));
+        service.delete(STORE_ID, CATALOG_ID);
+
+        // then
+        verify(placement, times(2)).evict(STORE_ID);
     }
 
     @Test

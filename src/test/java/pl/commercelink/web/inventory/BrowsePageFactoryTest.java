@@ -65,15 +65,19 @@ class BrowsePageFactoryTest {
     @Mock private StockQueryService stock;
     private BrowsePageFactory factory;
 
+    private PimCatalog pimCatalog;
+
     @BeforeEach
     void setUp() {
-        PimCatalog pimCatalog = mock(PimCatalog.class);
+        pimCatalog = mock(PimCatalog.class);
+        when(inventoryBrowse.isReady()).thenReturn(true);
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("10", null, "Komponenty komputerowe", "pl"),
                 new PimCategory("11", "10", "Karty graficzne", "pl"),
                 new PimCategory("12", "10", "Dyski SSD", "pl"),
                 new PimCategory("20", null, "Akcesoria", "pl"),
-                new PimCategory("21", "20", "Kable", "pl")));
+                new PimCategory("21", "20", "Kable", "pl"),
+                new PimCategory("31", "99", "Sierota", "pl")));
         when(storesRepository.findById(STORE_ID)).thenReturn(store(
                 labelled("Kosatec-k7f3a9c2", "Kosatec B2B"),
                 labelled("manual-a1b2c3d4", "Hurtownia Nowak"),
@@ -156,7 +160,7 @@ class BrowsePageFactoryTest {
                 row("5901000000002", "777", "Zasilacze awaryjne")), 1, false));
 
         // when
-        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("777"), true, false);
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("-"), true, false);
 
         // then
         assertThat(page.rows().get(0).category().pimAncestors()).isEmpty();
@@ -298,6 +302,100 @@ class BrowsePageFactoryTest {
         assertThat(start.tiles()).extracting(BrowsePage.Tile::labelKey).contains("inventory.browse.unassigned");
         assertThat(start.tiles()).filteredOn(tile -> "inventory.browse.unassigned".equals(tile.labelKey()))
                 .extracting(BrowsePage.Tile::count).containsExactly(4);
+    }
+
+    @Test
+    void indexStillBeingBuiltGivesTheBuildingStateWithoutCountingOrListing() {
+        // given
+        when(inventoryBrowse.isReady()).thenReturn(false);
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
+
+        // then
+        assertThat(page.building()).isTrue();
+        assertThat(page.noSuppliers()).isFalse();
+        assertThat(page.rows()).isEmpty();
+        verify(inventoryBrowse, never()).summary(any());
+        verify(inventoryBrowse, never()).browse(any(), any());
+        verifyNoInteractions(catalogPlacement);
+    }
+
+    @Test
+    void pimThatDoesNotAnswerGivesTheErrorStateInsteadOfFailingThePage() {
+        // given
+        when(pimCatalog.allCategories()).thenThrow(new IllegalStateException("PIM down"));
+        BrowsePageFactory failing = new BrowsePageFactory(inventoryBrowse, new PimCategoryTree(pimCatalog), catalogPlacement,
+                new SupplierLabels(storesRepository), new WarehouseStockLookup(warehouse, storesRepository));
+
+        // when
+        BrowsePage page = failing.build(STORE_ID, BrowseQuery.start(), true, false);
+
+        // then
+        assertThat(page.pimUnavailable()).isTrue();
+        assertThat(page.tiles()).isEmpty();
+        verify(inventoryBrowse, never()).summary(any());
+    }
+
+    @Test
+    void categoryThePimTreeDoesNotHaveGivesTheUnknownCategoryState() {
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("999999999"), true, false);
+        BrowsePage orphan = factory.build(STORE_ID, BrowseQuery.start().withCategory("31"), true, false);
+
+        // then
+        assertThat(page.unknownCategory()).isTrue();
+        assertThat(page.title()).isNull();
+        assertThat(orphan.unknownCategory()).isTrue();
+        verify(inventoryBrowse, never()).browse(any(), any());
+    }
+
+    @Test
+    void productsOfACategoryWhoseParentIsMissingCountAsUnassigned() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 3, "-", 2, "31", 4),
+                Map.of("AB", 9), 9));
+
+        // when
+        BrowsePage start = factory.build(STORE_ID, BrowseQuery.start(), true, false);
+        factory.build(STORE_ID, BrowseQuery.start().withCategory("-"), true, false);
+
+        // then
+        assertThat(start.tiles()).filteredOn(tile -> "inventory.browse.unassigned".equals(tile.labelKey()))
+                .extracting(BrowsePage.Tile::count).containsExactly(6);
+        ArgumentCaptor<BrowseCriteria> criteria = ArgumentCaptor.forClass(BrowseCriteria.class);
+        verify(inventoryBrowse).browse(eq(STORE_ID), criteria.capture());
+        assertThat(criteria.getValue().categoryIds()).containsExactlyInAnyOrder("-", "31");
+    }
+
+    @Test
+    void rowWithoutAnEanCannotBeAdded() {
+        // given
+        when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
+                mfnRow("MFN-ONLY"), row("5901000000002", "11", "Karty graficzne")), 2, false));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false);
+
+        // then
+        assertThat(page.rows().get(0).addable()).isFalse();
+        assertThat(page.rows().get(0).addHref()).isNull();
+        assertThat(page.rows().get(0).detailHref()).contains("q=MFN-ONLY");
+        assertThat(page.rows().get(1).addable()).isTrue();
+        assertThat(page.rows().get(1).addHref()).isEqualTo("/dashboard/inventory?cat=11&open=add&ean=5901000000002");
+    }
+
+    @Test
+    void freshPlacementIsReadPastTheCache() {
+        // given
+        when(catalogPlacement.forStoreFresh(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(), List.of()));
+
+        // when
+        factory.build(STORE_ID, BrowseQuery.start().withCategory("11"), true, false, true);
+
+        // then
+        verify(catalogPlacement).forStoreFresh(STORE_ID);
+        verify(catalogPlacement, never()).forStore(any());
     }
 
     @Test

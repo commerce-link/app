@@ -108,6 +108,29 @@ class ProductLabelsDynamoDbIntegrationTest {
     }
 
     @Test
+    void codesOfReadsTheIdAndBothCodesConsistentlyAcrossEveryPage() {
+        // given
+        save("cat-codes", "A", "B", "C");
+        AmazonDynamoDB spy = Mockito.mock(AmazonDynamoDB.class, AdditionalAnswers.delegatesTo(client));
+
+        // when: two items a page, so two pages
+        List<ProductRepository.ProductCodes> codes = new ProductRepository(spy).codesOf("cat-codes", 2);
+
+        // then
+        assertThat(codes).hasSize(3).allSatisfy(product -> {
+            assertThat(product.productId()).isNotBlank();
+            assertThat(product.ean()).isEqualTo("5900000000008");
+            assertThat(product.manufacturerCode()).isEqualTo("MFN");
+        });
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(spy, times(2)).query(request.capture());
+        assertThat(request.getAllValues()).allSatisfy(query -> {
+            assertThat(query.getProjectionExpression()).isEqualTo("productId, ean, mfn");
+            assertThat(query.getConsistentRead()).isTrue();
+        });
+    }
+
+    @Test
     void anEmptyCategoryHasNoLabels() {
         // when / then
         assertThat(products.labelsOf("cat-empty")).isEmpty();

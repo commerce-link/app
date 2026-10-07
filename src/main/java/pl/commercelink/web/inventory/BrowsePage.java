@@ -10,10 +10,44 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
                          String title, List<Crumb> crumbs, List<NavItem> subnav, boolean subnavSiblings,
                          List<Tile> tiles, List<MenuOption> supplierOptions, List<Chip> chips, String clearHref,
                          List<RowView> rows, int total, boolean truncated, Pagination pagination,
-                         Map<String, SortHeader> sortHeaders, String returnTo) {
+                         Map<String, SortHeader> sortHeaders, String returnTo, Status status) {
 
     public static final String PAGE_PATH = BrowseQuery.PATH;
     public static final String FRAGMENT_PATH = BrowseQuery.FRAGMENT_PATH;
+
+    /**
+     * READY is the list or the tiles. BUILDING: the index of the inventory is not in place yet (the first seconds after a
+     * start), PIM_UNAVAILABLE: the category tree could not be read, UNKNOWN_CATEGORY: {@code cat} names no category.
+     */
+    public enum Status { READY, BUILDING, PIM_UNAVAILABLE, UNKNOWN_CATEGORY }
+
+    /** A page that shows only its state: nothing was counted or listed for it. */
+    public static BrowsePage of(Status status, BrowseQuery query, boolean admin, boolean superAdmin) {
+        return new BrowsePage(query, admin, superAdmin, false, false, null, List.of(), List.of(), false, List.of(),
+                List.of(), List.of(), query.cleared().href(), List.of(), 0, false,
+                Pagination.of(1, 0, BrowseQuery.PAGE_SIZE, page -> query.withPage(page).href()), Map.of(), query.href(),
+                status);
+    }
+
+    public boolean ready() {
+        return status == Status.READY;
+    }
+
+    public boolean building() {
+        return status == Status.BUILDING;
+    }
+
+    public boolean pimUnavailable() {
+        return status == Status.PIM_UNAVAILABLE;
+    }
+
+    public boolean unknownCategory() {
+        return status == Status.UNKNOWN_CATEGORY;
+    }
+
+    public String startHref() {
+        return BrowseQuery.start().href();
+    }
 
     public boolean isStart() {
         return query.isStart();
@@ -56,6 +90,14 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
 
         public boolean inCatalog() {
             return category.inCatalog();
+        }
+
+        /**
+         * The dialog and "Uzupełnij dane" find the product by its EAN; a row without one (an own or manual offer listed
+         * by its manufacturer code only) has neither the checkbox nor the add action.
+         */
+        public boolean addable() {
+            return ean != null && !ean.isBlank();
         }
     }
 }

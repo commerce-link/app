@@ -51,7 +51,7 @@ class InventoryBrowseControllerTest {
     void setUp() {
         security = mockStatic(CustomSecurityContext.class);
         signedInAs("ADMIN");
-        when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean())).thenReturn(mock(BrowsePage.class));
+        when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(mock(BrowsePage.class));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu), List.of()));
@@ -96,6 +96,40 @@ class InventoryBrowseControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/inventory/prices?q=A%2BB+%7Bx%7D");
         verifyNoInteractions(pageFactory);
+    }
+
+    @Test
+    void emptyOrBlankCodeSearchOpensTheBrowseStart() {
+        // given
+        LinkedMultiValueMap<String, String> empty = new LinkedMultiValueMap<>();
+        empty.add("q", "");
+        LinkedMultiValueMap<String, String> blank = new LinkedMultiValueMap<>();
+        blank.add("q", "   ");
+
+        // when
+        String emptyView = controller.page(empty, new ConcurrentModel());
+        String blankView = controller.page(blank, new ConcurrentModel());
+
+        // then
+        assertThat(emptyView).isEqualTo("inventory");
+        assertThat(blankView).isEqualTo("inventory");
+        verify(pageFactory, times(2)).build(eq(STORE_ID), eq(BrowseQuery.start()), eq(true), eq(false), eq(false));
+    }
+
+    @Test
+    void returnFromTheCatalogsReviewReadsTheCatalogStatusAfresh() {
+        // given
+        ConcurrentModel model = new ConcurrentModel();
+        model.addAttribute(InventoryBrowseController.NOTICE_FLASH, "Dodano 2 produkty");
+
+        // when
+        controller.page(new LinkedMultiValueMap<>(), model);
+        controller.page(new LinkedMultiValueMap<>(), new ConcurrentModel());
+        controller.results(new LinkedMultiValueMap<>(), new ConcurrentModel());
+
+        // then
+        verify(pageFactory).build(eq(STORE_ID), any(), eq(true), eq(false), eq(true));
+        verify(pageFactory, times(2)).build(eq(STORE_ID), any(), eq(true), eq(false), eq(false));
     }
 
     @Test
@@ -149,7 +183,7 @@ class InventoryBrowseControllerTest {
         controller.results(params, new ConcurrentModel());
 
         // then
-        verify(pageFactory, times(2)).build(isNull(), any(), eq(false), eq(true));
+        verify(pageFactory, times(2)).build(isNull(), any(), eq(false), eq(true), eq(false));
     }
 
     @Test

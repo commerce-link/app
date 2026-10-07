@@ -15,7 +15,7 @@ class InventoryBrowseScriptContractTest {
     private static final List<String> HOOKS = List.of(
             "data-browse-root", "data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add",
             "data-browse-add-selected", "data-browse-dialog-close", "data-browse-other-select",
-            "data-browse-other-radio", "data-cl-select-row");
+            "data-browse-other-radio", "data-cl-select-row", "data-browse-building");
 
     @Test
     void everyHookOfTheScriptExistsInTheTemplates() throws IOException {

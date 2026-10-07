@@ -233,7 +233,20 @@ class InventoryPageControllerTest {
     @MethodSource("legacyCheckPriceLinks")
     void legacyCheckPriceRedirectsToTheNewQuery(String rule, String mfn, String ean, String pimId, String expected) {
         // when / then
-        assertThat(controller.legacyCheckPrice(mfn, ean, pimId)).isEqualTo(expected);
+        assertThat(controller.legacyCheckPrice(mfn, ean, pimId, null)).isEqualTo(expected);
+    }
+
+    @Test
+    void legacyCheckPriceKeepsAValidBackLinkAndDropsAForeignOne() {
+        // when
+        String kept = controller.legacyCheckPrice(null, "5900000000126", null, "/dashboard/inventory?cat=1571");
+        String plain = controller.legacyCheckPrice(null, null, null, "/dashboard/inventory?cat=1571");
+        String foreign = controller.legacyCheckPrice(null, "5900000000126", null, "https://evil.example/");
+
+        // then
+        assertThat(kept).isEqualTo("redirect:/dashboard/inventory/prices?q=5900000000126&from=%2Fdashboard%2Finventory%3Fcat%3D1571");
+        assertThat(plain).isEqualTo("redirect:/dashboard/inventory/prices?from=%2Fdashboard%2Finventory%3Fcat%3D1571");
+        assertThat(foreign).isEqualTo("redirect:/dashboard/inventory/prices?q=5900000000126");
     }
 
     private static Stream<Arguments> legacyCheckPriceLinks() {

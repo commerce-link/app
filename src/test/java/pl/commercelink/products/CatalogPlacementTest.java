@@ -7,6 +7,9 @@ import pl.commercelink.inventory.InventoryKey;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -28,12 +31,8 @@ class CatalogPlacementTest {
         ProductCatalog parts = catalog("c-1", "Podzespoły komputerowe", gpus, auto);
         ProductCatalog shop = catalog("c-2", "Sklep B2B", b2b);
         when(catalogs.findAll(STORE_ID)).thenReturn(List.of(shop, parts));
-        Product existing = mock(Product.class);
-        when(existing.getEan()).thenReturn("5901000000001");
-        when(existing.getManufacturerCode()).thenReturn("GPU-1");
-        when(existing.getProductId()).thenReturn("p-1");
-        when(products.findAll("cat-gpu")).thenReturn(List.of(existing));
-        when(products.findAll("cat-b2b")).thenReturn(List.of());
+        when(products.codesOf("cat-gpu")).thenReturn(List.of(new ProductRepository.ProductCodes("p-1", "5901000000001", "GPU-1")));
+        when(products.codesOf("cat-b2b")).thenReturn(List.of());
     }
 
     @Test
@@ -78,6 +77,42 @@ class CatalogPlacementTest {
 
         // then
         verify(catalogs, times(2)).findAll(STORE_ID);
+    }
+
+    @Test
+    void freshReadBypassesTheCachedPlacementAndReplacesIt() {
+        // given
+        placement.forStore(STORE_ID);
+        when(products.codesOf("cat-b2b")).thenReturn(List.of(new ProductRepository.ProductCodes("p-2", "5902000000002", null)));
+
+        // when
+        CatalogPlacement.StorePlacement fresh = placement.forStoreFresh(STORE_ID);
+        CatalogPlacement.StorePlacement next = placement.forStore(STORE_ID);
+
+        // then
+        assertThat(fresh.isIn("cat-b2b", InventoryKey.fromEan("5902000000002"))).isTrue();
+        assertThat(next).isSameAs(fresh);
+        verify(catalogs, times(2)).findAll(STORE_ID);
+    }
+
+    @Test
+    void automaticCategoriesAreNotRead() {
+        // when
+        placement.forStore(STORE_ID);
+
+        // then
+        verify(products, never()).codesOf("cat-auto");
+        verify(products, never()).findAll(anyString());
+    }
+
+    @Test
+    void failedReadOfACategoryFailsThePlacementWithItsOwnException() {
+        // given
+        when(products.codesOf("cat-b2b")).thenThrow(new IllegalStateException("throttled"));
+
+        // when / then
+        assertThatThrownBy(() -> placement.forStore(STORE_ID)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("throttled");
     }
 
     private static CategoryDefinition category(String id, String name, CategoryDefinitionType type,

@@ -17,16 +17,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * The store's manual catalog categories by the PIM categories they take, and the products already in them. Read once
- * per two minutes per store (one query per category); a save from "Uzupełnij dane" evicts it at once.
+ * per two minutes per store (one query per category, a few at a time, the two codes only). A save of products or
+ * categories evicts it on the instance that saved; the inventory page reads it fresh after "Uzupełnij dane", which may
+ * have saved on another instance.
  */
 @Component
 @RequiredArgsConstructor
 public class CatalogPlacement {
 
     private static final Collator POLISH = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
+    private static final Executor READERS = Executors.newFixedThreadPool(8, runnable -> {
+        Thread thread = new Thread(runnable, "catalog-placement");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final ProductCatalogRepository catalogRepository;
     private final ProductRepository productRepository;
@@ -39,13 +50,19 @@ public class CatalogPlacement {
         return cache.get(storeId, this::load);
     }
 
+    /** Read again, bypassing what this instance holds, and kept for the requests after it. */
+    public StorePlacement forStoreFresh(String storeId) {
+        StorePlacement placement = load(storeId);
+        cache.put(storeId, placement);
+        return placement;
+    }
+
     public void evict(String storeId) {
         cache.invalidate(storeId);
     }
 
     private StorePlacement load(String storeId) {
         List<Target> targets = new ArrayList<>();
-        List<Existing> existing = new ArrayList<>();
         List<ProductCatalog> catalogs = new ArrayList<>(catalogRepository.findAll(storeId));
         catalogs.sort(Comparator.comparing(ProductCatalog::getName, Comparator.nullsLast(POLISH)));
         for (ProductCatalog catalog : catalogs) {
@@ -56,13 +73,35 @@ public class CatalogPlacement {
                 }
                 targets.add(new Target(catalog.getCatalogId(), catalog.getName(), category.getCategoryId(),
                         category.getName(), List.copyOf(category.getPimCategoryIds())));
-                for (Product product : productRepository.findAll(category.getCategoryId())) {
-                    existing.add(new Existing(catalog.getCatalogId(), category.getCategoryId(), product.getProductId(),
-                            InventoryKey.fromProduct(product)));
-                }
             }
         }
+        // One query per category: run a few at once so a store with a hundred categories does not wait for them in turn.
+        List<CompletableFuture<List<Existing>>> reads = targets.stream()
+                .map(target -> CompletableFuture.supplyAsync(() -> existingIn(target), READERS))
+                .toList();
+        List<Existing> existing = new ArrayList<>();
+        for (CompletableFuture<List<Existing>> read : reads) {
+            existing.addAll(joined(read));
+        }
         return new StorePlacement(targets, existing);
+    }
+
+    private List<Existing> existingIn(Target target) {
+        return productRepository.codesOf(target.categoryId()).stream()
+                .map(product -> new Existing(target.catalogId(), target.categoryId(), product.productId(),
+                        new InventoryKey(product.ean(), product.manufacturerCode())))
+                .toList();
+    }
+
+    private static <T> T joined(CompletableFuture<T> future) {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            throw e;
+        }
     }
 
     public record Target(String catalogId, String catalogName, String categoryId, String categoryName,

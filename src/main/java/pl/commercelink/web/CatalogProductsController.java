@@ -57,6 +57,7 @@ import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.inventory.InventoryBrowseController;
 import pl.commercelink.web.inventory.InventoryReturnTo;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -351,7 +352,7 @@ public class CatalogProductsController {
         if (backToInventory.isPresent()) {
             // The review already dropped what the category had then; only the inventory notice reports that number.
             int skipped = form.getProducts().size() - added + reviewSkipped(skippedBefore);
-            redirectAttributes.addFlashAttribute("inventoryNotice", messageSource.getMessage("inventory.browse.added",
+            redirectAttributes.addFlashAttribute(InventoryBrowseController.NOTICE_FLASH, messageSource.getMessage("inventory.browse.added",
                     new Object[]{category.getName(), added, skipped}, locale));
             redirectAttributes.addFlashAttribute("inventoryNoticeHref", CatalogPaths.category(catalogId, categoryId));
             return "redirect:" + backToInventory.get();
@@ -444,6 +445,7 @@ public class CatalogProductsController {
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
         productRepository.save(product);
+        catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.added", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
@@ -537,6 +539,8 @@ public class CatalogProductsController {
                     Map.of(PRODUCT_FORM, "product.conflict"), null, currentFilter, model, locale);
             return async ? PRODUCT_FRAGMENT : view;
         }
+        // An edit may change the codes the inventory's "W katalogu" compares.
+        catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage(joined.isPresent() ? "product.saved.pimAttached" : "product.saved",
                         new Object[]{product.getName()}, locale), async, model,
@@ -578,6 +582,7 @@ public class CatalogProductsController {
         }
         // Deleted whatever its version: a save of the product landing after this page read it does not fail the delete.
         productRepository.deleteWhateverItsVersion(product);
+        catalogPlacement.evict(storeId());
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("product.deleted", new Object[]{product.getName()}, locale));
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
@@ -826,6 +831,7 @@ public class CatalogProductsController {
     /** What the operator chose goes, even when it was saved meanwhile: the delete does not ask for the version it read. */
     private int delete(List<Product> products) {
         products.forEach(productRepository::deleteWhateverItsVersion);
+        catalogPlacement.evict(storeId());
         return products.size();
     }
 

@@ -174,6 +174,65 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
+    void buildingIndexShowsABusySkeletonWithAStatusInsteadOfTheNoProductsMessage() {
+        // when
+        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.BUILDING, BrowseQuery.start(), true, false)));
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("aria-busy=\"true\"", "data-browse-building", "cl-skeleton",
+                "<p role=\"status\">Preparing the assortment for browsing \u2014 this takes a few seconds.</p>",
+                "<noscript><p class=\"cl-inv-muted\">Reload the page in a moment.</p></noscript>", "data-cl-list-results");
+        assertThat(html).doesNotContain("There are no products to browse yet", "cl-table", "No products for these filters");
+    }
+
+    @Test
+    void unavailablePimShowsTheErrorAlertWithARetryOfTheSameAddress() {
+        // given
+        BrowseQuery query = BrowseQuery.start().withCategory("11");
+
+        // when
+        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, true, false)));
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("<div class=\"cl-alert is-bad\" role=\"alert\">", "Could not load the PIM categories.",
+                "<a href=\"/dashboard/inventory?cat=11\">Try again</a>");
+        assertThat(html).doesNotContain("There are no products to browse yet", "cl-table", "data-browse-building");
+    }
+
+    @Test
+    void unknownCategoryShowsItsOwnEmptyStateWithAWayToTheStart() {
+        // when
+        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.UNKNOWN_CATEGORY,
+                BrowseQuery.start().withCategory("999999999"), true, false)));
+
+        // then
+        assertThat(html).doesNotContain("??", "999999999");
+        assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\">There is no such category</h2>",
+                "The PIM has no such category, or it was removed.",
+                "<a class=\"cl-button\" href=\"/dashboard/inventory\" data-cl-list-nav>All categories</a>");
+        assertThat(html).doesNotContain("There are no products to browse yet", "cl-table");
+    }
+
+    @Test
+    void rowWithoutAnEanHasNeitherTheCheckboxNorTheRowMenu() {
+        // given
+        BrowsePage.RowView noEan = new BrowsePage.RowView("Zasilacz", "Brand", null, "PSU-1",
+                "/dashboard/inventory/prices?q=PSU-1", line(List.of()), 199.0, true, "AB", 3, 1, 0, null);
+
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"),
+                List.of(noEan, row(false)))));
+
+        // then
+        assertThat(html.split("data-cl-select-row", -1)).hasSize(2);
+        assertThat(html.split("<details class=\"cl-menu\">", -1)).hasSize(2);
+        assertThat(html).contains("value=\"5901000000001\"", "PSU-1");
+        assertThat(html).doesNotContain("Actions: Zasilacz", "Select: Zasilacz");
+    }
+
+    @Test
     void startRendersCategoryTiles() {
         // given
         BrowsePage start = page(true, false, BrowseQuery.start(), List.of());
@@ -348,6 +407,6 @@ class InventoryBrowseRenderingTest {
                 chips,
                 "/dashboard/inventory", rows, rows.size(), false,
                 Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?page=" + p),
-                Map.of("NAME", none, "COST", none, "QTY", none), query.href());
+                Map.of("NAME", none, "COST", none, "QTY", none), query.href(), BrowsePage.Status.READY);
     }
 }

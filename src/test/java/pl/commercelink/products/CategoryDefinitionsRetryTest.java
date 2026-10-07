@@ -27,7 +27,8 @@ class CategoryDefinitionsRetryTest {
     private final ProductCatalogRepository catalogs = mock(ProductCatalogRepository.class);
     private final ProductRepository products = mock(ProductRepository.class);
     private final CategoryDefinitions definitions =
-            new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create());
+            new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create(),
+                    mock(CatalogPlacement.class));
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
