@@ -107,8 +107,8 @@ public class ShipmentPickupController {
                 .findFirst();
         // only packages that still wait in this group: the form may be stale, or carry ids from elsewhere
         List<PickupTarget> targets = chosen.map(g -> g.entries().stream()
-                        .filter(e -> externalIds.contains(e.getExternalId()))
-                        .map(e -> new PickupTarget(e.getOwnerType(), e.getOwnerId(), e.getExternalId(), e.getTrackingNo()))
+                        .filter(c -> externalIds.contains(c.externalId()))
+                        .map(PickupCandidate::target)
                         .toList())
                 .orElse(List.of());
         if (targets.isEmpty()) {
@@ -189,7 +189,7 @@ public class ShipmentPickupController {
 
     private List<ShipmentPickupPage.PackageRow> packageRows(PickupGroup group, Map<String, String> refused, String back,
                                                             Locale locale) {
-        return group.entries().stream().map(e -> packageRow(e, refused.get(e.getExternalId()), back, locale)).toList();
+        return group.entries().stream().map(c -> packageRow(c, refused.get(c.externalId()), back, locale)).toList();
     }
 
     private ShipmentPickupPage.GroupOption groupOption(PickupGroup group, boolean selected, Store store, Locale locale) {
@@ -203,25 +203,26 @@ public class ShipmentPickupController {
         return new ShipmentPickupPage.GroupOption(group.key(), label, selected);
     }
 
-    private ShipmentPickupPage.PackageRow packageRow(AwaitingPickup entry, String refusal, String back, Locale locale) {
-        String label = ConversionUtil.getShortenedId(entry.getOwnerId()) + " · " + entry.getTrackingNo();
+    private ShipmentPickupPage.PackageRow packageRow(PickupCandidate candidate, String refusal, String back,
+                                                     Locale locale) {
+        String label = ConversionUtil.getShortenedId(candidate.ownerId()) + " · " + candidate.trackingNo();
         String refusalLine = refusal == null ? null
                 : messageSource.getMessage("shipping.pickup.package.refused", new Object[]{refusal}, locale);
-        return new ShipmentPickupPage.PackageRow(entry.getExternalId(), label, ownerMarker(entry, back, locale),
+        return new ShipmentPickupPage.PackageRow(candidate.externalId(), label, ownerMarker(candidate, back, locale),
                 refusalLine);
     }
 
     // the package of the order or RMA the operator came from reads "to zamówienie" / "to zgłoszenie"
-    private String ownerMarker(AwaitingPickup entry, String back, Locale locale) {
+    private String ownerMarker(PickupCandidate candidate, String back, Locale locale) {
         var page = OWNER_PAGE.matcher(back);
-        if (!page.matches() || !page.group(2).equals(entry.getOwnerId())) {
+        if (!page.matches() || !page.group(2).equals(candidate.ownerId())) {
             return null;
         }
         boolean order = "orders".equals(page.group(1));
-        if (order && entry.getOwnerType() == ShipmentOwnerType.ORDER) {
+        if (order && candidate.ownerType() == ShipmentOwnerType.ORDER) {
             return message("shipping.pickup.this.order", locale);
         }
-        if (!order && (entry.getOwnerType() == ShipmentOwnerType.RMA || entry.getOwnerType() == ShipmentOwnerType.RMA_RETURN)) {
+        if (!order && candidate.ownerType() == ShipmentOwnerType.RMA) {
             return message("shipping.pickup.this.rma", locale);
         }
         return null;
@@ -249,7 +250,7 @@ public class ShipmentPickupController {
     }
 
     private static List<String> externalIds(PickupGroup group) {
-        return group.entries().stream().map(AwaitingPickup::getExternalId).toList();
+        return group.entries().stream().map(PickupCandidate::externalId).toList();
     }
 
     private String message(String key, Locale locale) {

@@ -22,7 +22,7 @@ public final class ShipmentLinks {
      * package without a pickup address (a customer's return, picked up at the customer's) is never in that group list.
      */
     public static String pickup(List<Shipment> shipments, String back) {
-        return shipments.stream().filter(ShipmentLinks::waitsInPickupIndex).findFirst()
+        return shipments.stream().filter(ShipmentLinks::listedForPickup).findFirst()
                 .map(s -> UriComponentsBuilder.fromPath(ShipmentPickupController.PAGE)
                         .queryParam("group", "{group}")
                         .queryParam("back", back)
@@ -31,8 +31,8 @@ public final class ShipmentLinks {
                 .orElse(null);
     }
 
-    /** The package waits for "Zamów odbiór" among the store's other packages (AwaitingPickupIndex holds exactly these). */
-    public static boolean waitsInPickupIndex(Shipment s) {
+    /** The package waits for "Zamów odbiór" among the store's other packages (PickupCandidates lists exactly these). */
+    public static boolean listedForPickup(Shipment s) {
         return s.awaitsPickup() && s.getProvider() != null && s.getExternalId() != null && s.getPickUpAddressId() != null;
     }
 }

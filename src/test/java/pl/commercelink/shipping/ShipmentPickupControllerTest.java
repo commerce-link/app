@@ -95,20 +95,13 @@ class ShipmentPickupControllerTest {
         return details;
     }
 
-    private static AwaitingPickup entry(String externalId, ShipmentOwnerType ownerType, String ownerId, String carrier,
-                                        String addressId) {
-        AwaitingPickup e = new AwaitingPickup();
-        e.setExternalId(externalId);
-        e.setOwnerType(ownerType);
-        e.setOwnerId(ownerId);
-        e.setTrackingNo("TRK-" + externalId);
-        e.setProvider("furgonetka");
-        e.setCarrier(carrier);
-        e.setPickUpAddressId(addressId);
-        return e;
+    private static PickupCandidate entry(String externalId, ShipmentOwnerType ownerType, String ownerId, String carrier,
+                                         String addressId) {
+        return new PickupCandidate(ownerType, ownerId, externalId, "TRK-" + externalId, "furgonetka", carrier,
+                addressId);
     }
 
-    private static PickupGroup group(String carrier, String addressId, AwaitingPickup... entries) {
+    private static PickupGroup group(String carrier, String addressId, PickupCandidate... entries) {
         return new PickupGroup(PickupGroup.key("furgonetka", carrier, addressId), "furgonetka", carrier, addressId,
                 List.of(entries));
     }

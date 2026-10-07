@@ -118,12 +118,6 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     }
 
     @Override
-    public PickupStanding pickupStanding(String storeId, String ownerId, String externalId) {
-        // the warehouse orders its pickup right away and never lists its packages in the pickup index
-        return PickupStanding.GONE;
-    }
-
-    @Override
     public int applyPickup(String storeId, String ownerId, Collection<String> externalIds,
                            UnaryOperator<ShipmentPickup> change) {
         // nothing stored: counted as applied, so ordering and settling the pickup go on

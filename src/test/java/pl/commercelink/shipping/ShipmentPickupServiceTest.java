@@ -45,7 +45,7 @@ class ShipmentPickupServiceTest {
     private static final PickupWindow WINDOW =
             new PickupWindow(LocalDate.of(2026, 10, 7), LocalTime.of(9, 0), LocalTime.of(17, 0), "h");
 
-    @Mock private AwaitingPickupIndex index;
+    @Mock private PickupCandidates candidates;
     @Mock private ShipmentOwners owners;
     @Mock private ShipmentOwner orderOwner;
     @Mock private ShippingService shippingService;
@@ -65,19 +65,12 @@ class ShipmentPickupServiceTest {
         when(provider.supportsPickups()).thenReturn(true);
         when(orderOwner.applyPickup(anyString(), anyString(), anyCollection(), any())).thenReturn(1);
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
-        service = new ShipmentPickupService(index, owners, shippingService, publisher, messageSource);
+        service = new ShipmentPickupService(candidates, owners, shippingService, publisher, messageSource);
     }
 
-    private static AwaitingPickup entry(String externalId, String carrier, String ownerId) {
-        AwaitingPickup e = new AwaitingPickup();
-        e.setStoreId("store-1");
-        e.setExternalId(externalId);
-        e.setProvider("furgonetka");
-        e.setCarrier(carrier);
-        e.setPickUpAddressId("addr-1");
-        e.setOwnerType(ShipmentOwnerType.ORDER);
-        e.setOwnerId(ownerId);
-        return e;
+    private static PickupCandidate candidate(String externalId, String carrier, String ownerId) {
+        return new PickupCandidate(ShipmentOwnerType.ORDER, ownerId, externalId, "TRK-" + externalId, "furgonetka",
+                carrier, "addr-1");
     }
 
     private static PickupTarget target(String externalId) {
@@ -96,37 +89,18 @@ class ShipmentPickupServiceTest {
     }
 
     @Test
-    void groupsAreByProviderCarrierAndAddressAndStaleEntriesGo() {
+    void groupsAreByProviderCarrierAndAddress() {
         // given
-        when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "o-1"), entry("2", "dpd", "o-2"),
-                entry("3", "dhl", "o-3"), entry("4", "dpd", "o-4")));
-        when(orderOwner.pickupStanding(eq("store-1"), anyString(), anyString())).thenReturn(PickupStanding.ORDERABLE);
-        when(orderOwner.pickupStanding("store-1", "o-4", "4")).thenReturn(PickupStanding.GONE);
+        when(candidates.of("store-1")).thenReturn(List.of(candidate("1", "dpd", "o-1"), candidate("2", "dpd", "o-2"),
+                candidate("3", "dhl", "o-3")));
 
         // when
         List<PickupGroup> groups = service.groups("store-1");
 
         // then
         assertThat(groups).extracting(PickupGroup::carrier).containsExactly("dhl", "dpd");
-        assertThat(groups.get(1).entries()).extracting(AwaitingPickup::getExternalId).containsExactly("1", "2");
+        assertThat(groups.get(1).entries()).extracting(PickupCandidate::externalId).containsExactly("1", "2");
         assertThat(groups.get(1).key()).isEqualTo("furgonetka|dpd|addr-1");
-        verify(index).remove("store-1", List.of("4"));
-    }
-
-    @Test
-    void aPackageWhosePickupIsBeingOrderedIsSkippedButStaysIndexed() {
-        // given
-        when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "o-1"), entry("2", "dpd", "o-2")));
-        when(orderOwner.pickupStanding("store-1", "o-1", "1")).thenReturn(PickupStanding.ORDERABLE);
-        when(orderOwner.pickupStanding("store-1", "o-2", "2")).thenReturn(PickupStanding.IN_FLIGHT);
-
-        // when
-        List<PickupGroup> groups = service.groups("store-1");
-
-        // then
-        assertThat(groups).hasSize(1);
-        assertThat(groups.get(0).entries()).extracting(AwaitingPickup::getExternalId).containsExactly("1");
-        verify(index, never()).remove(anyString(), anyList());
     }
 
     @Test
@@ -363,9 +337,9 @@ class ShipmentPickupServiceTest {
     }
 
     @Test
-    void aPackageHandedOverElsewhereStopsWaitingAndLeavesTheIndex() {
+    void aPackageHandedOverElsewhereStopsWaiting() {
         // given
-        when(index.list("store-1")).thenReturn(List.of(entry("1", "dpd", "order-1")));
+        when(candidates.of("store-1")).thenReturn(List.of(candidate("1", "dpd", "order-1")));
         ArgumentCaptor<UnaryOperator<ShipmentPickup>> change = ArgumentCaptor.forClass(UnaryOperator.class);
         when(orderOwner.applyPickup(eq("store-1"), eq("order-1"), eq(List.of("1")), change.capture())).thenReturn(1);
 
@@ -378,13 +352,12 @@ class ShipmentPickupServiceTest {
                 .isEqualTo(pl.commercelink.orders.ShipmentPickupStatus.HANDED_OVER);
         ShipmentPickup ordering = pending("cmd-1");
         assertThat(change.getValue().apply(ordering)).isSameAs(ordering);
-        verify(index).remove("store-1", List.of("1"));
     }
 
     @Test
-    void aPackageNotInTheStoresIndexIsNotHandedOver() {
+    void aPackageNotWaitingInTheStoreIsNotHandedOver() {
         // given: an id of another store, or one whose pickup was ordered meanwhile
-        when(index.list("store-1")).thenReturn(List.of());
+        when(candidates.of("store-1")).thenReturn(List.of());
 
         // when / then
         assertThat(service.handOver("store-1", "foreign")).isFalse();

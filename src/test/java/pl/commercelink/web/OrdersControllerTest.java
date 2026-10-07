@@ -204,8 +204,6 @@ class OrdersControllerTest {
     @Mock
     private ShipmentCancelService shipmentCancelService;
     @Mock
-    private pl.commercelink.shipping.AwaitingPickupIndex awaitingPickupIndex;
-    @Mock
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock
     private ReceiptAttemptService receiptAttemptService;
@@ -1106,34 +1104,6 @@ class OrdersControllerTest {
             // then
             assertThat(errorMessage()).isNull();
             assertThat(order.getShipments()).containsExactly(shipped);
-        }
-
-        @Test
-        void removingTheLastRowOfAPackageTakesItOffThePickupList() {
-            // given
-            Shipment other = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
-            Shipment unresolved = withUnresolvedCancellation(courier("TRACK-2", null), "EXT-2");
-            orderWith(other, unresolved);
-
-            // when
-            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(unresolved), redirect, Locale.ENGLISH);
-
-            // then
-            verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-2"));
-        }
-
-        @Test
-        void anotherParcelOfThePackageKeepsItOnThePickupList() {
-            // given
-            Shipment first = withUnresolvedCancellation(courier("TRACK-1", null), "EXT-2");
-            Shipment second = withUnresolvedCancellation(courier("TRACK-2", null), "EXT-2");
-            orderWith(first, second);
-
-            // when
-            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(second), redirect, Locale.ENGLISH);
-
-            // then
-            verifyNoInteractions(awaitingPickupIndex);
         }
 
         @Test

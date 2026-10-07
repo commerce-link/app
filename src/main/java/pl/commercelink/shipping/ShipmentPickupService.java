@@ -37,40 +37,26 @@ public class ShipmentPickupService {
     static final String UNCONFIRMED_KEY = ShipmentPickup.UNCONFIRMED_KEY;
     static final String NOT_SENT_KEY = "shipping.pickup.not.sent";
 
-    private final AwaitingPickupIndex index;
+    private final PickupCandidates candidates;
     private final ShipmentOwners owners;
     private final ShippingService shippingService;
     private final ShipmentPickupEventPublisher publisher;
     private final MessageSource messageSource;
 
     /**
-     * The store's packages that can be ordered, by integration, carrier and pickup address. Entries whose pickup is
-     * being ordered are skipped but stay indexed (a failed command makes them orderable again); entries that no longer
-     * wait at all go.
+     * The store's packages that can be ordered, by integration, carrier and pickup address. A package whose pickup is
+     * being ordered is not listed until its command fails.
      */
     public List<PickupGroup> groups(String storeId) {
-        List<String> stale = new ArrayList<>();
-        Map<String, List<AwaitingPickup>> byKey = new TreeMap<>();
-        for (AwaitingPickup entry : index.list(storeId)) {
-            PickupStanding standing = owners.get(entry.getOwnerType())
-                    .pickupStanding(storeId, entry.getOwnerId(), entry.getExternalId());
-            if (standing == PickupStanding.GONE) {
-                stale.add(entry.getExternalId());
-            }
-            if (standing != PickupStanding.ORDERABLE) {
-                continue;
-            }
-            byKey.computeIfAbsent(PickupGroup.key(entry.getProvider(), entry.getCarrier(), entry.getPickUpAddressId()),
-                    k -> new ArrayList<>()).add(entry);
-        }
-        if (!stale.isEmpty()) {
-            index.remove(storeId, stale);
+        Map<String, List<PickupCandidate>> byKey = new TreeMap<>();
+        for (PickupCandidate candidate : candidates.of(storeId)) {
+            byKey.computeIfAbsent(candidate.groupKey(), k -> new ArrayList<>()).add(candidate);
         }
         return byKey.entrySet().stream()
                 .map(e -> {
-                    AwaitingPickup first = e.getValue().get(0);
-                    return new PickupGroup(e.getKey(), first.getProvider(), first.getCarrier(),
-                            first.getPickUpAddressId(), List.copyOf(e.getValue()));
+                    PickupCandidate first = e.getValue().get(0);
+                    return new PickupGroup(e.getKey(), first.provider(), first.carrier(), first.pickUpAddressId(),
+                            List.copyOf(e.getValue()));
                 })
                 .sorted(Comparator.comparing(PickupGroup::carrier, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .toList();
@@ -123,21 +109,17 @@ public class ShipmentPickupService {
 
     /**
      * The operator gave the package to the carrier without "Zamów odbiór": it no longer waits for a courier and leaves
-     * the pickup list. False when it does not wait in the store's index any more.
+     * the pickup list. False when it is not among the store's packages waiting for a courier any more.
      */
     public boolean handOver(String storeId, String externalId) {
-        AwaitingPickup entry = index.list(storeId).stream()
-                .filter(e -> externalId.equals(e.getExternalId()))
+        PickupCandidate candidate = candidates.of(storeId).stream()
+                .filter(c -> c.externalId().equals(externalId))
                 .findFirst().orElse(null);
-        if (entry == null) {
+        if (candidate == null) {
             return false;
         }
-        int changed = owners.get(entry.getOwnerType()).applyPickup(storeId, entry.getOwnerId(), List.of(externalId),
-                p -> p.isAwaiting() ? ShipmentPickup.handedOver() : p);
-        if (changed > 0) {
-            index.remove(storeId, List.of(externalId));
-        }
-        return changed > 0;
+        return owners.get(candidate.ownerType()).applyPickup(storeId, candidate.ownerId(), List.of(externalId),
+                p -> p.isAwaiting() ? ShipmentPickup.handedOver() : p) > 0;
     }
 
     public PickupStart order(Store store, String provider, List<PickupTarget> targets, PickupWindow window) {

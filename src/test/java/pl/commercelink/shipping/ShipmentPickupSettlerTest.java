@@ -28,9 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,7 +40,6 @@ class ShipmentPickupSettlerTest {
     @Mock private ShipmentTrackingSubscriber trackingSubscriber;
     @Mock private OrderLifecycle orderLifecycle;
     @Mock private OrderLifecycleEventPublisher lifecycleEventPublisher;
-    @Mock private AwaitingPickupIndex index;
     @Mock private ShipmentOwners owners;
     @Mock private WarehouseShipmentOwner warehouseOwner;
 
@@ -62,7 +59,7 @@ class ShipmentPickupSettlerTest {
                 trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owners.get(ShipmentOwnerType.WAREHOUSE)).thenReturn(warehouseOwner);
-        settler = new ShipmentPickupSettler(owners, index);
+        settler = new ShipmentPickupSettler(owners);
     }
 
     private static Shipment shipment(String externalId, String trackingNo) {
@@ -81,7 +78,7 @@ class ShipmentPickupSettlerTest {
     }
 
     @Test
-    void orderedPickupLandsOnEveryRowOfThePackageAndLeavesTheIndex() {
+    void orderedPickupLandsOnEveryRowOfThePackage() {
         // when
         settler.ordered(request("cmd-1"), "20261006800071");
 
@@ -89,11 +86,10 @@ class ShipmentPickupSettlerTest {
         assertThat(order.getShipments()).allMatch(s -> s.getPickup().isOrdered()
                 && "20261006800071".equals(s.getPickup().getPickupId()));
         verify(ordersRepository).save(order);
-        verify(index).remove("store-1", List.of("1"));
     }
 
     @Test
-    void aPartialPickupOrdersOnlyTheListedPackagesAndLeavesTheOthersUnconfirmedInTheIndex() {
+    void aPartialPickupOrdersOnlyTheListedPackagesAndLeavesTheOthersUnconfirmed() {
         // given
         order.setShipments(new ArrayList<>(List.of(shipment("1", "A"), shipment("2", "B"))));
         ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1")
@@ -110,8 +106,6 @@ class ShipmentPickupSettlerTest {
         assertThat(order.getShipments().get(1).getPickup().isFailed()).isTrue();
         assertThat(order.getShipments().get(1).getPickup().getErrorKey()).isEqualTo("shipping.pickup.unconfirmed");
         assertThat(order.getShipments().get(1).awaitsPickup()).isTrue();
-        verify(index).remove("store-1", List.of("1"));
-        verify(index, never()).remove("store-1", List.of("2"));
     }
 
     @Test
@@ -125,19 +119,17 @@ class ShipmentPickupSettlerTest {
 
         // then
         assertThat(order.getShipments()).allMatch(s -> s.getPickup().isPendingFor("cmd-1"));
-        verifyNoInteractions(index);
         assertThat(warnings).singleElement().satisfies(m -> assertThat(m).contains("cmd-old", "order-1"));
     }
 
     @Test
-    void aFailedPickupStaysOrderableAndInTheIndex() {
+    void aFailedPickupStaysOrderable() {
         // when
         settler.failed(request("cmd-1"), "Brak możliwości podjazdu");
 
         // then
         assertThat(order.getShipments()).allMatch(s -> s.getPickup().isFailed() && s.awaitsPickup()
                 && "Brak możliwości podjazdu".equals(s.getPickup().getError()));
-        verifyNoInteractions(index);
     }
 
     @Test

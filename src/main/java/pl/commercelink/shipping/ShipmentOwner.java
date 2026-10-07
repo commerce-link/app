@@ -36,9 +36,6 @@ public interface ShipmentOwner {
     /** The command did not create anything: error (the provider's words) or errorKey (our reason, a message key). */
     void failed(ShipmentCreationCheckRequest request, String error, String errorKey);
 
-    /** Where the pickup of the package stands on this owner's shipments carrying it. */
-    PickupStanding pickupStanding(String storeId, String ownerId, String externalId);
-
     /**
      * Changes the pickup of every row of these packages (every parcel of a package carries its externalId); returns
      * how many rows changed, 0 when nothing applied. A change that does not concern a pickup returns it unchanged.

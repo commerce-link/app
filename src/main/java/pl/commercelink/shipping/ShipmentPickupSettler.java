@@ -25,43 +25,42 @@ import java.util.stream.Collectors;
 public class ShipmentPickupSettler {
 
     private final ShipmentOwners owners;
-    private final AwaitingPickupIndex index;
 
     public void ordered(ShipmentPickupCheckRequest request, String pickupId) {
-        settle(request, request.getTargets(), p -> p.ordered(pickupId), true);
+        settle(request, request.getTargets(), p -> p.ordered(pickupId));
     }
 
     /**
      * A command that succeeded for some of its packages only: the packages the provider listed are ordered, the others
-     * fail as unconfirmed and stay indexed, so the operator checks the provider's panel and can order them again.
+     * fail as unconfirmed and are listed again, so the operator checks the provider's panel and can order them again.
      */
     public void ordered(ShipmentPickupCheckRequest request, String pickupId, Collection<String> orderedIds) {
         Map<Boolean, List<PickupTarget>> listed = request.getTargets().stream()
                 .collect(Collectors.partitioningBy(t -> orderedIds.contains(t.externalId())));
-        settle(request, listed.get(true), p -> p.ordered(pickupId), true);
+        settle(request, listed.get(true), p -> p.ordered(pickupId));
         if (!listed.get(false).isEmpty()) {
             List<String> left = listed.get(false).stream().map(PickupTarget::externalId).toList();
             log.error("Pickup command {} in store {} succeeded without packages {}", request.getCommandId(),
                     request.getStoreId(), left);
-            settle(request, listed.get(false), p -> p.failedWithKey(ShipmentPickup.UNCONFIRMED_KEY), false);
+            settle(request, listed.get(false), p -> p.failedWithKey(ShipmentPickup.UNCONFIRMED_KEY));
         }
     }
 
     public void failed(ShipmentPickupCheckRequest request, String error) {
         log.warn("Pickup failed store={} command={} packages={}: {}", request.getStoreId(), request.getCommandId(),
                 externalIds(request), error);
-        settle(request, request.getTargets(), p -> p.failed(error), false);
+        settle(request, request.getTargets(), p -> p.failed(error));
     }
 
     /** Our own reason (never confirmed, no provider): the courier may still come, the provider's panel says. */
     public void failedWithKey(ShipmentPickupCheckRequest request, String key) {
         log.error("Pickup ended without a result store={} command={} packages={}: {}", request.getStoreId(),
                 request.getCommandId(), externalIds(request), key);
-        settle(request, request.getTargets(), p -> p.failedWithKey(key), false);
+        settle(request, request.getTargets(), p -> p.failedWithKey(key));
     }
 
     private void settle(ShipmentPickupCheckRequest request, List<PickupTarget> targets,
-                        UnaryOperator<ShipmentPickup> result, boolean leaveIndex) {
+                        UnaryOperator<ShipmentPickup> result) {
         UnaryOperator<ShipmentPickup> change = p -> p.isPendingFor(request.getCommandId()) ? result.apply(p) : p;
         for (PickupTarget target : targets) {
             ShipmentOwner owner = owners.get(target.ownerType());
@@ -80,9 +79,6 @@ public class ShipmentPickupSettler {
                         request.getCommandId());
                 continue;
             }
-            if (leaveIndex) {
-                leaveIndex(request, target);
-            }
             // an owner without stored shipments (the warehouse) never runs the change: its outcome is computed here
             ShipmentPickup outcome = written.get() != null ? written.get() : result.apply(pendingOf(request));
             try {
@@ -92,16 +88,6 @@ public class ShipmentPickupSettler {
                 log.error("Pickup of package {} ({} {}) in store {} was settled, but what it sets off failed",
                         target.externalId(), target.ownerType(), target.ownerId(), request.getStoreId(), e);
             }
-        }
-    }
-
-    private void leaveIndex(ShipmentPickupCheckRequest request, PickupTarget target) {
-        try {
-            index.remove(request.getStoreId(), List.of(target.externalId()));
-        } catch (RuntimeException e) {
-            // the entry no longer waits, so the pickup page drops it when it reads it
-            log.warn("Ordered package {} of store {} is still in the pickup index", target.externalId(),
-                    request.getStoreId(), e);
         }
     }
 

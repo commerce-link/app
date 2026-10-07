@@ -39,7 +39,6 @@ import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptProviderFactory;
 import pl.commercelink.scheduling.DailyScheduleExecutionCount;
-import pl.commercelink.shipping.AwaitingPickup;
 import pl.commercelink.shipping.ShipmentTracking;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.users.CognitoUserService;
@@ -384,8 +383,6 @@ class StoreDeletionServiceTest {
         when(wipeRepository.findOrderFilters(STORE_ID)).thenReturn(List.of(filters));
         ShipmentTracking tracking = new ShipmentTracking();
         when(wipeRepository.findShipmentTrackings(STORE_ID)).thenReturn(List.of(tracking));
-        AwaitingPickup awaitingPickup = new AwaitingPickup();
-        when(wipeRepository.findAwaitingPickups(STORE_ID)).thenReturn(List.of(awaitingPickup));
 
         // when
         boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
@@ -396,7 +393,6 @@ class StoreDeletionServiceTest {
         verify(wipeRepository).deleteAll(List.of(notification));
         verify(wipeRepository).deleteAll(List.of(filters));
         verify(wipeRepository).deleteAll(List.of(tracking));
-        verify(wipeRepository).deleteAll(List.of(awaitingPickup));
         verify(storeFilesWipe).deleteAllVersions("stores", STORE_ID + "/");
     }
 

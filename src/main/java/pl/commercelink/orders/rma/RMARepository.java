@@ -44,6 +44,13 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
         return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(RMA.class::cast).toList();
     }
 
+    /** Every RMA of the store, whatever its status: a query of the store's partition. */
+    public List<RMA> findAllByStoreId(String storeId) {
+        RMA key = new RMA();
+        key.setStoreId(storeId);
+        return dynamoDBMapper.query(RMA.class, new DynamoDBQueryExpression<RMA>().withHashKeyValues(key));
+    }
+
     public List<RMA> findAll() {
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression();
         return dynamoDBMapper.scan(RMA.class, scanExpression);

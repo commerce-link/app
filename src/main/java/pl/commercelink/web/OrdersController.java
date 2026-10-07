@@ -53,7 +53,6 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
-import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
@@ -184,8 +183,6 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
-    @Autowired
-    private AwaitingPickupIndex awaitingPickupIndex;
     @Autowired
     private OrderRealizationStepBack realizationStepBack;
 
@@ -2109,27 +2106,12 @@ public class OrdersController extends BaseController {
         Shipment removed = shipments.remove(index);
         boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
         forgetShipmentEmails(existingOrder, removed);
-        leavePickupIndex(removed, shipments);
         String notice = messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale);
         if (backToRealization) {
             notice += " " + backToRealizationNotice(locale);
         }
         OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
-    }
-
-    /** The index lists packages: another parcel row of the same package keeps it waiting for a pickup. */
-    private void leavePickupIndex(Shipment removed, List<Shipment> remaining) {
-        String externalId = removed.getExternalId();
-        if (externalId == null || remaining.stream().anyMatch(s -> externalId.equals(s.getExternalId()))) {
-            return;
-        }
-        try {
-            awaitingPickupIndex.remove(getStoreId(), List.of(externalId));
-        } catch (RuntimeException e) {
-            // the shipment is gone, so the pickup page drops the entry when it reads it
-            log.warn("Removed package {} of store {} is still in the pickup index", externalId, getStoreId(), e);
-        }
     }
 
     /** "new" is a new shipment (null); anything else must be the index of one of the order's shipments. */

@@ -33,7 +33,6 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentPickup;
-import pl.commercelink.shipping.AwaitingPickupIndex;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -99,8 +98,6 @@ class RMAControllerTest {
     private RedirectAttributes redirectAttributes;
     @Mock
     private OpenRmaCoverage openRmaCoverage;
-    @Mock
-    private AwaitingPickupIndex awaitingPickupIndex;
 
     @InjectMocks
     private RMAController controller;
@@ -812,7 +809,6 @@ class RMAControllerTest {
         assertThat(shipment.getProvider()).isEqualTo("furgonetka");
         assertThat(shipment.getPickUpAddressId()).isEqualTo("addr-1");
         assertThat(shipment.awaitsPickup()).isTrue();
-        verify(awaitingPickupIndex, never()).remove(any(), any());
     }
 
     @Test
@@ -835,10 +831,10 @@ class RMAControllerTest {
         existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
 
         // when
-        saveShipments(existing, typed("T-2", "EXT-2"));
+        RMA saved = saveShipments(existing, typed("T-2", "EXT-2"));
 
         // then
-        verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-1"));
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
     }
 
     @Test
@@ -851,10 +847,9 @@ class RMAControllerTest {
         // when: the operator saves the form as it was, showing only EXT-1
         RMA saved = saveShipments(existing, List.of("EXT-1"), typed("T-1", "EXT-1"));
 
-        // then: the paid package and its pickup index row stay
+        // then: the paid package stays, still waiting for its pickup
         assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-1", "EXT-2");
         assertThat(saved.getShipments().get(1).awaitsPickup()).isTrue();
-        verify(awaitingPickupIndex, never()).remove(any(), any());
     }
 
     @Test
@@ -868,6 +863,5 @@ class RMAControllerTest {
 
         // then
         assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
-        verify(awaitingPickupIndex).remove(STORE_ID, List.of("EXT-1"));
     }
 }

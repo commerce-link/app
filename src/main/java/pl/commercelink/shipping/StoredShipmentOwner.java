@@ -7,7 +7,6 @@ import pl.commercelink.orders.ShipmentLists;
 import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -106,21 +105,6 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
                     s.setCreation(errorKey != null ? creation.failedWithKey(errorKey) : creation.failed(error));
                     return true;
                 }).orElse(false));
-    }
-
-    @Override
-    public PickupStanding pickupStanding(String storeId, String ownerId, String externalId) {
-        T owner = load(storeId, ownerId);
-        if (owner == null) {
-            return PickupStanding.GONE;
-        }
-        List<Shipment> rows = shipments(owner).stream().filter(s -> externalId.equals(s.getExternalId())).toList();
-        if (rows.stream().anyMatch(Shipment::awaitsPickup)) {
-            return PickupStanding.ORDERABLE;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        return rows.stream().anyMatch(s -> s.getCreation() == null && s.getPickup() != null
-                && s.getPickup().isInProgress(now)) ? PickupStanding.IN_FLIGHT : PickupStanding.GONE;
     }
 
     @Override

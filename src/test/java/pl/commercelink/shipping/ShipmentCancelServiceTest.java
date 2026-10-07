@@ -71,8 +71,6 @@ class ShipmentCancelServiceTest {
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
     @Mock
-    private AwaitingPickupIndex awaitingPickupIndex;
-    @Mock
     private Store store;
     @Mock
     private ShippingProvider shippingProvider;
@@ -86,7 +84,7 @@ class ShipmentCancelServiceTest {
         // the real settler: an immediate provider result is written by the same rules as the checker's
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                        new OrderRealizationStepBack(orderEventsRepository), awaitingPickupIndex);
+                        new OrderRealizationStepBack(orderEventsRepository));
         shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, shippingProviderFactory,
                 publisher, optimisticLockingExecutor, settler);
     }

@@ -31,7 +31,6 @@ class ShipmentCreationSettlerTest {
     @Mock private ShipmentTrackingSubscriber trackingSubscriber;
     @Mock private OrderLifecycle orderLifecycle;
     @Mock private OrderLifecycleEventPublisher lifecycleEventPublisher;
-    @Mock private AwaitingPickupIndex index;
     @Mock private ShipmentOwners owners;
     @Mock private ImmediatePickup immediatePickup;
     @Mock private ShipmentOwner returnOwner;
@@ -56,7 +55,7 @@ class ShipmentCreationSettlerTest {
                 trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owners.get(ShipmentOwnerType.RMA_RETURN)).thenReturn(returnOwner);
-        settler = new ShipmentCreationSettler(owners, index, immediatePickup);
+        settler = new ShipmentCreationSettler(owners, immediatePickup);
     }
 
     private static ShipmentCreationCheckRequest request() {
@@ -69,7 +68,7 @@ class ShipmentCreationSettlerTest {
     }
 
     @Test
-    void aSuccessReplacesThePlaceholderIndexesThePickupAndAnnouncesTheShipment() {
+    void aSuccessReplacesThePlaceholderAndAnnouncesTheShipment() {
         // when
         settler.succeeded(request(), result());
 
@@ -78,7 +77,7 @@ class ShipmentCreationSettlerTest {
         Shipment created = order.getShipments().get(0);
         assertThat(created.getTrackingNo()).isEqualTo("A");
         assertThat(created.awaitsPickup()).isTrue();
-        verify(index).add(eq("store-1"), eq(ShipmentOwnerType.ORDER), eq("order-1"), anyList());
+        verifyNoInteractions(immediatePickup);
         verify(trackingSubscriber).subscribe(eq("store-1"), any(Order.class));
         verify(orderLifecycle).update(any(Order.class));
         verify(lifecycleEventPublisher).publish(any(Order.class), eq(OrderLifecycleEventType.ShipmentCreated));
@@ -88,7 +87,7 @@ class ShipmentCreationSettlerTest {
     void secondDeliveryOfSameSuccessChangesNothing() {
         // given
         settler.succeeded(request(), result());
-        clearInvocations(index, trackingSubscriber, orderLifecycle, lifecycleEventPublisher, ordersRepository);
+        clearInvocations(trackingSubscriber, orderLifecycle, lifecycleEventPublisher, ordersRepository);
         when(ordersRepository.findById("store-1", "order-1")).thenAnswer(i -> order);
 
         // when
@@ -96,7 +95,7 @@ class ShipmentCreationSettlerTest {
 
         // then
         verify(ordersRepository, never()).save(any());
-        verifyNoInteractions(index, trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
+        verifyNoInteractions(trackingSubscriber, orderLifecycle, lifecycleEventPublisher);
     }
 
     @Test
@@ -109,7 +108,7 @@ class ShipmentCreationSettlerTest {
 
         // then
         assertThat(order.getShipments()).isEmpty();
-        verifyNoInteractions(index, lifecycleEventPublisher);
+        verifyNoInteractions(lifecycleEventPublisher);
     }
 
     @Test
@@ -134,7 +133,6 @@ class ShipmentCreationSettlerTest {
 
         // then
         verify(immediatePickup).orderFor(eq(request), anyList());
-        verifyNoInteractions(index);
     }
 
     @Test

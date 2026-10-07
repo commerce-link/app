@@ -11,7 +11,6 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.scheduling.DailyScheduleExecutionCount;
-import pl.commercelink.shipping.AwaitingPickup;
 import pl.commercelink.shipping.ShipmentTracking;
 import pl.commercelink.templates.EmailTemplate;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
@@ -95,12 +94,6 @@ public class StoreWipeRepository {
         OwnedOrderFilters key = new OwnedOrderFilters();
         key.setStoreId(storeId);
         return query(OwnedOrderFilters.class, key);
-    }
-
-    public List<AwaitingPickup> findAwaitingPickups(String storeId) {
-        AwaitingPickup key = new AwaitingPickup();
-        key.setStoreId(storeId);
-        return query(AwaitingPickup.class, key);
     }
 
     public List<ShipmentTracking> findShipmentTrackings(String storeId) {
