@@ -25,6 +25,14 @@ public class GlobalMatchedInventory {
         return version;
     }
 
+    /** The groups, their index and the version of one reload, read together so they always belong to each other. */
+    synchronized Generation generation() {
+        return new Generation(version, matched, index());
+    }
+
+    record Generation(long version, Collection<MatchedInventory> all, InventoryIndex index) {
+    }
+
     public Collection<MatchedInventory> all() {
         return matched;
     }

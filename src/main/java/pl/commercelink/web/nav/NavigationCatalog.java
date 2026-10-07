@@ -12,6 +12,7 @@ import static pl.commercelink.starter.security.UserRole.USER;
 public final class NavigationCatalog {
 
     private static final Set<UserRole> STORE_ROLES = Set.of(USER, ADMIN);
+    private static final Set<UserRole> INVENTORY_ROLES = Set.of(USER, ADMIN, SUPER_ADMIN);
 
     private static final List<NavSection> SECTIONS = List.of(
             new NavSection("nav.group.sales", List.of(
@@ -34,8 +35,9 @@ public final class NavigationCatalog {
                             "fa-file-alt", STORE_ROLES))),
             new NavSection("nav.group.catalog", List.of(
                     new NavItem("catalogs", "nav.product.catalog", "/dashboard/catalogs", "fa-book", Set.of(ADMIN)),
-                    new NavItem("inventory", "nav.inventory", "/dashboard/inventory", "fa-boxes",
-                            Set.of(USER, ADMIN, SUPER_ADMIN)))),
+                    new NavItem("inventory", "nav.inventory", "/dashboard/inventory", "fa-boxes", INVENTORY_ROLES),
+                    new NavItem("inventoryPrices", "nav.inventory.prices", "/dashboard/inventory/prices",
+                            "fa-tag", INVENTORY_ROLES))),
             new NavSection("nav.group.finance", List.of(
                     new NavItem("payments", "nav.payments", "/dashboard/payments", "fa-credit-card", Set.of(ADMIN)),
                     new NavItem("reports", "nav.reports", "/dashboard/reports", "fa-chart-bar", Set.of(ADMIN)))),

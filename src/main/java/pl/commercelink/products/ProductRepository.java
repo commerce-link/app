@@ -105,6 +105,48 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return labels;
     }
 
+    /** The two codes of a product, the only fields the inventory's "W katalogu" column compares. */
+    public record ProductCodes(String ean, String manufacturerCode) {
+    }
+
+    /**
+     * The codes of every product of the category, for {@link CatalogPlacement}. Read consistently: the inventory page
+     * shows a product as in the catalog right after "Uzupełnij dane" saved it, possibly on another instance, and an
+     * eventually consistent read could miss the rows written a moment ago.
+     */
+    public List<ProductCodes> codesOf(String categoryId) {
+        return codesOf(categoryId, null);
+    }
+
+    /** As {@link #codesOf(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
+    List<ProductCodes> codesOf(String categoryId, Integer pageSize) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":categoryId", new AttributeValue().withS(categoryId));
+        List<ProductCodes> codes = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName(TABLE)
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withExpressionAttributeValues(eav)
+                    .withProjectionExpression("ean, mfn")
+                    .withConsistentRead(true)
+                    .withLimit(pageSize)
+                    .withExclusiveStartKey(lastEvaluatedKey);
+            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
+            for (Map<String, AttributeValue> item : queryResult.getItems()) {
+                codes.add(new ProductCodes(stringOf(item, "ean"), stringOf(item, "mfn")));
+            }
+            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
+        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
+        return codes;
+    }
+
+    private static String stringOf(Map<String, AttributeValue> item, String attribute) {
+        AttributeValue value = item.get(attribute);
+        return value == null ? null : value.getS();
+    }
+
     public List<Product> findAll(ProductCatalog catalog) {
         List<String> categoryIds = getCategoryIds(catalog);
         List<Product> result = new ArrayList<>();
