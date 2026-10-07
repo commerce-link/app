@@ -172,14 +172,16 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
     }
 
     /**
-     * Received deliveries in a reception window; a missing bound means from the start, an open upper bound reaches
-     * every reception up to the end of the history. Partial, see findInTransit.
+     * Received deliveries whose reception is on or after the given day; null means the whole history. The list filters
+     * by the day a delivery was created (orderedAt), which the index does not carry, but a delivery is never received
+     * before it is created, so every delivery created since that day is among these; the caller narrows the rest by
+     * orderedAt. Partial, see findInTransit.
      */
-    public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
+    public List<Delivery> findReceivedSince(String storeId, LocalDate since) {
         List<Delivery> result = new ArrayList<>();
         for (String prefix : List.of(DeliveryListKey.TO_SETTLE, DeliveryListKey.SETTLED)) {
-            String lo = from == null ? prefix : DeliveryListKey.receivedBound(prefix, from, false);
-            String hi = to == null ? prefix + "\uffff" : DeliveryListKey.receivedBound(prefix, to, true);
+            String lo = since == null ? prefix : DeliveryListKey.receivedBound(prefix, since, false);
+            String hi = prefix + "\uffff";
             result.addAll(readList(storeId, "deliveryListSortKey BETWEEN :lo AND :hi", lo, hi,
                     key -> key.compareTo(lo) >= 0 && key.compareTo(hi) <= 0));
         }
