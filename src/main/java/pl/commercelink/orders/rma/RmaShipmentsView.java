@@ -14,7 +14,8 @@ public record RmaShipmentsView(List<Row> rows, String pickupHref, String pollHre
 
     /**
      * stateKey with stateArgs and stateTone: the state line (OrderLabels#shipmentState), null for a shipment typed in
-     * by hand. labelHref: "Pobierz etykietę". retryHref: "Spróbuj ponownie" after a failed operator shipment, the item
+     * by hand or a customer's return that needs nothing (RmaShipmentsViewFactory). labelHref: "Pobierz etykietę",
+     * never for a customer's return, whose label the courier brings. retryHref: "Spróbuj ponownie" after a failed operator shipment, the item
      * list of the page where the items are shipped again. removeAction: the POST that drops a failed creation.
      * pickupRetryAction: the POST of "Zamów odbiór ponownie", for a customer's return whose pickup was not ordered.
      * returnRetryAction: the POST of "Spróbuj ponownie" for a customer's return that failed to be created, booked again

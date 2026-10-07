@@ -334,9 +334,10 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
-    void aReturnWhoseCourierTheCarrierBookedReadsAsOrderedWithItsNumberAndOffersNoPickup() {
-        // given
+    void aReturnWhoseCourierTheCarrierBookedShowsItsNumberAndCarrierWithoutAStateOrALabel() {
+        // given: the courier brings the printed label to the customer, so the shop has nothing to print or check
         Shipment booked = customerReturn();
+        booked.setTrackingUrl("https://tracking.example/0000123");
         booked.setPickup(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
         RmaShipmentsView view = factory.build(rmaWith(booked), false, PL);
 
@@ -346,12 +347,118 @@ class RmaShipmentsViewFactoryTest {
 
         // then
         RmaShipmentsView.Row row = view.rows().get(0);
-        assertThat(row.stateKey()).isEqualTo("order.shipments.state.pickup.carrier");
-        assertThat(row.pickupRetryAction()).isNull();
+        assertThat(row.stateKey()).isNull();
+        assertThat(row.labelHref()).isNull();
+        assertThat(row.hasActions()).isFalse();
         assertThat(view.pickupHref()).isNull();
-        assertThat(html)
-                .contains("<span class=\"cl-status is-ok\">Odbiór zamówiony przez przewoźnika (nr APP/CRIN/13023761)</span>")
-                .doesNotContain("Nadaj w punkcie");
+        assertThat(html).contains("href=\"https://tracking.example/0000123\"").contains(">0000123</a>")
+                .contains("Przewoźnik</span>: <span>DPD")
+                .doesNotContain("cl-status")
+                .doesNotContain("Pobierz etykietę")
+                .doesNotContain("APP/CRIN/13023761");
+    }
+
+    @Test
+    void aCustomerReturnWhosePickupIsOrderedOrNotNeededShowsNoState() {
+        // given
+        Shipment ordered = customerReturn();
+        ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("P-1"));
+        Shipment atPoint = customerReturn();
+        atPoint.setPickup(ShipmentPickup.notRequired());
+
+        // when
+        RmaShipmentsView view = factory.build(rmaWith(ordered, atPoint), false, PL);
+
+        // then
+        assertThat(view.rows()).allSatisfy(row -> {
+            assertThat(row.stateKey()).isNull();
+            assertThat(row.labelHref()).isNull();
+        });
+    }
+
+    @Test
+    void aCustomerReturnWaitingForItsPickupShowsNoAwaitingState() {
+        // when
+        RmaShipmentsView.Row row = factory.build(rmaWith(customerReturn()), false, PL).rows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isNull();
+        assertThat(row.labelHref()).isNull();
+    }
+
+    @Test
+    void aCustomerReturnWhosePickupFailedKeepsItsStateAndRetryButOffersNoLabel() {
+        // given
+        Shipment failed = customerReturn();
+        failed.setPickup(ShipmentPickup.awaiting().failed("Brak kuriera"));
+        RmaShipmentsView view = factory.build(rmaWith(failed), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        assertThat(view.rows().get(0).labelHref()).isNull();
+        assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się zamówić odbioru: Brak kuriera</span>")
+                .contains(">Zamów odbiór ponownie</button>")
+                .doesNotContain("Pobierz etykietę");
+    }
+
+    @Test
+    void aCustomerReturnBeingCreatedOrWhosePickupIsBeingOrderedKeepsItsInProgressState() {
+        // given
+        Shipment creating = new Shipment(ShipmentType.Courier);
+        creating.setProvider("furgonetka");
+        creating.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        Shipment ordering = customerReturn();
+        ordering.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)));
+
+        // when
+        RmaShipmentsView view = factory.build(rmaWith(creating, ordering), false, PL);
+
+        // then
+        assertThat(view.rows().get(0).stateKey()).isEqualTo("order.shipments.state.creating");
+        assertThat(view.rows().get(1).stateKey()).isEqualTo("order.shipments.state.pickup.pending");
+        assertThat(view.pollHref()).isEqualTo("/dashboard/rma/rma-1/shipments/state");
+    }
+
+    @Test
+    void aFailedCustomerReturnRendersItsReasonWithRetryAndRemove() {
+        // given
+        RMA rma = rmaWith(failedCreation(true));
+        rma.setShippingDetails(ShippingDetails._default());
+        rma.setReturnPackageTemplateId("7");
+        RmaShipmentsView view = factory.build(rma, false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków</span>")
+                .contains("action=\"/dashboard/rma/rma-1/return-shipment/retry\"")
+                .contains("action=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\"")
+                .doesNotContain("Pobierz etykietę");
+    }
+
+    @Test
+    void anOperatorShipmentKeepsItsLabelAndItsStateInTheTable() {
+        // given: the shop prints the label of what it sends itself
+        Shipment ordered = operatorPackage();
+        ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)).ordered("P-1"));
+        RmaShipmentsView view = factory.build(rmaWith(ordered), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
+                .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/rma/rma-1\"")
+                .contains("<span>Pobierz etykietę</span>");
     }
 
     @Test

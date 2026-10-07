@@ -32,11 +32,11 @@ public class RmaShipmentsViewFactory {
         Set<String> labelProviders = ShipmentLinks.labelProviders(shipments,
                 provider -> shippingService.supportsLabels(store, provider));
         List<RmaShipmentsView.Row> rows = shipments.stream().map(s -> {
-            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+            OrderLabels.ShipmentState state = shownState(s, locale);
             return new RmaShipmentsView.Row(s,
                     state == null ? null : state.key(), state == null ? null : state.args(),
                     state == null ? null : state.tone(),
-                    ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
+                    !isCustomerReturn(s) && ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
                     !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#rmaItemsForm" : null,
                     !closed && s.creationFailed() ? removeAction(details, s) : null,
@@ -47,6 +47,19 @@ public class RmaShipmentsViewFactory {
         LocalDateTime now = LocalDateTime.now();
         String pollHref = shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now)) ? details + "/shipments/state" : null;
         return new RmaShipmentsView(rows, closed ? null : ShipmentLinks.pickup(shipments, details), pollHref);
+    }
+
+    /**
+     * A customer's return shows its state only while it needs the operator or waits for the provider (client decision
+     * 2026-10-07): the courier brings the printed label to the customer, so a return that went well has nothing to
+     * check and nothing to print, and its label is not offered either.
+     */
+    private static OrderLabels.ShipmentState shownState(Shipment s, Locale locale) {
+        OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+        if (state == null || !isCustomerReturn(s)) {
+            return state;
+        }
+        return state.inProgress() || OrderLabels.WARN.equals(state.tone()) ? state : null;
     }
 
     private static boolean isCustomerReturn(Shipment s) {

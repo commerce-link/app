@@ -3,7 +3,7 @@
 <body>
 <!--/* The shipments table of an RMA (orders.rma.RmaShipmentsView), in the page's older Bulma look. A shipment created
        through an integration has its state as a pill under its number (OrderLabels#shipmentState), its actions below
-       that; the state's arguments are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
+       that; a customer's return has a pill only when it failed or waits for the provider, and no label; the state's arguments are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
        one value). "Zamów odbiór" above the table leads to the pickup page and comes back here; "Zamów odbiór ponownie"
        orders the pickup of a customer's return again at once (its package is not on the pickup page); "Spróbuj
        ponownie" after a failed operator shipment points to the item list, where the items are shipped again, and after
