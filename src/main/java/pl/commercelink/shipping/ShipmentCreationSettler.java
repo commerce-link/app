@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.shipping.api.ShipmentResult;
 
 import java.util.List;
@@ -23,11 +22,7 @@ public class ShipmentCreationSettler {
     private final ImmediatePickup immediatePickup;
 
     public void succeeded(ShipmentCreationCheckRequest request, ShipmentResult result) {
-        // type, delivery point and carrier come from the placeholder, which only the owner's record holds
-        Shipment template = new Shipment(ShipmentType.Courier);
-        template.setProvider(request.getProvider());
-        template.setPickUpAddressId(request.getPickUpAddressId());
-        List<Shipment> created = ShipmentResults.toShipments(result, template);
+        List<Shipment> created = ShipmentResults.toShipments(result, request.getProvider(), request.getPickUpAddressId());
         if (!owners.get(request.getOwnerType()).succeeded(request, created)) {
             log.warn("Creation result dropped, nothing waits for it: store={} owner={} {} command={}",
                     request.getStoreId(), request.getOwnerType(), request.getOwnerId(), request.getCommandId());
