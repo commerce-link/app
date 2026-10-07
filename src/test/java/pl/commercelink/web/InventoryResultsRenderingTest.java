@@ -319,7 +319,7 @@ class InventoryResultsRenderingTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("cl-inv-product-category", "Komponenty komputerowe", "<strong>Karty graficzne</strong>");
-        assertThat(html).doesNotContain("data-browse-add", "Add to catalog", "Add to another category", "cl-inv-in-catalog",
+        assertThat(html).doesNotContain("/dashboard/inventory/add", "Add to catalog", "Add to another category", "cl-inv-in-catalog",
                 "fa-check-circle", "In catalog");
     }
 
@@ -379,13 +379,12 @@ class InventoryResultsRenderingTest {
     }
 
     @Test
-    void pricesPageLoadsNoAddToCatalogScriptAndHasNoDialogSlot() {
+    void pricesPageHasNoAddToCatalogForm() {
         // when
         String html = engine.process("inventory-prices", pageContext());
 
         // then
-        assertThat(html).doesNotContain("inventory-browse.js", "data-browse-dialog-slot", "data-browse-root",
-                "data-browse-dialog-url");
+        assertThat(html).doesNotContain("inventory-add-form", "/dashboard/inventory/add", "data-browse-root");
     }
 
     private Context pageContext() {

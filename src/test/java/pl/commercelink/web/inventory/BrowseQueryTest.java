@@ -210,7 +210,6 @@ class BrowseQueryTest {
         // when / then
         assertThat(start.href()).isEqualTo("/dashboard/inventory");
         assertThat(start.withPage(2).href()).isEqualTo("/dashboard/inventory?page=2");
-        assertThat(start.hrefWith("open=add&ean=1")).isEqualTo("/dashboard/inventory?open=add&ean=1");
-        assertThat(start.withCategory("11").hrefWith("open=add")).isEqualTo("/dashboard/inventory?cat=11&open=add");
+        assertThat(start.withCategory("11").withPage(3).href()).isEqualTo("/dashboard/inventory?cat=11&page=3");
     }
 }

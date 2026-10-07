@@ -28,6 +28,8 @@ import org.springframework.web.servlet.ViewResolver;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import pl.commercelink.products.CatalogPlacement;
+import pl.commercelink.web.catalog.CatalogAccess;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.starter.security.config.WebSecurityConfiguration;
 import pl.commercelink.starter.security.filter.CustomTokenRefreshFilter;
@@ -58,8 +60,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Requests through the application's own security configuration ({@link WebSecurityConfiguration}, with its method
- * security) to the proxied controller: the add dialog and the add are the store admin's, a user and a super admin get
- * 403 without the handler running. Only the OAuth2 collaborators of that configuration are stand-ins.
+ * security) to the proxied controllers: browsing is everyone's, "Dodaj do katalogu" ("Uzupełnij dane" opened from the
+ * inventory, its change of category and its save) is the store admin's -- a user and a super admin get 403 without the
+ * handler running. Only the OAuth2 collaborators of that configuration are stand-ins.
  */
 @SpringJUnitWebConfig(InventoryBrowseAuthorizationTest.Config.class)
 @TestPropertySource(properties = "application.env=test")
@@ -68,8 +71,10 @@ class InventoryBrowseAuthorizationTest {
     private static final String STORE_ID = "store-1";
 
     @MockitoBean private BrowsePageFactory pageFactory;
-    @MockitoBean private AddToCatalogDialogFactory dialogFactory;
+    @MockitoBean private CatalogTargetOptionsFactory optionsFactory;
     @MockitoBean private CatalogPlacement catalogPlacement;
+    @MockitoBean private CatalogAccess access;
+    @MockitoBean private ProductsAddReview review;
     @MockitoBean private OAuth2AuthorizedClientService authorizedClients;
     @MockitoBean private SecretsManager secretsManager;
 
@@ -78,7 +83,7 @@ class InventoryBrowseAuthorizationTest {
 
     @Configuration
     @EnableWebMvc
-    @Import({WebSecurityConfiguration.class, InventoryBrowseController.class})
+    @Import({WebSecurityConfiguration.class, InventoryBrowseController.class, InventoryAddController.class})
     static class Config {
 
         /** Views are not rendered here; the prefix only keeps "inventory" from forwarding back to /dashboard/inventory. */
@@ -131,42 +136,57 @@ class InventoryBrowseAuthorizationTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean(), anyBoolean()))
                 .thenReturn(BrowsePage.of(BrowsePage.Status.READY, BrowseQuery.start(), false));
-        when(dialogFactory.build(any(), anyList(), any())).thenReturn(new AddToCatalogDialog(List.of("5901000000001"),
-                "RTX 4060", "Karty graficzne", List.of(), List.of(), false, "/dashboard/inventory", AddToCatalogDialog.ACTION));
+        when(optionsFactory.build(any(), anyList())).thenReturn(new CatalogTargetOptions(1, List.of(), List.of(), null, false, null));
     }
 
     @Test
-    void userAndSuperAdminAreRefusedTheAddDialog() throws Exception {
+    void userAndSuperAdminAreRefusedEveryAddRoute() throws Exception {
         // when / then
         for (String role : List.of("USER", "SUPER_ADMIN")) {
-            mvc.perform(get("/dashboard/inventory/browse/add-dialog").param("ean", "5901000000001").with(signedInAs(role)))
+            mvc.perform(get("/dashboard/inventory/add").param("ean", "5901000000001").with(signedInAs(role)))
                     .andExpect(status().isForbidden())
                     .andExpect(forwardedUrl("/access-denied"));
-        }
-        verifyNoInteractions(dialogFactory);
-    }
-
-    @Test
-    void userAndSuperAdminAreRefusedTheAdd() throws Exception {
-        // when / then
-        for (String role : List.of("USER", "SUPER_ADMIN")) {
-            mvc.perform(post("/dashboard/inventory/browse/add").param("target", "c-1/cat-gpu").with(signedInAs(role)))
+            mvc.perform(post("/dashboard/inventory/add").param("ean", "5901000000001").param("target", "c-1/cat-gpu")
+                            .with(signedInAs(role)))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post("/dashboard/inventory/add/save").param("ean", "5901000000001").param("target", "c-1/cat-gpu")
+                            .param("reviewedTarget", "c-1/cat-gpu").with(signedInAs(role)))
+                    .andExpect(status().isForbidden());
+            mvc.perform(get("/dashboard/inventory/add/save").with(signedInAs(role)))
                     .andExpect(status().isForbidden());
         }
-        verifyNoInteractions(catalogPlacement);
+        verifyNoInteractions(optionsFactory, catalogPlacement, access, review);
     }
 
     @Test
-    void storeAdminGetsTheDialogAndItsAdd() throws Exception {
+    void storeAdminOpensTheReviewAndItsSaveReloadsBackToTheList() throws Exception {
         // when / then
-        mvc.perform(get("/dashboard/inventory/browse/add-dialog").param("ean", "5901000000001")
+        mvc.perform(get("/dashboard/inventory/add").param("ean", "5901000000001")
                         .param("returnTo", "/dashboard/inventory?cat=11").with(signedInAs("ADMIN")))
                 .andExpect(status().isOk())
-                .andExpect(view().name("fragments/inventory-browse :: addDialog"));
-        mvc.perform(post("/dashboard/inventory/browse/add").param("returnTo", "/dashboard/inventory?cat=11")
+                .andExpect(view().name(ProductsAddReview.VIEW));
+        mvc.perform(post("/dashboard/inventory/add").param("ean", "5901000000001")
+                        .param("returnTo", "/dashboard/inventory?cat=11").with(signedInAs("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(view().name(ProductsAddReview.VIEW));
+        mvc.perform(get("/dashboard/inventory/add/save").param("returnTo", "/dashboard/inventory?cat=11")
                         .with(signedInAs("ADMIN")))
                 .andExpect(redirectedUrl("/dashboard/inventory?cat=11"));
-        verify(dialogFactory).build(eq(STORE_ID), eq(List.of("5901000000001")), eq("/dashboard/inventory?cat=11"));
+        verify(optionsFactory, times(2)).build(eq(STORE_ID), eq(List.of("5901000000001")));
+    }
+
+    @Test
+    void adminAccountWithoutAStoreIsSentBackToTheList() throws Exception {
+        // given
+        CustomUser user = new CustomUser(new DefaultOAuth2User(List.of(), Map.of("sub", "user-1"), "sub"), null,
+                Map.of("role", "ADMIN"));
+        RequestPostProcessor storeless = authentication(new UsernamePasswordAuthenticationToken(user, null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+
+        // when / then
+        mvc.perform(get("/dashboard/inventory/add").param("ean", "5901000000001").with(storeless))
+                .andExpect(redirectedUrl("/dashboard/inventory"));
+        verifyNoInteractions(optionsFactory, review);
     }
 
     @Test
@@ -181,11 +201,11 @@ class InventoryBrowseAuthorizationTest {
     }
 
     @Test
-    void anonymousVisitorIsSentToTheLoginInsteadOfTheDialog() throws Exception {
+    void anonymousVisitorIsSentToTheLoginInsteadOfTheReview() throws Exception {
         // when / then
-        mvc.perform(get("/dashboard/inventory/browse/add-dialog").param("ean", "5901000000001"))
+        mvc.perform(get("/dashboard/inventory/add").param("ean", "5901000000001"))
                 .andExpect(status().is3xxRedirection());
-        verifyNoInteractions(dialogFactory);
+        verifyNoInteractions(optionsFactory);
     }
 
     /** As the OAuth2 login signs in: the role and store as attributes of the user, the role as its authority. */

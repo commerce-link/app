@@ -38,22 +38,19 @@ class InventoryScriptContractTest {
     }
 
     /**
-     * Like the hooks of inventory.js above: a script of the browse list that still looks for a renamed hook does nothing,
-     * and no server-side test would notice.
+     * Like the hooks of inventory.js above: the script of "Kategoria katalogu" on the review that still looks for a
+     * renamed hook does nothing, and no server-side test would notice.
      */
     @Test
-    void browseScriptUsesOnlyHooksTheTemplatesRender() throws Exception {
+    void reviewTargetScriptUsesOnlyHooksTheReviewRenders() throws Exception {
         // given
-        String script = read("src/main/resources/static/js/inventory-browse.js");
-        String templates = read("src/main/resources/templates/inventory.html")
-                + read("src/main/resources/templates/fragments/inventory-browse.html");
+        String script = read("src/main/resources/static/js/review-target.js");
+        String template = read("src/main/resources/templates/catalog/products-add-review.html");
 
         // when / then
-        for (String hook : List.of("data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add",
-                "data-browse-add-selected", "data-browse-add-error", "data-browse-other-select", "data-browse-other-radio",
-                "data-browse-other-field", "data-cl-select-row")) {
+        for (String hook : List.of("data-review-target", "data-review-target-change", "data-review-target-actions")) {
             assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
-            assertThat(templates).as("templates render " + hook).contains(hook);
+            assertThat(template).as("template renders " + hook).contains(hook);
         }
     }
 

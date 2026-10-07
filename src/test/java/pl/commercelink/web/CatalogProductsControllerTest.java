@@ -50,6 +50,7 @@ import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
@@ -161,7 +162,9 @@ class CatalogProductsControllerTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement)).build();
+                brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
     }
 
     @AfterEach
@@ -586,6 +589,14 @@ class CatalogProductsControllerTest {
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).isEmpty();
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
                 .extracting(ProductsBulkAddForm.Row::getName).containsExactly("MSI RTX 5070");
+    }
+
+    /** The review and the save answer a POST; a reload or Back asks for them with a GET, which is not a 405. */
+    @Test
+    void reloadOfTheReviewOrTheSaveGoesBackToTheProposals() throws Exception {
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/add/review")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
+        mvc.perform(get(categoryPath() + "/products/add/save")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
     }
 
     @Test
@@ -1809,7 +1820,9 @@ class CatalogProductsControllerTest {
                 .thenReturn("Enabled 0, skipped 1");
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement)).build();
+                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
 
         // when / then
         real.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))

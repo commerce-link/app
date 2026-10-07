@@ -5,7 +5,6 @@ import org.thymeleaf.TemplateEngine;
 import org.springframework.util.LinkedMultiValueMap;
 import org.thymeleaf.context.Context;
 import pl.commercelink.inventory.BrowseCriteria;
-import pl.commercelink.web.inventory.AddToCatalogDialog;
 import pl.commercelink.web.inventory.BrowsePage;
 import pl.commercelink.web.inventory.BrowseQuery;
 import pl.commercelink.web.inventory.CategoryLine;
@@ -19,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InventoryBrowseRenderingTest {
 
     private static final String RESULTS = "<div th:replace=\"~{fragments/inventory-browse :: results}\"></div>";
-    private static final String DIALOG = "<div th:replace=\"~{fragments/inventory-browse :: addDialog}\"></div>";
 
     private final TemplateEngine engine = EnglishFragmentTemplateEngine.create();
 
@@ -31,7 +29,7 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains(">PIM category</th>", "data-label=\"PIM category\"", "Komponenty komputerowe", "Karty graficzne");
-        assertThat(html).contains("data-browse-add", "data-cl-select-row", "data-cl-list-results");
+        assertThat(html).contains("form=\"inventory-add-form\"", "data-cl-select-row", "data-cl-list-results");
         assertThat(html).doesNotContain("Podzespoły › Karta graficzna", "+1", "Fits:", "No matching catalog category", "fa-book");
     }
 
@@ -90,8 +88,8 @@ class InventoryBrowseRenderingTest {
         assertThat(html).contains("<details class=\"cl-menu\">",
                 "<summary class=\"cl-button is-icon\" aria-label=\"Actions: Gigabyte RTX 4060\">",
                 "<span class=\"cl-menu-glyph\" aria-hidden=\"true\">⋯</span>");
-        assertThat(html).contains("<a class=\"cl-menu-item\" href=\"/dashboard/inventory?open=add&amp;ean=5901000000001\" "
-                + "data-browse-add data-ean=\"5901000000001\">Add to catalog</a>");
+        assertThat(html).contains("<a class=\"cl-menu-item\" "
+                + "href=\"/dashboard/inventory/add?ean=5901000000001&amp;returnTo=%2Fdashboard%2Finventory%3Fcat%3D11\">Add to catalog</a>");
         assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(2);
         assertThat(html).doesNotContain("Prices and availability", "cl-mark", "fa-check-circle", "Open in catalog",
                 "Add to another category");
@@ -124,7 +122,7 @@ class InventoryBrowseRenderingTest {
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row))));
 
         // then
-        assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to catalog</a>",
+        assertThat(html).contains("returnTo=%2Fdashboard%2Finventory%3Fcat%3D11\">Add to catalog</a>",
                 "<a href=\"/dashboard/inventory/prices?q=5901000000001\">Gigabyte RTX 4060</a>");
         assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(2);
         assertThat(html).doesNotContain("Add to another category", "Prices and availability", "Open in catalog", "/dashboard/catalogs/");
@@ -161,7 +159,7 @@ class InventoryBrowseRenderingTest {
                 List.of(row(false), row(true)))));
 
         // then
-        assertThat(html).doesNotContain("data-browse-add", "data-cl-select-row", "cl-inv-in-catalog", "Not in a catalog",
+        assertThat(html).doesNotContain("inventory-add-form", "data-cl-select-row", "cl-inv-in-catalog", "Not in a catalog",
                 "In catalog", "cl-menu", "Actions");
     }
 
@@ -261,44 +259,6 @@ class InventoryBrowseRenderingTest {
         // then
         assertThat(html).contains("cl-tile-grid", "Komponenty komputerowe", "Products: 5");
         assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void dialogRendersMatchingOptionsTheOtherSelectAndTheChosenEans() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0, true)),
-                List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false)))),
-                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-        Context context = new Context();
-        context.setVariable("addDialog", dialog);
-
-        // when
-        String html = engine.process(DIALOG, context);
-
-        // then
-        assertThat(html).doesNotContain("??");
-        assertThat(html).contains("Add to catalog (2)", "value=\"c-1/cat-gpu\"", "data-browse-other-select", "value=\"c-1/cat-case\"");
-        assertThat(html).contains("name=\"eans\" value=\"5901000000001\"", "name=\"returnTo\"");
-        assertThat(html).doesNotContain(" open");
-    }
-
-    @Test
-    void dialogChecksThePreselectedOptionEvenWhenItIsNotTheFirst() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, false),
-                        new AddToCatalogDialog.Option("c-2/cat-b2b", "Sklep B2B › Karty", 0, true)),
-                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-        Context context = new Context();
-        context.setVariable("addDialog", dialog);
-
-        // when
-        String html = engine.process(DIALOG, context);
-
-        // then
-        assertThat(html).containsPattern("value=\"c-2/cat-b2b\"\\s+checked");
-        assertThat(html).doesNotContainPattern("value=\"c-1/cat-gpu\"\\s+checked");
     }
 
     @Test
@@ -494,107 +454,17 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void checkedRowsCarryAHiddenErrorForADialogThatCannotBeFetched() {
+    void checkedRowsPostToTheReviewThroughAFormOfTheirOwnThatComesBackToThisList() {
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
 
         // then
-        assertThat(html).contains("<div class=\"cl-alert is-bad cl-inv-browse-error\" hidden data-browse-add-error>",
-                "<p role=\"alert\" data-message=\"Could not open the add dialog. Try again.\"></p>");
-    }
-
-    @Test
-    void dialogForOneProductSaysItFitsWithoutCountsAndOnlySaysItIsThereWhenItIs() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, false),
-                        new AddToCatalogDialog.Option("c-2/cat-b2b", "Sklep B2B › Karty", 0, true)),
-                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-
-        // when
-        String html = engine.process(DIALOG, dialogContext(dialog));
-
-        // then
-        assertThat(html).contains("Fits the product&#39;s PIM category. Already in this category.",
-                "Fits the product&#39;s PIM category.</span>");
-        assertThat(html).doesNotContain(" of 1", "products&#39;");
-    }
-
-    @Test
-    void dialogForSeveralProductsCountsThoseAlreadyInEachCategory() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, true)),
-                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-
-        // when
-        String html = engine.process(DIALOG, dialogContext(dialog));
-
-        // then
-        assertThat(html).contains("Fits the products&#39; PIM category. Already in this category: 1 of 2.");
-    }
-
-    @Test
-    void otherCategoryOfAMatchedDialogIsAListUnderItsOptionNamedByItWithOneHelpText() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0, true)),
-                List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false)))),
-                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-
-        // when
-        String html = engine.process(DIALOG, dialogContext(dialog));
-
-        // then
-        String fieldset = html.substring(html.indexOf("<fieldset"), html.indexOf("</fieldset>"));
-        assertThat(fieldset).contains("<span class=\"cl-choice-title\" id=\"inventory-add-other-title\">Another category</span>",
-                "<div class=\"cl-choice-reveal cl-field\" data-browse-other-field>",
-                "aria-labelledby=\"inventory-add-other-title\" aria-describedby=\"inventory-add-other-help\"",
-                "Manual categories only");
-        assertThat(html).doesNotContain("for=\"inventory-add-other\"", "Choose from all manual categories", "required");
-    }
-
-    @Test
-    void unmatchedDialogRequiresACategoryAndSpeaksOfTheChosenOne() {
-        // given
-        List<AddToCatalogDialog.Group> others = List.of(new AddToCatalogDialog.Group("Podzespoły",
-                List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false))));
-        AddToCatalogDialog one = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", null, List.of(), others, false,
-                "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-        AddToCatalogDialog two = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, null, List.of(), others,
-                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-
-        // when
-        String single = engine.process(DIALOG, dialogContext(one));
-        String many = engine.process(DIALOG, dialogContext(two));
-
-        // then
-        assertThat(single).contains("This product&#39;s PIM category is not mapped", "the chosen category&#39;s suggestions");
-        assertThat(many).contains("The PIM categories of these products are not mapped", "They will be added");
-        assertThat(single + many).doesNotContain("that category&#39;s", "data-browse-other-field");
-        assertThat(single).containsPattern("<select class=\"cl-select\" id=\"inventory-add-other\" name=\"otherTarget\" required");
-        assertThat(single).contains("<label class=\"cl-label\" for=\"inventory-add-other\">Catalog category</label>");
-    }
-
-    @Test
-    void dialogCancelIsTheSharedDialogCloserWithTheWayBackWithoutJavaScript() {
-        // given
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", null, List.of(), List.of(), true,
-                "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
-
-        // when
-        String html = engine.process(DIALOG, dialogContext(dialog));
-
-        // then
-        assertThat(html).contains("<dialog class=\"cl-dialog is-form\"",
-                "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\" data-cl-dialog-close>Cancel</a>");
-        assertThat(html).doesNotContain("data-browse-dialog-close");
-    }
-
-    private static Context dialogContext(AddToCatalogDialog dialog) {
-        Context context = new Context();
-        context.setVariable("addDialog", dialog);
-        return context;
+        assertThat(html).contains("<form id=\"inventory-add-form\" hidden method=\"post\" action=\"/dashboard/inventory/add\">",
+                "<input type=\"hidden\" name=\"returnTo\" value=\"/dashboard/inventory?cat=11\">",
+                "<button type=\"submit\" class=\"cl-button is-primary\" form=\"inventory-add-form\">");
+        assertThat(html).containsPattern("data-cl-select-row hidden autocomplete=\"off\"\\s+name=\"ean\" form=\"inventory-add-form\"\\s+"
+                + "value=\"5901000000001\"");
+        assertThat(html).doesNotContain("data-browse-add", "cl-inv-browse-error", "<dialog");
     }
 
     private static Context context(BrowsePage page) {
@@ -620,7 +490,7 @@ class InventoryBrowseRenderingTest {
 
     private static BrowsePage.RowView row(CategoryLine line, long warehouseQty) {
         return new BrowsePage.RowView("Gigabyte RTX 4060", "Gigabyte", "5901000000001", "GV-N4060", "/dashboard/inventory/prices?q=5901000000001",
-                line, 1189.0, true, "AB", 214, 4, warehouseQty, "/dashboard/inventory?open=add&ean=5901000000001");
+                line, 1189.0, true, "AB", 214, 4, warehouseQty, "/dashboard/inventory/add?ean=5901000000001&returnTo=%2Fdashboard%2Finventory%3Fcat%3D11");
     }
 
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows) {

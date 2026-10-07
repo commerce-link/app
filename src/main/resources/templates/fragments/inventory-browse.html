@@ -3,14 +3,9 @@
 <body>
 
 <!--/* The supplier assortment page (spec docs/active/inventory-browse §4). `results` is swapped in place by
-       list-page.js; the slot below it receives the add-to-catalog dialog that inventory-browse.js fetches. */-->
+       list-page.js. */-->
 <div th:fragment="browse" class="cl-inv-browse">
     <div th:replace="~{fragments/inventory-browse :: results}"></div>
-    <div data-browse-dialog-slot>
-        <th:block th:if="${addDialog != null}">
-            <dialog th:replace="~{fragments/inventory-browse :: addDialog}"></dialog>
-        </th:block>
-    </div>
 </div>
 
 <!--/* A PIM category name with a break opportunity after every "/": "Profesjonalne/konsumenckie AV i foto" is one word to
@@ -186,11 +181,12 @@
                 <th:block th:unless="${b.rows().isEmpty()}">
                     <th:block th:if="${b.admin()}">
                         <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
-                        <!--/* inventory-browse.js shows it when the dialog for the checked rows cannot be fetched */-->
-                        <div class="cl-alert is-bad cl-inv-browse-error" hidden data-browse-add-error>
-                            <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
-                            <div class="cl-alert-text"><p role="alert" th:attr="data-message=#{inventory.browse.add.error}"></p></div>
-                        </div>
+                        <!--/* "Dodaj zaznaczone" posts the checked rows (form="inventory-add-form") to "Uzupełnij dane". The
+                               form stands apart: wrapped around the selection row it would end the row's sticky range. It
+                               lives in the swapped results, so a new list always brings the address it returns to. */-->
+                        <form id="inventory-add-form" hidden method="post" th:action="@{/dashboard/inventory/add}">
+                            <input type="hidden" name="returnTo" th:value="${b.query().href()}">
+                        </form>
                         <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
                             <label class="cl-check-target">
                                 <input type="checkbox" class="cl-check-input" data-cl-select-all autocomplete="off"
@@ -199,7 +195,7 @@
                             <span class="cl-selection-count" data-cl-selection-count
                                   th:attr="data-template=#{inventory.browse.selected('{k}', '{n}')}"></span>
                             <div class="cl-selection-actions">
-                                <button type="button" class="cl-button is-primary" data-browse-add-selected>
+                                <button type="submit" class="cl-button is-primary" form="inventory-add-form">
                                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                                     <span data-cl-selection-text th:attr="data-template=#{inventory.browse.add.selected('{k}')}"></span>
                                 </button>
@@ -240,6 +236,7 @@
                                 <!--/* a row without an EAN cannot be added (BrowsePage.RowView#addable) */-->
                                 <label class="cl-check-target" th:if="${row.addable()}">
                                     <input type="checkbox" class="cl-check-input" data-cl-select-row hidden autocomplete="off"
+                                           name="ean" form="inventory-add-form"
                                            th:value="${row.ean()}" th:attr="aria-label=#{inventory.browse.select.row(${row.name()})}">
                                 </label>
                             </td>
@@ -270,14 +267,13 @@
                                       th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></span></span>
                                 <span th:unless="${row.inCatalog()}" class="cl-visually-hidden" th:text="#{inventory.browse.notInCatalog}"></span>
                             </td>
-                            <!--/* the row menu of the design system (details.cl-menu, menu.js); "Dodaj…" opens the add dialog through
-                                   inventory-browse.js and without JavaScript goes to the page that draws it open */-->
+                            <!--/* the row menu of the design system (details.cl-menu, menu.js); "Dodaj do katalogu" is a plain link
+                                   to "Uzupełnij dane" for this product, which comes back to this exact list */-->
                             <td class="cl-table-actions" th:if="${b.admin()}">
                                 <details class="cl-menu" th:if="${row.addable()}">
                                     <summary class="cl-button is-icon" th:attr="aria-label=#{inventory.browse.actions.aria(${row.name()})}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
                                     <ul class="cl-menu-list">
-                                        <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"
-                                               th:text="#{inventory.browse.add}"></a></li>
+                                        <li><a class="cl-menu-item" th:href="${row.addHref()}" th:text="#{inventory.browse.add}"></a></li>
                                     </ul>
                                 </details>
                             </td>
@@ -301,88 +297,6 @@
         </ul>
     </section>
 </div>
-
-<!--/* One question: which manual catalog category. "Dalej" posts to /dashboard/inventory/browse/add, which forwards to
-       the catalog's own review ("Uzupełnij dane") with these eans and returnTo. Drawn open only on the no-JS page. */-->
-<dialog th:fragment="addDialog" class="cl-dialog is-form" id="inventory-add-dialog"
-        aria-labelledby="inventory-add-title" th:with="d=${addDialog}" th:attr="open=${addDialogOpen} ? 'open' : null">
-    <form method="post" th:action="${d.action()}">
-        <input type="hidden" name="eans" th:each="ean : ${d.eans()}" th:value="${ean}"/>
-        <input type="hidden" name="returnTo" th:value="${d.returnTo()}"/>
-        <h2 class="cl-dialog-title" id="inventory-add-title"
-            th:text="${d.count() > 1} ? #{inventory.browse.dialog.titleMany(${d.count()})} : #{inventory.browse.dialog.title}"></h2>
-        <div class="cl-dialog-body">
-            <th:block th:if="${d.noManualCategories()}">
-                <p class="cl-dialog-effect" th:text="#{inventory.browse.dialog.noManual}"></p>
-                <p><a href="/dashboard/catalogs" th:text="#{inventory.browse.dialog.noManual.link}"></a></p>
-            </th:block>
-            <th:block th:unless="${d.noManualCategories()}">
-                <p class="cl-dialog-effect" th:if="${d.productName() != null}"
-                   th:text="${d.pimCategoryName() != null} ? #{inventory.browse.dialog.single(${d.productName()}, ${d.pimCategoryName()})} : ${d.productName()}"></p>
-                <p class="cl-dialog-effect" th:if="${d.productName() == null}"
-                   th:text="${d.pimCategoryName() != null} ? #{inventory.browse.dialog.manyCommon(${d.count()}, ${d.pimCategoryName()})} : #{inventory.browse.dialog.many(${d.count()})}"></p>
-                <fieldset class="cl-choice-group" th:if="${d.anyMatching()}">
-                    <legend class="cl-label"><span th:text="#{inventory.browse.dialog.target}"></span></legend>
-                    <label class="cl-choice" th:each="o : ${d.matching()}">
-                        <input type="radio" name="target" th:value="${o.value()}" th:checked="${o.preselected()}">
-                        <span class="cl-choice-text">
-                            <span class="cl-choice-title" th:text="${o.label()}"></span>
-                            <span class="cl-choice-description"
-                                  th:text="${d.count() > 1} ? #{inventory.browse.dialog.fits.many(${o.alreadyIn()}, ${d.count()})}
-                                          : (${o.alreadyIn() > 0} ? #{inventory.browse.dialog.fits.oneIn} : #{inventory.browse.dialog.fits.one})"></span>
-                        </span>
-                    </label>
-                    <th:block th:unless="${d.others().isEmpty()}">
-                        <label class="cl-choice">
-                            <input type="radio" name="target" value="other" data-browse-other-radio>
-                            <span class="cl-choice-text">
-                                <span class="cl-choice-title" id="inventory-add-other-title" th:text="#{inventory.browse.dialog.other}"></span>
-                            </span>
-                        </label>
-                        <!--/* design system P6; inventory-browse.js shows it only while "Inna kategoria" is chosen and then
-                               requires a choice, without JavaScript it stays visible and the server reports an empty one */-->
-                        <div class="cl-choice-reveal cl-field" data-browse-other-field>
-                            <select class="cl-select" id="inventory-add-other" name="otherTarget" data-browse-other-select
-                                    aria-labelledby="inventory-add-other-title" aria-describedby="inventory-add-other-help">
-                                <th:block th:replace="~{fragments/inventory-browse :: otherOptions(${d})}"></th:block>
-                            </select>
-                            <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
-                        </div>
-                    </th:block>
-                </fieldset>
-                <th:block th:unless="${d.anyMatching()}">
-                    <input type="hidden" name="target" value="other"/>
-                    <div class="cl-alert is-info">
-                        <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
-                        <div class="cl-alert-text"><p th:text="${d.count() > 1} ? #{inventory.browse.dialog.unmatched.many} : #{inventory.browse.dialog.unmatched}"></p></div>
-                    </div>
-                    <div class="cl-field" th:unless="${d.others().isEmpty()}">
-                        <label class="cl-label" for="inventory-add-other" th:text="#{inventory.browse.dialog.target}"></label>
-                        <select class="cl-select" id="inventory-add-other" name="otherTarget" required
-                                aria-describedby="inventory-add-other-help">
-                            <th:block th:replace="~{fragments/inventory-browse :: otherOptions(${d})}"></th:block>
-                        </select>
-                        <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
-                    </div>
-                </th:block>
-                <p class="cl-help is-note" th:text="#{inventory.browse.dialog.effect}"></p>
-            </th:block>
-        </div>
-        <div class="cl-dialog-actions">
-            <button class="cl-button is-primary" type="submit" th:unless="${d.noManualCategories()}"
-                    th:text="#{inventory.browse.dialog.next}"></button>
-            <a class="cl-button" th:href="${d.returnTo()}" data-cl-dialog-close th:text="#{general.cancel}"></a>
-        </div>
-    </form>
-</dialog>
-
-<!--/* The manual categories of every catalog, for "Inna kategoria" or, when nothing matches, the only choice. */-->
-<th:block th:fragment="otherOptions(d)">
-    <option value="" th:text="#{inventory.browse.dialog.choose}"></option>
-    <optgroup th:each="g : ${d.others()}" th:label="${g.catalogName()}">
-        <option th:each="o : ${g.options()}" th:value="${o.value()}" th:text="${o.label()}"></option>
-    </optgroup>
-</th:block>
 
 </body>
 </html>

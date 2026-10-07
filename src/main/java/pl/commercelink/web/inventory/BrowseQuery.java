@@ -110,19 +110,11 @@ public record BrowseQuery(String category, List<String> suppliers, String q2, Br
     }
 
     public String href() {
-        return hrefWith(null);
-    }
-
-    /** The list's address with an extra, already encoded query appended, e.g. the parameters that open a dialog on it. */
-    public String hrefWith(String extraQuery) {
         List<String> parts = new ArrayList<>(params(null).stream()
                 .map(param -> param.name() + "=" + encode(param.value()))
                 .toList());
         if (page > 1) {
             parts.add("page=" + page);
-        }
-        if (extraQuery != null && !extraQuery.isEmpty()) {
-            parts.add(extraQuery);
         }
         return parts.isEmpty() ? PATH : PATH + "?" + String.join("&", parts);
     }

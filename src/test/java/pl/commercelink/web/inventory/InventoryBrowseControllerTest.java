@@ -12,12 +12,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
-import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.starter.security.CustomSecurityContext;
-
-import java.util.List;
-import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,9 +33,6 @@ class InventoryBrowseControllerTest {
     private static final String STORE_ID = "store-1";
 
     @Mock private BrowsePageFactory pageFactory;
-    @Mock private AddToCatalogDialogFactory dialogFactory;
-    @Mock private CatalogPlacement catalogPlacement;
-    @Mock private org.springframework.context.MessageSource messageSource;
     @InjectMocks private InventoryBrowseController controller;
     private MockedStatic<CustomSecurityContext> security;
 
@@ -49,9 +41,6 @@ class InventoryBrowseControllerTest {
         security = mockStatic(CustomSecurityContext.class);
         signedInAs("ADMIN");
         when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(BrowsePage.of(BrowsePage.Status.READY, BrowseQuery.start(), true));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
-        CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
-        when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu), List.of()));
     }
 
     @AfterEach
@@ -77,8 +66,6 @@ class InventoryBrowseControllerTest {
         // then
         assertThat(view).isEqualTo("inventory");
         assertThat(model.getAttribute("browse")).isNotNull();
-        assertThat(model.getAttribute("addDialog")).isNull();
-        assertThat(model.getAttribute("browseDialogUrl")).isEqualTo("/dashboard/inventory/browse/add-dialog");
     }
 
     @Test
@@ -143,28 +130,6 @@ class InventoryBrowseControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/inventory/prices?q=MX-1&from=%2Fdashboard%2Finventory%3Fcat%3D11%26supplier%3DAB");
     }
 
-    @Test
-    void openAddRendersTheDialogForAnAdminOnly() {
-        // given
-        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("open", "add");
-        params.add("ean", "5901000000001");
-        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne", List.of(),
-                List.of(), false, "/dashboard/inventory", AddToCatalogDialog.ACTION);
-        when(dialogFactory.build(eq(STORE_ID), eq(List.of("5901000000001")), anyString())).thenReturn(dialog);
-        ConcurrentModel adminModel = new ConcurrentModel();
-
-        // when
-        controller.page(params, adminModel);
-        signedInAs("USER");
-        ConcurrentModel userModel = new ConcurrentModel();
-        controller.page(params, userModel);
-
-        // then
-        assertThat(adminModel.getAttribute("addDialog")).isSameAs(dialog);
-        assertThat(userModel.getAttribute("addDialog")).isNull();
-    }
-
     /**
      * A super admin account can carry a store id (the local seed's does); the browse is still the global one, as the code
      * search is, and never that store's own feeds or its choice of suppliers.
@@ -191,37 +156,5 @@ class InventoryBrowseControllerTest {
 
         // then
         assertThat(view).isEqualTo("fragments/inventory-browse :: results");
-    }
-
-    @Test
-    void addForwardsToTheCatalogReviewOfTheChosenCategory() {
-        // when
-        String view = controller.add("c-1/cat-gpu", null, "/dashboard/inventory", new RedirectAttributesModelMap(), Locale.ENGLISH);
-
-        // then
-        assertThat(view).isEqualTo("forward:/dashboard/catalogs/c-1/category/cat-gpu/products/add/review");
-    }
-
-    @Test
-    void addWithOtherUsesTheSelectedCategory() {
-        // when
-        String view = controller.add(AddToCatalogDialog.OTHER, "c-1/cat-gpu", null, new RedirectAttributesModelMap(), Locale.ENGLISH);
-
-        // then
-        assertThat(view).startsWith("forward:");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void addWithUnknownTargetGoesBackWithAnError() {
-        // given
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        String view = controller.add("c-9/nope", null, "/dashboard/inventory?cat=11", redirect, Locale.ENGLISH);
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/inventory?cat=11");
-        assertThat((java.util.Map<String, Object>) redirect.getFlashAttributes()).containsEntry("inventoryError", "inventory.browse.add.noTarget");
     }
 }

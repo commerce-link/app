@@ -61,7 +61,7 @@ class InventoryPageTemplateTest {
 
         // then
         assertThat(html).doesNotContain("data-inventory-summary", "cl-inv-sources", "is-wide", "data-cl-list-results",
-                "inventory-browse.js", "data-browse-dialog-url", "data-browse-add");
+                "inventory-add-form", "/dashboard/inventory/add");
     }
 
     @Test
@@ -106,7 +106,7 @@ class InventoryPageTemplateTest {
         // then
         assertThat(html).contains("<script src=\"/js/list-page.js\" defer></script>", "<script src=\"/js/menu.js\" defer></script>",
                 "<script src=\"/js/collapse-path.js\" defer></script>");
-        assertThat(html).doesNotContain("/js/dialog.js", "/js/inventory-browse.js");
+        assertThat(html).doesNotContain("/js/dialog.js");
     }
 
     @Test
@@ -120,15 +120,14 @@ class InventoryPageTemplateTest {
         assertThat(admin).contains("<script src=\"/js/inventory-building.js\" defer></script>");
     }
 
+    /** "Dodaj do katalogu" is a link and a form post to "Uzupełnij dane": the page loads no dialog for it. */
     @Test
-    void storeAdminGetsTheAddScriptAfterTheSharedDialogScriptAndTheDialogAddress() {
+    void storeAdminPageHasNoAddDialogAndNoDialogScript() {
         // when
         String html = assortment(true);
 
         // then
-        assertThat(html).contains("data-browse-dialog-url=\"/dashboard/inventory/browse/add-dialog\"",
-                "<script src=\"/js/dialog.js\" defer></script>", "<script src=\"/js/inventory-browse.js\" defer></script>");
-        assertThat(html.indexOf("/js/dialog.js")).isLessThan(html.indexOf("/js/inventory-browse.js"));
+        assertThat(html).doesNotContain("<dialog", "/js/dialog.js", "data-browse-dialog-url", "data-browse-dialog-slot");
     }
 
     private String prices(boolean superAdmin, String query) {
@@ -144,7 +143,6 @@ class InventoryPageTemplateTest {
         context.setVariable("canManageSuppliers", admin);
         context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("browse", BrowsePage.of(BrowsePage.Status.READY, BrowseQuery.start(), admin));
-        context.setVariable("browseDialogUrl", "/dashboard/inventory/browse/add-dialog");
         return engine.process("inventory", context);
     }
 }

@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class AddToCatalogDialogFactoryTest {
+class CatalogTargetOptionsFactoryTest {
 
     private static final String STORE_ID = "store-1";
 
@@ -39,13 +39,13 @@ class AddToCatalogDialogFactoryTest {
     @Mock private TaxonomyCache taxonomyCache;
     /** Mocked, not built: a real group adds every offer's codes to its key, and this case needs the global key alone. */
     @Mock private MatchedInventory merged;
-    private AddToCatalogDialogFactory factory;
+    private CatalogTargetOptionsFactory factory;
 
     @BeforeEach
     void setUp() {
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("11", null, "Karty graficzne", "pl"), new PimCategory("31", null, "Chłodzenie", "pl")));
-        factory = new AddToCatalogDialogFactory(inventory, catalogPlacement, new PimCategoryTree(pimCatalog));
+        factory = new CatalogTargetOptionsFactory(inventory, catalogPlacement, new PimCategoryTree(pimCatalog));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
         when(view.findByEan(anyString())).thenReturn(MatchedInventory.empty(new InventoryKey()));
         product("5901000000001", "RTX 4060", "11");
@@ -61,18 +61,16 @@ class AddToCatalogDialogFactoryTest {
     @Test
     void matchingCategoriesComeFirstWithHowManyAreAlreadyThere() {
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001", "5901000000002", "5901000000001"),
-                "/dashboard/inventory?cat=11");
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001", "5901000000002", "5901000000001"));
 
         // then
-        assertThat(dialog.count()).isEqualTo(2);
-        assertThat(dialog.pimCategoryName()).isEqualTo("Karty graficzne");
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::label)
+        assertThat(options.count()).isEqualTo(2);
+        assertThat(options.pimCategoryName()).isEqualTo("Karty graficzne");
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::label)
                 .containsExactly("Podzespoły › Karta graficzna", "Sklep B2B › Karty");
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(0, 1);
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(true, false);
-        assertThat(dialog.others()).extracting(AddToCatalogDialog.Group::catalogName).containsExactly("Podzespoły");
-        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory?cat=11");
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 1);
+        assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
+        assertThat(options.others()).extracting(CatalogTargetOptions.Group::catalogName).containsExactly("Podzespoły");
     }
 
     @Test
@@ -81,10 +79,10 @@ class AddToCatalogDialogFactoryTest {
         placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000001")));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001"));
 
         // then
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+        assertThat(options.preselectedValue()).isEqualTo("c-2/cat-b2b");
     }
 
     @Test
@@ -94,12 +92,10 @@ class AddToCatalogDialogFactoryTest {
                 new CatalogPlacement.Existing("c-2", "cat-b2b", InventoryKey.fromEan("5901000000001")));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001"));
 
         // then
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(true, false);
-        assertThat(dialog.others()).flatExtracting(AddToCatalogDialog.Group::options)
-                .extracting(AddToCatalogDialog.Option::preselected).containsOnly(false);
+        assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
     }
 
     @Test
@@ -110,16 +106,16 @@ class AddToCatalogDialogFactoryTest {
                 new CatalogPlacement.Existing("c-2", "cat-b2b", InventoryKey.fromEan("5901000000001")));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001", "5901000000002"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001", "5901000000002"));
 
         // then
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(2, 1);
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(2, 1);
+        assertThat(options.preselectedValue()).isEqualTo("c-2/cat-b2b");
     }
 
     /**
      * A store's own offer joined a global product by one shared code and is the cheapest, so the row adds the product by
-     * that offer's EAN. The catalog holds it under that EAN only; the dialog must count it there, as the row's pill does.
+     * that offer's EAN. The catalog holds it under that EAN only; the options must count it there, as the row's pill does.
      */
     @Test
     void productInTheCatalogUnderTheRowsEanOnlyCountsAsThereAndTheOtherCategoryIsPreselected() {
@@ -128,11 +124,11 @@ class AddToCatalogDialogFactoryTest {
         placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000077")));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000077"));
 
         // then
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(1, 0);
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::preselected).containsExactly(false, true);
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(1, 0);
+        assertThat(options.preselectedValue()).isEqualTo("c-2/cat-b2b");
     }
 
     @Test
@@ -142,22 +138,22 @@ class AddToCatalogDialogFactoryTest {
         placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromMfn("OWN-77")));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000077"));
 
         // then
-        assertThat(dialog.matching()).extracting(AddToCatalogDialog.Option::alreadyIn).containsExactly(1, 0);
+        assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(1, 0);
     }
 
     @Test
     void productOutsideEveryMappedCategoryGetsAllManualCategories() {
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000003"), "//evil.com");
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000003"));
 
         // then
-        assertThat(dialog.productName()).isEqualTo("Freezer 360");
-        assertThat(dialog.anyMatching()).isFalse();
-        assertThat(dialog.others()).extracting(AddToCatalogDialog.Group::catalogName).containsExactly("Podzespoły", "Sklep B2B");
-        assertThat(dialog.returnTo()).isEqualTo("/dashboard/inventory");
+        assertThat(options.unmatched()).isTrue();
+        assertThat(options.preselectedValue()).isNull();
+        assertThat(options.pimCategoryName()).isEqualTo("Chłodzenie");
+        assertThat(options.others()).extracting(CatalogTargetOptions.Group::catalogName).containsExactly("Podzespoły", "Sklep B2B");
     }
 
     @Test
@@ -166,10 +162,10 @@ class AddToCatalogDialogFactoryTest {
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(), List.of()));
 
         // when
-        AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
+        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001"));
 
         // then
-        assertThat(dialog.noManualCategories()).isTrue();
+        assertThat(options.noManualCategories()).isTrue();
     }
 
     private void placement(CatalogPlacement.Existing... existing) {

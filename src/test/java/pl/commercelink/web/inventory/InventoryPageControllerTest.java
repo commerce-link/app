@@ -100,7 +100,6 @@ class InventoryPageControllerTest {
         assertThat(view).isEqualTo("inventory-prices");
         assertThat(model.getAttribute("query")).isEqualTo("");
         assertThat(model.getAttribute("result")).isNull();
-        assertThat(model.getAttribute("browseDialogUrl")).isNull();
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(true);
         assertThat(model.getAttribute("manageSuppliersUrl")).isEqualTo("/dashboard/store/suppliers");
         verifyNoInteractions(inventorySearch);

@@ -147,7 +147,7 @@ class BrowsePageFactoryTest {
         assertThat(row.category().pimLeaf()).isEqualTo("Karty graficzne");
         assertThat(row.category().inCatalogLabels()).containsExactly("Podzespoły › Karta graficzna");
         assertThat(row.detailHref()).startsWith("/dashboard/inventory/prices?q=5901000000001&from=%2Fdashboard%2Finventory%3Fcat%3D10");
-        assertThat(row.addHref()).isEqualTo("/dashboard/inventory?cat=10&open=add&ean=5901000000001");
+        assertThat(row.addHref()).isEqualTo("/dashboard/inventory/add?ean=5901000000001&returnTo=%2Fdashboard%2Finventory%3Fcat%3D10");
     }
 
     @Test
@@ -379,7 +379,7 @@ class BrowsePageFactoryTest {
         assertThat(page.rows().get(0).addHref()).isNull();
         assertThat(page.rows().get(0).detailHref()).contains("q=MFN-ONLY");
         assertThat(page.rows().get(1).addable()).isTrue();
-        assertThat(page.rows().get(1).addHref()).isEqualTo("/dashboard/inventory?cat=11&open=add&ean=5901000000002");
+        assertThat(page.rows().get(1).addHref()).isEqualTo("/dashboard/inventory/add?ean=5901000000002&returnTo=%2Fdashboard%2Finventory%3Fcat%3D11");
     }
 
     @Test
