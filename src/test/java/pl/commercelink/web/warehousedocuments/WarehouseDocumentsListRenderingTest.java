@@ -74,6 +74,17 @@ class WarehouseDocumentsListRenderingTest {
     }
 
     @Test
+    void noticeRendersInsideTheResultsFragment() {
+        // when
+        String html = SettingsTemplateRenderer.render(RESULTS, Map.of("page", page(List.of(row()), List.of(), null, false),
+                "documentsNotice", "Dokument nie istnieje."));
+
+        // then
+        assertThat(html).contains("Dokument nie istnieje.").contains("data-cl-list-notice");
+        assertThat(html.indexOf("data-cl-list-notice")).isGreaterThan(html.indexOf("data-cl-list-results"));
+    }
+
+    @Test
     void superAdminSeesTheStoreColumn() {
         // given
         DocumentRow withStore = new DocumentRow(row().href(), row().number(), row().typeName(), true, row().reason(), null,

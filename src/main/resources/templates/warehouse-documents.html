@@ -18,11 +18,6 @@
 
         <div th:replace="~{fragments/screen-intro :: panel('warehouse-documents', 'fas fa-file-alt')}"></div>
 
-        <div th:if="${documentsNotice != null}" class="cl-alert is-warn" role="status" tabindex="-1" data-cl-list-notice>
-            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-text" th:text="${documentsNotice}"></p>
-        </div>
-
         <!--/* Documents switched off in the store settings: say what it means and where to change it, nothing else. */-->
         <div th:fragment="disabled" th:unless="${page.documentsEnabled()}" class="cl-alert is-warn" role="status">
             <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
@@ -35,6 +30,13 @@
         <th:block th:fragment="results">
         <div th:if="${page.documentsEnabled()}" data-cl-list-results th:attr="data-cl-list-path=${page.query().path()}, data-cl-list-fragment=${page.fragmentPath()}"
              th:with="q=${page.query()}">
+
+            <!--/* Inside the swapped block: the fragment request carries no flash, so the notice goes away with the next swap;
+                   list-page.js focuses it once (data-cl-list-notice). */-->
+            <div th:if="${documentsNotice != null}" class="cl-alert is-warn" role="status" tabindex="-1" data-cl-list-notice>
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${documentsNotice}"></p>
+            </div>
 
             <section class="cl-card" aria-labelledby="documents-table-title">
                 <h2 class="cl-visually-hidden" id="documents-table-title" th:text="#{warehouse.documents.list.table}"></h2>
