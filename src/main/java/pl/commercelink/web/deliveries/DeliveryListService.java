@@ -28,7 +28,8 @@ import java.util.stream.Stream;
 
 /**
  * The deliveries list (spec §5–§6): reads only the part of the store the scope needs (on their way, the settlement
- * backlog, a window of the history), then narrows, counts, sorts and pages it in memory. The super admin gets the
+ * backlog, a window of the history), then narrows, counts, sorts and pages it in memory. The date filter is the day a
+ * delivery was created (orderedAt) in every scope, received or not. The super admin gets the
  * GLOBAL deliveries of every store, one store's key range at a time instead of a table scan.
  */
 @Service
@@ -53,10 +54,12 @@ public class DeliveryListService {
         // the backlog is read only when its list is opened; the tile counts it with a cheap COUNT
         boolean invoiceFocus = query.focus() == DeliveryAttention.INVOICE && !actor.superAdmin();
         List<Delivery> toSettle = invoiceFocus ? read(storeIds, deliveries::findToSettle, actor) : List.of();
+        LocalDate from = query.scope().includesHistory() ? query.historyFrom(today) : query.from();
         List<Delivery> history = List.of();
         if (query.scope().includesHistory()) {
-            history = query.focus() == DeliveryAttention.INVOICE ? toSettle
-                    : read(storeIds, id -> deliveries.findReceivedBetween(id, query.historyFrom(today), query.to()), actor);
+            history = (query.focus() == DeliveryAttention.INVOICE ? toSettle
+                    : read(storeIds, id -> deliveries.findReceivedSince(id, from), actor)).stream()
+                    .filter(d -> createdWithin(d, from, query.to())).toList();
         }
         if (query.q() != null && NUMBER.matcher(query.q()).matches() && query.scope().includesHistory()) {
             String prefix = query.q().toLowerCase(Locale.ROOT);
@@ -69,9 +72,9 @@ public class DeliveryListService {
 
         List<Tile> tiles = tiles(actor, query, transit, toSettle, today, locale);
         List<Delivery> inScope = switch (query.scope()) {
-            case TRANSIT -> transit.stream().filter(d -> orderedWithin(d, query)).toList();
+            case TRANSIT -> transit.stream().filter(d -> createdWithin(d, from, query.to())).toList();
             case RECEIVED -> history;
-            case ALL -> Stream.concat(transit.stream(), history.stream()).toList();
+            case ALL -> Stream.concat(transit.stream().filter(d -> createdWithin(d, from, query.to())), history.stream()).toList();
         };
         List<Delivery> base = inScope.stream()
                 .filter(d -> query.focus() == null || query.focus().matches(d, DeliveryListState.of(d), today))
@@ -147,17 +150,19 @@ public class DeliveryListService {
                 query.withScope(scope).href(), scope == query.scope())).toList();
     }
 
-    private static boolean orderedWithin(Delivery d, DeliveryListQuery query) {
-        LocalDate ordered = d.getOrderedAt() == null ? null : d.getOrderedAt().toLocalDate();
-        if (query.from() != null && (ordered == null || ordered.isBefore(query.from()))) return false;
-        return query.to() == null || (ordered != null && !ordered.isAfter(query.to()));
+    /** orderedAt is set when the delivery is created and never changes, so it is the delivery's creation day. */
+    private static boolean createdWithin(Delivery d, LocalDate from, LocalDate to) {
+        LocalDate created = d.getOrderedAt() == null ? null : d.getOrderedAt().toLocalDate();
+        if (from != null && (created == null || created.isBefore(from))) return false;
+        return to == null || (created != null && !created.isAfter(to));
     }
 
     private static boolean matchesSettle(Delivery d, List<Settle> settle) {
         return settle.stream().allMatch(s -> switch (s) {
             // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
             case NO_INVOICE -> !d.isInvoiced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
-            case NO_SYNC -> d.isInvoiced() && !d.isSynced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
+            // only the sync flag counts (client's decision): a delivery still waiting for its invoice is unsynced too
+            case NO_SYNC -> !d.isSynced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
             case UNPAID -> !d.isPaid();
         });
     }
@@ -232,7 +237,7 @@ public class DeliveryListService {
 
     private DateMenu dateMenu(DeliveryListQuery query, LocalDate today, Locale locale) {
         boolean history = query.scope().includesHistory();
-        String key = text(locale, history ? "deliveries.list.dates.received" : "deliveries.list.dates.ordered");
+        String key = text(locale, "deliveries.list.dates.ordered");
         boolean window = history && query.from() == null && query.to() == null && !query.allHistory()
                 && query.focus() != DeliveryAttention.INVOICE;
         String value = query.from() != null || query.to() != null
