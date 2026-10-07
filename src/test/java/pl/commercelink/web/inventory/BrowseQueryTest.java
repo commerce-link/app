@@ -93,7 +93,37 @@ class BrowseQueryTest {
         // when / then
         assertThat(byCost.descending()).isFalse();
         assertThat(byCost.toggleSort(BrowseCriteria.Sort.COST).descending()).isTrue();
-        assertThat(byCost.toggleSort(BrowseCriteria.Sort.QTY).descending()).isFalse();
+        assertThat(byCost.toggleSort(BrowseCriteria.Sort.NAME).descending()).isFalse();
+    }
+
+    @Test
+    void quantityStartsWithTheMostAndFlipsFromThere() {
+        // given
+        BrowseQuery byQty = BrowseQuery.start().toggleSort(BrowseCriteria.Sort.QTY);
+
+        // when / then
+        assertThat(byQty.descending()).isTrue();
+        assertThat(byQty.toggleSort(BrowseCriteria.Sort.QTY).descending()).isFalse();
+        assertThat(byQty.toggleSort(BrowseCriteria.Sort.COST).descending()).isFalse();
+    }
+
+    @Test
+    void pageTooLargeForAnOffsetIsCappedInsteadOfOverflowing() {
+        // given
+        LinkedMultiValueMap<String, String> huge = new LinkedMultiValueMap<>();
+        huge.add("page", "50000000");
+        LinkedMultiValueMap<String, String> endless = new LinkedMultiValueMap<>();
+        endless.add("page", "99999999999999999999999");
+
+        // when
+        BrowseQuery query = BrowseQuery.parse(huge);
+        BrowseQuery longer = BrowseQuery.parse(endless);
+
+        // then
+        assertThat(query.page()).isEqualTo(BrowseQuery.MAX_PAGE);
+        assertThat(query.toCriteria(null).offset()).isPositive();
+        assertThat(longer.page()).isEqualTo(BrowseQuery.MAX_PAGE);
+        assertThat(BrowseQuery.start().withPage(Integer.MAX_VALUE).toCriteria(null).offset()).isPositive();
     }
 
     @Test

@@ -43,16 +43,15 @@ public class BrowsePageFactory {
     public BrowsePage build(@Nullable String storeId, BrowseQuery query, boolean admin, boolean superAdmin) {
         BrowseSummary summary = inventoryBrowse.summary(storeId);
         Set<String> unknownIds = unknownCategoryIds(summary.byCategory());
-        Map<String, Integer> counts = new HashMap<>(CategoryCounts.rollUp(summary.byCategory(), tree));
-        // A category id the PIM tree does not know cannot be reached by drill-down, so it browses as "Bez kategorii PIM".
-        int unassigned = summary.byCategory().getOrDefault(BrowseIndex.UNASSIGNED, 0)
-                + unknownIds.stream().mapToInt(id -> summary.byCategory().get(id)).sum();
-        counts.put(BrowseIndex.UNASSIGNED, unassigned);
+        Map<String, Integer> counts = counts(summary.byCategory(), unknownIds);
         // Offers carry connection identities (Kosatec-k7f3a9c2); without a store they read as their legacy shape.
         SupplierLabelMap labels = storeId == null ? supplierLabels.forStore(null) : supplierLabels.forStoreId(storeId);
         boolean withCatalog = admin && !superAdmin && storeId != null;
         CatalogPlacement.StorePlacement placement = withCatalog ? catalogPlacement.forStore(storeId) : null;
         String category = query.category();
+        // Every count beside the list follows the filters its links carry; without filters the store's summary is exact.
+        Filters filters = new Filters(storeId, Set.copyOf(query.suppliers()), query.textTooShort() ? null : query.q2(),
+                unknownIds, summary.total() > 0);
 
         List<BrowsePage.RowView> rows = List.of();
         int total = 0;
@@ -73,9 +72,41 @@ public class BrowsePageFactory {
         }
 
         return new BrowsePage(query, admin, superAdmin, summary.total() == 0 && !superAdmin, query.textTooShort(),
-                title(category), crumbs(category), subnav(category, counts, query), isSiblings(category),
-                tiles(query, counts), supplierOptions(summary, query, labels), chips(query, labels), query.cleared().href(),
+                title(category), crumbs(category, query), subnav(category, counts, filters, query), isSiblings(category),
+                tiles(query, counts, filters), supplierOptions(summary, supplierCounts(summary, category, filters), query, labels),
+                chips(query, labels), query.cleared().href(),
                 rows, total, truncated, pagination, sortHeaders(query), query.href());
+    }
+
+    private record Filters(String storeId, Set<String> suppliers, String text, Set<String> unknownIds, boolean any) {
+
+        boolean active() {
+            return !suppliers.isEmpty() || text != null;
+        }
+    }
+
+    /** Products per category with the parents counting their subtree, and unknown PIM ids counted as unassigned. */
+    private Map<String, Integer> counts(Map<String, Integer> byCategory, Set<String> unknownIds) {
+        Map<String, Integer> counts = new HashMap<>(CategoryCounts.rollUp(byCategory, tree));
+        // A category id the PIM tree does not know cannot be reached by drill-down, so it browses as "Bez kategorii PIM".
+        int unassigned = byCategory.getOrDefault(BrowseIndex.UNASSIGNED, 0)
+                + unknownIds.stream().mapToInt(id -> byCategory.getOrDefault(id, 0)).sum();
+        counts.put(BrowseIndex.UNASSIGNED, unassigned);
+        return counts;
+    }
+
+    private Map<String, Integer> filteredCounts(Set<String> categoryIds, Filters filters) {
+        return counts(inventoryBrowse.facets(filters.storeId(), categoryIds, filters.suppliers(), filters.text())
+                .byCategory(), filters.unknownIds());
+    }
+
+    /** The supplier menu counts the current category and phrase, whichever suppliers are ticked. */
+    private Map<String, Integer> supplierCounts(BrowseSummary summary, String category, Filters filters) {
+        if ((category == null && filters.text() == null) || !filters.any()) {
+            return summary.bySupplier();
+        }
+        return inventoryBrowse.facets(filters.storeId(), categoryIds(category, filters.unknownIds()), Set.of(),
+                filters.text()).bySupplier();
     }
 
     private Set<String> categoryIds(String category, Set<String> unknownIds) {
@@ -128,9 +159,10 @@ public class BrowsePageFactory {
         return tree.find(category).map(PimCategory::name).orElse(category);
     }
 
-    private List<BrowsePage.Crumb> crumbs(String category) {
+    /** Going up keeps the filters, the phrase and the sort, as going down through the pills does. */
+    private List<BrowsePage.Crumb> crumbs(String category, BrowseQuery query) {
         List<BrowsePage.Crumb> crumbs = new ArrayList<>();
-        crumbs.add(new BrowsePage.Crumb(null, "inventory.browse.all", BrowseQuery.start().href()));
+        crumbs.add(new BrowsePage.Crumb(null, "inventory.browse.all", query.withCategory(null).href()));
         if (category == null) {
             return crumbs;
         }
@@ -146,7 +178,7 @@ public class BrowsePageFactory {
         }
         for (String id : ids) {
             String name = tree.find(id).map(PimCategory::name).orElse(id);
-            crumbs.add(new BrowsePage.Crumb(name, null, id.equals(category) ? null : BrowseQuery.start().withCategory(id).href()));
+            crumbs.add(new BrowsePage.Crumb(name, null, id.equals(category) ? null : query.withCategory(id).href()));
         }
         return crumbs;
     }
@@ -155,22 +187,33 @@ public class BrowsePageFactory {
         return category != null && tree.find(category).isPresent() && tree.childrenOf(category).isEmpty();
     }
 
-    private List<BrowsePage.NavItem> subnav(String category, Map<String, Integer> counts, BrowseQuery query) {
+    private List<BrowsePage.NavItem> subnav(String category, Map<String, Integer> storeCounts, Filters filters,
+                                            BrowseQuery query) {
         if (category == null || tree.find(category).isEmpty()) {
             return List.of();
         }
-        List<PimCategory> items = tree.childrenOf(category).isEmpty() ? tree.siblingsOf(category) : tree.childrenOf(category);
+        boolean siblings = tree.childrenOf(category).isEmpty();
+        List<PimCategory> items = siblings ? tree.siblingsOf(category) : tree.childrenOf(category);
+        Map<String, Integer> counts = storeCounts;
+        if (filters.active() && filters.any() && !items.isEmpty()) {
+            // Siblings live under the parent, outside the current category; a top-level leaf's siblings are the top levels.
+            Set<String> scope = !siblings ? tree.selfAndDescendants(category)
+                    : tree.parentIdOf(category).map(tree::selfAndDescendants).orElse(null);
+            counts = filteredCounts(scope, filters);
+        }
+        Map<String, Integer> shown = counts;
         return items.stream()
-                .filter(item -> counts.getOrDefault(item.id(), 0) > 0)
-                .map(item -> new BrowsePage.NavItem(item.name(), null, counts.get(item.id()),
+                .filter(item -> shown.getOrDefault(item.id(), 0) > 0 || item.id().equals(category))
+                .map(item -> new BrowsePage.NavItem(item.name(), null, shown.getOrDefault(item.id(), 0),
                         query.withCategory(item.id()).href(), item.id().equals(category)))
                 .toList();
     }
 
-    private List<BrowsePage.Tile> tiles(BrowseQuery query, Map<String, Integer> counts) {
+    private List<BrowsePage.Tile> tiles(BrowseQuery query, Map<String, Integer> storeCounts, Filters filters) {
         if (!query.isStart()) {
             return List.of();
         }
+        Map<String, Integer> counts = filters.active() && filters.any() ? filteredCounts(null, filters) : storeCounts;
         List<BrowsePage.Tile> tiles = new ArrayList<>(tree.topLevels().stream()
                 .filter(top -> counts.getOrDefault(top.id(), 0) > 0)
                 .sorted(Comparator.comparingInt((PimCategory top) -> counts.get(top.id())).reversed())
@@ -195,17 +238,21 @@ public class BrowsePageFactory {
         return names.isEmpty() ? null : String.join(", ", names);
     }
 
-    private static List<BrowsePage.MenuOption> supplierOptions(BrowseSummary summary, BrowseQuery query,
-                                                               SupplierLabelMap labels) {
-        Map<String, Long> labelUses = summary.bySupplier().keySet().stream()
+    /** The store's suppliers that have products here, and the ticked ones even when they have none, to untick them. */
+    private static List<BrowsePage.MenuOption> supplierOptions(BrowseSummary summary, Map<String, Integer> counts,
+                                                               BrowseQuery query, SupplierLabelMap labels) {
+        List<String> shown = summary.bySupplier().keySet().stream()
+                .filter(supplier -> counts.getOrDefault(supplier, 0) > 0 || query.suppliers().contains(supplier))
+                .toList();
+        Map<String, Long> labelUses = shown.stream()
                 .collect(Collectors.groupingBy(labels::of, Collectors.counting()));
-        return summary.bySupplier().entrySet().stream()
-                .map(entry -> {
-                    String label = labels.of(entry.getKey());
+        return shown.stream()
+                .map(supplier -> {
+                    String label = labels.of(supplier);
                     // Two connections under one label would be two identical checkboxes; the identity tells them apart.
-                    String shown = labelUses.get(label) > 1 ? label + " (" + entry.getKey() + ")" : label;
-                    return new BrowsePage.MenuOption(entry.getKey(), shown, entry.getValue(),
-                            query.suppliers().contains(entry.getKey()));
+                    String text = labelUses.get(label) > 1 ? label + " (" + supplier + ")" : label;
+                    return new BrowsePage.MenuOption(supplier, text, counts.getOrDefault(supplier, 0),
+                            query.suppliers().contains(supplier));
                 })
                 .sorted(Comparator.comparing(BrowsePage.MenuOption::label, String.CASE_INSENSITIVE_ORDER))
                 .toList();

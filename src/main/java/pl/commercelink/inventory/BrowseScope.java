@@ -35,25 +35,21 @@ final class BrowseScope {
     }
 
     static BrowseScope everyGlobalSupplier(BrowseIndex global) {
-        return new BrowseScope(global, supplier -> true, Map.of(), BrowseIndex.build(global.version(), List.of()));
+        return new BrowseScope(global, supplier -> true, Map.of(), global.alongside(List.of()));
     }
 
-    static BrowseScope of(BrowseIndex global, InventoryIndex globalGroups, Predicate<String> enabledGlobal,
-                          Collection<MatchedInventory> own) {
+    static BrowseScope of(BrowseIndex global, Predicate<String> enabledGlobal, Collection<MatchedInventory> own) {
         Map<MatchedInventory, List<InventoryItem>> extras = new IdentityHashMap<>();
         List<MatchedInventory> ownOnly = new ArrayList<>();
         for (MatchedInventory ownGroup : own) {
-            // The browse index may lag one reload behind the live groups; a group it does not know is listed as own.
-            Optional<MatchedInventory> listed = globalGroups.findMatching(ownGroup.getInventoryKey()).stream()
-                    .filter(candidate -> global.entryOf(candidate).isPresent())
-                    .findFirst();
+            Optional<MatchedInventory> listed = global.findListed(ownGroup.getInventoryKey());
             if (listed.isPresent()) {
                 extras.computeIfAbsent(listed.get(), group -> new ArrayList<>()).addAll(ownGroup.getInventoryItems());
             } else {
                 ownOnly.add(ownGroup);
             }
         }
-        return new BrowseScope(global, enabledGlobal, extras, BrowseIndex.build(global.version(), ownOnly));
+        return new BrowseScope(global, enabledGlobal, extras, global.alongside(ownOnly));
     }
 
     Stream<BrowseEntry> entries(Set<String> categoryIds) {

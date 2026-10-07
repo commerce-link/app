@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,6 +25,7 @@ public class BrowseIndexHolder {
     private final Executor executor;
     private final AtomicReference<BrowseIndex> current = new AtomicReference<>();
     private final AtomicBoolean rebuilding = new AtomicBoolean();
+    private final List<Runnable> replacedListeners = new CopyOnWriteArrayList<>();
 
     @Autowired
     public BrowseIndexHolder(GlobalMatchedInventory global) {
@@ -47,6 +50,11 @@ public class BrowseIndexHolder {
         return index;
     }
 
+    /** Runs after a rebuilt index replaced the previous one, so whoever holds results of the old one can drop them. */
+    public void onReplaced(Runnable listener) {
+        replacedListeners.add(listener);
+    }
+
     /**
      * A stale index holds the previous inventory generation in memory until it is replaced; without this, that lasts
      * until someone opens the browse page. Before the first browse there is no index and nothing is built here.
@@ -64,6 +72,7 @@ public class BrowseIndexHolder {
             executor.execute(() -> {
                 try {
                     current.set(build());
+                    replacedListeners.forEach(Runnable::run);
                 } catch (RuntimeException e) {
                     log.error("Browse index rebuild failed", e);
                 } finally {
@@ -84,10 +93,9 @@ public class BrowseIndexHolder {
 
     private BrowseIndex build() {
         long started = System.nanoTime();
-        // Read the version before the items: a reload in between only causes one extra rebuild, never a stale index.
-        long version = global.version();
-        BrowseIndex index = BrowseIndex.build(version, global.all());
-        log.info("Browse index built: {} products, version {}, {} ms", index.size(), version,
+        GlobalMatchedInventory.Generation generation = global.generation();
+        BrowseIndex index = BrowseIndex.build(generation.version(), generation.all(), generation.index());
+        log.info("Browse index built: {} products, version {}, {} ms", index.size(), generation.version(),
                 (System.nanoTime() - started) / 1_000_000);
         return index;
     }

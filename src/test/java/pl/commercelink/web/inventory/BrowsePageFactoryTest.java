@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.inventory.BrowseCriteria;
+import pl.commercelink.inventory.BrowseFacets;
 import pl.commercelink.inventory.BrowseResult;
 import pl.commercelink.inventory.BrowseRow;
 import pl.commercelink.inventory.BrowseSummary;
@@ -37,11 +38,13 @@ import pl.commercelink.warehouse.api.WarehouseItemView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -81,6 +84,8 @@ class BrowsePageFactoryTest {
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stock);
         when(inventoryBrowse.summary(any())).thenReturn(new BrowseSummary(Map.of("11", 3, "12", 2, "21", 9), Map.of("AB", 14), 14));
         when(inventoryBrowse.browse(any(), any())).thenReturn(new BrowseResult(List.of(), 0, false));
+        when(inventoryBrowse.facets(any(), any(), any(), any()))
+                .thenReturn(new BrowseFacets(Map.of("11", 3, "12", 2, "21", 9), Map.of("AB", 14)));
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
         CatalogPlacement.Target b2b = new CatalogPlacement.Target("c-2", "Sklep B2B", "cat-b2b", "Karty", List.of("11"));
         CatalogPlacement.Existing existing = new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001"));
@@ -214,6 +219,8 @@ class BrowsePageFactoryTest {
                 Map.of("Kosatec-k7f3a9c2", 3, "manual-a1b2c3d4", 2), 5));
         when(inventoryBrowse.browse(eq(STORE_ID), any())).thenReturn(new BrowseResult(List.of(
                 row("5901000000001", "11", "Karty graficzne", "Kosatec-k7f3a9c2")), 1, false));
+        when(inventoryBrowse.facets(any(), any(), any(), any())).thenReturn(new BrowseFacets(Map.of("11", 3),
+                Map.of("Kosatec-k7f3a9c2", 3, "manual-a1b2c3d4", 2)));
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("cat", "11");
         params.add("supplier", "Kosatec-k7f3a9c2");
@@ -389,6 +396,113 @@ class BrowsePageFactoryTest {
 
         // then
         verifyNoInteractions(stock);
+    }
+
+    @Test
+    void supplierMenuCountsTheCurrentCategoryAndHidesSuppliersWithoutProductsThere() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 5, "21", 9),
+                Map.of("AB", 120, "Action", 104), 14));
+        when(inventoryBrowse.facets(eq(STORE_ID), eq(Set.of("10", "11", "12")), eq(Set.of()), isNull()))
+                .thenReturn(new BrowseFacets(Map.of("11", 5), Map.of("AB", 5)));
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.start().withCategory("10"), true, false);
+
+        // then
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::value).containsExactly("AB");
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::count).containsExactly(5);
+    }
+
+    @Test
+    void tickedSupplierStaysInTheMenuWhenTheCategoryHasNoneOfItsProducts() {
+        // given
+        when(inventoryBrowse.summary(STORE_ID)).thenReturn(new BrowseSummary(Map.of("11", 5, "21", 9),
+                Map.of("AB", 120, "Action", 104), 14));
+        when(inventoryBrowse.facets(eq(STORE_ID), any(), eq(Set.of()), isNull()))
+                .thenReturn(new BrowseFacets(Map.of("11", 5), Map.of("AB", 5)));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "10");
+        params.add("supplier", "Action");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::value).containsExactly("AB", "Action");
+        assertThat(page.supplierOptions()).extracting(BrowsePage.MenuOption::count).containsExactly(5, 0);
+    }
+
+    @Test
+    void tilesCountOnlyTheProductsOfTheTickedSupplier() {
+        // given
+        when(inventoryBrowse.facets(eq(STORE_ID), isNull(), eq(Set.of("AB")), isNull()))
+                .thenReturn(new BrowseFacets(Map.of("11", 1, "21", 2), Map.of("AB", 3)));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("supplier", "AB");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        assertThat(page.tiles()).extracting(BrowsePage.Tile::label).containsExactly("Akcesoria", "Komponenty komputerowe");
+        assertThat(page.tiles()).extracting(BrowsePage.Tile::count).containsExactly(2, 1);
+    }
+
+    @Test
+    void childPillsCountWithTheSupplierFilterAndPhraseTheirLinksCarry() {
+        // given
+        when(inventoryBrowse.facets(eq(STORE_ID), eq(Set.of("10", "11", "12")), eq(Set.of("AB")), eq("rtx")))
+                .thenReturn(new BrowseFacets(Map.of("11", 1), Map.of("AB", 1)));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "10");
+        params.add("supplier", "AB");
+        params.add("q2", "rtx");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        assertThat(page.subnav()).extracting(BrowsePage.NavItem::label).containsExactly("Karty graficzne");
+        assertThat(page.subnav()).extracting(BrowsePage.NavItem::count).containsExactly(1);
+        assertThat(page.subnav().get(0).href()).isEqualTo("/dashboard/inventory?cat=11&supplier=AB&q2=rtx");
+    }
+
+    @Test
+    void siblingPillsOfALeafCountWithinItsParent() {
+        // given
+        when(inventoryBrowse.facets(eq(STORE_ID), eq(Set.of("10", "11", "12")), eq(Set.of("AB")), isNull()))
+                .thenReturn(new BrowseFacets(Map.of("11", 2, "12", 4), Map.of("AB", 6)));
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "11");
+        params.add("supplier", "AB");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        assertThat(page.subnav()).extracting(BrowsePage.NavItem::label).containsExactly("Dyski SSD", "Karty graficzne");
+        assertThat(page.subnav()).extracting(BrowsePage.NavItem::count).containsExactly(4, 2);
+    }
+
+    @Test
+    void crumbsKeepTheFiltersThePhraseAndTheSortAndStartAtPageOne() {
+        // given
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("cat", "11");
+        params.add("supplier", "AB");
+        params.add("q2", "rtx");
+        params.add("sort", "cost");
+        params.add("page", "3");
+
+        // when
+        BrowsePage page = factory.build(STORE_ID, BrowseQuery.parse(params), true, false);
+
+        // then
+        assertThat(page.crumbs()).extracting(BrowsePage.Crumb::href).containsExactly(
+                "/dashboard/inventory?supplier=AB&q2=rtx&sort=cost",
+                "/dashboard/inventory?cat=10&supplier=AB&q2=rtx&sort=cost",
+                null);
     }
 
     private static BrowseRow mfnRow(String mfn) {

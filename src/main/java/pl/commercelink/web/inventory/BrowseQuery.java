@@ -21,6 +21,8 @@ public record BrowseQuery(String category, List<String> suppliers, String q2, Br
     public static final int PAGE_SIZE = 50;
     public static final int MIN_TEXT = 3;
     public static final int MAX_TEXT = 100;
+    // The largest page whose offset still fits an int; anything beyond is past the end and shows the last page anyway.
+    static final int MAX_PAGE = Integer.MAX_VALUE / PAGE_SIZE;
 
     public static BrowseQuery start() {
         return new BrowseQuery(null, List.of(), null, BrowseCriteria.Sort.NAME, false, 1);
@@ -66,13 +68,14 @@ public record BrowseQuery(String category, List<String> suppliers, String q2, Br
         return new BrowseQuery(category, List.of(), null, sort, descending, 1);
     }
 
+    /** The current column flips its direction; another starts ascending, except quantity, which starts with the most. */
     public BrowseQuery toggleSort(BrowseCriteria.Sort column) {
-        boolean nextDescending = sort == column && !descending;
+        boolean nextDescending = sort == column ? !descending : column == BrowseCriteria.Sort.QTY;
         return new BrowseQuery(category, suppliers, q2, column, nextDescending, 1);
     }
 
     public BrowseQuery withPage(int newPage) {
-        return new BrowseQuery(category, suppliers, q2, sort, descending, Math.max(1, newPage));
+        return new BrowseQuery(category, suppliers, q2, sort, descending, clampPage(newPage));
     }
 
     public BrowseCriteria toCriteria(Set<String> categoryIds) {
@@ -133,11 +136,20 @@ public record BrowseQuery(String category, List<String> suppliers, String q2, Br
     }
 
     private static int parsePage(String value) {
+        String digits = trim(value);
+        if (!digits.isEmpty() && digits.chars().allMatch(Character::isDigit)) {
+            // Too many digits for any number is still a page past the end, not the first page.
+            return digits.length() > 10 ? MAX_PAGE : clampPage(Long.parseLong(digits));
+        }
         try {
-            return Math.max(1, Integer.parseInt(trim(value)));
+            return clampPage(Long.parseLong(digits));
         } catch (NumberFormatException e) {
             return 1;
         }
+    }
+
+    private static int clampPage(long page) {
+        return (int) Math.min(Math.max(1, page), MAX_PAGE);
     }
 
     private static String normalizeText(String value) {
