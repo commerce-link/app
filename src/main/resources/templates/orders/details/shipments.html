@@ -93,7 +93,7 @@
                 </p>
                 <!--/* the arguments are an array: a message expression would print it as one value, msgWithParams spreads it */-->
                 <div th:if="${s.stateInProgress()}" aria-live="polite" aria-busy="true">
-                    <p class="cl-list-desc cl-loading"><span class="cl-spinner" aria-hidden="true"></span><span
+                    <p class="cl-list-desc cl-loading"><span class="cl-spinner is-compact" aria-hidden="true"></span><span
                             th:text="${#messages.msgWithParams(s.stateKey(), s.stateArgs())}"></span></p>
                 </div>
                 <p th:if="${s.stateKey() != null and !s.stateInProgress()}" class="cl-list-desc">

@@ -7768,16 +7768,11 @@ a.cl-link-button:hover {
 }
 
 /* Work in progress in a list row (a shipment being created or its pickup ordered): the line above at the size of the
-   row description. */
+   row description, with the compact spinner. */
 .cl-page .cl-list-desc.cl-loading {
     font-size: 13.5px;
     gap: 8px;
     margin-top: 2px;
-}
-
-.cl-page .cl-list-desc.cl-loading .cl-spinner {
-    width: 16px;
-    height: 16px;
 }
 
 /* A spinner in running text or a disclosure title (restock suggestions loading): the size of the text beside it. */

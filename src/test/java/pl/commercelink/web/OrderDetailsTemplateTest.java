@@ -701,7 +701,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
                         + "/shipments/cancellation-state\"")
-                .containsPattern("<p class=\"cl-list-desc cl-loading\"><span class=\"cl-spinner\" aria-hidden=\"true\"></span><span>Nadawanie…</span></p>")
+                .containsPattern("<p class=\"cl-list-desc cl-loading\"><span class=\"cl-spinner is-compact\" aria-hidden=\"true\"></span><span>Nadawanie…</span></p>")
                 .doesNotContain(">Edytuj<")
                 .contains("Przesyłka jest nadawana — poczekaj na wynik.");
     }

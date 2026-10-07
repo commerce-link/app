@@ -24,16 +24,15 @@ import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.Objects;
+
+import static pl.commercelink.shipping.OperatorMessages.message;
+import static pl.commercelink.shipping.OperatorMessages.reason;
 
 /** The shipment a customer books to send goods back: its pickup is ordered at once and the customer gets an e-mail. */
 @Slf4j
 @Component
 public class RmaReturnShipmentOwner extends RmaShipmentOwner {
-
-    // the bell is read by the store's staff, whose language is Polish whatever thread settles the message
-    private static final Locale OPERATOR_LOCALE = Locale.forLanguageTag("pl");
 
     private final EmailClient emailClient;
     private final StoreNotificationService notifications;
@@ -91,7 +90,8 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         // keyed by the command: a return created again after a failure can fail again and must be heard of again
         notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED, request.getOwnerId() + ":" + request.getCommandId(),
-                message("shipping.notification.return.failed", request.getOwnerId(), reason(error, errorKey))));
+                message(messageSource, "shipping.notification.return.failed", request.getOwnerId(),
+                        reason(messageSource, error, errorKey))));
     }
 
     @Override
@@ -123,8 +123,8 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         String attempt = result.getCommandId() != null ? result.getCommandId() : target.externalId();
         notifications.publish(storeId, new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.RMA_RETURN_PICKUP_FAILED, target.ownerId() + ":" + attempt,
-                message("shipping.notification.return.pickup.failed", target.ownerId(),
-                        reason(result.getError(), result.getErrorKey()))));
+                message(messageSource, "shipping.notification.return.pickup.failed", target.ownerId(),
+                        reason(messageSource, result.getError(), result.getErrorKey()))));
     }
 
     // the e-mail the customer got when the return was booked in one step, unchanged
@@ -134,16 +134,5 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         rma.getShipments().stream().map(Shipment::getTrackingUrl).filter(Objects::nonNull).distinct()
                 .forEach(msg::addTrackingUrl);
         return emailClient.send(rma.getStoreId(), EmailNotificationType.RMA_CARRIER_CONFIRMATION, msg);
-    }
-
-    private String reason(String error, String errorKey) {
-        if (errorKey != null) {
-            return messageSource.getMessage(errorKey, null, OPERATOR_LOCALE);
-        }
-        return error != null ? error : "";
-    }
-
-    private String message(String key, Object... args) {
-        return messageSource.getMessage(key, args, OPERATOR_LOCALE);
     }
 }

@@ -33,9 +33,6 @@ public class WarehouseShippingController extends AbstractShippingController {
     @Autowired
     private WarehouseRepository warehouseRepository;
 
-    @Autowired
-    private WarehouseShippingReservations reservations;
-
     @PostMapping("")
     public String initiate(@RequestParam("selectedItemIds") List<String> itemIds, Model model) {
         List<WarehouseItem> warehouseItems = itemIds.stream()
@@ -78,12 +75,7 @@ public class WarehouseShippingController extends AbstractShippingController {
                 .issuedBy(CustomSecurityContext.getLoggedInUserName());
     }
 
-    @Override
-    protected String refuseBooking(ShippingForm form) {
-        // the goods-out follows only once the shipment is confirmed: items another shipment holds are still listed
-        return reservations.canShip(getStoreId(), form.getOrderItemIds()) ? null : WAREHOUSE_TAKEN_KEY;
-    }
-
+    /** Items another shipment holds are still listed (their goods-out follows the confirmation): its hold refuses. */
     @Override
     protected String goneMessageKey() {
         return WAREHOUSE_TAKEN_KEY;

@@ -18,8 +18,10 @@ import pl.commercelink.warehouse.builtin.WarehouseShippingReservations;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.UnaryOperator;
+
+import static pl.commercelink.shipping.OperatorMessages.message;
+import static pl.commercelink.shipping.OperatorMessages.reason;
 
 /**
  * A shipment sent from the warehouse. No shipment is stored for it: the check message carries what settling needs, the
@@ -29,9 +31,6 @@ import java.util.function.UnaryOperator;
 @Component
 @RequiredArgsConstructor
 public class WarehouseShipmentOwner implements ShipmentOwner {
-
-    // the bell is read by the store's staff, whose language is Polish whatever thread settles the message
-    private static final Locale OPERATOR_LOCALE = Locale.forLanguageTag("pl");
 
     private final StoreNotificationService notifications;
     private final WarehouseGoodsOutService goodsOutService;
@@ -69,7 +68,8 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     @Override
     public boolean succeeded(ShipmentCreationCheckRequest request, List<Shipment> created) {
         Shipment first = created.get(0);
-        String message = message("shipping.notification.warehouse.created", first.getTrackingNo(), first.getCarrier());
+        String message = message(messageSource, "shipping.notification.warehouse.created", first.getTrackingNo(),
+                first.getCarrier());
         // nothing else records the command, so the notification is the guard: a repeated message finds it and
         // issues no second goods-out (nor a second pickup, which follows only a true here)
         boolean isNew = notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.INFO,
@@ -114,7 +114,8 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
         reservations.release(request.getStoreId(), request.getItemIds(), request.getCommandId());
         notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_FAILED, request.getCommandId(),
-                message("shipping.notification.warehouse.failed", reason(error, errorKey))));
+                message(messageSource, "shipping.notification.warehouse.failed",
+                        reason(messageSource, error, errorKey))));
     }
 
     @Override
@@ -130,21 +131,10 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
                 : result.isOrdered() ? "shipping.notification.warehouse.pickup.ordered"
                 : result.isFailed() ? "shipping.notification.warehouse.pickup.failed"
                 : "shipping.notification.warehouse.pickup.point";
-        String message = message(key, target.trackingNo(), result.getDate(), result.getFrom(), result.getTo(),
-                reason(result.getError(), result.getErrorKey()), result.getPickupId());
+        String message = message(messageSource, key, target.trackingNo(), result.getDate(), result.getFrom(),
+                result.getTo(), reason(messageSource, result.getError(), result.getErrorKey()), result.getPickupId());
         notifications.publish(storeId, new StoreNotification(
                 result.isFailed() ? StoreNotificationSeverity.WARNING : StoreNotificationSeverity.INFO,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP, packageObject(provider, target.externalId()), message));
-    }
-
-    private String reason(String error, String errorKey) {
-        if (errorKey != null) {
-            return messageSource.getMessage(errorKey, null, OPERATOR_LOCALE);
-        }
-        return error != null ? error : "";
-    }
-
-    private String message(String key, Object... args) {
-        return messageSource.getMessage(key, args, OPERATOR_LOCALE);
     }
 }

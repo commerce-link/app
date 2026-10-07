@@ -63,7 +63,6 @@ class WarehouseShippingReservationsTest {
         assertThat(held).isTrue();
         assertThat(stored.get("w-1").isHeldBy("cmd-1")).isTrue();
         assertThat(stored.get("w-2").isHeldBy("cmd-1")).isTrue();
-        assertThat(reservations.canShip(STORE_ID, List.of("w-1"))).isFalse();
     }
 
     @Test
@@ -124,7 +123,6 @@ class WarehouseShippingReservationsTest {
         // then
         assertThat(stored.get("w-1").getShippingCommandId()).isNull();
         assertThat(stored.get("w-2").isHeldBy("cmd-2")).isTrue();
-        assertThat(reservations.canShip(STORE_ID, List.of("w-1"))).isTrue();
     }
 
     @Test
@@ -133,7 +131,6 @@ class WarehouseShippingReservationsTest {
         item("w-1", FulfilmentStatus.InRMA);
 
         // when / then
-        assertThat(reservations.canShip(STORE_ID, List.of("w-1"))).isTrue();
         assertThat(reservations.hold(STORE_ID, List.of("w-1"), "cmd-1")).isTrue();
     }
 }

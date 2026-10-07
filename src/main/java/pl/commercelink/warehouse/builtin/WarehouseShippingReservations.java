@@ -23,14 +23,6 @@ public class WarehouseShippingReservations {
 
     private final WarehouseRepository warehouseRepository;
 
-    /** Whether every item is still in the warehouse and not held by another shipment: what a new shipment needs. */
-    public boolean canShip(String storeId, List<String> itemIds) {
-        LocalDateTime now = LocalDateTime.now();
-        return itemIds.stream()
-                .map(id -> warehouseRepository.findById(storeId, id))
-                .allMatch(item -> item != null && item.isNotShippedOut() && !item.isBeingShipped(now));
-    }
-
     /** Holds all the items for the command, or none of them when one is shipped out or held already. */
     public boolean hold(String storeId, List<String> itemIds, String commandId) {
         LocalDateTime now = LocalDateTime.now();
