@@ -137,7 +137,7 @@ public class WarehouseDocumentPageMapper {
             return null;
         }
         return new PrintAction(PRINT_ENDPOINT, text("warehouse.documents.print.count", labels),
-                printers.stream().map(p -> new Printer(p.getName(), p.getSettings().get("deviceId"))).toList());
+                printers.stream().map(p -> new Printer(p.getName(), p.getSettings() == null ? null : p.getSettings().get("deviceId"))).toList());
     }
 
     private String amount(double value) {

@@ -7,6 +7,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import org.springframework.context.MessageSource;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.warehousedocuments.TestMessages;
+import pl.commercelink.documents.DocumentType;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -26,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +45,14 @@ class WarehouseDocumentsControllerTest {
 
     @Mock
     private WarehouseDocumentListService listService;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private WarehouseDocumentRepository warehouseDocumentRepository;
+    @Mock
+    private WarehouseDocumentItemRepository warehouseDocumentItemRepository;
+    @Spy
+    private MessageSource messageSource = TestMessages.polish();
     @InjectMocks
     private WarehouseDocumentsController controller;
 
@@ -108,6 +123,68 @@ class WarehouseDocumentsControllerTest {
 
         // then
         assertThat(query.getValue().path()).isEqualTo("/dashboard/store/s9/warehouse-documents");
+    }
+
+    @Test
+    void foreignDocumentRedirectsWithNotice() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        Store store = storeWithDocuments();
+        when(storesRepository.findById("s1")).thenReturn(store);
+        when(warehouseDocumentRepository.findByDocumentId("s1", "doc-of-s2")).thenReturn(null);
+
+        // when / then
+        mockMvc.perform(get("/dashboard/warehouse-documents/details").param("documentId", "doc-of-s2")
+                        .locale(java.util.Locale.forLanguageTag("pl")))
+                .andExpect(redirectedUrl("/dashboard/warehouse-documents"))
+                .andExpect(flash().attribute("documentsNotice", "Nie znaleziono dokumentu."));
+    }
+
+    @Test
+    void detailsRenderTheDocumentPage() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        Store store = storeWithDocuments();
+        when(storesRepository.findById("s1")).thenReturn(store);
+        when(warehouseDocumentRepository.findByDocumentId("s1", "doc-1")).thenReturn(receipt());
+        when(warehouseDocumentItemRepository.findByDocumentId("doc-1")).thenReturn(List.of());
+
+        // when / then
+        mockMvc.perform(get("/dashboard/warehouse-documents/details").param("documentId", "doc-1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("warehouse-document-details"))
+                .andExpect(model().attributeExists("page"));
+    }
+
+    @Test
+    void superAdminDetailsKeepWorkingOnTheStorePath() throws Exception {
+        // given
+        securityContext.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+        Store store = storeWithDocuments();
+        when(storesRepository.findById("s9")).thenReturn(store);
+        when(warehouseDocumentRepository.findByDocumentId("s9", "doc-1")).thenReturn(receipt());
+        when(warehouseDocumentItemRepository.findByDocumentId("doc-1")).thenReturn(List.of());
+
+        // when / then
+        mockMvc.perform(get("/dashboard/store/s9/warehouse-documents/details").param("documentId", "doc-1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("warehouse-document-details"))
+                .andExpect(model().attributeExists("page"));
+    }
+
+    private static Store storeWithDocuments() {
+        Store store = org.mockito.Mockito.mock(Store.class);
+        when(store.hasDocumentsGenerationEnabled()).thenReturn(true);
+        return store;
+    }
+
+    private static WarehouseDocument receipt() {
+        WarehouseDocument d = new WarehouseDocument();
+        d.setDocumentId("doc-1");
+        d.setStoreId("s1");
+        d.setDocumentNo("PZ/MAG1/2026/000214");
+        d.setType(DocumentType.GoodsReceipt);
+        return d;
     }
 
     private static WarehouseDocumentListPage enabledPage() {

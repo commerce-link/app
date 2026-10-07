@@ -9921,3 +9921,16 @@ a.cl-link-button:hover {
         margin: -12px;
     }
 }
+
+/* Warehouse document details: the item table gives the name what the fixed numeric columns leave (width: 1% does not
+   work with the table-layout: fixed of .is-wrap — the columns overlapped); a code part never breaks inside */
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: 8.5rem; white-space: nowrap; }
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric.is-qty { width: 5.5rem; }
+.cl-page .cl-table.is-line-items .cl-table-actions { width: 4rem; }
+.cl-page .cl-table.is-line-items .cl-code-part { white-space: nowrap; }
+.cl-page .cl-record-type { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--cl-ink-2); }
+.cl-page .cl-label-print[hidden] { display: none; }
+.cl-page .cl-label-print [aria-busy="true"] { opacity: .6; cursor: progress; }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: auto; }
+}

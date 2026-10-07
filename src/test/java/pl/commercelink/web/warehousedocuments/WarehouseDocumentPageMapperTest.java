@@ -120,6 +120,21 @@ class WarehouseDocumentPageMapperTest {
     }
 
     @Test
+    void printerWithoutSettingsHasNoDeviceIdInsteadOfFailing() {
+        // given
+        Printer bare = new Printer();
+        bare.setName("Bare");
+        bare.setSettings(null);
+
+        // when
+        WarehouseDocumentPage page = mapper.page(receipt(), items(), List.of(bare), false);
+
+        // then
+        assertThat(page.print().printers()).hasSize(1);
+        assertThat(page.print().printers().get(0).deviceId()).isNull();
+    }
+
+    @Test
     void internalDocumentWithoutCounterpartyHasDetailsCardWithTheNote() {
         // given
         WarehouseDocument d = issue();

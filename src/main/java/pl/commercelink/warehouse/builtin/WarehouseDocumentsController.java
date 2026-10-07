@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,11 +10,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import pl.commercelink.documents.DocumentReason;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.Printer;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.warehousedocuments.WarehouseDocumentListQuery;
+import pl.commercelink.web.warehousedocuments.WarehouseDocumentPageMapper;
 
 import java.util.List;
 import java.util.Locale;
@@ -38,6 +41,9 @@ class WarehouseDocumentsController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private MessageSource messageSource;
 
     @Autowired
     private WarehouseLabelPrintService warehouseLabelPrintService;
@@ -84,8 +90,8 @@ class WarehouseDocumentsController {
 
     @GetMapping("/dashboard/warehouse-documents/details")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    String documentDetails(@RequestParam String documentId, Model model) {
-        return showDocumentDetails(getStoreId(), documentId, model);
+    String documentDetails(@RequestParam String documentId, Locale locale, Model model, RedirectAttributes redirect) {
+        return showDocumentDetails(getStoreId(), documentId, locale, model, redirect);
     }
 
     @GetMapping("/dashboard/store/{storeId}/warehouse-documents/details")
@@ -93,41 +99,34 @@ class WarehouseDocumentsController {
     String documentDetailsForSuperAdmin(
             @PathVariable String storeId,
             @RequestParam String documentId,
-            Model model
+            Locale locale,
+            Model model,
+            RedirectAttributes redirect
     ) {
-        return showDocumentDetails(storeId, documentId, model);
+        return showDocumentDetails(storeId, documentId, locale, model, redirect);
     }
 
-    private String showDocumentDetails(String storeId, String documentId, Model model) {
+    private String showDocumentDetails(String storeId, String documentId, Locale locale, Model model, RedirectAttributes redirect) {
         Store store = storesRepository.findById(storeId);
-        String redirectUrl = isSuperAdmin()
-                ? "redirect:/dashboard/store/" + storeId + "/warehouse-documents"
-                : "redirect:/dashboard/warehouse-documents";
+        String listUrl = "redirect:" + (isSuperAdmin() ? storeListPath(storeId) : LIST_PATH);
 
         if (!store.hasDocumentsGenerationEnabled()) {
-            return redirectUrl;
+            return listUrl;
         }
 
+        // the key holds the store: another store's document id finds nothing
         WarehouseDocument document = warehouseDocumentRepository.findByDocumentId(storeId, documentId);
 
         if (document == null) {
-            return redirectUrl;
+            redirect.addFlashAttribute("documentsNotice", messageSource.getMessage("warehouse.documents.notFound", null, locale));
+            return listUrl;
         }
 
-        List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDocumentId(documentId);
-
-        model.addAttribute("document", document);
-        model.addAttribute("items", items);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("documentReasons", DocumentReason.values());
-        model.addAttribute("printers", store.getWarehouseConfiguration() != null
+        List<Printer> printers = store.getWarehouseConfiguration() != null
                 ? store.getWarehouseConfiguration().getPrinters()
-                : List.of());
-
-        if (isSuperAdmin()) {
-            model.addAttribute("storeId", storeId);
-        }
-
+                : List.of();
+        model.addAttribute("page", new WarehouseDocumentPageMapper(messageSource, locale).page(
+                document, warehouseDocumentItemRepository.findByDocumentId(documentId), printers, isSuperAdmin()));
         return "warehouse-document-details";
     }
 
