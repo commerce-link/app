@@ -40,7 +40,8 @@ class WarehouseDocumentDetailsRenderingTest {
 
         // then
         assertThat(js).contains("cl-spinner is-compact").contains("spinner.remove()")
-                .contains("template.split('{' + key + '}').join(value)").doesNotContain("template.replace(");
+                .contains("template.split('{' + key + '}').join(value)").doesNotContain("template.replace(")
+                .contains("'count', root.getAttribute('data-count')");
     }
 
     @Test
@@ -52,7 +53,8 @@ class WarehouseDocumentDetailsRenderingTest {
         // then
         assertThat(one).contains("data-cl-label-print").contains("data-printer=\"Zebra 1\"").doesNotContain("label-printers-menu")
                 .contains("data-endpoint=\"/dashboard/warehouse-documents/print-labels\"")
-                .contains("data-sent=\"Wysłano etykiety do drukarki {printer}.\"");
+                .contains("data-sent=\"Wysłano do drukarki {printer} · etykiety: {count}.\"")
+                .contains("data-count=\"6\"");
         assertThat(two).contains("id=\"label-printers-menu\"").contains("data-printer=\"Zebra 2\"").contains("Etykiety: 6");
         assertThat(two).contains("<noscript>");
     }
@@ -66,6 +68,23 @@ class WarehouseDocumentDetailsRenderingTest {
         assertThat(html).contains("class=\"cl-table is-compact is-wrap is-line-items\"")
                 .contains(">Wartość netto<").contains("Razem: 6 szt.")
                 .contains("Historia pozycji w dostawie").contains("aria-label=\"Akcje: Samsung 990 PRO\"");
+    }
+
+    @Test
+    void documentWithoutItemsSaysSoInsteadOfAnEmptyCard() {
+        // given
+        WarehouseDocumentPage full = receiptPage(printers(0));
+        WarehouseDocumentPage empty = new WarehouseDocumentPage(full.documentId(), full.backHref(), full.backLabel(), full.number(),
+                full.typeName(), full.incoming(), full.reason(), full.createdText(), full.author(), "0,00 PLN", "Pozycje: 0",
+                List.of(), false, "Razem: 0 szt.", "0,00 PLN netto", full.linksTitle(), full.links(), full.counterparty(),
+                full.deliveryAddress(), full.issuer(), null);
+
+        // when
+        String html = SettingsTemplateRenderer.render(BODY, Map.of("page", empty));
+
+        // then
+        assertThat(html).contains("<p class=\"cl-list-empty\">Dokument nie ma pozycji.</p>")
+                .doesNotContain("is-line-items").doesNotContain("Razem: 0 szt.").doesNotContain("data-cl-label-print");
     }
 
     @Test
@@ -85,7 +104,7 @@ class WarehouseDocumentDetailsRenderingTest {
 
     private static WarehouseDocumentPage receiptPage(List<Printer> printers) {
         PrintAction print = printers.isEmpty() ? null
-                : new PrintAction(WarehouseDocumentPageMapper.PRINT_ENDPOINT, "Etykiety: 6", printers);
+                : new PrintAction(WarehouseDocumentPageMapper.PRINT_ENDPOINT, 6, "Etykiety: 6", printers);
         return new WarehouseDocumentPage("doc-1", "/dashboard/warehouse-documents", "Dokumenty magazynowe",
                 "PZ/MAG1/2026/000214", "Przyjęcie zewnętrzne", true, "Dostawa od dostawcy", "Utworzono 07.10.2026, 14:32",
                 "Jan Kowalski", "3 494,00 PLN", "Pozycje: 2",

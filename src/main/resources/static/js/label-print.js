@@ -81,7 +81,9 @@
             var zpl = await fetchZpl(printer);
             var device = await findDevice(trigger.getAttribute('data-device-id'));
             await send(device, zpl);
-            toast(message(root.getAttribute('data-sent'), 'printer', printer));
+            // the count first: a printer name is free text and may itself contain "{count}"
+            var sent = message(root.getAttribute('data-sent'), 'count', root.getAttribute('data-count'));
+            toast(message(sent, 'printer', printer));
         } catch (e) {
             toast(message(root.getAttribute('data-failed'), 'error', e.message), 'danger');
         } finally {

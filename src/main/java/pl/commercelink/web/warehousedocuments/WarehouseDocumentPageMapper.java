@@ -91,11 +91,13 @@ public class WarehouseDocumentPageMapper {
             links.add(new Link(text("warehouse.documents.details.link.delivery"), DocumentRowMapper.shortId(d.getDeliveryId()),
                     DeliveryLinks.of(superAdmin, d.getStoreId(), encode(d.getDeliveryId())).details(), false));
         }
-        // the order and RMA screens refuse a super admin, so he gets the number as text
+        // a super admin opens the order through its store-scoped route
         if (StringUtils.isNotBlank(d.getOrderId())) {
             links.add(new Link(text("warehouse.documents.details.link.order"), DocumentRowMapper.shortId(d.getOrderId()),
-                    superAdmin ? null : "/dashboard/orders/" + d.getOrderId(), false));
+                    superAdmin ? "/dashboard/store/" + d.getStoreId() + "/orders/" + d.getOrderId()
+                            : "/dashboard/orders/" + d.getOrderId(), false));
         }
+        // the RMA screen has no store-scoped route, so a super admin gets the number as text
         if (StringUtils.isNotBlank(d.getRmaId())) {
             links.add(new Link(text("warehouse.documents.details.link.rma"), DocumentRowMapper.shortId(d.getRmaId()),
                     superAdmin ? null : "/dashboard/rma/" + d.getRmaId(), false));
@@ -139,10 +141,11 @@ public class WarehouseDocumentPageMapper {
     }
 
     private PrintAction print(WarehouseDocument d, int labels, List<pl.commercelink.stores.Printer> printers, boolean superAdmin) {
-        if (superAdmin || d.getType() != DocumentType.GoodsReceipt || printers == null || printers.isEmpty()) {
+        // a document without items has no labels to print
+        if (superAdmin || d.getType() != DocumentType.GoodsReceipt || printers == null || printers.isEmpty() || labels == 0) {
             return null;
         }
-        return new PrintAction(PRINT_ENDPOINT, text("warehouse.documents.print.count", labels),
+        return new PrintAction(PRINT_ENDPOINT, labels, text("warehouse.documents.print.count", labels),
                 printers.stream().map(p -> new Printer(p.getName(), p.getSettings() == null ? null : p.getSettings().get("deviceId"))).toList());
     }
 

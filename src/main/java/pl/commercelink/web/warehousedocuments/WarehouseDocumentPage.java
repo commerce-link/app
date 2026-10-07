@@ -17,7 +17,7 @@ public record WarehouseDocumentPage(String documentId, String backHref, String b
 
     public record Address(String name, List<String> lines, String taxId) { }
 
-    public record PrintAction(String endpoint, String labelsText, List<Printer> printers) { }
+    public record PrintAction(String endpoint, int labels, String labelsText, List<Printer> printers) { }
 
     public record Printer(String name, String deviceId) { }
 }

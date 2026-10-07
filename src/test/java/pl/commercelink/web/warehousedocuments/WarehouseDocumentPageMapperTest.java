@@ -131,18 +131,20 @@ class WarehouseDocumentPageMapperTest {
     }
 
     @Test
-    void superAdminGetsTextInsteadOfOrderAndRmaLinksAndTheStoreBack() {
+    void superAdminGetsStoreScopedDeliveryAndOrderLinksTheRmaAsTextAndTheStoreBack() {
         // given
         WarehouseDocument d = receipt();
         d.setOrderId("ord-1");
+        d.setRmaId("rma-1");
 
         // when
         WarehouseDocumentPage page = mapper.page(d, items(), List.of(printer()), true);
 
         // then
         assertThat(page.backHref()).isEqualTo("/dashboard/store/s1/warehouse-documents");
-        assertThat(page.links().get(0).href()).isEqualTo("/dashboard/store/s1/deliveries/details?deliveryId=del-1");
-        assertThat(page.links().get(1).href()).isNull();
+        assertThat(page.links()).extracting(Link::label).containsExactly("Dostawa", "Zamówienie", "Zwrot (RMA)", "Magazyn");
+        assertThat(page.links()).extracting(Link::href).containsExactly(
+                "/dashboard/store/s1/deliveries/details?deliveryId=del-1", "/dashboard/store/s1/orders/ord-1", null, null);
         assertThat(page.print()).isNull();
     }
 
@@ -155,11 +157,23 @@ class WarehouseDocumentPageMapperTest {
 
         // then
         assertThat(page.print().labelsText()).isEqualTo("Etykiety: 6");
+        assertThat(page.print().labels()).isEqualTo(6);
         assertThat(page.print().printers()).extracting(WarehouseDocumentPage.Printer::name).containsExactly("Zebra ZD421");
         assertThat(page.print().printers().get(0).deviceId()).isEqualTo("uid-1");
         assertThat(page.print().endpoint()).isEqualTo("/dashboard/warehouse-documents/print-labels");
         assertThat(issue.print()).isNull();
         assertThat(noPrinters.print()).isNull();
+    }
+
+    @Test
+    void receiptWithoutItemsOffersNoPrint() {
+        // when
+        WarehouseDocumentPage page = mapper.page(receipt(), List.of(), List.of(printer()), false);
+
+        // then
+        assertThat(page.items()).isEmpty();
+        assertThat(page.itemsTitle()).isEqualTo("Pozycje: 0");
+        assertThat(page.print()).isNull();
     }
 
     @Test
