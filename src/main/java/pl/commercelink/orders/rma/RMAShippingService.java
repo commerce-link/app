@@ -35,7 +35,17 @@ public class RMAShippingService {
                 .collect(Collectors.toList());
     }
 
+    /** The customer's submission: refused while the RMA holds a return already (RmaReturnShipmentOwner). */
     public ShipmentCreationStart startReturnShipment(RMAShipmentRequest request, Store store) {
+        return start(request, store, false);
+    }
+
+    /** The operator's "Spróbuj ponownie": books the failed return again, in place of its failed row. */
+    public ShipmentCreationStart retryReturnShipment(RMAShipmentRequest request, Store store) {
+        return start(request, store, true);
+    }
+
+    private ShipmentCreationStart start(RMAShipmentRequest request, Store store, boolean replacesFailedReturn) {
         validateStoreReturnConfiguration(store);
         AuthorizedCarrier ac = store.getRmaConfiguration().getCarrier();
         Carrier carrier = new Carrier(ac.getId(), ac.getName(), ac.getDisplayName());
@@ -49,6 +59,7 @@ public class RMAShippingService {
                 .storeId(store.getStoreId())
                 .ownerType(ShipmentOwnerType.RMA_RETURN)
                 .ownerId(request.getRmaId())
+                .replacesFailedReturn(replacesFailedReturn)
                 .build(), shipmentRequest, store, placeholder);
     }
 

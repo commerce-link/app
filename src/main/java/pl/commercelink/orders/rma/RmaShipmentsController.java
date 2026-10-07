@@ -98,7 +98,7 @@ public class RmaShipmentsController {
                 rma.getShippingDetails(), rma.getShippingInsurance());
         ShipmentCreationStart start;
         try {
-            start = rmaShippingService.startReturnShipment(request, storesRepository.findById(storeId()));
+            start = rmaShippingService.retryReturnShipment(request, storesRepository.findById(storeId()));
         } catch (RuntimeException e) {
             // no command was sent (no carrier or template in the settings any more, no integration): the row stays
             log.warn("Return of RMA {} in store {} could not be booked again", rmaId, storeId(), e);

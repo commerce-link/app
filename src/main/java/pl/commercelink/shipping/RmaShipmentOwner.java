@@ -43,8 +43,7 @@ public class RmaShipmentOwner extends StoredShipmentOwner<RMA> {
     @Override
     public boolean markCreating(ShipmentCreationCheckRequest request, Shipment placeholder) {
         return modify(request, rma -> {
-            // a second command next to one in flight would pay for a second label
-            if (rma.getShipments().stream().anyMatch(Shipment::isCreating)) {
+            if (refusesNewCreation(rma, request)) {
                 return false;
             }
             List<Shipment> next = new ArrayList<>(rma.getShipments().stream()
@@ -53,6 +52,11 @@ public class RmaShipmentOwner extends StoredShipmentOwner<RMA> {
             rma.setShipments(next);
             return true;
         });
+    }
+
+    protected boolean refusesNewCreation(RMA rma, ShipmentCreationCheckRequest request) {
+        // a second command next to one in flight would pay for a second label
+        return rma.getShipments().stream().anyMatch(Shipment::isCreating);
     }
 
     /** The operator's shipment: the items go to the customer or to repair, and the RMA moves on. */

@@ -158,7 +158,7 @@ class RmaShipmentsControllerTest {
     void aFailedReturnIsBookedAgainWithWhatTheCustomerChose() {
         // given
         RMA rma = failedReturn();
-        when(rmaShippingService.startReturnShipment(any(), eq(store)))
+        when(rmaShippingService.retryReturnShipment(any(), eq(store)))
                 .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -167,7 +167,7 @@ class RmaShipmentsControllerTest {
 
         // then
         ArgumentCaptor<RMAShipmentRequest> request = ArgumentCaptor.forClass(RMAShipmentRequest.class);
-        verify(rmaShippingService).startReturnShipment(request.capture(), eq(store));
+        verify(rmaShippingService).retryReturnShipment(request.capture(), eq(store));
         assertThat(request.getValue().getRmaId()).isEqualTo("rma-1");
         assertThat(request.getValue().getPackageTemplateId()).isEqualTo("7");
         assertThat(request.getValue().getCustomerAddress()).isSameAs(rma.getShippingDetails());
@@ -180,7 +180,7 @@ class RmaShipmentsControllerTest {
     void aRefusedRetryShowsTheProvidersReason() {
         // given
         failedReturn();
-        when(rmaShippingService.startReturnShipment(any(), any()))
+        when(rmaShippingService.retryReturnShipment(any(), any()))
                 .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Zły kod pocztowy"));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -195,7 +195,7 @@ class RmaShipmentsControllerTest {
     void aRetryThatFindsTheRmaChangedSaysSoNeutrally() {
         // given
         failedReturn();
-        when(rmaShippingService.startReturnShipment(any(), any()))
+        when(rmaShippingService.retryReturnShipment(any(), any()))
                 .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.GONE, null));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -217,7 +217,7 @@ class RmaShipmentsControllerTest {
         controller.retryReturnShipment("rma-1", redirect, PL);
 
         // then
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        verify(rmaShippingService, never()).retryReturnShipment(any(), any());
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("rma.shipments.return.retry.unavailable");
     }
 
@@ -231,7 +231,7 @@ class RmaShipmentsControllerTest {
         controller.retryReturnShipment("rma-1", new RedirectAttributesModelMap(), PL);
 
         // then
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        verify(rmaShippingService, never()).retryReturnShipment(any(), any());
     }
 
     @Test
@@ -243,7 +243,7 @@ class RmaShipmentsControllerTest {
         controller.retryReturnShipment("rma-1", new RedirectAttributesModelMap(), PL);
 
         // then
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        verify(rmaShippingService, never()).retryReturnShipment(any(), any());
     }
 
     @Test
@@ -255,7 +255,7 @@ class RmaShipmentsControllerTest {
         controller.retryReturnShipment("rma-1", new RedirectAttributesModelMap(), PL);
 
         // then
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        verify(rmaShippingService, never()).retryReturnShipment(any(), any());
     }
 
     @Test
@@ -266,6 +266,6 @@ class RmaShipmentsControllerTest {
         // when / then
         assertThatThrownBy(() -> controller.retryReturnShipment("rma-1", new RedirectAttributesModelMap(), PL))
                 .isInstanceOf(ResponseStatusException.class);
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        verify(rmaShippingService, never()).retryReturnShipment(any(), any());
     }
 }

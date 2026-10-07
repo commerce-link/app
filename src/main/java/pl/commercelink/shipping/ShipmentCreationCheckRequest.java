@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -35,6 +36,13 @@ public class ShipmentCreationCheckRequest {
     /** Warehouse: where the goods go, for the goods-out document. */
     private ShippingDetails receiver;
     private int attempt;
+    /**
+     * Customer's return: the operator books a failed return again ("Spróbuj ponownie") in place of its failed row. A
+     * customer's own submission never replaces a return already there (RmaReturnShipmentOwner#markCreating). Read only
+     * before the provider is called, so it is not sent with the check.
+     */
+    @JsonIgnore
+    private boolean replacesFailedReturn;
 
     public ShipmentCreationCheckRequest withExternalId(String id) {
         return toBuilder().externalId(id).build();

@@ -10,6 +10,7 @@ import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.notifications.EmailNotificationType;
+import pl.commercelink.orders.rma.CustomerReturnRetry;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMACarrierConfirmationEmailNotification;
 import pl.commercelink.orders.rma.RMAItemsRepository;
@@ -51,6 +52,17 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
     @Override
     public ShipmentOwnerType type() {
         return ShipmentOwnerType.RMA_RETURN;
+    }
+
+    /**
+     * The customer submits a return once: a return already on the RMA, created, being created or failed without a
+     * clean refusal (unconfirmed: the paid label may exist), is the operator's to retry or remove. A clean refusal
+     * leaves nothing on the RMA (see refused), so the customer can correct the data and submit again.
+     */
+    @Override
+    protected boolean refusesNewCreation(RMA rma, ShipmentCreationCheckRequest request) {
+        return super.refusesNewCreation(rma, request) || (!request.isReplacesFailedReturn()
+                && rma.getShipments().stream().anyMatch(CustomerReturnRetry::isCustomerReturn));
     }
 
     @Override

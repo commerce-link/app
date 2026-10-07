@@ -7,7 +7,7 @@ import pl.commercelink.orders.Shipment;
  * nothing is being created now, and the RMA holds what the customer chose (address and package template; RMAs from
  * before the template was saved have none and are not offered the retry).
  */
-final class CustomerReturnRetry {
+public final class CustomerReturnRetry {
 
     private CustomerReturnRetry() {
     }
@@ -23,7 +23,7 @@ final class CustomerReturnRetry {
      * The customer books a return without choosing a pickup address (the courier comes to the customer), so its
      * package is never in the store's pickup list.
      */
-    static boolean isCustomerReturn(Shipment s) {
+    public static boolean isCustomerReturn(Shipment s) {
         return s.getProvider() != null && s.getPickUpAddressId() == null;
     }
 }

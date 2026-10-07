@@ -147,13 +147,104 @@ class RmaShipmentOwnerTest {
         RmaShipmentOwner owner = returnOwner();
 
         // when
-        boolean marked = owner.markCreating(request("cmd-1"), placeholder("cmd-1"));
+        boolean marked = owner.markCreating(operatorRetry("cmd-1"), placeholder("cmd-1"));
 
         // then
         assertThat(marked).isTrue();
         assertThat(rma.getShipments()).hasSize(2);
         assertThat(rma.getShipments().get(0).getExternalId()).isEqualTo("21480003");
         assertThat(rma.getShipments().get(1).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    private static ShipmentCreationCheckRequest customerSubmission(String commandId) {
+        return ShipmentCreationCheckRequest.builder().storeId("store-1").ownerType(ShipmentOwnerType.RMA_RETURN)
+                .ownerId("rma-1").commandId(commandId).provider("furgonetka").build();
+    }
+
+    private static ShipmentCreationCheckRequest operatorRetry(String commandId) {
+        return customerSubmission(commandId).toBuilder().replacesFailedReturn(true).build();
+    }
+
+    /** A customer's return: created through the integration, collected at the customer's (no pickup address). */
+    private static Shipment customerReturn(String commandId) {
+        Shipment s = placeholder(commandId);
+        s.setProvider("furgonetka");
+        return s;
+    }
+
+    @Test
+    void theCustomerCannotSubmitAgainWhileAnUnconfirmedReturnMayHaveAPaidLabel() {
+        // given
+        Shipment unconfirmed = customerReturn("cmd-0");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        rma.setShipments(new ArrayList<>(List.of(unconfirmed)));
+
+        // when
+        boolean marked = returnOwner().markCreating(customerSubmission("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
+        assertThat(rma.getShipments()).containsExactly(unconfirmed);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void theCustomerCannotSubmitAgainOnceTheReturnWasCreated() {
+        // given
+        Shipment created = customerReturn("cmd-0");
+        created.setCreation(null);
+        created.setExternalId("21480003");
+        created.setPickup(ShipmentPickup.awaiting());
+        rma.setShipments(new ArrayList<>(List.of(created)));
+
+        // when
+        boolean marked = returnOwner().markCreating(customerSubmission("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
+        assertThat(rma.getShipments()).containsExactly(created);
+    }
+
+    @Test
+    void theCustomerSubmitsAgainAfterACleanRefusal() {
+        // given: a refusal at the start left nothing on the RMA
+        rma.setShipments(new ArrayList<>());
+
+        // when
+        boolean marked = returnOwner().markCreating(customerSubmission("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(rma.getShipments()).hasSize(1);
+        assertThat(rma.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void theOperatorBooksAnUnconfirmedReturnAgain() {
+        // given
+        Shipment unconfirmed = customerReturn("cmd-0");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        rma.setShipments(new ArrayList<>(List.of(unconfirmed)));
+
+        // when
+        boolean marked = returnOwner().markCreating(operatorRetry("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isTrue();
+        assertThat(rma.getShipments()).hasSize(1);
+        assertThat(rma.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void anOperatorRetryIsStillRefusedWhileAReturnIsBeingCreated() {
+        // given
+        rma.setShipments(new ArrayList<>(List.of(customerReturn("cmd-0"))));
+
+        // when
+        boolean marked = returnOwner().markCreating(operatorRetry("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
     }
 
     @Test
