@@ -7,6 +7,8 @@ import pl.commercelink.orders.notifications.EmailNotificationType;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 @DynamoDBDocument
 public class ClientNotificationsConfiguration {
 
@@ -34,6 +36,11 @@ public class ClientNotificationsConfiguration {
 
     public String getTemplateName(EmailNotificationType type) {
         return supportedTemplates.getOrDefault(type.name(), null);
+    }
+
+    /** No customer email goes out without both: the name it is signed with and the address replies go to. */
+    public boolean hasSender() {
+        return isNotBlank(senderName) && isNotBlank(replyToEmail);
     }
 
     public String getSenderName() {

@@ -18,5 +18,8 @@ public interface StockQueryService {
 
     List<WarehouseItemView> searchAllAvailableByMfns(String storeId, Collection<String> mfns);
 
+    /** Every available item of the store (ordered or delivered, sealed or not), whatever its code. */
+    List<WarehouseItemView> searchAllAvailable(String storeId);
+
     StockSummary summarizeAvailable(String storeId);
 }

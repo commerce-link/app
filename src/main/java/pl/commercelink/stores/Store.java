@@ -557,6 +557,11 @@ public class Store {
         return clientNotificationsConfiguration != null && clientNotificationsConfiguration.supports(type);
     }
 
+    @DynamoDBIgnore
+    public boolean hasNotificationSender() {
+        return clientNotificationsConfiguration != null && clientNotificationsConfiguration.hasSender();
+    }
+
     /**
      * Turns on the {@code ORDER_RECEIPT} e-mail, creating the client notifications configuration if the store has
      * none yet. Called whenever e-receipts are enabled for the first time (the settings form and the demo seeder

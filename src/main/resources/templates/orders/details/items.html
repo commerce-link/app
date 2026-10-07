@@ -273,7 +273,7 @@
 <!--/* The margin of one unit as an icon after the price; the tooltip (and the accessible name) carries the numbers,
        the cost included — it used to be the line under the price. A loss changes the glyph (info → exclamation) as
        well as the colour, so the mark does not rest on colour alone. Focusable, so the tooltip opens from the keyboard and on tap. */-->
-<span th:fragment="margin(m)" class="cl-margin cl-tooltip is-lines" tabindex="0" role="img"
+<span th:fragment="margin(m)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
       th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{order.items.margin.unknown}
                 : #{${m.tone().key()}(${m.percent() != null ? m.percent() : '—'},
