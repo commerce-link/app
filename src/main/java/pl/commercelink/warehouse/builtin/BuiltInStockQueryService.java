@@ -81,9 +81,15 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
+    public List<WarehouseItemView> searchAllAvailable(String storeId) {
+        return findAllAvailable(storeId).stream()
+                .map(this::fromInternal)
+                .toList();
+    }
+
+    @Override
     public StockSummary summarizeAvailable(String storeId) {
-        List<WarehouseItem> items = warehouseRepository.findAllFiltered(storeId, null,
-                List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
+        List<WarehouseItem> items = findAllAvailable(storeId);
         Set<String> products = new HashSet<>();
         int inStockQty = 0;
         int inDeliveryQty = 0;
@@ -98,6 +104,11 @@ class BuiltInStockQueryService implements StockQueryService {
             }
         }
         return new StockSummary(products.size(), inStockQty, inDeliveryQty);
+    }
+
+    private List<WarehouseItem> findAllAvailable(String storeId) {
+        return warehouseRepository.findAllFiltered(storeId, null,
+                List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
     }
 
     private WarehouseItemView fromInternal(WarehouseItem warehouseItem) {

@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<button th:fragment="toggle" type="button" class="screen-intro-toggle cl-tooltip" data-intro-toggle
+<button th:fragment="toggle" type="button" class="screen-intro-toggle cl-tooltip is-end" data-intro-toggle
         th:attr="data-tooltip=#{intro.toggle}" onclick="toggleScreenIntro()">?</button>
 
 <div th:fragment="panel(screen, icon)" class="screen-intro" th:attr="data-intro-panel=${screen}" hidden>
@@ -194,7 +194,7 @@
             <h3 class="screen-intro-title" th:text="#{${'intro.' + screen + '.title'}}"></h3>
             <p class="screen-intro-lead" th:text="#{${'intro.' + screen + '.lead'}}"></p>
             <ul class="screen-intro-list">
-                <li th:each="i : ${#numbers.sequence(1, 3)}">
+                <li th:each="i : ${#numbers.sequence(1, 4)}" th:if="${#messages.msgOrNull('intro.' + screen + '.item' + i) != null}">
                     <span class="screen-intro-check" aria-hidden="true"><i class="fas fa-check"></i></span>
                     <span>
                         <strong th:text="#{${'intro.' + screen + '.item' + i}}"></strong>
