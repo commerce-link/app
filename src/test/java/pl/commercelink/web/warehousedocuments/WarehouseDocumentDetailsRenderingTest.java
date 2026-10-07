@@ -26,7 +26,7 @@ class WarehouseDocumentDetailsRenderingTest {
 
         // then
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
-        assertThat(html).contains(">PZ/MAG1/2026/000214</h1>")
+        assertThat(html).containsPattern("<h1 class=\"cl-page-title\">\\s*PZ/<wbr>MAG1/<wbr>2026/<wbr>000214\\s*</h1>")
                 .contains("data-cl-copy=\"PZ/MAG1/2026/000214\"")
                 .contains("class=\"cl-record-type\"").contains("Przyjęcie zewnętrzne").contains("· Dostawa od dostawcy")
                 .contains("class=\"cl-back\" href=\"/dashboard/warehouse-documents\"")

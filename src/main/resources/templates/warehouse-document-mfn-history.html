@@ -9,7 +9,7 @@
         <header class="cl-page-header">
             <a class="cl-back" th:href="@{${p.backHref()}}">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
-                <span th:text="${p.backLabel()}"></span>
+                <span><th:block th:replace="~{fragments/doc-number :: parts(${p.backLabel()})}"></th:block></span>
             </a>
             <div class="cl-page-header-row"><h1 class="cl-page-title" th:text="#{warehouse.documents.history.title}"></h1></div>
             <p class="cl-record-meta">
@@ -31,7 +31,7 @@
                 <tbody>
                 <tr th:each="m : ${p.moves()}">
                     <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.documents.history.column.document}">
-                        <a th:href="@{${m.documentHref()}}" th:text="${m.documentNo()}"></a>
+                        <a class="cl-doc-no" th:href="@{${m.documentHref()}}"><th:block th:replace="~{fragments/doc-number :: parts(${m.documentNo()})}"></th:block></a>
                         <span class="cl-table-sub"><span class="cl-icon-text"><i class="fas" th:classappend="${m.incoming()} ? 'fa-sign-in-alt' : 'fa-sign-out-alt'" aria-hidden="true"></i><th:block th:text="${m.typeName()}"></th:block></span></span>
                     </th>
                     <td th:attr="data-label=#{warehouse.documents.history.column.date}" th:text="${m.date()}"></td>

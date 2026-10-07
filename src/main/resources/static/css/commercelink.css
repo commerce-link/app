@@ -6361,8 +6361,9 @@ a.cl-link-button:hover {
 
 .cl-page .cl-record-name > .cl-page-title {
     min-width: 0;
-    /* a long token (a document number with a store id) breaks instead of widening the page at 320 px */
-    overflow-wrap: anywhere;
+    /* a word longer than the line breaks instead of widening the page at 320 px; break-word, not anywhere, so it never
+       narrows the title of other record pages (a document number brings its own <wbr> break points) */
+    overflow-wrap: break-word;
 }
 
 .cl-page .cl-record-meta {
@@ -9041,12 +9042,13 @@ a.cl-link-button:hover {
     }
 }
 
-/* Warehouse documents list (docs/active/warehouse-documents-redesign): the number never breaks in the table (from 720 px;
-   a card breaks it rather than run under the reason text), the direction icon
-   repeats the type name in colour (the name carries the meaning) */
-.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* Warehouse documents list (docs/active/warehouse-documents-redesign). A document number wraps after a "/" (the
+   fragments/doc-number <wbr> break points), never inside the sequence digits; break-word only splits a segment that is
+   longer than the whole column. The direction icon repeats the type name in colour (the name carries the meaning). */
+.cl-page .cl-doc-no { overflow-wrap: break-word; }
+.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; }
 /* Fixed column widths from 720 px: with auto layout each kind segment (PZ, WZ, …) sized the columns to its own texts and
-   the table jumped between tabs. The number keeps one line once the rail is gone and the column is wide enough. */
+   the table jumped between tabs. */
 @media screen and (min-width: 720px) {
     .cl-page .cl-table.is-documents { table-layout: fixed; }
     .cl-page .cl-table.is-documents .cl-col-document { width: 27%; }
@@ -9060,9 +9062,6 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-source { width: 15%; }
     .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-counterparty { width: 18%; }
     .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-created { width: 15%; }
-}
-@media screen and (min-width: 1216px) {
-    .cl-page .cl-table.is-documents .cl-doc-no { white-space: nowrap; }
 }
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }

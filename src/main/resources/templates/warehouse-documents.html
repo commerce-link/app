@@ -148,7 +148,7 @@
                     <tbody>
                     <tr th:each="row : ${page.rows()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.documents.list.column.document}">
-                            <a class="cl-row-link cl-doc-no" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
+                            <a class="cl-row-link cl-doc-no" th:href="@{${row.href()}}"><th:block th:replace="~{fragments/doc-number :: parts(${row.number()})}"></th:block></a>
                             <span class="cl-table-sub"><span class="cl-icon-text"><i class="fas" th:classappend="${row.incoming()} ? 'fa-sign-in-alt' : 'fa-sign-out-alt'" aria-hidden="true"></i><th:block th:text="${row.typeName()}"></th:block></span></span>
                         </th>
                         <td th:if="${page.superAdmin()}" th:attr="data-label=#{warehouse.documents.list.column.store}">

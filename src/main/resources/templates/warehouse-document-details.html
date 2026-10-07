@@ -7,8 +7,9 @@
 <section class="cl-page" th:fragment="body" th:with="p=${page}">
     <div class="cl-page-body is-wide">
 
-        <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, ${p.backLabel()}, ${p.number()},
+        <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, ${p.backLabel()}, ~{::documentNumber},
                 ~{::documentCopy}, ~{::documentType}, ~{::documentMeta}, ${p.print() != null} ? ~{::documentActions} : null)}">
+            <th:block th:fragment="documentNumber"><th:block th:replace="~{fragments/doc-number :: parts(${p.number()})}"></th:block></th:block>
             <th:block th:fragment="documentCopy">
                 <button type="button" class="cl-copy-inline is-icon"
                         th:attr="data-cl-copy=${p.number()}, aria-label=#{warehouse.documents.details.copy}">

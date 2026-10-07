@@ -32,8 +32,23 @@ class ItemHistoryRenderingTest {
                 .contains("Przyjęto 5 szt. · wydano 2 szt. · zostało 3 szt.")
                 .contains("class=\"cl-back\" href=\"/dashboard/deliveries/details?deliveryId=del-1\"")
                 .contains("MFN MZ-V9P2T0BW").contains("3 szt.")
+                .contains(">PZ/<wbr>MAG1/<wbr>2026/<wbr>000210</a>")
                 .doesNotContain("has-text-danger").doesNotContain("style=").doesNotContain("??");
         assertThat(html.split("<h1", -1).length - 1).isEqualTo(1);
+    }
+
+    @Test
+    void backToTheDocumentBreaksItsNumberAfterSlashes() {
+        // given
+        ItemHistoryPage page = ItemHistoryPage.of(new MfnHistory("X", List.of()), "del-1", "M",
+                "/dashboard/warehouse-documents/details?documentId=d1", "PZ/MAG1/2026/000210",
+                TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));
+
+        // when
+        String html = SettingsTemplateRenderer.render(BODY, Map.of("page", page));
+
+        // then
+        assertThat(html).containsPattern("class=\"cl-back\"[^>]*>(?s).*<span>PZ/<wbr>MAG1/<wbr>2026/<wbr>000210</span>");
     }
 
     @Test

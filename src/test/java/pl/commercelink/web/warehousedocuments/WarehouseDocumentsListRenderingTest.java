@@ -43,7 +43,7 @@ class WarehouseDocumentsListRenderingTest {
 
         // then
         assertThat(html).contains("class=\"cl-table is-orders is-documents\"")
-                .contains("<a class=\"cl-row-link cl-doc-no\" href=\"/dashboard/warehouse-documents/details?documentId=d1\">PZ/MAG1/2026/000214</a>")
+                .contains("<a class=\"cl-row-link cl-doc-no\" href=\"/dashboard/warehouse-documents/details?documentId=d1\">PZ/<wbr>MAG1/<wbr>2026/<wbr>000214</a>")
                 .contains("fa-sign-in-alt").contains("Przyjęcie zewnętrzne").contains("Dostawa od dostawcy")
                 .contains("Dostawa 3f2a9c1e").contains("AB S.A.").contains("07.10.2026").contains("14:32 · Jan Kowalski")
                 .contains("aria-sort=\"descending\"")
@@ -123,13 +123,14 @@ class WarehouseDocumentsListRenderingTest {
     }
 
     @Test
-    void documentNumberBreaksUntilTheRailIsGoneAndColumnsKeepTheirWidthsAcrossKinds() throws Exception {
+    void documentNumberBreaksOnlyAfterASlashAndColumnsKeepTheirWidthsAcrossKinds() throws Exception {
         // given
         String css = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/css/commercelink.css"));
 
         // then
-        assertThat(css).containsPattern("\\.cl-table\\.is-documents \\.cl-doc-no \\{[^}]*overflow-wrap: anywhere[^}]*\\}")
-                .containsPattern("@media screen and \\(min-width: 1216px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\.cl-doc-no \\{ white-space: nowrap; \\}")
+        assertThat(css).containsPattern("\\.cl-page \\.cl-doc-no \\{[^}]*overflow-wrap: break-word[^}]*\\}")
+                .doesNotContainPattern("\\.cl-doc-no \\{[^}]*(white-space: nowrap|overflow-wrap: anywhere)")
+                .doesNotContainPattern("\\.cl-record-name > \\.cl-page-title \\{[^}]*overflow-wrap: anywhere")
                 .containsPattern("@media screen and \\(min-width: 720px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\{ table-layout: fixed; \\}");
     }
 }
