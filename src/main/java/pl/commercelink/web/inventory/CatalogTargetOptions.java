@@ -1,7 +1,6 @@
 package pl.commercelink.web.inventory;
 
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * "Kategoria katalogu" on "Uzupełnij dane" opened from the inventory: the manual catalog categories the chosen products
@@ -19,11 +18,6 @@ public record CatalogTargetOptions(int count, List<Option> matching, List<Option
     /** Nothing matches the products' PIM category: the field starts empty and says why. */
     public boolean unmatched() {
         return matching.isEmpty();
-    }
-
-    /** Every manual category is in one catalog, so naming it under each option would only repeat it. */
-    public boolean oneCatalog() {
-        return Stream.concat(matching.stream(), others.stream()).map(Option::catalogId).distinct().count() == 1;
     }
 
     /** @param alreadyIn how many of the products the category holds already (it picks the preselected one) */

@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ComboboxFragmentTest {
 
     private static final List<ComboboxOption> OPTIONS = List.of(
-            new ComboboxOption("c1/k1", "GPU", "Parts · matches"),
+            new ComboboxOption("c1/k1", "GPU", "Parts", "Suggested"),
             new ComboboxOption("c2/k1", "Tools", "Garden"),
             new ComboboxOption("c2/k2", "Seeds", null));
 
@@ -41,7 +41,7 @@ class ComboboxFragmentTest {
 
         // then
         assertThat(html).contains("<select class=\"cl-select\" id=\"pick\" name=\"target\" data-combobox-select", "required=\"required\"",
-                "<option value=\"c1/k1\">GPU — Parts · matches</option>", "<option value=\"c2/k1\">Tools — Garden</option>");
+                "<option value=\"c1/k1\">GPU — Parts (suggested)</option>", "<option value=\"c2/k1\">Tools — Garden</option>");
         assertThat(html).containsPattern("<option value=\"c2/k2\"\\s+selected=\"selected\">Seeds</option>");
         assertThat(html).doesNotContain("optgroup", "role=\"group\"", "cl-picker-group");
         // the hidden input posts nothing until the script swaps the select for the combobox
@@ -58,11 +58,13 @@ class ComboboxFragmentTest {
         assertThat(tagWith(html, "data-combobox-list")).contains("class=\"cl-picker-list\" role=\"listbox\" tabindex=\"-1\"",
                 "id=\"pick-listbox\"", "aria-labelledby=\"pick-label\"");
         assertThat(tagWith(html, "data-value=\"c1/k1\"")).contains("class=\"cl-picker-option is-selected\"", "role=\"option\"",
-                "id=\"pick-option-0\"", "aria-selected=\"true\"", "data-label=\"GPU\"", "aria-label=\"GPU, Parts · matches\"");
+                "id=\"pick-option-0\"", "aria-selected=\"true\"", "data-label=\"GPU\"", "aria-label=\"GPU, Parts, suggested\"");
         assertThat(tagWith(html, "data-value=\"c2/k1\"")).contains("class=\"cl-picker-option\"", "id=\"pick-option-1\"",
                 "aria-selected=\"false\"", "aria-label=\"Tools, Garden\"");
         assertThat(tagWith(html, "data-value=\"c2/k2\"")).contains("aria-label=\"Seeds\"");
-        assertThat(html).containsPattern("<span class=\"cl-picker-name\">GPU</span>\\s*<span class=\"cl-picker-meta\">Parts · matches</span>");
+        assertThat(html).containsPattern("<span class=\"cl-picker-name\">GPU</span>\\s*<span class=\"cl-picker-meta\">Parts · <span\\s[^>]*>"
+                + "<i class=\"fas fa-star\"\\s+aria-hidden=\"true\"></i> Suggested</span></span>");
+        assertThat(html.split("Suggested", -1)).hasSize(2);
         assertThat(html).containsPattern("<span class=\"cl-picker-name\">Seeds</span>\\s*</span>");
         assertThat(html.split("class=\"cl-picker-meta\"", -1)).hasSize(3);
     }

@@ -238,20 +238,17 @@ public class InventoryAddController {
 
     /**
      * The options of the category combobox, one flat list: the categories matching the products' PIM category first, then
-     * the other manual ones. Each reads as the category's name, with its catalog in grey under it ("· pasuje" after it on
-     * a matching one); with a single catalog only "pasuje" stays.
+     * the other manual ones. Each reads as the category's name with its catalog in grey under it, a matching one starred
+     * as suggested on that line ("Local Catalog · ★ Sugerowana").
      */
     public static List<ComboboxOption> targetOptions(CatalogTargetOptions options, MessageSource messages, Locale locale) {
-        boolean oneCatalog = options.oneCatalog();
+        String suggested = messages.getMessage("catalog.products.review.target.suggested", null, locale);
         List<ComboboxOption> result = new ArrayList<>();
         for (CatalogTargetOptions.Option option : options.matching()) {
-            String meta = oneCatalog
-                    ? messages.getMessage("catalog.products.review.target.matches", null, locale)
-                    : messages.getMessage("catalog.products.review.target.matches.in", new Object[]{option.catalogName()}, locale);
-            result.add(new ComboboxOption(option.value(), option.categoryName(), meta));
+            result.add(new ComboboxOption(option.value(), option.categoryName(), option.catalogName(), suggested));
         }
         for (CatalogTargetOptions.Option option : options.others()) {
-            result.add(new ComboboxOption(option.value(), option.categoryName(), oneCatalog ? null : option.catalogName()));
+            result.add(new ComboboxOption(option.value(), option.categoryName(), option.catalogName()));
         }
         return result;
     }

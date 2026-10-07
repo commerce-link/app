@@ -378,9 +378,9 @@ class ProductsAddTemplateTest {
                 "autofocus=\"autofocus\"");
         assertThat(html).containsPattern("</div>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate data-review-change\\s+"
                 + "formaction=\"/dashboard/inventory/add\">Change category</button>\\s*</div>");
-        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">GPU — Parts · matches</option>");
+        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">GPU — Parts \\(suggested\\)</option>");
         assertThat(html).contains("<option value=\"c2/k2\">Tools — Garden</option>",
-                "<span class=\"cl-picker-name\">GPU</span>", "<span class=\"cl-picker-meta\">Parts · matches</span>",
+                "<span class=\"cl-picker-name\">GPU</span>", "aria-label=\"GPU, Parts, suggested\"", "aria-label=\"Tools, Garden\"",
                 "<span class=\"cl-picker-meta\">Garden</span>", "value=\"GPU\"",
                 "PIM category: Graphics cards. Manual categories only",
                 "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
@@ -435,14 +435,14 @@ class ProductsAddTemplateTest {
         String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
 
         // then
-        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "matches",
+        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "uggested",
                 ">Change category</button>", "cl-input-row", "data-review-status=");
         assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a category…</option>");
         assertThat(html).contains("placeholder=\"Choose a category…\"",
                 "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-combobox-value>",
-                "<option value=\"c1/k2\">Cases</option>");
-        // one catalog: no catalog line under the options, and nothing matches, so no grey line at all
-        assertThat(html).doesNotContain("cl-picker-meta", "Cases — Parts");
+                "placeholder=\"Choose a category…\"");
+        // one catalog still names it under every option; nothing matches, so nothing is suggested
+        assertThat(html).contains("<option value=\"c1/k2\">Cases — Parts</option>", "<span class=\"cl-picker-meta\">Parts</span>");
         assertThat(tagsOf(html, "input").stream().filter(tag -> tag.contains("data-combobox-input")).findFirst().orElseThrow())
                 .contains("required=\"required\"", "value=\"\"");
         assertThat(html).contains(

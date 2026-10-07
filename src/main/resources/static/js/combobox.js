@@ -41,6 +41,8 @@
         var chosenLabel = input.value;
         var visible = options;
         var active = -1;
+        // Where the first arrow lands: the chosen option, which opens ticked but not highlighted (one tinted row at most).
+        var start = -1;
         var announceTimer = null;
         var quiet = false;
         var selectOnMouseUp = false;
@@ -83,7 +85,7 @@
             }, ANNOUNCE_DELAY);
         }
 
-        function highlight(index) {
+        function highlight(index, scroll) {
             active = index;
             options.forEach(function (option) {
                 option.classList.remove('is-active');
@@ -93,7 +95,9 @@
                 return;
             }
             visible[active].classList.add('is-active');
-            visible[active].scrollIntoView({ block: 'nearest' });
+            if (scroll !== false) {
+                visible[active].scrollIntoView({ block: 'nearest' });
+            }
             input.setAttribute('aria-activedescendant', visible[active].id);
         }
 
@@ -106,6 +110,7 @@
             });
             empty.hidden = visible.length > 0;
             list.scrollTop = 0;
+            start = -1;
             highlight(-1);
         }
 
@@ -131,7 +136,8 @@
                 return option.dataset.value === field.value;
             });
             if (chosen >= 0) {
-                highlight(chosen);
+                start = chosen;
+                visible[chosen].scrollIntoView({ block: 'nearest' });
             }
             if (selectText !== false) {
                 input.select();
@@ -197,6 +203,10 @@
                 event.preventDefault();
                 if (!isOpen() || event.altKey) {
                     open();
+                } else if (!visible.length) {
+                    return;
+                } else if (active < 0) {
+                    highlight(start >= 0 ? start : (event.key === 'ArrowDown' ? 0 : visible.length - 1));
                 } else if (event.key === 'ArrowDown') {
                     highlight(Math.min(active + 1, visible.length - 1));
                 } else {
@@ -240,6 +250,14 @@
         list.addEventListener('mousedown', function (event) {
             // The focus stays in the text field, so a click on an option does not count as leaving the field.
             event.preventDefault();
+        });
+        // The row under the mouse becomes the active one, so the mouse and the arrows never tint two rows at once.
+        list.addEventListener('mouseover', function (event) {
+            var option = event.target.closest('[role="option"]');
+            var index = option ? visible.indexOf(option) : -1;
+            if (index >= 0 && index !== active) {
+                highlight(index, false);
+            }
         });
         list.addEventListener('click', function (event) {
             var option = event.target.closest('[role="option"]');

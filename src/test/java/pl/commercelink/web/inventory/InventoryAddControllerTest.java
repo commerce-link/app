@@ -216,32 +216,31 @@ class InventoryAddControllerTest {
 
     /**
      * One flat list: the matching categories first, as the factory ordered them, then the others. The name is the first
-     * line; the catalog, with "matches" on a matching one, the grey second line. No "already here" count any more.
+     * line, the catalog the grey second line; only a matching one is starred as suggested. No "already here" count.
      */
     @Test
-    void comboboxOptionsPutTheMatchingCategoriesFirstWithTheirCatalogAndMatchesOnTheSecondLine() {
+    void comboboxOptionsPutTheMatchingCategoriesFirstAndStarOnlyThemAsSuggested() {
         // given
         CatalogTargetOptions options = new CatalogTargetOptions(3,
                 List.of(new CatalogTargetOptions.Option("c-2", "cat-b2b", "Sklep B2B", "Karty", 2),
                         new CatalogTargetOptions.Option("c-1", "cat-gpu", "Podzespoły", "Karta graficzna", 0)),
                 List.of(new CatalogTargetOptions.Option("c-1", "cat-case", "Podzespoły", "Obudowa", 3)),
                 "c-1/cat-gpu", false, "Karty graficzne");
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0)
-                + (call.getArgument(1) == null ? "" : List.of((Object[]) call.getArgument(1)).toString()));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
 
         // when
         List<ComboboxOption> choices = InventoryAddController.targetOptions(options, messageSource, Locale.ENGLISH);
 
         // then
         assertThat(choices).containsExactly(
-                new ComboboxOption("c-2/cat-b2b", "Karty", "catalog.products.review.target.matches.in[Sklep B2B]"),
-                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "catalog.products.review.target.matches.in[Podzespoły]"),
-                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły"));
+                new ComboboxOption("c-2/cat-b2b", "Karty", "Sklep B2B", "catalog.products.review.target.suggested"),
+                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
+                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
     }
 
-    /** With every manual category in one catalog its name would repeat on every line: only "matches" stays. */
+    /** The catalog is named under every option even when the store has only one (U14). */
     @Test
-    void comboboxOptionsOfASingleCatalogLeaveTheCatalogOut() {
+    void comboboxOptionsOfASingleCatalogStillNameIt() {
         // given
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
 
@@ -250,8 +249,8 @@ class InventoryAddControllerTest {
 
         // then
         assertThat(choices).containsExactly(
-                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "catalog.products.review.target.matches"),
-                new ComboboxOption("c-1/cat-case", "Obudowa", null));
+                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
+                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
     }
 
     /** The rows were checked against the category they were drawn for; another one may skip or reset some of them. */

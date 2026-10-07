@@ -4479,9 +4479,26 @@ a.cl-link-button:hover {
     padding: 6px 12px;
 }
 
-/* The chosen option is told by a tick, not by bold type: the name stays the plain first line. */
+/* The chosen option is told by a tick, not by bold type or a tint: the name stays the plain first line. */
 .cl-page .cl-combobox .cl-picker-option.is-selected {
     font-weight: 400;
+}
+
+/* One tinted row at most: the script makes the row under the mouse the active one, so the arrows and the mouse share
+   one highlight instead of the hover tint landing on a second row. The bar keeps the arrows' row plain to see. */
+.cl-page .cl-combobox .cl-picker-option:hover:not(.is-active) {
+    background: transparent;
+}
+
+.cl-page .cl-combobox .cl-picker-option.is-active {
+    box-shadow: inset 3px 0 0 var(--cl-accent);
+}
+
+/* A suggested option: a star in --cl-warn (6.8:1 on white, 5.8:1 on the active row) before the word, in the grey line.
+   .fa-star, not i: the FontAwesome script swaps the i for an svg that keeps the class. */
+.cl-page .cl-combobox-star .fa-star {
+    font-size: 10px;
+    color: var(--cl-warn);
 }
 
 .cl-page .cl-combobox-check {
@@ -4500,8 +4517,8 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
-/* --cl-ink-3 is 4.76:1 on the white menu; on the tinted row under the mouse or the arrows it is 4.04:1, below AA for
-   12 px, so that row takes --cl-ink-2 (as the tree picker's path does). */
+/* --cl-ink-3 is 4.76:1 on the white menu; on the tinted (active) row it is 4.04:1, below AA for 12 px, so that row
+   takes --cl-ink-2 (as the tree picker's path does). */
 .cl-page .cl-picker-meta {
     display: block;
     overflow: hidden;
@@ -4512,7 +4529,7 @@ a.cl-link-button:hover {
     color: var(--cl-ink-3);
 }
 
-.cl-page .cl-picker-option:is(:hover, .is-active) .cl-picker-meta {
+.cl-page .cl-picker-option.is-active .cl-picker-meta {
     color: var(--cl-ink-2);
 }
 

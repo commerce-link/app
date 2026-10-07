@@ -74,7 +74,6 @@ class CatalogTargetOptionsFactoryTest {
         assertThat(options.matching()).extracting(CatalogTargetOptions.Option::alreadyIn).containsExactly(0, 1);
         assertThat(options.preselectedValue()).isEqualTo("c-1/cat-gpu");
         assertThat(options.others()).extracting(CatalogTargetOptions.Option::value).containsExactly("c-1/cat-case");
-        assertThat(options.oneCatalog()).isFalse();
     }
 
     @Test
@@ -178,20 +177,6 @@ class CatalogTargetOptionsFactoryTest {
         // then
         assertThat(options.others()).extracting(CatalogTargetOptions.Option::categoryName)
                 .containsExactly("Oprawy", "Świetlówki", "Żarówki", "Routery", "Akcesoria");
-    }
-
-    @Test
-    void storeWithManualCategoriesInOneCatalogIsOneCatalog() {
-        // given
-        when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(
-                new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11")),
-                new CatalogPlacement.Target("c-1", "Podzespoły", "cat-case", "Obudowa", List.of("40"))), List.of()));
-
-        // when
-        CatalogTargetOptions options = factory.build(STORE_ID, List.of("5901000000001"));
-
-        // then
-        assertThat(options.oneCatalog()).isTrue();
     }
 
     @Test

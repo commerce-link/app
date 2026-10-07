@@ -4,9 +4,9 @@
 
 <!--/* One value out of a flat list of options, typed to filter: an editable combobox (one text field) on the tree picker's
        skin (fragments/category-picker), for options that are known when the page is drawn. An option is its label with
-       an optional grey second line (ComboboxOption.meta).
+       an optional grey second line (ComboboxOption.meta), which may end in a starred word (ComboboxOption.starred).
 
-       Progressive enhancement: the native select is the field without JavaScript ("label — note" per option).
+       Progressive enhancement: the native select is the field without JavaScript ("label — note (starred word)" per option).
        static/js/combobox.js shows the text field instead, moves the name to the hidden input and fires
        "cl:combobox-change" on the .cl-combobox when a choice is made with Enter or a click -- never on the arrows.
        The text field shows the chosen label; whatever was typed and not picked goes back to it.
@@ -53,7 +53,11 @@
                               data-label=${option.label()}, aria-label=${option.accessibleName()}">
                     <span class="cl-picker-option-text">
                         <span class="cl-picker-name" th:text="${option.label()}"></span>
-                        <span class="cl-picker-meta" th:if="${option.meta() != null}" th:text="${option.meta()}"></span>
+                        <span class="cl-picker-meta" th:if="${option.meta() != null or option.starred() != null}"><th:block
+                              th:text="${option.meta()}"></th:block><th:block
+                              th:if="${option.meta() != null and option.starred() != null}"> · </th:block><span
+                              class="cl-combobox-star" th:if="${option.starred() != null}"><i class="fas fa-star"
+                              aria-hidden="true"></i> <th:block th:text="${option.starred()}"></th:block></span></span>
                     </span>
                     <i class="fas fa-check cl-combobox-check" aria-hidden="true"></i>
                 </div>
