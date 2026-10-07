@@ -25,7 +25,9 @@ import static pl.commercelink.shipping.OperatorMessages.reason;
 
 /**
  * A shipment sent from the warehouse. No shipment is stored for it: the check message carries what settling needs, the
- * items are held for the command until their goods-out, and the store learns the outcome from its notifications.
+ * items are held for the command until their goods-out, and the store learns the outcome from its notifications. With
+ * nothing stored, a pickup that failed cannot be ordered again in the app: its notification tells the operator to book
+ * the courier in the integration's panel or hand the parcel in at a carrier point.
  */
 @Slf4j
 @Component

@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentPickup;
@@ -25,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -220,6 +222,23 @@ class WarehouseShipmentOwnerTest {
         verify(notifications).publish(eq("store-1"), argThat((StoreNotification n) ->
                 n.getSeverity() == StoreNotificationSeverity.WARNING
                         && "shipping.notification.warehouse.pickup.failed".equals(n.getMessage())));
+    }
+
+    @Test
+    void aFailedPickupTellsTheOperatorHowToSendTheParcelInBothLanguages() {
+        // given: a warehouse shipment is stored nowhere in the app, so its pickup cannot be ordered again here
+        ResourceBundleMessageSource bundles = new ResourceBundleMessageSource();
+        bundles.setBasename("messages");
+        bundles.setDefaultEncoding("UTF-8");
+        Object[] args = {"A", null, null, null, "Przewoźnik nie podał terminu", null};
+
+        // when
+        String pl = bundles.getMessage("shipping.notification.warehouse.pickup.failed", args, Locale.forLanguageTag("pl"));
+        String en = bundles.getMessage("shipping.notification.warehouse.pickup.failed", args, Locale.ENGLISH);
+
+        // then
+        assertThat(pl).contains("A", "Przewoźnik nie podał terminu", "panelu integracji", "punkcie przewoźnika");
+        assertThat(en).contains("A", "Przewoźnik nie podał terminu", "integration's panel", "carrier point");
     }
 
     @Test
