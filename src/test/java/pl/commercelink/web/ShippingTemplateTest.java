@@ -154,7 +154,7 @@ class ShippingTemplateTest {
                 .contains("value=\"ups\" disabled=\"disabled\"").contains("Niedostępna")
                 .contains("<span class=\"cl-choice-description is-warn\">Za ciężka paczka</span>")
                 .contains("class=\"cl-button is-primary\">Utwórz przesyłkę</button>")
-                .contains("<p class=\"cl-help\">Kuriera po paczkę zamówisz potem przyciskiem „Zamów odbiór” na karcie Przesyłki, razem z innymi paczkami tego przewoźnika.</p>")
+                .contains("<p class=\"cl-help\">Kuriera po paczkę zamówisz potem przyciskiem „Zamów odbiór” na liście zamówień, razem z innymi paczkami tego przewoźnika.</p>")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/shipping/create\"")
                 .contains("<input type=\"hidden\" name=\"parcels[1].description\" value=\"\">")
                 .contains("<input type=\"hidden\" name=\"pickUpAddressId\" value=\"pickup-1\">")
