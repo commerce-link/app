@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 @Controller
 class WarehouseDocumentsController {
 
@@ -93,8 +95,10 @@ class WarehouseDocumentsController {
         String eanQuery = ean != null ? ean.trim() : null;
         String mfnQuery = mfn != null ? mfn.trim() : null;
 
-        List<WarehouseDocument> pagedDocuments = warehouseDocumentSearchService.search(
-                storeId, documentType, from, to, warehouseId, eanQuery, mfnQuery, page, PAGE_SIZE + 1);
+        WarehouseDocumentCriteria criteria = new WarehouseDocumentCriteria(storeId, documentType, Set.of(), from, to,
+                isBlank(warehouseId) ? null : "/" + warehouseId.trim() + "/");
+        String productCode = !isBlank(eanQuery) ? eanQuery : mfnQuery;
+        List<WarehouseDocument> pagedDocuments = warehouseDocumentSearchService.search(criteria, productCode, page, PAGE_SIZE);
 
         boolean hasNextPage = pagedDocuments.size() > PAGE_SIZE;
         if (hasNextPage) {
