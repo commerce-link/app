@@ -79,7 +79,7 @@ class InventoryBrowseRenderingTest {
     }
 
     @Test
-    void productOutsideTheCatalogHasAnEmptyStatusCellAndOnlyTheAddAndPricesItemsInItsRowMenu() {
+    void productOutsideTheCatalogHasAnEmptyStatusCellAndOnlyTheAddItemInItsRowMenu() {
         // when
         String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
 
@@ -91,8 +91,9 @@ class InventoryBrowseRenderingTest {
                 "<span class=\"cl-menu-glyph\" aria-hidden=\"true\">⋯</span>");
         assertThat(html).contains("<a class=\"cl-menu-item\" href=\"/dashboard/inventory?open=add&amp;ean=5901000000001\" "
                 + "data-browse-add data-ean=\"5901000000001\">Add to catalog</a>");
-        assertThat(html).contains("<a class=\"cl-menu-item\" href=\"/dashboard/inventory/prices?q=5901000000001\">Prices and availability</a>");
-        assertThat(html).doesNotContain("cl-inv-in-catalog", "fa-check-circle", "Open in catalog", "Add to another category");
+        assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(2);
+        assertThat(html).doesNotContain("Prices and availability", "cl-mark", "fa-check-circle", "Open in catalog",
+                "Add to another category");
     }
 
     @Test
@@ -105,15 +106,16 @@ class InventoryBrowseRenderingTest {
 
         // then
         String places = "In catalog:\nPodzespoły › Karta graficzna\nSklep B2B › Karty";
-        assertThat(html).contains("<span class=\"cl-inv-in-catalog cl-tooltip is-lines is-end\" tabindex=\"0\" role=\"img\" "
-                + "data-tooltip=\"" + places + "\" aria-label=\"" + places + "\"><i class=\"fas fa-check-circle\" aria-hidden=\"true\"></i></span>");
-        assertThat(html).doesNotContain("<a class=\"cl-inv-in-catalog", "Not in a catalog", "Karta graficzna</span>", "+1",
+        assertThat(html).contains("<span class=\"cl-inv-catalog-mark\"><span class=\"cl-mark is-positive cl-tooltip is-lines is-end\" "
+                + "tabindex=\"0\" role=\"img\" data-tooltip=\"" + places + "\" aria-label=\"" + places + "\">"
+                + "<i class=\"fas fa-check-circle\" aria-hidden=\"true\"></i></span></span>");
+        assertThat(html).doesNotContain("<a class=\"cl-mark", "Not in a catalog", "Karta graficzna</span>", "+1",
                 "cl-inv-catalog-cell is-empty");
         assertThat(html).containsPattern("<td class=\"cl-inv-catalog-cell\"\\s+data-label=\"In catalog\">");
     }
 
     @Test
-    void rowMenuOfAProductInTheCatalogAddsElsewhereAndShowsPricesButDoesNotOpenTheEntry() {
+    void rowMenuOfAProductInTheCatalogOnlyAddsElsewhereBecauseTheNameAlreadyLeadsToThePrices() {
         // given
         BrowsePage.RowView row = row(line(List.of("Podzespoły › Karta graficzna")), 0);
 
@@ -122,10 +124,9 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(html).contains("data-browse-add data-ean=\"5901000000001\">Add to another category</a>",
-                ">Prices and availability</a>");
-        assertThat(html.indexOf("Add to another category")).isLessThan(html.indexOf("Prices and availability"));
-        assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(3);
-        assertThat(html).doesNotContain(">Add to catalog</a>", "Open in catalog", "/dashboard/catalogs/");
+                "<a href=\"/dashboard/inventory/prices?q=5901000000001\">Gigabyte RTX 4060</a>");
+        assertThat(html.split("class=\"cl-menu-item\"", -1)).hasSize(2);
+        assertThat(html).doesNotContain(">Add to catalog</a>", "Prices and availability", "Open in catalog", "/dashboard/catalogs/");
     }
 
     @Test
@@ -211,7 +212,8 @@ class InventoryBrowseRenderingTest {
         assertThat(html).doesNotContain("??", "999999999");
         assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\">There is no such category</h2>",
                 "The PIM has no such category, or it was removed.",
-                "<a class=\"cl-button\" href=\"/dashboard/inventory\" data-cl-list-nav>All categories</a>");
+                "<a class=\"cl-link-button\" href=\"/dashboard/inventory\" data-cl-list-nav>All categories</a>");
+        assertThat(html).contains("<div class=\"cl-list-empty\">");
         assertThat(html).doesNotContain("There are no products to browse yet", "cl-table");
     }
 
@@ -336,6 +338,41 @@ class InventoryBrowseRenderingTest {
                 "<span class=\"cl-path-crumb\" data-cl-path-crumb><span aria-current=\"page\">Wentylatory</span></span>",
                 ">All categories</a>");
         assertThat(html).doesNotContain("data-cl-collapsed", "cl-path-more", "hidden>");
+    }
+
+    @Test
+    void pimCategoryIsBothASecondaryColumnAndALineUnderTheProductForNarrowScreens() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\">PIM category</th>");
+        assertThat(html).containsPattern("<td class=\"cl-category-cell is-secondary-column\" data-label=\"PIM category\">");
+        String key = html.substring(html.indexOf("<th scope=\"row\" class=\"cl-table-key\">"), html.indexOf("</th>",
+                html.indexOf("<th scope=\"row\" class=\"cl-table-key\">")));
+        assertThat(key).contains("<span class=\"cl-table-sub cl-narrow-only\">", "Komponenty komputerowe", "<strong>Karty graficzne</strong>");
+        assertThat(key).contains("<span class=\"cl-table-code\">5901000000001</span>", "<span class=\"cl-table-code\">GV-N4060</span>");
+    }
+
+    @Test
+    void costHasAShortFieldNameOnTheCard() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains(">Lowest delivered cost</a>", "data-label=\"Delivered cost\"");
+        assertThat(html).doesNotContain("data-label=\"Lowest delivered cost\"");
+    }
+
+    @Test
+    void emptyResultIsOnlyItsTextBecauseClearingTheFiltersIsInTheToolbar() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of())));
+
+        // then
+        assertThat(html).contains("<p class=\"cl-list-empty\">No products for these filters.</p>");
+        assertThat(html.split(">Clear filters</a>", -1)).hasSize(2);
+        assertThat(html).doesNotContain("<table", "cl-inv-browse-empty");
     }
 
     @Test

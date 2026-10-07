@@ -23,9 +23,7 @@
             <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${productCategory})}"></th:block>
         </div>
     </div>
-    <div class="cl-inv-product-actions">
-        <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
-    </div>
+    <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
 </div>
 
 <th:block th:fragment="codeMatch(match, ean, code)">

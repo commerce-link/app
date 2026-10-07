@@ -429,6 +429,8 @@
     font-weight: 650;
     line-height: 1.3;
     color: var(--cl-ink);
+    /* feed names glue words with "_" or carry URLs: such a token breaks instead of widening the page */
+    overflow-wrap: anywhere;
 }
 
 .cl-inv-page .cl-inv-codes {
@@ -866,69 +868,15 @@
     margin-top: 16px;
 }
 
-/* The toolbar sits as far from the card's top edge (or the subcategory list's rule) as from its sides, whether it
-   opens the card or follows the category head; the second selector outranks the shared "toolbar opens its card" rule
-   (14 px). Under a bare result head (text search) the head's own 4 px bottom padding makes up the difference. */
-.cl-inv-page .cl-inv-browse-card > .cl-table-toolbar,
-.cl-inv-page .cl-card.cl-inv-browse-card > .cl-visually-hidden:first-child + .cl-table-toolbar {
-    padding-top: 20px;
-}
-
-.cl-inv-page .cl-inv-browse-card > .cl-result-head + .cl-table-toolbar {
-    padding-top: 16px;
-}
-
-.cl-inv-page .cl-inv-browse-empty {
-    display: grid;
-    justify-items: start;
-    gap: 8px;
-    padding: 20px;
-    color: var(--cl-ink-2);
-}
-
 .cl-inv-page .cl-inv-browse-error {
     margin: 0 20px 12px;
 }
 
 @media screen and (max-width: 719px) {
-    .cl-inv-page .cl-inv-browse-card > .cl-table-toolbar,
-    .cl-inv-page .cl-card.cl-inv-browse-card > .cl-visually-hidden:first-child + .cl-table-toolbar {
-        padding-top: 16px;
-    }
-
-    .cl-inv-page .cl-inv-browse-card > .cl-result-head + .cl-table-toolbar {
-        padding-top: 12px;
-    }
-
-    .cl-inv-page .cl-inv-browse-empty {
-        padding: 16px;
-    }
-
     .cl-inv-page .cl-inv-browse-error {
         margin-left: 16px;
         margin-right: 16px;
     }
-}
-
-/* The check icon is centred under its column name in table mode; as a card field it stays at the left. */
-@media screen and (min-width: 720px) {
-    .cl-inv-page .cl-table.cl-inv-browse-table :is(th, td).cl-inv-catalog-cell {
-        text-align: center;
-    }
-}
-
-.cl-inv-page .cl-inv-add-dialog {
-    width: min(520px, calc(100vw - 32px));
-}
-
-.cl-inv-page .cl-inv-add-dialog .cl-dialog-body {
-    display: grid;
-    gap: 12px;
-    padding: 4px 20px 18px;
-}
-
-.cl-inv-page .cl-inv-add-dialog .cl-dialog-body > p.cl-help {
-    margin: 0;
 }
 
 .cl-inv-page .cl-inv-product-category {
@@ -939,94 +887,74 @@
     max-width: none;
 }
 
-.cl-inv-page .cl-inv-product-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+/* The browse list. A code (EAN, manufacturer code) moves to the next line whole instead of breaking at its hyphen; only a
+   code longer than the whole line breaks inside. */
+.cl-inv-page .cl-inv-browse-table .cl-table-key .cl-table-code {
+    display: inline-block;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
-/* "W katalogu": a check icon with the places in its tooltip (not a link: the entry opens from the row menu); outside
-   the catalog the cell is empty but for a visually hidden text. */
-.cl-inv-page .cl-inv-in-catalog {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    font-size: 16px;
-    color: var(--cl-ok);
+/* The PIM category is a column from 1216 px; below it folds under the product name (design system "Kolumna zwijana pod
+   klucz"), so the list keeps five narrow columns beside the product and fits its card at every width. */
+.cl-inv-page .cl-inv-browse-table .cl-narrow-only {
+    display: none;
 }
 
-.cl-inv-page .cl-inv-in-catalog:focus-visible {
-    outline: 2px solid var(--cl-accent);
-    outline-offset: 2px;
-}
-
-/* 720-1439 px: the six columns of the browse list need about 870 px at their natural widths, more than the card beside
-   the sidebar has (it overflowed by up to 85 px at 1024 px). The column names wrap, and below 1216 px the cells get
-   tighter sides and the category a lower floor, so the table fits the card at every width. */
-@media screen and (min-width: 720px) and (max-width: 1439px) {
-    .cl-inv-page .cl-table.cl-inv-browse-table thead th,
-    .cl-inv-page .cl-table.cl-inv-browse-table thead th.is-numeric,
-    .cl-inv-page .cl-table.cl-inv-browse-table thead .cl-table-sort {
-        white-space: normal;
+@media screen and (max-width: 1215px) {
+    .cl-inv-page .cl-inv-browse-table .is-secondary-column {
+        display: none;
     }
 
-    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-sort {
-        text-align: inherit;
+    .cl-inv-page .cl-inv-browse-table .cl-table-key .cl-table-sub.cl-narrow-only {
+        display: block;
+        margin-top: 4px;
+    }
+
+    .cl-inv-page .cl-inv-browse-table .cl-narrow-only .cl-category-path {
+        max-width: none;
+        font-size: inherit;
+        font-weight: 400;
     }
 }
 
-@media screen and (min-width: 720px) and (max-width: 1215px) {
-    .cl-inv-page .cl-inv-browse-table :is(thead th, tbody th, td),
-    .cl-inv-page .cl-table.cl-inv-browse-table :is(th, td):last-child {
-        padding-left: 8px;
-        padding-right: 8px;
-    }
-
-    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
-        min-width: 9rem;
-    }
+/* The column names wrap ("Najniższy koszt z dostawą" is wider than its numbers); at 720-1023 px, without the sidebar
+   but with 44 px targets, the cells take the tighter 8 px sides of the orders table. */
+.cl-inv-page .cl-table.cl-inv-browse-table thead :is(th, th.is-numeric, .cl-table-sort) {
+    white-space: normal;
 }
 
-/* 1216-1439 px: the row menu column made the list ~18 px wider than the card at 1216 px; the PIM category, which wraps
-   anyway, gives way first */
-@media screen and (min-width: 1216px) and (max-width: 1439px) {
-    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
-        min-width: 12rem;
-    }
+.cl-inv-page .cl-table.cl-inv-browse-table .cl-table-sort {
+    text-align: inherit;
+}
+
+/* the amount stays on one line; the supplier under it ("u <supplier>") wraps, so a long supplier name cannot widen the
+   list ("Dostawców: 12" and "W magazynie: 3" stay whole) */
+.cl-inv-page .cl-table.cl-inv-browse-table td.cl-inv-cost-cell .cl-table-sub {
+    white-space: normal;
 }
 
 @media screen and (min-width: 720px) and (max-width: 1023px) {
-    /* without the sidebar but with 44 px targets: the PIM category drops to 6rem (below that its longest word binds)
-       and the name to 8.5rem, which keeps the table inside the card at 720 px */
-    .cl-inv-page .cl-table.cl-inv-browse-table .cl-table-key {
-        min-width: 8.5rem;
-    }
-
-    .cl-inv-page .cl-inv-browse-table .cl-category-cell {
-        min-width: 6rem;
+    .cl-inv-page .cl-table.cl-inv-browse-table :is(thead th, tbody th, td) {
+        padding-left: 8px;
+        padding-right: 8px;
     }
 }
 
-@media screen and (max-width: 1023px) {
-    /* a 44 px tap target around the 20 px check without growing the row, like the margin icon */
-    .cl-inv-page .cl-inv-in-catalog {
-        box-sizing: content-box;
-        padding: 12px;
-        margin: -12px;
+/* The "W katalogu" mark is centred under its column name in table mode; as a card field it stays at the left. */
+@media screen and (min-width: 720px) {
+    .cl-inv-page .cl-table.cl-inv-browse-table :is(th, td).cl-inv-catalog-cell {
+        text-align: center;
     }
 }
 
 @media screen and (max-width: 719px) {
-    /* As a card the row menu takes the top-right corner, level with the name, like the checkbox in the top-left one;
-       its list opens leftwards (right-aligned to the trigger). The name keeps clear of it. */
+    /* As a card the row menu takes the top-right corner, level with the name and as far from the card's edge as the
+       fields are on the left; its list opens leftwards (right-aligned to the trigger). The name keeps clear of it. */
     .cl-inv-page .cl-table.cl-inv-browse-table tbody td.cl-table-actions {
         position: absolute;
-        top: 3px;
-        right: 0;
+        top: var(--cl-gap-attached);
+        right: 16px;
         display: block;
         padding: 0;
     }
@@ -1036,14 +964,33 @@
     }
 
     .cl-inv-page .cl-table.cl-inv-browse-table tbody th.cl-table-key {
-        padding-right: 52px;
+        padding-right: calc(44px + var(--cl-gap-related));
     }
 
-    /* the check starts at the left of its value column: its bubble opens rightwards and is capped, because even hidden
-       it counts towards the page's width */
-    .cl-inv-page .cl-inv-in-catalog.is-end::after {
+    /* a two-line field name spans the value's lines, so "u Acme" and "Dostawców: 2" stay right under their number */
+    .cl-inv-page .cl-table.cl-inv-browse-table td.is-numeric::before {
+        grid-row: span 3;
+    }
+
+    /* As a card field the mark stands at the start of its value column, so its end-anchored bubble turns round: it
+       opens rightwards and is as wide as the value column at most (the column is its containing block); the arrow
+       stays over the 20 px mark. */
+    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-mark {
+        position: relative;
+        justify-self: stretch;
+    }
+
+    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-mark .cl-mark.cl-tooltip {
+        position: static;
+    }
+
+    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-mark .cl-tooltip.is-end::after {
+        left: 0;
         right: auto;
-        left: -8px;
-        max-width: calc(100vw - 160px);
+        max-width: 100%;
+    }
+
+    .cl-inv-page .cl-inv-browse-table .cl-inv-catalog-mark .cl-tooltip::before {
+        left: 10px;
     }
 }

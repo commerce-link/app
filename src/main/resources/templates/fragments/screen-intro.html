@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<button th:fragment="toggle" type="button" class="screen-intro-toggle cl-tooltip" data-intro-toggle
+<button th:fragment="toggle" type="button" class="screen-intro-toggle cl-tooltip is-end" data-intro-toggle
         th:attr="data-tooltip=#{intro.toggle}" onclick="toggleScreenIntro()">?</button>
 
 <div th:fragment="panel(screen, icon)" class="screen-intro" th:attr="data-intro-panel=${screen}" hidden>

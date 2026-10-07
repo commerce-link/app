@@ -18,16 +18,16 @@
        split with limit -1 keeps leading, trailing and doubled slashes. */-->
 <th:block th:fragment="breakable(text)"><th:block th:if="${text != null}"><th:block th:each="part, it : ${text.split('/', -1)}"><th:block th:text="${part}"></th:block><th:block th:unless="${it.last}">/<wbr></th:block></th:block></th:block></th:block>
 
-<!--/* The "Kategoria w PIM" cell: the PIM path (ancestors grey, leaf bold, the whole path in the title). Shared with the
-       product header of the prices and availability page. */-->
+<!--/* The PIM path (ancestors grey, leaf bold, the whole path in the title): the "Kategoria w PIM" cell, the line under the
+       product name below 1216 px and the product header of the prices and availability page. */-->
 <th:block th:fragment="categoryLines(line)">
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${ancestor})}"></th:block></span> › </th:block><strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span>
 </th:block>
 
-<!--/* "In the catalog": a check icon, not a link. Focusable like the margin icon, so
+<!--/* "In the catalog": a check mark, not a link. Focusable like the margin mark, so
        the tooltip opens from the keyboard and on tap; it and the accessible name list every place, one per line. Anchored
        to its right edge, so the bubble grows back over the table and never widens the page. */-->
-<span th:fragment="inCatalogIcon(line)" class="cl-inv-in-catalog cl-tooltip is-lines is-end" tabindex="0" role="img"
+<span th:fragment="inCatalogIcon(line)" class="cl-mark is-positive cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:with="text=#{inventory.browse.inCatalog.where(${line.inCatalogPlaces()})}"
       th:attr="data-tooltip=${text}, aria-label=${text}"><i class="fas fa-check-circle" aria-hidden="true"></i></span>
 
@@ -62,9 +62,9 @@
         <div class="cl-result-head">
             <h2 id="browse-title" tabindex="-1" th:text="#{inventory.browse.unknownCategory}"></h2>
         </div>
-        <div class="cl-inv-browse-empty">
-            <p th:text="#{inventory.browse.unknownCategory.text}"></p>
-            <a class="cl-button" th:href="${b.startHref()}" data-cl-list-nav th:text="#{inventory.browse.all}"></a>
+        <div class="cl-list-empty">
+            <span th:text="#{inventory.browse.unknownCategory.text}"></span>
+            <a class="cl-link-button" th:href="${b.startHref()}" data-cl-list-nav th:text="#{inventory.browse.all}"></a>
         </div>
     </section>
 
@@ -77,7 +77,7 @@
     </div>
 
     <th:block th:if="${b.ready() && !b.noSuppliers()}">
-        <section class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
+        <section class="cl-card cl-inv-browse-card is-toolbar-inset" aria-labelledby="browse-title">
             <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
             <div th:unless="${b.isStart()}" class="cl-result-head">
                 <h2 id="browse-title" tabindex="-1" th:if="${q.category() == null}" th:text="#{inventory.browse.textResults(${q.q2()})}"></h2>
@@ -169,11 +169,8 @@
                     </p>
                 </div>
 
-                <div th:if="${b.rows().isEmpty()}" class="cl-inv-browse-empty">
-                    <p th:text="#{inventory.browse.empty}"></p>
-                    <a th:unless="${b.chips().isEmpty()}" class="cl-button" th:href="${b.clearHref()}" data-cl-list-nav
-                       th:text="#{general.clear.filters}"></a>
-                </div>
+                <!--/* "Wyczyść filtry" stays in the toolbar right above, so the empty state is only its text */-->
+                <p th:if="${b.rows().isEmpty()}" class="cl-list-empty" th:text="#{inventory.browse.empty}"></p>
 
                 <th:block th:unless="${b.rows().isEmpty()}">
                     <th:block th:if="${b.admin()}">
@@ -208,7 +205,7 @@
                                 <a class="cl-table-sort" th:href="${b.sortHeaders().get('NAME').href()}" data-cl-list-nav
                                    th:text="#{inventory.browse.column.product}"></a>
                             </th>
-                            <th scope="col" th:text="#{inventory.browse.column.category}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{inventory.browse.column.category}"></th>
                             <th scope="col" class="is-numeric" th:attr="aria-sort=${b.sortHeaders().get('COST').ariaSort()}">
                                 <a class="cl-table-sort" th:href="${b.sortHeaders().get('COST').href()}" data-cl-list-nav
                                    th:text="#{inventory.browse.column.cost}"></a>
@@ -232,12 +229,14 @@
                             </td>
                             <th scope="row" class="cl-table-key">
                                 <a th:href="${row.detailHref()}" th:text="${row.name()}"></a>
-                                <span class="cl-table-sub"><span th:text="${row.brand()}"></span> · <span class="cl-table-code" th:text="${row.ean()}"></span> · <span th:text="${row.mfn()}"></span></span>
+                                <span class="cl-table-sub"><span th:text="${row.brand()}"></span> · <span class="cl-table-code" th:text="${row.ean()}"></span> · <span class="cl-table-code" th:text="${row.mfn()}"></span></span>
+                                <!--/* below 1216 px the PIM category column folds under the product (design system "Kolumna zwijana pod klucz") */-->
+                                <span class="cl-table-sub cl-narrow-only"><th:block th:replace="~{fragments/inventory-browse :: categoryLines(${row.category()})}"></th:block></span>
                             </th>
-                            <td class="cl-category-cell" th:attr="data-label=#{inventory.browse.column.category}">
+                            <td class="cl-category-cell is-secondary-column" th:attr="data-label=#{inventory.browse.column.category}">
                                 <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${row.category()})}"></th:block>
                             </td>
-                            <td class="is-numeric" th:attr="data-label=#{inventory.browse.column.cost}">
+                            <td class="is-numeric cl-inv-cost-cell" th:attr="data-label=#{inventory.browse.column.cost.card}">
                                 <span th:text="${#numbers.formatDecimal(row.cost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
                                 <span class="cl-table-sub"
                                       th:text="${row.deliveryKnown()} ? #{inventory.browse.cost.from(${row.costSupplier()})} : #{inventory.browse.cost.noDelivery(${row.costSupplier()})}"></span>
@@ -251,9 +250,8 @@
                             <!--/* td.is-empty hides the field only in card mode (< 720 px), where a bare label would remain */-->
                             <td class="cl-inv-catalog-cell" th:if="${b.admin()}" th:classappend="${row.inCatalog()} ? '' : 'is-empty'"
                                 th:attr="data-label=#{inventory.browse.column.inCatalog}">
-                                <th:block th:if="${row.inCatalog()}">
-                                    <span th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></span>
-                                </th:block>
+                                <span th:if="${row.inCatalog()}" class="cl-inv-catalog-mark"><span
+                                      th:replace="~{fragments/inventory-browse :: inCatalogIcon(${row.category()})}"></span></span>
                                 <span th:unless="${row.inCatalog()}" class="cl-visually-hidden" th:text="#{inventory.browse.notInCatalog}"></span>
                             </td>
                             <!--/* the row menu of the design system (details.cl-menu, menu.js); "Dodaj…" opens the add dialog through
@@ -264,7 +262,6 @@
                                     <ul class="cl-menu-list">
                                         <li><a class="cl-menu-item" th:href="${row.addHref()}" data-browse-add th:attr="data-ean=${row.ean()}"
                                                th:text="${row.inCatalog()} ? #{inventory.browse.addElsewhere} : #{inventory.browse.add}"></a></li>
-                                        <li><a class="cl-menu-item" th:href="${row.detailHref()}" th:text="#{inventory.browse.prices}"></a></li>
                                     </ul>
                                 </details>
                             </td>
@@ -291,7 +288,7 @@
 
 <!--/* One question: which manual catalog category. "Dalej" posts to /dashboard/inventory/browse/add, which forwards to
        the catalog's own review ("Uzupełnij dane") with these eans and returnTo. Drawn open only on the no-JS page. */-->
-<dialog th:fragment="addDialog" class="cl-dialog is-form cl-inv-add-dialog" id="inventory-add-dialog"
+<dialog th:fragment="addDialog" class="cl-dialog is-form" id="inventory-add-dialog"
         aria-labelledby="inventory-add-title" th:with="d=${addDialog}" th:attr="open=${addDialogOpen} ? 'open' : null">
     <form method="post" th:action="${d.action()}">
         <input type="hidden" name="eans" th:each="ean : ${d.eans()}" th:value="${ean}"/>
