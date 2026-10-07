@@ -84,7 +84,7 @@ class ImmediatePickupTest {
     }
 
     @Test
-    void noWindowsMeansHandingInAtAPointAndTheOwnerIsTold() {
+    void noWindowsFailThePickupSoItCanBeOrderedAgain() {
         // given
         when(pickupService.windows(store, "furgonetka", List.of("21480003"), 3)).thenReturn(List.of());
 
@@ -94,12 +94,13 @@ class ImmediatePickupTest {
         // then
         verify(owner).applyPickup(eq("store-1"), eq("rma-1"), eq(List.of("21480003")), any());
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), argThat(t -> "21480003".equals(t.externalId())),
-                argThat(p -> !p.isAwaiting() && !p.isPending()));
+                argThat(p -> p.isFailed() && p.isAwaiting()
+                        && ImmediatePickup.NO_WINDOWS_KEY.equals(p.getErrorKey())));
         verify(pickupService, never()).order(any(), any(), any(), any());
     }
 
     @Test
-    void handingInAtAPointChangesOnlyAPickupThatStillWaits() {
+    void noWindowsChangeOnlyAPickupThatStillWaits() {
         // given
         when(pickupService.windows(store, "furgonetka", List.of("21480003"), 3)).thenReturn(List.of());
 
@@ -111,7 +112,7 @@ class ImmediatePickupTest {
             @SuppressWarnings("unchecked")
             UnaryOperator<ShipmentPickup> c = (UnaryOperator<ShipmentPickup>) change;
             ShipmentPickup ordered = ShipmentPickup.awaiting().ordered("p-1");
-            return !c.apply(ShipmentPickup.awaiting()).isAwaiting() && c.apply(ordered) == ordered;
+            return c.apply(ShipmentPickup.awaiting()).isFailed() && c.apply(ordered) == ordered;
         }));
     }
 

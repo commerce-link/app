@@ -16,9 +16,10 @@ import java.util.Objects;
 /**
  * Orders the pickup right after creation for shipments nobody books a courier for by hand: a customer's return
  * (picked up at the customer's address) and a warehouse shipment. The first window the carrier offers within
- * {@link #DAYS_AHEAD} days is taken; no window means the package is handed in at a carrier point, and a courier the
- * carrier booked with the shipment is not ordered again. An ordered pickup is
- * settled by its check, like one ordered on the page; every other outcome is told to the owner here.
+ * {@link #DAYS_AHEAD} days is taken, and a courier the carrier booked with the shipment is not ordered again. No window
+ * fails the pickup instead of skipping it: the package needs a courier (a customer's return is collected at the
+ * customer's), so it stays orderable ("Zamów odbiór ponownie") and the store is told. An ordered pickup is settled by
+ * its check, like one ordered on the page; every other outcome is told to the owner here.
  */
 @Slf4j
 @Component
@@ -26,6 +27,8 @@ import java.util.Objects;
 public class ImmediatePickup {
 
     static final int DAYS_AHEAD = 3;
+    /** The reason of a pickup the carrier offered no window for: nobody comes until it is ordered again. */
+    static final String NO_WINDOWS_KEY = "shipping.pickup.immediate.no.windows";
 
     private final StoresRepository storesRepository;
     private final ShipmentPickupService pickupService;
@@ -54,7 +57,7 @@ public class ImmediatePickup {
             return;
         }
         if (windows.isEmpty()) {
-            settleAll(creation, owner, externalIds, created, ShipmentPickup.notRequired());
+            settleAll(creation, owner, externalIds, created, ShipmentPickup.awaiting().failedWithKey(NO_WINDOWS_KEY));
             return;
         }
         PickupWindow window = windows.get(0);

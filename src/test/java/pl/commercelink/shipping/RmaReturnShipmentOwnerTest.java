@@ -160,6 +160,32 @@ class RmaReturnShipmentOwnerTest {
     }
 
     @Test
+    void aReturnWithoutPickupWindowsGetsNoEmailAndTheStoreIsTold() {
+        // when
+        owner.onPickupSettled("store-1", "furgonetka", target(),
+                ShipmentPickup.awaiting().failedWithKey(ImmediatePickup.NO_WINDOWS_KEY));
+
+        // then
+        verify(emailClient, never()).send(any(), any(), any());
+        verify(notifications).publish(eq("store-1"), argThat((StoreNotification n) ->
+                n.getType() == StoreNotificationType.RMA_RETURN_PICKUP_FAILED && "rma-1:21480003".equals(n.getObject())));
+    }
+
+    @Test
+    void aReturnWithoutPickupWindowsGetsItsEmailOnceThePickupIsOrderedAgain() {
+        // given
+        owner.onPickupSettled("store-1", "furgonetka", target(),
+                ShipmentPickup.awaiting().failedWithKey(ImmediatePickup.NO_WINDOWS_KEY));
+
+        // when
+        owner.onPickupSettled("store-1", "furgonetka", target(), pending("pick-2").ordered("p-2"));
+        owner.onPickupSettled("store-1", "furgonetka", target(), pending("pick-2").ordered("p-2"));
+
+        // then
+        verify(emailClient, times(1)).send(eq("store-1"), eq(EmailNotificationType.RMA_CARRIER_CONFIRMATION), any());
+    }
+
+    @Test
     void aFailedCreationTellsTheStore() {
         // given
         Shipment placeholder = new Shipment(ShipmentType.Courier);
