@@ -58,7 +58,7 @@ public class ShipmentCreationService {
             creation = provider.createShipment(request, commandId);
         } catch (RuntimeException e) {
             if (ProviderErrors.isRefusal(e)) {
-                return refused(owner, check, ProviderErrors.describe(e));
+                return refused(owner, check, ProviderErrors.describe(e), ProviderErrors.isProviderAnswer(e));
             }
             log.warn("Creation command {} of {} {} in store {} has an unknown outcome; it stays PENDING and is checked",
                     commandId, check.getOwnerType(), check.getOwnerId(), check.getStoreId(), e);
@@ -69,7 +69,7 @@ public class ShipmentCreationService {
             recordExternalId(owner, check);
         }
         if (creation.status() == CommandStatus.FAILED) {
-            return refused(owner, check, creation.error());
+            return refused(owner, check, creation.error(), true);
         }
         return publishCheck(owner, check);
     }
@@ -85,7 +85,8 @@ public class ShipmentCreationService {
         }
     }
 
-    private ShipmentCreationStart refused(ShipmentOwner owner, ShipmentCreationCheckRequest check, String reason) {
+    private ShipmentCreationStart refused(ShipmentOwner owner, ShipmentCreationCheckRequest check, String reason,
+                                          boolean providerAnswer) {
         try {
             owner.refused(check, reason);
         } catch (RuntimeException e) {
@@ -93,7 +94,7 @@ public class ShipmentCreationService {
                     + "PENDING: marking it failed did not work", check.getCommandId(), check.getOwnerType(),
                     check.getOwnerId(), check.getStoreId(), check.getExternalId(), reason, e);
         }
-        return ShipmentCreationStart.refused(reason);
+        return ShipmentCreationStart.refused(reason, providerAnswer);
     }
 
     /**
@@ -121,6 +122,7 @@ public class ShipmentCreationService {
                     + "PENDING: marking it failed did not work", check.getCommandId(), check.getOwnerType(),
                     check.getOwnerId(), check.getStoreId(), check.getExternalId(), e);
         }
-        return ShipmentCreationStart.refused(messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale()));
+        return ShipmentCreationStart.refused(messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale()),
+                false);
     }
 }

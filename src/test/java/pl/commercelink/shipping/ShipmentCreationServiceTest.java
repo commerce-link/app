@@ -88,8 +88,38 @@ class ShipmentCreationServiceTest {
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("Nieprawidłowy kod pocztowy");
+        assertThat(start.providerAnswer()).isTrue();
         verify(owner).refused(any(), eq("Nieprawidłowy kod pocztowy"));
         verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void aRefusalBeforeTheProviderAnsweredIsNotTheProvidersAnswer() {
+        // given
+        when(provider.createShipment(eq(request), anyString()))
+                .thenThrow(new ShippingException("could not create the package: no parcels"));
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
+        assertThat(start.error()).isEqualTo("could not create the package: no parcels");
+        assertThat(start.providerAnswer()).isFalse();
+    }
+
+    @Test
+    void aFailureTheProviderReportsIsItsAnswer() {
+        // given
+        when(provider.createShipment(eq(request), anyString()))
+                .thenAnswer(i -> ShipmentCreation.failed(i.getArgument(1), null, "Nieprawidłowy kod pocztowy"));
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
+        assertThat(start.providerAnswer()).isTrue();
     }
 
     @Test

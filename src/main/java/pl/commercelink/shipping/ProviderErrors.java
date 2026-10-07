@@ -31,6 +31,11 @@ public final class ProviderErrors {
         return e instanceof ShippingException;
     }
 
+    /** The provider answered the command (an HTTP answer stands behind it), as opposed to the adapter's own words. */
+    public static boolean isProviderAnswer(RuntimeException e) {
+        return httpCause(e) != null;
+    }
+
     /** The provider's own messages (errors[].message of a JSON body), else the exception's message. */
     public static String describe(RuntimeException e) {
         HttpClientException http = httpCause(e);

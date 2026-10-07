@@ -102,8 +102,9 @@ public class RMAClientController {
             }
             boolean unconfirmed = start.outcome() == ShipmentCreationStart.Outcome.REFUSED && holdsReturn(storeId, rmaId);
             if (start.outcome() == ShipmentCreationStart.Outcome.REFUSED && !unconfirmed) {
-                // a clean refusal left nothing on the RMA: the customer corrects the data and submits again
-                String reason = start.error() != null ? start.error()
+                // a clean refusal left nothing on the RMA: the customer corrects the data and submits again; only the
+                // provider's own answer (e.g. a wrong postcode) is meant for the customer, the adapter's words are not
+                String reason = start.providerAnswer() && start.error() != null ? start.error()
                         : messageSource.getMessage("rma.shipment.creation.failed", null, locale);
                 redirectAttributes.addFlashAttribute("errorMessage", reason);
                 return "redirect:/store/" + storeId + "/client/rma/" + rmaId;

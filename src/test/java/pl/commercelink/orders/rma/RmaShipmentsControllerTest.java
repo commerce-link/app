@@ -159,7 +159,7 @@ class RmaShipmentsControllerTest {
         // given
         RMA rma = failedReturn();
         when(rmaShippingService.retryReturnShipment(any(), eq(store)))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null, false));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -181,7 +181,7 @@ class RmaShipmentsControllerTest {
         // given
         failedReturn();
         when(rmaShippingService.retryReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Zły kod pocztowy"));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Zły kod pocztowy", false));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -196,7 +196,7 @@ class RmaShipmentsControllerTest {
         // given
         failedReturn();
         when(rmaShippingService.retryReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.GONE, null));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.GONE, null, false));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when

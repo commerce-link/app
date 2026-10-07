@@ -53,7 +53,7 @@ class RMAClientControllerTest {
         when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
         when(storesRepository.findById("store-1")).thenReturn(new Store());
         when(rmaShippingService.startReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null, false));
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any())).thenAnswer(passThroughModifyAndSave());
         RMAReturnForm form = new RMAReturnForm();
         ShippingDetails address = ShippingDetails._default();
@@ -79,7 +79,7 @@ class RMAClientControllerTest {
         when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
         when(storesRepository.findById("store-1")).thenReturn(new Store());
         when(rmaShippingService.startReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null, false));
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any())).thenThrow(new RuntimeException("DynamoDB"));
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
         RMAReturnForm form = new RMAReturnForm();
@@ -131,7 +131,7 @@ class RMAClientControllerTest {
         RMA rma = approvedRma();
         rma.getShipments().add(unconfirmedReturn());
         when(rmaShippingService.startReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.GONE, null));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.GONE, null, false));
 
         // when
         RedirectAttributesModelMap redirect = submit("7");
@@ -149,7 +149,7 @@ class RMAClientControllerTest {
         when(rmaShippingService.startReturnShipment(any(), any())).thenAnswer(i -> {
             rma.getShipments().add(unconfirmedReturn());
             return new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED,
-                    "Furgonetka nie potwierdziła nadania — sprawdź przesyłkę w jej panelu");
+                    "Furgonetka nie potwierdziła nadania — sprawdź przesyłkę w jej panelu", false);
         });
 
         // when
@@ -168,7 +168,7 @@ class RMAClientControllerTest {
         // given
         RMA rma = approvedRma();
         when(rmaShippingService.startReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Nieprawidłowy kod pocztowy"));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Nieprawidłowy kod pocztowy", true));
 
         // when
         RedirectAttributesModelMap redirect = submit("7");
@@ -177,5 +177,20 @@ class RMAClientControllerTest {
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Nieprawidłowy kod pocztowy");
         assertThat(rma.getStatus()).isEqualTo(RMAStatus.Approved);
         verify(optimisticLockingExecutor, never()).modifyAndSave(any(), any(), any());
+    }
+
+    @Test
+    void aRefusalWithoutTheProvidersAnswerIsNotShownToTheCustomerInTechnicalWords() {
+        // given: the adapter gave up before the provider answered, in its own English words
+        RMA rma = approvedRma();
+        when(rmaShippingService.startReturnShipment(any(), any())).thenReturn(new ShipmentCreationStart(
+                ShipmentCreationStart.Outcome.REFUSED, "could not create the package: Read timed out", false));
+
+        // when
+        RedirectAttributesModelMap redirect = submit("7");
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("rma.shipment.creation.failed");
+        assertThat(rma.getStatus()).isEqualTo(RMAStatus.Approved);
     }
 }
