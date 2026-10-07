@@ -4454,11 +4454,11 @@ a.cl-link-button:hover {
     cursor: pointer;
 }
 
-.cl-page .cl-combobox-toggle i {
+.cl-page .cl-combobox-toggle :is(i, svg) {
     transition: transform .15s ease;
 }
 
-.cl-page .cl-combobox-toggle[aria-expanded="true"] i {
+.cl-page .cl-combobox-toggle[aria-expanded="true"] :is(i, svg) {
     transform: rotate(180deg);
 }
 
@@ -4534,7 +4534,7 @@ a.cl-link-button:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .cl-page .cl-combobox-toggle i {
+    .cl-page .cl-combobox-toggle :is(i, svg) {
         transition: none;
     }
 }
