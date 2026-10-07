@@ -8,6 +8,9 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.CatalogTargetOptions;
+import pl.commercelink.web.inventory.InventoryAddController;
+import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,6 +18,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -348,9 +353,9 @@ class ProductsAddTemplateTest {
     }
 
     /**
-     * From the inventory the category is the first field: matching categories first with how many products each holds,
-     * then the other manual ones by catalog; "Zmień kategorię" beside it reviews the rows again, and only it does -- no
-     * script sends the form when the select changes (WCAG 3.2.2).
+     * From the inventory the category is the first field: a combobox over the native select it enhances -- the matching
+     * categories first, noting how many products each holds, then the other manual ones by catalog. Without the script
+     * the select and "Zmień kategorię" beside it do the job; nothing is sent when the select changes (WCAG 3.2.2).
      */
     @Test
     void aReviewFromTheInventoryAsksForTheCategoryAboveTheRows() {
@@ -365,27 +370,57 @@ class ProductsAddTemplateTest {
 
         // then
         assertThat(html).doesNotContain("??", "Catalog category: Parts");
-        assertThat(html).containsPattern("<label class=\"cl-label\" for=\"review-target\">Catalog category</label>\\s*"
-                + "<div class=\"cl-input-row\">\\s*"
-                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" required\\s+"
-                + "aria-describedby=\"review-target-help\" autofocus=\"autofocus\">");
-        assertThat(html).containsPattern("</select>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate\\s+"
+        assertThat(html).contains("<label class=\"cl-label\" id=\"review-target-label\" for=\"review-target\">Catalog category</label>");
+        assertThat(html).containsPattern("<div class=\"cl-input-row\">\\s*<div class=\"cl-picker cl-combobox\" data-cl-combobox>\\s*"
+                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" data-combobox-select");
+        // the order of the processed attributes is not fixed
+        assertThat(tagsOf(html, "select").get(0)).contains("aria-describedby=\"review-target-help\"", "required=\"required\"",
+                "autofocus=\"autofocus\"");
+        assertThat(html).containsPattern("</div>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate data-review-change\\s+"
                 + "formaction=\"/dashboard/inventory/add\">Change category</button>\\s*</div>");
-        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">Parts › GPU \\(already in this category: 1 of 2\\)</option>");
-        assertThat(html).contains("<optgroup label=\"Match the PIM category\">",
-                "<optgroup label=\"Parts\">", "<option value=\"c1/k2\">Cases</option>",
+        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">Parts › GPU \\(already here: 1 of 2\\)</option>");
+        assertThat(html).contains("<optgroup label=\"Matching the PIM category &quot;Graphics cards&quot;\">",
+                "<optgroup label=\"Parts\">", "<option value=\"c1/k2\">Parts › Cases</option>",
+                "<span class=\"cl-picker-meta\">already here: 1 of 2</span>",
                 "PIM category: Graphics cards. Manual categories only",
                 "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
-                "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">");
-        assertThat(html).doesNotContain("review-target.js", "data-review-target", "Next</button>");
-        assertThat(html.indexOf("id=\"review-target\"")).isLessThan(html.indexOf("id=\"products\""));
+                "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">",
+                "<script src=\"/js/combobox.js\" defer></script>", "<script src=\"/js/review-target.js\" defer></script>",
+                "data-review-status=\"Category: Parts › GPU. Rows: 1.\"",
+                ">Add</button>");
+        assertThat(html).doesNotContain("Next</button>", "Add products");
+        assertThat(html.indexOf("id=\"review-target\"")).isLessThan(html.indexOf("id=\"review-area\""));
+        assertThat(html.indexOf("id=\"review-area\"")).isLessThan(html.indexOf("id=\"products\""));
         assertThat(html).contains("<div class=\"cl-stack is-wide\">");
     }
 
+    /** The rows, their notes and what the save needs about them form the part a pick in the combobox redraws. */
+    @Test
+    void theRedrawnPartCarriesTheRowsTheirNotesAndTheReviewedCategory() {
+        // given
+        Context context = inventoryContext(new CatalogTargetOptions(2,
+                List.of(new CatalogTargetOptions.Option("c1/k1", "Parts › GPU", 1)), List.of(), "c1/k1", false, null),
+                "c1/k1", Map.of());
+        context.setVariable("skippedExisting", List.of("5901234567891"));
+        context.setVariable("skippedBefore", 1);
+        context.setVariable("partial", true);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review-parts", Set.of("reviewArea"), context);
+
+        // then
+        assertThat(html).startsWith("<div class=\"cl-stack is-wide\" id=\"review-area\" data-review-area");
+        assertThat(html).contains("data-review-status=\"Category: Parts › GPU. Rows: 1. Skipped: 1.\"",
+                "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
+                "<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>",
+                "already in this category: 5901234567891", "id=\"products\"", ">Add</button>");
+        assertThat(html).doesNotContain("review-target-label", "data-cl-combobox", "name=\"ean\"", "name=\"reviewId\"", "hidden=\"hidden\"");
+    }
+
     /**
-     * Nothing matched: the field starts empty and says why; there are no rows to fill in until a category is chosen,
-     * and "Next" -- not a change of the select -- draws them.
+     * Nothing matched: the field starts empty and says why; there are no rows to fill in until a category is chosen.
+     * Without the script "Next" -- not a change of the select -- draws them; with it, a pick does.
      */
     @Test
     void anInventoryReviewWithoutACategoryHasOnlyTheFieldWithNextAsItsMainButton() {
@@ -401,14 +436,19 @@ class ProductsAddTemplateTest {
         String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
 
         // then
-        assertThat(html).doesNotContain("??", "id=\"products\"", "Add products", "reviewedTarget", "Match the PIM category",
-                "Change category", "cl-input-row", "review-target.js", "data-review-target");
+        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "Matching",
+                ">Change category</button>", "cl-input-row", "data-review-status=");
         assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a category…</option>");
+        assertThat(html).contains("<span data-combobox-label id=\"review-target-value\">Choose a category…</span>",
+                "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-combobox-value>",
+                "aria-required=\"true\"");
         assertThat(html).contains(
                 "This product&#39;s PIM category is not mapped to any catalog category.",
                 "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\">Cancel</a>",
                 "Complete the data: 1 products");
-        assertThat(html).contains("<button class=\"cl-button is-primary\" type=\"submit\" formnovalidate formaction=\"/dashboard/inventory/add\">Next</button>");
+        assertThat(html).containsPattern("<button class=\"cl-button is-primary\" type=\"submit\" formnovalidate data-review-next\\s+formaction=\"/dashboard/inventory/add\">Next</button>");
+        assertThat(tagsOf(html, "div").stream().filter(tag -> tag.contains("data-review-area")).findFirst().orElseThrow())
+                .contains("id=\"review-area\"", "hidden=\"hidden\"");
     }
 
     /** A category the store does not have (or no longer offers) is an error of the field, linked from the summary. */
@@ -425,7 +465,7 @@ class ProductsAddTemplateTest {
 
         // then
         assertThat(html).contains("<a href=\"#review-target\">No catalog category was chosen.</a>",
-                "aria-invalid=\"true\" aria-describedby=\"review-target-error review-target-help\"",
+                "aria-invalid=\"true\"", "aria-describedby=\"review-target-error review-target-help\"",
                 "<p class=\"cl-field-error\" id=\"review-target-error\">");
         assertThat(html).doesNotContain("autofocus");
     }
@@ -443,6 +483,14 @@ class ProductsAddTemplateTest {
         assertThat(html).contains("There is no manual category in your product catalogs.",
                 "<a href=\"/dashboard/catalogs\">Go to product catalogs</a>");
         assertThat(html).doesNotContain("<form", "review-target");
+    }
+
+    private static MessageSource englishMessages() {
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        messages.setFallbackToSystemLocale(false);
+        return messages;
     }
 
     private static Context inventoryContext(CatalogTargetOptions options, String selected, Map<String, String> errors) {
@@ -464,6 +512,7 @@ class ProductsAddTemplateTest {
         context.setVariable("skippedBefore", 0);
         context.setVariable("resetRows", 0);
         context.setVariable("targetOptions", options);
+        context.setVariable("targetGroups", InventoryAddController.targetGroups(options, englishMessages(), Locale.ENGLISH));
         context.setVariable("selectedTarget", selected);
         context.setVariable("eans", List.of("5901234567890", "5901234567891"));
         context.setVariable("reviewCount", options.count());

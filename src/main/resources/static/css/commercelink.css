@@ -4432,6 +4432,36 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* Single-choice combobox (fragments/combobox): the tree picker's skin with group headings and a note under an option. */
+/* A landscape phone keeps the search and some options on screen at once. */
+.cl-page .cl-combobox .cl-picker-list {
+    max-height: min(20rem, 50vh);
+}
+
+.cl-page .cl-picker-group + .cl-picker-group {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-picker-group-label {
+    padding: 8px 16px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+/* --cl-ink-2, not -3: the note stays legible on the tinted row under the mouse or the arrows. */
+.cl-page .cl-picker-meta {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* The combobox redraws the rows itself, so the "Zmień kategorię" next to it is hidden and the field takes the row. */
+.cl-page .cl-input-row:has(> .cl-button[hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 /* --- Catalog: One-field repeat rows (labels list): numbered lines instead of a fieldset per entry --- */
 .cl-page .cl-repeat-lines {
     display: grid;

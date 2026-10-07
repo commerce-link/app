@@ -153,6 +153,17 @@
                     path.textContent = option.shortPath;
                     return path;
                 },
+                // The count is a status line: written a moment after the typing stops, so a screen reader reads the
+                // result once instead of after every key.
+                announceLater: (() => {
+                    const timers = new WeakMap();
+                    return (element, text) => {
+                        clearTimeout(timers.get(element));
+                        timers.set(element, setTimeout(() => {
+                            element.textContent = text;
+                        }, 600));
+                    };
+                })(),
                 // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
                 menuOf: picker => picker.querySelector('.cl-picker-menu'),
                 closeMenu: closeMenu,
@@ -245,7 +256,7 @@
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
             const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
-            const {showActive, closeOnLeave} = window.pickerHelpers;
+            const {showActive, closeOnLeave, announceLater} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -330,7 +341,7 @@
                     empty.hidden = matches.length > 0;
 
                     appendChunk();
-                    counter.textContent = format(messages.count, matches.length, options.length);
+                    announceLater(counter, format(messages.count, matches.length, options.length));
                 };
 
                 list.addEventListener('scroll', () => {
@@ -421,7 +432,7 @@
                 removed: /*[[#{catalog.category.pim.removed}]]*/ ''
             };
             const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
-            const {showActive, closeOnLeave} = window.pickerHelpers;
+            const {showActive, closeOnLeave, announceLater} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -585,7 +596,7 @@
                     empty.hidden = matches.length > 0;
 
                     appendChunk();
-                    counter.textContent = format(messages.count, matches.length, entries.length);
+                    announceLater(counter, format(messages.count, matches.length, entries.length));
                 };
 
                 list.addEventListener('scroll', () => {

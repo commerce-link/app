@@ -42,6 +42,8 @@ import java.util.Optional;
 public class ProductsAddReview {
 
     public static final String VIEW = "catalog/products-add-review";
+    /** What a pick of another category on the inventory review redraws: the rows and their notes, not the page. */
+    public static final String REDRAWN_PART = "catalog/products-add-review-parts :: reviewArea";
 
     private final ProductRepository productRepository;
     private final Inventory inventory;

@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* One value out of grouped options, with a search: the single-choice sibling of the tree picker
+       (fragments/category-picker), on the same skin and the same combobox contract, for options that are known when the
+       page is drawn (value, label, an optional note, a group heading).
+
+       Progressive enhancement: the native select is the field without JavaScript (an optgroup per group, the note in
+       brackets). static/js/combobox.js shows the combobox instead, moves the name to the hidden input and fires
+       "cl:combobox-change" on the .cl-combobox when a choice is made with Enter or a click -- never on the arrows.
+
+       The label of the field carries the id fieldId + '-label' and points at the select (for = fieldId); the script
+       points it at the trigger. describedBy is the id list of the help and the error under the field, or null. */-->
+<div th:fragment="combobox(fieldId, name, groups, selected, placeholder, required, autofocus, describedBy, invalid)"
+     class="cl-picker cl-combobox" data-cl-combobox
+     th:with="labelledBy=${fieldId + '-label'},
+              selectedLabel=${T(pl.commercelink.web.dtos.ComboboxGroup).labelOf(groups, selected)}">
+    <select class="cl-select" th:id="${fieldId}" th:name="${name}" th:required="${required}" data-combobox-select
+            th:autofocus="${autofocus}" th:classappend="${invalid} ? 'is-invalid'"
+            th:attr="aria-invalid=${invalid} ? 'true' : null, aria-describedby=${describedBy}">
+        <option value="" th:selected="${selectedLabel == null}" th:text="${placeholder}"></option>
+        <optgroup th:each="group : ${groups}" th:label="${group.label()}">
+            <option th:each="option : ${group.options()}" th:value="${option.value()}"
+                    th:selected="${option.value() == selected}" th:text="${option.selectText()}"></option>
+        </optgroup>
+    </select>
+    <!--/* Disabled, so the form does not post it next to the select; the script enables it as it hides the select. */-->
+    <input type="hidden" th:name="${name}" th:value="${selectedLabel == null} ? '' : ${selected}" disabled data-combobox-value>
+
+    <div class="cl-picker-field" data-combobox hidden>
+        <button type="button" class="cl-picker-trigger" th:id="${fieldId + '-trigger'}" data-combobox-trigger
+                aria-haspopup="listbox" aria-expanded="false" th:classappend="${invalid} ? 'is-invalid'"
+                th:attr="aria-labelledby=${labelledBy + ' ' + fieldId + '-value'}, aria-describedby=${describedBy},
+                         data-combobox-placeholder=${placeholder}">
+            <span data-combobox-label th:id="${fieldId + '-value'}"
+                  th:text="${selectedLabel == null} ? ${placeholder} : ${selectedLabel}"></span>
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-angle-down"></i></span>
+        </button>
+        <div class="cl-picker-menu" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-combobox-search
+                   role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   th:attr="aria-controls=${fieldId + '-listbox'}, aria-labelledby=${labelledBy},
+                            aria-required=${required} ? 'true' : null"
+                   th:placeholder="#{picker.filter}">
+            <!--/* tabindex -1: Chromium would make the scrolling list a Tab stop of its own (see the tree picker). */-->
+            <div class="cl-picker-list" role="listbox" tabindex="-1" data-combobox-list
+                 th:id="${fieldId + '-listbox'}" th:attr="aria-labelledby=${labelledBy}">
+                <div class="cl-picker-group" role="group" th:each="group, groupStatus : ${groups}"
+                     th:attr="aria-labelledby=${fieldId + '-group-' + groupStatus.index}">
+                    <div class="cl-picker-group-label" role="presentation" th:id="${fieldId + '-group-' + groupStatus.index}"
+                         th:text="${group.label()}"></div>
+                    <div class="cl-picker-option" role="option" th:each="option, optionStatus : ${group.options()}"
+                         th:id="${fieldId + '-option-' + groupStatus.index + '-' + optionStatus.index}"
+                         th:classappend="${option.value() == selected} ? 'is-selected'"
+                         th:attr="aria-selected=${option.value() == selected}, data-value=${option.value()},
+                                  data-label=${option.label()}">
+                        <span class="cl-picker-option-text">
+                            <span class="cl-picker-name" th:text="${option.label()}"></span>
+                            <span class="cl-picker-meta" th:if="${option.meta() != null}" th:text="${option.meta()}"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <p class="cl-picker-empty" data-combobox-empty hidden th:text="#{picker.empty}"></p>
+            <!--/* Announced a moment after the typing stops, not on every key (the tree picker's chatty count, §7). */-->
+            <p class="cl-help cl-picker-count" role="status" data-combobox-count
+               th:attr="data-combobox-count-template=#{picker.count}"></p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

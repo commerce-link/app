@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -24,10 +25,13 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
+import pl.commercelink.web.dtos.ComboboxGroup;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.settings.SettingsPaths;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,8 +88,15 @@ public class InventoryAddController {
                          @RequestParam(required = false) String target,
                          @RequestParam(required = false) String returnTo,
                          @ModelAttribute("edited") ProductsBulkAddForm edited,
+                         @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                          Model model, Locale locale, RedirectAttributes redirectAttributes) {
-        return show(eans, target, edited, returnTo, null, model, locale, redirectAttributes);
+        String view = show(eans, target, edited, returnTo, null, model, locale, redirectAttributes);
+        // A pick in the combobox redraws only the rows; the field it came from stays as the operator left it.
+        if (SettingsPaths.isAsync(requestedWith) && ProductsAddReview.VIEW.equals(view)) {
+            model.addAttribute("partial", true);
+            return ProductsAddReview.REDRAWN_PART;
+        }
+        return view;
     }
 
     @GetMapping(SAVE_PATH)
@@ -212,6 +223,7 @@ public class InventoryAddController {
     private void inventoryAttributes(CatalogTargetOptions options, List<String> eans, String selected, String back,
                                      int skippedBefore, int resetRows, @Nullable String notice, Model model, Locale locale) {
         model.addAttribute("targetOptions", options);
+        model.addAttribute("targetGroups", targetGroups(options, messageSource, locale));
         model.addAttribute("selectedTarget", selected);
         model.addAttribute("eans", eans);
         model.addAttribute("reviewCount", options.count());
@@ -222,6 +234,41 @@ public class InventoryAddController {
         model.addAttribute("saveAction", SAVE_PATH);
         model.addAttribute("changeAction", PATH);
         model.addAttribute("targetNotice", notice == null ? null : messageSource.getMessage(notice, null, locale));
+    }
+
+    /**
+     * The options of the category combobox: the categories matching the products' PIM category first, then the other
+     * manual ones by catalog. Every option reads "Katalog › Kategoria", so the search finds it by either name.
+     */
+    public static List<ComboboxGroup> targetGroups(CatalogTargetOptions options, MessageSource messages, Locale locale) {
+        List<ComboboxGroup> groups = new ArrayList<>();
+        if (!options.unmatched()) {
+            String heading = options.pimCategoryName() == null
+                    ? messages.getMessage("catalog.products.review.target.matching", null, locale)
+                    : messages.getMessage("catalog.products.review.target.matching.named",
+                    new Object[]{options.pimCategoryName()}, locale);
+            groups.add(new ComboboxGroup(heading, options.matching().stream()
+                    .map(option -> new ComboboxGroup.Option(option.value(), option.label(),
+                            alreadyIn(option.alreadyIn(), options.count(), messages, locale)))
+                    .toList()));
+        }
+        for (CatalogTargetOptions.Group group : options.others()) {
+            groups.add(new ComboboxGroup(group.catalogName(), group.options().stream()
+                    .map(option -> new ComboboxGroup.Option(option.value(), group.catalogName() + " › " + option.label(),
+                            alreadyIn(option.alreadyIn(), options.count(), messages, locale)))
+                    .toList()));
+        }
+        return groups;
+    }
+
+    /** "już tu: x z n" -- only when the category holds some of the products already. */
+    private static String alreadyIn(int alreadyIn, int count, MessageSource messages, Locale locale) {
+        if (alreadyIn == 0) {
+            return null;
+        }
+        return count > 1
+                ? messages.getMessage("catalog.products.review.target.in.many", new Object[]{alreadyIn, count}, locale)
+                : messages.getMessage("catalog.products.review.target.in.one", null, locale);
     }
 
     private String noStore(String returnTo, Locale locale, RedirectAttributes redirectAttributes) {

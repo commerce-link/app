@@ -25,6 +25,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
+import pl.commercelink.web.dtos.ComboboxGroup;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
@@ -168,6 +169,85 @@ class InventoryAddControllerTest {
         verify(review).prepare(eq(STORE_ID), eq(cases), eq(List.of("5901000000001")), edited.capture());
         assertThat(edited.getValue().getReviewId()).isEqualTo("rid");
         assertThat(edited.getValue().getProducts()).extracting(ProductsBulkAddForm.Row::getName).containsExactly("Typed");
+    }
+
+    /** A pick in the combobox (fetch) gets the redrawn rows alone, with what was typed; the field stays on the page. */
+    @Test
+    void pickInTheComboboxGetsOnlyTheRedrawnRowsWithWhatWasTyped() throws Exception {
+        // given
+        ArgumentCaptor<ProductsBulkAddForm> edited = ArgumentCaptor.forClass(ProductsBulkAddForm.class);
+
+        // when
+        mvc.perform(post("/dashboard/inventory/add").header("X-Requested-With", "fetch")
+                        .param("ean", "5901000000001").param("target", "c-1/cat-case").param("reviewId", "rid")
+                        .param("products[0].sourceEan", "5901000000001").param("products[0].name", "Typed")
+                        .param("returnTo", LIST))
+                .andExpect(status().isOk())
+                .andExpect(view().name(ProductsAddReview.REDRAWN_PART))
+                .andExpect(model().attribute("partial", true))
+                .andExpect(model().attribute("selectedTarget", "c-1/cat-case"))
+                .andExpect(model().attribute("skippedBefore", 1))
+                .andExpect(model().attribute("returnTo", LIST));
+
+        // then
+        verify(review).prepare(eq(STORE_ID), eq(cases), eq(List.of("5901000000001")), edited.capture());
+        assertThat(edited.getValue().getReviewId()).isEqualTo("rid");
+        assertThat(edited.getValue().getProducts()).extracting(ProductsBulkAddForm.Row::getName).containsExactly("Typed");
+    }
+
+    /** "Zmień kategorię" without the script posts the same form without the header and gets the whole page. */
+    @Test
+    void changeWithoutTheScriptGetsTheWholePage() throws Exception {
+        // when / then
+        mvc.perform(post("/dashboard/inventory/add").param("ean", "5901000000001").param("target", "c-1/cat-case"))
+                .andExpect(status().isOk())
+                .andExpect(view().name(ProductsAddReview.VIEW))
+                .andExpect(model().attributeDoesNotExist("partial"));
+    }
+
+    /** A pick that no longer leads anywhere (no products left) is a redirect: the script then reloads the page. */
+    @Test
+    void pickWithoutProductsIsStillARedirect() throws Exception {
+        // when / then
+        mvc.perform(post("/dashboard/inventory/add").header("X-Requested-With", "fetch").param("target", "c-1/cat-case")
+                        .param("returnTo", LIST))
+                .andExpect(redirectedUrl(LIST));
+    }
+
+    /** The combobox reads "Katalog › Kategoria" in every group, notes "already here" only where some products are. */
+    @Test
+    void comboboxGroupsPutTheMatchingCategoriesFirstAndNameEveryOptionWithItsCatalog() {
+        // given
+        CatalogTargetOptions options = new CatalogTargetOptions(3,
+                List.of(new CatalogTargetOptions.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 2)),
+                List.of(new CatalogTargetOptions.Group("Podzespoły", List.of(new CatalogTargetOptions.Option("c-1/cat-case", "Obudowa", 0)))),
+                "c-1/cat-gpu", false, "Karty graficzne");
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0)
+                + (call.getArgument(1) == null ? "" : List.of((Object[]) call.getArgument(1)).toString()));
+
+        // when
+        List<ComboboxGroup> groups = InventoryAddController.targetGroups(options, messageSource, Locale.ENGLISH);
+
+        // then
+        assertThat(groups).containsExactly(
+                new ComboboxGroup("catalog.products.review.target.matching.named[Karty graficzne]", List.of(
+                        new ComboboxGroup.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", "catalog.products.review.target.in.many[2, 3]"))),
+                new ComboboxGroup("Podzespoły", List.of(new ComboboxGroup.Option("c-1/cat-case", "Podzespoły › Obudowa", null))));
+    }
+
+    @Test
+    void comboboxOfOneProductInMixedPimCategoriesSaysAlreadyHereWithoutCounts() {
+        // given
+        CatalogTargetOptions options = new CatalogTargetOptions(1,
+                List.of(new CatalogTargetOptions.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1)), List.of(),
+                "c-1/cat-gpu", false, null);
+
+        // when
+        List<ComboboxGroup> groups = InventoryAddController.targetGroups(options, messageSource, Locale.ENGLISH);
+
+        // then
+        assertThat(groups).containsExactly(new ComboboxGroup("catalog.products.review.target.matching", List.of(
+                new ComboboxGroup.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", "catalog.products.review.target.in.one"))));
     }
 
     /** The rows were checked against the category they were drawn for; another one may skip or reset some of them. */
