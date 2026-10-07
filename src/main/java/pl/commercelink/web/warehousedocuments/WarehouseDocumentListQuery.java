@@ -57,7 +57,7 @@ public record WarehouseDocumentListQuery(String path, DocumentKind kind, List<Do
         if (!oldType && params.keySet().stream().noneMatch(LEGACY::contains)) {
             return Optional.empty();
         }
-        return Optional.of(parse(path, params).withPage(1).href());
+        return Optional.of(parse(path, params).href());
     }
 
     public List<DocumentReason> allowedReasons() {

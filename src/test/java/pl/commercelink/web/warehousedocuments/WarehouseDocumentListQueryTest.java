@@ -78,6 +78,15 @@ class WarehouseDocumentListQueryTest {
     }
 
     @Test
+    void legacyRedirectKeepsTheRequestedPage() {
+        // when
+        Optional<String> target = WarehouseDocumentListQuery.legacyRedirect(PATH, params("type", "GoodsReceipt", "page", "2"));
+
+        // then
+        assertThat(target).contains(PATH + "?type=PZ&page=2");
+    }
+
+    @Test
     void searchModeTreatsSlashAsDocumentNumber() {
         // when / then
         assertThat(query("PZ/MAG1/2026").searchMode()).isEqualTo(SearchMode.NUMBER);
