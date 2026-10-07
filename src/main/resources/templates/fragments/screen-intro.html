@@ -194,7 +194,7 @@
             <h3 class="screen-intro-title" th:text="#{${'intro.' + screen + '.title'}}"></h3>
             <p class="screen-intro-lead" th:text="#{${'intro.' + screen + '.lead'}}"></p>
             <ul class="screen-intro-list">
-                <li th:each="i : ${#numbers.sequence(1, 4)}" th:if="${#messages.msgOrNull('intro.' + screen + '.item' + i) != null}">
+                <li th:each="i : ${#numbers.sequence(1, 5)}" th:if="${#messages.msgOrNull('intro.' + screen + '.item' + i) != null}">
                     <span class="screen-intro-check" aria-hidden="true"><i class="fas fa-check"></i></span>
                     <span>
                         <strong th:text="#{${'intro.' + screen + '.item' + i}}"></strong>
