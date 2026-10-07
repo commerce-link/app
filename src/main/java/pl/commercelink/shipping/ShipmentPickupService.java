@@ -107,21 +107,6 @@ public class ShipmentPickupService {
     public record PageWindows(List<PickupWindow> windows, Map<String, String> refused) {
     }
 
-    /**
-     * The operator gave the package to the carrier without "Zamów odbiór": it no longer waits for a courier and leaves
-     * the pickup list. False when it is not among the store's packages waiting for a courier any more.
-     */
-    public boolean handOver(String storeId, String externalId) {
-        PickupCandidate candidate = candidates.of(storeId).stream()
-                .filter(c -> c.externalId().equals(externalId))
-                .findFirst().orElse(null);
-        if (candidate == null) {
-            return false;
-        }
-        return owners.get(candidate.ownerType()).applyPickup(storeId, candidate.ownerId(), List.of(externalId),
-                p -> p.isAwaiting() ? ShipmentPickup.handedOver() : p) > 0;
-    }
-
     public PickupStart order(Store store, String provider, List<PickupTarget> targets, PickupWindow window) {
         ShippingProvider shippingProvider = providerFor(store, provider);
         if (shippingProvider == null) {

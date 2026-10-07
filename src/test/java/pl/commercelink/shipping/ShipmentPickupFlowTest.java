@@ -282,29 +282,22 @@ class ShipmentPickupFlowTest {
         Shipment customerReturn = awaiting("3", "C");
         customerReturn.setPickUpAddressId(null);
         rma.setShipments(new ArrayList<>(List.of(customerReturn)));
-        Shipment handedOver = awaiting("1", "A");
-        handedOver.setPickup(ShipmentPickup.handedOver());
-        orderShips(handedOver);
 
         // when / then
         assertThat(listed()).isEmpty();
     }
 
     @Test
-    void aStoreCannotOrderOrHandOverAnotherStoresPackage() {
+    void aStoreCannotOrderAnotherStoresPackage() {
         // given
         orderShips(awaiting("1", "A"));
         RedirectAttributesModelMap ordered = new RedirectAttributesModelMap();
-        RedirectAttributesModelMap handed = new RedirectAttributesModelMap();
 
         // when
         controller.order(GROUP, List.of("B-1"), WINDOW_VALUE, null, ordered, Locale.forLanguageTag("pl"));
-        controller.handedOver(GROUP, "B-1", null, handed, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(ordered.getFlashAttributes().get("errorMessage"))
-                .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
-        assertThat(handed.getFlashAttributes().get("pickupError"))
                 .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
         verify(provider, never()).orderPickup(anyList(), any(), anyString());
         verify(ordersRepository, never()).save(any());

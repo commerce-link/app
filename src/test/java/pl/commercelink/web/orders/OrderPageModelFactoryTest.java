@@ -2211,20 +2211,6 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void aPackageHandedOverOutsideCommerceLinkSaysSoAndOrdersNoPickup() {
-        // given
-        Shipment handedOver = furgonetkaPackage();
-        handedOver.setPickup(ShipmentPickup.handedOver());
-
-        // when
-        OrderPageModel.ShipmentsCard card = factory.build(orderWith(handedOver), List.of(), ADMIN, PL).shipments();
-
-        // then
-        assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.handed.over");
-        assertThat(card.pickupHref()).isNull();
-    }
-
-    @Test
     void aDeliveredPackageNoLongerWaitsForAPickup() {
         // given: the carrier delivered it, so somebody brought it to the carrier whatever the pickup state says
         Shipment delivered = furgonetkaPackage();

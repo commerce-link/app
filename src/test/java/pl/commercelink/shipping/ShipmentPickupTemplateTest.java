@@ -121,15 +121,14 @@ class ShipmentPickupTemplateTest {
     }
 
     @Test
-    void everyPackageCanBeMarkedAsHandedOverOutsideTheApp() {
+    void aPackageRowIsOnlyItsCheckboxWithNoActionBesideIt() {
         // when
         String html = render(page(List.of(), null, null));
 
-        // then: the button posts the order form to its own action, without the form's validation
-        assertThat(html).contains("<button type=\"submit\" class=\"cl-link-button\" formnovalidate name=\"handedOver\" "
-                        + "value=\"1\" formaction=\"/dashboard/shipping/pickups/handed-over\" "
-                        + "aria-label=\"Przekazana poza CommerceLink: 7a3f2c1e · TRK-1\">Przekazana poza CommerceLink</button>")
-                .contains("value=\"2\" formaction=\"/dashboard/shipping/pickups/handed-over\"");
+        // then: every package goes through CommerceLink (client decision 2026-10-07), nothing marks it handed over
+        assertThat(html).contains("<ul class=\"cl-check-list\">")
+                .doesNotContain("has-actions").doesNotContain("handed-over").doesNotContain("formaction")
+                .doesNotContain("Przekazana poza CommerceLink");
     }
 
     @Test

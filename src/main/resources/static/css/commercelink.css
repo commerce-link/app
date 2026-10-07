@@ -9924,17 +9924,8 @@ a.cl-link-button:hover {
     }
 }
 
-/* A check list whose rows carry a text action ("Przekazana poza CommerceLink" on the pickup page) and, when needed, a
-   note under the row: the action sits after the label and wraps under it on a narrow screen */
-.cl-page .cl-check-list.has-actions > li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 12px;
-}
-
+/* A note under a row of a check list: why the row cannot be ticked (a package the carrier refuses on the pickup page) */
 .cl-page .cl-check-list .cl-check-note {
-    flex-basis: 100%;
     margin: 0 0 4px 24px;
     font-size: 13px;
     color: var(--cl-ink-2);

@@ -335,32 +335,4 @@ class ShipmentPickupServiceTest {
         assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", List.of("1", "2"), 4))
                 .isInstanceOf(ShippingException.class);
     }
-
-    @Test
-    void aPackageHandedOverElsewhereStopsWaiting() {
-        // given
-        when(candidates.of("store-1")).thenReturn(List.of(candidate("1", "dpd", "order-1")));
-        ArgumentCaptor<UnaryOperator<ShipmentPickup>> change = ArgumentCaptor.forClass(UnaryOperator.class);
-        when(orderOwner.applyPickup(eq("store-1"), eq("order-1"), eq(List.of("1")), change.capture())).thenReturn(1);
-
-        // when
-        boolean handedOver = service.handOver("store-1", "1");
-
-        // then
-        assertThat(handedOver).isTrue();
-        assertThat(change.getValue().apply(ShipmentPickup.awaiting()).getStatus())
-                .isEqualTo(pl.commercelink.orders.ShipmentPickupStatus.HANDED_OVER);
-        ShipmentPickup ordering = pending("cmd-1");
-        assertThat(change.getValue().apply(ordering)).isSameAs(ordering);
-    }
-
-    @Test
-    void aPackageNotWaitingInTheStoreIsNotHandedOver() {
-        // given: an id of another store, or one whose pickup was ordered meanwhile
-        when(candidates.of("store-1")).thenReturn(List.of());
-
-        // when / then
-        assertThat(service.handOver("store-1", "foreign")).isFalse();
-        verify(orderOwner, never()).applyPickup(anyString(), anyString(), anyCollection(), any());
-    }
 }

@@ -250,7 +250,6 @@ public final class OrderLabels {
                     : new ShipmentState("order.shipments.state.pickup.ordered", new Object[]{
                     pickupDay(pickup.getDate(), locale), pickupHour(pickup.getFrom()), pickupHour(pickup.getTo())}, OK, false);
             case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);
-            case HANDED_OVER -> new ShipmentState("order.shipments.state.pickup.handed.over", NO_ARGS, NEUTRAL, false);
             case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getError(), pickup.getErrorKey());
         };
     }

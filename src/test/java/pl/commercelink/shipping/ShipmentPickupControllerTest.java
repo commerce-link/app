@@ -423,34 +423,6 @@ class ShipmentPickupControllerTest {
         assertThat(page.packages()).extracting(ShipmentPickupPage.PackageRow::orderable).containsExactly(true, false);
         assertThat(page.packages().get(1).refusal())
                 .isEqualTo("Przewoźnik nie poda terminu odbioru tej paczki: Przesyłka została już zamówiona. "
-                        + "Jeśli trafiła do niego inaczej, oznacz ją jako przekazaną.");
-    }
-
-    @Test
-    void aPackageHandedOverElsewhereLeavesTheListAndThePageReturnsToItsGroup() {
-        // given
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-        when(pickupService.handOver(STORE_ID, "2")).thenReturn(true);
-
-        // when
-        String view = controller.handedOver(DPD.key(), "2", BACK, redirect, POLISH);
-
-        // then
-        assertThat(view).startsWith("redirect:/dashboard/shipping/pickups/new?group=");
-        assertThat(redirect.getFlashAttributes().get("successMessage")).isEqualTo("Paczka nie czeka już na odbiór.");
-    }
-
-    @Test
-    void aPackageNoLongerWaitingCannotBeHandedOver() {
-        // given: e.g. another tab ordered its pickup meanwhile
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-        when(pickupService.handOver(STORE_ID, "2")).thenReturn(false);
-
-        // when
-        controller.handedOver(DPD.key(), "2", BACK, redirect, POLISH);
-
-        // then
-        assertThat(redirect.getFlashAttributes().get("pickupError"))
-                .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
+                        + "Zniknie z listy, gdy przewoźnik ją dostarczy.");
     }
 }

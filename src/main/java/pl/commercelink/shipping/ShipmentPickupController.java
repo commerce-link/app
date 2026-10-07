@@ -133,19 +133,6 @@ public class ShipmentPickupController {
         return "redirect:" + safeBack;
     }
 
-    /** The package went to the carrier without "Zamów odbiór" (a point, the provider's panel): it stops waiting. */
-    @PostMapping("/dashboard/shipping/pickups/handed-over")
-    public String handedOver(@RequestParam String group, @RequestParam String handedOver,
-                             @RequestParam(required = false) String back, RedirectAttributes redirectAttributes,
-                             Locale locale) {
-        if (pickupService.handOver(storeId(), handedOver)) {
-            redirectAttributes.addFlashAttribute("successMessage",
-                    messageSource.getMessage("shipping.pickup.handed.over.done", null, locale));
-            return redirect(PAGE, group, safeBack(back));
-        }
-        return backToPage(group, safeBack(back), "shipping.pickup.gone", redirectAttributes, locale);
-    }
-
     private String storeId() {
         return CustomSecurityContext.getStoreId();
     }
