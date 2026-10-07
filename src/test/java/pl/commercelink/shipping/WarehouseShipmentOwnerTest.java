@@ -225,20 +225,23 @@ class WarehouseShipmentOwnerTest {
     }
 
     @Test
-    void aFailedPickupTellsTheOperatorHowToSendTheParcelInBothLanguages() {
-        // given: a warehouse shipment is stored nowhere in the app, so its pickup cannot be ordered again here
+    void aFailedPickupTellsTheOperatorHowToSendTheParcelInBothLanguagesWithTheReasonLast() {
+        // given: a warehouse shipment is stored nowhere in the app, so its pickup cannot be ordered again here; the
+        // provider's reason may come without a closing period, so nothing may follow it
         ResourceBundleMessageSource bundles = new ResourceBundleMessageSource();
         bundles.setBasename("messages");
         bundles.setDefaultEncoding("UTF-8");
-        Object[] args = {"A", null, null, null, "Przewoźnik nie podał terminu", null};
+        Object[] args = {"A", null, null, null, "Brak kuriera w rejonie", null};
 
         // when
         String pl = bundles.getMessage("shipping.notification.warehouse.pickup.failed", args, Locale.forLanguageTag("pl"));
         String en = bundles.getMessage("shipping.notification.warehouse.pickup.failed", args, Locale.ENGLISH);
 
         // then
-        assertThat(pl).contains("A", "Przewoźnik nie podał terminu", "panelu integracji", "punkcie przewoźnika");
-        assertThat(en).contains("A", "Przewoźnik nie podał terminu", "integration's panel", "carrier point");
+        assertThat(pl).isEqualTo("Nie udało się zamówić odbioru przesyłki A. Zamów kuriera w panelu integracji wysyłki "
+                + "(np. Furgonetki) albo nadaj paczkę w punkcie przewoźnika. Powód: Brak kuriera w rejonie");
+        assertThat(en).isEqualTo("The pickup of shipment A could not be ordered. Book a courier in the shipping "
+                + "integration's panel (e.g. Furgonetka) or hand the parcel in at a carrier point. Reason: Brak kuriera w rejonie");
     }
 
     @Test

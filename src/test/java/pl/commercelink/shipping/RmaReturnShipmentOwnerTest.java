@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -261,5 +263,24 @@ class RmaReturnShipmentOwnerTest {
         // then
         verify(emailClient, times(1)).send(eq("store-1"), eq(EmailNotificationType.RMA_CARRIER_CONFIRMATION), any());
         verify(notifications, never()).publish(any(), any());
+    }
+
+    @Test
+    void aFailedReturnPickupPutsTheReasonLastSoItsOwnPeriodIsNotDoubledInBothLanguages() {
+        // given: our own reasons end with a period, the provider's may not
+        ResourceBundleMessageSource bundles = new ResourceBundleMessageSource();
+        bundles.setBasename("messages");
+        bundles.setDefaultEncoding("UTF-8");
+        Object[] args = {"rma-1", "Przewoźnik nie podał terminu odbioru w najbliższych dniach."};
+
+        // when
+        String pl = bundles.getMessage("shipping.notification.return.pickup.failed", args, Locale.forLanguageTag("pl"));
+        String en = bundles.getMessage("shipping.notification.return.pickup.failed", args, Locale.ENGLISH);
+
+        // then
+        assertThat(pl).isEqualTo("Nie udało się zamówić odbioru zwrotu RMA rma-1. Zamów go ponownie na stronie zgłoszenia. "
+                + "Powód: Przewoźnik nie podał terminu odbioru w najbliższych dniach.");
+        assertThat(en).isEqualTo("The pickup of the return of RMA rma-1 could not be ordered. Order it again on the RMA page. "
+                + "Reason: Przewoźnik nie podał terminu odbioru w najbliższych dniach.");
     }
 }
