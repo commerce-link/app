@@ -111,4 +111,24 @@ class WarehouseDocumentsListRenderingTest {
         assertThat(html).contains("cl-alert is-warn").contains("Dokumenty magazynowe są wyłączone")
                 .contains("href=\"/dashboard/store/warehouse\"");
     }
+
+    @Test
+    void phoneSortBarStatesTheNewestFirstOrderAboveTheTable() {
+        // when
+        String html = SettingsTemplateRenderer.render(RESULTS, Map.of("page", page(List.of(row()), List.of(), null, false)));
+
+        // then
+        assertThat(html).containsPattern("<nav class=\"cl-table-sortbar\"[^>]*>\\s*<span class=\"cl-eyebrow\">Od najnowszych</span>")
+                .containsPattern("(?s)cl-table-sortbar.*<table");
+    }
+
+    @Test
+    void documentNumberBreaksInACardAndStaysOnOneLineFromTheTableWidth() throws Exception {
+        // given
+        String css = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then
+        assertThat(css).containsPattern("\\.cl-table\\.is-documents \\.cl-doc-no \\{[^}]*overflow-wrap: anywhere[^}]*\\}")
+                .containsPattern("@media screen and \\(min-width: 720px\\) \\{\\s*\\.cl-page \\.cl-table\\.is-documents \\.cl-doc-no \\{ white-space: nowrap; \\}");
+    }
 }

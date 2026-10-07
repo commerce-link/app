@@ -34,6 +34,16 @@ class WarehouseDocumentDetailsRenderingTest {
     }
 
     @Test
+    void labelPrintScriptShowsACompactSpinnerWhileBusyAndFillsMessagesWithoutReplacePatterns() throws Exception {
+        // given
+        String js = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/js/label-print.js"));
+
+        // then
+        assertThat(js).contains("cl-spinner is-compact").contains("spinner.remove()")
+                .contains("template.split('{' + key + '}').join(value)").doesNotContain("template.replace(");
+    }
+
+    @Test
     void onePrinterIsOneButtonSeveralAreAMenu() {
         // when
         String one = SettingsTemplateRenderer.render(BODY, Map.of("page", receiptPage(printers(1))));

@@ -63,6 +63,19 @@ class ItemHistoryRenderingTest {
         assertThat(page.moves().get(0).date()).isEqualTo("—");
     }
 
+    @Test
+    void deliveryLinkEncodesTheDeliveryId() {
+        // given
+        MfnHistory history = new MfnHistory("X", List.of());
+
+        // when
+        ItemHistoryPage page = ItemHistoryPage.of(history, "del 1&x=2", "M", "/back", "Back",
+                TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(page.deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del+1%26x%3D2");
+    }
+
     private static ItemHistoryPage page(MfnHistory history) {
         return ItemHistoryPage.of(history, "del-1", "MZ-V9P2T0BW", "/dashboard/deliveries/details?deliveryId=del-1",
                 "Dostawa del-1", TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));

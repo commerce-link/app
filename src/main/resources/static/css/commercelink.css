@@ -6352,6 +6352,8 @@ a.cl-link-button:hover {
 
 .cl-page .cl-record-name > .cl-page-title {
     min-width: 0;
+    /* a long token (a document number with a store id) breaks instead of widening the page at 320 px */
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-record-meta {
@@ -9030,9 +9032,13 @@ a.cl-link-button:hover {
     }
 }
 
-/* Warehouse documents list (docs/active/warehouse-documents-redesign): the number never breaks, the direction icon
+/* Warehouse documents list (docs/active/warehouse-documents-redesign): the number never breaks in the table (from 720 px;
+   a card breaks it rather than run under the reason text), the direction icon
    repeats the type name in colour (the name carries the meaning) */
-.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-documents .cl-doc-no { white-space: nowrap; }
+}
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }
 

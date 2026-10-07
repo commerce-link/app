@@ -39,7 +39,7 @@ public class WarehouseDocumentListService {
                 q.kind() == null ? null : q.kind().type(), new LinkedHashSet<>(q.reasons()),
                 q.from() == null ? null : q.from().atStartOfDay(),
                 q.to() == null ? null : q.to().atTime(LocalTime.MAX),
-                q.numberFragment());
+                q.numberFragments());
         List<WarehouseDocument> found = search.search(criteria, q.productCode(), q.page(), WarehouseDocumentListQuery.PAGE_SIZE);
         boolean hasNext = found.size() > WarehouseDocumentListQuery.PAGE_SIZE;
         List<WarehouseDocument> shown = hasNext ? found.subList(0, WarehouseDocumentListQuery.PAGE_SIZE) : found;
@@ -53,11 +53,13 @@ public class WarehouseDocumentListService {
                 : Pagination.openEnded(q.page(), WarehouseDocumentListQuery.PAGE_SIZE, rows.size(), hasNext,
                 n -> q.withPage(n).href());
 
+        EmptyState emptyState = rows.isEmpty() ? emptyState(q, locale) : null;
+        // an empty list would read "Dokumenty: 0–0" to a screen reader; it hears the empty-state text instead
+        String resultsLine = emptyState != null ? emptyState.text()
+                : text(locale, "warehouse.documents.list.results", pagination.fromIndex() + 1, pagination.toIndex());
         return new WarehouseDocumentListPage(q, superAdmin, true, fragmentPath,
                 segments(q, locale), reasonOptions(q, locale), reasonSummary(q, locale), dates(q, locale),
-                chips(q, locale),
-                text(locale, "warehouse.documents.list.results", pagination.fromIndex() + (rows.isEmpty() ? 0 : 1), pagination.toIndex()),
-                rows, pagination, rows.isEmpty() ? emptyState(q, locale) : null, SETTINGS_HREF);
+                chips(q, locale), resultsLine, rows, pagination, emptyState, SETTINGS_HREF);
     }
 
     private List<SegmentLink> segments(WarehouseDocumentListQuery q, Locale locale) {

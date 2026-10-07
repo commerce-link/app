@@ -54,7 +54,7 @@ class WarehouseDocumentRepositoryTest {
         when(paginatedQueryList.iterator()).thenReturn(List.of(document("doc-1")).iterator());
         WarehouseDocumentCriteria criteria = new WarehouseDocumentCriteria("store-1", DocumentType.GoodsReceipt,
                 Set.of(DocumentReason.SupplierDelivery), LocalDateTime.of(2026, 8, 1, 0, 0),
-                LocalDateTime.of(2026, 8, 13, 23, 59), "PZ/MAG1");
+                LocalDateTime.of(2026, 8, 13, 23, 59), List.of("PZ/MAG1"));
 
         // when
         List<WarehouseDocument> result = warehouseDocumentRepository.search(criteria, 1, 25);
@@ -65,10 +65,28 @@ class WarehouseDocumentRepositoryTest {
         assertThat(query.getIndexName()).isEqualTo("CreatedAtIndex");
         assertThat(query.isScanIndexForward()).isFalse();
         assertThat(query.getKeyConditionExpression()).isEqualTo("storeId = :storeId AND createdAt BETWEEN :dateFrom AND :dateTo");
-        assertThat(query.getFilterExpression()).isEqualTo("#type = :type and #reason IN (:reason0) and contains(documentNo, :number)");
+        assertThat(query.getFilterExpression()).isEqualTo("#type = :type and #reason IN (:reason0) and (contains(documentNo, :number0))");
         assertThat(query.getExpressionAttributeNames()).containsEntry("#type", "type").containsEntry("#reason", "reason");
-        assertThat(query.getExpressionAttributeValues().get(":number").getS()).isEqualTo("PZ/MAG1");
+        assertThat(query.getExpressionAttributeValues().get(":number0").getS()).isEqualTo("PZ/MAG1");
         assertThat(query.getExpressionAttributeValues().get(":reason0").getS()).isEqualTo("SupplierDelivery");
+    }
+
+    @Test
+    @DisplayName("a number typed with lower-case letters is searched as typed or in capitals")
+    void numberFragmentVariantsAreOrConditions() {
+        // given
+        ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocument>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
+        when(dynamoDBMapper.query(eq(WarehouseDocument.class), queryCaptor.capture())).thenReturn(paginatedQueryList);
+
+        // when
+        warehouseDocumentRepository.findAllMatching(new WarehouseDocumentCriteria("store-1", null, Set.of(), null, null,
+                List.of("PZ/MAG-uma2dqukxr/2026/000214", "PZ/MAG-UMA2DQUKXR/2026/000214")));
+
+        // then
+        assertThat(queryCaptor.getValue().getFilterExpression())
+                .isEqualTo("(contains(documentNo, :number0) or contains(documentNo, :number1))");
+        assertThat(queryCaptor.getValue().getExpressionAttributeValues().get(":number0").getS()).isEqualTo("PZ/MAG-uma2dqukxr/2026/000214");
+        assertThat(queryCaptor.getValue().getExpressionAttributeValues().get(":number1").getS()).isEqualTo("PZ/MAG-UMA2DQUKXR/2026/000214");
     }
 
     @Test
@@ -80,7 +98,7 @@ class WarehouseDocumentRepositoryTest {
 
         // when
         warehouseDocumentRepository.findAllMatching(new WarehouseDocumentCriteria("store-1", null, Set.of(),
-                LocalDateTime.of(2026, 10, 1, 0, 0), null, null));
+                LocalDateTime.of(2026, 10, 1, 0, 0), null, List.of()));
 
         // then
         assertThat(queryCaptor.getValue().getKeyConditionExpression()).isEqualTo("storeId = :storeId AND createdAt >= :dateFrom");
@@ -97,7 +115,7 @@ class WarehouseDocumentRepositoryTest {
 
         // when
         warehouseDocumentRepository.findAllMatching(new WarehouseDocumentCriteria("store-1", null, Set.of(),
-                null, LocalDateTime.of(2026, 10, 7, 23, 59), null));
+                null, LocalDateTime.of(2026, 10, 7, 23, 59), List.of()));
 
         // then
         assertThat(queryCaptor.getValue().getKeyConditionExpression()).isEqualTo("storeId = :storeId AND createdAt <= :dateTo");
@@ -112,7 +130,7 @@ class WarehouseDocumentRepositoryTest {
         Set<DocumentReason> reasons = new LinkedHashSet<>(List.of(DocumentReason.Destruction, DocumentReason.Theft));
 
         // when
-        warehouseDocumentRepository.findAllMatching(new WarehouseDocumentCriteria("store-1", null, reasons, null, null, null));
+        warehouseDocumentRepository.findAllMatching(new WarehouseDocumentCriteria("store-1", null, reasons, null, null, List.of()));
 
         // then
         assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("#reason IN (:reason0, :reason1)");
@@ -129,7 +147,7 @@ class WarehouseDocumentRepositoryTest {
 
         // when
         List<WarehouseDocument> page2 = warehouseDocumentRepository.search(
-                new WarehouseDocumentCriteria("store-1", null, Set.of(), null, null, null), 2, 25);
+                new WarehouseDocumentCriteria("store-1", null, Set.of(), null, null, List.of()), 2, 25);
 
         // then
         assertThat(page2).hasSize(26);

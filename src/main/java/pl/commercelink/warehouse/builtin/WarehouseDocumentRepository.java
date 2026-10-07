@@ -70,9 +70,15 @@ class WarehouseDocumentRepository extends DynamoDbRepository<WarehouseDocument> 
             names.put("#reason", "reason");
             appendFilter(filterExpression, "#reason IN (" + String.join(", ", placeholders) + ")");
         }
-        if (criteria.numberFragment() != null) {
-            eav.put(":number", new AttributeValue().withS(criteria.numberFragment()));
-            appendFilter(filterExpression, "contains(documentNo, :number)");
+        if (!criteria.numberFragments().isEmpty()) {
+            List<String> alternatives = new ArrayList<>();
+            int i = 0;
+            for (String fragment : criteria.numberFragments()) {
+                String placeholder = ":number" + i++;
+                eav.put(placeholder, new AttributeValue().withS(fragment));
+                alternatives.add("contains(documentNo, " + placeholder + ")");
+            }
+            appendFilter(filterExpression, "(" + String.join(" or ", alternatives) + ")");
         }
 
         DynamoDBQueryExpression<WarehouseDocument> queryExpression = new DynamoDBQueryExpression<WarehouseDocument>()

@@ -81,6 +81,20 @@ class WarehouseDocumentListServiceTest {
     }
 
     @Test
+    void emptyListReadsTheEmptyStateToScreenReadersNotARangeOfZeros() {
+        // given
+        givenStore(true);
+        when(search.search(any(), any(), eq(1), eq(25))).thenReturn(List.of());
+        WarehouseDocumentListQuery q = new WarehouseDocumentListQuery(PATH, null, List.of(), null, null, null, 1);
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, q, PL);
+
+        // then
+        assertThat(page.resultsLine()).isEqualTo(page.emptyState().text()).doesNotContain("0–0");
+    }
+
+    @Test
     void pagePastTheEndOffersTheFirstPage() {
         // given
         givenStore(true);
@@ -113,7 +127,7 @@ class WarehouseDocumentListServiceTest {
         assertThat(criteria.getValue().reasons()).containsExactly(DocumentReason.Theft);
         assertThat(criteria.getValue().from()).isEqualTo(LocalDateTime.of(2026, 10, 1, 0, 0));
         assertThat(criteria.getValue().to()).isNull();
-        assertThat(criteria.getValue().numberFragment()).isEqualTo("RW/MAG1");
+        assertThat(criteria.getValue().numberFragments()).containsExactly("rw/mag1", "RW/MAG1");
         verify(search).search(any(), isNull(), eq(1), eq(25));
     }
 

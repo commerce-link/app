@@ -82,12 +82,21 @@ class WarehouseDocumentListQueryTest {
         // when / then
         assertThat(query("PZ/MAG1/2026").searchMode()).isEqualTo(SearchMode.NUMBER);
         assertThat(query("000214").searchMode()).isEqualTo(SearchMode.NUMBER);
-        assertThat(query("pz/mag1").numberFragment()).isEqualTo("PZ/MAG1");
+        assertThat(query("pz/mag1").numberFragments()).containsExactly("pz/mag1", "PZ/MAG1");
         assertThat(query("5901234123457").searchMode()).isEqualTo(SearchMode.PRODUCT);
         assertThat(query("910-006559").searchMode()).isEqualTo(SearchMode.PRODUCT);
         assertThat(query("910-006559").productCode()).isEqualTo("910-006559");
-        assertThat(query("910-006559").numberFragment()).isNull();
+        assertThat(query("910-006559").numberFragments()).isEmpty();
         assertThat(query(null).searchMode()).isNull();
+    }
+
+    @Test
+    void numberFragmentsKeepTheTypedFormAndItsUpperCaseOnlyWhenTheyDiffer() {
+        // when / then
+        assertThat(query("PZ/MAG-uma2dqukxr/2026/000214").numberFragments())
+                .containsExactly("PZ/MAG-uma2dqukxr/2026/000214", "PZ/MAG-UMA2DQUKXR/2026/000214");
+        assertThat(query("PZ/MAG1/2026").numberFragments()).containsExactly("PZ/MAG1/2026");
+        assertThat(query("000214").numberFragments()).containsExactly("000214");
     }
 
     @Test

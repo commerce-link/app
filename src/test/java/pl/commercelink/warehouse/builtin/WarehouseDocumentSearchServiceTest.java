@@ -33,7 +33,7 @@ class WarehouseDocumentSearchServiceTest {
     private WarehouseDocumentSearchService warehouseDocumentSearchService;
 
     private static final WarehouseDocumentCriteria CRITERIA =
-            new WarehouseDocumentCriteria("store-1", null, Set.of(), null, null, null);
+            new WarehouseDocumentCriteria("store-1", null, Set.of(), null, null, List.of());
 
     @Test
     @DisplayName("without a product code the service passes the page size through, the starter adds the extra row")

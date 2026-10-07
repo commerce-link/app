@@ -69,9 +69,13 @@ public record WarehouseDocumentListQuery(String path, DocumentKind kind, List<Do
         return q.contains("/") || NUMBER_DIGITS.matcher(q).matches() ? SearchMode.NUMBER : SearchMode.PRODUCT;
     }
 
-    /** Document numbers are stored in capitals ("PZ/MAG1/2026/000214"). */
-    public String numberFragment() {
-        return searchMode() == SearchMode.NUMBER ? q.toUpperCase(Locale.ROOT) : null;
+    /**
+     * The fragment as typed and in capitals: the sequence is stored in capitals ("PZ/MAG1/2026/000214") but a warehouse id
+     * may carry lower-case letters ("PZ/MAG-uma2dqukxr/..."), and the number search is case-sensitive.
+     */
+    public List<String> numberFragments() {
+        if (searchMode() != SearchMode.NUMBER) return List.of();
+        return List.of(q, q.toUpperCase(Locale.ROOT)).stream().distinct().toList();
     }
 
     public String productCode() {

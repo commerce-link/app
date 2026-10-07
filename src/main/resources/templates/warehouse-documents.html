@@ -127,6 +127,11 @@
                     <p class="cl-table-results cl-visually-hidden" role="status" th:text="${page.resultsLine()}"></p>
                 </div>
 
+                <!--/* Below 720 px the table turns into cards without a header row, so the order is stated on this bar. */-->
+                <nav class="cl-table-sortbar" th:unless="${page.isEmpty()}" th:attr="aria-label=#{warehouse.documents.list.sort.newest}">
+                    <span class="cl-eyebrow" th:text="#{warehouse.documents.list.sort.newest}"></span>
+                </nav>
+
                 <!--/* Newest first, always: the index is read one way only, so the header states the order without a toggle. */-->
                 <table class="cl-table is-orders is-documents" th:unless="${page.isEmpty()}">
                     <thead>

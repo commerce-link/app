@@ -10,7 +10,17 @@
     root.hidden = false;
 
     function message(template, key, value) {
-        return template.replace('{' + key + '}', value);
+        // split/join, not replace: a value with "$&" must not be read as a replacement pattern
+        return template.split('{' + key + '}').join(value);
+    }
+
+    // spec §3.4: a compact spinner inside the busy button, besides aria-busy
+    function showSpinner(trigger) {
+        var spinner = document.createElement('span');
+        spinner.className = 'cl-spinner is-compact';
+        spinner.setAttribute('aria-hidden', 'true');
+        trigger.appendChild(spinner);
+        return spinner;
     }
 
     // showToast is defined by the layout; do not fail the print flow when it is missing
@@ -66,6 +76,7 @@
             menu.open = false;
         }
         trigger.setAttribute('aria-busy', 'true');
+        var spinner = showSpinner(trigger);
         try {
             var zpl = await fetchZpl(printer);
             var device = await findDevice(trigger.getAttribute('data-device-id'));
@@ -75,6 +86,7 @@
             toast(message(root.getAttribute('data-failed'), 'error', e.message), 'danger');
         } finally {
             trigger.removeAttribute('aria-busy');
+            spinner.remove();
         }
     });
 })();

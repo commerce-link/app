@@ -52,6 +52,49 @@ class WarehouseDocumentPageMapperTest {
     }
 
     @Test
+    void itemsAreSortedByPolishAlphabetSoPlytaComesBeforeProcesor() {
+        // given
+        WarehouseDocumentItem cpu = item("Procesor");
+        WarehouseDocumentItem board = item("Płyta");
+        WarehouseDocumentItem cable = item("kabel");
+
+        // when
+        WarehouseDocumentPage page = mapper.page(receipt(), List.of(cpu, board, cable), List.of(), false);
+
+        // then
+        assertThat(page.items()).extracting(ItemLine::name).containsExactly("kabel", "Płyta", "Procesor");
+    }
+
+    @Test
+    void labelsAreCountedLikeThePrintServicePrintsThemAtLeastOnePerItem() {
+        // given
+        WarehouseDocumentItem noQty = item("Bez ilości");
+        noQty.setQty(0);
+        WarehouseDocumentItem three = item("Trzy");
+        three.setQty(3);
+
+        // when
+        WarehouseDocumentPage page = mapper.page(receipt(), List.of(noQty, three), List.of(printer()), false);
+
+        // then
+        assertThat(page.print().labelsText()).isEqualTo("Etykiety: 4");
+        assertThat(page.summaryQty()).isEqualTo("Razem: 3 szt.");
+    }
+
+    @Test
+    void deliveryLinkEncodesTheDeliveryId() {
+        // given
+        WarehouseDocument d = receipt();
+        d.setDeliveryId("del 1&x=2");
+
+        // when
+        WarehouseDocumentPage page = mapper.page(d, items(), List.of(), false);
+
+        // then
+        assertThat(page.links().get(0).href()).isEqualTo("/dashboard/deliveries/details?deliveryId=del+1%26x%3D2");
+    }
+
+    @Test
     void itemWithDeliveryAndMfnLinksItsHistoryForAStoreUserOnly() {
         // when
         WarehouseDocumentPage user = mapper.page(receipt(), items(), List.of(), false);
@@ -206,6 +249,13 @@ class WarehouseDocumentPageMapperTest {
         cable.setUnitPrice(49.0);
         cable.setDeliveryId("del-1");
         return List.of(ssd, cable);
+    }
+
+    private static WarehouseDocumentItem item(String name) {
+        WarehouseDocumentItem i = new WarehouseDocumentItem();
+        i.setName(name);
+        i.setQty(1);
+        return i;
     }
 
     private static Printer printer() {

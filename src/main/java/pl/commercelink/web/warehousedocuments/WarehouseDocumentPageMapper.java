@@ -9,6 +9,7 @@ import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.warehousedocuments.WarehouseDocumentPage.*;
 
 import java.net.URLEncoder;
+import java.text.Collator;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -31,11 +32,16 @@ public class WarehouseDocumentPageMapper {
     public WarehouseDocumentPage page(WarehouseDocument d, List<WarehouseDocumentItem> items,
                                       List<pl.commercelink.stores.Printer> printers, boolean superAdmin) {
         DocumentKind kind = DocumentKind.of(d.getType()).orElse(null);
+        // a collator, not CASE_INSENSITIVE_ORDER: "Płyta" belongs before "Procesor" in Polish
+        Collator collator = Collator.getInstance(locale);
+        collator.setStrength(Collator.SECONDARY);
         List<WarehouseDocumentItem> sorted = items.stream()
-                .sorted(Comparator.comparing((WarehouseDocumentItem i) -> StringUtils.defaultString(i.getName()), String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing((WarehouseDocumentItem i) -> StringUtils.defaultString(i.getName()), collator))
                 .toList();
         double total = sorted.stream().mapToDouble(i -> i.getQty() * i.getUnitPrice()).sum();
         int qty = sorted.stream().mapToInt(WarehouseDocumentItem::getQty).sum();
+        // WarehouseLabelPrintService prints max(1, qty) labels per item
+        int labels = sorted.stream().mapToInt(i -> Math.max(1, i.getQty())).sum();
         List<ItemLine> lines = sorted.stream().map(i -> line(d, i, superAdmin)).toList();
         boolean internal = d.getCounterparty() == null && StringUtils.isAllBlank(d.getDeliveryId(), d.getOrderId(), d.getRmaId());
 
@@ -60,7 +66,7 @@ public class WarehouseDocumentPageMapper {
                 counterparty(d.getCounterparty()),
                 deliveryAddress(d.getDeliveryAddress()),
                 issuer(d.getIssuer()),
-                print(d, qty, printers, superAdmin));
+                print(d, labels, printers, superAdmin));
     }
 
     private String typeName(WarehouseDocument d, DocumentKind kind) {
@@ -83,7 +89,7 @@ public class WarehouseDocumentPageMapper {
         List<Link> links = new ArrayList<>();
         if (StringUtils.isNotBlank(d.getDeliveryId())) {
             links.add(new Link(text("warehouse.documents.details.link.delivery"), DocumentRowMapper.shortId(d.getDeliveryId()),
-                    DeliveryLinks.of(superAdmin, d.getStoreId(), d.getDeliveryId()).details(), false));
+                    DeliveryLinks.of(superAdmin, d.getStoreId(), encode(d.getDeliveryId())).details(), false));
         }
         // the order and RMA screens refuse a super admin, so he gets the number as text
         if (StringUtils.isNotBlank(d.getOrderId())) {

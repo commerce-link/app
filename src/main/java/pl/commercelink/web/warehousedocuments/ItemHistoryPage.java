@@ -5,12 +5,14 @@ import pl.commercelink.warehouse.builtin.MfnHistory;
 import pl.commercelink.warehouse.builtin.MfnHistoryRow;
 import pl.commercelink.web.deliveries.details.DeliveryLinks;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** The history of one item in one delivery (spec §2.6), every text resolved. */
+/** The history of one item in one delivery (spec §4), every text resolved. */
 public record ItemHistoryPage(String backHref, String backLabel, String productName, String mfn, String deliveryShortId,
                               String deliveryHref, String movesTitle, List<Move> moves, String summary, String emptyText) {
 
@@ -35,7 +37,7 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
                     messages.getMessage("warehouse.documents.history.after", new Object[]{r.stockAfter()}, locale)));
         }
         return new ItemHistoryPage(backHref, backLabel, history.productName(), mfn, DocumentRowMapper.shortId(deliveryId),
-                DeliveryLinks.of(false, null, deliveryId).details(),
+                DeliveryLinks.of(false, null, URLEncoder.encode(deliveryId, StandardCharsets.UTF_8)).details(),
                 messages.getMessage("warehouse.documents.history.moves", new Object[]{moves.size()}, locale), moves,
                 moves.isEmpty() ? null : messages.getMessage("warehouse.documents.history.summary", new Object[]{in, out, after}, locale),
                 moves.isEmpty() ? messages.getMessage("warehouse.documents.history.empty", null, locale) : null);
