@@ -4,11 +4,12 @@
 
 <!--/* The part of the inventory review a new category redraws: the notes on the rows, what the save needs to know about
        them and the rows themselves. The controller sends it alone to a pick in the category picker (X-Requested-With: fetch);
-       data-review-status is what the page announces once it is in. */-->
+       data-review-status is what the page announces once it is in; data-review-title is the page title for the redrawn rows. */-->
 <div th:fragment="reviewArea" class="cl-stack is-wide" id="review-area" data-review-area
      th:with="hasNotes=${targetNotice != null or (resetRows != null and resetRows > 0) or !skipped.isEmpty() or !skippedExisting.isEmpty()}"
      th:hidden="${category == null and !hasNotes and (partial == null or errors.isEmpty())}"
-     th:attr="data-review-status=${category == null} ? null : (#{catalog.products.review.target.status(${catalog.name + ' › ' + category.name}, ${form.products.size()})}
+     th:attr="data-review-title=${category == null} ? null : #{catalog.products.review.title(${form.products.size()})},
+              data-review-status=${category == null} ? null : (#{catalog.products.review.target.status(${catalog.name + ' › ' + category.name}, ${form.products.size()})}
               + (${skipped.size() + skippedExisting.size() > 0} ? ' ' + #{catalog.products.review.target.status.skipped(${skipped.size() + skippedExisting.size()})} : ''))">
     <!--/* The category the rows below were checked against; a save for another one reviews it first. */-->
     <input type="hidden" name="reviewedTarget" th:if="${category != null}" th:value="${selectedTarget}"/>

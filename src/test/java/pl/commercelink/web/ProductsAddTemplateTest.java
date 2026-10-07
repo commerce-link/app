@@ -413,7 +413,8 @@ class ProductsAddTemplateTest {
 
         // then
         assertThat(html).startsWith("<div class=\"cl-stack is-wide\" id=\"review-area\" data-review-area");
-        assertThat(html).contains("data-review-status=\"Category: Parts › GPU. Rows: 1. Skipped: 1.\"",
+        assertThat(html).contains("data-review-title=\"Complete the data: 1 products\"",
+                "data-review-status=\"Category: Parts › GPU. Rows: 1. Skipped: 1.\"",
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
                 "<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>",
                 "already in this category: 5901234567891", "id=\"products\"", ">Add</button>");

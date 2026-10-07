@@ -73,6 +73,11 @@
             if (footer && redrawn.querySelector('#products')) {
                 footer.hidden = true;
             }
+            // The title carries the only product count on the page ("Dodaj" has none), so it follows the rows.
+            var title = document.querySelector('h1.cl-page-title');
+            if (title && redrawn.dataset.reviewTitle) {
+                title.textContent = redrawn.dataset.reviewTitle;
+            }
             if (status && redrawn.dataset.reviewStatus) {
                 status.textContent = redrawn.dataset.reviewStatus;
             }
