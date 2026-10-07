@@ -20,7 +20,7 @@
             <div th:if="${product.mfn() != null}"><dt th:text="#{inventory.code.mfn}"></dt><dd th:text="${product.mfn()}"></dd></div>
         </dl>
         <div class="cl-inv-product-category" th:if="${productCategory != null}">
-            <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${productCategory})}"></th:block>
+            <th:block th:replace="~{fragments/inventory-browse :: categoryPath(${productCategory})}"></th:block>
         </div>
     </div>
     <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>

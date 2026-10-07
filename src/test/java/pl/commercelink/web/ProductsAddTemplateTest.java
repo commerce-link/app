@@ -276,6 +276,31 @@ class ProductsAddTemplateTest {
         assertThat(html).containsPattern("<input type=\"hidden\" name=\"reviewId\" value=\"[0-9a-f-]{36}\"");
     }
 
+    /** The back link is named after the page it leads to: the supplier assortment when the review came from there. */
+    @Test
+    void aReviewFromTheInventoryNamesItsBackLinkAfterTheInventory() {
+        // given
+        Context context = baseContext();
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+        context.setVariable("errors", Map.of());
+        context.setVariable("errorSummary", Map.of());
+        context.setVariable("labels", List.of());
+        context.setVariable("pricingGroups", List.of("Default"));
+        context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of());
+        context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
+        context.setVariable("backHref", "/dashboard/inventory?cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?cat=11");
+
+        // when
+        String fromInventory = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+        String fromCatalog = renderedReview(Map.of());
+
+        // then
+        assertThat(fromInventory).contains("Supplier assortment");
+        assertThat(fromCatalog).doesNotContain("Supplier assortment");
+    }
+
     /** From the inventory the save needs the way back and the count of products the review already dropped. */
     @Test
     void aReviewFromTheInventoryPostsTheWayBackAndWhatItSkipped() {

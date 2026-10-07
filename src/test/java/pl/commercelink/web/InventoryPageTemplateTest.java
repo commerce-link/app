@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import org.thymeleaf.context.Context;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,6 +29,24 @@ class InventoryPageTemplateTest {
         // when / then
         assertThat(prices()).contains("th:action=\"@{/dashboard/inventory/prices}\"").contains("method=\"get\"")
                 .contains("name=\"q\"").doesNotContain("th:disabled");
+    }
+
+    @Test
+    void newSearchWithoutJavaScriptKeepsTheWayBackToTheBrowseList() {
+        // given
+        Context context = new Context();
+        context.setVariable("query", "5900000000126");
+        context.setVariable("backToBrowse", "/dashboard/inventory?cat=11&page=2");
+        String form = "<form th:replace=\"~{inventory-prices :: form[data-inventory-search]}\"></form>";
+
+        // when
+        String opened = EnglishFragmentTemplateEngine.create().process(form, context);
+        context.removeVariable("backToBrowse");
+        String direct = EnglishFragmentTemplateEngine.create().process(form, context);
+
+        // then
+        assertThat(opened).contains("<input type=\"hidden\" name=\"from\" value=\"/dashboard/inventory?cat=11&amp;page=2\">");
+        assertThat(direct).contains("name=\"q\"").doesNotContain("name=\"from\"");
     }
 
     @Test

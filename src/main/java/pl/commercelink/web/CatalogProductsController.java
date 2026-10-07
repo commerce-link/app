@@ -352,7 +352,8 @@ public class CatalogProductsController {
         if (backToInventory.isPresent()) {
             // The review already dropped what the category had then; only the inventory notice reports that number.
             int skipped = form.getProducts().size() - added + reviewSkipped(skippedBefore);
-            redirectAttributes.addFlashAttribute(InventoryBrowseController.NOTICE_FLASH, messageSource.getMessage("inventory.browse.added",
+            redirectAttributes.addFlashAttribute(InventoryBrowseController.NOTICE_FLASH, messageSource.getMessage(
+                    skipped > 0 ? "inventory.browse.added.skipped" : "inventory.browse.added",
                     new Object[]{category.getName(), added, skipped}, locale));
             redirectAttributes.addFlashAttribute("inventoryNoticeHref", CatalogPaths.category(catalogId, categoryId));
             return "redirect:" + backToInventory.get();

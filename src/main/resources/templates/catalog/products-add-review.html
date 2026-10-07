@@ -6,7 +6,7 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, #{catalog.products.add.title},
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${returnTo != null} ? #{inventory.title} : #{catalog.products.add.title},
                     #{catalog.products.review.title(${form.products.size()})}, #{catalog.products.review.lead}, null)}"></div>
 
             <div th:replace="~{fragments/settings-form :: errorSummaryText('review-errors', ${errorSummary})}"></div>

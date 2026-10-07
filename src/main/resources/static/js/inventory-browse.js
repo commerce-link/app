@@ -1,14 +1,12 @@
 /*
- * "Dodaj do katalogu" on the inventory page: fetches the dialog for one product (row menu item, product header) or for
- * the checked rows (selection row), and opens it. Without JavaScript the item's link goes to ?open=add, where the server
- * draws the same dialog open; when the fetch fails the script falls back to that link.
+ * "Dodaj do katalogu" on the inventory page: fetches the dialog for one product (row menu item) or for the checked rows
+ * (selection row) and opens it as a modal. Closing (Cancel, Escape, the backdrop) and the guard against a second "Dalej"
+ * come from dialog.js; this script only gives the focus back to the opener. Without JavaScript the item's link goes to
+ * ?open=add, where the server draws the same dialog open; when the fetch fails a single product falls back to that link
+ * and the checked rows get an error above the selection row.
  */
 (function () {
     'use strict';
-
-    function root() {
-        return document.querySelector('[data-browse-root]');
-    }
 
     function checkedEans() {
         return Array.from(document.querySelectorAll('[data-cl-select-row]:checked'))
@@ -16,16 +14,23 @@
             .filter(Boolean);
     }
 
+    // "Inna kategoria": its list shows only while the option is chosen and must then have a choice, so "Dalej" cannot
+    // send an empty one. Without the script the list stays visible and the server answers an empty choice.
     function wireOther(dialog) {
-        var select = dialog.querySelector('[data-browse-other-select]');
         var radio = dialog.querySelector('[data-browse-other-radio]');
-        if (select && radio) {
-            select.addEventListener('change', function () {
-                if (select.value) {
-                    radio.checked = true;
-                }
-            });
+        var select = dialog.querySelector('[data-browse-other-select]');
+        var field = dialog.querySelector('[data-browse-other-field]');
+        if (!radio || !select || !field) {
+            return;
         }
+        function sync() {
+            field.hidden = !radio.checked;
+            select.required = radio.checked;
+        }
+        dialog.querySelectorAll('input[name="target"]').forEach(function (option) {
+            option.addEventListener('change', sync);
+        });
+        sync();
     }
 
     // The page the dialog returns to after saving, without the parameters that would open the dialog again.
@@ -37,8 +42,18 @@
         return window.location.pathname + (query ? '?' + query : '');
     }
 
+    function showAddError(show) {
+        var alert = document.querySelector('[data-browse-add-error]');
+        var text = alert && alert.querySelector('[data-message]');
+        if (!alert || !text) {
+            return;
+        }
+        alert.hidden = !show;
+        text.textContent = show ? text.getAttribute('data-message') : '';
+    }
+
     async function openDialog(eans, opener) {
-        var page = root();
+        var page = document.querySelector('[data-browse-dialog-url]');
         var slot = document.querySelector('[data-browse-dialog-slot]');
         if (!page || !slot || !eans.length || !page.dataset.browseDialogUrl) {
             return false;
@@ -85,12 +100,6 @@
     }
 
     document.addEventListener('click', function (event) {
-        var close = event.target.closest('[data-browse-dialog-close]');
-        if (close && close.closest('dialog')) {
-            event.preventDefault();
-            close.closest('dialog').close();
-            return;
-        }
         // A modified or non-primary click keeps the browser's own behaviour, e.g. the row link in a new tab.
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
             return;
@@ -109,9 +118,15 @@
             opener = menu.querySelector(':scope > summary');
         }
         var eans = single ? [single.dataset.ean] : checkedEans();
+        showAddError(false);
         openDialog(eans, opener).then(function (opened) {
-            if (!opened && single && single.href) {
+            if (opened) {
+                return;
+            }
+            if (single && single.href) {
                 window.location.href = single.href;
+            } else if (bulk && eans.length) {
+                showAddError(true);
             }
         });
     });
@@ -161,13 +176,11 @@
     document.addEventListener('DOMContentLoaded', startPolling);
     document.addEventListener('cl-list:swapped', startPolling);
 
-    // The no-JS page (?open=add) draws the dialog open but not modal; with the script running make it a real modal.
+    // The no-JS page (?open=add) draws the dialog open; dialog.js turns it into a modal, this wires its other category.
     document.addEventListener('DOMContentLoaded', function () {
-        var drawn = document.querySelector('[data-browse-dialog-slot] dialog[open]');
-        if (drawn && typeof drawn.showModal === 'function') {
+        var drawn = document.querySelector('[data-browse-dialog-slot] dialog');
+        if (drawn) {
             wireOther(drawn);
-            drawn.close();
-            drawn.showModal();
         }
     });
 })();

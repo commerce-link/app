@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.TemplateEngine;
+import org.springframework.util.LinkedMultiValueMap;
 import org.thymeleaf.context.Context;
 import pl.commercelink.inventory.BrowseCriteria;
 import pl.commercelink.web.inventory.AddToCatalogDialog;
@@ -197,7 +198,8 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("<div class=\"cl-alert is-bad\" role=\"alert\">", "Could not load the PIM categories.",
+        assertThat(html).contains("<div class=\"cl-alert is-bad\" role=\"alert\" tabindex=\"-1\" data-cl-list-focus>",
+                "Could not load the PIM categories.",
                 "<a href=\"/dashboard/inventory?cat=11\">Try again</a>");
         assertThat(html).doesNotContain("There are no products to browse yet", "cl-table", "data-browse-building");
     }
@@ -210,7 +212,7 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??", "999999999");
-        assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\">There is no such category</h2>",
+        assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>There is no such category</h2>",
                 "The PIM has no such category, or it was removed.",
                 "<a class=\"cl-link-button\" href=\"/dashboard/inventory\" data-cl-list-nav>All categories</a>");
         assertThat(html).contains("<div class=\"cl-list-empty\">");
@@ -298,7 +300,7 @@ class InventoryBrowseRenderingTest {
 
         // then
         assertThat(start).contains("<span class=\"cl-tile-title\">" + broken + "</span>");
-        assertThat(category).contains("<h2 id=\"browse-title\" tabindex=\"-1\">" + broken + "</h2>",
+        assertThat(category).contains("<h2 id=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>" + broken + "</h2>",
                 "<span aria-current=\"page\">" + broken + "</span>", "<span>" + broken + "</span>");
         assertThat(start + category).doesNotContain("Profesjonalne/konsumenckie");
     }
@@ -387,6 +389,150 @@ class InventoryBrowseRenderingTest {
         String escaped = "In catalog:\n&lt;b&gt;x&lt;/b&gt; › &lt;b&gt;Fan&lt;/b&gt;\nSklep › &lt;b&gt;y&lt;/b&gt;";
         assertThat(html).contains("data-tooltip=\"" + escaped + "\"", "aria-label=\"" + escaped + "\"");
         assertThat(html).doesNotContain("<b>x</b>", "<b>y</b>", "<b>Fan</b>");
+    }
+
+    @Test
+    void focusAfterASwapGoesToTheVisibleHeadingOfACategory() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)), List.of())));
+
+        // then
+        assertThat(html.split("data-cl-list-focus", -1)).hasSize(2);
+        assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>Karty graficzne</h2>");
+        assertThat(html).containsPattern("<p class=\"cl-table-results cl-visually-hidden\" role=\"status\">");
+    }
+
+    @Test
+    void focusAfterASwapGoesToTheVisibleHeadingOfAPhrase() {
+        // given
+        BrowsePage results = page(true, false, BrowseQuery.parse(new LinkedMultiValueMap<>(Map.of("q2", List.of("kabel")))),
+                List.of(row(false)), List.of());
+
+        // when
+        String html = engine.process(RESULTS, context(results));
+
+        // then
+        assertThat(html.split("data-cl-list-focus", -1)).hasSize(2);
+        assertThat(html).contains("<h2 id=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>Results for &quot;kabel&quot;</h2>");
+    }
+
+    @Test
+    void startHoldsTheToolbarAndTheTilesUnderOneHiddenCategoriesHeadingAndFocusesTheTileList() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start(), List.of())));
+
+        // then
+        assertThat(html).contains("<section aria-labelledby=\"browse-title\">",
+                "<h2 id=\"browse-title\" class=\"cl-visually-hidden\">Main categories</h2>",
+                "<section class=\"cl-card cl-inv-browse-card is-toolbar-inset\">",
+                "<ul class=\"cl-tile-grid is-categories\" aria-labelledby=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>");
+        assertThat(html.split("data-cl-list-focus", -1)).hasSize(2);
+        assertThat(html.indexOf("cl-tile-grid")).isLessThan(html.lastIndexOf("</section>"));
+        assertThat(html).doesNotContain(">Supplier assortment</h2>");
+    }
+
+    @Test
+    void checkedRowsCarryAHiddenErrorForADialogThatCannotBeFetched() {
+        // when
+        String html = engine.process(RESULTS, context(page(true, false, BrowseQuery.start().withCategory("11"), List.of(row(false)))));
+
+        // then
+        assertThat(html).contains("<div class=\"cl-alert is-bad cl-inv-browse-error\" hidden data-browse-add-error>",
+                "<p role=\"alert\" data-message=\"Could not open the add dialog. Try again.\"></p>");
+    }
+
+    @Test
+    void dialogForOneProductSaysItFitsWithoutCountsAndOnlySaysItIsThereWhenItIs() {
+        // given
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
+                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, false),
+                        new AddToCatalogDialog.Option("c-2/cat-b2b", "Sklep B2B › Karty", 0, true)),
+                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+
+        // when
+        String html = engine.process(DIALOG, dialogContext(dialog));
+
+        // then
+        assertThat(html).contains("Fits the product&#39;s PIM category. Already in this category.",
+                "Fits the product&#39;s PIM category.</span>");
+        assertThat(html).doesNotContain(" of 1", "products&#39;");
+    }
+
+    @Test
+    void dialogForSeveralProductsCountsThoseAlreadyInEachCategory() {
+        // given
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, "Karty graficzne",
+                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 1, true)),
+                List.of(), false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+
+        // when
+        String html = engine.process(DIALOG, dialogContext(dialog));
+
+        // then
+        assertThat(html).contains("Fits the products&#39; PIM category. Already in this category: 1 of 2.");
+    }
+
+    @Test
+    void otherCategoryOfAMatchedDialogIsAListUnderItsOptionNamedByItWithOneHelpText() {
+        // given
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne",
+                List.of(new AddToCatalogDialog.Option("c-1/cat-gpu", "Podzespoły › Karta graficzna", 0, true)),
+                List.of(new AddToCatalogDialog.Group("Podzespoły", List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false)))),
+                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+
+        // when
+        String html = engine.process(DIALOG, dialogContext(dialog));
+
+        // then
+        String fieldset = html.substring(html.indexOf("<fieldset"), html.indexOf("</fieldset>"));
+        assertThat(fieldset).contains("<span class=\"cl-choice-title\" id=\"inventory-add-other-title\">Another category</span>",
+                "<div class=\"cl-choice-reveal cl-field\" data-browse-other-field>",
+                "aria-labelledby=\"inventory-add-other-title\" aria-describedby=\"inventory-add-other-help\"",
+                "Manual categories only");
+        assertThat(html).doesNotContain("for=\"inventory-add-other\"", "Choose from all manual categories", "required");
+    }
+
+    @Test
+    void unmatchedDialogRequiresACategoryAndSpeaksOfTheChosenOne() {
+        // given
+        List<AddToCatalogDialog.Group> others = List.of(new AddToCatalogDialog.Group("Podzespoły",
+                List.of(new AddToCatalogDialog.Option("c-1/cat-case", "Obudowa", 0, false))));
+        AddToCatalogDialog one = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", null, List.of(), others, false,
+                "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+        AddToCatalogDialog two = new AddToCatalogDialog(List.of("5901000000001", "5901000000002"), null, null, List.of(), others,
+                false, "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+
+        // when
+        String single = engine.process(DIALOG, dialogContext(one));
+        String many = engine.process(DIALOG, dialogContext(two));
+
+        // then
+        assertThat(single).contains("This product&#39;s PIM category is not mapped", "the chosen category&#39;s suggestions");
+        assertThat(many).contains("The PIM categories of these products are not mapped", "They will be added");
+        assertThat(single + many).doesNotContain("that category&#39;s", "data-browse-other-field");
+        assertThat(single).containsPattern("<select class=\"cl-select\" id=\"inventory-add-other\" name=\"otherTarget\" required");
+        assertThat(single).contains("<label class=\"cl-label\" for=\"inventory-add-other\">Catalog category</label>");
+    }
+
+    @Test
+    void dialogCancelIsTheSharedDialogCloserWithTheWayBackWithoutJavaScript() {
+        // given
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", null, List.of(), List.of(), true,
+                "/dashboard/inventory?cat=11", AddToCatalogDialog.ACTION);
+
+        // when
+        String html = engine.process(DIALOG, dialogContext(dialog));
+
+        // then
+        assertThat(html).contains("<dialog class=\"cl-dialog is-form\"",
+                "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\" data-cl-dialog-close>Cancel</a>");
+        assertThat(html).doesNotContain("data-browse-dialog-close");
+    }
+
+    private static Context dialogContext(AddToCatalogDialog dialog) {
+        Context context = new Context();
+        context.setVariable("addDialog", dialog);
+        return context;
     }
 
     private static Context context(BrowsePage page) {

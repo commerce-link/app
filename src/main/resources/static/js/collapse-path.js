@@ -27,7 +27,6 @@
         button.className = 'cl-path-more';
         button.textContent = '…';
         button.setAttribute('aria-label', path.getAttribute('data-cl-collapse-label') || '');
-        button.setAttribute('aria-expanded', 'false');
         var separator = document.createElement('span');
         separator.setAttribute('aria-hidden', 'true');
         separator.textContent = ' › ';
@@ -37,7 +36,6 @@
         path.setAttribute('data-cl-collapsed', '');
 
         button.addEventListener('click', function () {
-            button.setAttribute('aria-expanded', 'true');
             middle.forEach(function (crumb) { crumb.hidden = false; });
             more.remove();
             var first = middle[0].querySelector('a, [aria-current]');

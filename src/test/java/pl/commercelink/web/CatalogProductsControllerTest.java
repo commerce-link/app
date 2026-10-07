@@ -677,7 +677,27 @@ class CatalogProductsControllerTest {
                 .andExpect(redirectedUrl(returnTo));
 
         // then
-        verify(messageSource).getMessage(eq("inventory.browse.added"), eq(new Object[]{"GPU", 1, 2}), any(Locale.class));
+        verify(messageSource).getMessage(eq("inventory.browse.added.skipped"), eq(new Object[]{"GPU", 1, 2}), any(Locale.class));
+    }
+
+    /** "Pominięto (już były): 0" is noise: with nothing skipped the notice only says what was added. */
+    @Test
+    void saveToTheInventoryWithNothingSkippedLeavesTheSkippedPartOut() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added"), eq(new Object[]{"GPU", 1, 0}), any(Locale.class));
     }
 
     /** A validation round renders the review again; the count must survive it, and a forged one is not believed. */

@@ -13,9 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InventoryBrowseScriptContractTest {
 
     private static final List<String> HOOKS = List.of(
-            "data-browse-root", "data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add",
-            "data-browse-add-selected", "data-browse-dialog-close", "data-browse-other-select",
-            "data-browse-other-radio", "data-cl-select-row", "data-browse-building");
+            "data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add", "data-browse-add-selected",
+            "data-browse-add-error", "data-browse-other-select", "data-browse-other-radio", "data-browse-other-field",
+            "data-cl-select-row", "data-browse-building");
 
     @Test
     void everyHookOfTheScriptExistsInTheTemplates() throws IOException {
@@ -39,8 +39,8 @@ class InventoryBrowseScriptContractTest {
         String prices = read("src/main/resources/templates/inventory-prices.html");
 
         // then
-        assertThat(browse).contains("@{/js/inventory-browse.js}", "data-browse-root");
-        assertThat(prices).doesNotContain("inventory-browse.js", "data-browse-root", "data-browse-dialog-url",
+        assertThat(browse).contains("@{/js/inventory-browse.js}", "data-browse-dialog-url");
+        assertThat(prices).doesNotContain("inventory-browse.js", "data-browse-dialog-url",
                 "data-browse-dialog-slot", "data-browse-add");
     }
 
@@ -56,7 +56,8 @@ class InventoryBrowseScriptContractTest {
         assertThat(page).doesNotContain("th:if=\"${canManageSuppliers}\" th:src=\"@{/js/collapse-path.js}\"");
         assertThat(fragment).contains("data-cl-collapse-path", "data-cl-collapse-label=#{inventory.browse.path.expand}", "data-cl-path-crumb");
         assertThat(script).contains("[data-cl-collapse-path]", "[data-cl-path-crumb]", "data-cl-collapse-label", "MAX_VISIBLE = 4",
-                "crumbs.slice(1, crumbs.length - 2)", "aria-expanded", "'cl-list:swapped'", "'DOMContentLoaded'", ".focus()");
+                "crumbs.slice(1, crumbs.length - 2)", "'cl-list:swapped'", "'DOMContentLoaded'", ".focus()");
+        assertThat(script).as("the button disappears once clicked, so an expanded state is never heard").doesNotContain("aria-expanded");
     }
 
     @Test
@@ -66,6 +67,18 @@ class InventoryBrowseScriptContractTest {
 
         // then
         assertThat(page).contains("@{/js/menu.js}");
+    }
+
+    @Test
+    void addDialogClosesAndGuardsItsSubmitThroughTheSharedDialogScript() throws IOException {
+        // when
+        String page = read("src/main/resources/templates/inventory.html");
+        String script = read("src/main/resources/static/js/inventory-browse.js");
+
+        // then
+        assertThat(page).contains("th:src=\"@{/js/dialog.js}\"");
+        assertThat(page.indexOf("/js/dialog.js")).isLessThan(page.indexOf("/js/inventory-browse.js"));
+        assertThat(script).doesNotContain("dialog-close", "pointerdown");
     }
 
     @Test

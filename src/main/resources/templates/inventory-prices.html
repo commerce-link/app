@@ -33,6 +33,8 @@
             <h2 class="cl-visually-hidden" id="inventory-search-title" th:text="#{inventory.search.title}"></h2>
             <form class="cl-inv-search" th:action="@{/dashboard/inventory/prices}" method="get" role="search"
                   data-inventory-search novalidate>
+                <!--/* a new search keeps the way back without JavaScript too (inventory.js carries it in the address) */-->
+                <input type="hidden" name="from" th:if="${backToBrowse != null}" th:value="${backToBrowse}">
                 <label class="cl-visually-hidden" for="inventory-q" th:text="#{inventory.search.label}"></label>
                 <div class="cl-inv-search-field">
                     <span class="cl-inv-search-icon" aria-hidden="true"><i class="fas fa-search"></i></span>

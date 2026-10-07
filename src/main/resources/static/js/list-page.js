@@ -2,8 +2,8 @@
 // data-cl-list-results, data-cl-list-path (the list page itself) and data-cl-list-fragment (the endpoint returning only
 // that block). A click on a chip, menu item, sort header or page link (a[data-cl-list-nav]), a submit of a
 // form[data-cl-list-form], and a tick in an auto-submitting menu fetch the fragment with the same query and swap the
-// results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the count line so
-// a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
+// results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the element marked
+// data-cl-list-focus in the fresh block, or else on the count line, so a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
 // box) so several values can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
 // once. Emptying the search field refreshes the list too, and an open menu (a native <details>) closes on a click
 // outside or Escape. After each swap the fresh block dispatches `cl-list:swapped` (bubbles), so other scripts can set
@@ -71,8 +71,13 @@
                     if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); }
                     return;
                 }
-                var results = root.querySelector('.cl-table-results');
-                if (results) { results.setAttribute('tabindex', '-1'); results.focus({ preventScroll: true }); }
+                // A block can name its own focus target (a visible heading) instead of the count line, which some
+                // lists only show to screen readers; a focused invisible element leaves no focus indicator.
+                var focusTarget = root.querySelector('[data-cl-list-focus]') || root.querySelector('.cl-table-results');
+                if (focusTarget) {
+                    if (!focusTarget.hasAttribute('tabindex')) { focusTarget.setAttribute('tabindex', '-1'); }
+                    focusTarget.focus({ preventScroll: true });
+                }
                 if (window.scrollY > root.getBoundingClientRect().top + window.scrollY) { root.scrollIntoView({ block: 'start' }); }
             })
             .catch(function () { window.location.assign(href); });

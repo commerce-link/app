@@ -18,9 +18,9 @@
        split with limit -1 keeps leading, trailing and doubled slashes. */-->
 <th:block th:fragment="breakable(text)"><th:block th:if="${text != null}"><th:block th:each="part, it : ${text.split('/', -1)}"><th:block th:text="${part}"></th:block><th:block th:unless="${it.last}">/<wbr></th:block></th:block></th:block></th:block>
 
-<!--/* The PIM path (ancestors grey, leaf bold, the whole path in the title): the "Kategoria w PIM" cell, the line under the
+<!--/* The PIM path (ancestors grey, leaf bold, the whole path in the title): the "Kategoria PIM" cell, the line under the
        product name below 1216 px and the product header of the prices and availability page. */-->
-<th:block th:fragment="categoryLines(line)">
+<th:block th:fragment="categoryPath(line)">
     <span class="cl-category-path" th:title="${line.pimFullPath()}"><span class="cl-visually-hidden" th:text="#{inventory.browse.pimCategory}"></span> <th:block th:each="ancestor : ${line.pimAncestors()}"><span><th:block th:replace="~{fragments/inventory-browse :: breakable(${ancestor})}"></th:block></span> › </th:block><strong><th:block th:replace="~{fragments/inventory-browse :: breakable(${line.pimLeaf()})}"></th:block></strong></span>
 </th:block>
 
@@ -50,7 +50,7 @@
         </ul>
     </section>
 
-    <div th:if="${b.pimUnavailable()}" class="cl-alert is-bad" role="alert">
+    <div th:if="${b.pimUnavailable()}" class="cl-alert is-bad" role="alert" tabindex="-1" data-cl-list-focus>
         <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
         <div class="cl-alert-text"><p>
             <span th:text="#{inventory.browse.pimUnavailable}"></span>
@@ -60,7 +60,7 @@
 
     <section th:if="${b.unknownCategory()}" class="cl-card cl-inv-browse-card" aria-labelledby="browse-title">
         <div class="cl-result-head">
-            <h2 id="browse-title" tabindex="-1" th:text="#{inventory.browse.unknownCategory}"></h2>
+            <h2 id="browse-title" tabindex="-1" data-cl-list-focus th:text="#{inventory.browse.unknownCategory}"></h2>
         </div>
         <div class="cl-list-empty">
             <span th:text="#{inventory.browse.unknownCategory.text}"></span>
@@ -76,12 +76,14 @@
         </p></div>
     </div>
 
-    <th:block th:if="${b.ready() && !b.noSuppliers()}">
-        <section class="cl-card cl-inv-browse-card is-toolbar-inset" aria-labelledby="browse-title">
-            <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.title}"></h2>
+    <!--/* list-page.js moves the focus to [data-cl-list-focus] after a swap: the visible heading of the result, or the tile
+           list at the start, whose section holds the toolbar card and the tiles under one heading */-->
+    <section th:if="${b.ready() && !b.noSuppliers()}" aria-labelledby="browse-title" th:remove="${b.isStart()} ? none : tag">
+        <h2 th:if="${b.isStart()}" id="browse-title" class="cl-visually-hidden" th:text="#{inventory.browse.tiles.label}"></h2>
+        <section class="cl-card cl-inv-browse-card is-toolbar-inset" th:attr="aria-labelledby=${b.isStart()} ? null : 'browse-title'">
             <div th:unless="${b.isStart()}" class="cl-result-head">
-                <h2 id="browse-title" tabindex="-1" th:if="${q.category() == null}" th:text="#{inventory.browse.textResults(${q.q2()})}"></h2>
-                <h2 id="browse-title" tabindex="-1" th:unless="${q.category() == null}"
+                <h2 id="browse-title" tabindex="-1" data-cl-list-focus th:if="${q.category() == null}" th:text="#{inventory.browse.textResults(${q.q2()})}"></h2>
+                <h2 id="browse-title" tabindex="-1" data-cl-list-focus th:unless="${q.category() == null}"
                     th:with="title=${b.title() != null} ? ${b.title()} : #{inventory.browse.unassigned}"><th:block th:replace="~{fragments/inventory-browse :: breakable(${title})}"></th:block></h2>
                 <p class="cl-result-path" th:if="${q.category() == null}" th:text="#{inventory.browse.textEverywhere}"></p>
                 <!--/* every crumb with the separator after it, so collapse-path.js can hide the middle of a long path (first
@@ -175,6 +177,11 @@
                 <th:block th:unless="${b.rows().isEmpty()}">
                     <th:block th:if="${b.admin()}">
                         <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                        <!--/* inventory-browse.js shows it when the dialog for the checked rows cannot be fetched */-->
+                        <div class="cl-alert is-bad cl-inv-browse-error" hidden data-browse-add-error>
+                            <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
+                            <div class="cl-alert-text"><p role="alert" th:attr="data-message=#{inventory.browse.add.error}"></p></div>
+                        </div>
                         <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
                             <label class="cl-check-target">
                                 <input type="checkbox" class="cl-check-input" data-cl-select-all autocomplete="off"
@@ -231,10 +238,10 @@
                                 <a th:href="${row.detailHref()}" th:text="${row.name()}"></a>
                                 <span class="cl-table-sub"><span th:text="${row.brand()}"></span> · <span class="cl-table-code" th:text="${row.ean()}"></span> · <span class="cl-table-code" th:text="${row.mfn()}"></span></span>
                                 <!--/* below 1216 px the PIM category column folds under the product (design system "Kolumna zwijana pod klucz") */-->
-                                <span class="cl-table-sub cl-narrow-only"><th:block th:replace="~{fragments/inventory-browse :: categoryLines(${row.category()})}"></th:block></span>
+                                <span class="cl-table-sub cl-narrow-only"><th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()})}"></th:block></span>
                             </th>
                             <td class="cl-category-cell is-secondary-column" th:attr="data-label=#{inventory.browse.column.category}">
-                                <th:block th:replace="~{fragments/inventory-browse :: categoryLines(${row.category()})}"></th:block>
+                                <th:block th:replace="~{fragments/inventory-browse :: categoryPath(${row.category()})}"></th:block>
                             </td>
                             <td class="is-numeric cl-inv-cost-cell" th:attr="data-label=#{inventory.browse.column.cost.card}">
                                 <span th:text="${#numbers.formatDecimal(row.cost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
@@ -273,7 +280,7 @@
             </th:block>
         </section>
 
-        <ul class="cl-tile-grid is-categories" th:if="${b.isStart()}" th:attr="aria-label=#{inventory.browse.tiles.label}">
+        <ul class="cl-tile-grid is-categories" th:if="${b.isStart()}" aria-labelledby="browse-title" tabindex="-1" data-cl-list-focus>
             <li th:each="tile : ${b.tiles()}">
                 <a class="cl-tile" th:href="${tile.href()}" data-cl-list-nav>
                     <span class="cl-tile-icon" aria-hidden="true"><i class="fas fa-folder"></i></span>
@@ -283,7 +290,7 @@
                 </a>
             </li>
         </ul>
-    </th:block>
+    </section>
 </div>
 
 <!--/* One question: which manual catalog category. "Dalej" posts to /dashboard/inventory/browse/add, which forwards to
@@ -311,46 +318,62 @@
                         <input type="radio" name="target" th:value="${o.value()}" th:checked="${o.preselected()}">
                         <span class="cl-choice-text">
                             <span class="cl-choice-title" th:text="${o.label()}"></span>
-                            <span class="cl-choice-description" th:text="#{inventory.browse.dialog.fits(${o.alreadyIn()}, ${d.count()})}"></span>
+                            <span class="cl-choice-description"
+                                  th:text="${d.count() > 1} ? #{inventory.browse.dialog.fits.many(${o.alreadyIn()}, ${d.count()})}
+                                          : (${o.alreadyIn() > 0} ? #{inventory.browse.dialog.fits.oneIn} : #{inventory.browse.dialog.fits.one})"></span>
                         </span>
                     </label>
-                    <label class="cl-choice" th:unless="${d.others().isEmpty()}">
-                        <input type="radio" name="target" value="other" data-browse-other-radio>
-                        <span class="cl-choice-text">
-                            <span class="cl-choice-title" th:text="#{inventory.browse.dialog.other}"></span>
-                            <span class="cl-choice-description" th:text="#{inventory.browse.dialog.other.help}"></span>
-                        </span>
-                    </label>
+                    <th:block th:unless="${d.others().isEmpty()}">
+                        <label class="cl-choice">
+                            <input type="radio" name="target" value="other" data-browse-other-radio>
+                            <span class="cl-choice-text">
+                                <span class="cl-choice-title" id="inventory-add-other-title" th:text="#{inventory.browse.dialog.other}"></span>
+                            </span>
+                        </label>
+                        <!--/* design system P6; inventory-browse.js shows it only while "Inna kategoria" is chosen and then
+                               requires a choice, without JavaScript it stays visible and the server reports an empty one */-->
+                        <div class="cl-choice-reveal cl-field" data-browse-other-field>
+                            <select class="cl-select" id="inventory-add-other" name="otherTarget" data-browse-other-select
+                                    aria-labelledby="inventory-add-other-title" aria-describedby="inventory-add-other-help">
+                                <th:block th:replace="~{fragments/inventory-browse :: otherOptions(${d})}"></th:block>
+                            </select>
+                            <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
+                        </div>
+                    </th:block>
                 </fieldset>
                 <th:block th:unless="${d.anyMatching()}">
                     <input type="hidden" name="target" value="other"/>
                     <div class="cl-alert is-info">
                         <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
-                        <div class="cl-alert-text"><p th:text="#{inventory.browse.dialog.unmatched}"></p></div>
+                        <div class="cl-alert-text"><p th:text="${d.count() > 1} ? #{inventory.browse.dialog.unmatched.many} : #{inventory.browse.dialog.unmatched}"></p></div>
+                    </div>
+                    <div class="cl-field" th:unless="${d.others().isEmpty()}">
+                        <label class="cl-label" for="inventory-add-other" th:text="#{inventory.browse.dialog.target}"></label>
+                        <select class="cl-select" id="inventory-add-other" name="otherTarget" required
+                                aria-describedby="inventory-add-other-help">
+                            <th:block th:replace="~{fragments/inventory-browse :: otherOptions(${d})}"></th:block>
+                        </select>
+                        <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
                     </div>
                 </th:block>
-                <div class="cl-field" th:unless="${d.others().isEmpty()}">
-                    <label class="cl-label" for="inventory-add-other"
-                           th:text="${d.anyMatching()} ? #{inventory.browse.dialog.other} : #{inventory.browse.dialog.target}"></label>
-                    <select class="cl-select" id="inventory-add-other" name="otherTarget" data-browse-other-select
-                            aria-describedby="inventory-add-other-help">
-                        <option value="" th:text="#{inventory.browse.dialog.choose}"></option>
-                        <optgroup th:each="g : ${d.others()}" th:label="${g.catalogName()}">
-                            <option th:each="o : ${g.options()}" th:value="${o.value()}" th:text="${o.label()}"></option>
-                        </optgroup>
-                    </select>
-                    <p class="cl-help" id="inventory-add-other-help" th:text="#{inventory.browse.dialog.manualOnly}"></p>
-                </div>
                 <p class="cl-help is-note" th:text="#{inventory.browse.dialog.effect}"></p>
             </th:block>
         </div>
         <div class="cl-dialog-actions">
             <button class="cl-button is-primary" type="submit" th:unless="${d.noManualCategories()}"
                     th:text="#{inventory.browse.dialog.next}"></button>
-            <a class="cl-button" th:href="${d.returnTo()}" data-browse-dialog-close th:text="#{general.cancel}"></a>
+            <a class="cl-button" th:href="${d.returnTo()}" data-cl-dialog-close th:text="#{general.cancel}"></a>
         </div>
     </form>
 </dialog>
+
+<!--/* The manual categories of every catalog, for "Inna kategoria" or, when nothing matches, the only choice. */-->
+<th:block th:fragment="otherOptions(d)">
+    <option value="" th:text="#{inventory.browse.dialog.choose}"></option>
+    <optgroup th:each="g : ${d.others()}" th:label="${g.catalogName()}">
+        <option th:each="o : ${g.options()}" th:value="${o.value()}" th:text="${o.label()}"></option>
+    </optgroup>
+</th:block>
 
 </body>
 </html>
