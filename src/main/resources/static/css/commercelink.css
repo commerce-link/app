@@ -9961,8 +9961,11 @@ a.cl-link-button:hover {
 .cl-page .cl-record-type { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--cl-ink-2); }
 .cl-page .cl-label-print[hidden] { display: none; }
 .cl-page .cl-label-print [aria-busy="true"] { opacity: .6; cursor: progress; }
+/* As cards (< 720 px) the amounts carry their column names ("Koszt netto/szt.: 489,99 PLN"), like the yes/no column of
+   order items: two bare amounts could not be told apart */
 @media screen and (max-width: 719px) {
     .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: auto; }
+    .cl-page .cl-table.is-line-items.is-wrap tbody tr > td.is-numeric::before { content: attr(data-label) ": "; }
 }
 
 /* Signed quantity change (item history): the sign carries the direction, the colour only repeats it */

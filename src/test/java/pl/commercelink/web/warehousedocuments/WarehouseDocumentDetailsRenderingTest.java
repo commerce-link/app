@@ -34,6 +34,19 @@ class WarehouseDocumentDetailsRenderingTest {
     }
 
     @Test
+    void phoneCardsLabelTheQuantityCostAndValue() throws Exception {
+        // given
+        String css = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // when
+        String html = SettingsTemplateRenderer.render(BODY, Map.of("page", receiptPage(printers(0))));
+
+        // then
+        assertThat(html).contains("data-label=\"Koszt netto/szt.\"").contains("data-label=\"Wartość netto\"");
+        assertThat(css).containsPattern("(?s)@media screen and \\(max-width: 719px\\) \\{[^@]*\\.cl-table\\.is-line-items\\.is-wrap tbody tr > td\\.is-numeric::before \\{ content: attr\\(data-label\\) \": \";");
+    }
+
+    @Test
     void labelPrintScriptShowsACompactSpinnerWhileBusyAndFillsMessagesWithoutReplacePatterns() throws Exception {
         // given
         String js = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/static/js/label-print.js"));
