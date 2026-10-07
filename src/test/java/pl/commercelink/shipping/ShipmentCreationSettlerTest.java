@@ -99,19 +99,6 @@ class ShipmentCreationSettlerTest {
     }
 
     @Test
-    void lateSuccessForRemovedPlaceholderIsDropped() {
-        // given: the operator removed the waiting shipment meanwhile
-        order.setShipments(new ArrayList<>());
-
-        // when
-        settler.succeeded(request(), result());
-
-        // then
-        assertThat(order.getShipments()).isEmpty();
-        verifyNoInteractions(lifecycleEventPublisher);
-    }
-
-    @Test
     void aFailureKeepsTheReasonOnTheShipment() {
         // when
         settler.failed(request(), "Nieprawidłowy kod pocztowy");

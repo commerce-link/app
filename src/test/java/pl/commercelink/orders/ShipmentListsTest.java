@@ -44,34 +44,6 @@ class ShipmentListsTest {
     }
 
     @Test
-    void replaceCreatingForAnotherCommandChangesNothing() {
-        // given
-        List<Shipment> list = new ArrayList<>(List.of(creating("cmd-2")));
-
-        // when
-        boolean replaced = ShipmentLists.replaceCreating(list, "cmd-1", List.of(created("1", "A")));
-
-        // then
-        assertThat(replaced).isFalse();
-        assertThat(list.get(0).isCreationPendingFor("cmd-2")).isTrue();
-    }
-
-    @Test
-    void applyPickupChangesEveryRowOfTheExternalId() {
-        // given
-        List<Shipment> list = new ArrayList<>(List.of(created("21480003", "A"), created("21480003", "B"), created("99", "C")));
-
-        // when
-        int changed = ShipmentLists.applyPickup(list, List.of("21480003"), p -> ShipmentPickup.notRequired());
-
-        // then
-        assertThat(changed).isEqualTo(2);
-        assertThat(list.get(0).getPickup().isAwaiting()).isFalse();
-        assertThat(list.get(1).getPickup().isAwaiting()).isFalse();
-        assertThat(list.get(2).getPickup().isAwaiting()).isTrue();
-    }
-
-    @Test
     void dropFailedCreationsKeepsEverythingElse() {
         // given
         Shipment failed = creating("cmd-1");

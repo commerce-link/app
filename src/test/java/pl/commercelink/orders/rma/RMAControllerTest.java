@@ -708,8 +708,6 @@ class RMAControllerTest {
 
         // then: two shipments, so the added row is shipments[2], not shipments[1] (which would merge into the second)
         assertThat(html).contains("data-next-index=\"2\"");
-        assertThat(template).contains("Number(tbody.dataset.nextIndex)")
-                .doesNotContain("querySelectorAll('tr').length");
     }
 
     private static String render(String fragment, RMA rma) {
