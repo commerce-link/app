@@ -33,6 +33,7 @@ import java.util.Locale;
 public class ShipmentLabelController {
 
     private static final String UNAVAILABLE = "shipping.label.unavailable";
+    private static final String EMPTY = "shipping.label.empty";
 
     private final StoresRepository storesRepository;
     private final ShippingService shippingService;
@@ -49,6 +50,11 @@ public class ShipmentLabelController {
         }
         try {
             Label label = shippingService.providerFor(store).getLabel(externalId);
+            if (label.content() == null || label.content().length == 0) {
+                // an empty download looks like a broken printer to the operator; the provider has no label yet
+                log.warn("Label of package {} in store {} came back empty", externalId, storeId());
+                return backWith(messageSource.getMessage(EMPTY, null, locale), safeBack, redirectAttributes);
+            }
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                             .filename(label.fileName(), StandardCharsets.UTF_8).build().toString())
@@ -56,7 +62,10 @@ public class ShipmentLabelController {
                     .body(label.content());
         } catch (RuntimeException e) {
             log.warn("Label of package {} in store {} could not be downloaded", externalId, storeId(), e);
-            return backWith(ProviderErrors.describe(e), safeBack, redirectAttributes);
+            // the provider's own answer is shown as it is; the adapter's words (no label yet, no answer) are not
+            String message = ProviderErrors.isProviderAnswer(e) ? ProviderErrors.describe(e)
+                    : messageSource.getMessage(EMPTY, null, locale);
+            return backWith(message, safeBack, redirectAttributes);
         }
     }
 

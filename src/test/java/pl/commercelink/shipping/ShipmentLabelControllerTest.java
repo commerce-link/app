@@ -11,6 +11,7 @@ import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.Label;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
@@ -85,9 +86,10 @@ class ShipmentLabelControllerTest {
     }
 
     @Test
-    void aProviderErrorGoesBackWithTheReason() {
+    void aProviderErrorGoesBackWithTheProvidersReason() {
         // given
-        when(provider.getLabel("21480003")).thenThrow(new ShippingException("Brak etykiety"));
+        when(provider.getLabel("21480003")).thenThrow(new ShippingException("HTTP 404",
+                new HttpClientException(404, "{\"errors\":[{\"message\":\"Brak etykiety\"}]}")));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -96,6 +98,48 @@ class ShipmentLabelControllerTest {
         // then
         assertThat(result).isEqualTo("redirect:/dashboard/orders/o-1");
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Brak etykiety");
+    }
+
+    @Test
+    void anAdapterRefusalWithoutTheProvidersAnswerGoesBackWithOurOwnMessage() {
+        // given: the adapter's English words (e.g. Furgonetka answered 204 with no label) are not shown to the operator
+        when(provider.getLabel("21480003")).thenThrow(new ShippingException("Furgonetka has no label for package 21480003 (yet)"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        Object result = controller.label("furgonetka", "21480003", "/dashboard/rma/r-1", redirect, PL);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/dashboard/rma/r-1");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.empty");
+    }
+
+    @Test
+    void anEmptyLabelIsNeverSentAsAFile() {
+        // given: a provider that hands back a label without bytes instead of refusing it
+        when(provider.getLabel("21480003")).thenReturn(new Label(new byte[0], "application/pdf", "etykieta-21480003.pdf"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        Object result = controller.label("furgonetka", "21480003", "/dashboard/rma/r-1", redirect, PL);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/dashboard/rma/r-1");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.empty");
+    }
+
+    @Test
+    void aLabelWithoutContentIsNeverSentAsAFile() {
+        // given
+        when(provider.getLabel("21480003")).thenReturn(new Label(null, "application/pdf", "etykieta-21480003.pdf"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        Object result = controller.label("furgonetka", "21480003", "/dashboard/rma/r-1", redirect, PL);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/dashboard/rma/r-1");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.empty");
     }
 
     @Test
