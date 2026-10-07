@@ -37,23 +37,6 @@ class InventoryScriptContractTest {
         }
     }
 
-    /**
-     * Like the hooks of inventory.js above: the script of "Kategoria katalogu" on the review that still looks for a
-     * renamed hook does nothing, and no server-side test would notice.
-     */
-    @Test
-    void reviewTargetScriptUsesOnlyHooksTheReviewRenders() throws Exception {
-        // given
-        String script = read("src/main/resources/static/js/review-target.js");
-        String template = read("src/main/resources/templates/catalog/products-add-review.html");
-
-        // when / then
-        for (String hook : List.of("data-review-target", "data-review-target-change", "data-review-target-actions")) {
-            assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
-            assertThat(template).as("template renders " + hook).contains(hook);
-        }
-    }
-
     @Test
     void buildingScriptUsesOnlyHooksTheTemplatesRender() throws Exception {
         // given

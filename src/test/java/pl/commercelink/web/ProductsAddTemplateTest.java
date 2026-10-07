@@ -349,7 +349,8 @@ class ProductsAddTemplateTest {
 
     /**
      * From the inventory the category is the first field: matching categories first with how many products each holds,
-     * then the other manual ones by catalog; "Zmień kategorię" reviews the rows again without the script.
+     * then the other manual ones by catalog; "Zmień kategorię" beside it reviews the rows again, and only it does -- no
+     * script sends the form when the select changes (WCAG 3.2.2).
      */
     @Test
     void aReviewFromTheInventoryAsksForTheCategoryAboveTheRows() {
@@ -365,25 +366,29 @@ class ProductsAddTemplateTest {
         // then
         assertThat(html).doesNotContain("??", "Catalog category: Parts");
         assertThat(html).containsPattern("<label class=\"cl-label\" for=\"review-target\">Catalog category</label>\\s*"
-                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" required data-review-target\\s+"
+                + "<div class=\"cl-input-row\">\\s*"
+                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" required\\s+"
                 + "aria-describedby=\"review-target-help\" autofocus=\"autofocus\">");
+        assertThat(html).containsPattern("</select>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate\\s+"
+                + "formaction=\"/dashboard/inventory/add\">Change category</button>\\s*</div>");
         assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">Parts › GPU \\(already in this category: 1 of 2\\)</option>");
         assertThat(html).contains("<optgroup label=\"Match the PIM category\">",
                 "<optgroup label=\"Parts\">", "<option value=\"c1/k2\">Cases</option>",
                 "PIM category: Graphics cards. Manual categories only",
-                "formaction=\"/dashboard/inventory/add\">Change category</button>",
                 "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
-                "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">",
-                "<script src=\"/js/review-target.js\" defer></script>");
-        assertThat(html).containsPattern("<button class=\"cl-button\" type=\"submit\" formnovalidate data-review-target-change");
+                "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">");
+        assertThat(html).doesNotContain("review-target.js", "data-review-target", "Next</button>");
         assertThat(html.indexOf("id=\"review-target\"")).isLessThan(html.indexOf("id=\"products\""));
         assertThat(html).contains("<div class=\"cl-stack is-wide\">");
     }
 
-    /** Nothing matched: the field starts empty and says why; there are no rows to fill in until a category is chosen. */
+    /**
+     * Nothing matched: the field starts empty and says why; there are no rows to fill in until a category is chosen,
+     * and "Next" -- not a change of the select -- draws them.
+     */
     @Test
-    void anInventoryReviewWithoutACategoryHasOnlyTheFieldWithChangeAsItsMainButton() {
+    void anInventoryReviewWithoutACategoryHasOnlyTheFieldWithNextAsItsMainButton() {
         // given
         Context context = inventoryContext(new CatalogTargetOptions(1, List.of(),
                 List.of(new CatalogTargetOptions.Group("Parts", List.of(new CatalogTargetOptions.Option("c1/k2", "Cases", 0)))),
@@ -396,13 +401,14 @@ class ProductsAddTemplateTest {
         String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
 
         // then
-        assertThat(html).doesNotContain("??", "id=\"products\"", "Add products", "reviewedTarget", "Match the PIM category");
+        assertThat(html).doesNotContain("??", "id=\"products\"", "Add products", "reviewedTarget", "Match the PIM category",
+                "Change category", "cl-input-row", "review-target.js", "data-review-target");
         assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a category…</option>");
         assertThat(html).contains(
                 "This product&#39;s PIM category is not mapped to any catalog category.",
                 "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\">Cancel</a>",
                 "Complete the data: 1 products");
-        assertThat(html).containsPattern("<button class=\"cl-button is-primary\" type=\"submit\" formnovalidate data-review-target-change");
+        assertThat(html).contains("<button class=\"cl-button is-primary\" type=\"submit\" formnovalidate formaction=\"/dashboard/inventory/add\">Next</button>");
     }
 
     /** A category the store does not have (or no longer offers) is an error of the field, linked from the summary. */
