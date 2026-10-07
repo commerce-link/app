@@ -125,7 +125,8 @@ public class ShipmentPickupController {
             return "redirect:" + safeBack;
         }
         switch (start.outcome()) {
-            case STARTED -> redirectAttributes.addFlashAttribute("successMessage", message("shipping.pickup.started", locale));
+            case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
+                    message(startedKey(chosen.get(), targets, safeBack), locale));
             case REFUSED -> redirectAttributes.addFlashAttribute("errorMessage", start.error());
             case GONE -> redirectAttributes.addFlashAttribute("errorMessage", message("shipping.pickup.gone", locale));
         }
@@ -214,18 +215,35 @@ public class ShipmentPickupController {
 
     // the package of the order or RMA the operator came from reads "to zamówienie" / "to zgłoszenie"
     private String ownerMarker(PickupCandidate candidate, String back, Locale locale) {
-        var page = OWNER_PAGE.matcher(back);
-        if (!page.matches() || !page.group(2).equals(candidate.ownerId())) {
+        if (!isOfBackPage(candidate, back)) {
             return null;
         }
-        boolean order = "orders".equals(page.group(1));
-        if (order && candidate.ownerType() == ShipmentOwnerType.ORDER) {
-            return message("shipping.pickup.this.order", locale);
+        return message(candidate.ownerType() == ShipmentOwnerType.ORDER
+                ? "shipping.pickup.this.order" : "shipping.pickup.this.rma", locale);
+    }
+
+    /**
+     * The page the operator returns to shows its own packages: when it has some waiting in this group and none of them
+     * went into the command (refused by the carrier, or unticked), "Zamawiamy odbiór" alone would read as if they did.
+     */
+    private static String startedKey(PickupGroup group, List<PickupTarget> targets, String back) {
+        List<PickupCandidate> own = group.entries().stream().filter(c -> isOfBackPage(c, back)).toList();
+        boolean leftOut = !own.isEmpty() && own.stream()
+                .noneMatch(c -> targets.stream().anyMatch(t -> t.externalId().equals(c.externalId())));
+        if (!leftOut) {
+            return "shipping.pickup.started";
         }
-        if (!order && candidate.ownerType() == ShipmentOwnerType.RMA) {
-            return message("shipping.pickup.this.rma", locale);
+        return own.get(0).ownerType() == ShipmentOwnerType.ORDER
+                ? "shipping.pickup.started.without.this.order" : "shipping.pickup.started.without.this.rma";
+    }
+
+    private static boolean isOfBackPage(PickupCandidate candidate, String back) {
+        var page = OWNER_PAGE.matcher(back);
+        if (!page.matches() || !page.group(2).equals(candidate.ownerId())) {
+            return false;
         }
-        return null;
+        ShipmentOwnerType pageType = "orders".equals(page.group(1)) ? ShipmentOwnerType.ORDER : ShipmentOwnerType.RMA;
+        return candidate.ownerType() == pageType;
     }
 
     private String addressLine(Store store, String pickUpAddressId, Locale locale) {

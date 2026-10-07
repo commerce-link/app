@@ -241,14 +241,66 @@ class ShipmentPickupControllerTest {
         when(pickupService.order(eq(store), eq("furgonetka"), anyList(), eq(WINDOW))).thenReturn(PickupStart.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
+        String back = "/dashboard/rma/" + ORDER_2;
+
         // when
-        String view = controller.order(DPD.key(), List.of("2", "9"), WINDOW_VALUE, BACK, redirect, POLISH);
+        String view = controller.order(DPD.key(), List.of("2", "9"), WINDOW_VALUE, back, redirect, POLISH);
 
         // then
-        assertThat(view).isEqualTo("redirect:" + BACK);
+        assertThat(view).isEqualTo("redirect:" + back);
         verify(pickupService).order(eq(store), eq("furgonetka"),
                 eq(List.of(new PickupTarget(ShipmentOwnerType.RMA, ORDER_2, "2", "TRK-2"))), eq(WINDOW));
         assertThat(redirect.getFlashAttributes().get("successMessage"))
+                .isEqualTo("Zamawiamy odbiór. Termin pojawi się przy przesyłkach za kilka sekund.");
+    }
+
+    @Test
+    void theOrderWhosePackageWasLeftOutIsToldItsPackageIsNotInThePickup() {
+        // given: the operator came from order 1 and unticked its package (refused by the carrier, or deselected)
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.order(DPD.key(), List.of("2"), WINDOW_VALUE, BACK, redirect, POLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:" + BACK);
+        assertThat(redirect.getFlashAttributes().get("successMessage"))
+                .isEqualTo("Zamawiamy odbiór pozostałych paczek. Paczki tego zamówienia w nim nie ma.");
+    }
+
+    @Test
+    void theRmaWhosePackageWasLeftOutIsToldItsPackageIsNotInThePickup() {
+        // given: an order and an RMA may share an id-shaped path; only the RMA's own package counts
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.order(DPD.key(), List.of("1"), WINDOW_VALUE, "/dashboard/rma/" + ORDER_2, redirect, POLISH);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("successMessage"))
+                .isEqualTo("Zamawiamy odbiór pozostałych paczek. Paczki tego zgłoszenia w nim nie ma.");
+    }
+
+    @Test
+    void aPageWithoutAPackageInTheGroupGetsThePlainMessage() {
+        // given: the order list, and an order whose packages wait in another group
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
+        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        RedirectAttributesModelMap fromList = new RedirectAttributesModelMap();
+        RedirectAttributesModelMap fromOtherOrder = new RedirectAttributesModelMap();
+
+        // when
+        controller.order(DPD.key(), List.of("1"), WINDOW_VALUE, "/dashboard/orders", fromList, POLISH);
+        controller.order(DPD.key(), List.of("1"), WINDOW_VALUE, "/dashboard/orders/" + ORDER_2, fromOtherOrder, POLISH);
+
+        // then
+        assertThat(fromList.getFlashAttributes().get("successMessage"))
+                .isEqualTo("Zamawiamy odbiór. Termin pojawi się przy przesyłkach za kilka sekund.");
+        assertThat(fromOtherOrder.getFlashAttributes().get("successMessage"))
                 .isEqualTo("Zamawiamy odbiór. Termin pojawi się przy przesyłkach za kilka sekund.");
     }
 
