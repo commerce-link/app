@@ -85,7 +85,7 @@ class InventoryPageTemplateTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("data-inventory-summary", "data-cl-list-results", "cl-page cl-page-body is-wide",
-                "<h1 class=\"cl-page-title\">Supplier assortment</h1>");
+                "<h1 class=\"cl-page-title\">Assortment</h1>");
         assertThat(html).doesNotContain("data-inventory-search", "id=\"inventory-results\"");
     }
 

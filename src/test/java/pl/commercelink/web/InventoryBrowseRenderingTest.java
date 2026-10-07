@@ -450,7 +450,7 @@ class InventoryBrowseRenderingTest {
                 "<ul class=\"cl-tile-grid is-categories\" aria-labelledby=\"browse-title\" tabindex=\"-1\" data-cl-list-focus>");
         assertThat(html.split("data-cl-list-focus", -1)).hasSize(2);
         assertThat(html.indexOf("cl-tile-grid")).isLessThan(html.lastIndexOf("</section>"));
-        assertThat(html).doesNotContain(">Supplier assortment</h2>");
+        assertThat(html).doesNotContain(">Assortment</h2>");
     }
 
     @Test
