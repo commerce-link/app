@@ -80,6 +80,7 @@ class ShipmentPickupRetryControllerTest {
     void aFailedPickupOfACustomersReturnIsOrderedAgainAtOnce() {
         // given
         RMA rma = rmaWithReturn(ShipmentPickup.awaiting().failed("Brak kuriera"));
+        when(immediatePickup.orderFor(any(), anyList())).thenReturn(ImmediatePickup.Outcome.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -138,5 +139,51 @@ class ShipmentPickupRetryControllerTest {
 
         // then
         verify(immediatePickup, never()).orderFor(any(), anyList());
+    }
+
+    @Test
+    void noWindowsAgainShowTheReasonInsteadOfSuccess() {
+        // given
+        rmaWithReturn(ShipmentPickup.awaiting().failedWithKey(ImmediatePickup.NO_WINDOWS_KEY));
+        when(immediatePickup.orderFor(any(), anyList()))
+                .thenReturn(ImmediatePickup.Outcome.failed(null, ImmediatePickup.NO_WINDOWS_KEY));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.orderAgain("rma-1", "21480003", redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo(ImmediatePickup.NO_WINDOWS_KEY);
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
+    void windowsThatCannotBeReadShowTheProvidersWords() {
+        // given
+        rmaWithReturn(ShipmentPickup.awaiting().failed("x"));
+        when(immediatePickup.orderFor(any(), anyList()))
+                .thenReturn(ImmediatePickup.Outcome.failed("Furgonetka down", null));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.orderAgain("rma-1", "21480003", redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Furgonetka down");
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
+    void aPackageThatStoppedWaitingMeanwhileIsGone() {
+        // given
+        rmaWithReturn(ShipmentPickup.awaiting().failed("x"));
+        when(immediatePickup.orderFor(any(), anyList())).thenReturn(ImmediatePickup.Outcome.gone());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.orderAgain("rma-1", "21480003", redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.pickup.gone");
     }
 }

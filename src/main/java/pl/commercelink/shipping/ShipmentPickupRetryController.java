@@ -65,8 +65,9 @@ public class ShipmentPickupRetryController {
                 .provider(provider)
                 .externalId(externalId)
                 .build();
+        ImmediatePickup.Outcome outcome;
         try {
-            immediatePickup.orderFor(request, parcels);
+            outcome = immediatePickup.orderFor(request, parcels);
         } catch (RuntimeException e) {
             // the operator sees the reason on the page and can try again
             log.warn("Pickup of the return of RMA {} in store {} (package {}) could not be ordered again", rmaId,
@@ -74,7 +75,16 @@ public class ShipmentPickupRetryController {
             redirectAttributes.addFlashAttribute("errorMessage", ProviderErrors.describe(e));
             return back;
         }
-        redirectAttributes.addFlashAttribute("successMessage", message("shipping.pickup.started", locale));
+        // the operator acted on this page, so the outcome is told here; the bell keeps one notification per package
+        // for a pickup that failed before any command was sent, so a repeated "no windows" adds nothing there
+        switch (outcome.kind()) {
+            case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
+                    message("shipping.pickup.started", locale));
+            case FAILED -> redirectAttributes.addFlashAttribute("errorMessage", outcome.errorKey() != null
+                    ? message(outcome.errorKey(), locale) : outcome.error());
+            case GONE, NOT_REQUIRED -> redirectAttributes.addFlashAttribute("errorMessage",
+                    message("shipping.pickup.gone", locale));
+        }
         return back;
     }
 

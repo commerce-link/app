@@ -74,9 +74,10 @@ class ImmediatePickupTest {
         when(pickupService.order(any(), any(), any(), any())).thenReturn(PickupStart.started());
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome.kind()).isEqualTo(ImmediatePickup.Outcome.Kind.STARTED);
         verify(pickupService).order(eq(store), eq("furgonetka"),
                 argThat(t -> t.size() == 1 && "21480003".equals(t.get(0).externalId())
                         && "rma-1".equals(t.get(0).ownerId()) && "A".equals(t.get(0).trackingNo())), eq(FIRST));
@@ -89,9 +90,11 @@ class ImmediatePickupTest {
         when(pickupService.windows(store, "furgonetka", List.of("21480003"), 3)).thenReturn(List.of());
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome.kind()).isEqualTo(ImmediatePickup.Outcome.Kind.FAILED);
+        assertThat(outcome.errorKey()).isEqualTo(ImmediatePickup.NO_WINDOWS_KEY);
         verify(owner).applyPickup(eq("store-1"), eq("rma-1"), eq(List.of("21480003")), any());
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), argThat(t -> "21480003".equals(t.externalId())),
                 argThat(p -> p.isFailed() && p.isAwaiting()
@@ -119,9 +122,10 @@ class ImmediatePickupTest {
     @Test
     void aPackageThatNeedsNoPickupIsSettledAtOnce() {
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.notRequired())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.notRequired())));
 
         // then
+        assertThat(outcome.kind()).isEqualTo(ImmediatePickup.Outcome.Kind.NOT_REQUIRED);
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), any(), argThat(p -> !p.isAwaiting()));
         verifyNoInteractions(pickupService);
     }
@@ -133,12 +137,27 @@ class ImmediatePickupTest {
         when(pickupService.order(any(), any(), any(), any())).thenReturn(PickupStart.refused("pick-1", "Brak kuriera"));
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome).isEqualTo(ImmediatePickup.Outcome.failed("Brak kuriera", null));
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), argThat(t -> "21480003".equals(t.externalId())),
                 argThat(p -> p.isFailed() && "pick-1".equals(p.getCommandId()) && "Brak kuriera".equals(p.getError())
                         && "2026-10-06".equals(p.getDate())));
+    }
+
+    @Test
+    void noWindowsForAPackageThatNoLongerWaitsIsGone() {
+        // given
+        when(pickupService.windows(store, "furgonetka", List.of("21480003"), 3)).thenReturn(List.of());
+        when(owner.applyPickup(anyString(), any(), anyCollection(), any())).thenReturn(0);
+
+        // when
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+
+        // then
+        assertThat(outcome.kind()).isEqualTo(ImmediatePickup.Outcome.Kind.GONE);
+        verify(owner, never()).onPickupSettled(any(), any(), any(), any());
     }
 
     @Test
@@ -148,9 +167,10 @@ class ImmediatePickupTest {
                 .thenThrow(new RuntimeException("Furgonetka down"));
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome).isEqualTo(ImmediatePickup.Outcome.failed("Furgonetka down", null));
         verify(owner).applyPickup(eq("store-1"), eq("rma-1"), eq(List.of("21480003")), any());
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), any(), argThat(ShipmentPickup::isFailed));
         verify(pickupService, never()).order(any(), any(), any(), any());
@@ -163,9 +183,10 @@ class ImmediatePickupTest {
         when(pickupService.order(any(), any(), any(), any())).thenThrow(new RuntimeException("dynamo down"));
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome).isEqualTo(ImmediatePickup.Outcome.failed(null, ShipmentPickupService.NOT_SENT_KEY));
         verify(owner).onPickupSettled(eq("store-1"), eq("furgonetka"), any(), argThat(p -> p.isFailed()
                 && ShipmentPickupService.NOT_SENT_KEY.equals(p.getErrorKey())));
     }
@@ -177,9 +198,10 @@ class ImmediatePickupTest {
         when(pickupService.order(any(), any(), any(), any())).thenReturn(PickupStart.gone());
 
         // when
-        immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
+        ImmediatePickup.Outcome outcome = immediate.orderFor(creation(), List.of(created(ShipmentPickup.awaiting())));
 
         // then
+        assertThat(outcome.kind()).isEqualTo(ImmediatePickup.Outcome.Kind.GONE);
         verify(owner, never()).onPickupSettled(any(), any(), any(), any());
         assertThat(ImmediatePickup.DAYS_AHEAD).isEqualTo(3);
     }
