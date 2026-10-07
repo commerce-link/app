@@ -20,8 +20,6 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -42,8 +40,8 @@ class ShipmentLabelControllerTest {
     void setUp() {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(shippingService.providerName(store)).thenReturn("furgonetka");
+        when(shippingService.supportsLabels(store, "furgonetka")).thenReturn(true);
         when(shippingService.providerFor(store)).thenReturn(provider);
-        when(provider.supportsLabels()).thenReturn(true);
         StaticMessageSource messages = new StaticMessageSource();
         messages.setUseCodeAsDefaultMessage(true);
         controller = new ShipmentLabelController(storesRepository, shippingService, messages) {
@@ -101,46 +99,18 @@ class ShipmentLabelControllerTest {
     }
 
     @Test
-    void anotherIntegrationThanTheStoresIsRefused() {
-        // given
+    void aPackageWhoseLabelTheStoreCannotGetIsRefusedWithoutAskingForIt() {
+        // given: another integration than the store's, one without labels or a disconnected one
+        when(shippingService.supportsLabels(store, "allegro")).thenReturn(false);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        Object result = controller.label("allegro", "1", "/dashboard/orders/o-1", redirect, PL);
-
-        // then
-        assertThat(result).isEqualTo("redirect:/dashboard/orders/o-1");
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.unavailable");
-        verifyNoInteractions(provider);
-    }
-
-    @Test
-    void anIntegrationWithoutLabelsIsRefusedWithoutAskingForOne() {
-        // given
-        when(provider.supportsLabels()).thenReturn(false);
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        Object result = controller.label("furgonetka", "1", "/dashboard/notifications", redirect, PL);
+        Object result = controller.label("allegro", "1", "/dashboard/notifications", redirect, PL);
 
         // then
         assertThat(result).isEqualTo("redirect:/dashboard/notifications");
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.unavailable");
-        verify(provider, never()).getLabel("1");
-    }
-
-    @Test
-    void aDisconnectedIntegrationGoesBackWithTheUnavailableMessage() {
-        // given
-        when(shippingService.providerFor(store)).thenThrow(new ShippingUnavailableException("store-1"));
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        Object result = controller.label("furgonetka", "1", "/dashboard/rma/r-1", redirect, PL);
-
-        // then
-        assertThat(result).isEqualTo("redirect:/dashboard/rma/r-1");
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.unavailable");
+        verifyNoInteractions(provider);
     }
 
     @Test

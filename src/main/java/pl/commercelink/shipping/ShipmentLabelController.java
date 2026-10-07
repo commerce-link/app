@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.shipping.api.Label;
-import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -45,20 +44,11 @@ public class ShipmentLabelController {
                         Locale locale) {
         String safeBack = ShipmentPickupController.safeBack(back);
         Store store = storesRepository.findById(storeId());
-        if (store == null || !provider.equals(shippingService.providerName(store))) {
-            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
-        }
-        ShippingProvider shippingProvider;
-        try {
-            shippingProvider = shippingService.providerFor(store);
-        } catch (ShippingUnavailableException e) {
-            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
-        }
-        if (!shippingProvider.supportsLabels()) {
+        if (!shippingService.supportsLabels(store, provider)) {
             return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
         }
         try {
-            Label label = shippingProvider.getLabel(externalId);
+            Label label = shippingService.providerFor(store).getLabel(externalId);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                             .filename(label.fileName(), StandardCharsets.UTF_8).build().toString())

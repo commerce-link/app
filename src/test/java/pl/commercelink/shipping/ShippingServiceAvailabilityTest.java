@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -13,6 +14,7 @@ import pl.commercelink.stores.Store;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** The courier is offered, priced and booked only for a store with a courier account; without one, no NPE. */
@@ -21,6 +23,7 @@ class ShippingServiceAvailabilityTest {
 
     @Mock private ShippingProviderFactory shippingProviderFactory;
     @Mock private CarrierDictionary carrierDictionary;
+    @Mock private ShippingProvider provider;
 
     @InjectMocks
     private ShippingService shippingService;
@@ -73,5 +76,43 @@ class ShippingServiceAvailabilityTest {
 
         // when / then
         assertThat(shippingService.isAvailable(store)).isFalse();
+    }
+
+    @Test
+    void labelsAreOfferedForThePackagesOfTheStoresOwnIntegrationWhenItsAdapterHandsThemOut() {
+        // given
+        Store store = store("furgonetka");
+        when(shippingProviderFactory.getDescriptor("furgonetka")).thenReturn(mock(ShippingProviderDescriptor.class));
+        when(shippingProviderFactory.get(store)).thenReturn(provider);
+        when(provider.supportsLabels()).thenReturn(true);
+
+        // when / then
+        assertThat(shippingService.supportsLabels(store, "furgonetka")).isTrue();
+    }
+
+    @Test
+    void noLabelsForAPackageOfAnotherIntegrationThanTheStoresWithoutLoadingTheAccount() {
+        // when / then: its label lives on an account the store has no access to
+        assertThat(shippingService.supportsLabels(store("furgonetka"), "allegro")).isFalse();
+        assertThat(shippingService.supportsLabels(store("furgonetka"), null)).isFalse();
+        verifyNoInteractions(shippingProviderFactory);
+    }
+
+    @Test
+    void noLabelsWhenTheAdapterHandsNoneOut() {
+        // given
+        Store store = store("furgonetka");
+        when(shippingProviderFactory.getDescriptor("furgonetka")).thenReturn(mock(ShippingProviderDescriptor.class));
+        when(shippingProviderFactory.get(store)).thenReturn(provider);
+        when(provider.supportsLabels()).thenReturn(false);
+
+        // when / then
+        assertThat(shippingService.supportsLabels(store, "furgonetka")).isFalse();
+    }
+
+    @Test
+    void noLabelsWhenTheIntegrationIsDisconnected() {
+        // when / then
+        assertThat(shippingService.supportsLabels(store("furgonetka"), "furgonetka")).isFalse();
     }
 }

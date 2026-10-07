@@ -390,7 +390,8 @@ public class OrderPageModelFactory {
         List<Shipment> shipments = order.getShipments();
         LocalDateTime now = LocalDateTime.now();
         String details = "/dashboard/orders/" + order.getOrderId();
-        Set<String> labelProviders = readOnly ? Set.of() : labelProviders(shipments, store);
+        Set<String> labelProviders = readOnly ? Set.of()
+                : ShipmentLinks.labelProviders(shipments, provider -> shippingService.supportsLabels(store, provider));
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
@@ -424,7 +425,7 @@ public class OrderPageModelFactory {
                     removeShipmentActionKey(order, i), placeholder,
                     state == null ? null : state.key(), state == null ? null : state.args(),
                     state == null ? null : state.tone(), state != null && state.inProgress(),
-                    hasPackage(s) && labelProviders.contains(s.getProvider())
+                    ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
                     !readOnly && s.creationFailed() ? details + "/shipping" : null));
             if (!readOnly) {
@@ -444,17 +445,6 @@ public class OrderPageModelFactory {
         String pickupHref = readOnly ? null : ShipmentLinks.pickup(shipments, details);
         return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers), pickupHref);
-    }
-
-    private static boolean hasPackage(Shipment s) {
-        return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
-    }
-
-    // asked once per integration on the page, and only when a package could carry the link: it loads the account
-    private Set<String> labelProviders(List<Shipment> shipments, Store store) {
-        return shipments.stream().filter(OrderPageModelFactory::hasPackage).map(Shipment::getProvider).distinct()
-                .filter(provider -> shippingService.supportsLabels(store, provider))
-                .collect(Collectors.toSet());
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";

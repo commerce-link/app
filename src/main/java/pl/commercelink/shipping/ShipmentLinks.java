@@ -4,6 +4,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.orders.Shipment;
 
 import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /** The addresses of "Pobierz etykietę" and "Zamów odbiór" on the order and RMA pages, with the way back to them. */
 public final class ShipmentLinks {
@@ -15,6 +18,21 @@ public final class ShipmentLinks {
         return UriComponentsBuilder.fromPath("/dashboard/shipping/labels/{provider}/{externalId}")
                 .queryParam("back", back)
                 .buildAndExpand(provider, externalId).encode().toUriString();
+    }
+
+    /** A created package of an integration: the shipment a label can be offered for. */
+    public static boolean hasPackage(Shipment s) {
+        return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
+    }
+
+    /**
+     * The integrations of the packages among these shipments that hand out their labels, each asked once and only when
+     * a package could carry the link (ShippingService#supportsLabels loads the account).
+     */
+    public static Set<String> labelProviders(List<Shipment> shipments, Predicate<String> supportsLabels) {
+        return shipments.stream().filter(ShipmentLinks::hasPackage).map(Shipment::getProvider).distinct()
+                .filter(supportsLabels)
+                .collect(Collectors.toSet());
     }
 
     /**

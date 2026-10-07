@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriUtils;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.receipts.ReceiptAttemptKeys;
+import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
@@ -49,11 +50,8 @@ public class NotificationViewFactory {
                 || type == StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP) && role == UserRole.ADMIN
                 && StringUtils.contains(record.getObject(), ':')) {
             // the label is fetched with the logged-in admin's store integration; an error there returns to the bell
-            String provider = StringUtils.substringBefore(record.getObject(), ":");
-            String externalId = StringUtils.substringAfter(record.getObject(), ":");
-            actionHref = "/dashboard/shipping/labels/" + UriUtils.encodePathSegment(provider, StandardCharsets.UTF_8)
-                    + "/" + UriUtils.encodePathSegment(externalId, StandardCharsets.UTF_8)
-                    + "?back=/dashboard/notifications";
+            actionHref = ShipmentLinks.label(StringUtils.substringBefore(record.getObject(), ":"),
+                    StringUtils.substringAfter(record.getObject(), ":"), "/dashboard/notifications");
             actionKey = "store.notification.action.downloadLabel";
         } else if ((type == StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED
                 || type == StoreNotificationType.RMA_RETURN_PICKUP_FAILED) && role == UserRole.ADMIN

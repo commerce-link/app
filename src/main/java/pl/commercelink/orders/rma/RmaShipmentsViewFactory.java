@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -26,20 +25,18 @@ public class RmaShipmentsViewFactory {
     /** closed: a closed RMA keeps its record, only the label stays downloadable. */
     public RmaShipmentsView build(RMA rma, boolean closed, Locale locale) {
         List<Shipment> shipments = rma.getShipments() == null ? List.of() : rma.getShipments();
-        Store store = shipments.stream().anyMatch(RmaShipmentsViewFactory::hasPackage)
+        Store store = shipments.stream().anyMatch(ShipmentLinks::hasPackage)
                 ? storesRepository.findById(rma.getStoreId()) : null;
         String details = "/dashboard/rma/" + rma.getRmaId();
         boolean returnRetry = !closed && CustomerReturnRetry.possible(rma);
-        Set<String> labelProviders = shipments.stream().filter(RmaShipmentsViewFactory::hasPackage)
-                .map(Shipment::getProvider).distinct()
-                .filter(provider -> shippingService.supportsLabels(store, provider))
-                .collect(Collectors.toSet());
+        Set<String> labelProviders = ShipmentLinks.labelProviders(shipments,
+                provider -> shippingService.supportsLabels(store, provider));
         List<RmaShipmentsView.Row> rows = shipments.stream().map(s -> {
             OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
             return new RmaShipmentsView.Row(s,
                     state == null ? null : state.key(), state == null ? null : state.args(),
                     state == null ? null : state.tone(),
-                    hasPackage(s) && labelProviders.contains(s.getProvider())
+                    ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
                     !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#rmaItemsForm" : null,
                     !closed && s.creationFailed() ? removeAction(details, s) : null,
@@ -50,10 +47,6 @@ public class RmaShipmentsViewFactory {
         LocalDateTime now = LocalDateTime.now();
         String pollHref = shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now)) ? details + "/shipments/state" : null;
         return new RmaShipmentsView(rows, closed ? null : ShipmentLinks.pickup(shipments, details), pollHref);
-    }
-
-    private static boolean hasPackage(Shipment s) {
-        return s.getProvider() != null && s.getExternalId() != null && s.getCreation() == null;
     }
 
     private static boolean isCustomerReturn(Shipment s) {
