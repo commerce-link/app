@@ -54,12 +54,16 @@
                             <div class="cl-field">
                                 <label class="cl-label" id="review-target-label" for="review-target"
                                        th:text="#{catalog.products.review.target}"></label>
-                                <!--/* With JavaScript a pick in the combobox redraws the rows in place (review-target.js),
-                                       and the arrows only move through the list (WCAG 3.2.2). Without it the select
-                                       changes nothing until "Zmień kategorię" or "Dalej" sends the form. */-->
-                                <div th:remove="${category == null} ? 'tag' : 'none'" th:class="${category != null} ? 'cl-input-row'">
-                                <div th:replace="~{fragments/combobox :: combobox('review-target', 'target', ${targetChoices}, ${selectedTarget},
-                                        #{catalog.products.review.target.choose}, true, ${errors.isEmpty()}, ${targetDescribedBy}, ${targetError != null})}"></div>
+                                <!--/* With JavaScript a pick in the category picker redraws the rows in place
+                                       (review-target.js), and the arrows only move through the list (WCAG 3.2.2). Without
+                                       it the select changes nothing until "Zmień kategorię" or "Dalej" sends the form.
+                                       The search hint names the first two categories of this store's own list. */-->
+                                <div th:remove="${category == null} ? 'tag' : 'none'" th:class="${category != null} ? 'cl-input-row'"
+                                     th:with="targetFilter=${targetChoices.size() > 1}
+                                             ? #{catalog.products.review.target.filter(${targetChoices[0].label()}, ${targetChoices[1].label()})}
+                                             : #{catalog.products.review.target.filter.plain}">
+                                <div th:replace="~{fragments/category-picker :: optionPicker('review-target', 'target', ${targetChoices}, ${selectedTarget},
+                                        #{catalog.products.review.target.choose}, ${targetFilter}, true, ${errors.isEmpty()}, ${targetDescribedBy}, ${targetError != null})}"></div>
                                 <button th:if="${category != null}" class="cl-button" type="submit" formnovalidate data-review-change
                                         th:attr="formaction=${changeAction}" th:text="#{catalog.products.review.target.change}"></button>
                                 </div>
@@ -91,7 +95,7 @@
         </div>
     </section>
     <th:block th:if="${targetOptions != null and !targetOptions.noManualCategories()}">
-        <script th:src="@{/js/combobox.js}" defer></script>
+        <th:block th:replace="~{fragments/category-picker :: optionPickerScript}"></th:block>
         <script th:src="@{/js/review-target.js}" defer></script>
     </th:block>
     <script th:unless="${errors.isEmpty()}">

@@ -25,7 +25,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
-import pl.commercelink.web.dtos.ComboboxOption;
+import pl.commercelink.web.dtos.FlatPickerOption;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
@@ -171,9 +171,9 @@ class InventoryAddControllerTest {
         assertThat(edited.getValue().getProducts()).extracting(ProductsBulkAddForm.Row::getName).containsExactly("Typed");
     }
 
-    /** A pick in the combobox (fetch) gets the redrawn rows alone, with what was typed; the field stays on the page. */
+    /** A pick in the category picker (fetch) gets the redrawn rows alone, with what was typed; the field stays on the page. */
     @Test
-    void pickInTheComboboxGetsOnlyTheRedrawnRowsWithWhatWasTyped() throws Exception {
+    void pickInTheCategoryPickerGetsOnlyTheRedrawnRowsWithWhatWasTyped() throws Exception {
         // given
         ArgumentCaptor<ProductsBulkAddForm> edited = ArgumentCaptor.forClass(ProductsBulkAddForm.class);
 
@@ -219,7 +219,7 @@ class InventoryAddControllerTest {
      * line, the catalog the grey second line; only a matching one is starred as suggested. No "already here" count.
      */
     @Test
-    void comboboxOptionsPutTheMatchingCategoriesFirstAndStarOnlyThemAsSuggested() {
+    void pickerOptionsPutTheMatchingCategoriesFirstAndStarOnlyThemAsSuggested() {
         // given
         CatalogTargetOptions options = new CatalogTargetOptions(3,
                 List.of(new CatalogTargetOptions.Option("c-2", "cat-b2b", "Sklep B2B", "Karty", 2),
@@ -229,28 +229,28 @@ class InventoryAddControllerTest {
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
 
         // when
-        List<ComboboxOption> choices = InventoryAddController.targetOptions(options, messageSource, Locale.ENGLISH);
+        List<FlatPickerOption> choices = InventoryAddController.targetOptions(options, messageSource, Locale.ENGLISH);
 
         // then
         assertThat(choices).containsExactly(
-                new ComboboxOption("c-2/cat-b2b", "Karty", "Sklep B2B", "catalog.products.review.target.suggested"),
-                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
-                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
+                new FlatPickerOption("c-2/cat-b2b", "Karty", "Sklep B2B", "catalog.products.review.target.suggested"),
+                new FlatPickerOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
+                new FlatPickerOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
     }
 
     /** The catalog is named under every option even when the store has only one (U14). */
     @Test
-    void comboboxOptionsOfASingleCatalogStillNameIt() {
+    void pickerOptionsOfASingleCatalogStillNameIt() {
         // given
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
 
         // when
-        List<ComboboxOption> choices = InventoryAddController.targetOptions(options("c-1/cat-gpu"), messageSource, Locale.ENGLISH);
+        List<FlatPickerOption> choices = InventoryAddController.targetOptions(options("c-1/cat-gpu"), messageSource, Locale.ENGLISH);
 
         // then
         assertThat(choices).containsExactly(
-                new ComboboxOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
-                new ComboboxOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
+                new FlatPickerOption("c-1/cat-gpu", "Karta graficzna", "Podzespoły", "catalog.products.review.target.suggested"),
+                new FlatPickerOption("c-1/cat-case", "Obudowa", "Podzespoły", null));
     }
 
     /** The rows were checked against the category they were drawn for; another one may skip or reset some of them. */

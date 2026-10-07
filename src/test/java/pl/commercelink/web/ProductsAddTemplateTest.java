@@ -353,8 +353,8 @@ class ProductsAddTemplateTest {
     }
 
     /**
-     * From the inventory the category is the first field: a combobox over the native select it enhances -- one flat list,
-     * the matching categories first, the catalog's name on a grey line under each. Without the script
+     * From the inventory the category is the first field: the category picker over the native select it enhances -- one
+     * flat list, the matching categories first, the catalog's name on a grey line above each. Without the script
      * the select and "Zmień kategorię" beside it do the job; nothing is sent when the select changes (WCAG 3.2.2).
      */
     @Test
@@ -371,8 +371,8 @@ class ProductsAddTemplateTest {
         // then
         assertThat(html).doesNotContain("??", "Catalog category: Parts");
         assertThat(html).contains("<label class=\"cl-label\" id=\"review-target-label\" for=\"review-target\">Catalog category</label>");
-        assertThat(html).containsPattern("<div class=\"cl-input-row\">\\s*<div class=\"cl-picker cl-combobox\" data-cl-combobox>\\s*"
-                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" data-combobox-select");
+        assertThat(html).containsPattern("<div class=\"cl-input-row\">\\s*<div class=\"cl-picker is-flat\">\\s*"
+                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" data-picker-select");
         // the order of the processed attributes is not fixed
         assertThat(tagsOf(html, "select").get(0)).contains("aria-describedby=\"review-target-help\"", "required=\"required\"",
                 "autofocus=\"autofocus\"");
@@ -381,12 +381,14 @@ class ProductsAddTemplateTest {
         assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">GPU — Parts \\(suggested\\)</option>");
         assertThat(html).contains("<option value=\"c2/k2\">Tools — Garden</option>",
                 "<span class=\"cl-picker-name\">GPU</span>", "aria-label=\"GPU, Parts, suggested\"", "aria-label=\"Tools, Garden\"",
-                "<span class=\"cl-picker-meta\">Garden</span>", "value=\"GPU\"",
+                "<span class=\"cl-picker-path\" title=\"Garden\">Garden</span>",
+                "<span data-picker-label id=\"review-target-value\">GPU</span>",
+                "placeholder=\"Filter categories, e.g. GPU, Tools…\"",
                 "PIM category: Graphics cards. Manual categories only",
                 "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
                 "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">",
-                "<script src=\"/js/combobox.js\" defer></script>", "<script src=\"/js/review-target.js\" defer></script>",
+                "initialiseOn('[data-option-picker]', setUp)", "<script src=\"/js/review-target.js\" defer></script>",
                 "data-review-status=\"Category: Parts › GPU. Rows: 1.\"",
                 ">Add</button>");
         assertThat(html).doesNotContain("Next</button>", "Add products", "optgroup", "already here");
@@ -395,7 +397,7 @@ class ProductsAddTemplateTest {
         assertThat(html).contains("<div class=\"cl-stack is-wide\">");
     }
 
-    /** The rows, their notes and what the save needs about them form the part a pick in the combobox redraws. */
+    /** The rows, their notes and what the save needs about them form the part a pick in the category picker redraws. */
     @Test
     void theRedrawnPartCarriesTheRowsTheirNotesAndTheReviewedCategory() {
         // given
@@ -415,7 +417,7 @@ class ProductsAddTemplateTest {
                 "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
                 "<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>",
                 "already in this category: 5901234567891", "id=\"products\"", ">Add</button>");
-        assertThat(html).doesNotContain("review-target-label", "data-cl-combobox", "name=\"ean\"", "name=\"reviewId\"", "hidden=\"hidden\"");
+        assertThat(html).doesNotContain("review-target-label", "data-option-picker", "name=\"ean\"", "name=\"reviewId\"", "hidden=\"hidden\"");
     }
 
     /**
@@ -437,14 +439,12 @@ class ProductsAddTemplateTest {
         // then
         assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "uggested",
                 ">Change category</button>", "cl-input-row", "data-review-status=");
-        assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a category…</option>");
-        assertThat(html).contains("placeholder=\"Choose a category…\"",
-                "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-combobox-value>",
-                "placeholder=\"Choose a category…\"");
-        // one catalog still names it under every option; nothing matches, so nothing is suggested
-        assertThat(html).contains("<option value=\"c1/k2\">Cases — Parts</option>", "<span class=\"cl-picker-meta\">Parts</span>");
-        assertThat(tagsOf(html, "input").stream().filter(tag -> tag.contains("data-combobox-input")).findFirst().orElseThrow())
-                .contains("required=\"required\"", "value=\"\"");
+        assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a catalog category</option>");
+        assertThat(html).contains("<span data-picker-label id=\"review-target-value\">Choose a catalog category</span>",
+                "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-picker-value>",
+                "placeholder=\"Filter categories…\"", "data-picker-required=\"true\"");
+        // one catalog still names it above every option; nothing matches, so nothing is suggested
+        assertThat(html).contains("<option value=\"c1/k2\">Cases — Parts</option>", "<span class=\"cl-picker-path\" title=\"Parts\">Parts</span>");
         assertThat(html).contains(
                 "This product&#39;s PIM category is not mapped to any catalog category.",
                 "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\">Cancel</a>",
@@ -470,7 +470,7 @@ class ProductsAddTemplateTest {
         assertThat(html).contains("<a href=\"#review-target\">No catalog category was chosen.</a>",
                 "aria-invalid=\"true\"", "aria-describedby=\"review-target-error review-target-help\"",
                 "<p class=\"cl-field-error\" id=\"review-target-error\">");
-        assertThat(html).doesNotContain("autofocus");
+        assertThat(tagsOf(html, "select").get(0)).doesNotContain("autofocus");
     }
 
     @Test

@@ -25,7 +25,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.ProductsAddReview;
-import pl.commercelink.web.dtos.ComboboxOption;
+import pl.commercelink.web.dtos.FlatPickerOption;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.settings.SettingsPaths;
 
@@ -91,7 +91,7 @@ public class InventoryAddController {
                          @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                          Model model, Locale locale, RedirectAttributes redirectAttributes) {
         String view = show(eans, target, edited, returnTo, null, model, locale, redirectAttributes);
-        // A pick in the combobox redraws only the rows; the field it came from stays as the operator left it.
+        // A pick in the category picker redraws only the rows; the field it came from stays as the operator left it.
         if (SettingsPaths.isAsync(requestedWith) && ProductsAddReview.VIEW.equals(view)) {
             model.addAttribute("partial", true);
             return ProductsAddReview.REDRAWN_PART;
@@ -237,18 +237,18 @@ public class InventoryAddController {
     }
 
     /**
-     * The options of the category combobox, one flat list: the categories matching the products' PIM category first, then
-     * the other manual ones. Each reads as the category's name with its catalog in grey under it, a matching one starred
+     * The options of the category picker, one flat list: the categories matching the products' PIM category first, then
+     * the other manual ones. Each reads as the category's name with its catalog in grey above it, a matching one starred
      * as suggested on that line ("Local Catalog · ★ Sugerowana").
      */
-    public static List<ComboboxOption> targetOptions(CatalogTargetOptions options, MessageSource messages, Locale locale) {
+    public static List<FlatPickerOption> targetOptions(CatalogTargetOptions options, MessageSource messages, Locale locale) {
         String suggested = messages.getMessage("catalog.products.review.target.suggested", null, locale);
-        List<ComboboxOption> result = new ArrayList<>();
+        List<FlatPickerOption> result = new ArrayList<>();
         for (CatalogTargetOptions.Option option : options.matching()) {
-            result.add(new ComboboxOption(option.value(), option.categoryName(), option.catalogName(), suggested));
+            result.add(new FlatPickerOption(option.value(), option.categoryName(), option.catalogName(), suggested));
         }
         for (CatalogTargetOptions.Option option : options.others()) {
-            result.add(new ComboboxOption(option.value(), option.categoryName(), option.catalogName()));
+            result.add(new FlatPickerOption(option.value(), option.categoryName(), option.catalogName()));
         }
         return result;
     }

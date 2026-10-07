@@ -1,4 +1,4 @@
-// "Kategoria katalogu" on "Uzupełnij dane" opened from the inventory: a pick in the combobox redraws the rows below
+// "Kategoria katalogu" on "Uzupełnij dane" opened from the inventory: a pick in the category picker redraws the rows below
 // in place. The form goes, typed values and all, to the address "Zmień kategorię" posts to, with X-Requested-With: fetch,
 // and the server answers with the redrawn part alone. Without JavaScript that button (or "Dalej") does the same with a
 // full page. The save still refuses a category other than the one the rows were drawn for, so a failed redraw cannot
@@ -11,7 +11,7 @@
         return;
     }
     var form = card.closest('form');
-    var combobox = card.querySelector('[data-cl-combobox]');
+    var picker = card.querySelector('.cl-picker');
     var change = card.querySelector('[data-review-change]');
     var next = card.querySelector('[data-review-next]');
     var footer = card.querySelector('[data-review-target-footer]');
@@ -86,5 +86,5 @@
         });
     }
 
-    combobox.addEventListener('cl:combobox-change', redraw);
+    picker.addEventListener('cl:picker-change', redraw);
 })();

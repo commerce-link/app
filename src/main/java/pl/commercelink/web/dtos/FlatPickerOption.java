@@ -5,16 +5,16 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * An option of {@code fragments/combobox}: the label on the first line and in the field once chosen, an optional short
- * note in small grey type under it (where it comes from), optionally followed on that line by a starred word that sets
- * the option apart (a suggestion).
+ * An option of {@code fragments/category-picker :: optionPicker}: the label is the name line and the field's text once
+ * chosen; an optional short note in small grey type above it says where it comes from, optionally followed on that line
+ * by a starred word that sets the option apart (a suggestion).
  *
- * @param meta    the second line, or null
- * @param starred the word after the star at the end of the second line ("Sugerowana"), or null for no star
+ * @param meta    the grey line above the label, or null
+ * @param starred the word after the star at the end of the grey line ("Sugerowana"), or null for no star
  */
-public record ComboboxOption(String value, String label, String meta, String starred) {
+public record FlatPickerOption(String value, String label, String meta, String starred) {
 
-    public ComboboxOption(String value, String label, String meta) {
+    public FlatPickerOption(String value, String label, String meta) {
         this(value, label, meta, null);
     }
 
@@ -36,10 +36,10 @@ public record ComboboxOption(String value, String label, String meta, String sta
     }
 
     /** The label of the option holding {@code value}, or null when none does. */
-    public static String labelOf(List<ComboboxOption> options, String value) {
+    public static String labelOf(List<FlatPickerOption> options, String value) {
         return options.stream()
                 .filter(option -> Objects.equals(option.value(), value))
-                .map(ComboboxOption::label)
+                .map(FlatPickerOption::label)
                 .findFirst()
                 .orElse(null);
     }

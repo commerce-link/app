@@ -3,7 +3,7 @@
 <body>
 
 <!--/* The part of the inventory review a new category redraws: the notes on the rows, what the save needs to know about
-       them and the rows themselves. The controller sends it alone to a pick in the combobox (X-Requested-With: fetch);
+       them and the rows themselves. The controller sends it alone to a pick in the category picker (X-Requested-With: fetch);
        data-review-status is what the page announces once it is in. */-->
 <div th:fragment="reviewArea" class="cl-stack is-wide" id="review-area" data-review-area
      th:with="hasNotes=${targetNotice != null or (resetRows != null and resetRows > 0) or !skipped.isEmpty() or !skippedExisting.isEmpty()}"
