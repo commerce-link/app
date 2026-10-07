@@ -140,7 +140,7 @@ class RmaShipmentOwnerTest {
     @Test
     void aRetryOfAFailedCustomerReturnDropsTheFailedRowAndKeepsAnUnrelatedCreatedOne() {
         // given
-        Shipment failed = placeholder("cmd-0");
+        Shipment failed = customerReturn("cmd-0");
         failed.setExternalId("ext-0");
         failed.setCreation(failed.getCreation().failed("Błąd"));
         rma.setShipments(new ArrayList<>(List.of(createdShipment(), failed)));
@@ -233,6 +233,37 @@ class RmaShipmentOwnerTest {
         assertThat(marked).isTrue();
         assertThat(rma.getShipments()).hasSize(1);
         assertThat(rma.getShipments().get(0).isCreationPendingFor("cmd-1")).isTrue();
+    }
+
+    @Test
+    void anOperatorRetryIsRefusedOnceAnotherCustomerReturnWasCreated() {
+        // given: a retry checked before the lock, while another submission created the return in the meantime
+        Shipment failed = customerReturn("cmd-0");
+        failed.setCreation(failed.getCreation().failed("Błąd"));
+        Shipment created = customerReturn("cmd-2");
+        created.setCreation(null);
+        created.setExternalId("21480003");
+        created.setPickup(ShipmentPickup.awaiting());
+        rma.setShipments(new ArrayList<>(List.of(failed, created)));
+
+        // when
+        boolean marked = returnOwner().markCreating(operatorRetry("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
+        assertThat(rma.getShipments()).containsExactly(failed, created);
+    }
+
+    @Test
+    void anOperatorRetryIsRefusedWhenNoCustomerReturnFailed() {
+        // given: the failed row was removed before the lock
+        rma.setShipments(new ArrayList<>());
+
+        // when
+        boolean marked = returnOwner().markCreating(operatorRetry("cmd-1"), customerReturn("cmd-1"));
+
+        // then
+        assertThat(marked).isFalse();
     }
 
     @Test

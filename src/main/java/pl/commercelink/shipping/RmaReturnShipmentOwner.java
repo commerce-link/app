@@ -56,12 +56,20 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
     /**
      * The customer submits a return once: a return already on the RMA, created, being created or failed without a
      * clean refusal (unconfirmed: the paid label may exist), is the operator's to retry or remove. A clean refusal
-     * leaves nothing on the RMA (see refused), so the customer can correct the data and submit again.
+     * leaves nothing on the RMA (see refused), so the customer can correct the data and submit again. The operator's
+     * retry replaces a failed return only while no other one lives: checked again here, under the lock, because the
+     * page's check ran before it.
      */
     @Override
     protected boolean refusesNewCreation(RMA rma, ShipmentCreationCheckRequest request) {
-        return super.refusesNewCreation(rma, request) || (!request.isReplacesFailedReturn()
-                && rma.getShipments().stream().anyMatch(CustomerReturnRetry::isCustomerReturn));
+        if (super.refusesNewCreation(rma, request)) {
+            return true;
+        }
+        if (!request.isReplacesFailedReturn()) {
+            return rma.getShipments().stream().anyMatch(CustomerReturnRetry::isCustomerReturn);
+        }
+        return rma.getShipments().stream().noneMatch(s -> CustomerReturnRetry.isCustomerReturn(s) && s.creationFailed())
+                || rma.getShipments().stream().anyMatch(s -> CustomerReturnRetry.isCustomerReturn(s) && !s.creationFailed());
     }
 
     @Override
