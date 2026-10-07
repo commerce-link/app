@@ -4,7 +4,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -32,12 +31,13 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.OfferCreationDto;
 import pl.commercelink.web.dtos.OfferTableRow;
+import pl.commercelink.web.settings.ConfirmAction;
 
-import java.time.LocalDate;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @Controller
@@ -76,44 +76,6 @@ public class OfferController {
 
     @Value("${app.domain}")
     private String appDomain;
-
-    private static final int OFFER_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/offers")
-    public String offers(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String basketId,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtEnd,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            Model model) {
-        List<Basket> paginatedOffers = new LinkedList<>();
-        boolean hasSearchParams = isNotBlank(name) || isNotBlank(basketId) || isNotBlank(type) || createdAtStart != null || createdAtEnd != null;
-        if (hasSearchParams) {
-            BasketFilter filter = new BasketFilter(name, basketId, isNotBlank(type) ? BasketType.valueOf(type) : null, createdAtStart, createdAtEnd);
-            paginatedOffers = basketsRepository.search(getStoreId(), filter, page, OFFER_PAGE_SIZE);
-        }
-
-        List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
-
-        HashMap<String, Object> searchParams = new HashMap<>();
-        searchParams.put("name", name);
-        searchParams.put("basketId", basketId);
-        searchParams.put("createdAtStart", createdAtStart);
-        searchParams.put("createdAtEnd", createdAtEnd);
-        searchParams.put("type", type);
-
-        model.addAttribute("offers", paginatedOffers.subList(0, Math.min(paginatedOffers.size(), OFFER_PAGE_SIZE)));
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", paginatedOffers.size() > OFFER_PAGE_SIZE);
-        model.addAttribute("catalogs", catalogs);
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("basketTypes", BasketType.values());
-        model.addAttribute("backofficeDomain", appDomain);
-
-        return "offers";
-    }
 
     @GetMapping("/dashboard/offer/new/csv")
     public String showOfferImportSelection(Model model) {
@@ -239,23 +201,64 @@ public class OfferController {
         return "redirect:/dashboard/offer/" + templateBasket.getBasketId();
     }
 
+    static final String LIST_PATH = "/dashboard/offers";
+
+    /** Without JavaScript the delete link opens this page; with it, confirm-dialog.js posts to the same address. */
+    @GetMapping("/dashboard/offer/{offerId}/delete")
+    public String confirmDeleteOffer(@PathVariable String offerId, @RequestParam(required = false) String returnTo,
+                                     Model model, Locale locale) {
+        Basket offer = deletable(offerId);
+        String back = safeReturnTo(returnTo);
+        boolean template = offer.hasType(BasketType.OfferTemplate);
+        String name = displayName(offer, locale);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage(template ? "offers.delete.confirm.titleTemplate" : "offers.delete.confirm.title", new Object[]{name}, locale),
+                messageSource.getMessage(template ? "offers.delete.confirm.messageTemplate" : "offers.delete.confirm.message", null, locale),
+                messageSource.getMessage("offers.delete.confirm.action", null, locale),
+                "/dashboard/offer/" + offerId + "/delete?returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8),
+                back));
+        model.addAttribute("backLabel", messageSource.getMessage("nav.offer", null, locale));
+        return "settings-confirm";
+    }
+
     @PostMapping("/dashboard/offer/{offerId}/delete")
-    public String deleteOffer(@PathVariable("offerId") String offerId, Model model) {
-        Optional<Basket> existingOfferOpt = basketsRepository.findById(getStoreId(), offerId);
-        if (!existingOfferOpt.isPresent()) {
-            model.addAttribute("error", "Offer not found");
-            return "error";
+    public String deleteOffer(@PathVariable("offerId") String offerId, @RequestParam(required = false) String returnTo,
+                              RedirectAttributes redirectAttributes, Locale locale) {
+        Basket offer = deletable(offerId);
+        basketsRepository.delete(offer);
+        String name = displayName(offer, locale);
+        redirectAttributes.addFlashAttribute("offerNotice", messageSource.getMessage(
+                offer.hasType(BasketType.OfferTemplate) ? "offers.template.deleted" : "offers.deleted", new Object[]{name}, locale));
+        return "redirect:" + safeReturnTo(returnTo);
+    }
+
+    /** Same fallback as the list rows, so the dialog, the confirm page and the notice name a record alike. */
+    private String displayName(Basket offer, Locale locale) {
+        if (StringUtils.isNotBlank(offer.getName())) {
+            return offer.getName();
         }
+        String key = offer.hasType(BasketType.OfferTemplate) ? "offers.list.untitledTemplate" : "offers.list.untitled";
+        return messageSource.getMessage(key, new Object[]{offer.getShortenedBasketId()}, locale);
+    }
 
-        Basket existingOffer = existingOfferOpt.get();
-        if (existingOffer.hasType(BasketType.Basket)) {
-            model.addAttribute("error", "Cannot delete Basket");
-            return "error";
+    private Basket deletable(String offerId) {
+        Basket offer = basketsRepository.findById(getStoreId(), offerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (offer.hasType(BasketType.Basket)) {
+            // store baskets are only previewed; the list offers no delete for them, this is a guard
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         }
+        return offer;
+    }
 
-        basketsRepository.delete(existingOffer);
-
-        return "redirect:/dashboard/offers";
+    /** Back to the list the delete came from, never to another address (no open redirect, no header injection). */
+    static String safeReturnTo(String returnTo) {
+        if (returnTo == null || returnTo.contains("\r") || returnTo.contains("\n")
+                // RedirectView expands {…} as URI templates, which would fail after the delete already happened
+                || returnTo.contains("{") || returnTo.contains("}")) {
+            return LIST_PATH;
+        }
+        return returnTo.equals(LIST_PATH) || returnTo.startsWith(LIST_PATH + "?") ? returnTo : LIST_PATH;
     }
 
     @PostMapping("/dashboard/offer/{offerId}/copy")

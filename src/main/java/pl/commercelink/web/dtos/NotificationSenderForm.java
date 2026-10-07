@@ -10,7 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** How emails to customers are signed: the sender's display name and the address customer replies go to. */
+/**
+ * How emails to customers are signed: the sender's display name and the address customer replies go to. Both are
+ * required, since no email goes out without them.
+ */
 @Getter
 @Setter
 public class NotificationSenderForm {
@@ -35,13 +38,16 @@ public class NotificationSenderForm {
 
     public Map<String, String> validate() {
         Map<String, String> errors = new LinkedHashMap<>();
-        String name = StringUtils.trimToEmpty(senderName);
-        if (HEADER_BREAKING.matcher(name).find()) {
-            errors.put("senderName", "store.notification.senderName.invalid");
-        } else if (name.length() > SENDER_NAME_MAX_LENGTH) {
-            errors.put("senderName", "store.notification.senderName.too.long");
+        if (FormRules.requireText(errors, "senderName", senderName, "store.notification.senderName.required")) {
+            String name = senderName.trim();
+            if (HEADER_BREAKING.matcher(name).find()) {
+                errors.put("senderName", "store.notification.senderName.invalid");
+            } else if (name.length() > SENDER_NAME_MAX_LENGTH) {
+                errors.put("senderName", "store.notification.senderName.too.long");
+            }
         }
-        if (StringUtils.isNotBlank(replyToEmail) && !FormRules.isEmail(replyToEmail)) {
+        if (FormRules.requireText(errors, "replyToEmail", replyToEmail, "store.notification.replyToEmail.required")
+                && !FormRules.isEmail(replyToEmail)) {
             errors.put("replyToEmail", "store.notification.replyToEmail.invalid");
         }
         return errors;

@@ -349,19 +349,59 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theDeliveryStandsUnderTheItemStatePill() {
+    void theItemStatePillIsTheLinkToItsDelivery() {
         // given
         Order order = order(OrderStatus.Assembly);
-        OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+        OrderItem ordered = inDelivery(order, "90fd6ba3-1111-2222-3333-444455556666", FulfilmentStatus.Ordered);
 
         // when
-        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+        String cell = fulfilmentCell(page(render(order, List.of(ordered), ADMIN, Set.of())));
 
-        // then: the delivery is the cell's second line, under the pill (client request 2026-09-30: the number beside the
-        // pill read worse than under it)
-        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">"
-                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">")
-                .doesNotContain("cl-table-state");
+        // then: the pill took the link of the delivery number that stood under it (client 2026-10-06); the number is
+        // gone from sight and named for screen readers only
+        assertThat(cell).containsPattern("^<a class=\"cl-status is-info\" "
+                        + "href=\"/dashboard/deliveries/details\\?deliveryId=90fd6ba3-1111-2222-3333-444455556666\" "
+                        + "aria-label=\"Zamówiony, dostawa 90fd6ba3\">Zamówiony</a>$")
+                .doesNotContain("cl-table-sub").doesNotContain("cl-table-link");
+    }
+
+    @Test
+    void anItemWaitingForItsSupplierLinksCreatingTheDeliveryForAnAdminOnly() {
+        // given: a warehouse order's item waiting for AcmeB, not yet in a delivery
+        Order order = order(OrderStatus.Assembly);
+        OrderItem awaiting = inDelivery(order, "AcmeB", FulfilmentStatus.Allocation);
+
+        // when
+        String admin = fulfilmentCell(page(render(order, List.of(awaiting), ADMIN, Set.of())));
+        String user = fulfilmentCell(page(render(order, List.of(awaiting), USER, Set.of())));
+
+        // then: creating a delivery is the admin's; a user sees the plain pill, never the supplier's name
+        assertThat(admin).contains("href=\"/dashboard/deliveries/create/AcmeB\"")
+                .contains("aria-label=\"W alokacji, dostawca: AcmeB\"");
+        assertThat(user).isEqualTo("<span class=\"cl-status is-info\">W alokacji</span>");
+    }
+
+    @Test
+    void theStoresWarehouseAndAnItemWithoutSupplierKeepThePlainPill() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem fromWarehouse = inDelivery(order, OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Delivered);
+        OrderItem unassigned = inDelivery(order, null, FulfilmentStatus.New);
+
+        // when
+        String warehouse = fulfilmentCell(page(render(order, List.of(fromWarehouse), ADMIN, Set.of())));
+        String none = fulfilmentCell(page(render(order, List.of(unassigned), ADMIN, Set.of())));
+
+        // then: the client wants the pill to lead to a delivery or its creation and nothing else
+        assertThat(warehouse).isEqualTo("<span class=\"cl-status is-ok\">Skompletowany</span>");
+        assertThat(none).isEqualTo("<span class=\"cl-status is-neutral\">Nowy</span>");
+    }
+
+    /** The inside of the first item's state cell, trimmed. */
+    private static String fulfilmentCell(String html) {
+        String open = "<td class=\"cl-table-fulfilment\" data-label=\"Stan\">";
+        int start = html.indexOf(open) + open.length();
+        return html.substring(start, html.indexOf("</td>", start)).strip().replaceAll("\\s+", " ");
     }
 
     @Test
@@ -1544,7 +1584,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, List.of(awaiting), ADMIN, Set.of()));
 
         // then: the rendered link is the order-aware one, not the item-only fallback a regression would produce
-        assertThat(html).contains("class=\"cl-table-link\"").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
+        assertThat(html).contains("<a class=\"cl-status").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
                 .doesNotContain("href=\"" + itemOnly.replace("&", "&amp;") + "\"");
     }
 

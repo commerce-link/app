@@ -181,5 +181,10 @@
 
     hideAutosubmitButtons();
     applyFold();
+    // An outcome message rendered after a redirect (e.g. "Usunięto ofertę …", [data-cl-list-notice][tabindex=-1]) gets the
+    // focus once, so a screen reader reads it; a role=status present at load is usually not announced. A swapped block
+    // never carries it (no flash on the fragment request).
+    var notice = root.querySelector('[data-cl-list-notice]');
+    if (notice) { notice.focus(); }
     history.replaceState({ listPage: true }, '', window.location.pathname + window.location.search);
 })();

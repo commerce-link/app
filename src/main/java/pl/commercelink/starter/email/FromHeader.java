@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
-/** The From header value SES accepts for a display name typed by a store admin or taken from the store name. */
+/** The From header value SES accepts for a display name typed by a store admin. */
 final class FromHeader {
 
     private static final int MAX_BYTES_PER_WORD = 45;
