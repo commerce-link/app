@@ -81,6 +81,22 @@ class WarehouseDocumentListServiceTest {
     }
 
     @Test
+    void pagePastTheEndOffersTheFirstPage() {
+        // given
+        givenStore(true);
+        when(search.search(any(), any(), eq(9), eq(25))).thenReturn(List.of());
+        WarehouseDocumentListQuery q = new WarehouseDocumentListQuery(PATH, DocumentKind.PZ, List.of(), null, null, null, 9);
+
+        // when
+        WarehouseDocumentListPage page = service.page("s1", false, q, PL);
+
+        // then
+        assertThat(page.emptyState().text()).isEqualTo("Brak dokumentów spełniających te warunki.");
+        assertThat(page.emptyState().actionLabel()).isEqualTo("Wróć do pierwszej strony");
+        assertThat(page.emptyState().actionHref()).isEqualTo(PATH + "?type=PZ");
+    }
+
+    @Test
     void criteriaCarryKindReasonsDatesAndNumberAndTheProductCodeGoesAside() {
         // given
         givenStore(true);

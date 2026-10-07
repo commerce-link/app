@@ -39,7 +39,7 @@ public class DocumentRowMapper {
         return new DocumentRow(
                 detailsHref(detailsBase, d.getDocumentId()),
                 d.getDocumentNo(),
-                kind == null ? text("DocumentType." + d.getType().name()) : text("warehouse.documents.kind." + kind.code()),
+                typeName(d, kind),
                 kind != null && kind.incoming(),
                 d.getReason() == null ? null : text("DocumentReason." + d.getReason().name()),
                 StringUtils.trimToNull(d.getNote()),
@@ -48,6 +48,11 @@ public class DocumentRowMapper {
                 d.getCreatedAt() == null ? null : d.getCreatedAt().format(DATE),
                 (d.getCreatedAt() == null ? "" : d.getCreatedAt().format(TIME) + " · ") + author,
                 superAdmin ? d.getStoreId() : null);
+    }
+
+    private String typeName(WarehouseDocument d, DocumentKind kind) {
+        if (kind != null) return text("warehouse.documents.kind." + kind.code());
+        return d.getType() == null ? text("warehouse.documents.list.none") : text("DocumentType." + d.getType().name());
     }
 
     public static String detailsHref(String detailsBase, String documentId) {

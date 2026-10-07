@@ -1,31 +1,28 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import pl.commercelink.documents.DocumentReason;
-import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.warehousedocuments.WarehouseDocumentListQuery;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.*;
-
-import static org.apache.commons.lang3.StringUtils.isBlank;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 @Controller
 class WarehouseDocumentsController {
 
-    private static final int PAGE_SIZE = 25;
+    private static final String LIST_PATH = "/dashboard/warehouse-documents";
 
     @Autowired
     private WarehouseDocumentRepository warehouseDocumentRepository;
@@ -37,7 +34,7 @@ class WarehouseDocumentsController {
     private WarehouseDocumentMfnHistoryService warehouseDocumentMfnHistoryService;
 
     @Autowired
-    private WarehouseDocumentSearchService warehouseDocumentSearchService;
+    private WarehouseDocumentListService warehouseDocumentListService;
 
     @Autowired
     private StoresRepository storesRepository;
@@ -47,86 +44,42 @@ class WarehouseDocumentsController {
 
     @GetMapping("/dashboard/warehouse-documents")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    String listDocuments(
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false) String warehouseId,
-            @RequestParam(required = false) String ean,
-            @RequestParam(required = false) String mfn,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            Model model
-    ) {
-        return showDocumentsList(getStoreId(), type, dateFrom, dateTo, warehouseId, ean, mfn, page, model);
+    String listDocuments(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        return list(LIST_PATH, getStoreId(), params, locale, model, "warehouse-documents");
+    }
+
+    @GetMapping("/dashboard/warehouse-documents/list")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    String listDocumentsFragment(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        return list(LIST_PATH, getStoreId(), params, locale, model, "warehouse-documents :: results");
     }
 
     @GetMapping("/dashboard/store/{storeId}/warehouse-documents")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    String listDocumentsForSuperAdmin(
-            @PathVariable String storeId,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-            @RequestParam(required = false) String warehouseId,
-            @RequestParam(required = false) String ean,
-            @RequestParam(required = false) String mfn,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            Model model
-    ) {
-        return showDocumentsList(storeId, type, dateFrom, dateTo, warehouseId, ean, mfn, page, model);
+    String listDocumentsForSuperAdmin(@PathVariable String storeId, @RequestParam MultiValueMap<String, String> params,
+                                      Locale locale, Model model) {
+        return list(storeListPath(storeId), storeId, params, locale, model, "warehouse-documents");
     }
 
-    private String showDocumentsList(String storeId, String type, LocalDate dateFrom, LocalDate dateTo,
-                                     String warehouseId, String ean, String mfn, int page, Model model) {
-        Store store = storesRepository.findById(storeId);
+    @GetMapping("/dashboard/store/{storeId}/warehouse-documents/list")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    String listDocumentsFragmentForSuperAdmin(@PathVariable String storeId, @RequestParam MultiValueMap<String, String> params,
+                                              Locale locale, Model model) {
+        return list(storeListPath(storeId), storeId, params, locale, model, "warehouse-documents :: results");
+    }
 
-        if (!store.hasDocumentsGenerationEnabled()) {
-            model.addAttribute("documentsDisabled", true);
-            if (isSuperAdmin()) {
-                model.addAttribute("storeId", storeId);
-                model.addAttribute("isSuperAdmin", true);
-            }
-            return "warehouse-documents";
+    private String list(String path, String storeId, MultiValueMap<String, String> params, Locale locale, Model model, String view) {
+        Optional<String> legacy = WarehouseDocumentListQuery.legacyRedirect(path, params);
+        if (legacy.isPresent()) {
+            return "redirect:" + legacy.get();
         }
+        model.addAttribute("page", warehouseDocumentListService.page(storeId, isSuperAdmin(),
+                WarehouseDocumentListQuery.parse(path, params), locale));
+        return view;
+    }
 
-        DocumentType documentType = (type != null && !type.trim().isEmpty()) ? DocumentType.valueOf(type) : null;
-        LocalDateTime from = dateFrom != null ? dateFrom.atStartOfDay() : null;
-        LocalDateTime to = dateTo != null ? dateTo.atTime(LocalTime.MAX) : null;
-        String eanQuery = ean != null ? ean.trim() : null;
-        String mfnQuery = mfn != null ? mfn.trim() : null;
-
-        WarehouseDocumentCriteria criteria = new WarehouseDocumentCriteria(storeId, documentType, Set.of(), from, to,
-                isBlank(warehouseId) ? null : "/" + warehouseId.trim() + "/");
-        String productCode = !isBlank(eanQuery) ? eanQuery : mfnQuery;
-        List<WarehouseDocument> pagedDocuments = warehouseDocumentSearchService.search(criteria, productCode, page, PAGE_SIZE);
-
-        boolean hasNextPage = pagedDocuments.size() > PAGE_SIZE;
-        if (hasNextPage) {
-            pagedDocuments = pagedDocuments.subList(0, PAGE_SIZE);
-        }
-
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", hasNextPage);
-
-        Map<String, Object> searchParams = new HashMap<>();
-        searchParams.put("type", type);
-        searchParams.put("dateFrom", dateFrom);
-        searchParams.put("dateTo", dateTo);
-        searchParams.put("warehouseId", warehouseId);
-        searchParams.put("ean", ean);
-        searchParams.put("mfn", mfn);
-
-        model.addAttribute("documents", pagedDocuments);
-        model.addAttribute("documentTypes", getWarehouseDocumentTypes());
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("documentsDisabled", false);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-
-        if (isSuperAdmin()) {
-            model.addAttribute("storeId", storeId);
-        }
-
-        return "warehouse-documents";
+    private static String storeListPath(String storeId) {
+        return "/dashboard/store/" + storeId + "/warehouse-documents";
     }
 
     @GetMapping("/dashboard/warehouse-documents/details")
@@ -192,16 +145,6 @@ class WarehouseDocumentsController {
         model.addAttribute("deliveryId", deliveryId);
         model.addAttribute("mfn", mfn);
         return "warehouse-document-mfn-history";
-    }
-
-    private List<DocumentType> getWarehouseDocumentTypes() {
-        return Arrays.asList(
-                DocumentType.GoodsReceipt,
-                DocumentType.GoodsIssue,
-                DocumentType.InternalReceipt,
-                DocumentType.InternalIssue,
-                DocumentType.StockTransfer
-        );
     }
 
     private String getStoreId() {

@@ -95,6 +95,19 @@ class DocumentRowMapperTest {
         assertThat(row.reason()).isNull();
     }
 
+    @Test
+    void documentWithoutTypeStillRenders() {
+        // given
+        WarehouseDocument d = document("doc-9", "XX/MAG1/2026/000001", null, null);
+
+        // when
+        DocumentRow row = mapper.row(d);
+
+        // then
+        assertThat(row.typeName()).isEqualTo("—");
+        assertThat(row.incoming()).isFalse();
+    }
+
     private static WarehouseDocument document(String id, String no, DocumentType type, DocumentReason reason) {
         WarehouseDocument d = new WarehouseDocument();
         d.setStoreId("s1");

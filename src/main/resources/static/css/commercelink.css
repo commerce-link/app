@@ -9030,6 +9030,12 @@ a.cl-link-button:hover {
     }
 }
 
+/* Warehouse documents list (docs/active/warehouse-documents-redesign): the number never breaks, the direction icon
+   repeats the type name in colour (the name carries the meaning) */
+.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }
+
 /* Offers list (spec docs/active/offers-redesign). The row link's ::after covers the whole row, so the actions cell rises
    above it or its menu and buttons could not be clicked. Scoped to is-offers: payments.html also has td.cl-table-actions
    inside an is-orders table and must keep its own layout. */

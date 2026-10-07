@@ -113,6 +113,11 @@ public class WarehouseDocumentListService {
     }
 
     private EmptyState emptyState(WarehouseDocumentListQuery q, Locale locale) {
+        // a page past the end is not "no documents": the list has them, the reader only went too far
+        if (q.page() > 1) {
+            return new EmptyState(text(locale, "warehouse.documents.list.empty.filtered"),
+                    text(locale, "warehouse.documents.list.empty.firstPage"), q.withPage(1).href());
+        }
         if (!q.isFiltered()) {
             return new EmptyState(text(locale, "warehouse.documents.list.empty.none"), null, null);
         }
