@@ -23,7 +23,8 @@ import java.util.stream.Collectors;
 /**
  * Closing a month stores its stock ledger report, and later reports start from its closing balance instead of the
  * whole history. Invoices stay editable after the closing: syncing one rewrites the prices of the warehouse documents
- * of its delivery, so a corrected month is generated again, together with the closed months after it.
+ * of its delivery, so a corrected month is generated again. The closed months after it start from its closing balance;
+ * generating them again is left to the user, month by month.
  */
 @Service
 public class StockLedgerMonthClosing {
@@ -66,41 +67,36 @@ public class StockLedgerMonthClosing {
         if (!status.nextClosable()) {
             return new NotAllowed("reports.stockLedger.closing.error.notOver");
         }
-        return store(storeId, List.of(month), status.closedMonths().isEmpty());
+        return store(storeId, month, status.closedMonths().isEmpty());
     }
 
-    /** Every closed month after the regenerated one starts from its closing balance, so they are generated again too. */
     public StockLedgerClosingResult regenerate(String storeId, YearMonth month) throws IOException {
         List<YearMonth> closed = closings.closedMonths(storeId);
         if (!closed.contains(month)) {
             return new NotAllowed("reports.stockLedger.closing.error.notClosed");
         }
-        List<YearMonth> fromMonth = closed.stream().filter(closedMonth -> !closedMonth.isBefore(month)).toList();
-        return store(storeId, fromMonth, month.equals(closed.get(0)));
+        return store(storeId, month, month.equals(closed.get(0)));
     }
 
     public Optional<byte[]> closedReport(String storeId, YearMonth month) {
         return closings.find(storeId, month);
     }
 
-    private StockLedgerClosingResult store(String storeId, List<YearMonth> months, boolean firstClosing) throws IOException {
-        List<Delivery> unsettled = unsettledDeliveries(storeId, months.get(0), months.get(months.size() - 1), firstClosing);
+    private StockLedgerClosingResult store(String storeId, YearMonth month, boolean firstClosing) throws IOException {
+        List<Delivery> unsettled = unsettledDeliveries(storeId, month, firstClosing);
         if (!unsettled.isEmpty()) {
             return new Blocked(unsettled);
         }
-        // oldest first: each month starts from the closing balance of the one before it
-        for (YearMonth month : months) {
-            byte[] report = StockLedgerRow.toCsv(stockLedgerService.generate(storeId, month.atDay(1), month.atEndOfMonth()));
-            closings.save(storeId, month, report);
-        }
-        return new Closed(months);
+        byte[] report = StockLedgerRow.toCsv(stockLedgerService.generate(storeId, month.atDay(1), month.atEndOfMonth()));
+        closings.save(storeId, month, report);
+        return new Closed(month);
     }
 
-    private List<Delivery> unsettledDeliveries(String storeId, YearMonth from, YearMonth to, boolean firstClosing) {
+    private List<Delivery> unsettledDeliveries(String storeId, YearMonth month, boolean firstClosing) {
         // the first closed month holds the whole history in its opening balance, so every earlier delivery has to be settled too
         List<WarehouseDocument> received = firstClosing
-                ? documents.findAllBeforeDate(storeId, to.plusMonths(1).atDay(1).atStartOfDay())
-                : documents.findAllInDateRange(storeId, from.atDay(1).atStartOfDay(), to.atEndOfMonth().atTime(LocalTime.MAX));
+                ? documents.findAllBeforeDate(storeId, month.plusMonths(1).atDay(1).atStartOfDay())
+                : documents.findAllInDateRange(storeId, month.atDay(1).atStartOfDay(), month.atEndOfMonth().atTime(LocalTime.MAX));
         Set<String> deliveryIds = received.stream()
                 .filter(document -> document.getType() == DocumentType.GoodsReceipt && document.getDeliveryId() != null)
                 .map(WarehouseDocument::getDeliveryId)

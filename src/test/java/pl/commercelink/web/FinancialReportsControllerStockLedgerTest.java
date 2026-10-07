@@ -81,7 +81,7 @@ class FinancialReportsControllerStockLedgerTest {
     @Test
     void closedMonthIsConfirmedOnTheClosingSection() throws Exception {
         // given
-        when(stockLedgerMonthClosing.close(STORE_ID, SEPTEMBER)).thenReturn(new Closed(List.of(SEPTEMBER)));
+        when(stockLedgerMonthClosing.close(STORE_ID, SEPTEMBER)).thenReturn(new Closed(SEPTEMBER));
 
         // when
         String view = controller.closeStockLedgerMonth("2026-09", redirectAttributes, PL);
@@ -130,10 +130,10 @@ class FinancialReportsControllerStockLedgerTest {
     }
 
     @Test
-    void regeneratedMonthsAreConfirmedOnTheClosingSection() throws Exception {
+    void regeneratedMonthIsConfirmedOnTheClosingSection() throws Exception {
         // given
         YearMonth august = YearMonth.of(2026, 8);
-        when(stockLedgerMonthClosing.regenerate(STORE_ID, august)).thenReturn(new Closed(List.of(august, SEPTEMBER)));
+        when(stockLedgerMonthClosing.regenerate(STORE_ID, august)).thenReturn(new Closed(august));
 
         // when
         String view = controller.regenerateStockLedgerMonth("2026-08", redirectAttributes, PL);

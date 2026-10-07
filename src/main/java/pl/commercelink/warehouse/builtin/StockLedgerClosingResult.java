@@ -7,8 +7,7 @@ import java.util.List;
 
 public sealed interface StockLedgerClosingResult {
 
-    /** The months whose report was stored, oldest first. */
-    record Closed(List<YearMonth> months) implements StockLedgerClosingResult {
+    record Closed(YearMonth month) implements StockLedgerClosingResult {
     }
 
     /** Deliveries received into the warehouse that still wait for their purchase invoice or its sync. */

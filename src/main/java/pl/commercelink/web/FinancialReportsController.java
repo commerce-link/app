@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -151,12 +150,8 @@ public class FinancialReportsController {
                                      RedirectAttributes redirectAttributes, Locale locale) {
         String label = StockLedgerClosingView.label(month, locale);
         switch (result) {
-            case Closed closed -> {
-                String months = closed.months().stream()
-                        .map(closedMonth -> StockLedgerClosingView.label(closedMonth, locale))
-                        .collect(Collectors.joining(", "));
-                redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(doneKey, new Object[]{months}, locale));
-            }
+            case Closed closed -> redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage(doneKey, new Object[]{label}, locale));
             case Blocked blocked -> {
                 SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
                 redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(blockedKey, new Object[]{label}, locale));

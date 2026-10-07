@@ -3,7 +3,6 @@ package pl.commercelink.warehouse.builtin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.documents.DocumentType;
@@ -30,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -150,7 +148,7 @@ class StockLedgerMonthClosingTest {
         StockLedgerClosingResult result = closing.close(STORE_ID, SEPTEMBER);
 
         // then
-        assertThat(result).isEqualTo(new Closed(List.of(SEPTEMBER)));
+        assertThat(result).isEqualTo(new Closed(SEPTEMBER));
     }
 
     @Test
@@ -179,36 +177,32 @@ class StockLedgerMonthClosingTest {
         StockLedgerClosingResult result = closing.close(STORE_ID, SEPTEMBER);
 
         // then
-        assertThat(result).isEqualTo(new Closed(List.of(SEPTEMBER)));
+        assertThat(result).isEqualTo(new Closed(SEPTEMBER));
         verify(closings).save(eq(STORE_ID), eq(SEPTEMBER), aryEq(StockLedgerRow.toCsv(rows)));
     }
 
     @Test
-    void regeneratingAMonthGeneratesItAndTheClosedMonthsAfterItAgain() throws Exception {
+    void regeneratingAMonthGeneratesOnlyThatMonth() throws Exception {
         // given
         when(closings.closedMonths(STORE_ID)).thenReturn(List.of(JULY, AUGUST, SEPTEMBER));
         List<StockLedgerRow> august = List.of(new StockLedgerRow("MFN-A", "Widget", 1, 10.0, Map.of(), Map.of()));
-        List<StockLedgerRow> september = List.of(new StockLedgerRow("MFN-A", "Widget", 2, 20.0, Map.of(), Map.of()));
         when(stockLedgerService.generate(STORE_ID, AUGUST.atDay(1), AUGUST.atEndOfMonth())).thenReturn(august);
-        when(stockLedgerService.generate(STORE_ID, SEPTEMBER.atDay(1), SEPTEMBER.atEndOfMonth())).thenReturn(september);
 
         // when
         StockLedgerClosingResult result = closing.regenerate(STORE_ID, AUGUST);
 
         // then
-        assertThat(result).isEqualTo(new Closed(List.of(AUGUST, SEPTEMBER)));
-        InOrder inOrder = inOrder(closings);
-        inOrder.verify(closings).save(eq(STORE_ID), eq(AUGUST), aryEq(StockLedgerRow.toCsv(august)));
-        inOrder.verify(closings).save(eq(STORE_ID), eq(SEPTEMBER), aryEq(StockLedgerRow.toCsv(september)));
-        verify(closings, never()).save(eq(STORE_ID), eq(JULY), any());
-        verify(documents).findAllInDateRange(STORE_ID, AUGUST.atDay(1).atStartOfDay(), SEPTEMBER.atEndOfMonth().atTime(LocalTime.MAX));
+        assertThat(result).isEqualTo(new Closed(AUGUST));
+        verify(closings).save(eq(STORE_ID), eq(AUGUST), aryEq(StockLedgerRow.toCsv(august)));
+        verify(closings, never()).save(eq(STORE_ID), eq(SEPTEMBER), any());
+        verify(documents).findAllInDateRange(STORE_ID, AUGUST.atDay(1).atStartOfDay(), AUGUST.atEndOfMonth().atTime(LocalTime.MAX));
     }
 
     @Test
-    void regeneratingWaitsForTheInvoicesOfTheMonthsItCovers() throws Exception {
+    void regeneratingTheFirstClosedMonthWaitsForTheInvoicesOfTheWholeHistory() throws Exception {
         // given
         when(closings.closedMonths(STORE_ID)).thenReturn(List.of(AUGUST, SEPTEMBER));
-        when(documents.findAllBeforeDate(STORE_ID, OCTOBER.atDay(1).atStartOfDay())).thenReturn(documents(receipt("unlinked")));
+        when(documents.findAllBeforeDate(STORE_ID, SEPTEMBER.atDay(1).atStartOfDay())).thenReturn(documents(receipt("unlinked")));
         Delivery unlinked = delivery("unlinked", "Manual-Hurt", false, false);
         when(deliveries.findAllByIds(STORE_ID, Set.of("unlinked"))).thenReturn(List.of(unlinked));
 
