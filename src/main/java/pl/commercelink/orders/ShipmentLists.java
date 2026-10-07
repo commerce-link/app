@@ -48,8 +48,4 @@ public final class ShipmentLists {
         }
         return changed;
     }
-
-    public static void dropFailedCreations(List<Shipment> shipments) {
-        shipments.removeIf(Shipment::creationFailed);
-    }
 }

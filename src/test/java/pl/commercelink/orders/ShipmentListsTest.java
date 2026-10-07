@@ -42,18 +42,4 @@ class ShipmentListsTest {
         assertThat(replaced).isTrue();
         assertThat(list).extracting(Shipment::getTrackingNo).containsExactly("MANUAL-1", "A", "B");
     }
-
-    @Test
-    void dropFailedCreationsKeepsEverythingElse() {
-        // given
-        Shipment failed = creating("cmd-1");
-        failed.setCreation(failed.getCreation().failed("Błąd"));
-        List<Shipment> list = new ArrayList<>(List.of(failed, created("1", "A")));
-
-        // when
-        ShipmentLists.dropFailedCreations(list);
-
-        // then
-        assertThat(list).extracting(Shipment::getTrackingNo).containsExactly("A");
-    }
 }
