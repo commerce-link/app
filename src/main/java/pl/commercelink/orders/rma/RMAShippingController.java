@@ -51,7 +51,7 @@ public class RMAShippingController extends AbstractShippingController {
     public String initiateShippingToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
 
-        List<RMAItem> qualifiedRmaItems = form.getSelectedRMAItems().stream()
+        List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))
                 .toList();
 
@@ -82,7 +82,7 @@ public class RMAShippingController extends AbstractShippingController {
     public String initiateShippingToClient(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
 
-        List<RMAItem> qualifiedRmaItems = form.getSelectedRMAItems().stream()
+        List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))
                 .toList();
 
@@ -134,6 +134,15 @@ public class RMAShippingController extends AbstractShippingController {
         rma.setShipments(shipments);
         shipmentTrackingSubscriber.subscribe(getStoreId(), rma);
         rmaLifecycle.update(rma, selectedItems);
+    }
+
+    // The RMA page posts only the checkbox and identifiers of each item, so its status and delivery
+    // must come from storage, not from the bound form (where the status would be the default New).
+    private List<RMAItem> storedSelectedItems(String rmaId, RMAItemsForm form) {
+        List<String> selectedIds = form.getSelectedRMAItemIds();
+        return rmaItemsRepository.findByRmaId(rmaId).stream()
+                .filter(item -> selectedIds.contains(item.getRmaItemId()))
+                .toList();
     }
 
     private List<RMAItem> filterSelectedItems(RMA rma, ShippingForm form) {
