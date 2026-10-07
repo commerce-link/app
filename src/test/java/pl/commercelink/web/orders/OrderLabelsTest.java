@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderReviewStatus;
@@ -8,11 +9,15 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.api.ItemCondition;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -130,5 +135,47 @@ class OrderLabelsTest {
         assertThat(OrderLabels.tone(ShipmentTrackingStatus.ACTIVE)).isEqualTo(OrderLabels.INFO);
         assertThat(OrderLabels.tone(ShipmentTrackingStatus.FAILED)).isEqualTo(OrderLabels.BAD);
         assertThat(OrderLabels.tone((ShipmentTrackingStatus) null)).isNull();
+    }
+
+    @Test
+    void aStoredCauseOfOurOwnIsResolvedAfterTheFailurePrefixByTheApplicationsMessageSource() {
+        // given: the message source the application runs with, which resolves a message given as an argument
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        Shipment notCreated = new Shipment(ShipmentType.Courier);
+        notCreated.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failedWithKey("shipping.creation.notCreated"));
+        Shipment noWindows = new Shipment(ShipmentType.Courier);
+        noWindows.setProvider("furgonetka");
+        noWindows.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.immediate.no.windows"));
+
+        // when
+        OrderLabels.ShipmentState creation = OrderLabels.shipmentState(notCreated, Locale.ENGLISH);
+        OrderLabels.ShipmentState pickup = OrderLabels.shipmentState(noWindows, Locale.ENGLISH);
+
+        // then
+        assertThat(messages.getMessage(creation.key(), creation.args(), Locale.ENGLISH)).isEqualTo(
+                EN.getString("order.shipments.state.creation.failed").replace("{0}", EN.getString("shipping.creation.notCreated")));
+        assertThat(messages.getMessage(pickup.key(), pickup.args(), Locale.ENGLISH)).isEqualTo(
+                EN.getString("order.shipments.state.pickup.failed").replace("{0}", EN.getString("shipping.pickup.immediate.no.windows")));
+    }
+
+    @Test
+    void aStoredSentenceThatStatesTheOutcomeIsTheLineItself() {
+        // given
+        Shipment unconfirmed = new Shipment(ShipmentType.Courier);
+        unconfirmed.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        List<String> pickupKeys = List.of(ShipmentPickup.UNCONFIRMED_KEY, "shipping.pickup.not.sent", "shipping.pickup.no.provider");
+
+        // when / then
+        assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH).key()).isEqualTo(ShipmentCreationState.UNCONFIRMED_KEY);
+        assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH).args()).isEmpty();
+        for (String key : pickupKeys) {
+            Shipment parcel = new Shipment(ShipmentType.Courier);
+            parcel.setProvider("furgonetka");
+            parcel.setPickup(ShipmentPickup.awaiting().failedWithKey(key));
+            assertThat(OrderLabels.shipmentState(parcel, Locale.ENGLISH).key()).isEqualTo(key);
+            assertThat(OrderLabels.shipmentState(parcel, Locale.ENGLISH).args()).isEmpty();
+        }
     }
 }

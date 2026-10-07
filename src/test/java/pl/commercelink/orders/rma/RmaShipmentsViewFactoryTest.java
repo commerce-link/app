@@ -296,6 +296,30 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
+    void aFailedCreationWithOurOwnCauseRendersLikeTheProvidersReasonAndAnUnconfirmedOneStaysASentence() {
+        // given: one package POST /packages refused with a 503, one Furgonetka never confirmed
+        Shipment notCreated = failedCreation(false);
+        notCreated.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now())
+                .failedWithKey("shipping.creation.notCreated"));
+        Shipment unconfirmed = failedCreation(true);
+        unconfirmed.setCreation(ShipmentCreationState.pending("cmd-2", LocalDateTime.now())
+                .failedWithKey("shipping.creation.unconfirmed"));
+        RmaShipmentsView view = factory.build(rmaWith(notCreated, unconfirmed), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Furgonetka nie utworzyła "
+                        + "paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj ponownie za chwilę.</span>")
+                .contains("<span class=\"cl-status is-warn\">Furgonetka nie potwierdziła nadania — sprawdź przesyłkę "
+                        + "w jej panelu, zanim nadasz ponownie.</span>")
+                .doesNotContain("Nie udało się nadać: Furgonetka nie potwierdziła")
+                .doesNotContain("??");
+    }
+
+    @Test
     void aReturnWhoseCourierTheCarrierBookedReadsAsOrderedWithItsNumberAndOffersNoPickup() {
         // given
         Shipment booked = customerReturn();

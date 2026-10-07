@@ -1,5 +1,6 @@
 package pl.commercelink.web.orders;
 
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderReviewStatus;
@@ -21,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Function;
 
 /** Message keys and pill tones of the enums shown on the order screens: templates read enum text and tone only through here. */
@@ -33,6 +35,15 @@ public final class OrderLabels {
     public static final String NEUTRAL = "is-neutral";
 
     private static final Object[] NO_ARGS = new Object[0];
+
+    /**
+     * Our own failure sentences that already state the outcome (not confirmed, not ordered): shown alone, since
+     * "Nie udało się nadać: Furgonetka nie potwierdziła nadania" would claim a failure nobody knows of, and "Nie udało
+     * się zamówić odbioru: Odbiór nie został zamówiony" says it twice. Every other stored key names a cause and is put
+     * after the failure prefix, as the provider's own words are.
+     */
+    private static final Set<String> OUTCOME_KEYS = Set.of(ShipmentCreationState.UNCONFIRMED_KEY,
+            ShipmentPickup.UNCONFIRMED_KEY, "shipping.pickup.not.sent", "shipping.pickup.no.provider");
 
     /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
     static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";
@@ -207,8 +218,9 @@ public final class OrderLabels {
     /**
      * The line under a shipment created through an integration: being created, failed, waiting for a pickup, pickup
      * being ordered, ordered (by us, or by the carrier with the shipment), handed in at a point, pickup failed; null
-     * for one typed in by hand. A stored reason of our own (errorKey) is the line itself, resolved in the viewer's
-     * language; the provider's words (error) are its argument, shown as they came.
+     * for one typed in by hand. The provider's words (error) are the argument of the failure line, shown as they came;
+     * a stored reason of our own (errorKey) is resolved in the viewer's language, as that argument when it names a
+     * cause, or as the line itself when it already states the outcome (OUTCOME_KEYS).
      */
     public static ShipmentState shipmentState(Shipment shipment, Locale locale) {
         if (shipment.isCreating()) {
@@ -244,8 +256,12 @@ public final class OrderLabels {
     }
 
     private static ShipmentState failure(String key, String error, String errorKey) {
-        return errorKey != null ? new ShipmentState(errorKey, NO_ARGS, WARN, false)
-                : new ShipmentState(key, new Object[]{error == null ? "" : error}, WARN, false);
+        if (errorKey != null && OUTCOME_KEYS.contains(errorKey)) {
+            return new ShipmentState(errorKey, NO_ARGS, WARN, false);
+        }
+        // the message source resolves a resolvable argument in the locale of the line itself
+        Object reason = errorKey != null ? new DefaultMessageSourceResolvable(errorKey) : error == null ? "" : error;
+        return new ShipmentState(key, new Object[]{reason}, WARN, false);
     }
 
     // the day as the pickup page offered it ("czw. 8 paź"); a value that does not parse is shown as stored

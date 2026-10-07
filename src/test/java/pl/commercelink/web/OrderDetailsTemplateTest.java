@@ -738,7 +738,59 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(card).contains("<span class=\"cl-status is-warn\">Furgonetka nie potwierdziła nadania — sprawdź "
-                + "przesyłkę w jej panelu, zanim nadasz ponownie.</span>");
+                + "przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
+                .doesNotContain("Nie udało się nadać");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given: POST /packages answered 503, nothing was created
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.notCreated"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Furgonetka nie utworzyła "
+                + "paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj ponownie za chwilę.</span>");
+    }
+
+    @Test
+    void aFailedPickupWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.immediate.no.windows"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się zamówić odbioru: Przewoźnik nie podał "
+                + "terminu odbioru w najbliższych dniach.</span>");
+    }
+
+    @Test
+    void aFailedPickupWhoseSentenceStatesTheOutcomeHasNoPrefix() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.not.sent"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Odbiór nie został zamówiony — spróbuj ponownie.</span>")
+                .doesNotContain("Nie udało się zamówić odbioru");
     }
 
     @Test
