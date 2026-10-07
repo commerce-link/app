@@ -15,8 +15,8 @@ public class DefaultNotificationConfigProvider implements NotificationConfigProv
         this.storesRepository = storesRepository;
     }
 
-    // Blank sender fields fall back to the store name and the company email, so a store that never filled the form
-    // still signs its emails and receives replies.
+    // No fallback to the store name or the company email: the store decides how its emails are signed and where
+    // replies go, and until it has, nothing is sent.
     @Override
     public NotificationSettings settings(String storeId) {
         Store store = storesRepository.findById(storeId);
@@ -24,8 +24,10 @@ public class DefaultNotificationConfigProvider implements NotificationConfigProv
             return null;
         }
         ClientNotificationsConfiguration configuration = store.getClientNotificationsConfiguration();
-        String configuredName = configuration != null ? StringUtils.trimToNull(configuration.getSenderName()) : null;
-        String senderName = configuredName != null ? configuredName : StringUtils.trimToNull(store.getName());
-        return new NotificationSettings(configuration, senderName, StringUtils.trimToNull(store.getClientContactEmail()));
+        if (configuration == null) {
+            return new NotificationSettings(null, null, null);
+        }
+        return new NotificationSettings(configuration, StringUtils.trimToNull(configuration.getSenderName()),
+                StringUtils.trimToNull(configuration.getReplyToEmail()));
     }
 }
