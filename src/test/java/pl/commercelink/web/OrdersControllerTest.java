@@ -2892,7 +2892,7 @@ class OrdersControllerTest {
         private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
             return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), "", List.of(),
                     Optional.empty(), List.of(), "", java.util.Map.of(), List.of(),
-                    pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null);
+                    pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, null);
         }
 
         @BeforeEach
@@ -2904,6 +2904,7 @@ class OrdersControllerTest {
             when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
             when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of()));
             when(orderListService.page(eq(ACTOR), any(), any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(1)));
+            lenient().when(orderListService.fullPage(eq(ACTOR), any(), any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(1)));
         }
 
         @Test

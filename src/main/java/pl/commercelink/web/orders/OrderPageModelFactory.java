@@ -442,9 +442,8 @@ public class OrderPageModelFactory {
         // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
         String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now))
                 ? details + "/shipments/cancellation-state" : null;
-        String pickupHref = readOnly ? null : ShipmentLinks.pickup(shipments, details);
         return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
-                readOnly ? null : OrderShipmentForm.blank(order, carriers), pickupHref);
+                readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";

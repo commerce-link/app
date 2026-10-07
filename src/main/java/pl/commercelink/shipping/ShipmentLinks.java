@@ -49,6 +49,16 @@ public final class ShipmentLinks {
                 .orElse(null);
     }
 
+    /** The pickup page on its first group, returning to back (a list address with its own query). */
+    public static String pickupPage(String back) {
+        // encoded as a variable, so the list's own "&" and "=" stay inside the back parameter
+        return UriComponentsBuilder.fromPath(ShipmentPickupController.PAGE)
+                .queryParam("back", "{back}")
+                .encode()
+                .buildAndExpand(back)
+                .toUriString();
+    }
+
     /** The package waits for "Zamów odbiór" among the store's other packages (PickupCandidates lists exactly these). */
     public static boolean listedForPickup(Shipment s) {
         return s.awaitsPickup() && s.getProvider() != null && s.getExternalId() != null && s.getPickUpAddressId() != null;

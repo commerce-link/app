@@ -94,12 +94,12 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * cancelCourierLockedKey: why "Cancel courier order" shows greyed (its cancellation is already in progress), null
      * when it can run or is absent. cancellationPollHref: the JSON shipments state the page polls while a command of
      * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
-     * does; null when nothing waits or the page is read-only. pickupHref: "Zamów odbiór", the pickup page preset to the
-     * group of the first package waiting for a courier, with the way back here; null when none waits.
+     * does; null when nothing waits or the page is read-only. "Zamów odbiór" is not here: it is ordered from the orders
+     * list, for every package of the store at once (client decision 2026-10-07).
      */
     public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
                                 String cancelCourierLockedKey, String cancellationPollHref,
-                                List<OrderShipmentForm> forms, OrderShipmentForm blank, String pickupHref) {
+                                List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
     /**

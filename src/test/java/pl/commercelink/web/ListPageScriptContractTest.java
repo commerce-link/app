@@ -56,4 +56,17 @@ class ListPageScriptContractTest {
         assertThat(script).contains("root.querySelector('[data-cl-list-notice]')").contains("notice.focus()");
         assertThat(offers).contains("tabindex=\"-1\" data-cl-list-notice");
     }
+
+    @Test
+    void aLinkBackToTheListFollowsTheListAfterAnInPlaceChange() throws Exception {
+        // given: "Zamów odbiór" in the orders list header sits outside the swapped block
+        String script = read("src/main/resources/static/js/list-page.js");
+        String orders = read("src/main/resources/templates/orders/list.html");
+
+        // then
+        assertThat(script).contains("document.querySelectorAll('a[data-cl-list-back]')")
+                .contains("url.searchParams.set('back', target.pathname + target.search)")
+                .contains("syncBackLinks(target);");
+        assertThat(orders).contains("data-cl-list-back");
+    }
 }

@@ -99,6 +99,20 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
+    void theRmaCardKeepsItsPickupButton() {
+        // given: unlike the order card, the RMA card stays an entry to the pickup page (there is no RMA list button)
+        RmaShipmentsView view = factory.build(rmaWith(operatorPackage()), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&amp;back=/dashboard/rma/rma-1\"")
+                .contains("<span>Zamów odbiór</span>");
+    }
+
+    @Test
     void aCustomerReturnWhosePickupFailedIsOrderedAgainHereNotOnThePickupPage() {
         // given
         Shipment failed = customerReturn();

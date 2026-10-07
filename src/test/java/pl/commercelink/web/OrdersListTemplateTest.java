@@ -1,10 +1,18 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.orders.OrdersPageModel;
+import pl.commercelink.web.orders.Pagination;
+import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,6 +22,59 @@ class OrdersListTemplateTest {
 
     private static String page() throws Exception {
         return Files.readString(Path.of("src/main/resources/templates/orders/list.html"), StandardCharsets.UTF_8);
+    }
+
+    private static final String PICKUP_HREF = "/dashboard/shipping/pickups/new?back=%2Fdashboard%2Forders%3Fstatus%3DShipping";
+
+    // the page header alone (the rest of the page needs the whole filter model), on one line so the renderer takes it
+    // for markup, rendered with Polish messages
+    private static String header(OrdersPageModel.PickupAction pickup) throws Exception {
+        String html = page();
+        String markup = html.substring(html.indexOf("<header class=\"cl-page-header\">"),
+                html.indexOf("</header>") + "</header>".length()).replaceAll("\\s+", " ");
+        OrdersPageModel model = new OrdersPageModel(OrderListQuery.parse(new org.springframework.util.LinkedMultiValueMap<>()),
+                List.of(), List.of(), "", List.of(), Optional.empty(), List.of(), "", Map.of(), List.of(),
+                Pagination.of(1, 0, 50, n -> "/x"), null, pickup);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("page", model);
+        return SettingsTemplateRenderer.render(markup, variables).replaceAll("\\s+", " ");
+    }
+
+    /** "Zamów odbiór" in the header, before "Nowa sprzedaż POS", with the number of packages waiting for a courier. */
+    @Test
+    void theHeaderOffersThePickupPageWithTheNumberOfWaitingPackages() throws Exception {
+        // when
+        String html = header(new OrdersPageModel.PickupAction(PICKUP_HREF, 5));
+
+        // then
+        assertThat(html).contains("<a class=\"cl-button is-page-action\" href=\"" + PICKUP_HREF + "\" data-cl-list-back>"
+                        + " <i class=\"fas fa-shipping-fast\" aria-hidden=\"true\"></i> <span>Zamów odbiór</span>"
+                        + " <span class=\"cl-button-count\"><span class=\"cl-visually-hidden\">paczki czekające na kuriera:</span>"
+                        + "<span>5</span></span> </a>");
+        assertThat(html.indexOf("Zamów odbiór")).isLessThan(html.indexOf("Nowa sprzedaż POS"));
+    }
+
+    /** Nothing waits: the action stays (the pickup page says so), without a number. */
+    @Test
+    void withNothingWaitingTheHeaderActionHasNoNumber() throws Exception {
+        // when
+        String html = header(new OrdersPageModel.PickupAction(PICKUP_HREF, null));
+
+        // then
+        assertThat(html).contains("href=\"" + PICKUP_HREF + "\"").contains("<span>Zamów odbiór</span>")
+                .doesNotContain("cl-button-count");
+    }
+
+    /** The action is part of the header only: outside the results block that list-page.js swaps. */
+    @Test
+    void thePickupActionSitsInTheHeaderOutsideTheResultsBlock() throws Exception {
+        // given
+        String html = page();
+
+        // then
+        assertThat(html.indexOf("page.pickup().href()")).isPositive()
+                .isLessThan(html.indexOf("</header>"))
+                .isLessThan(html.indexOf("data-cl-list-results"));
     }
 
     /** One way to clear every narrowing at once, right after the filter menu in the toolbar, only when something narrows. */

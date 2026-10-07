@@ -12,8 +12,8 @@
        card carries data-cl-cancellation-poll: shipment-cancellation.js asks it every few seconds and reloads the page
        once the provider answers; without JavaScript the line says what is going on and the operator refreshes.
        A shipment created through an integration has a state line under its numbers (OrderLabels#shipmentState):
-       a spinner while it waits for the provider, else a pill. "Zamów odbiór" in the head leads to the pickup page,
-       "Pobierz etykietę" downloads the label, "Spróbuj ponownie" opens the shipping page again after a failed creation;
+       a spinner while it waits for the provider, else a pill. "Zamów odbiór" is on the orders list, not here (client
+       decision 2026-10-07); "Pobierz etykietę" downloads the label, "Spróbuj ponownie" opens the shipping page again after a failed creation;
        a shipment being created or whose creation failed has no "Edytuj". */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}"
@@ -31,10 +31,6 @@
             <!--/* greyed, still focusable, its reason under the head (design system: link action that cannot run) */-->
             <button th:if="${shipments.cancelCourierLockedKey() != null}" type="button" class="cl-link-button"
                     aria-disabled="true" aria-describedby="shipment-cancel-reason" th:text="#{order.shipments.cancel}"></button>
-            <a th:if="${shipments.pickupHref() != null}" class="cl-button" th:href="@{${shipments.pickupHref()}}">
-                <i class="fas fa-shipping-fast" aria-hidden="true"></i>
-                <span th:text="#{order.shipments.pickup.order}"></span>
-            </a>
             <a class="cl-button" data-cl-dialog-open="shipment-dialog-new"
                th:href="@{/dashboard/orders/{o}/shipments/new(o=${page.orderId()})}">
                 <i class="fas fa-plus" aria-hidden="true"></i>

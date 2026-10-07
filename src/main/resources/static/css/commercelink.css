@@ -679,6 +679,23 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-accent-ink);
 }
 
+/* A number inside a button: how many records the action would take ("Zamów odbiór" on the orders list counts the
+   packages waiting for a courier); the text before it for a screen reader is visually hidden */
+.cl-button-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .cl-page .cl-back:focus-visible,
 .cl-button:focus-visible {
     outline: 2px solid var(--cl-accent);
@@ -5577,7 +5594,8 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-page-actions .cl-page-action-form,
-    .cl-page .cl-page-actions .cl-page-action-form .cl-button {
+    .cl-page .cl-page-actions .cl-page-action-form .cl-button,
+    .cl-page .cl-page-actions .cl-button.is-page-action {
         width: 100%;
         justify-content: center;
     }

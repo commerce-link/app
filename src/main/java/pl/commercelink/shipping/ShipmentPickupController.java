@@ -32,8 +32,9 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * "Zamów odbiór": one courier for the chosen packages of one carrier at one pickup address. A page, not a dialog on the
- * order: the windows come from the provider, and a dialog rendered with the order would ask for them on every visit.
+ * "Zamów odbiór": one courier for the chosen packages of one carrier at one pickup address. Opened from the orders list
+ * (every package of the store waiting for a courier) and from an RMA page. A page, not a dialog: the windows come from the
+ * provider, and a dialog rendered with a list or a record would ask for them on every visit.
  */
 @Slf4j
 @Controller
@@ -46,7 +47,7 @@ public class ShipmentPickupController {
     private static final String DEFAULT_BACK = "/dashboard/orders";
     private static final String FORM_ERROR = "pickupError";
     // the address comes from the request and ends up in a redirect: only a plain path of the dashboard is followed
-    private static final Pattern SAFE_BACK = Pattern.compile("/dashboard/[A-Za-z0-9_\\-./?=&%]*");
+    private static final Pattern SAFE_BACK = Pattern.compile("/dashboard/[A-Za-z0-9_\\-./?=&%+]*");
     private static final Pattern OWNER_PAGE = Pattern.compile("/dashboard/(orders|rma)/([A-Za-z0-9\\-]+)(?:[/?].*)?");
 
     private final ShipmentPickupService pickupService;
@@ -166,12 +167,13 @@ public class ShipmentPickupController {
         return redirect(PAGE, group, back);
     }
 
+    // encoded as variables: a back address of the orders list carries its own "&" and "="
     private static String redirect(String page, String group, String back) {
         return "redirect:" + UriComponentsBuilder.fromPath(page)
-                .queryParam("group", group)
-                .queryParam("back", back)
+                .queryParam("group", "{group}")
+                .queryParam("back", "{back}")
                 .encode()
-                .build()
+                .buildAndExpand(group, back)
                 .toUriString();
     }
 

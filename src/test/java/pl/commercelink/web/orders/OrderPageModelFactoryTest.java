@@ -2109,7 +2109,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void aPackageWaitingForPickupOffersItsLabelAndTheCardOffersThePickupPage() {
+    void aPackageWaitingForPickupOffersItsLabel() {
         // given
         Order order = orderWith(furgonetkaPackage());
         when(shippingService.supportsLabels(any(), eq("furgonetka"))).thenReturn(true);
@@ -2123,8 +2123,6 @@ class OrderPageModelFactoryTest {
         assertThat(row.stateTone()).isEqualTo("is-neutral");
         assertThat(row.labelHref())
                 .isEqualTo("/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId());
-        assertThat(card.pickupHref()).isEqualTo("/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&back=/dashboard/orders/"
-                + order.getOrderId());
         assertThat(row.editHref()).isNotNull();
     }
 
@@ -2142,7 +2140,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void anOrderedPickupShowsItsDayAndHoursAndNeedsNoPickupButton() {
+    void anOrderedPickupShowsItsDayAndHours() {
         // given
         Shipment ordered = furgonetkaPackage();
         ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
@@ -2155,7 +2153,6 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.ordered");
         assertThat(card.rows().get(0).stateArgs()).containsExactly("czw. 8 paź", "9:00", "17:00");
         assertThat(card.rows().get(0).stateTone()).isEqualTo("is-ok");
-        assertThat(card.pickupHref()).isNull();
     }
 
     @Test
@@ -2173,7 +2170,6 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.pending");
         assertThat(card.rows().get(0).stateInProgress()).isTrue();
         assertThat(card.cancellationPollHref()).isNotNull();
-        assertThat(card.pickupHref()).isNull();
     }
 
     @Test
@@ -2191,7 +2187,6 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateKey()).isEqualTo("shipping.pickup.unconfirmed");
         assertThat(card.rows().get(0).stateInProgress()).isFalse();
         assertThat(card.cancellationPollHref()).isNull();
-        assertThat(card.pickupHref()).isNotNull();
     }
 
     @Test
@@ -2207,7 +2202,6 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.failed");
         assertThat(card.rows().get(0).stateArgs()).containsExactly("Brak kuriera w rejonie");
-        assertThat(card.pickupHref()).isNotNull();
     }
 
     @Test
@@ -2222,7 +2216,6 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(delivered.awaitsPickup()).isFalse();
-        assertThat(card.pickupHref()).isNull();
         assertThat(card.rows().get(0).stateKey()).isNull();
     }
 
@@ -2237,11 +2230,10 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.point");
-        assertThat(card.pickupHref()).isNull();
     }
 
     @Test
-    void aShipmentTypedInByHandHasNoStateLabelOrPickup() {
+    void aShipmentTypedInByHandHasNoStateOrLabel() {
         // given
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", null);
@@ -2254,7 +2246,6 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateKey()).isNull();
         assertThat(card.rows().get(0).labelHref()).isNull();
         assertThat(card.rows().get(0).retryHref()).isNull();
-        assertThat(card.pickupHref()).isNull();
         assertThat(card.cancellationPollHref()).isNull();
     }
 
@@ -2270,7 +2261,6 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.awaiting");
         assertThat(card.rows().get(0).labelHref()).isNull();
-        assertThat(card.pickupHref()).isNull();
     }
 
     @Test
@@ -2288,7 +2278,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void aPickupTheCarrierBookedShowsItsNumberAndNeedsNoPickupButton() {
+    void aPickupTheCarrierBookedShowsItsNumber() {
         // given
         Shipment booked = furgonetkaPackage();
         booked.setPickup(ShipmentPickup.bookedByCarrier("APP/CRIN/13023761"));
@@ -2300,6 +2290,5 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateKey()).isEqualTo("order.shipments.state.pickup.carrier");
         assertThat(card.rows().get(0).stateArgs()).containsExactly("APP/CRIN/13023761");
         assertThat(card.rows().get(0).stateTone()).isEqualTo("is-ok");
-        assertThat(card.pickupHref()).isNull();
     }
 }

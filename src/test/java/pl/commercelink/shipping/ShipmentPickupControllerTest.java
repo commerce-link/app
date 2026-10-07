@@ -234,6 +234,52 @@ class ShipmentPickupControllerTest {
         assertThat(page.back()).isEqualTo("/dashboard/rma/abc?tab=shipments");
     }
 
+    private static final String LIST = "/dashboard/orders?status=Shipping&q=Jan+Kowalski";
+
+    @Test
+    void theOrdersListWithItsQueryIsKeptAsTheWayBack() {
+        // given: "Zamów odbiór" on the orders list sends the list as it is narrowed now
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+
+        // when
+        ShipmentPickupPage page = open(null, LIST);
+
+        // then: the first group, no package marked as the page's own
+        assertThat(page.back()).isEqualTo(LIST);
+        assertThat(page.selectedKey()).isEqualTo(DPD.key());
+        assertThat(page.packages()).extracting(ShipmentPickupPage.PackageRow::marker).containsOnlyNulls();
+    }
+
+    @Test
+    void orderingFromTheListReturnsToTheSameListWithThePlainMessage() {
+        // given: order 1's package is left out, which an order page would be told about
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.order(DPD.key(), List.of("2"), WINDOW_VALUE, LIST, redirect, POLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:" + LIST);
+        assertThat(redirect.getFlashAttributes().get("successMessage"))
+                .isEqualTo("Zamawiamy odbiór. Termin pojawi się przy przesyłkach za kilka sekund.");
+    }
+
+    @Test
+    void aFormErrorKeepsTheListQueryInsideTheWayBack() {
+        // given
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.order(DPD.key(), null, WINDOW_VALUE, LIST, redirect, POLISH);
+
+        // then: the list's "&" and "=" stay in the back parameter instead of becoming the page's own parameters
+        assertThat(view).isEqualTo("redirect:/dashboard/shipping/pickups/new?group=furgonetka%7Cdpd%7Caddr-2"
+                + "&back=%2Fdashboard%2Forders%3Fstatus%3DShipping%26q%3DJan%2BKowalski");
+    }
+
     @Test
     void ordersThePickupForTheChosenPackagesOfTheGroup() {
         // given
@@ -315,7 +361,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/shipping/pickups/new?group=furgonetka%7Cdpd%7Caddr-2&back="
-                + "/dashboard/orders/" + ORDER_1);
+                + "%2Fdashboard%2Forders%2F" + ORDER_1);
         assertThat(redirect.getFlashAttributes().get("pickupError")).isEqualTo("Zaznacz co najmniej jedną paczkę.");
         verify(pickupService, never()).order(any(), any(), any(), any());
     }

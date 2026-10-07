@@ -237,20 +237,18 @@ public class OrdersController extends BaseController {
             }
         }
         OrderListQuery query = OrderListQuery.parse(params);
-        addListAttributes(model, query, locale);
+        addFilterFormAttributes(model, query.returnTo(), locale);
+        model.addAttribute("page", orderListService.fullPage(actor(), query, LocalDate.now(), locale));
         return "orders/list";
     }
 
     @GetMapping("/dashboard/orders/list")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String ordersList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
-        addListAttributes(model, OrderListQuery.parse(params), locale);
-        return "orders/list :: results";
-    }
-
-    private void addListAttributes(Model model, OrderListQuery query, Locale locale) {
+        OrderListQuery query = OrderListQuery.parse(params);
         addFilterFormAttributes(model, query.returnTo(), locale);
         model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
+        return "orders/list :: results";
     }
 
     static final String FILTERS_PATH = "/dashboard/orders/filters";

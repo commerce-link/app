@@ -794,7 +794,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aPackageWaitingForPickupOffersItsLabelAndThePickupPage() {
+    void aPackageWaitingForPickupOffersItsLabelButNoPickupButton() {
         // given
         Order order = order(OrderStatus.Shipping);
         Shipment parcel = integrationShipment(order);
@@ -806,11 +806,9 @@ class OrderDetailsTemplateTest {
         // when
         String card = card(page(render(order, ADMIN)), "przesylki");
 
-        // then
+        // then: the pickup is ordered from the orders list, for all packages at once (client decision 2026-10-07)
         assertThat(card).contains("<span class=\"cl-status is-neutral\">Czeka na odbiór</span>")
-                .contains("href=\"/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&amp;back=/dashboard/orders/"
-                        + order.getOrderId() + "\"")
-                .contains("<span>Zamów odbiór</span>")
+                .doesNotContain("/dashboard/shipping/pickups").doesNotContain("Zamów odbiór")
                 .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId() + "\"")
                 .contains("aria-label=\"Pobierz etykietę przesyłki 1\"")
                 .contains(">Edytuj<");
