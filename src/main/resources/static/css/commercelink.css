@@ -9680,7 +9680,6 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-mark.is-positive { color: var(--cl-ok); }
-.cl-page .cl-mark.is-negative { color: var(--cl-bad); }
 
 .cl-page .cl-mark:focus-visible {
     outline: 2px solid var(--cl-accent);

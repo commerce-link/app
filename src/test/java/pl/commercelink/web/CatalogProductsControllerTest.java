@@ -105,6 +105,8 @@ class CatalogProductsControllerTest {
     @Mock
     private MatchedInventory emptyInventory;
     @Mock
+    private MatchedInventory foundInventory;
+    @Mock
     private MarketplaceConnections marketplaces;
     @Mock
     private PimCategoryOptions pimCategoryOptions;
@@ -624,12 +626,11 @@ class CatalogProductsControllerTest {
     void reviewKeepsTheInventoryReturnToForTheSaveForm() throws Exception {
         // given
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
-        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
         String returnTo = "/dashboard/inventory?cat=11";
 
@@ -647,10 +648,9 @@ class CatalogProductsControllerTest {
         // given
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/review")
@@ -1034,10 +1034,9 @@ class CatalogProductsControllerTest {
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1"))
@@ -1110,12 +1109,11 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
-        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when

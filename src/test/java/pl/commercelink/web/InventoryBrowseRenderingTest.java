@@ -178,7 +178,7 @@ class InventoryBrowseRenderingTest {
     @Test
     void buildingIndexShowsABusySkeletonWithAStatusInsteadOfTheNoProductsMessage() {
         // when
-        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.BUILDING, BrowseQuery.start(), true, false)));
+        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.BUILDING, BrowseQuery.start(), true)));
 
         // then
         assertThat(html).doesNotContain("??");
@@ -194,7 +194,7 @@ class InventoryBrowseRenderingTest {
         BrowseQuery query = BrowseQuery.start().withCategory("11");
 
         // when
-        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, true, false)));
+        String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, true)));
 
         // then
         assertThat(html).doesNotContain("??");
@@ -208,7 +208,7 @@ class InventoryBrowseRenderingTest {
     void unknownCategoryShowsItsOwnEmptyStateWithAWayToTheStart() {
         // when
         String html = engine.process(RESULTS, context(BrowsePage.of(BrowsePage.Status.UNKNOWN_CATEGORY,
-                BrowseQuery.start().withCategory("999999999"), true, false)));
+                BrowseQuery.start().withCategory("999999999"), true)));
 
         // then
         assertThat(html).doesNotContain("??", "999999999");
@@ -581,15 +581,15 @@ class InventoryBrowseRenderingTest {
     private static BrowsePage page(boolean admin, boolean noSuppliers, BrowseQuery query, List<BrowsePage.RowView> rows,
                                    List<BrowsePage.Chip> chips, String category, String tile, List<BrowsePage.Crumb> crumbs) {
         BrowsePage.SortHeader none = new BrowsePage.SortHeader("/dashboard/inventory?sort=cost", "none");
-        return new BrowsePage(query, admin, false, noSuppliers, false, query.isStart() ? null : category,
+        return new BrowsePage(query, admin, noSuppliers, false, query.isStart() ? null : category,
                 crumbs,
-                List.of(new BrowsePage.NavItem(category, null, 3, "/dashboard/inventory?cat=11", true)), true,
+                List.of(new BrowsePage.NavItem(category, 3, "/dashboard/inventory?cat=11", true)), true,
                 query.isStart() ? List.of(new BrowsePage.Tile(tile, null, 5, "Karty graficzne",
                         "/dashboard/inventory?cat=10")) : List.of(),
                 List.of(new BrowsePage.MenuOption("AB", "AB", 3, true)),
                 chips,
                 "/dashboard/inventory", rows, rows.size(), false,
                 Pagination.of(1, rows.size(), BrowseQuery.PAGE_SIZE, p -> "/dashboard/inventory?page=" + p),
-                Map.of("NAME", none, "COST", none, "QTY", none), query.href(), BrowsePage.Status.READY);
+                Map.of("NAME", none, "COST", none, "QTY", none), BrowsePage.Status.READY);
     }
 }

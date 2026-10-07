@@ -10,8 +10,10 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -30,7 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -146,10 +147,10 @@ class InventoryBrowseTest {
     void sortsByDeliveredCostNotByPrice() {
         // given
         when(store.getGlobalSupplierNames()).thenReturn(List.of("AB", "Action"));
-        SupplierInfo expensiveShipping = mock(SupplierInfo.class);
+        SupplierInfo expensiveShipping = new SupplierInfo("Action", SupplierType.Distributor, 1, "PL",
+                new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.FlatRate(100_000, 50))));
         when(supplierRegistry.exists("Action")).thenReturn(true);
         when(supplierRegistry.get("Action")).thenReturn(expensiveShipping);
-        when(expensiveShipping.shippingTermsFor("PL")).thenReturn(new ShippingTerms(1, new ShippingCostPolicy.FlatRate(100_000, 50)));
         global.replace(List.of(
                 product("5901000000001", "GPU-1", "A cheap with shipping", "11", item("5901000000001", "GPU-1", "Action", 90, 5)),
                 product("5901000000002", "GPU-2", "B dearer but free", "11", item("5901000000002", "GPU-2", "AB", 100, 5))));

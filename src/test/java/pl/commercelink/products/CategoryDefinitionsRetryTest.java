@@ -3,6 +3,9 @@ package pl.commercelink.products;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.testsupport.RetryingOptimisticLockingExecutor;
 
@@ -12,7 +15,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,19 +24,20 @@ import static org.mockito.Mockito.when;
  * CategoryDefinitions over the real Spring-Retry-proxied executor: what reaches the controller is the service's own
  * exception (a 404, a refused deletion, a conflict), never the proxy's ExhaustedRetryException.
  */
+@ExtendWith(MockitoExtension.class)
 class CategoryDefinitionsRetryTest {
 
-    private final ProductCatalogRepository catalogs = mock(ProductCatalogRepository.class);
-    private final ProductRepository products = mock(ProductRepository.class);
-    private final CategoryDefinitions definitions =
-            new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create(),
-                    mock(CatalogPlacement.class));
+    @Mock private ProductCatalogRepository catalogs;
+    @Mock private ProductRepository products;
+    @Mock private CatalogPlacement placement;
+    private CategoryDefinitions definitions;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
 
     @BeforeEach
     void setUp() {
+        definitions = new CategoryDefinitions(catalogs, products, RetryingOptimisticLockingExecutor.create(), placement);
         catalog = catalogWithGpu(false);
         gpu = catalog.getCategories().get(0);
     }

@@ -45,7 +45,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -63,13 +62,11 @@ class BrowsePageFactoryTest {
     @Mock private StoresRepository storesRepository;
     @Mock private Warehouse warehouse;
     @Mock private StockQueryService stock;
+    @Mock private PimCatalog pimCatalog;
     private BrowsePageFactory factory;
-
-    private PimCatalog pimCatalog;
 
     @BeforeEach
     void setUp() {
-        pimCatalog = mock(PimCatalog.class);
         when(inventoryBrowse.isReady()).thenReturn(true);
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("10", null, "Komponenty komputerowe", "pl"),
@@ -92,7 +89,7 @@ class BrowsePageFactoryTest {
                 .thenReturn(new BrowseFacets(Map.of("11", 3, "12", 2, "21", 9), Map.of("AB", 14)));
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
         CatalogPlacement.Target b2b = new CatalogPlacement.Target("c-2", "Sklep B2B", "cat-b2b", "Karty", List.of("11"));
-        CatalogPlacement.Existing existing = new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001"));
+        CatalogPlacement.Existing existing = new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000001"));
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu, b2b), List.of(existing)));
     }
 

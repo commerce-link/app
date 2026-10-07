@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 /** Everything the browse mode of the inventory page renders; labels that need translation travel as message keys. */
-public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, boolean noSuppliers, boolean textTooShort,
+public record BrowsePage(BrowseQuery query, boolean admin, boolean noSuppliers, boolean textTooShort,
                          String title, List<Crumb> crumbs, List<NavItem> subnav, boolean subnavSiblings,
                          List<Tile> tiles, List<MenuOption> supplierOptions, List<Chip> chips, String clearHref,
                          List<RowView> rows, int total, boolean truncated, Pagination pagination,
-                         Map<String, SortHeader> sortHeaders, String returnTo, Status status) {
+                         Map<String, SortHeader> sortHeaders, Status status) {
 
     public static final String PAGE_PATH = BrowseQuery.PATH;
     public static final String FRAGMENT_PATH = BrowseQuery.FRAGMENT_PATH;
@@ -22,11 +22,10 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
     public enum Status { READY, BUILDING, PIM_UNAVAILABLE, UNKNOWN_CATEGORY }
 
     /** A page that shows only its state: nothing was counted or listed for it. */
-    public static BrowsePage of(Status status, BrowseQuery query, boolean admin, boolean superAdmin) {
-        return new BrowsePage(query, admin, superAdmin, false, false, null, List.of(), List.of(), false, List.of(),
+    public static BrowsePage of(Status status, BrowseQuery query, boolean admin) {
+        return new BrowsePage(query, admin, false, false, null, List.of(), List.of(), false, List.of(),
                 List.of(), List.of(), query.cleared().href(), List.of(), 0, false,
-                Pagination.of(1, 0, BrowseQuery.PAGE_SIZE, page -> query.withPage(page).href()), Map.of(), query.href(),
-                status);
+                Pagination.of(1, 0, BrowseQuery.PAGE_SIZE, page -> query.withPage(page).href()), Map.of(), status);
     }
 
     public boolean ready() {
@@ -53,10 +52,6 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
         return query.isStart();
     }
 
-    public boolean hasText() {
-        return query.q2() != null && !textTooShort;
-    }
-
     public String pagePath() {
         return PAGE_PATH;
     }
@@ -69,7 +64,7 @@ public record BrowsePage(BrowseQuery query, boolean admin, boolean superAdmin, b
     public record Crumb(String label, String labelKey, String href) {
     }
 
-    public record NavItem(String label, String labelKey, int count, String href, boolean current) {
+    public record NavItem(String label, int count, String href, boolean current) {
     }
 
     public record Tile(String label, String labelKey, int count, String description, String href) {

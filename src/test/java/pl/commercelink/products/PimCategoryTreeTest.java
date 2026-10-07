@@ -2,6 +2,9 @@ package pl.commercelink.products;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 
@@ -10,19 +13,18 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class PimCategoryTreeTest {
 
-    private PimCatalog pimCatalog;
+    @Mock private PimCatalog pimCatalog;
     private PimCategoryTree tree;
 
     @BeforeEach
     void setUp() {
-        pimCatalog = mock(PimCatalog.class);
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("10", null, "Komponenty komputerowe", "pl"),
                 new PimCategory("11", "10", "Karty graficzne", "pl"),

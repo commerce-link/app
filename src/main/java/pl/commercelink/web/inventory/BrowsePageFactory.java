@@ -50,14 +50,14 @@ public class BrowsePageFactory {
     public BrowsePage build(@Nullable String storeId, BrowseQuery query, boolean admin, boolean superAdmin,
                             boolean freshPlacement) {
         if (!inventoryBrowse.isReady()) {
-            return BrowsePage.of(BrowsePage.Status.BUILDING, query, admin, superAdmin);
+            return BrowsePage.of(BrowsePage.Status.BUILDING, query, admin);
         }
         try {
             // Read once here, so a PIM that does not answer is a state of the page rather than an error halfway through.
             tree.topLevels();
         } catch (RuntimeException e) {
             log.warn("PIM category tree unavailable for the inventory page: {}", e.getMessage());
-            return BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, admin, superAdmin);
+            return BrowsePage.of(BrowsePage.Status.PIM_UNAVAILABLE, query, admin);
         }
         BrowseSummary summary = inventoryBrowse.summary(storeId);
         Set<String> unknownIds = unknownCategoryIds(summary.byCategory());
@@ -68,7 +68,7 @@ public class BrowsePageFactory {
         String category = query.category();
         boolean noSuppliers = summary.total() == 0 && !superAdmin;
         if (!noSuppliers && category != null && !BrowseIndex.UNASSIGNED.equals(category) && tree.find(category).isEmpty()) {
-            return BrowsePage.of(BrowsePage.Status.UNKNOWN_CATEGORY, query, admin, superAdmin);
+            return BrowsePage.of(BrowsePage.Status.UNKNOWN_CATEGORY, query, admin);
         }
         CatalogPlacement.StorePlacement placement = !withCatalog ? null
                 : freshPlacement ? catalogPlacement.forStoreFresh(storeId) : catalogPlacement.forStore(storeId);
@@ -94,11 +94,11 @@ public class BrowsePageFactory {
             truncated = result.truncated();
         }
 
-        return new BrowsePage(query, admin, superAdmin, noSuppliers, query.textTooShort(),
+        return new BrowsePage(query, admin, noSuppliers, query.textTooShort(),
                 title(category), crumbs(category, query), subnav(category, counts, filters, query), isSiblings(category),
                 tiles(query, counts, filters), supplierOptions(summary, supplierCounts(summary, category, filters), query, labels),
                 chips(query, labels), query.cleared().href(),
-                rows, total, truncated, pagination, sortHeaders(query), query.href(), BrowsePage.Status.READY);
+                rows, total, truncated, pagination, sortHeaders(query), BrowsePage.Status.READY);
     }
 
     private record Filters(String storeId, Set<String> suppliers, String text, Set<String> unknownIds, boolean any) {
@@ -227,7 +227,7 @@ public class BrowsePageFactory {
         Map<String, Integer> shown = counts;
         return items.stream()
                 .filter(item -> shown.getOrDefault(item.id(), 0) > 0 || item.id().equals(category))
-                .map(item -> new BrowsePage.NavItem(item.name(), null, shown.getOrDefault(item.id(), 0),
+                .map(item -> new BrowsePage.NavItem(item.name(), shown.getOrDefault(item.id(), 0),
                         query.withCategory(item.id()).href(), item.id().equals(category)))
                 .toList();
     }

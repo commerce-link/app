@@ -17,12 +17,13 @@ import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryTree;
 import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,11 +35,14 @@ class AddToCatalogDialogFactoryTest {
     @Mock private Inventory inventory;
     @Mock private InventoryView view;
     @Mock private CatalogPlacement catalogPlacement;
+    @Mock private PimCatalog pimCatalog;
+    @Mock private TaxonomyCache taxonomyCache;
+    /** Mocked, not built: a real group adds every offer's codes to its key, and this case needs the global key alone. */
+    @Mock private MatchedInventory merged;
     private AddToCatalogDialogFactory factory;
 
     @BeforeEach
     void setUp() {
-        PimCatalog pimCatalog = mock(PimCatalog.class);
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("11", null, "Karty graficzne", "pl"), new PimCategory("31", null, "Chłodzenie", "pl")));
         factory = new AddToCatalogDialogFactory(inventory, catalogPlacement, new PimCategoryTree(pimCatalog));
@@ -50,7 +54,7 @@ class AddToCatalogDialogFactoryTest {
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
         CatalogPlacement.Target b2b = new CatalogPlacement.Target("c-2", "Sklep B2B", "cat-b2b", "Karty", List.of("11"));
         CatalogPlacement.Target cases = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-case", "Obudowa", List.of("40"));
-        CatalogPlacement.Existing existing = new CatalogPlacement.Existing("c-2", "cat-b2b", "p-1", InventoryKey.fromEan("5901000000001"));
+        CatalogPlacement.Existing existing = new CatalogPlacement.Existing("c-2", "cat-b2b", InventoryKey.fromEan("5901000000001"));
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu, b2b, cases), List.of(existing)));
     }
 
@@ -74,7 +78,7 @@ class AddToCatalogDialogFactoryTest {
     @Test
     void productInTheFirstMatchingCategoryOnlyHasTheNextOnePreselected() {
         // given
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000001")));
 
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
@@ -86,8 +90,8 @@ class AddToCatalogDialogFactoryTest {
     @Test
     void productInEveryMatchingCategoryHasTheFirstOnePreselected() {
         // given
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")),
-                new CatalogPlacement.Existing("c-2", "cat-b2b", "p-2", InventoryKey.fromEan("5901000000001")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000001")),
+                new CatalogPlacement.Existing("c-2", "cat-b2b", InventoryKey.fromEan("5901000000001")));
 
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001"), null);
@@ -101,9 +105,9 @@ class AddToCatalogDialogFactoryTest {
     @Test
     void bulkPreselectsTheFirstCategoryThatDoesNotHoldEveryChosenProduct() {
         // given
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000001")),
-                new CatalogPlacement.Existing("c-1", "cat-gpu", "p-2", InventoryKey.fromEan("5901000000002")),
-                new CatalogPlacement.Existing("c-2", "cat-b2b", "p-3", InventoryKey.fromEan("5901000000001")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000001")),
+                new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000002")),
+                new CatalogPlacement.Existing("c-2", "cat-b2b", InventoryKey.fromEan("5901000000001")));
 
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000001", "5901000000002"), null);
@@ -121,7 +125,7 @@ class AddToCatalogDialogFactoryTest {
     void productInTheCatalogUnderTheRowsEanOnlyCountsAsThereAndTheOtherCategoryIsPreselected() {
         // given
         mergedProduct("5901000000077", "OWN-77");
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromEan("5901000000077")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromEan("5901000000077")));
 
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
@@ -135,7 +139,7 @@ class AddToCatalogDialogFactoryTest {
     void productInTheCatalogUnderTheMfnOfTheOfferCarryingTheEanCountsAsThere() {
         // given
         mergedProduct("5901000000077", "OWN-77");
-        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", "p-1", InventoryKey.fromMfn("OWN-77")));
+        placement(new CatalogPlacement.Existing("c-1", "cat-gpu", InventoryKey.fromMfn("OWN-77")));
 
         // when
         AddToCatalogDialog dialog = factory.build(STORE_ID, List.of("5901000000077"), null);
@@ -177,23 +181,23 @@ class AddToCatalogDialogFactoryTest {
 
     /** Found by the own offer's EAN, keyed by the global product's codes that the own offer joined. */
     private void mergedProduct(String ownEan, String ownMfn) {
-        MatchedInventory matched = mock(MatchedInventory.class);
-        when(matched.isEmpty()).thenReturn(false);
         InventoryKey group = InventoryKey.fromEan("5909999999998");
         group.addManufacturerCode("GLOBAL-98");
-        when(matched.getInventoryKey()).thenReturn(group);
-        when(matched.getInventoryItems()).thenReturn(List.of(
+        when(merged.isEmpty()).thenReturn(false);
+        when(merged.getInventoryKey()).thenReturn(group);
+        when(merged.getInventoryItems()).thenReturn(List.of(
                 new InventoryItem("5909999999998", "GLOBAL-98", 120.0, "PLN", 5, 1, "AB"),
                 new InventoryItem(ownEan, ownMfn, 100.0, "PLN", 3, 1, "Own")));
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
-        when(view.findByEan(ownEan)).thenReturn(matched);
+        when(merged.getTaxonomy()).thenReturn(new Taxonomy(ownEan, ownMfn, "Brand", "Merged", "x", 1, null, null, null, "11"));
+        when(view.findByEan(ownEan)).thenReturn(merged);
     }
 
     private void product(String ean, String name, String categoryId) {
-        MatchedInventory matched = mock(MatchedInventory.class);
-        when(matched.isEmpty()).thenReturn(false);
-        when(matched.getInventoryKey()).thenReturn(InventoryKey.fromEan(ean));
-        when(matched.getTaxonomy()).thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "x", 1, null, null, null, categoryId));
+        InventoryKey key = InventoryKey.fromEan(ean);
+        MatchedInventory matched = new MatchedInventory(key,
+                new InventoryItem(ean, "M-" + ean, 100.0, "PLN", 1, 1, "AB"), taxonomyCache, null);
+        when(taxonomyCache.find(same(key)))
+                .thenReturn(new Taxonomy(ean, "M-" + ean, "Brand", name, "x", 1, null, null, null, categoryId));
         when(view.findByEan(ean)).thenReturn(matched);
     }
 }

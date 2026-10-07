@@ -2,6 +2,10 @@ package pl.commercelink.products;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
 
 import java.util.List;
@@ -10,18 +14,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class CatalogPlacementTest {
 
     private static final String STORE_ID = "store-1";
 
-    private final ProductCatalogRepository catalogs = mock(ProductCatalogRepository.class);
-    private final ProductRepository products = mock(ProductRepository.class);
-    private final CatalogPlacement placement = new CatalogPlacement(catalogs, products);
+    @Mock private ProductCatalogRepository catalogs;
+    @Mock private ProductRepository products;
+    @InjectMocks private CatalogPlacement placement;
 
     @BeforeEach
     void setUp() {
@@ -31,7 +35,7 @@ class CatalogPlacementTest {
         ProductCatalog parts = catalog("c-1", "Podzespoły komputerowe", gpus, auto);
         ProductCatalog shop = catalog("c-2", "Sklep B2B", b2b);
         when(catalogs.findAll(STORE_ID)).thenReturn(List.of(shop, parts));
-        when(products.codesOf("cat-gpu")).thenReturn(List.of(new ProductRepository.ProductCodes("p-1", "5901000000001", "GPU-1")));
+        when(products.codesOf("cat-gpu")).thenReturn(List.of(new ProductRepository.ProductCodes("5901000000001", "GPU-1")));
         when(products.codesOf("cat-b2b")).thenReturn(List.of());
     }
 
@@ -51,8 +55,8 @@ class CatalogPlacementTest {
         CatalogPlacement.StorePlacement store = placement.forStore(STORE_ID);
 
         // when / then
-        assertThat(store.existing(InventoryKey.fromEan("5901000000001"))).extracting(CatalogPlacement.Existing::productId)
-                .containsExactly("p-1");
+        assertThat(store.existing(InventoryKey.fromEan("5901000000001"))).extracting(CatalogPlacement.Existing::categoryId)
+                .containsExactly("cat-gpu");
         assertThat(store.existing(InventoryKey.fromMfn("GPU-1"))).hasSize(1);
         assertThat(store.isIn("cat-gpu", InventoryKey.fromEan("5901000000001"))).isTrue();
         assertThat(store.isIn("cat-b2b", InventoryKey.fromEan("5901000000001"))).isFalse();
@@ -83,7 +87,7 @@ class CatalogPlacementTest {
     void freshReadBypassesTheCachedPlacementAndReplacesIt() {
         // given
         placement.forStore(STORE_ID);
-        when(products.codesOf("cat-b2b")).thenReturn(List.of(new ProductRepository.ProductCodes("p-2", "5902000000002", null)));
+        when(products.codesOf("cat-b2b")).thenReturn(List.of(new ProductRepository.ProductCodes("5902000000002", null)));
 
         // when
         CatalogPlacement.StorePlacement fresh = placement.forStoreFresh(STORE_ID);
@@ -117,20 +121,18 @@ class CatalogPlacementTest {
 
     private static CategoryDefinition category(String id, String name, CategoryDefinitionType type,
                                                String... pimIds) {
-        CategoryDefinition category = mock(CategoryDefinition.class);
-        when(category.getCategoryId()).thenReturn(id);
-        when(category.getName()).thenReturn(name);
-        when(category.getType()).thenReturn(type);
-        when(category.hasType(type)).thenReturn(true);
-        when(category.getPimCategoryIds()).thenReturn(List.of(pimIds));
+        CategoryDefinition category = new CategoryDefinition();
+        category.setCategoryId(id);
+        category.setName(name);
+        category.setType(type);
+        category.setPimCategoryIds(List.of(pimIds));
         return category;
     }
 
     private static ProductCatalog catalog(String id, String name, CategoryDefinition... categories) {
-        ProductCatalog catalog = mock(ProductCatalog.class);
-        when(catalog.getCatalogId()).thenReturn(id);
-        when(catalog.getName()).thenReturn(name);
-        when(catalog.getCategories()).thenReturn(List.of(categories));
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, name);
+        catalog.setCatalogId(id);
+        catalog.setCategories(List.of(categories));
         return catalog;
     }
 }

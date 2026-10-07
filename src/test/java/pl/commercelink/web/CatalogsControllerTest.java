@@ -76,6 +76,8 @@ class CatalogsControllerTest {
     private PimCategoryOptions pimCategoryOptions;
     @Mock
     private MarketplaceConnections marketplaces;
+    @Mock
+    private CatalogPlacement catalogPlacement;
 
     private MockMvc mvc;
 
@@ -89,7 +91,7 @@ class CatalogsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        mock(CatalogPlacement.class)))).build();
+                        catalogPlacement))).build();
     }
 
     @AfterEach
@@ -133,7 +135,7 @@ class CatalogsControllerTest {
         CatalogsController controller = new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        mock(CatalogPlacement.class)));
+                        catalogPlacement));
         Locale polish = Locale.forLanguageTag("pl");
         when(messageSource.getMessage(eq("store.supplier.schedule.summary.every.minutes"), any(), eq(polish)))
                 .thenReturn("Co 30 min");
@@ -501,11 +503,11 @@ class CatalogsControllerTest {
                 .when(catalogRepository).save(any(ProductCatalog.class));
         PricelistEventScheduler scheduler = mock(PricelistEventScheduler.class);
         ProductCatalogDetailsService realDetails = new ProductCatalogDetailsService(catalogRepository, productRepository, scheduler,
-                mock(CatalogPlacement.class), 5);
+                catalogPlacement, 5);
         MockMvc withRealDetails = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource,
                 realDetails, access, productRepository, pimCategoryOptions, marketplaces,
                 new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class),
-                        mock(CatalogPlacement.class)))).build();
+                        catalogPlacement))).build();
         when(messageSource.getMessage(eq("catalog.created"), any(), any(Locale.class))).thenReturn("Created");
         var create = post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000001");
 

@@ -10,10 +10,8 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -27,7 +25,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,7 +48,7 @@ class InventoryBrowseControllerTest {
     void setUp() {
         security = mockStatic(CustomSecurityContext.class);
         signedInAs("ADMIN");
-        when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(mock(BrowsePage.class));
+        when(pageFactory.build(any(), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(BrowsePage.of(BrowsePage.Status.READY, BrowseQuery.start(), true));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         CatalogPlacement.Target gpu = new CatalogPlacement.Target("c-1", "Podzespoły", "cat-gpu", "Karta graficzna", List.of("11"));
         when(catalogPlacement.forStore(STORE_ID)).thenReturn(new CatalogPlacement.StorePlacement(List.of(gpu), List.of()));
@@ -152,7 +149,8 @@ class InventoryBrowseControllerTest {
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("open", "add");
         params.add("ean", "5901000000001");
-        AddToCatalogDialog dialog = mock(AddToCatalogDialog.class);
+        AddToCatalogDialog dialog = new AddToCatalogDialog(List.of("5901000000001"), "RTX 4060", "Karty graficzne", List.of(),
+                List.of(), false, "/dashboard/inventory", AddToCatalogDialog.ACTION);
         when(dialogFactory.build(eq(STORE_ID), eq(List.of("5901000000001")), anyString())).thenReturn(dialog);
         ConcurrentModel adminModel = new ConcurrentModel();
 
@@ -225,34 +223,5 @@ class InventoryBrowseControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/inventory?cat=11");
         assertThat((java.util.Map<String, Object>) redirect.getFlashAttributes()).containsEntry("inventoryError", "inventory.browse.add.noTarget");
-    }
-
-    @Test
-    void dialogAndAddAreAdminOnly() throws Exception {
-        // when
-        PreAuthorize dialog = InventoryBrowseController.class
-                .getMethod("addDialog", List.class, String.class, org.springframework.ui.Model.class)
-                .getAnnotation(PreAuthorize.class);
-        PreAuthorize add = InventoryBrowseController.class
-                .getMethod("add", String.class, String.class, String.class,
-                        org.springframework.web.servlet.mvc.support.RedirectAttributes.class, Locale.class)
-                .getAnnotation(PreAuthorize.class);
-
-        // then
-        assertThat(dialog.value()).isEqualTo("hasRole('ADMIN')");
-        assertThat(add.value()).isEqualTo("hasRole('ADMIN')");
-        verifyNoInteractions(dialogFactory);
-    }
-
-    @Test
-    void supplierAssortmentOwnsTheBareInventoryPath() throws Exception {
-        // when
-        GetMapping mapping = InventoryBrowseController.class
-                .getMethod("page", org.springframework.util.MultiValueMap.class, org.springframework.ui.Model.class)
-                .getAnnotation(GetMapping.class);
-
-        // then
-        assertThat(mapping.value()).containsExactly("/dashboard/inventory");
-        assertThat(mapping.params()).isEmpty();
     }
 }

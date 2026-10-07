@@ -1,34 +1,26 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import pl.commercelink.web.inventory.BrowsePage;
+import pl.commercelink.web.inventory.BrowseQuery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** The two inventory pages rendered whole (without the layout around them): what each carries and which scripts it loads. */
 class InventoryPageTemplateTest {
 
-    private static String read(String name) throws Exception {
-        return Files.readString(Path.of("src/main/resources/templates/" + name), StandardCharsets.UTF_8)
-                .replace("\r\n", "\n");
-    }
-
-    private static String assortment() throws Exception {
-        return read("inventory.html");
-    }
-
-    private static String prices() throws Exception {
-        return read("inventory-prices.html");
-    }
+    private final TemplateEngine engine = EnglishFragmentTemplateEngine.create();
 
     @Test
-    void searchFormWorksWithoutJavaScriptAsAPlainGet() throws Exception {
-        // when / then
-        assertThat(prices()).contains("th:action=\"@{/dashboard/inventory/prices}\"").contains("method=\"get\"")
-                .contains("name=\"q\"").doesNotContain("th:disabled");
+    void searchFormWorksWithoutJavaScriptAsAPlainGet() {
+        // when
+        String html = prices(false, null);
+
+        // then
+        assertThat(html).contains("<form class=\"cl-inv-search\" action=\"/dashboard/inventory/prices\" method=\"get\" role=\"search\"")
+                .contains("name=\"q\"").doesNotContain("disabled");
     }
 
     @Test
@@ -40,9 +32,9 @@ class InventoryPageTemplateTest {
         String form = "<form th:replace=\"~{inventory-prices :: form[data-inventory-search]}\"></form>";
 
         // when
-        String opened = EnglishFragmentTemplateEngine.create().process(form, context);
+        String opened = engine.process(form, context);
         context.removeVariable("backToBrowse");
-        String direct = EnglishFragmentTemplateEngine.create().process(form, context);
+        String direct = engine.process(form, context);
 
         // then
         assertThat(opened).contains("<input type=\"hidden\" name=\"from\" value=\"/dashboard/inventory?cat=11&amp;page=2\">");
@@ -50,48 +42,98 @@ class InventoryPageTemplateTest {
     }
 
     @Test
-    void priceComparisonExposesTheHooksTheScriptSwapsFragmentsInto() throws Exception {
-        // when / then
-        assertThat(prices()).contains("data-inventory-page").contains("id=\"inventory-results\"")
-                .contains("aria-live=\"polite\"").contains("data-inventory-search-error")
-                .contains("th:data-page-url=\"@{/dashboard/inventory/prices}\"")
-                .contains("panel('inventory-prices'").contains("#{inventory.prices.title}");
+    void priceComparisonExposesTheHooksTheScriptSwapsFragmentsInto() {
+        // when
+        String html = prices(false, null);
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("data-inventory-page", "data-page-url=\"/dashboard/inventory/prices\"",
+                "<div id=\"inventory-results\">", "aria-live=\"polite\"", "data-inventory-search-error",
+                "data-intro-panel=\"inventory-prices\"", "<h1 class=\"cl-page-title\">Prices and availability</h1>",
+                "<script src=\"/js/inventory.js\" defer></script>");
     }
 
     @Test
-    void priceComparisonHasNoTilesNoSourcesBarAndStaysNarrow() throws Exception {
-        // when / then
-        assertThat(prices()).doesNotContain("data-inventory-summary").doesNotContain("cl-inv-sources")
-                .doesNotContain("is-wide").doesNotContain("inventory-browse :: browse");
+    void priceComparisonHasNoTilesNoSourcesBarNoAddingAndStaysNarrow() {
+        // when
+        String html = prices(false, null);
+
+        // then
+        assertThat(html).doesNotContain("data-inventory-summary", "cl-inv-sources", "is-wide", "data-cl-list-results",
+                "inventory-browse.js", "data-browse-dialog-url", "data-browse-add");
     }
 
     @Test
-    void supplierAssortmentCarriesTheTilesAndTheBrowseListWithoutTheCodeSearch() throws Exception {
-        // when / then
-        assertThat(assortment()).contains("data-inventory-summary").contains("inventory-browse :: browse")
-                .contains("is-wide").contains("#{inventory.title}")
-                .doesNotContain("data-inventory-search").doesNotContain("id=\"inventory-results\"");
+    void priceComparisonPromisesTheSuperAdminNoWarehouse() {
+        // when
+        String store = prices(false, null);
+        String superAdmin = prices(true, null);
+
+        // then
+        assertThat(store).contains("Price, delivered cost and availability of one product at every supplier and in your warehouse.")
+                .doesNotContain("without store warehouses");
+        assertThat(superAdmin).contains(
+                "Price and availability of a product at every global supplier (without store warehouses).");
     }
 
     @Test
-    void neitherPageHasTheModeSwitchAnyMore() throws Exception {
-        // when / then
-        assertThat(assortment() + prices()).doesNotContain("cl-inv-modes").doesNotContain("inventory.view.")
-                .doesNotContain("view=browse");
+    void supplierAssortmentCarriesTheTilesAndTheBrowseListWithoutTheCodeSearch() {
+        // when
+        String html = assortment(true);
+
+        // then
+        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("data-inventory-summary", "data-cl-list-results", "cl-page cl-page-body is-wide",
+                "<h1 class=\"cl-page-title\">Supplier assortment</h1>");
+        assertThat(html).doesNotContain("data-inventory-search", "id=\"inventory-results\"");
     }
 
     @Test
-    void scriptLoadsTheSummaryOnlyWhereItsSlotExists() throws Exception {
-        // given
-        String script = Files.readString(Path.of("src/main/resources/static/js/inventory.js"), StandardCharsets.UTF_8);
+    void neitherPageHasTheModeSwitchAnyMore() {
+        // when
+        String html = assortment(true) + prices(false, null);
 
-        // when / then
-        assertThat(script).contains("if (summarySlot)");
+        // then
+        assertThat(html).doesNotContain("cl-inv-modes", "view=browse");
     }
 
     @Test
-    void priceComparisonPromisesTheSuperAdminNoWarehouse() throws Exception {
-        // when / then
-        assertThat(prices()).contains("th:text=\"${superAdmin} ? #{inventory.prices.tech.lead} : #{inventory.prices.lead}\"");
+    void everyVisitorOfTheAssortmentGetsTheListTheRowMenuAndThePathScripts() {
+        // when
+        String html = assortment(false);
+
+        // then
+        assertThat(html).contains("<script src=\"/js/list-page.js\" defer></script>", "<script src=\"/js/menu.js\" defer></script>",
+                "<script src=\"/js/collapse-path.js\" defer></script>");
+        assertThat(html).doesNotContain("/js/dialog.js", "/js/inventory-browse.js");
+    }
+
+    @Test
+    void storeAdminGetsTheAddScriptAfterTheSharedDialogScriptAndTheDialogAddress() {
+        // when
+        String html = assortment(true);
+
+        // then
+        assertThat(html).contains("data-browse-dialog-url=\"/dashboard/inventory/browse/add-dialog\"",
+                "<script src=\"/js/dialog.js\" defer></script>", "<script src=\"/js/inventory-browse.js\" defer></script>");
+        assertThat(html.indexOf("/js/dialog.js")).isLessThan(html.indexOf("/js/inventory-browse.js"));
+    }
+
+    private String prices(boolean superAdmin, String query) {
+        Context context = new Context();
+        context.setVariable("superAdmin", superAdmin);
+        context.setVariable("query", query);
+        return engine.process("inventory-prices", context);
+    }
+
+    private String assortment(boolean admin) {
+        Context context = new Context();
+        context.setVariable("superAdmin", false);
+        context.setVariable("canManageSuppliers", admin);
+        context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
+        context.setVariable("browse", BrowsePage.of(BrowsePage.Status.READY, BrowseQuery.start(), admin));
+        context.setVariable("browseDialogUrl", "/dashboard/inventory/browse/add-dialog");
+        return engine.process("inventory", context);
     }
 }

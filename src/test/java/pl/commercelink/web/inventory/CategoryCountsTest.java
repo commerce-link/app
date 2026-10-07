@@ -1,6 +1,9 @@
 package pl.commercelink.web.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.products.PimCategoryTree;
@@ -9,15 +12,16 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class CategoryCountsTest {
+
+    @Mock private PimCatalog catalog;
 
     @Test
     void leafCountsAddUpToEveryAncestorAndUnknownIdsKeepTheirOwn() {
         // given
-        PimCatalog catalog = mock(PimCatalog.class);
         when(catalog.allCategories()).thenReturn(List.of(
                 new PimCategory("10", null, "Komponenty", "pl"),
                 new PimCategory("11", "10", "Karty graficzne", "pl"),

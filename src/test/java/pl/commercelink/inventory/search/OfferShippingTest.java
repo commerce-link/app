@@ -1,22 +1,28 @@
 package pl.commercelink.inventory.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class OfferShippingTest {
+
+    @Mock private SupplierRegistry registry;
 
     @Test
     void forItemOfUnknownSupplierIsUnknown() {
         // given
-        SupplierRegistry registry = mock(SupplierRegistry.class);
         when(registry.exists("Nobody")).thenReturn(false);
         InventoryItem item = new InventoryItem("5901234567890", "MFN-1", 100.0, "PLN", 3, 1, "Nobody");
 
@@ -30,11 +36,9 @@ class OfferShippingTest {
     @Test
     void forItemOfKnownSupplierQuotesPolishTermsForOneUnit() {
         // given
-        SupplierRegistry registry = mock(SupplierRegistry.class);
-        SupplierInfo info = mock(SupplierInfo.class);
+        ShippingTerms terms = new ShippingTerms(2, new ShippingCostPolicy.FlatRate(500, 18));
         when(registry.exists("AB")).thenReturn(true);
-        when(registry.get("AB")).thenReturn(info);
-        when(info.shippingTermsFor("PL")).thenReturn(new ShippingTerms(2, new ShippingCostPolicy.FlatRate(500, 18)));
+        when(registry.get("AB")).thenReturn(new SupplierInfo("AB", SupplierType.Distributor, 1, "PL", new ShippingPolicy(terms)));
         InventoryItem item = new InventoryItem("5901234567890", "MFN-1", 100.0, "PLN", 3, 1, "AB");
 
         // when

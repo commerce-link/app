@@ -37,14 +37,32 @@ class InventoryScriptContractTest {
         }
     }
 
+    /**
+     * Like the hooks of inventory.js above: a script of the browse list that still looks for a renamed hook does nothing,
+     * and no server-side test would notice.
+     */
     @Test
-    void searchOnThePricesPageKeepsTheWayBackInThePushedAddress() throws Exception {
-        // when
-        String script = read("src/main/resources/static/js/inventory.js");
+    void browseScriptUsesOnlyHooksTheTemplatesRender() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/inventory-browse.js");
+        String templates = read("src/main/resources/templates/inventory.html")
+                + read("src/main/resources/templates/fragments/inventory-browse.html");
 
-        // then
-        assertThat(script).contains("get('from')", "params.set('from', from)", "pushState({q: query}, '', pageAddress(query))",
-                "pushState({q: ''}, '', pageAddress(''))");
-        assertThat(script).doesNotContain("page.dataset.pageUrl + '?q='");
+        // when / then
+        for (String hook : List.of("data-browse-dialog-url", "data-browse-dialog-slot", "data-browse-add",
+                "data-browse-add-selected", "data-browse-add-error", "data-browse-other-select", "data-browse-other-radio",
+                "data-browse-other-field", "data-cl-select-row", "data-browse-building")) {
+            assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
+            assertThat(templates).as("templates render " + hook).contains(hook);
+        }
+    }
+
+    private static String datasetName(String hook) {
+        String[] parts = hook.substring("data-".length()).split("-");
+        StringBuilder name = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            name.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+        }
+        return name.toString();
     }
 }

@@ -1,6 +1,9 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,14 +11,14 @@ import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class BrowseIndexHolderTest {
 
-    private final GlobalMatchedInventory global = mock(GlobalMatchedInventory.class);
+    @Mock private GlobalMatchedInventory global;
     private final List<Runnable> queued = new ArrayList<>();
     private final Executor manual = queued::add;
 
@@ -99,7 +102,6 @@ class BrowseIndexHolderTest {
     @Test
     void scheduledRefreshDoesNotBuildTheFirstIndex() {
         // given
-        when(global.version()).thenReturn(3L);
         BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
 
         // when
@@ -155,8 +157,6 @@ class BrowseIndexHolderTest {
     @Test
     void startupStartsTheFirstBuildOnlyOnce() {
         // given
-        when(global.version()).thenReturn(3L);
-        when(global.generation()).thenAnswer(call -> generation());
         BrowseIndexHolder holder = new BrowseIndexHolder(global, manual);
 
         // when

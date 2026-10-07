@@ -105,8 +105,8 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return labels;
     }
 
-    /** The id and the two codes of a product, the only fields the inventory's "W katalogu" column compares. */
-    public record ProductCodes(String productId, String ean, String manufacturerCode) {
+    /** The two codes of a product, the only fields the inventory's "W katalogu" column compares. */
+    public record ProductCodes(String ean, String manufacturerCode) {
     }
 
     /**
@@ -129,13 +129,13 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                     .withTableName(TABLE)
                     .withKeyConditionExpression("categoryId = :categoryId")
                     .withExpressionAttributeValues(eav)
-                    .withProjectionExpression("productId, ean, mfn")
+                    .withProjectionExpression("ean, mfn")
                     .withConsistentRead(true)
                     .withLimit(pageSize)
                     .withExclusiveStartKey(lastEvaluatedKey);
             QueryResult queryResult = amazonDynamoDB.query(queryRequest);
             for (Map<String, AttributeValue> item : queryResult.getItems()) {
-                codes.add(new ProductCodes(stringOf(item, "productId"), stringOf(item, "ean"), stringOf(item, "mfn")));
+                codes.add(new ProductCodes(stringOf(item, "ean"), stringOf(item, "mfn")));
             }
             lastEvaluatedKey = queryResult.getLastEvaluatedKey();
         } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());

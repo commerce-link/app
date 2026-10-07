@@ -88,7 +88,7 @@ public class CatalogPlacement {
 
     private List<Existing> existingIn(Target target) {
         return productRepository.codesOf(target.categoryId()).stream()
-                .map(product -> new Existing(target.catalogId(), target.categoryId(), product.productId(),
+                .map(product -> new Existing(target.catalogId(), target.categoryId(),
                         new InventoryKey(product.ean(), product.manufacturerCode())))
                 .toList();
     }
@@ -116,7 +116,7 @@ public class CatalogPlacement {
         }
     }
 
-    public record Existing(String catalogId, String categoryId, String productId, InventoryKey key) {
+    public record Existing(String catalogId, String categoryId, InventoryKey key) {
     }
 
     public static final class StorePlacement {

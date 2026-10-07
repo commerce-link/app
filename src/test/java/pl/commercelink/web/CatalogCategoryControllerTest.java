@@ -83,6 +83,8 @@ class CatalogCategoryControllerTest {
     private static final String BRAND_LINE_KEY = "catalog.filter.brandLines.line";
 
     @Mock
+    private CatalogPlacement catalogPlacement;
+    @Mock
     private CatalogAccess access;
     @Mock
     private CategoryDefinitions definitions;
@@ -1005,7 +1007,7 @@ class CatalogCategoryControllerTest {
      */
     private MockMvc overTheRealExecutor(ProductCatalogRepository catalogs) {
         CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create(),
-                mock(CatalogPlacement.class));
+                catalogPlacement);
         return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
                 storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
     }

@@ -29,14 +29,20 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
         return String.join("\n", inCatalogLabels);
     }
 
-    public static CategoryLine of(PimCategoryTree tree, @Nullable CatalogPlacement.StorePlacement placement,
-                                  String categoryId, String categoryText, InventoryKey key, boolean leafOnly) {
+    /** The PIM path only, without catalog places: the line of a viewer who does not manage the catalog. */
+    public static CategoryLine of(PimCategoryTree tree, String categoryId, String categoryText, boolean leafOnly) {
         List<String> path = tree.pathNames(categoryId);
         List<String> ancestors = path.isEmpty() || leafOnly ? List.of() : path.subList(0, path.size() - 1);
         String leaf = path.isEmpty() ? categoryText : path.get(path.size() - 1);
         String fullPath = path.isEmpty() ? categoryText : String.join(SEPARATOR, path);
+        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, List.of());
+    }
+
+    public static CategoryLine of(PimCategoryTree tree, @Nullable CatalogPlacement.StorePlacement placement,
+                                  String categoryId, String categoryText, InventoryKey key, boolean leafOnly) {
+        CategoryLine pim = of(tree, categoryId, categoryText, leafOnly);
         if (placement == null) {
-            return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, List.of());
+            return pim;
         }
         List<CatalogPlacement.Existing> existing = placement.existing(key);
         // One place per catalog category: two same-named categories in different catalogs still count as two.
@@ -44,7 +50,7 @@ public record CategoryLine(List<String> pimAncestors, String pimLeaf, String pim
                 .filter(distinctBy(entry -> entry.catalogId() + "/" + entry.categoryId()))
                 .map(entry -> label(placement, entry))
                 .toList();
-        return new CategoryLine(List.copyOf(ancestors), leaf, fullPath, inCatalogLabels);
+        return new CategoryLine(pim.pimAncestors(), pim.pimLeaf(), pim.pimFullPath(), inCatalogLabels);
     }
 
     private static String label(CatalogPlacement.StorePlacement placement, CatalogPlacement.Existing entry) {

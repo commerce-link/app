@@ -22,11 +22,10 @@ public class ProductCategoryLineFactory {
     private final PimCategoryTree tree;
 
     public Optional<CategoryLine> build(ProductHeader product) {
-        InventoryKey key = new InventoryKey(product.ean(), product.mfn());
-        Taxonomy taxonomy = taxonomyCache.find(key);
+        Taxonomy taxonomy = taxonomyCache.find(new InventoryKey(product.ean(), product.mfn()));
         if (!TaxonomyCache.hasCategory(taxonomy)) {
             return Optional.empty();
         }
-        return Optional.of(CategoryLine.of(tree, null, taxonomy.categoryId(), taxonomy.category(), key, false));
+        return Optional.of(CategoryLine.of(tree, taxonomy.categoryId(), taxonomy.category(), false));
     }
 }
