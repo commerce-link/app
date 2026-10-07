@@ -101,8 +101,72 @@
                    th:href="@{'/dashboard/reports/paymentsExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
                    th:text="#{reports.payments.export}"></a>
             </div>
+
+            <div class="box mt-5" id="stock-ledger-closing" th:with="closing=${ledgerClosing}">
+                <h3 class="mb-2" th:text="#{reports.stockLedger.closing.title}"></h3>
+                <p class="mb-4" th:text="#{reports.stockLedger.closing.intro}"></p>
+
+                <div th:if="${ledgerBlockers != null and !ledgerBlockers.isEmpty()}" class="notification is-warning is-light">
+                    <p class="mb-3" th:text="#{reports.stockLedger.closing.blockers}"></p>
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-narrow">
+                            <thead>
+                            <tr>
+                                <th th:text="#{reports.stockLedger.closing.delivery}"></th>
+                                <th th:text="#{reports.stockLedger.closing.supplier}"></th>
+                                <th th:text="#{reports.stockLedger.closing.supplierOrder}"></th>
+                                <th th:text="#{reports.stockLedger.closing.received}"></th>
+                                <th th:text="#{reports.stockLedger.closing.missing}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="blocker : ${ledgerBlockers}">
+                                <td><a th:href="@{/dashboard/deliveries/details(deliveryId=${blocker.deliveryId()})}"
+                                       th:text="${blocker.number()}"></a></td>
+                                <td th:text="${blocker.supplier()}"></td>
+                                <td th:text="${blocker.supplierOrder()}"></td>
+                                <td th:text="${blocker.receivedOn()}"></td>
+                                <td th:text="#{${blocker.missingKey()}}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <form method="post" th:action="@{/dashboard/reports/stock-ledger/{month}/close(month=${closing.nextMonth()})}">
+                    <button class="button is-link" type="submit" th:disabled="${!closing.closable()}"
+                            th:text="#{reports.stockLedger.closing.close(${closing.nextLabel()})}"></button>
+                    <p th:unless="${closing.closable()}" class="help"
+                       th:text="#{reports.stockLedger.closing.notYet(${closing.nextLabel()}, ${closing.closableFrom()})}"></p>
+                </form>
+
+                <table class="table is-fullwidth mt-4" th:unless="${closing.closedMonths().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{reports.stockLedger.closing.closedMonths}"></th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="closed : ${closing.closedMonths()}">
+                        <td th:text="${closed.label()}"></td>
+                        <td class="has-text-right">
+                            <a class="button is-small is-link"
+                               th:href="@{/dashboard/reports/stock-ledger/{month}(month=${closed.month()})}"
+                               th:text="#{reports.stockLedger.closing.download}"></a>
+                            <form class="is-inline-block" method="post"
+                                  th:action="@{/dashboard/reports/stock-ledger/{month}/regenerate(month=${closed.month()})}">
+                                <button class="button is-small" type="submit"
+                                        th:text="#{reports.stockLedger.closing.regenerate}"></button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
+
 
     <script th:inline="javascript">
         const reportOwn = {

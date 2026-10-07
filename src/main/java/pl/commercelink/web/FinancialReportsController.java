@@ -2,26 +2,46 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.financials.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.warehouse.builtin.StockLedgerClosingResult;
+import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Blocked;
+import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
+import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
+import pl.commercelink.warehouse.builtin.StockLedgerMonthClosing;
+import pl.commercelink.web.reports.StockLedgerClosingBlocker;
+import pl.commercelink.web.reports.StockLedgerClosingView;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
 public class FinancialReportsController {
+
+    private static final String REPORTS_PATH = "/dashboard/reports";
+    private static final String CLOSING_SECTION = REPORTS_PATH + "#stock-ledger-closing";
 
     @Autowired
     private OrdersExport ordersExport;
@@ -47,10 +67,16 @@ public class FinancialReportsController {
     @Autowired
     private SupplierLabels supplierLabels;
 
-    @GetMapping("/dashboard/reports")
+    @Autowired
+    private StockLedgerMonthClosing stockLedgerMonthClosing;
+
+    @Autowired
+    private MessageSource messageSource;
+
+    @GetMapping(REPORTS_PATH)
     public String reports(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-                                  Model model) {
+                                  Model model, Locale locale) {
         if (dateFrom == null || dateTo == null) {
             LocalDate now = LocalDate.now();
             dateFrom = now.minusMonths(1).withDayOfMonth(1);
@@ -70,6 +96,7 @@ public class FinancialReportsController {
         model.addAttribute("providerSales", providerSales);
         model.addAttribute("dateFrom", dateFrom);
         model.addAttribute("dateTo", dateTo);
+        model.addAttribute("ledgerClosing", StockLedgerClosingView.of(stockLedgerMonthClosing.status(getStoreId()), locale));
 
         return "reports";
     }
@@ -95,11 +122,51 @@ public class FinancialReportsController {
     @GetMapping("/dashboard/reports/stockLedgerExport")
     public void stockLedgerExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
         byte[] csv = stockLedgerExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+        writeStockLedger(response, dateFrom, dateTo, csv);
+    }
 
-        response.setContentType("text/csv; charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment; filename=\"stock-ledger-" + dateFrom + "_" + dateTo + ".csv\"");
-        response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
-        response.getOutputStream().write(csv);
+    @GetMapping("/dashboard/reports/stock-ledger/{month}")
+    public void closedStockLedger(@PathVariable String month, HttpServletResponse response) throws IOException {
+        YearMonth closed = parseMonth(month);
+        byte[] csv = stockLedgerMonthClosing.closedReport(getStoreId(), closed)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        writeStockLedger(response, closed.atDay(1).toString(), closed.atEndOfMonth().toString(), csv);
+    }
+
+    @PostMapping("/dashboard/reports/stock-ledger/{month}/close")
+    public String closeStockLedgerMonth(@PathVariable String month, RedirectAttributes redirectAttributes, Locale locale) throws IOException {
+        YearMonth closing = parseMonth(month);
+        return showClosingResult(stockLedgerMonthClosing.close(getStoreId(), closing), closing,
+                "reports.stockLedger.closing.closed", "reports.stockLedger.closing.blocked", redirectAttributes, locale);
+    }
+
+    @PostMapping("/dashboard/reports/stock-ledger/{month}/regenerate")
+    public String regenerateStockLedgerMonth(@PathVariable String month, RedirectAttributes redirectAttributes, Locale locale) throws IOException {
+        YearMonth regenerated = parseMonth(month);
+        return showClosingResult(stockLedgerMonthClosing.regenerate(getStoreId(), regenerated), regenerated,
+                "reports.stockLedger.closing.regenerated", "reports.stockLedger.closing.regenerateBlocked", redirectAttributes, locale);
+    }
+
+    private String showClosingResult(StockLedgerClosingResult result, YearMonth month, String doneKey, String blockedKey,
+                                     RedirectAttributes redirectAttributes, Locale locale) {
+        String label = StockLedgerClosingView.label(month, locale);
+        switch (result) {
+            case Closed closed -> {
+                String months = closed.months().stream()
+                        .map(closedMonth -> StockLedgerClosingView.label(closedMonth, locale))
+                        .collect(Collectors.joining(", "));
+                redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(doneKey, new Object[]{months}, locale));
+            }
+            case Blocked blocked -> {
+                SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(blockedKey, new Object[]{label}, locale));
+                redirectAttributes.addFlashAttribute("ledgerBlockers",
+                        blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList());
+            }
+            case NotAllowed notAllowed -> redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(notAllowed.messageKey(), new Object[]{label}, locale));
+        }
+        return "redirect:" + CLOSING_SECTION;
     }
 
     @GetMapping("/dashboard/reports/productWeightOriginComplianceExport")
@@ -130,6 +197,21 @@ public class FinancialReportsController {
         response.setHeader("Content-Disposition", "attachment; filename=\"payments-" + dateFrom + "_" + dateTo + ".csv\"");
         response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         response.getOutputStream().write(csv);
+    }
+
+    private static void writeStockLedger(HttpServletResponse response, String dateFrom, String dateTo, byte[] csv) throws IOException {
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"stock-ledger-" + dateFrom + "_" + dateTo + ".csv\"");
+        response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+        response.getOutputStream().write(csv);
+    }
+
+    private static YearMonth parseMonth(String month) {
+        try {
+            return YearMonth.parse(month);
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
     }
 
     private String getStoreId() {
