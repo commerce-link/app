@@ -190,8 +190,14 @@ public class ShipmentPickupController {
                 .map(ShippingDetails::getDisplayName)
                 .orElseGet(() -> message("shipping.pickup.place.unknown", locale));
         String label = messageSource.getMessage("shipping.pickup.group",
-                new Object[]{group.carrier(), integration, address, group.entries().size()}, locale);
+                new Object[]{carrierName(group.carrier()), integration, address, group.entries().size()}, locale);
         return new ShipmentPickupPage.GroupOption(group.key(), label, selected);
+    }
+
+    /** Allegro's own network (ALLEGRO_ONE_KURIER, ...) reads "One by Allegro" like on the shipments card; others as they come. */
+    private static String carrierName(String carrier) {
+        String name = AllegroCarrierNames.displayName(carrier);
+        return name != null ? name : carrier;
     }
 
     private ShipmentPickupPage.PackageRow packageRow(PickupCandidate candidate, String refusal, String back,

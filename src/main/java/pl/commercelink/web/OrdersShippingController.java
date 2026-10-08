@@ -122,7 +122,7 @@ public class OrdersShippingController extends AbstractShippingController {
 
     /**
      * The first visit of the Allegro form (or a template picked): one parcel of the chosen template (the store's
-     * default one before any choice), cash on delivery of the unpaid amount, insurance at least that much and at most
+     * default one before any choice), the unpaid amount as the cash on delivery amount (the box is checked only when the buyer chose it), insurance at least that much and at most
      * the method's limit. A form posted back with errors keeps what the operator typed.
      */
     private void prefillAllegro(ShippingForm form, Order order, Store store, ShipmentProposal proposal) {
@@ -139,7 +139,7 @@ public class OrdersShippingController extends AbstractShippingController {
         parcel.setType("package");
         double unpaid = order.getUnpaidAmount();
         if (unpaid > 0) {
-            form.setCashOnDelivery(true);
+            form.setCashOnDelivery(buyerChoseCashOnDelivery(order, proposal));
             form.setCashOnDeliveryAmount(unpaid);
         }
         int insurance = Math.max(parcel.getValue(), (int) Math.ceil(form.isCashOnDelivery() ? unpaid : 0));
@@ -148,6 +148,17 @@ public class OrdersShippingController extends AbstractShippingController {
         }
         parcel.setValue(insurance);
         form.setParcels(new ArrayList<>(List.of(parcel)));
+    }
+
+    /**
+     * Cash on delivery is pre-checked only when the buyer chose it. An Allegro order paid online often still looks
+     * unpaid here, and a pre-checked box would charge the buyer a second time. The marketplace import records the
+     * checkout form's payment type as the order's payment source; an order without one falls back to the proposal,
+     * which carries a COD limit only for the POSTPAID option the adapter picks for cash-on-delivery orders.
+     */
+    private static boolean buyerChoseCashOnDelivery(Order order, ShipmentProposal proposal) {
+        PaymentSource source = order.getPayments().stream().findFirst().map(Payment::getSource).orElse(null);
+        return source != null ? source == PaymentSource.CashOnDelivery : proposal.maxCashOnDelivery() != null;
     }
 
     @Override

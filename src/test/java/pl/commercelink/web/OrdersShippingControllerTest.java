@@ -16,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
@@ -330,6 +332,34 @@ class OrdersShippingControllerTest {
         // then
         assertThat(model.get("allegroShipping")).isNull();
         assertThat(((ShippingForm) model.get("shippingForm")).getProvider()).isEqualTo("furgonetka");
+    }
+
+    @Test
+    void anOnlinePaidAllegroOrderThatLooksUnpaidKeepsCashOnDeliveryUnchecked() {
+        ShippingForm form = allegroFormFor(PaymentSource.OnlinePayment);
+
+        assertThat(form.isCashOnDelivery()).isFalse();
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(919.99);
+    }
+
+    @Test
+    void aCashOnDeliveryAllegroOrderStartsWithCashOnDeliveryCheckedForTheUnpaidAmount() {
+        ShippingForm form = allegroFormFor(PaymentSource.CashOnDelivery);
+
+        assertThat(form.isCashOnDelivery()).isTrue();
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(919.99);
+    }
+
+    private ShippingForm allegroFormFor(PaymentSource source) {
+        Order order = allegroOrder();
+        order.getPayments().clear();
+        order.addPayment(new Payment(source));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        ExtendedModelMap model = new ExtendedModelMap();
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+        return (ShippingForm) model.get("shippingForm");
     }
 
     @Test

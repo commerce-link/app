@@ -120,6 +120,22 @@ class ShipmentPickupControllerTest {
     }
 
     @Test
+    void anAllegroOwnNetworkCarrierReadsOneByAllegroInTheGroupLabel() {
+        // given
+        PickupGroup one = group("ALLEGRO_ONE_KURIER", "addr-1",
+                entry("7", ShipmentOwnerType.ORDER, ORDER_1, "ALLEGRO_ONE_KURIER", "addr-1"));
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(one));
+        when(pickupService.pageWindows(any(), any(), any(), any(), eq(4))).thenReturn(new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of()));
+
+        // when
+        ShipmentPickupPage page = open(one.key(), BACK);
+
+        // then
+        assertThat(page.groups()).extracting(ShipmentPickupPage.GroupOption::label)
+                .allMatch(label -> label.startsWith("One by Allegro · ") && !label.contains("ALLEGRO_ONE_KURIER"));
+    }
+
+    @Test
     void theRequestedGroupIsShownWithItsPackagesAndTheWindowsOfTheNextFourDays() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
