@@ -87,62 +87,67 @@
                             </div>
                         </div>
                         <p th:if="${p.mappings.isEmpty()}" class="cl-list-empty" th:text="#{invoiceSync.items.empty}"></p>
-                        <table th:if="${!p.mappings.isEmpty()}" class="cl-table is-match">
-                            <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
-                            <thead>
-                            <tr>
-                                <th scope="col" th:text="#{invoiceSync.col.product}"></th>
-                                <th scope="col" th:text="#{invoiceSync.col.position}"></th>
-                                <th scope="col" th:text="#{invoiceSync.col.match}"></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="mapping, stat : ${p.mappings}" data-cl-sync-row="item" th:with="state=${p.stateOf(mapping)}"
-                                th:attr="data-cost=${mapping.unitCost}, data-qty=${mapping.qty}, data-name=${mapping.name}">
-                                <th scope="row" class="cl-table-key" th:attr="data-label=#{invoiceSync.col.product}">
-                                    <span th:text="${mapping.name}"></span>
-                                    <span class="cl-table-sub"><th:block th:if="${!#strings.isEmpty(mapping.mfn)}"><span
-                                            th:text="#{invoiceSync.item.mfn(${mapping.mfn})}"></span> · </th:block><span
-                                            th:text="#{invoiceSync.item.qty(${mapping.qty})}"></span> · <span
-                                            th:text="#{invoiceSync.item.cost(${p.money(mapping.unitCost)})}"></span></span>
-                                </th>
-                                <td class="cl-cell-pick" th:attr="data-label=#{invoiceSync.col.position}">
-                                    <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
-                                    <select class="cl-select" th:field="*{mappings[__${stat.index}__].selectedPositionId}" data-cl-sync-select
-                                            th:attr="aria-label=#{invoiceSync.position.for(${mapping.name})}">
-                                        <option value="" th:text="#{invoiceSync.noMatch}"></option>
-                                        <option th:replace="~{::positionOption}"></option>
-                                    </select>
-                                    <div data-cl-sync-warnings></div>
-                                </td>
-                                <td data-cl-sync-state th:attr="data-label=#{invoiceSync.col.match}">
-                                    <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
-                                    <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
-                                          th:with="o=${p.option(mapping.selectedPositionId)}"
-                                          th:text="#{invoiceSync.diff(${(o.priceNet > mapping.unitCost ? '+' : '') + p.invoiceMoney(o.priceNet - mapping.unitCost)})}"></span>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+                        <!--/* spaced from the description like the items table of a new delivery (cl-card-section) */-->
+                        <div th:if="${!p.mappings.isEmpty()}" class="cl-card-section">
+                            <table class="cl-table is-match">
+                                <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
+                                <thead>
+                                <tr>
+                                    <th scope="col" th:text="#{invoiceSync.col.product}"></th>
+                                    <th scope="col" th:text="#{invoiceSync.col.position}"></th>
+                                    <th scope="col" th:text="#{invoiceSync.col.match}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="mapping, stat : ${p.mappings}" data-cl-sync-row="item" th:with="state=${p.stateOf(mapping)}"
+                                    th:attr="data-cost=${mapping.unitCost}, data-qty=${mapping.qty}, data-name=${mapping.name}">
+                                    <th scope="row" class="cl-table-key" th:attr="data-label=#{invoiceSync.col.product}">
+                                        <span th:text="${mapping.name}"></span>
+                                        <span class="cl-table-sub"><th:block th:if="${!#strings.isEmpty(mapping.mfn)}"><span
+                                                th:text="#{invoiceSync.item.mfn(${mapping.mfn})}"></span> · </th:block><span
+                                                th:text="#{invoiceSync.item.qty(${mapping.qty})}"></span> · <span
+                                                th:text="#{invoiceSync.item.cost(${p.money(mapping.unitCost)})}"></span></span>
+                                    </th>
+                                    <td class="cl-cell-pick" th:attr="data-label=#{invoiceSync.col.position}">
+                                        <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
+                                        <select class="cl-select" th:field="*{mappings[__${stat.index}__].selectedPositionId}" data-cl-sync-select
+                                                th:attr="aria-label=#{invoiceSync.position.for(${mapping.name})}">
+                                            <option value="" th:text="#{invoiceSync.noMatch}"></option>
+                                            <option th:replace="~{::positionOption}"></option>
+                                        </select>
+                                        <div data-cl-sync-warnings></div>
+                                    </td>
+                                    <td data-cl-sync-state th:attr="data-label=#{invoiceSync.col.match}">
+                                        <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
+                                        <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
+                                              th:with="o=${p.option(mapping.selectedPositionId)}"
+                                              th:text="#{invoiceSync.diff(${(o.priceNet > mapping.unitCost ? '+' : '') + p.invoiceMoney(o.priceNet - mapping.unitCost)})}"></span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <section class="cl-card" aria-labelledby="sync-extras-title">
                         <div class="cl-card-head"><h2 class="cl-card-title" id="sync-extras-title" th:text="#{invoiceSync.extras.title}"></h2></div>
                         <p class="cl-card-desc" th:text="#{invoiceSync.extras.desc}"></p>
-                        <table class="cl-table is-match">
-                            <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
-                            <thead>
-                            <tr>
-                                <th scope="col" th:text="#{invoiceSync.col.cost}"></th>
-                                <th scope="col" th:text="#{invoiceSync.col.position}"></th>
-                                <th scope="col" th:text="#{invoiceSync.col.match}"></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:replace="~{::extraRow('shipping', #{invoiceSync.shippingCost}, ${p.shippingCost}, 'shippingCostPositionId', ${p.shippingCostState}, ${p.shippingCostPositionId})}"></tr>
-                            <tr th:replace="~{::extraRow('payment', #{invoiceSync.paymentCost}, ${p.paymentCost}, 'paymentCostPositionId', ${p.paymentCostState}, ${p.paymentCostPositionId})}"></tr>
-                            </tbody>
-                        </table>
+                        <div class="cl-card-section">
+                            <table class="cl-table is-match">
+                                <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
+                                <thead>
+                                <tr>
+                                    <th scope="col" th:text="#{invoiceSync.col.cost}"></th>
+                                    <th scope="col" th:text="#{invoiceSync.col.position}"></th>
+                                    <th scope="col" th:text="#{invoiceSync.col.match}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:replace="~{::extraRow('shipping', #{invoiceSync.shippingCost}, ${p.shippingCost}, 'shippingCostPositionId', ${p.shippingCostState}, ${p.shippingCostPositionId})}"></tr>
+                                <tr th:replace="~{::extraRow('payment', #{invoiceSync.paymentCost}, ${p.paymentCost}, 'paymentCostPositionId', ${p.paymentCostState}, ${p.paymentCostPositionId})}"></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <section class="cl-card" aria-labelledby="sync-unassigned-title" data-cl-sync-unassigned
