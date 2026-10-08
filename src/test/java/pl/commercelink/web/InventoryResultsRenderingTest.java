@@ -349,7 +349,7 @@ class InventoryResultsRenderingTest {
         String html = engine.process(RESULTS, context);
 
         // then
-        assertThat(html).doesNotContain("cl-back", "/dashboard/inventory?cat=11", "Supplier assortment");
+        assertThat(html).doesNotContain("cl-back", "/dashboard/inventory?cat=11", "Assortment");
     }
 
     @Test
@@ -365,7 +365,7 @@ class InventoryResultsRenderingTest {
         assertThat(html).containsPattern("<header class=\"cl-page-header\">\\s*<a class=\"cl-back\" "
                 + "href=\"/dashboard/inventory\\?cat=11&amp;page=2\">\\s*"
                 + "<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-chevron-left\"></i></span>\\s*"
-                + "<span>Supplier assortment</span>\\s*</a>\\s*<div class=\"cl-page-header-row\">");
+                + "<span>Assortment</span>\\s*</a>\\s*<div class=\"cl-page-header-row\">");
         assertThat(html.indexOf("cl-back")).isLessThan(html.indexOf("<h1"));
     }
 
@@ -375,7 +375,7 @@ class InventoryResultsRenderingTest {
         String html = engine.process("inventory-prices", pageContext());
 
         // then
-        assertThat(html).doesNotContain("cl-back", "Supplier assortment");
+        assertThat(html).doesNotContain("cl-back", "Assortment");
     }
 
     @Test

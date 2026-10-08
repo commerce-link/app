@@ -1,9 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.springframework.stereotype.Service;
-import pl.commercelink.documents.DocumentType;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,23 +20,38 @@ class WarehouseDocumentMfnHistoryService {
         this.warehouseDocumentRepository = warehouseDocumentRepository;
     }
 
-    List<MfnHistoryRow> getMfnHistory(String storeId, String deliveryId, String mfn) {
+    /** Every document of one delivery that moved this product, oldest first, with the stock after each move. Items
+     *  whose document is not in the store are skipped: items are read by delivery id alone, which is not store-scoped. */
+    MfnHistory history(String storeId, String deliveryId, String mfn) {
         List<WarehouseDocumentItem> items = warehouseDocumentItemRepository.findByDeliveryId(deliveryId).stream()
                 .filter(item -> mfn.equals(item.getMfn()))
                 .sorted(Comparator.comparing(WarehouseDocumentItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
         List<MfnHistoryRow> rows = new ArrayList<>();
+        String productName = null;
         int runningStock = 0;
         for (WarehouseDocumentItem item : items) {
-            int stockChange = item.getDocumentType().isReceiptType() ? item.getQty() : -item.getQty();
-            runningStock += stockChange;
             WarehouseDocument document = warehouseDocumentRepository.findByDocumentId(storeId, item.getDocumentId());
-            String documentNo = document != null ? document.getDocumentNo() : item.getDocumentId();
-            rows.add(new MfnHistoryRow(item.getDocumentId(), documentNo, item.getDocumentType(), item.getCreatedAt(), item.getQty(), stockChange, runningStock));
+            if (document == null) {
+                continue;
+            }
+            int stockChange = stockChange(item);
+            runningStock += stockChange;
+            if (productName == null) {
+                productName = item.getName();
+            }
+            rows.add(new MfnHistoryRow(item.getDocumentId(), document.getDocumentNo(), item.getDocumentType(),
+                    item.getCreatedAt(), item.getQty(), stockChange, runningStock));
         }
-        return rows;
+        return new MfnHistory(productName, rows);
     }
 
-    record MfnHistoryRow(String documentId, String documentNo, DocumentType documentType, LocalDateTime createdAt, int qty, int stockChange, int stockAfter) {}
+    // legacy items may lack a type; their direction is unknown, so they do not move the running stock
+    private static int stockChange(WarehouseDocumentItem item) {
+        if (item.getDocumentType() == null) {
+            return 0;
+        }
+        return item.getDocumentType().isReceiptType() ? item.getQty() : -item.getQty();
+    }
 }

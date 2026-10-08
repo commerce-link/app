@@ -303,8 +303,8 @@ class ProductsAddTemplateTest {
         String fromCatalog = renderedReview(Map.of());
 
         // then
-        assertThat(fromInventory).contains("Supplier assortment");
-        assertThat(fromCatalog).doesNotContain("Supplier assortment");
+        assertThat(fromInventory).contains("Assortment");
+        assertThat(fromCatalog).doesNotContain("Assortment");
     }
 
     /** From the inventory the save needs the way back and the count of products the review already dropped. */
