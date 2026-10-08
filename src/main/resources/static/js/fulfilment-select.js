@@ -130,24 +130,35 @@
         return winner;
     }
 
+    // net per piece above the winner, in whole grosze; zero or less when the gross decided (same net, other VAT rate)
+    function dearerCents(offer, winner) {
+        return Math.round((offer.net - winner.net) * 100);
+    }
+
     // a ticked covered offer orders nothing and says who takes its items; an unticked one says how much dearer it is
-    // than the offer it sits under (net, per piece), the amount in the bad colour
+    // than the offer it sits under (net, per piece), the amount in the bad colour, or only who covers it when it is
+    // not dearer in net
     function renderCovered(offer, winner, beaters) {
         var covered = offer.row.querySelector('[data-cl-covered]');
+        var key = offer.row.querySelector('th.cl-table-key');
         covered.textContent = '';
         covered.hidden = !offer.covered;
+        // a covered row shows no pieces: its line takes the empty quantity cell too, so the pill and the text fit together
+        key.colSpan = offer.covered ? 2 : 1;
+        offer.row.querySelector('td.cl-cell-qty').hidden = offer.covered;
         if (!offer.covered) {
             return;
         }
-        if (offer.check.checked) {
-            covered.textContent = format(texts.coveredOn, beaters.join(', '));
+        var cents = dearerCents(offer, winner[offer.allocations[0].key]);
+        if (offer.check.checked || cents <= 0) {
+            covered.textContent = format(offer.check.checked ? texts.coveredOn : texts.coveredOff, beaters.join(', '));
             return;
         }
         var template = String(texts.dearer);
         var at = template.indexOf('{0}');
         var amount = document.createElement('span');
         amount.className = 'cl-offer-dearer';
-        amount.textContent = format(template.slice(at), money(offer.net - winner[offer.allocations[0].key].net));
+        amount.textContent = format(template.slice(at), money(cents / 100));
         covered.appendChild(document.createTextNode(template.slice(0, at)));
         covered.appendChild(amount);
     }
@@ -235,10 +246,14 @@
             cell.appendChild(button);
             row.appendChild(cell);
             button.addEventListener('click', function () {
+                // a group holding a ticked offer stays open (aria-disabled): folding it would hide part of the selection
+                if (button.getAttribute('aria-disabled') === 'true') {
+                    return;
+                }
                 unfolded[parent.id] = button.getAttribute('aria-expanded') !== 'true';
                 render();
             });
-            fold = foldRows[parent.id] = {row: row, button: button, label: label, children: []};
+            fold = foldRows[parent.id] = {row: row, button: button, label: label, parent: parent, children: []};
         }
         return fold;
     }
@@ -300,16 +315,26 @@
                     unfolded[primary.id] = true;
                 }
                 tickedUnder[primary.id] = ticked;
-                // the focus never lands on a row that folds away
-                var open = unfolded[primary.id] === true || children.some(function (child) {
+                // the focus never lands on a row that folds away, and a ticked offer is never folded out of sight
+                var locked = ticked.length > 0;
+                var open = locked || unfolded[primary.id] === true || children.some(function (child) {
                     return child.row.contains(focused);
                 });
-                var cheapest = Math.min.apply(null, children.map(function (child) {
-                    return child.net - primary.net;
-                }));
+                var dearer = children.map(function (child) {
+                    return dearerCents(child, primary);
+                }).filter(function (cents) {
+                    return cents > 0;
+                });
                 fold.children = children;
-                fold.label.textContent = format(texts.fold, children.length, money(cheapest));
+                fold.label.textContent = dearer.length
+                    ? format(texts.fold, children.length, money(Math.min.apply(null, dearer) / 100))
+                    : format(texts.foldPlain, children.length);
                 fold.button.setAttribute('aria-expanded', String(open));
+                if (locked) {
+                    fold.button.setAttribute('aria-disabled', 'true');
+                } else {
+                    fold.button.removeAttribute('aria-disabled');
+                }
                 fold.button.setAttribute('aria-controls', children.map(function (child) {
                     return child.row.id;
                 }).join(' '));
@@ -524,7 +549,8 @@
                 && (!providers.length || providers.indexOf(offer.provider) >= 0)
                 && (min === null || offer.net >= min)
                 && (max === null || offer.net <= max);
-            if (!offer.visible && offer.check.checked) {
+            // only what will be saved: a ticked offer beaten on every item orders nothing
+            if (!offer.visible && offer.check.checked && offer.won > 0) {
                 hiddenTicked++;
             }
         });
@@ -535,14 +561,14 @@
                 if (offer.category !== tbody) {
                     return;
                 }
-                offer.row.hidden = !offer.visible || !open || offer.folded;
+                offer.row.hidden = !onScreen(offer);
                 any = any || offer.visible;
             });
             tbody.hidden = !any;
         });
         Object.keys(foldRows).forEach(function (id) {
             var fold = foldRows[id];
-            fold.row.hidden = !isOpen(fold.row.parentNode) || !fold.children.some(function (child) {
+            fold.row.hidden = !isOpen(fold.row.parentNode) || fold.parent.row.hidden || !fold.children.some(function (child) {
                 return child.visible;
             });
         });
@@ -559,13 +585,18 @@
         renderSelectVisible();
     }
 
-    function shownOffers() {
-        return offers.filter(function (offer) {
-            return offer.visible;
-        });
+    // on screen: passing the filters, in an expanded category and not folded under its winner. A winner the filters
+    // hide takes its fold row with it, so the offers under it then show on their own instead of becoming unreachable.
+    function onScreen(offer) {
+        return offer.visible && isOpen(offer.category) && !(offer.folded && offer.parent.visible);
     }
 
-    // one button for the offers the filters leave: it ticks them while one of them is unticked, otherwise it clears them
+    function shownOffers() {
+        return offers.filter(onScreen);
+    }
+
+    // one button for the offers on screen: it ticks them while one of them is unticked, otherwise it clears them; what a
+    // collapsed category or a closed fold holds is never changed unseen
     function renderSelectVisible() {
         if (!selectVisible) {
             return;
