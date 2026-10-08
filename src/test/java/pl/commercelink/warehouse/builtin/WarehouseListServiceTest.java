@@ -230,6 +230,17 @@ class WarehouseListServiceTest {
     }
 
     @Test
+    void searchFindsAnEanTypedOrScannedWithItsLeadingZero() {
+        // given
+        WarehouseItem ryzen = add("Ryzen 7", "CPU", Delivered, 1, 1);
+        ryzen.setEan("0730143316002");
+
+        // when / then
+        assertThat(page("q", "0730143316002").rows()).extracting(WarehouseItemRow::name).containsExactly("Ryzen 7");
+        assertThat(page("q", "730143316002").rows()).extracting(WarehouseItemRow::name).containsExactly("Ryzen 7");
+    }
+
+    @Test
     void defaultSortIsCategoryThenNameWithNoCategoryLast() {
         // given
         add("Zeta", "GPU", Delivered, 1, 1);

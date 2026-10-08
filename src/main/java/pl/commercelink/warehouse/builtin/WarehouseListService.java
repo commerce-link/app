@@ -12,6 +12,7 @@ import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.*;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.Pagination;
@@ -189,8 +190,11 @@ class WarehouseListService {
 
     private static boolean matchesSearch(WarehouseItem item, String q) {
         if (q == null) return true;
+        // an EAN is stored without its leading zeros, so a scanned or typed EAN-13 is also tried in that form
+        String asEan = UnifiedProductIdentifiers.unifyEan(q);
         return Stream.of(item.getName(), item.getEan(), item.getManufacturerCode(), item.getDeliveryId(), item.getSerialNo(), item.getComment())
-                .anyMatch(field -> StringUtils.containsIgnoreCase(StringUtils.stripAccents(StringUtils.defaultString(field)), StringUtils.stripAccents(q)));
+                .map(field -> StringUtils.stripAccents(StringUtils.defaultString(field)))
+                .anyMatch(field -> StringUtils.containsIgnoreCase(field, StringUtils.stripAccents(q)) || StringUtils.containsIgnoreCase(field, asEan));
     }
 
     private static Comparator<WarehouseItem> comparator(WarehouseListQuery query, Collator collator, List<FulfilmentStatus> visible) {
