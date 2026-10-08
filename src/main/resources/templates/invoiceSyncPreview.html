@@ -65,8 +65,9 @@
                     <section class="cl-card" aria-labelledby="sync-items-title">
                         <div class="cl-card-head">
                             <h2 class="cl-card-title" id="sync-items-title" th:text="#{invoiceSync.items.title}"></h2>
-                            <ul th:if="${!p.mappings.isEmpty()}" class="cl-status-row" data-cl-sync-counts th:attr="aria-label=#{invoiceSync.items.summary}">
-                                <li th:each="state : ${p.rowStates}" th:with="n=${p.count(state)}" th:hidden="${n == 0}"
+                            <ul th:if="${!p.mappings.isEmpty()}" class="cl-status-row" data-cl-sync-counts th:hidden="${!p.anyCounted}"
+                                th:attr="aria-label=#{invoiceSync.items.summary}">
+                                <li th:each="state : ${p.countedStates}" th:with="n=${p.count(state)}" th:hidden="${n == 0}"
                                     th:attr="data-state=${state.name()}">
                                     <span class="cl-status" th:classappend="${state.tone}"
                                           th:text="#{invoiceSync.state.count(#{${state.labelKey}}, ${n})}"></span>

@@ -31,6 +31,16 @@ class InvoiceSyncPreviewTest {
     }
 
     @Test
+    void matchingRowsAreNotCountedAboveTheTable() {
+        // given
+        InvoiceSyncPreview preview = preview(mapping("MFN-1", 100.00, "p1"), mapping("MFN-2", 50.00, "p2"));
+
+        // when / then
+        assertThat(preview.getCountedStates()).doesNotContain(MatchState.EXACT);
+        assertThat(preview.isAnyCounted()).isFalse();
+    }
+
+    @Test
     void extraCostWithoutAPositionIsNoCostOnlyWhenItIsZero() {
         // given
         InvoiceSyncPreview preview = preview();

@@ -42,7 +42,7 @@ class InvoiceSyncPreviewTemplateTest {
                 .contains("<span class=\"cl-status is-info\">Różnica 1 gr</span>")
                 .contains("<span class=\"cl-status is-bad\">Do przypisania</span>")
                 .contains("<span class=\"cl-status is-neutral\">Brak kosztu</span>")
-                .contains("Zgodne: 1").contains("Różnica 1 gr: 1").contains("Do przypisania: 1");
+                .contains("Różnica 1 gr: 1").contains("Do przypisania: 1").doesNotContain("Zgodne: ");
         assertThat(html).containsPattern("<li hidden=\"hidden\" data-state=\"DIFFERENT\">|<li data-state=\"DIFFERENT\" hidden=\"hidden\">");
     }
 
@@ -114,7 +114,8 @@ class InvoiceSyncPreviewTemplateTest {
         String html = render(preview);
 
         // then
-        assertThat(html).contains("<span class=\"cl-status is-ok\">Zgodne: 2</span>")
+        assertThat(html).containsPattern("<ul class=\"cl-status-row\" data-cl-sync-counts hidden=\"hidden\"|<ul[^>]*data-cl-sync-counts[^>]*hidden=\"hidden\"")
+                .doesNotContain("Zgodne: ")
                 .contains("<strong data-cl-effect-text>Koszty produktów bez zmian</strong>")
                 .doesNotContain("cl-alert is-ok");
     }
@@ -159,7 +160,7 @@ class InvoiceSyncPreviewTemplateTest {
         assertThat(js).contains("var EPS = 0.005;").contains("var CLOSE_DELTA = 0.01;")
                 .contains("text.split('{' + i + '}').join(value)").doesNotContain(".replace('{'")
                 .contains("NO_COST").contains("'is-neutral'")
-                .contains("window.addEventListener('pageshow'").contains("r.choice && r.state !== 'EXACT'");
+                .contains("window.addEventListener('pageshow'").contains("list.hidden = !any;").contains("r.choice && r.state !== 'EXACT'");
         assertThat(css).contains(".cl-page .cl-table.is-match {").contains(".cl-page .cl-status-row {")
                 .contains(".cl-page .cl-effects {");
     }

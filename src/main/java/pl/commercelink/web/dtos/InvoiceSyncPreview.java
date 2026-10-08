@@ -374,9 +374,16 @@ public class InvoiceSyncPreview {
         return mappings.stream().filter(m -> stateOf(m) == state).count();
     }
 
-    /** The states a product row can be in, in the order of the counts above the table. */
-    public List<MatchState> getRowStates() {
-        return List.of(MatchState.EXACT, MatchState.CLOSE, MatchState.DIFFERENT, MatchState.UNASSIGNED);
+    /**
+     * The row states counted above the table, in their order: only those that need a look. A matching row asks for
+     * nothing, and its pill in the row already says so.
+     */
+    public List<MatchState> getCountedStates() {
+        return List.of(MatchState.CLOSE, MatchState.DIFFERENT, MatchState.UNASSIGNED);
+    }
+
+    public boolean isAnyCounted() {
+        return getCountedStates().stream().anyMatch(state -> count(state) > 0);
     }
 
     /** The rows whose unit cost the save changes: assigned to an invoice line of another price. */

@@ -99,12 +99,20 @@
     }
 
     function drawCounts(form, items) {
-        form.querySelectorAll('[data-cl-sync-counts] [data-state]').forEach(function (li) {
+        var list = form.querySelector('[data-cl-sync-counts]');
+        if (!list) {
+            return;
+        }
+        var any = false;
+        list.querySelectorAll('[data-state]').forEach(function (li) {
             var state = li.getAttribute('data-state');
             var n = items.filter(function (r) { return r.state === state; }).length;
             li.hidden = n === 0;
+            any = any || n > 0;
             li.querySelector('.cl-status').textContent = fill(form.dataset.templateCount, [form.dataset[LABELS[state]], n]);
         });
+        // a list with nothing to count would still be announced, as an empty list
+        list.hidden = !any;
     }
 
     function drawUnassigned(form, results) {
