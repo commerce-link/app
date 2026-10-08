@@ -9181,10 +9181,13 @@ a.cl-link-button:hover {
 }
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }
+    /* the hidden delivery column leaves room: 12 % was 78 px at 768 px and broke "Chłodzenie" inside the word */
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 18%; }
 }
 @media screen and (max-width: 719px) {
     .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
-    .cl-page .cl-table.is-warehouse .cl-table-code { overflow-wrap: anywhere; }
+    /* the card has no room for an ellipsis with its tooltip (no hover on touch): an overlong code wraps anywhere */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; overflow-wrap: anywhere; }
     .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
 
     /* phone card (B3): like the orders card A, the cells give their parts to one grid of the row and drop their labels

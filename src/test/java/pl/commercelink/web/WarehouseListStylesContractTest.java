@@ -161,7 +161,31 @@ class WarehouseListStylesContractTest {
         // the pill may break after "syst." (the amount itself is grouped with no-break spaces), never out of its cell
         assertThat(section).doesNotContain(".cl-table-pills .cl-status { white-space: nowrap; }")
                 .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; white-space: normal; }");
-        assertThat(section).contains("-webkit-line-clamp: 2;").doesNotContain(".cl-table-code { white-space: normal; }");
+        assertThat(section).contains("-webkit-line-clamp: 2;");
+        assertThat(table.substring(0, table.indexOf("@media screen and (max-width: 719px)"))).doesNotContain(".cl-table-code { white-space: normal");
+    }
+
+    @Test
+    void aCodeLongerThanThePhoneCardWrapsInsteadOfWideningThePage() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // the shared rule keeps a code on one line (an EAN is read digit by digit); a 46-character code pushed a 390 px
+        // page to 482 px, and the ellipsis of the table has no tooltip on touch, so on the card it may break anywhere
+        String phone = section.substring(section.indexOf("@media screen and (max-width: 719px)"));
+        assertThat(phone).contains(".cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; overflow-wrap: anywhere; }");
+    }
+
+    @Test
+    void categoryColumnTakesTheRoomOfTheHiddenDeliveryColumnBelow1024() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // 12 % left 78 px at 768 px and broke "Chłodzenie" inside the word; the delivery column is hidden there anyway
+        String narrow = section.substring(section.indexOf("@media screen and (min-width: 720px) and (max-width: 1023px)"));
+        assertThat(narrow.substring(0, narrow.indexOf("}\n}") + 3)).contains(".cl-page .cl-table.is-warehouse .cl-col-category { width: 18%; }");
     }
 
     @Test
