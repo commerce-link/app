@@ -1,9 +1,15 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.invoicing.InvoicePositionMatcher;
+import pl.commercelink.inventory.deliveries.InvoicePaymentSync;
+import pl.commercelink.web.orders.Money;
+import pl.commercelink.web.orders.OrderFormats;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
 
 public class InvoiceSyncPreview {
 
@@ -31,6 +37,16 @@ public class InvoiceSyncPreview {
     private String invoicePaymentToDate;
     private boolean deliveryPaid;
     private String deliveryPaymentDueDate;
+
+    // read-only context of the page; not posted back
+    private String deliveryShortId;
+    private String deliverySupplier;
+    private String supplierName;
+    private String deliveryOrderedAt;
+    private boolean deliveryAwaitingApproval;
+    private boolean deliverySynced;
+    private int deliveryPaymentsCount;
+    private Integer paymentTermDays;
 
     private List<Option> options = new ArrayList<>();
     private List<Mapping> mappings = new ArrayList<>();
@@ -242,28 +258,204 @@ public class InvoiceSyncPreview {
         return invoiceShortcut != null && !invoiceShortcut.equals(deliveryProvider);
     }
 
-    public int getExactMatchCount() {
-        return (int) mappings.stream().filter(m -> m.getMatchQuality() == InvoicePositionMatcher.Quality.EXACT_MATCH).count();
-    }
-
-    public int getCloseMatchCount() {
-        return (int) mappings.stream().filter(m -> m.getMatchQuality() == InvoicePositionMatcher.Quality.CLOSE_MATCH).count();
-    }
-
-    public int getNoMatchCount() {
-        return (int) mappings.stream().filter(m -> m.getMatchQuality() == null || m.getMatchQuality() == InvoicePositionMatcher.Quality.NO_MATCH).count();
-    }
-
     public boolean isAllExact() {
-        return !mappings.isEmpty() && getExactMatchCount() == mappings.size();
+        return !mappings.isEmpty() && count(MatchState.EXACT) == mappings.size();
+    }
+
+    public String getDeliveryShortId() {
+        return deliveryShortId;
+    }
+
+    public void setDeliveryShortId(String deliveryShortId) {
+        this.deliveryShortId = deliveryShortId;
+    }
+
+    public String getDeliverySupplier() {
+        return deliverySupplier;
+    }
+
+    public void setDeliverySupplier(String deliverySupplier) {
+        this.deliverySupplier = deliverySupplier;
+    }
+
+    public String getSupplierName() {
+        return supplierName;
+    }
+
+    public void setSupplierName(String supplierName) {
+        this.supplierName = supplierName;
+    }
+
+    public String getDeliveryOrderedAt() {
+        return deliveryOrderedAt;
+    }
+
+    public void setDeliveryOrderedAt(String deliveryOrderedAt) {
+        this.deliveryOrderedAt = deliveryOrderedAt;
+    }
+
+    public boolean isDeliveryAwaitingApproval() {
+        return deliveryAwaitingApproval;
+    }
+
+    public void setDeliveryAwaitingApproval(boolean deliveryAwaitingApproval) {
+        this.deliveryAwaitingApproval = deliveryAwaitingApproval;
+    }
+
+    public boolean isDeliverySynced() {
+        return deliverySynced;
+    }
+
+    public void setDeliverySynced(boolean deliverySynced) {
+        this.deliverySynced = deliverySynced;
+    }
+
+    public int getDeliveryPaymentsCount() {
+        return deliveryPaymentsCount;
+    }
+
+    public void setDeliveryPaymentsCount(int deliveryPaymentsCount) {
+        this.deliveryPaymentsCount = deliveryPaymentsCount;
+    }
+
+    public Integer getPaymentTermDays() {
+        return paymentTermDays;
+    }
+
+    public void setPaymentTermDays(Integer paymentTermDays) {
+        this.paymentTermDays = paymentTermDays;
+    }
+
+    public InvoicePaymentSync getPaymentSync() {
+        return InvoicePaymentSync.of(invoicePaid, deliveryPaymentsCount > 0);
+    }
+
+    public boolean isForeignCurrency() {
+        return currency != null && !"PLN".equalsIgnoreCase(currency);
+    }
+
+    /** An amount of the delivery, kept in złoty. */
+    public String money(double amount) {
+        return Money.format(amount) + " z\u0142";
+    }
+
+    /** An amount of the invoice, in the invoice's currency. */
+    public String invoiceMoney(double amount) {
+        return isForeignCurrency() ? Money.format(amount) + " " + currency : money(amount);
+    }
+
+    /** A date the page carries as ISO text, the way the order screens show dates. */
+    public String date(String isoDate) {
+        return isoDate == null || isoDate.isBlank() ? null : OrderFormats.date(LocalDate.parse(isoDate));
+    }
+
+    public String optionLabel(Option option) {
+        return option.getQty() + " \u00d7 " + option.getName() + " \u2014 " + invoiceMoney(option.getPriceNet());
+    }
+
+    /** The state of a product row from its current choice; invoice-sync.js applies the same rule after every change. */
+    public MatchState stateOf(Mapping mapping) {
+        Option option = option(mapping.getSelectedPositionId());
+        return option == null ? MatchState.UNASSIGNED : MatchState.compare(option.getPriceNet(), mapping.getUnitCost());
+    }
+
+    public MatchState getShippingCostState() {
+        return extraState(shippingCostPositionId, shippingCost);
+    }
+
+    public MatchState getPaymentCostState() {
+        return extraState(paymentCostPositionId, paymentCost);
+    }
+
+    public long count(MatchState state) {
+        return mappings.stream().filter(m -> stateOf(m) == state).count();
+    }
+
+    public long getAssignedItemCount() {
+        return mappings.stream().filter(m -> option(m.getSelectedPositionId()) != null).count();
+    }
+
+    /** The invoice positions no row has chosen, which the save leaves out of the delivery. */
+    public List<Option> getUnassignedOptions() {
+        Set<String> chosen = chosenPositionIds();
+        return options.stream().filter(o -> !chosen.contains(o.getId())).toList();
+    }
+
+    public double getAssignedNet() {
+        Set<String> chosen = chosenPositionIds();
+        return options.stream().filter(o -> chosen.contains(o.getId())).mapToDouble(Option::getTotalNet).sum();
+    }
+
+    public double getUnassignedNet() {
+        return getUnassignedOptions().stream().mapToDouble(Option::getTotalNet).sum();
+    }
+
+    public Option option(String positionId) {
+        if (positionId == null || positionId.isBlank()) {
+            return null;
+        }
+        return options.stream().filter(o -> positionId.equals(o.getId())).findFirst().orElse(null);
+    }
+
+    private MatchState extraState(String positionId, double cost) {
+        Option option = option(positionId);
+        if (option == null) {
+            return Math.abs(cost) < MatchState.EPS ? MatchState.NO_COST : MatchState.UNASSIGNED;
+        }
+        return MatchState.compare(option.getTotalNet(), cost);
+    }
+
+    private Set<String> chosenPositionIds() {
+        Set<String> chosen = new HashSet<>();
+        Stream.concat(mappings.stream().map(Mapping::getSelectedPositionId), Stream.of(shippingCostPositionId, paymentCostPositionId))
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(chosen::add);
+        return chosen;
+    }
+
+    /** How a delivery cost compares with the invoice position chosen for it; the tone is the pill's class. */
+    public enum MatchState {
+        EXACT("is-ok", "invoiceSync.state.exact"),
+        CLOSE("is-info", "invoiceSync.state.close"),
+        DIFFERENT("is-warn", "invoiceSync.state.different"),
+        UNASSIGNED("is-bad", "invoiceSync.state.unassigned"),
+        NO_COST("is-neutral", "invoiceSync.state.noCost");
+
+        static final double EPS = 0.005;
+        private static final double CLOSE_DELTA = 0.01;
+
+        private final String tone;
+        private final String labelKey;
+
+        MatchState(String tone, String labelKey) {
+            this.tone = tone;
+            this.labelKey = labelKey;
+        }
+
+        // the bands of InvoicePositionMatcher: equal below half a grosz, "close" at one grosz either way
+        static MatchState compare(double invoiceAmount, double deliveryAmount) {
+            double delta = Math.abs(invoiceAmount - deliveryAmount);
+            if (delta < EPS) {
+                return EXACT;
+            }
+            return Math.abs(delta - CLOSE_DELTA) < EPS ? CLOSE : DIFFERENT;
+        }
+
+        public String getTone() {
+            return tone;
+        }
+
+        public String getLabelKey() {
+            return labelKey;
+        }
     }
 
     public static class Option {
         private String id;
-        private String label;
         private String name;
         private int qty;
         private double priceNet;
+        private double totalNet;
         private String currency;
 
         public String getId() {
@@ -272,14 +464,6 @@ public class InvoiceSyncPreview {
 
         public void setId(String id) {
             this.id = id;
-        }
-
-        public String getLabel() {
-            return label;
-        }
-
-        public void setLabel(String label) {
-            this.label = label;
         }
 
         public String getName() {
@@ -313,6 +497,14 @@ public class InvoiceSyncPreview {
         public void setCurrency(String currency) {
             this.currency = currency;
         }
+
+        public double getTotalNet() {
+            return totalNet;
+        }
+
+        public void setTotalNet(double totalNet) {
+            this.totalNet = totalNet;
+        }
     }
 
     public static class Mapping {
@@ -321,7 +513,6 @@ public class InvoiceSyncPreview {
         private int qty;
         private double unitCost;
         private String selectedPositionId;
-        private InvoicePositionMatcher.Quality matchQuality;
 
         public String getMfn() {
             return mfn;
@@ -361,26 +552,6 @@ public class InvoiceSyncPreview {
 
         public void setSelectedPositionId(String selectedPositionId) {
             this.selectedPositionId = selectedPositionId;
-        }
-
-        public InvoicePositionMatcher.Quality getMatchQuality() {
-            return matchQuality;
-        }
-
-        public void setMatchQuality(InvoicePositionMatcher.Quality matchQuality) {
-            this.matchQuality = matchQuality;
-        }
-
-        public boolean isExact() {
-            return matchQuality == InvoicePositionMatcher.Quality.EXACT_MATCH;
-        }
-
-        public boolean isClose() {
-            return matchQuality == InvoicePositionMatcher.Quality.CLOSE_MATCH;
-        }
-
-        public boolean isUnmatched() {
-            return matchQuality == null || matchQuality == InvoicePositionMatcher.Quality.NO_MATCH;
         }
     }
 }

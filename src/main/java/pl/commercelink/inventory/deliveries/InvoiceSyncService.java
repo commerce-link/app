@@ -135,10 +135,11 @@ public class InvoiceSyncService {
             delivery.updateShippingCost(position.totalPrice().netValue());
         }
 
-        if (invoice.paid() && delivery.getPayments().isEmpty()) {
-            delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
-        } else if (!invoice.paid() && !delivery.getPayments().isEmpty()) {
-            delivery.clearPayments();
+        switch (InvoicePaymentSync.of(invoice.paid(), !delivery.getPayments().isEmpty())) {
+            case ADD -> delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+            case REMOVE -> delivery.clearPayments();
+            case NONE -> {
+            }
         }
 
         if (invoice.paymentToDate() != null) {

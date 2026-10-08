@@ -11,7 +11,9 @@ import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.orders.OrderFormats;
 
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,9 @@ public class InvoiceSyncPreviewBuilder {
     public InvoiceSyncPreview build(String storeId, String deliveryId, String invoiceId) {
         Store store = storesRepository.findById(storeId);
         var delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (delivery == null) {
+            return null;
+        }
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
@@ -74,6 +79,16 @@ public class InvoiceSyncPreviewBuilder {
         preview.setInvoicePaymentToDate(invoice.paymentToDate() != null ? invoice.paymentToDate().toString() : null);
         preview.setDeliveryPaid(delivery.isPaid());
         preview.setDeliveryPaymentDueDate(delivery.getPaymentDueDate() != null ? delivery.getPaymentDueDate().toString() : null);
+        preview.setDeliveryShortId(delivery.getShortenedDeliveryId());
+        preview.setDeliverySupplier(delivery.getProvider());
+        preview.setDeliveryOrderedAt(OrderFormats.date(delivery.getOrderedAt()));
+        preview.setDeliveryAwaitingApproval(delivery.isAwaitingApproval());
+        preview.setDeliverySynced(delivery.isSynced());
+        preview.setDeliveryPaymentsCount(delivery.getPayments() == null ? 0 : delivery.getPayments().size());
+        // the save stores the due date as days from the order date (InvoiceSyncService.updateDelivery)
+        if (invoice.paymentToDate() != null && delivery.getOrderedAt() != null) {
+            preview.setPaymentTermDays((int) ChronoUnit.DAYS.between(delivery.getOrderedAt().toLocalDate(), invoice.paymentToDate()));
+        }
 
         return preview;
     }
@@ -87,8 +102,8 @@ public class InvoiceSyncPreviewBuilder {
             option.setName(pos.name());
             option.setQty(pos.qty());
             option.setPriceNet(pos.price().netValue());
+            option.setTotalNet(pos.totalPrice().netValue());
             option.setCurrency(pos.price().currency() != null ? pos.price().currency() : currency);
-            option.setLabel(String.format("%d x %s (%.2f %s)", pos.qty(), pos.name(), pos.price().netValue(), option.getCurrency()));
             options.add(option);
         }
 
@@ -105,7 +120,6 @@ public class InvoiceSyncPreviewBuilder {
             mapping.setUnitCost(item.getUnitCost());
 
             InvoicePositionMatcher.Match match = matcher.match(item.getUnitCost(), item.getOrderedQty());
-            mapping.setMatchQuality(match.quality());
             if (match.found()) {
                 mapping.setSelectedPositionId(match.positionId());
             }
