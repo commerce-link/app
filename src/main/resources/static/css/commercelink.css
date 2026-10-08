@@ -10824,7 +10824,9 @@ a.cl-link-button:hover {
     box-shadow: inset 4px 0 0 var(--cl-accent);
 }
 
-.cl-page .cl-table.is-offers th.cl-table-key {
+/* The Offers list shares the is-offers class and, in a card narrower than 960 px, makes every cell without a name nowrap
+   (tbody tr > :not(:has(.cl-cell-name))); the row selector here outranks that so the key cell still wraps. */
+.cl-page .cl-table.is-offers tbody tr[data-cl-offer] > th.cl-table-key {
     white-space: normal;
     overflow-wrap: anywhere;
     padding-right: 16px;
