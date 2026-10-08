@@ -106,7 +106,7 @@ class StockLedgerClosings {
     }
 
     private static String prefix(String storeId) {
-        return storeId + "/stock-ledger/";
+        return storeId + "/reports/stock-ledger/";
     }
 
     record ClosingBalance(String name, int qty, double value) {
