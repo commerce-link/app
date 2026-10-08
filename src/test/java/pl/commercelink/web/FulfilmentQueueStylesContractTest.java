@@ -8,14 +8,29 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Pins the card-mode row of every part of a fulfilment queue order, since the orders card rules reorder some of them. */
+/**
+ * Pins the fulfilment queue styles: the card-mode row of every part of an order (the orders card rules reorder some of
+ * them), the wrapping count header that leaves the customer column room beside the side column, and the even spacing
+ * of the narrowing options from 1024 px.
+ */
 class FulfilmentQueueStylesContractTest {
 
-    private static String cardBlock() throws Exception {
+    private static String queueSection() throws Exception {
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
         int section = css.indexOf("/* Fulfilment queue (/dashboard/fulfilment/queue");
         assertThat(section).as("the fulfilment queue block").isPositive();
-        int media = css.indexOf("@media screen and (max-width: 719px)", section);
+        return css.substring(section);
+    }
+
+    private static String ruleBody(String css, String head) {
+        int rule = css.indexOf(head + " {");
+        assertThat(rule).as(head).isNotNegative();
+        return css.substring(rule, css.indexOf('}', rule));
+    }
+
+    private static String cardBlock() throws Exception {
+        String css = queueSection();
+        int media = css.indexOf("@media screen and (max-width: 719px)");
         assertThat(media).as("the queue's card block").isPositive();
         return css.substring(media);
     }
@@ -41,5 +56,34 @@ class FulfilmentQueueStylesContractTest {
         assertRow(block, ".cl-cell-due-date", 5);
         assertRow(block, ".cl-due-note", 6);
         assertThat(block).contains("grid-row: 1 / span 6;");
+    }
+
+    @Test
+    void countHeaderWrapsWhileTheValueStaysOnOneLine() throws Exception {
+        // given
+        String css = queueSection();
+
+        // when
+        String header = ruleBody(css, ".cl-page .cl-table.is-queue thead th.is-numeric");
+        String value = ruleBody(css, ".cl-page .cl-table.is-queue .cl-cell-count");
+
+        // then
+        assertThat(header).contains("white-space: normal;");
+        assertThat(value).contains("white-space: nowrap;");
+    }
+
+    @Test
+    void narrowingOptionsTakeTheirOwnHeightFromDesktopWidth() throws Exception {
+        // given
+        String css = queueSection();
+        int media = css.indexOf("@media screen and (min-width: 1024px) {\n    .cl-page .cl-check-stack .cl-check {");
+        assertThat(media).as("the narrowing options' desktop block").isNotNegative();
+
+        // when
+        String rule = ruleBody(css.substring(media), ".cl-page .cl-check-stack .cl-check");
+
+        // then
+        assertThat(rule).contains("min-height: 0;");
+        assertThat(css.substring(0, media)).doesNotContain("cl-check-stack .cl-check {\n    min-height");
     }
 }
