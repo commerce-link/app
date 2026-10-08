@@ -10426,8 +10426,30 @@ a.cl-link-button:hover {
         justify-self: end;
     }
 
-    .cl-page .cl-table.is-queue :is(.cl-table-key .cl-table-sub, .cl-cell-client, .cl-cell-ordered, .cl-cell-due-date, .cl-due-note) {
+    /* explicit rows: the orders card rules give some of these parts an order, which would otherwise shuffle them */
+    .cl-page .cl-table.is-queue .cl-table-key .cl-table-sub {
         grid-column: 2 / -1;
+        grid-row: 2;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-client {
+        grid-column: 2 / -1;
+        grid-row: 3;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-ordered {
+        grid-column: 2 / -1;
+        grid-row: 4;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-due-date {
+        grid-column: 2 / -1;
+        grid-row: 5;
+    }
+
+    .cl-page .cl-table.is-queue .cl-due-note {
+        grid-column: 2 / -1;
+        grid-row: 6;
     }
 
     .cl-page .cl-table.is-queue .cl-queue-label {
