@@ -36,41 +36,35 @@ class WarehouseDocumentItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("documentContainsProduct queries by documentId and filters by both ean and mfn")
-    void documentContainsProductFiltersByEanAndMfn() {
+    @DisplayName("containsProduct matches an item by EAN or by manufacturer code")
+    void containsProductMatchesEanOrMfn() {
         // given
         ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocumentItem>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
         when(dynamoDBMapper.query(eq(WarehouseDocumentItem.class), queryCaptor.capture())).thenReturn(queryList);
         when(queryList.isEmpty()).thenReturn(false);
 
         // when
-        boolean result = warehouseDocumentItemRepository.documentContainsProduct("doc-1", "5901234123457", "MFN-123");
+        boolean result = warehouseDocumentItemRepository.containsProduct("doc-1", "5901234123457", "MZ-V9P2T0BW");
 
         // then
         assertThat(result).isTrue();
-        DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = queryCaptor.getValue();
-        assertThat(queryExpression.getKeyConditionExpression()).isEqualTo("documentId = :documentId");
-        assertThat(queryExpression.getFilterExpression()).isEqualTo("ean = :ean and mfn = :mfn");
-        assertThat(queryExpression.getExpressionAttributeValues().get(":documentId").getS()).isEqualTo("doc-1");
-        assertThat(queryExpression.getExpressionAttributeValues().get(":ean").getS()).isEqualTo("5901234123457");
-        assertThat(queryExpression.getExpressionAttributeValues().get(":mfn").getS()).isEqualTo("MFN-123");
+        assertThat(queryCaptor.getValue().getKeyConditionExpression()).isEqualTo("documentId = :documentId");
+        assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("ean = :ean or mfn = :mfn");
     }
 
     @Test
-    @DisplayName("documentContainsProduct filters only by ean and returns false when nothing matches")
-    void documentContainsProductFiltersByEanOnly() {
+    @DisplayName("containsProduct with only a manufacturer code filters on it alone")
+    void containsProductWithMfnOnly() {
         // given
         ArgumentCaptor<DynamoDBQueryExpression<WarehouseDocumentItem>> queryCaptor = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
         when(dynamoDBMapper.query(eq(WarehouseDocumentItem.class), queryCaptor.capture())).thenReturn(queryList);
         when(queryList.isEmpty()).thenReturn(true);
 
         // when
-        boolean result = warehouseDocumentItemRepository.documentContainsProduct("doc-1", "5901234123457", null);
+        boolean result = warehouseDocumentItemRepository.containsProduct("doc-1", null, "HDMI21-2M");
 
         // then
         assertThat(result).isFalse();
-        DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = queryCaptor.getValue();
-        assertThat(queryExpression.getFilterExpression()).isEqualTo("ean = :ean");
-        assertThat(queryExpression.getExpressionAttributeValues()).containsOnlyKeys(":documentId", ":ean");
+        assertThat(queryCaptor.getValue().getFilterExpression()).isEqualTo("mfn = :mfn");
     }
 }

@@ -1411,6 +1411,7 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink);
 }
 
+.cl-page .cl-card .cl-card-head + .cl-table,
 .cl-page .cl-card .cl-card-head + .cl-list,
 .cl-page .cl-card .cl-card-desc + .cl-list,
 .cl-page .cl-card .cl-card-head + .cl-list-empty,
@@ -5269,6 +5270,14 @@ a.cl-link-button:hover {
     pointer-events: none;
 }
 
+/* A field whose placeholder names three things (warehouse documents: number, EAN, manufacturer code) did not fit in 300 px;
+   below 720 px every field takes the row anyway. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-search-field.is-wide {
+        width: 360px;
+    }
+}
+
 .cl-page .cl-search-field .cl-table-search {
     width: 100%;
     padding-left: 36px;
@@ -6445,6 +6454,9 @@ a.cl-link-button:hover {
 
 .cl-page .cl-record-name > .cl-page-title {
     min-width: 0;
+    /* a word longer than the line breaks instead of widening the page at 320 px; break-word, not anywhere, so it never
+       narrows the title of other record pages (a document number brings its own <wbr> break points) */
+    overflow-wrap: break-word;
 }
 
 .cl-page .cl-record-meta {
@@ -9123,6 +9135,30 @@ a.cl-link-button:hover {
     }
 }
 
+/* Warehouse documents list (docs/active/warehouse-documents-redesign). A document number wraps after a "/" (the
+   fragments/doc-number <wbr> break points), never inside the sequence digits; break-word only splits a segment that is
+   longer than the whole column. The direction icon repeats the type name in colour (the name carries the meaning). */
+.cl-page .cl-doc-no { overflow-wrap: break-word; }
+.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Fixed column widths from 720 px: with auto layout each kind segment (PZ, WZ, …) sized the columns to its own texts and
+   the table jumped between tabs. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-documents { table-layout: fixed; }
+    .cl-page .cl-table.is-documents .cl-col-document { width: 27%; }
+    .cl-page .cl-table.is-documents .cl-col-reason { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-source { width: 17%; }
+    .cl-page .cl-table.is-documents .cl-col-counterparty { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-created { width: 16%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-document { width: 24%; }
+    .cl-page .cl-table.is-documents .cl-col-store { width: 11%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-reason { width: 17%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-source { width: 15%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-counterparty { width: 18%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-created { width: 15%; }
+}
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }
+
 /* Offers list (spec docs/active/offers-redesign). The row link's ::after covers the whole row, so the actions cell rises
    above it or its menu and buttons could not be clicked. Scoped to is-offers: payments.html also has td.cl-table-actions
    inside an is-orders table and must keep its own layout. */
@@ -9996,6 +10032,27 @@ a.cl-link-button:hover {
         margin: -12px;
     }
 }
+
+/* Warehouse document details: the item table gives the name what the fixed numeric columns leave (width: 1% does not
+   work with the table-layout: fixed of .is-wrap — the columns overlapped); a code part never breaks inside */
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: 8.5rem; white-space: nowrap; }
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric.is-qty { width: 5.5rem; }
+.cl-page .cl-table.is-line-items .cl-table-actions { width: 4rem; }
+.cl-page .cl-table.is-line-items .cl-code-part { white-space: nowrap; }
+.cl-page .cl-record-type { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--cl-ink-2); }
+.cl-page .cl-label-print[hidden] { display: none; }
+.cl-page .cl-label-print [aria-busy="true"] { opacity: .6; cursor: progress; }
+/* As cards (< 720 px) the amounts carry their column names ("Koszt netto/szt.: 489,99 PLN"), like the yes/no column of
+   order items: two bare amounts could not be told apart */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: auto; }
+    .cl-page .cl-table.is-line-items.is-wrap tbody tr > td.is-numeric::before { content: attr(data-label) ": "; }
+}
+
+/* Signed quantity change (item history): the sign carries the direction, the colour only repeats it */
+.cl-page .cl-qty-change { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cl-page .cl-qty-change.is-in { color: var(--cl-ok); }
+.cl-page .cl-qty-change.is-out { color: var(--cl-ink); }
 
 /* the margin of an order item (ItemMargin tones); its tooltip is end-anchored (.is-end): the price column stands right
    of the middle and a centred box hid the state pill */

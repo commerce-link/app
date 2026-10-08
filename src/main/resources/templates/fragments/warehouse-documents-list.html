@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The rest of the query as hidden fields, so a menu's form never drops what the others set; "skip" names what the
+       form itself submits (reason, dates = from/to, search = q). The kind always rides along. */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <input type="hidden" name="type" th:if="${q.kind() != null}" th:value="${q.kind().code()}"/>
+    <th:block th:if="${skip != 'reason'}"><input type="hidden" name="reason" th:each="r : ${q.reasons()}" th:value="${r.name()}"/></th:block>
+    <th:block th:if="${skip != 'dates'}">
+        <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>
+        <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
+    </th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+</th:block>
+</body>
+</html>

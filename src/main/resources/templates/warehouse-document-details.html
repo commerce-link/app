@@ -3,284 +3,137 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <div class="level mb-4">
-                <div class="level-left">
-                    <div class="level-item">
-                        <h1 th:text="#{warehouse.documents.details}"></h1>
-                    </div>
+<section class="cl-page" th:fragment="body" th:with="p=${page}">
+    <div class="cl-page-body is-wide">
+
+        <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, ${p.backLabel()}, ~{::documentNumber},
+                ~{::documentCopy}, ~{::documentType}, ~{::documentMeta}, ${p.print() != null} ? ~{::documentActions} : null)}">
+            <th:block th:fragment="documentNumber"><th:block th:replace="~{fragments/doc-number :: parts(${p.number()})}"></th:block></th:block>
+            <th:block th:fragment="documentCopy">
+                <button type="button" class="cl-copy-inline is-icon"
+                        th:attr="data-cl-copy=${p.number()}, aria-label=#{warehouse.documents.details.copy}">
+                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+                </button>
+            </th:block>
+            <th:block th:fragment="documentType">
+                <span class="cl-record-type">
+                    <span class="cl-icon-text"><i class="fas" th:classappend="${p.incoming()} ? 'fa-sign-in-alt' : 'fa-sign-out-alt'" aria-hidden="true"></i><span th:text="${p.typeName()}"></span></span>
+                    <span th:if="${p.reason() != null}" th:text="'· ' + ${p.reason()}"></span>
+                </span>
+            </th:block>
+            <th:block th:fragment="documentMeta">
+                <p class="cl-record-meta">
+                    <span th:if="${p.createdText() != null}" th:text="${p.createdText()}"></span>
+                    <span th:text="${p.author()}"></span>
+                    <span><strong th:text="${p.totalNet()}"></strong> <span th:text="#{warehouse.documents.details.net}"></span></span>
+                </p>
+            </th:block>
+            <th:block th:fragment="documentActions">
+                <!--/* Printing goes through the Zebra Browser Print app on this computer, so it needs the script: the
+                       controls stay hidden until label-print.js shows them, and say why without it. */-->
+                <div class="cl-label-print" data-cl-label-print hidden
+                     th:attr="data-endpoint=@{${p.print().endpoint()}}, data-document-id=${p.documentId()}, data-count=${p.print().labels()},
+                              data-sent=#{warehouse.documents.print.sent('{printer}', '{count}')}, data-failed=#{warehouse.documents.print.failed('{error}')}">
+                    <button th:if="${p.print().printers().size() == 1}" type="button" class="cl-button is-primary"
+                            th:attr="data-printer=${p.print().printers()[0].name()}, data-device-id=${p.print().printers()[0].deviceId()}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-print"></i></span>
+                        <span th:text="#{warehouse.documents.print.labels}"></span>
+                    </button>
+                    <details th:if="${p.print().printers().size() > 1}" class="cl-menu">
+                        <summary class="cl-button is-primary">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-print"></i></span>
+                            <span th:text="#{warehouse.documents.print.labels}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list" id="label-printers-menu">
+                            <li th:each="printer : ${p.print().printers()}">
+                                <button type="button" class="cl-menu-item" th:attr="data-printer=${printer.name()}, data-device-id=${printer.deviceId()}">
+                                    <span th:text="${printer.name()}"></span>
+                                    <span class="cl-menu-desc" th:text="${p.print().labelsText()}"></span>
+                                </button>
+                            </li>
+                        </ul>
+                    </details>
                 </div>
-                <div class="level-right">
-                    <div class="level-item">
-                        <span class="is-size-7 has-text-grey">
-                            <span th:text="#{warehouse.documents.created.at}"></span>:
-                            <span th:text="${#temporals.format(document.createdAt, 'yyyy-MM-dd HH:mm:ss')}"></span>
-                            <span th:if="${document.createdBy}">
-                                | <span th:text="#{warehouse.documents.created.by}"></span>:
-                                <span th:text="${document.createdBy}"></span>
-                            </span>
-                        </span>
-                    </div>
-                </div>
+                <noscript><p class="cl-help" th:text="#{warehouse.documents.print.noscript}"></p></noscript>
+            </th:block>
+        </div>
+
+        <div class="cl-layout-aside">
+            <div class="cl-layout-main">
+                <section class="cl-card" aria-labelledby="items-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="items-title" th:text="${p.itemsTitle()}"></h2></div>
+                    <table class="cl-table is-compact is-wrap is-line-items" th:unless="${p.items().isEmpty()}">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{warehouse.documents.details.column.product}"></th>
+                            <th scope="col" class="is-numeric is-qty" th:text="#{warehouse.documents.details.column.qty}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{warehouse.documents.details.column.unitCost}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{warehouse.documents.details.column.value}"></th>
+                            <th scope="col" class="cl-table-actions" th:if="${p.anyItemMenu()}"><span class="cl-visually-hidden" th:text="#{warehouse.documents.details.column.actions}"></span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item, s : ${p.items()}">
+                            <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.documents.details.column.product}">
+                                <span th:text="${item.name()}"></span>
+                                <span class="cl-table-sub">
+                                    <th:block th:if="${item.ean() != null}"><span class="cl-code-part" th:text="'EAN ' + ${item.ean()}"></span><span class="cl-table-sep" th:if="${item.mfn() != null}"> · </span></th:block>
+                                    <span th:if="${item.mfn() != null}" class="cl-code-part" th:text="'MFN ' + ${item.mfn()}"></span>
+                                </span>
+                            </th>
+                            <td class="is-numeric is-qty" th:attr="data-label=#{warehouse.documents.details.column.qty}" th:text="${item.qty()}"></td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.documents.details.column.unitCost}" th:text="${item.unitCost()}"></td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.documents.details.column.value}"><strong th:text="${item.value()}"></strong></td>
+                            <td class="cl-table-actions" th:if="${p.anyItemMenu()}">
+                                <details th:if="${item.historyHref() != null}" class="cl-menu">
+                                    <summary class="cl-button is-icon" th:attr="aria-label=${item.menuLabel()}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+                                    <ul class="cl-menu-list" th:id="|item-menu-${s.index}|">
+                                        <li><a class="cl-menu-item" th:href="@{${item.historyHref()}}" th:text="#{warehouse.documents.details.item.history}"></a></li>
+                                    </ul>
+                                </details>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <p class="cl-list-empty" th:if="${p.items().isEmpty()}" th:text="#{warehouse.documents.details.items.empty}"></p>
+                    <p class="cl-list-summary" th:unless="${p.items().isEmpty()}"><span th:text="${p.summaryQty()}"></span> · <strong th:text="${p.summaryTotal()}"></strong></p>
+                </section>
             </div>
 
-            <div class="box mb-5">
-                <div class="columns is-vcentered">
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.document.no}"></p>
-                        <p class="title is-5" th:text="${document.documentNo}"></p>
-                    </div>
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.type}"></p>
-                        <p class="title is-5">
-                            <span class="tag is-info" th:text="${enumI18n.localize(document.type)}"></span>
-                            <span th:if="${document.reason}" class="tag is-light ml-1" th:text="${enumI18n.localize(document.reason)}"></span>
-                        </p>
-                    </div>
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.warehouse.id}"></p>
-                        <p class="title is-5" th:text="${document.warehouseId}"></p>
-                    </div>
-                    <div class="column" th:if="${document.deliveryId}">
-                        <p class="heading" th:text="#{warehouse.documents.delivery.id}"></p>
-                        <p class="title is-5">
-                            <a th:href="@{${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/deliveries/details' : '/dashboard/deliveries/details'(deliveryId=${document.deliveryId})}"
-                               th:text="${document.getShortenedDeliveryId}"></a>
-                        </p>
-                    </div>
-                    <div class="column" th:if="${document.orderId}">
-                        <p class="heading" th:text="#{warehouse.documents.order.id}"></p>
-                        <p class="title is-5">
-                            <a th:href="@{${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/orders/' + ${document.orderId} : '/dashboard/orders/' + ${document.orderId}}"
-                               th:text="${document.shortenedOrderId}"></a>
-                        </p>
-                    </div>
-                </div>
-                <div class="columns" th:if="${document.note}">
-                    <div class="column">
-                        <p class="heading" th:text="#{warehouse.documents.note}"></p>
-                        <p th:text="${document.note}"></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="columns" th:if="${document.issuer != null or document.counterparty != null}">
-                <div class="column is-half is-flex" th:if="${document.issuer}">
-                    <div class="box is-flex-grow-1">
-                        <h2 class="title is-5" th:text="#{warehouse.documents.issuer}"></h2>
-                        <div class="field" th:if="${document.issuer.companyName}">
-                            <label class="label" th:text="#{billing.company.name}"></label>
-                            <div class="control">
-                                <span th:text="${document.issuer.companyName}"></span>
-                            </div>
+            <div class="cl-layout-side is-grid">
+                <section class="cl-card" aria-labelledby="links-title" th:unless="${p.links().isEmpty()}">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="links-title" th:text="${p.linksTitle()}"></h2></div>
+                    <dl class="cl-kv is-column">
+                        <div th:each="link : ${p.links()}" th:class="${link.wide()} ? 'cl-kv-wide' : null">
+                            <dt th:text="${link.label()}"></dt>
+                            <dd th:class="${link.wide()} ? 'cl-kv-text' : null">
+                                <a th:if="${link.href() != null}" th:href="@{${link.href()}}" th:text="${link.text()}"></a>
+                                <span th:unless="${link.href() != null}" th:text="${link.text()}"></span>
+                            </dd>
                         </div>
-                        <div class="field" th:if="${document.issuer.taxId}">
-                            <label class="label" th:text="#{billing.tax.id}"></label>
-                            <div class="control">
-                                <span th:text="${document.issuer.taxId}"></span>
-                            </div>
+                    </dl>
+                </section>
+                <th:block th:each="card : ${ {'counterparty', 'deliveryAddress', 'issuer'} }"
+                          th:with="a=${card == 'counterparty'} ? ${p.counterparty()} : (${card == 'issuer'} ? ${p.issuer()} : ${p.deliveryAddress()})">
+                    <section th:if="${a != null}" class="cl-card" th:attr="aria-labelledby=${card} + '-title'">
+                        <div class="cl-card-head"><h2 class="cl-card-title" th:id="${card} + '-title'"
+                                                      th:text="#{${'warehouse.documents.details.' + card}}"></h2></div>
+                        <div class="cl-address">
+                            <th:block th:if="${a.name() != null}"><strong th:text="${a.name()}"></strong><br></th:block>
+                            <th:block th:each="line, ls : ${a.lines()}"><span th:text="${line}"></span><br th:unless="${ls.last}"></th:block>
+                            <div th:if="${a.taxId() != null}" th:text="${a.taxId()}"></div>
                         </div>
-                        <div class="field" th:if="${document.issuer.streetAndNumber}">
-                            <label class="label" th:text="#{billing.address}"></label>
-                            <div class="control">
-                                <span th:text="${document.issuer.streetAndNumber}"></span><br/>
-                                <span th:text="${document.issuer.postalCode + ' ' + document.issuer.city}"></span><br/>
-                                <span th:text="${document.issuer.country}"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="column is-half is-flex" th:if="${document.counterparty}">
-                    <div class="box is-flex-grow-1">
-                        <h2 class="title is-5" th:text="#{warehouse.documents.counterparty}"></h2>
-                        <div class="field" th:if="${document.counterparty.name}">
-                            <label class="label" th:text="#{billing.name}"></label>
-                            <div class="control">
-                                <span th:text="${document.counterparty.name + (document.counterparty.surname != null ? ' ' + document.counterparty.surname : '')}"></span>
-                            </div>
-                        </div>
-                        <div class="field" th:if="${document.counterparty.companyName}">
-                            <label class="label" th:text="#{billing.company.name}"></label>
-                            <div class="control">
-                                <span th:text="${document.counterparty.companyName}"></span>
-                            </div>
-                        </div>
-                        <div class="field" th:if="${document.counterparty.taxId}">
-                            <label class="label" th:text="#{billing.tax.id}"></label>
-                            <div class="control">
-                                <span th:text="${document.counterparty.taxId}"></span>
-                            </div>
-                        </div>
-                        <div class="field" th:if="${document.counterparty.streetAndNumber}">
-                            <label class="label" th:text="#{billing.address}"></label>
-                            <div class="control">
-                                <span th:text="${document.counterparty.streetAndNumber}"></span><br/>
-                                <span th:text="${document.counterparty.postalCode + ' ' + document.counterparty.city}"></span><br/>
-                                <span th:text="${document.counterparty.country}"></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="box" th:if="${document.deliveryAddress}">
-                <h2 class="title is-5" th:text="#{warehouse.documents.delivery.address}"></h2>
-                <div class="field" th:if="${document.deliveryAddress.name}">
-                    <label class="label" th:text="#{billing.name}"></label>
-                    <div class="control">
-                        <span th:text="${document.deliveryAddress.name + (document.deliveryAddress.surname != null ? ' ' + document.deliveryAddress.surname : '')}"></span>
-                    </div>
-                </div>
-                <div class="field" th:if="${document.deliveryAddress.companyName}">
-                    <label class="label" th:text="#{billing.company.name}"></label>
-                    <div class="control">
-                        <span th:text="${document.deliveryAddress.companyName}"></span>
-                    </div>
-                </div>
-                <div class="field" th:if="${document.deliveryAddress.streetAndNumber}">
-                    <label class="label" th:text="#{billing.address}"></label>
-                    <div class="control">
-                        <span th:text="${document.deliveryAddress.streetAndNumber}"></span><br/>
-                        <span th:text="${document.deliveryAddress.postalCode + ' ' + document.deliveryAddress.city}"></span><br/>
-                        <span th:text="${document.deliveryAddress.country}"></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="box">
-                <h2 class="title is-5" th:text="#{warehouse.documents.items}"></h2>
-
-                <table class="table is-fullwidth is-narrow">
-                    <thead>
-                    <tr>
-                        <th th:text="#{warehouse.documents.item.ean}"></th>
-                        <th th:text="#{warehouse.documents.item.mfn}"></th>
-                        <th th:text="#{warehouse.documents.item.name}"></th>
-                        <th th:text="#{warehouse.documents.item.quantity}"></th>
-                        <th th:text="#{warehouse.documents.item.unit.price}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="item : ${items}">
-                        <td th:text="${item.ean}"></td>
-                        <td th:text="${item.mfn}"></td>
-                        <td th:text="${item.name}"></td>
-                        <td th:text="${item.qty}"></td>
-                        <td th:text="${#numbers.formatDecimal(item.unitPrice, 1, 2)} + ' PLN'"></td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="box" th:if="${document.type.name() == 'GoodsReceipt' and !#lists.isEmpty(printers)}">
-                <h2 class="title is-5" th:text="#{warehouse.documents.print.title}"></h2>
-
-                <div class="field is-grouped is-align-items-center">
-                    <div class="control">
-                        <div class="select">
-                            <select id="label-printer-select">
-                                <option th:each="printer : ${printers}"
-                                        th:value="${printer.name}"
-                                        th:attr="data-device-id=${printer.settings['deviceId']}"
-                                        th:text="${printer.name}"></option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="control">
-                        <button type="button" class="button is-primary" id="print-labels-button"
-                                th:attr="data-document-id=${document.documentId}"
-                                th:text="#{warehouse.documents.print.button}"></button>
-                    </div>
-                    <div class="control">
-                        <span id="print-labels-status" class="is-size-7 has-text-grey"></span>
-                    </div>
-                </div>
+                    </section>
+                </th:block>
             </div>
         </div>
-    </section>
-
-    <script th:inline="javascript">
-        (function () {
-            var BROWSER_PRINT_URL = 'http://localhost:9100';
-            var button = document.getElementById('print-labels-button');
-            if (!button) {
-                return;
-            }
-            var select = document.getElementById('label-printer-select');
-            var status = document.getElementById('print-labels-status');
-            var endpoint = /*[[@{/dashboard/warehouse-documents/print-labels}]]*/ '/dashboard/warehouse-documents/print-labels';
-            var successText = /*[[#{warehouse.documents.print.success}]]*/ 'Sent to printer';
-            var errorText = /*[[#{warehouse.documents.print.error}]]*/ 'Print error';
-
-            function setStatus(message) {
-                if (status) {
-                    status.textContent = message;
-                }
-            }
-
-            async function fetchZpl(documentId, printer) {
-                var url = endpoint + '?documentId=' + encodeURIComponent(documentId) + '&printer=' + encodeURIComponent(printer);
-                var response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-                return await response.text();
-            }
-
-            async function getPrinterDevice(deviceId) {
-                var response = await fetch(BROWSER_PRINT_URL + '/available');
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-                var data = await response.json();
-                var printers = (data && data.printer) || [];
-                if (!printers.length) {
-                    throw new Error('no printers available');
-                }
-                if (deviceId) {
-                    var match = printers.filter(function (p) { return p.uid === deviceId; })[0];
-                    if (match) {
-                        return match;
-                    }
-                }
-                return printers.filter(function (p) { return p.connection === 'usb'; })[0] || printers[0];
-            }
-
-            async function sendToPrinter(device, data) {
-                var response = await fetch(BROWSER_PRINT_URL + '/write', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device: device, data: data })
-                });
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-            }
-
-            button.addEventListener('click', async function () {
-                var documentId = button.getAttribute('data-document-id');
-                var printer = select ? select.value : '';
-                var selectedOption = select ? select.options[select.selectedIndex] : null;
-                var deviceId = selectedOption ? selectedOption.getAttribute('data-device-id') : null;
-                button.classList.add('is-loading');
-                setStatus('');
-                try {
-                    var zpl = await fetchZpl(documentId, printer);
-                    var device = await getPrinterDevice(deviceId);
-                    await sendToPrinter(device, zpl);
-                    setStatus(successText);
-                } catch (e) {
-                    setStatus(errorText + ': ' + e.message);
-                } finally {
-                    button.classList.remove('is-loading');
-                }
-            });
-        })();
-    </script>
+    </div>
+</section>
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/copy-field.js}" defer></script>
+<script th:src="@{/js/label-print.js}" defer></script>
 </div>
 </body>
 </html>

@@ -26,8 +26,9 @@ class ScreenIntroFragmentTest {
         String technical = panel("inventory-tech");
 
         // then
-        assertThat(items(assortment)).isEqualTo(4);
+        assertThat(items(assortment)).isEqualTo(5);
         assertThat(assortment).contains("Przeglądaj po kategoriach").contains("Wychwyć braki");
+        assertThat(assortment.indexOf("Jeden wspólny układ")).isNotNegative().isLessThan(assortment.indexOf("Przeglądaj po kategoriach"));
         assertThat(items(prices)).isEqualTo(2);
         assertThat(prices).contains("Sprawdź cenę produktu").doesNotContain("Wychwyć braki");
         assertThat(items(technical)).isEqualTo(3);
