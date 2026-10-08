@@ -52,10 +52,16 @@ class FulfilmentSelectStylesContractTest {
 
         // when / then
         assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers")).contains("border-collapse: separate;").contains("border-spacing: 0 8px;");
-        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tr.is-on > *")).contains("var(--cl-offer-on)");
-        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tr.is-on > :first-child")).contains("inset 5px 0 0 var(--cl-accent)");
-        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tr.is-covered > *")).contains("var(--cl-surface-2)");
+        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tbody tr.is-on > *")).contains("var(--cl-offer-on)");
+        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tbody tr.is-on > :first-child")).contains("inset 5px 0 0 var(--cl-accent)");
+        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tbody tr.is-covered > *")).contains("var(--cl-surface-2)");
         assertThat(css).contains(".cl-page .cl-table.is-supplier-offers tr.is-off");
+        // the states match the white card row's specificity, so they must come after it to win
+        int card = css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > * {");
+        assertThat(card).isPositive();
+        assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-on > * {")).isGreaterThan(card);
+        assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-covered > * {")).isGreaterThan(card);
+        assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {")).isGreaterThan(card);
     }
 
     @Test

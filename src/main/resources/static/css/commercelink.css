@@ -10839,23 +10839,23 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-qty-s {
-    width: 68px;
+    width: 60px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-price {
-    width: 124px;
+    width: 120px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-profit {
-    width: 112px;
+    width: 108px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-toggle {
-    width: 132px;
+    width: 128px;
 }
 
 .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > * {
-    padding: 12px 10px;
+    padding: 12px 8px;
     border-top: 1px solid var(--cl-line);
     border-bottom: 1px solid var(--cl-line);
     background: var(--cl-surface);
@@ -10897,12 +10897,12 @@ a.cl-link-button:hover {
     }
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-on > * {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-on > * {
     border-color: var(--cl-offer-on-line);
     background: var(--cl-offer-on);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-on > :first-child {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-on > :first-child {
     box-shadow: inset 5px 0 0 var(--cl-accent);
 }
 
@@ -10955,7 +10955,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-order-ref a {
     font-weight: 600;
-    color: var(--cl-accent-ink);
+    color: var(--cl-accent);
 }
 
 /* an item a cheaper ticked offer takes: the reference stays, dashed, its price struck through */
@@ -11103,13 +11103,13 @@ a.cl-link-button:hover {
 
 /* Covered cheaper: one compact line nested under its winner — a connector, the supplier, how much dearer (or why
    nothing is ordered), the net price and the toggle; name, codes, orders and the other numbers fold away. */
-.cl-page .cl-table.is-supplier-offers tr.is-covered > * {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-covered > * {
     padding-top: 6px;
     padding-bottom: 6px;
     background: var(--cl-surface-2);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-covered th.cl-table-key {
     position: relative;
     padding-left: 46px;
 }
@@ -11261,7 +11261,7 @@ a.cl-link-button:hover {
     color: var(--cl-ink);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-missing > * {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {
     border-color: var(--cl-missing-line);
     background: var(--cl-warn-soft);
 }
@@ -11398,8 +11398,8 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        column-gap: 12px;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        column-gap: 16px;
         row-gap: 10px;
         margin-top: 8px;
         padding: 12px 14px;

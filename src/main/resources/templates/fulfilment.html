@@ -237,7 +237,7 @@
                                     <span class="cl-offer-line">
                                         <span th:replace="~{fragments/supplier-pill :: pill(${o.label()}, ${o.color()}, ${o.warehouse()})}"></span>
                                         <span class="cl-offer-stock" th:text="#{fulfilment.select.stock(${e.source.qty})}"></span>
-                                        <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{general.manufacturer.code}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
+                                        <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{fulfilment.select.mfn}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
                                         <span class="cl-offer-covered" data-cl-covered hidden></span>
                                     </span>
                                     <span class="cl-order-refs" th:hidden="${!page.showOrderRefs()}">
