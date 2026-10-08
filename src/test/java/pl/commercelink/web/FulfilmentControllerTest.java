@@ -291,4 +291,53 @@ class FulfilmentControllerTest {
         assertThat(next.getSkippedOrderIds()).containsExactly("s1");
         assertThat(next.getOrderCountAtStart()).isEqualTo(2);
     }
+
+    @Test
+    void commitAndContinueThatLeavesNothingBehavesLikeAPlainCommit() {
+        // given
+        FulfilmentForm form = postedForm("Elko-k1");
+        when(manualOrderFulfilment.init(eq("store-1"), eq(List.of("o-1")), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(new FulfilmentForm());
+        when(messageSource.getMessage(eq("fulfilment.select.saved"), any(), eq(PL))).thenReturn("Zapisano dobór 2/0");
+        when(messageSource.getMessage(eq("fulfilment.select.saved.link"), any(), eq(PL))).thenReturn("Oczekujące dostawy ›");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.commitAndContinueFulfilmentForm(form, new ConcurrentModel(), PL, redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/fulfilment/queue?orderIds=s1&skippedGroups=1");
+        assertThat(((OrderNotice) redirect.getFlashAttributes().get("orderNotice")).text()).isEqualTo("Zapisano dobór 2/0");
+    }
+
+    @Test
+    void commitAndContinueWithMoreToPickShowsTheSelectionPageAgain() {
+        // given
+        FulfilmentForm form = postedForm("Elko-k1");
+        when(manualOrderFulfilment.init(eq("store-1"), eq(List.of("o-1")), any(), anyBoolean(), anyBoolean(), anyBoolean()))
+                .thenReturn(postedForm("AB-k2"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.commitAndContinueFulfilmentForm(form, new ConcurrentModel(), PL, redirect);
+
+        // then
+        assertThat(view).isEqualTo("fulfilment");
+        assertThat(redirect.getFlashAttributes()).isEmpty();
+    }
+
+    @Test
+    void theSuperAdminsCommitAndContinueThatLeavesNothingAlsoReturnsToTheQueue() {
+        // given
+        security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+        when(manualOrderFulfilment.init(eq("store-9"), eq(List.of("o-1")), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(new FulfilmentForm());
+        when(messageSource.getMessage(any(String.class), any(), eq(PL))).thenReturn("x");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.commitAndContinueFulfilmentFormForSuperAdmin("store-9", postedForm("Warehouse"), new ConcurrentModel(), PL, redirect);
+
+        // then
+        assertThat(view).startsWith("redirect:/dashboard/fulfilment/queue");
+        assertThat(((OrderNotice) redirect.getFlashAttributes().get("orderNotice")).linkHref()).isEqualTo("/dashboard/store/store-9/deliveries/preview");
+    }
 }

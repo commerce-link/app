@@ -185,9 +185,10 @@ class FulfilmentController extends BaseController {
 
     @PostMapping("/dashboard/orders/fulfilment/commitAndContinue")
     @PreAuthorize("hasRole('ADMIN')")
-    public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model, Locale locale) {
+    public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model, Locale locale,
+                                                  RedirectAttributes redirect) {
         manualOrderFulfilment.commit(getStoreId(), form);
-        return render(getStoreId(), Selection.of(form), model, locale);
+        return continueOrFinish(getStoreId(), form, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commit")
@@ -208,9 +209,23 @@ class FulfilmentController extends BaseController {
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commitAndContinue")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String commitAndContinueFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId,
-                                                               @ModelAttribute FulfilmentForm form, Model model, Locale locale) {
+                                                               @ModelAttribute FulfilmentForm form, Model model, Locale locale,
+                                                               RedirectAttributes redirect) {
         manualOrderFulfilment.commit(storeId, form);
-        return render(storeId, Selection.of(form), model, locale);
+        return continueOrFinish(storeId, form, model, locale, redirect);
+    }
+
+    /**
+     * "Commit and pick the rest": when that commit left nothing to pick, the operator who just saved should get the
+     * saved notice and the queue, not a page claiming someone else finished the selection.
+     */
+    private String continueOrFinish(String storeId, FulfilmentForm committed, Model model, Locale locale, RedirectAttributes redirect) {
+        String view = render(storeId, Selection.of(committed), model, locale);
+        FulfilmentForm rest = (FulfilmentForm) model.getAttribute("form");
+        if (rest.getEntries().isEmpty() && rest.getUnmatched().isEmpty()) {
+            return nextOrderOrQueue(storeId, committed, true, model, locale, redirect);
+        }
+        return view;
     }
 
     /**
