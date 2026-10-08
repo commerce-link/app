@@ -183,4 +183,21 @@ class ShipmentTrackingsRepositoryTest {
         assertThat(rows).containsExactly(row);
         assertThat(query.getValue().getHashKeyValues().getStoreId()).isEqualTo("store-1");
     }
+
+    @Test
+    void revertPutsBackTheReadStateOnlyWhileTheRowStillHoldsTheAdvancedOne() {
+        // given
+        ShipmentTracking row = new ShipmentTracking("store-1", "PKG-1", "order-1", null, LocalDateTime.now(), "allegro", "shp-1");
+        row.setState("COLLECTED");
+        ArgumentCaptor<DynamoDBSaveExpression> expression = ArgumentCaptor.forClass(DynamoDBSaveExpression.class);
+
+        // when
+        boolean reverted = repository.revert(row, null);
+
+        // then
+        assertThat(reverted).isTrue();
+        assertThat(row.getState()).isNull();
+        verify(dynamoDBMapper).save(eq(row), expression.capture());
+        assertThat(expression.getValue().getExpected().get("state").getValue().getS()).isEqualTo("COLLECTED");
+    }
 }

@@ -85,11 +85,21 @@ public class ShipmentTrackingUpdates {
             log.warn("Shipment COLLECTED not applied yet: order={} status={}", order.getOrderId(), order.getStatus());
             return false;
         }
+        String previousState = row.getState();
         if (!shipmentTrackingsRepository.advance(row, state)) {
             log.warn("Shipment status {} already applied by another writer: store={} trackingNo={}",
                     state, row.getStoreId(), row.getTrackingNo());
             return false;
         }
+        try {
+            return applyOrderEffects(order, row, state, occurredAt);
+        } catch (RuntimeException e) {
+            revertAfterFailedEffects(row, previousState, state, e);
+            throw e;
+        }
+    }
+
+    private boolean applyOrderEffects(Order order, ShipmentTracking row, ShipmentTrackingState state, LocalDateTime occurredAt) {
         String orderId = order.getOrderId();
         switch (state) {
             case COLLECTED -> {
@@ -138,9 +148,19 @@ public class ShipmentTrackingUpdates {
             log.warn("Shipment DELIVERED ignored: rma={} status={}", rma.getRmaId(), rma.getStatus());
             return false;
         }
+        String previousState = row.getState();
         if (!shipmentTrackingsRepository.advance(row, state)) {
             return false;
         }
+        try {
+            return applyRmaEffects(rma, row, state, occurredAt);
+        } catch (RuntimeException e) {
+            revertAfterFailedEffects(row, previousState, state, e);
+            throw e;
+        }
+    }
+
+    private boolean applyRmaEffects(RMA rma, ShipmentTracking row, ShipmentTrackingState state, LocalDateTime occurredAt) {
         String storeId = rma.getStoreId();
         String rmaId = rma.getRmaId();
         switch (state) {
@@ -166,5 +186,27 @@ public class ShipmentTrackingUpdates {
             );
         }
         return true;
+    }
+
+    /**
+     * The state is written before the effects so that a status never takes effect twice. When the effects then fail,
+     * the state is put back (only if still ours), so that the next poll or webhook retry applies the status again.
+     */
+    private void revertAfterFailedEffects(ShipmentTracking row, String previousState, ShipmentTrackingState state,
+                                          RuntimeException cause) {
+        boolean reverted;
+        try {
+            reverted = shipmentTrackingsRepository.revert(row, previousState);
+        } catch (RuntimeException revertFailure) {
+            cause.addSuppressed(revertFailure);
+            reverted = false;
+        }
+        if (reverted) {
+            log.error("Carrier status {} could not be applied, it will be applied again on the next poll or webhook: store={} trackingNo={}",
+                    state, row.getStoreId(), row.getTrackingNo(), cause);
+        } else {
+            log.error("Carrier status {} could not be applied and the state could not be reverted, the status is LOST, mark the delivery by hand: store={} trackingNo={}",
+                    state, row.getStoreId(), row.getTrackingNo(), cause);
+        }
     }
 }

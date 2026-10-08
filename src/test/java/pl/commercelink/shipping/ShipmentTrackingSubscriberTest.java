@@ -201,6 +201,30 @@ class ShipmentTrackingSubscriberTest {
     }
 
     @Test
+    void parcelCreatedThroughAnIntegrationThatCannotTrackStillGetsItsProviderOnTheRow() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.defaultShippingIntegration()).thenReturn("furgonetka");
+        Shipment shipment = courier("AD000123");
+        shipment.setProvider("allegro");
+        shipment.setExternalId("shp-1");
+        when(shippingProviders.nameFor(store, shipment)).thenReturn("allegro");
+        when(shippingProviders.forName(store, "allegro")).thenReturn(Optional.empty());
+        when(shipmentTrackingsRepository.saveIfAbsent(any())).thenReturn(true);
+        ArgumentCaptor<ShipmentTracking> row = ArgumentCaptor.forClass(ShipmentTracking.class);
+
+        // when
+        subscriber.subscribe(STORE_ID, orderWith(shipment));
+
+        // then
+        verify(shipmentTrackingsRepository).saveIfAbsent(row.capture());
+        assertThat(row.getValue().getProvider()).isEqualTo("allegro");
+        assertThat(row.getValue().getExternalId()).isEqualTo("shp-1");
+        assertThat(shipment.hasTrackingSubscription()).isFalse();
+    }
+
+    @Test
     void foreignNumberIsTrackedByTheDefaultIntegrationAndIndexedWithItsName() {
         // given
         providerAvailable();

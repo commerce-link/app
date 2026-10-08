@@ -65,6 +65,17 @@ public class ShipmentTrackingsRepository extends DynamoDbRepository<ShipmentTrac
         return saved;
     }
 
+    /** Puts back the state the row was read with, only while it still holds the one {@link #advance} wrote. */
+    public boolean revert(ShipmentTracking row, String previousState) {
+        String advancedState = row.getState();
+        row.setState(previousState);
+        boolean saved = saveIfStateIs(row, advancedState);
+        if (!saved) {
+            row.setState(advancedState);
+        }
+        return saved;
+    }
+
     /** Remembers the poll time without ever writing back a state that another writer has moved meanwhile. */
     public boolean markPolled(ShipmentTracking row, LocalDateTime at) {
         row.setLastPolledAt(at);

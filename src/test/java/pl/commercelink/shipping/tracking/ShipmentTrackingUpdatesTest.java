@@ -31,8 +31,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -307,5 +309,64 @@ class ShipmentTrackingUpdatesTest {
         assertThat(applied).isFalse();
         assertThat(order.getShipments().get(0).getDeliveredAt()).isNull();
         verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void failedEffectsRevertTheStateAndPropagateSoARetryAppliesThemOnce() {
+        // given: the first attempt fails while publishing, the retry works
+        Order order = order(OrderStatus.Shipping, courier("PKG-1"));
+        ShipmentTracking row = indexedForOrder("PKG-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        when(shipmentTrackingsRepository.advance(eq(row), eq(ShipmentTrackingState.COLLECTED))).thenAnswer(invocation -> {
+            row.setState("COLLECTED");
+            return true;
+        });
+        when(shipmentTrackingsRepository.revert(eq(row), any())).thenAnswer(invocation -> {
+            row.setState(invocation.getArgument(1));
+            return true;
+        });
+        doThrow(new IllegalStateException("sqs down")).doNothing().when(goodsOutEventPublisher).publish(order, "System");
+
+        // when
+        assertThatThrownBy(() -> apply("PKG-1", ShipmentTrackingState.COLLECTED)).isInstanceOf(IllegalStateException.class);
+        boolean retried = apply("PKG-1", ShipmentTrackingState.COLLECTED);
+
+        // then
+        assertThat(retried).isTrue();
+        assertThat(row.getState()).isEqualTo("COLLECTED");
+        verify(shipmentTrackingsRepository).revert(row, null);
+        verify(goodsOutEventPublisher, times(2)).publish(order, "System");
+    }
+
+    @Test
+    void failedEffectsStillPropagateWhenTheRevertFails() {
+        // given
+        Order order = order(OrderStatus.Shipping, courier("PKG-1"));
+        ShipmentTracking row = indexedForOrder("PKG-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+        doThrow(new IllegalStateException("sqs down")).when(goodsOutEventPublisher).publish(order, "System");
+        when(shipmentTrackingsRepository.revert(eq(row), any())).thenReturn(false);
+
+        // when / then
+        assertThatThrownBy(() -> apply("PKG-1", ShipmentTrackingState.COLLECTED))
+                .isInstanceOf(IllegalStateException.class).hasMessage("sqs down");
+    }
+
+    @Test
+    void failedRmaEffectsRevertTheState() {
+        // given
+        RMA rma = new RMA();
+        rma.setRmaId("rma-1");
+        rma.setStoreId(STORE_ID);
+        rma.setStatus(RMAStatus.WaitingForItems);
+        rma.setShipments(new ArrayList<>(List.of(courier("RET-1"))));
+        ShipmentTracking row = new ShipmentTracking(STORE_ID, "RET-1", null, "rma-1", DELIVERED_AT);
+        when(shipmentTrackingsRepository.find(STORE_ID, "RET-1")).thenReturn(Optional.of(row));
+        when(rmaRepository.findById(STORE_ID, "rma-1")).thenReturn(rma);
+        doThrow(new IllegalStateException("version conflict")).when(rmaRepository).save(any());
+
+        // when / then
+        assertThatThrownBy(() -> apply("RET-1", ShipmentTrackingState.DELIVERED)).isInstanceOf(IllegalStateException.class);
+        verify(shipmentTrackingsRepository).revert(row, null);
     }
 }

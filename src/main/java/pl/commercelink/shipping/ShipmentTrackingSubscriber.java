@@ -91,7 +91,7 @@ public class ShipmentTrackingSubscriber {
         } else {
             newlyIndexed = shipmentTrackingsRepository.saveIfAbsent(new ShipmentTracking(storeId,
                     shipment.getTrackingNo(), orderId, rmaId, now,
-                    tracker.map(Tracker::name).orElse(null), ownParcel ? shipment.getExternalId() : null));
+                    ownParcel ? shippingProviders.nameFor(store, shipment) : tracker.map(Tracker::name).orElse(null), ownParcel ? shipment.getExternalId() : null));
             if (!newlyIndexed) {
                 fail(storeId, orderId, shipment, DUPLICATE_TRACKING_NO, now);
                 return;
