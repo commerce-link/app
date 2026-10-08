@@ -10348,3 +10348,89 @@ a.cl-link-button:hover {
         padding-top: 12px;
     }
 }
+
+/* Fulfilment queue (/dashboard/fulfilment/queue, spec docs/active/fulfilment-queue-redesign). The table is the orders
+   table with is-selectable set by the template: its checkbox column is the form's selectedOrders, not a bulk selection,
+   so it is drawn without JavaScript and kept in card mode (no data-cl-select-table, whose card rule hides it). An
+   unticked row greys its client and dates; ticked rows get no tint, since the whole group starts ticked. */
+.cl-page .cl-table.is-queue tr:has(.cl-check-input:not(:checked)) :is(.cl-cell-client, .cl-cell-ordered, .cl-cell-due-date) {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-table.is-queue :is(.cl-cell-ordered, .cl-cell-due-date) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-queue .cl-cell-count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* the column headers name the values on a wide screen; the labels speak only in card mode */
+.cl-page .cl-table.is-queue .cl-queue-label {
+    display: none;
+}
+
+/* A list of checkboxes with an optional line under the name (the queue's narrowing). */
+.cl-page .cl-check-stack {
+    display: grid;
+    gap: var(--cl-gap-related);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-check-stack .cl-check {
+    align-items: flex-start;
+}
+
+.cl-page .cl-check-desc {
+    display: block;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* One fact about the record shown in a card, under its description (the store of a super admin's group). */
+.cl-page .cl-group-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+@media screen and (max-width: 719px) {
+    /* card: the checkbox down the left edge, number and count on the first line, then source, customer, dates */
+    .cl-page .cl-table.is-queue tr {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+    }
+
+    .cl-page .cl-table.is-queue td.cl-table-check {
+        display: block;
+        grid-column: 1;
+        grid-row: 1 / span 6;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-queue .cl-row-link {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-count {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-queue :is(.cl-table-key .cl-table-sub, .cl-cell-client, .cl-cell-ordered, .cl-cell-due-date, .cl-due-note) {
+        grid-column: 2 / -1;
+    }
+
+    .cl-page .cl-table.is-queue .cl-queue-label {
+        display: inline;
+    }
+}

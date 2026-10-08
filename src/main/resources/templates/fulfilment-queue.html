@@ -5,106 +5,176 @@
 <body>
 
 <div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
 
-    <section class="section">
-        <div class="container">
-            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
-                <h1 class="title mb-0" th:text="#{fulfilment.queue}"></h1>
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{fulfilment.queue}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-            </div>
-
-            <div th:replace="~{fragments/screen-intro :: panel('fulfilment', 'fas fa-magic')}"></div>
-
-            <form id="fulfilmentQueueForm" method="post">
-                <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
-                    <thead>
-                    <tr>
-                        <th>
-                            <input type="checkbox" id="selectAllOrders" />
-                        </th>
-                        <th th:text="#{orders.id}"></th>
-                        <th th:text="#{orders.email}"></th>
-                        <th th:text="#{fulfilment.queue.items.to.order}"></th>
-                        <th th:text="#{offers.fulfilment.type}"></th>
-                        <th th:if="${isSuperAdmin}" th:text="#{store.id}"></th>
-                        <th th:text="#{orders.ordered.at.date}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="order : ${orders}">
-                        <td>
-                            <input type="checkbox" name="selectedOrders" th:value="${order.orderId}" />
-                        </td>
-                        <td>
-                            <a th:href="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}(storeId=${order.storeId}, orderId=${order.orderId})} : @{/dashboard/orders/{orderId}(orderId=${order.orderId})}">
-                                <span th:text="${order.shortenedOrderId}"></span>
-                            </a>
-                        </td>
-                        <td th:text="${order.email}"></td>
-                        <td th:text="${itemsToOrder[order.orderId]}"></td>
-                        <td th:text="${order.fulfilmentType}"></td>
-                        <td th:if="${isSuperAdmin}" th:text="${order.storeId}"></td>
-                        <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd HH:mm:ss')}"></td>
-                    </tr>
-                    </tbody>
-                </table>
-                <div class="field" th:if="${orders.size() > 0}">
-                    <div class="control is-flex is-align-items-center">
-                        <div class="select is-small">
-                            <select id="actionSelect" name="action" th:with="orderFulfilmentBasePath=${isSuperAdmin} ? '/dashboard/store/' + ${orders[0].storeId} + '/orders/fulfilment' : '/dashboard/orders/fulfilment'">
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='default')}" th:text="#{orders.choose.suppliers}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='suggest')}" th:text="#{orders.suggest.suppliers}"></option>
-                                <option th:value="@{${orderFulfilmentBasePath}(pathSelector='suggest-exact')}" th:text="#{orders.suggest.suppliers.exact}"></option>
-                            </select>
-                        </div>
-                        <button class="button is-primary is-small ml-2" type="submit" th:text="#{orders.apply}"></button>
-                        <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
-                            <input type="checkbox" name="onlyWithProfit" value="true" />
-                            <span class="ml-1" th:text="#{fulfilment.queue.only.with.profit}"></span>
-                        </label>
-                        <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
-                            <input type="checkbox" name="onlyLocalSuppliers" value="true" />
-                            <span class="ml-1" th:text="#{fulfilment.queue.only.local.suppliers}"></span>
-                        </label>
-                        <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
-                            <input type="checkbox" name="onlyMultiOrder" value="true" />
-                            <span class="ml-1" th:text="#{fulfilment.queue.only.multi.order}"></span>
-                        </label>
-                        <label class="checkbox is-size-7 ml-3 is-flex is-align-items-center">
-                            <input type="checkbox" name="orderByOrder" value="true" />
-                            <span class="ml-1" th:text="#{fulfilment.queue.order.by.order}"></span>
-                        </label>
-                    </div>
+                <!--/* Skipping sends the skipped orders plus this group back as orderIds: FulfilmentQueue leaves them out
+                       and picks the next group. It skips the whole group, ticked or not. */-->
+                <div class="cl-page-actions" th:if="${page.hasGroup()}">
+                    <form method="get" th:action="@{/dashboard/fulfilment/queue}" class="cl-page-action-form">
+                        <input type="hidden" name="orderIds" th:each="id : ${page.skipOrderIds()}" th:value="${id}">
+                        <button type="submit" class="cl-button">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-forward"></i></span>
+                            <span th:text="#{fulfilment.queue.skip}"></span>
+                        </button>
+                    </form>
                 </div>
-            </form>
-
-            <div class="buttons is-right mt-4">
-                <a href="/dashboard/fulfilment/queue" class="button is-light is-danger">
-                    <span class="icon"><i class="fas fa-undo-alt"></i></span>
-                    <span th:text="#{fulfilment.queue.reset}"></span>
-                </a>
-                <form action="/dashboard/fulfilment/queue" method="get">
-                    <div th:each="id : ${orderIds}">
-                        <input type="hidden" name="orderIds" th:value="${id}" />
-                    </div>
-                    <button type="submit" class="button is-primary" th:disabled="${!hasNext}">
-                        <span class="icon"><i class="fas fa-arrow-right"></i></span>
-                        <span th:text="#{fulfilment.queue.next.group}"></span>
-                    </button>
-                </form>
             </div>
-        </div>
-    </section>
+            <p class="cl-page-lead" th:text="#{fulfilment.queue.lead}"></p>
+            <p class="cl-page-lead" th:if="${page.hasGroup() and page.skippedCount() > 0}">
+                <span th:text="#{fulfilment.queue.skipped(${page.skippedCount()})}"></span> ·
+                <a th:href="@{/dashboard/fulfilment/queue}" th:text="#{fulfilment.queue.restore}"></a>
+            </p>
+        </header>
 
-    <script>
-        document.getElementById('fulfilmentQueueForm').addEventListener('submit', function () {
-            this.action = document.getElementById('actionSelect').value;
-        });
-        document.getElementById('selectAllOrders').addEventListener('change', function () {
-            document.querySelectorAll('input[name="selectedOrders"]').forEach(checkbox => checkbox.checked = this.checked);
-        });
-    </script>
+        <div th:replace="~{fragments/screen-intro :: panel('fulfilment', 'fas fa-magic')}"></div>
 
+        <section class="cl-card" th:unless="${page.hasGroup()}" aria-labelledby="queue-empty-title">
+            <div class="cl-card-head">
+                <h2 class="cl-card-title" id="queue-empty-title"
+                    th:text="${page.allSkipped()} ? #{fulfilment.queue.empty.skipped.title} : #{fulfilment.queue.empty.none.title}"></h2>
+            </div>
+            <div class="cl-list-empty" th:if="${page.nothingWaiting()}">
+                <span th:text="#{fulfilment.queue.empty.none.text}"></span>
+                <a th:unless="${page.superAdmin()}" class="cl-link-button" th:href="@{/dashboard/orders}"
+                   th:text="#{fulfilment.queue.empty.none.action}"></a>
+            </div>
+            <div class="cl-list-empty" th:if="${page.allSkipped()}">
+                <span th:text="#{fulfilment.queue.empty.skipped.text(${page.skippedCount()})}"></span>
+                <div class="cl-list-empty-action">
+                    <a class="cl-button is-primary" th:href="@{/dashboard/fulfilment/queue}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-undo-alt"></i></span>
+                        <span th:text="#{fulfilment.queue.restore}"></span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!--/* Layout of "Nowa dostawa" (design system: Kolumna boczna przyklejona, Karta podsumowania z akcjami): the
+               group is the work, the side column holds the narrowing and the summary whose buttons are the strategies.
+               The first submit button is the default strategy, so Enter in the form picks it. */-->
+        <form th:if="${page.hasGroup()}" method="post" th:action="@{${page.postAction()}}" class="cl-layout-aside"
+              data-cl-queue data-cl-submit-once>
+            <div class="cl-layout-main">
+                <section class="cl-card" aria-labelledby="queue-group-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="queue-group-title">
+                            <span th:text="#{${page.kind().titleKey()}}"></span>
+                            <span class="cl-status is-info">
+                                <i class="fas" th:classappend="${page.kind().icon()}" aria-hidden="true"></i>
+                                <span th:text="#{${page.kind().pillKey()}}"></span>
+                            </span>
+                        </h2>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{${page.kind().descriptionKey()}}"></p>
+                    <p class="cl-card-desc cl-group-meta" th:if="${page.storeName() != null}">
+                        <span class="cl-icon-text"><i class="fas fa-store" aria-hidden="true"></i><span th:text="#{fulfilment.queue.store}"></span></span>
+                        <strong th:text="${page.storeName()}"></strong>
+                    </p>
+
+                    <!--/* is-selectable keeps the orders table's checkbox column: here it is the form's selectedOrders,
+                           ticked by the server, so it works without JavaScript and in card mode (commercelink.css,
+                           "Fulfilment queue"). It is not a bulk selection, hence no data-cl-select-table. */-->
+                    <table class="cl-table is-orders is-queue is-selectable">
+                        <thead>
+                        <tr>
+                            <th scope="col" class="cl-table-check">
+                                <label class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" data-cl-queue-all hidden checked autocomplete="off"
+                                           th:attr="aria-label=#{fulfilment.queue.select.none}, data-label-select=#{fulfilment.queue.select.all}, data-label-clear=#{fulfilment.queue.select.none}">
+                                </label>
+                                <span class="cl-visually-hidden" th:text="#{fulfilment.queue.column.select}"></span>
+                            </th>
+                            <th scope="col" th:text="#{fulfilment.queue.column.order}"></th>
+                            <th scope="col" th:text="#{fulfilment.queue.column.client}"></th>
+                            <th scope="col" th:text="#{fulfilment.queue.column.ordered}"></th>
+                            <th scope="col" th:text="#{fulfilment.queue.column.due}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{fulfilment.queue.column.items}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${page.rows()}">
+                            <td class="cl-table-check">
+                                <label class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" name="selectedOrders" checked autocomplete="off"
+                                           data-cl-queue-row th:value="${row.orderId()}"
+                                           th:attr="data-items=${row.itemsToOrder()}, aria-label=#{fulfilment.queue.select.row(${row.number()})}">
+                                </label>
+                            </td>
+                            <th scope="row" class="cl-table-key">
+                                <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
+                                <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}"></span></th:block></span>
+                            </th>
+                            <td>
+                                <span class="cl-cell-client"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>
+                                <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
+                            </td>
+                            <td>
+                                <span class="cl-cell-ordered"><span class="cl-queue-label" th:text="#{fulfilment.queue.card.ordered}"></span> <span th:text="${row.orderedAtText()}"></span></span>
+                            </td>
+                            <td>
+                                <span class="cl-cell-due-date"><span class="cl-queue-label" th:text="#{fulfilment.queue.card.due}"></span> <span th:text="${row.dueText()}"></span></span>
+                                <span th:if="${row.dueNote() != null}" class="cl-table-sub cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span>
+                            </td>
+                            <td class="is-numeric">
+                                <span class="cl-cell-count"><span class="cl-queue-label" th:text="#{fulfilment.queue.card.items}"></span> <span th:text="${row.itemsToOrder()}"></span></span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <aside class="cl-layout-side is-sticky">
+                <section class="cl-card" aria-labelledby="queue-narrow-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="queue-narrow-title" th:text="#{fulfilment.queue.narrow.title}"></h2></div>
+                    <div class="cl-card-body">
+                        <ul class="cl-check-stack">
+                            <li><label class="cl-check"><input type="checkbox" name="onlyWithProfit" value="true">
+                                <span class="cl-check-text"><span th:text="#{fulfilment.queue.narrow.profit}"></span><span class="cl-check-desc" th:text="#{fulfilment.queue.narrow.profit.help}"></span></span></label></li>
+                            <li><label class="cl-check"><input type="checkbox" name="onlyLocalSuppliers" value="true">
+                                <span class="cl-check-text" th:text="#{fulfilment.queue.narrow.local}"></span></label></li>
+                            <li><label class="cl-check"><input type="checkbox" name="onlyMultiOrder" value="true">
+                                <span class="cl-check-text" th:text="#{fulfilment.queue.narrow.multi}"></span></label></li>
+                            <li><label class="cl-check"><input type="checkbox" name="orderByOrder" value="true">
+                                <span class="cl-check-text"><span th:text="#{fulfilment.queue.narrow.byOrder}"></span><span class="cl-check-desc" th:text="#{fulfilment.queue.narrow.byOrder.help}"></span></span></label></li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="cl-card" aria-labelledby="queue-summary-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="queue-summary-title" th:text="#{fulfilment.queue.summary.title}"></h2></div>
+                    <dl class="cl-kv is-column cl-card-inset">
+                        <div><dt th:text="#{fulfilment.queue.summary.selected}"></dt>
+                            <dd class="is-numeric"><output data-cl-queue-count aria-live="polite"
+                                    th:attr="data-template=#{fulfilment.queue.summary.selected.value('{k}', '{n}')}"
+                                    th:text="#{fulfilment.queue.summary.selected.value(${page.rows().size()}, ${page.rows().size()})}"></output></dd></div>
+                        <div class="cl-kv-total"><dt th:text="#{fulfilment.queue.summary.items}"></dt>
+                            <dd class="is-numeric"><output data-cl-queue-items aria-live="polite" th:text="${page.itemsTotal()}"></output></dd></div>
+                    </dl>
+                    <div class="cl-card-footer is-stacked">
+                        <p class="cl-help is-warn" id="queue-reason" data-cl-queue-reason hidden th:text="#{fulfilment.queue.pick.reason}"></p>
+                        <button type="submit" name="pathSelector" value="default" class="cl-button is-primary"
+                                aria-describedby="queue-help-default" data-help="queue-help-default" th:text="#{fulfilment.queue.pick.default}"></button>
+                        <p class="cl-help" id="queue-help-default" th:text="#{fulfilment.queue.pick.default.help}"></p>
+                        <button type="submit" name="pathSelector" value="suggest" class="cl-button"
+                                aria-describedby="queue-help-suggest" data-help="queue-help-suggest" th:text="#{fulfilment.queue.pick.suggest}"></button>
+                        <p class="cl-help" id="queue-help-suggest" th:text="#{fulfilment.queue.pick.suggest.help}"></p>
+                        <button type="submit" name="pathSelector" value="suggest-exact" class="cl-button"
+                                aria-describedby="queue-help-exact" data-help="queue-help-exact" th:text="#{fulfilment.queue.pick.exact}"></button>
+                        <p class="cl-help" id="queue-help-exact" th:text="#{fulfilment.queue.pick.exact.help}"></p>
+                    </div>
+                </section>
+            </aside>
+        </form>
+    </div>
+</section>
+<script th:src="@{/js/submit-once.js}" defer></script>
+<script th:src="@{/js/fulfilment-queue.js}" defer></script>
 </div>
 
 </body>
