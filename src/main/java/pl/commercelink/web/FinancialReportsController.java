@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -93,10 +94,10 @@ public class FinancialReportsController {
         model.addAttribute("providerSales", providerSales);
         model.addAttribute("dateFrom", dateFrom);
         model.addAttribute("dateTo", dateTo);
-        // after a held closing the range picker keeps the range that was held, so it can be corrected or closed anyway
+        // after a held closing the range picker keeps the range that was held, so it can be closed once settled
         StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
-        model.addAttribute("ledgerClosing", StockLedgerClosingView.of(stockLedgerPeriodClosing.closedPeriods(getStoreId()),
-                warning != null ? warning.dateFrom() : dateFrom, warning != null ? warning.dateTo() : dateTo));
+        StockLedgerClosingView closing = StockLedgerClosingView.of(stockLedgerPeriodClosing.closedPeriods(getStoreId()), dateFrom, dateTo);
+        model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
 
         return "reports";
     }
@@ -134,18 +135,24 @@ public class FinancialReportsController {
         writeStockLedger(response, dateFrom.toString(), dateTo.toString(), csv);
     }
 
-    /** Closes the range, or generates it again when it is closed already; force closes it despite unsettled deliveries. */
+    /** Closes the range, or generates it again when it is closed already. */
     @PostMapping("/dashboard/reports/stock-ledger/close")
     public String closeStockLedgerPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-                                         @RequestParam(defaultValue = "false") boolean force,
                                          RedirectAttributes redirectAttributes, Locale locale) throws IOException {
         StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
         Object[] label = {period.label()};
-        switch (stockLedgerPeriodClosing.close(getStoreId(), period, force)) {
-            case Closed closed -> redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
-                    closed.regenerated() ? "reports.stockLedger.closing.regenerated" : "reports.stockLedger.closing.closed",
-                    label, locale));
+        switch (stockLedgerPeriodClosing.close(getStoreId(), period)) {
+            case Closed closed -> {
+                redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
+                        closed.regenerated() ? "reports.stockLedger.closing.regenerated" : "reports.stockLedger.closing.closed",
+                        label, locale));
+                if (!closed.outdatedLaterPeriods().isEmpty()) {
+                    String later = closed.outdatedLaterPeriods().stream().map(StockLedgerPeriod::label).collect(Collectors.joining(", "));
+                    redirectAttributes.addFlashAttribute("ledgerOutdated", messageSource.getMessage(
+                            "reports.stockLedger.closing.outdated", new Object[]{period.label(), later}, locale));
+                }
+            }
             case Blocked blocked -> {
                 SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
                 redirectAttributes.addFlashAttribute("errorMessage",
@@ -153,8 +160,12 @@ public class FinancialReportsController {
                 redirectAttributes.addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(dateFrom, dateTo,
                         blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList()));
             }
-            case NotAllowed notAllowed -> redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage(notAllowed.messageKey(), label, locale));
+            case NotAllowed notAllowed -> {
+                List<Object> arguments = new ArrayList<>(List.of(label));
+                arguments.addAll(notAllowed.arguments());
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        messageSource.getMessage(notAllowed.messageKey(), arguments.toArray(), locale));
+            }
         }
         return "redirect:" + CLOSING_SECTION;
     }

@@ -45,12 +45,9 @@ class StockLedgerClosings {
                 .toList();
     }
 
-    boolean exists(String storeId, StockLedgerPeriod period) {
-        return fileStorage.canRead(bucketName, key(storeId, period));
-    }
-
     Optional<byte[]> find(String storeId, StockLedgerPeriod period) {
-        return exists(storeId, period) ? Optional.of(fileStorage.getBytes(bucketName, key(storeId, period))) : Optional.empty();
+        String key = key(storeId, period);
+        return fileStorage.canRead(bucketName, key) ? Optional.of(fileStorage.getBytes(bucketName, key)) : Optional.empty();
     }
 
     void save(String storeId, StockLedgerPeriod period, byte[] report) {

@@ -13,4 +13,10 @@ public record StockLedgerPeriod(LocalDate from, LocalDate to) {
     public String label() {
         return from + " – " + to;
     }
+
+    /** Closed periods follow one another without a gap: the next one is a month starting the day after this one. */
+    public StockLedgerPeriod next() {
+        LocalDate start = to.plusDays(1);
+        return new StockLedgerPeriod(start, start.plusMonths(1).minusDays(1));
+    }
 }

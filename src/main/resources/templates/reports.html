@@ -106,6 +106,8 @@
                 <h3 class="mb-2" th:text="#{reports.stockLedger.closing.title}"></h3>
                 <p class="mb-4" th:text="#{reports.stockLedger.closing.intro}"></p>
 
+                <div th:if="${ledgerOutdated != null}" class="notification is-warning is-light" th:text="${ledgerOutdated}"></div>
+
                 <div th:if="${ledgerWarning != null}" class="notification is-warning is-light">
                     <p class="mb-3" th:text="#{reports.stockLedger.closing.blockers}"></p>
                     <div class="table-container">
@@ -131,12 +133,6 @@
                             </tbody>
                         </table>
                     </div>
-                    <form method="post" th:action="@{/dashboard/reports/stock-ledger/close}">
-                        <input type="hidden" name="dateFrom" th:value="${ledgerWarning.dateFrom()}">
-                        <input type="hidden" name="dateTo" th:value="${ledgerWarning.dateTo()}">
-                        <input type="hidden" name="force" value="true">
-                        <button class="button is-warning" type="submit" th:text="#{reports.stockLedger.closing.force}"></button>
-                    </form>
                 </div>
 
                 <form method="post" th:action="@{/dashboard/reports/stock-ledger/close}">

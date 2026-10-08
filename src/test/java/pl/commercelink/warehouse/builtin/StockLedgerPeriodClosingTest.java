@@ -10,6 +10,7 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Blocked;
+import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 
@@ -38,6 +39,7 @@ class StockLedgerPeriodClosingTest {
 
     private static final String STORE_ID = "store-1";
     private static final StockLedgerPeriod MARCH = new StockLedgerPeriod(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+    private static final StockLedgerPeriod APRIL = new StockLedgerPeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30));
     private static final Clock OCTOBER_7 = Clock.fixed(Instant.parse("2026-10-07T10:00:00Z"), ZoneOffset.UTC);
 
     @Mock
@@ -63,23 +65,23 @@ class StockLedgerPeriodClosingTest {
         when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to())).thenReturn(rows);
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
 
         // then
-        assertThat(result).isEqualTo(new Closed(MARCH, false));
+        assertThat(result).isEqualTo(new Closed(MARCH, false, List.of()));
         verify(closings).save(eq(STORE_ID), eq(MARCH), aryEq(StockLedgerRow.toCsv(rows)));
     }
 
     @Test
-    void closingAClosedPeriodAgainRegeneratesIt() throws Exception {
+    void closingAClosedPeriodAgainRegeneratesItEvenWithLaterPeriodsClosed() throws Exception {
         // given
-        when(closings.exists(STORE_ID, MARCH)).thenReturn(true);
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
 
         // then
-        assertThat(result).isEqualTo(new Closed(MARCH, true));
+        assertThat(result).isEqualTo(new Closed(MARCH, true, List.of()));
         verify(closings).save(eq(STORE_ID), eq(MARCH), any());
     }
 
@@ -89,7 +91,7 @@ class StockLedgerPeriodClosingTest {
         StockLedgerPeriod untilToday = new StockLedgerPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 7));
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, untilToday, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, untilToday);
 
         // then
         assertThat(result).isEqualTo(new NotAllowed("reports.stockLedger.closing.error.notOver"));
@@ -102,7 +104,7 @@ class StockLedgerPeriodClosingTest {
         StockLedgerPeriod reversed = new StockLedgerPeriod(LocalDate.of(2026, 3, 31), LocalDate.of(2026, 3, 1));
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, reversed, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, reversed);
 
         // then
         assertThat(result).isEqualTo(new NotAllowed("reports.stockLedger.closing.error.range"));
@@ -121,7 +123,7 @@ class StockLedgerPeriodClosingTest {
                 .thenReturn(List.of(noInvoice, unsynced, settled));
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
 
         // then
         assertThat(result).isInstanceOf(Blocked.class);
@@ -130,14 +132,87 @@ class StockLedgerPeriodClosingTest {
     }
 
     @Test
-    void periodCanBeClosedDespiteUnsettledDeliveries() throws Exception {
+    void regeneratedPeriodWhoseClosingBalanceChangedNamesTheLaterClosedPeriods() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
+        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 1, 10.0)));
+        when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to()))
+                .thenReturn(List.of(new StockLedgerRow("MFN-A", "Widget", 1, 11.0, Map.of(), Map.of())));
+
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH, true);
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
 
         // then
-        assertThat(result).isEqualTo(new Closed(MARCH, false));
-        verifyNoInteractions(documents, deliveries);
-        verify(closings).save(eq(STORE_ID), eq(MARCH), any());
+        assertThat(result).isEqualTo(new Closed(MARCH, true, List.of(APRIL)));
+    }
+
+    @Test
+    void regeneratedPeriodWithTheSameClosingBalanceLeavesTheLaterPeriodsUpToDate() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
+        when(closings.closingBalances(STORE_ID, MARCH)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 1, 10.0)));
+        when(stockLedgerService.generate(STORE_ID, MARCH.from(), MARCH.to()))
+                .thenReturn(List.of(new StockLedgerRow("MFN-A", "Widget", 1, 10.0, Map.of(), Map.of())));
+
+        // when
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
+
+        // then
+        assertThat(result).isEqualTo(new Closed(MARCH, true, List.of()));
+    }
+
+    @Test
+    void unreadablePreviousReportLeavesTheLaterPeriodsOutOfDate() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
+        when(closings.closingBalances(STORE_ID, MARCH)).thenThrow(new IllegalStateException("broken file"));
+
+        // when
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
+
+        // then
+        assertThat(result).isEqualTo(new Closed(MARCH, true, List.of(APRIL)));
+    }
+
+    @Test
+    void regeneratingTheLastClosedPeriodDoesNotReadItsPreviousReport() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH, APRIL));
+
+        // when
+        StockLedgerClosingResult result = closing.close(STORE_ID, APRIL);
+
+        // then
+        assertThat(result).isEqualTo(new Closed(APRIL, true, List.of()));
+        verify(closings, never()).closingBalances(any(), any());
+    }
+
+    @Test
+    void newPeriodStartsTheDayAfterTheLastClosedOne() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH));
+
+        // when
+        StockLedgerClosingResult result = closing.close(STORE_ID, APRIL);
+
+        // then
+        assertThat(result).isEqualTo(new Closed(APRIL, false, List.of()));
+        verify(closings).save(eq(STORE_ID), eq(APRIL), any());
+    }
+
+    @Test
+    void periodLeavingAGapAfterTheLastClosedOneIsRejected() throws Exception {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH));
+        StockLedgerPeriod may = new StockLedgerPeriod(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31));
+
+        // when
+        StockLedgerClosingResult result = closing.close(STORE_ID, may);
+
+        // then
+        assertThat(result).isEqualTo(new NotAllowed("reports.stockLedger.closing.error.gap", List.of(LocalDate.of(2026, 4, 1))));
+        verify(closings, never()).save(any(), any(), any());
+        verifyNoInteractions(documents, stockLedgerService);
     }
 
     @Test
@@ -151,10 +226,10 @@ class StockLedgerPeriodClosingTest {
                 .thenReturn(List.of(delivery("own", SupplierRegistry.WAREHOUSE, false, false)));
 
         // when
-        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH, false);
+        StockLedgerClosingResult result = closing.close(STORE_ID, MARCH);
 
         // then
-        assertThat(result).isEqualTo(new Closed(MARCH, false));
+        assertThat(result).isEqualTo(new Closed(MARCH, false, List.of()));
     }
 
     private static List<WarehouseDocument> documents(WarehouseDocument... documents) {

@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
@@ -21,10 +22,12 @@ import java.util.stream.Collectors;
 
 /**
  * Closing a period stores its stock ledger report, and reports starting after it take its closing balance instead of
- * reading the whole history. Any past range can be closed, in any order, so months can be closed back in time. Closing
- * a closed range again regenerates it, e.g. after an invoice correction rewrote the prices of its documents; the closed
- * periods after it start from its closing balance, and regenerating them is left to the user.
+ * reading the whole history. A period closes only when every delivery received into the warehouse in it has its
+ * purchase invoice linked and synced. Closing a closed range again regenerates it, e.g. after an invoice correction
+ * rewrote the prices of its documents; the closed periods after it start from its closing balance, and regenerating
+ * them is left to the user.
  */
+@Slf4j
 @Service
 public class StockLedgerPeriodClosing {
 
@@ -54,26 +57,53 @@ public class StockLedgerPeriodClosing {
         return closings.closedPeriods(storeId);
     }
 
-    /** Deliveries without a settled invoice only warn: the operator may close the period anyway. */
-    public StockLedgerClosingResult close(String storeId, StockLedgerPeriod period, boolean despiteUnsettledDeliveries)
-            throws IOException {
+    /**
+     * A new period starts the day after the last closed one, so the closed periods form one chain; only the first can
+     * start anywhere, to close the history back in time. A closed range can always be closed again to regenerate it.
+     */
+    public StockLedgerClosingResult close(String storeId, StockLedgerPeriod period) throws IOException {
         if (period.from().isAfter(period.to())) {
             return new NotAllowed("reports.stockLedger.closing.error.range");
         }
         if (!period.to().isBefore(LocalDate.now(clock))) {
             return new NotAllowed("reports.stockLedger.closing.error.notOver");
         }
-        if (!despiteUnsettledDeliveries) {
-            List<Delivery> unsettled = unsettledDeliveries(storeId, period);
-            if (!unsettled.isEmpty()) {
-                return new Blocked(unsettled);
+        List<StockLedgerPeriod> closed = closings.closedPeriods(storeId);
+        boolean regenerating = closed.contains(period);
+        if (!regenerating && !closed.isEmpty()) {
+            LocalDate nextFrom = closed.get(closed.size() - 1).next().from();
+            if (!period.from().equals(nextFrom)) {
+                return new NotAllowed("reports.stockLedger.closing.error.gap", List.<Object>of(nextFrom));
             }
         }
+        List<Delivery> unsettled = unsettledDeliveries(storeId, period);
+        if (!unsettled.isEmpty()) {
+            return new Blocked(unsettled);
+        }
 
-        boolean closedBefore = closings.exists(storeId, period);
         byte[] report = StockLedgerRow.toCsv(stockLedgerService.generate(storeId, period.from(), period.to()));
+        List<StockLedgerPeriod> outdated = regenerating ? outdatedAfter(storeId, period, closed, report) : List.of();
         closings.save(storeId, period, report);
-        return new Closed(period, closedBefore);
+        return new Closed(period, regenerating, outdated);
+    }
+
+    // the closed periods after a regenerated one start from its closing balance, so they are out of date once it changed
+    private List<StockLedgerPeriod> outdatedAfter(String storeId, StockLedgerPeriod period, List<StockLedgerPeriod> closed,
+                                                  byte[] report) {
+        List<StockLedgerPeriod> later = closed.stream()
+                .filter(closedPeriod -> closedPeriod.from().isAfter(period.to()))
+                .toList();
+        return later.isEmpty() || !closingBalanceChanged(storeId, period, report) ? List.of() : later;
+    }
+
+    private boolean closingBalanceChanged(String storeId, StockLedgerPeriod period, byte[] report) {
+        try {
+            return !closings.closingBalances(storeId, period).equals(StockLedgerClosings.parse(report));
+        } catch (RuntimeException e) {
+            log.warn("Previous stock ledger of {} for store {} could not be read, the later closed periods are reported as out of date",
+                    period.label(), storeId, e);
+            return true;
+        }
     }
 
     public Optional<byte[]> closedReport(String storeId, StockLedgerPeriod period) {
