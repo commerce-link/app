@@ -86,4 +86,24 @@ class FulfilmentQueueStylesContractTest {
         assertThat(rule).contains("min-height: 0;");
         assertThat(css.substring(0, media)).doesNotContain("cl-check-stack .cl-check {\n    min-height");
     }
+
+    @Test
+    void aNarrowCardFoldsTheOrderedColumnUnderTheKeyOnlyOutsideCardMode() throws Exception {
+        // given
+        String css = queueSection();
+
+        // when
+        String container = ruleBody(css, ".cl-page .cl-queue-card");
+        int media = css.indexOf("@media screen and (min-width: 720px) {\n    @container (width < 660px) {");
+        String hiddenByDefault = ruleBody(css, ".cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub");
+
+        // then
+        assertThat(container).contains("container-type: inline-size;");
+        assertThat(hiddenByDefault).contains("display: none;");
+        assertThat(media).as("the narrow-card block, outside the card mode").isNotNegative();
+        String narrow = css.substring(media, css.indexOf("\n}\n", media));
+        assertThat(ruleBody(narrow, ".cl-page .cl-table.is-queue .is-secondary-column")).contains("display: none;");
+        assertThat(ruleBody(narrow, ".cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub")).contains("display: block;");
+        assertThat(ruleBody(narrow, ".cl-page .cl-table.is-queue .cl-queue-ordered-sub .cl-queue-label")).contains("display: inline;");
+    }
 }

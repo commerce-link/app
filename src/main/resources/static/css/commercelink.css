@@ -10353,7 +10353,7 @@ a.cl-link-button:hover {
    table with is-selectable set by the template: its checkbox column is the form's selectedOrders, not a bulk selection,
    so it is drawn without JavaScript and kept in card mode (no data-cl-select-table, whose card rule hides it). An
    unticked row greys its client and dates; ticked rows get no tint, since the whole group starts ticked. */
-.cl-page .cl-table.is-queue tr:has(.cl-check-input:not(:checked)) :is(.cl-cell-client, .cl-cell-ordered, .cl-cell-due-date) {
+.cl-page .cl-table.is-queue tr:has(.cl-check-input:not(:checked)) :is(.cl-cell-client, .cl-cell-ordered, .cl-queue-ordered-sub, .cl-cell-due-date) {
     color: var(--cl-ink-3);
 }
 
@@ -10378,6 +10378,39 @@ a.cl-link-button:hover {
 /* the column headers name the values on a wide screen; the labels speak only in card mode */
 .cl-page .cl-table.is-queue .cl-queue-label {
     display: none;
+}
+
+/* Kolumna zwijana pod klucz, following the card like the Metoda column of Payments: beside the side column the card is
+   604 px at 1366 px and 678 px at 1440 px, while the full table needs about 651 px (an other-year date, the overdue note
+   and the number with its source do not wrap). Below 660 px of card the "Złożone" column goes and its date moves under
+   the order number, labelled. The sub-line exists only for that: the card mode (< 720 px) keeps the date in its own row. */
+.cl-page .cl-queue-card {
+    container-type: inline-size;
+}
+
+.cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub {
+    display: none;
+}
+
+@media screen and (min-width: 720px) {
+    @container (width < 660px) {
+        .cl-page .cl-table.is-queue .is-secondary-column {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub {
+            display: block;
+        }
+
+        .cl-page .cl-table.is-queue .cl-queue-ordered-sub .cl-queue-label {
+            display: inline;
+        }
+
+        .cl-page .cl-table.is-queue .cl-queue-ordered-date {
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+    }
 }
 
 /* A list of checkboxes with an optional line under the name (the queue's narrowing). */

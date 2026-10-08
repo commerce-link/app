@@ -92,4 +92,19 @@ class FulfilmentQueueRenderingTest {
                 .contains("Przywróć pominięte").contains("href=\"/dashboard/fulfilment/queue\"")
                 .doesNotContain("Pomiń grupę").doesNotContain("??");
     }
+
+    @Test
+    void theOrderedDateHasALabelledSubLineUnderTheNumberAndASecondaryColumn() {
+        // when
+        String html = render(group(false));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-table-sub cl-queue-ordered-sub\"><span class=\"cl-queue-label\">Złożone:</span> "
+                + "<span class=\"cl-queue-ordered-date\">02.10 09:14</span></span>");
+        String key = html.substring(html.indexOf("<th scope=\"row\" class=\"cl-table-key\">"));
+        assertThat(key.substring(0, key.indexOf("</th>"))).contains("cl-queue-ordered-sub");
+        assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\">Złożone</th>")
+                .contains("<td class=\"is-secondary-column\">")
+                .contains("class=\"cl-card cl-queue-card\"");
+    }
 }

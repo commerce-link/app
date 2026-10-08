@@ -60,7 +60,7 @@
         <form th:if="${page.hasGroup()}" method="post" th:action="@{${page.postAction()}}" class="cl-layout-aside"
               data-cl-queue data-cl-submit-once>
             <div class="cl-layout-main">
-                <section class="cl-card" aria-labelledby="queue-group-title">
+                <section class="cl-card cl-queue-card" aria-labelledby="queue-group-title">
                     <div class="cl-card-head">
                         <h2 class="cl-card-title" id="queue-group-title">
                             <span th:text="#{${page.kind().titleKey()}}"></span>
@@ -91,7 +91,7 @@
                             </th>
                             <th scope="col" th:text="#{fulfilment.queue.column.order}"></th>
                             <th scope="col" th:text="#{fulfilment.queue.column.client}"></th>
-                            <th scope="col" th:text="#{fulfilment.queue.column.ordered}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{fulfilment.queue.column.ordered}"></th>
                             <th scope="col" th:text="#{fulfilment.queue.column.due}"></th>
                             <th scope="col" class="is-numeric" th:text="#{fulfilment.queue.column.items}"></th>
                         </tr>
@@ -108,12 +108,14 @@
                             <th scope="row" class="cl-table-key">
                                 <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
                                 <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}"></span></th:block></span>
+                                <!--/* the ordered date's place when the card is too narrow for its column (commercelink.css, "Fulfilment queue") */-->
+                                <span class="cl-table-sub cl-queue-ordered-sub"><span class="cl-queue-label" th:text="#{fulfilment.queue.card.ordered}"></span> <span class="cl-queue-ordered-date" th:text="${row.orderedAtText()}"></span></span>
                             </th>
                             <td>
                                 <span class="cl-cell-client"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>
                                 <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
                             </td>
-                            <td>
+                            <td class="is-secondary-column">
                                 <span class="cl-cell-ordered"><span class="cl-queue-label" th:text="#{fulfilment.queue.card.ordered}"></span> <span th:text="${row.orderedAtText()}"></span></span>
                             </td>
                             <td>
