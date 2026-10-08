@@ -178,6 +178,17 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
+    void categoryColumnIsWiderWhereTheSidebarNarrowsTheTableBelow1280() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // at 1024 px the table is 786 px and 12 % left 70 px of text, three short of "Chłodzenie" (73 px at 14 px)
+        String block = section.substring(section.indexOf("@media screen and (min-width: 1024px) and (max-width: 1279px)"));
+        assertThat(block.substring(0, block.indexOf("}\n}") + 3)).contains(".cl-page .cl-table.is-warehouse .cl-col-category { width: 14%; }");
+    }
+
+    @Test
     void categoryColumnTakesTheRoomOfTheHiddenDeliveryColumnBelow1024() throws Exception {
         // given
         String section = section();
