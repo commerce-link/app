@@ -63,12 +63,34 @@ class InvoiceSyncPreviewBuilderTest {
 
         // then
         assertThat(preview.getPaymentTermDays()).isEqualTo(16);
-        assertThat(preview.getDeliveryPaymentsCount()).isEqualTo(1);
+        assertThat(preview.getDeliveryPayments()).containsExactly(new InvoiceSyncPreview.PaymentLine(100.0, "FV/1"));
         assertThat(preview.getPaymentSync()).isEqualTo(InvoicePaymentSync.REMOVE);
         assertThat(preview.getDeliveryOrderedAt()).isEqualTo("06.10.2026");
         assertThat(preview.getDeliverySupplier()).isEqualTo("Acme");
         assertThat(preview.getOptions()).singleElement().satisfies(o -> assertThat(o.getTotalNet()).isEqualTo(100.0));
         assertThat(preview.getMappings()).singleElement().satisfies(m -> assertThat(m.getSelectedPositionId()).isEqualTo("pos-1"));
+    }
+
+    @Test
+    void rowsFollowTheOrderOfTheDeliveryNotTheGrouping() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        Delivery delivery = new Delivery("store-1", "ZK/1", "Acme");
+        delivery.setDeliveryId("delivery-1");
+        delivery.setAllocations(List.of(allocation("MFN-C"), allocation("MFN-A"), allocation("MFN-B"), allocation("MFN-A")));
+        delivery.setItems(List.of(item("MFN-A", 1, 10.0), item("MFN-B", 1, 20.0), item("MFN-C", 1, 30.0)));
+        when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        Invoice invoice = new Invoice("inv-1", "FV/1", null, Price.fromNet(60.0), null, "PLN", 1.0, false, null, List.of(),
+                BillingParty.company("seller-1", "Acme S.A.", null, null, null, null, null, "ACME"), null);
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenReturn(invoice);
+
+        // when
+        InvoiceSyncPreview preview = builder.build("store-1", "delivery-1", "inv-1");
+
+        // then
+        assertThat(preview.getMappings()).extracting(InvoiceSyncPreview.Mapping::getMfn).containsExactly("MFN-C", "MFN-A", "MFN-B");
     }
 
     @Test
@@ -78,6 +100,12 @@ class InvoiceSyncPreviewBuilderTest {
 
         // when / then
         assertThat(builder.build("store-1", "missing", "inv-1")).isNull();
+    }
+
+    private static Allocation allocation(String mfn) {
+        Allocation allocation = new Allocation();
+        allocation.setMfn(mfn);
+        return allocation;
     }
 
     private static DeliveryItem item(String mfn, int qty, double unitCost) {

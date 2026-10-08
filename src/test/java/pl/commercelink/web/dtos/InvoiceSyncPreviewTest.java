@@ -1,6 +1,8 @@
 package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import pl.commercelink.inventory.deliveries.InvoicePaymentSync;
 import pl.commercelink.web.dtos.InvoiceSyncPreview.MatchState;
 
@@ -25,7 +27,7 @@ class InvoiceSyncPreviewTest {
         assertThat(preview.stateOf(preview.getMappings().get(2))).isEqualTo(MatchState.DIFFERENT);
         assertThat(preview.stateOf(preview.getMappings().get(3))).isEqualTo(MatchState.UNASSIGNED);
         assertThat(preview.count(MatchState.EXACT)).isEqualTo(1);
-        assertThat(preview.getAssignedItemCount()).isEqualTo(3);
+        assertThat(preview.getChangedItemCount()).isEqualTo(2);
         assertThat(preview.isAllExact()).isFalse();
     }
 
@@ -70,10 +72,51 @@ class InvoiceSyncPreviewTest {
         InvoiceSyncPreview preview = preview();
         preview.setInvoicePaid(false);
         preview.setDeliveryPaid(true);
-        preview.setDeliveryPaymentsCount(2);
+        preview.setDeliveryPayments(List.of(new InvoiceSyncPreview.PaymentLine(100.0, "FV/1"),
+                new InvoiceSyncPreview.PaymentLine(20.0, null)));
 
         // when / then
         assertThat(preview.getPaymentSync()).isEqualTo(InvoicePaymentSync.REMOVE);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "15.00, 15.004, EXACT",
+            "15.00, 14.996, EXACT",
+            "15.00, 15.01, CLOSE",
+            "15.00, 14.99, CLOSE",
+            "15.00, 15.0149, CLOSE",
+            "15.00, 14.9851, CLOSE",
+            "15.00, 15.015, DIFFERENT",
+            "15.00, 14.985, DIFFERENT",
+            "15.00, 15.02, DIFFERENT",
+            "15.00, 0.00, DIFFERENT"
+    })
+    void stateBandsAreHalfAGroszAroundEqualAndAroundOneGroszEitherWay(double invoiceAmount, double deliveryAmount, MatchState expected) {
+        // when / then
+        assertThat(MatchState.compare(invoiceAmount, deliveryAmount)).isEqualTo(expected);
+    }
+
+    @Test
+    void additionalCostEqualToTheChosenLineIsExact() {
+        // given
+        InvoiceSyncPreview preview = preview();
+        preview.setPaymentCost(50.004);
+        preview.setPaymentCostPositionId("p3");
+
+        // when / then
+        assertThat(preview.getPaymentCostState()).isEqualTo(MatchState.EXACT);
+    }
+
+    @Test
+    void dueDateIsNoEffectWithoutTheDaysTheSaveStores() {
+        // given
+        InvoiceSyncPreview preview = preview();
+        preview.setInvoicePaymentToDate("2026-10-22");
+        preview.setDeliveryPaymentDueDate(null);
+
+        // when / then
+        assertThat(preview.isPaymentDueDateDiffers()).isFalse();
     }
 
     @Test

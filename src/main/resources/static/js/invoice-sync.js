@@ -142,14 +142,15 @@
 
     function drawEffects(form, results) {
         var items = results.filter(function (r) { return r.item; });
-        var assigned = items.filter(function (r) { return r.choice; }).length;
+        // a row matching the invoice is saved with the same cost, so only the others change (InvoiceSyncPreview.getChangedItemCount)
+        var changed = items.filter(function (r) { return r.choice && r.state !== 'EXACT'; }).length;
         var line = form.querySelector('[data-cl-effect-items]');
-        line.querySelector('[data-cl-effect-text]').textContent = assigned === 0
+        line.querySelector('[data-cl-effect-text]').textContent = changed === 0
             ? line.getAttribute('data-template-none')
-            : fill(line.getAttribute('data-template'), [assigned, items.length]);
+            : fill(line.getAttribute('data-template'), [changed, items.length]);
         var rest = line.querySelector('[data-cl-effect-sub]');
-        rest.hidden = assigned === 0 || assigned === items.length;
-        rest.textContent = fill(line.getAttribute('data-template-rest'), [items.length - assigned]);
+        rest.hidden = changed === 0 || changed === items.length;
+        rest.textContent = fill(line.getAttribute('data-template-rest'), [items.length - changed]);
 
         results.filter(function (r) { return !r.item; }).forEach(function (r) {
             var effect = form.querySelector('[data-cl-effect-extra="' + r.row.getAttribute('data-cl-sync-row') + '"]');
@@ -194,5 +195,10 @@
             }
         });
         refresh(form);
+        // Back restores the chosen lines after DOMContentLoaded (Chromium), and a page from the back-forward cache runs
+        // no script at all: redraw from the restored choice, which is what the form will post
+        window.addEventListener('pageshow', function () {
+            refresh(form);
+        });
     });
 })();

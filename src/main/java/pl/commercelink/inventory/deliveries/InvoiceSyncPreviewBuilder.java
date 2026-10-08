@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.InvoicePositionMatcher;
@@ -15,6 +16,7 @@ import pl.commercelink.web.orders.OrderFormats;
 
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -53,7 +55,7 @@ public class InvoiceSyncPreviewBuilder {
         InvoicePositionMatcher matcher = new InvoicePositionMatcher(invoice.positions());
 
         List<InvoiceSyncPreview.Option> options = createOptions(invoice.positions(), invoice.currency());
-        List<InvoiceSyncPreview.Mapping> mappings = createMappings(delivery.getItems(), matcher);
+        List<InvoiceSyncPreview.Mapping> mappings = createMappings(inDeliveryOrder(delivery), matcher);
 
         InvoiceSyncPreview preview = new InvoiceSyncPreview();
         preview.setDeliveryId(delivery.getDeliveryId());
@@ -84,7 +86,10 @@ public class InvoiceSyncPreviewBuilder {
         preview.setDeliveryOrderedAt(OrderFormats.date(delivery.getOrderedAt()));
         preview.setDeliveryAwaitingApproval(delivery.isAwaitingApproval());
         preview.setDeliverySynced(delivery.isSynced());
-        preview.setDeliveryPaymentsCount(delivery.getPayments() == null ? 0 : delivery.getPayments().size());
+        preview.setDeliveryPayments(delivery.getPayments() == null ? List.of() : delivery.getPayments().stream()
+                .map(payment -> new InvoiceSyncPreview.PaymentLine(payment.getAmount(),
+                        StringUtils.firstNonBlank(payment.getReferenceNo(), payment.getName())))
+                .toList());
         // the save stores the due date as days from the order date (InvoiceSyncService.updateDelivery)
         if (invoice.paymentToDate() != null && delivery.getOrderedAt() != null) {
             preview.setPaymentTermDays((int) ChronoUnit.DAYS.between(delivery.getOrderedAt().toLocalDate(), invoice.paymentToDate()));
@@ -108,6 +113,14 @@ public class InvoiceSyncPreviewBuilder {
         }
 
         return options;
+    }
+
+    // DeliveryItem.groupAndUnify lists the products in hash order; the rows follow the delivery, like its details page
+    private List<DeliveryItem> inDeliveryOrder(Delivery delivery) {
+        List<String> mfns = delivery.getAllocations().stream().map(Allocation::getMfn).distinct().toList();
+        return delivery.getItems().stream()
+                .sorted(Comparator.comparingInt(item -> mfns.indexOf(item.getMfn())))
+                .toList();
     }
 
     private List<InvoiceSyncPreview.Mapping> createMappings(List<DeliveryItem> deliveryItems, InvoicePositionMatcher matcher) {

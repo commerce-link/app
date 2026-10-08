@@ -55,7 +55,7 @@ class InvoiceSyncPreviewTemplateTest {
         assertThat(html).contains("name=\"mappings[0].selectedPositionId\"").contains("name=\"mappings[0].mfn\"")
                 .contains("name=\"shippingCostPositionId\"").contains("name=\"paymentCostPositionId\"")
                 .contains("name=\"deliveryId\"").contains("name=\"invoiceShortcut\"")
-                .containsPattern("<option value=\"p1\"[^>]* selected=\"selected\">2 × Laptop — 3\u00a0249,00 PLN</option>")
+                .containsPattern("<option value=\"p1\"[^>]* selected=\"selected\">3\u00a0249,00 PLN · 2 × Laptop</option>")
                 .contains("action=\"/dashboard/deliveries/sync/apply\"");
     }
 
@@ -75,7 +75,7 @@ class InvoiceSyncPreviewTemplateTest {
         String html = render(typical());
 
         // then
-        assertThat(html).contains("Koszty produktów z faktury: 2 z 3").contains("Bez przypisania, bez zmian: 1")
+        assertThat(html).contains("Koszty produktów do zmiany: 1 z 3").contains("Bez zmian (zgodne albo bez przypisania): 2")
                 .contains("Koszt dostawy: 35,00 PLN</strong><span class=\"cl-effects-was\" data-cl-effect-sub>bez zmian</span>")
                 .contains("Płatność: dodamy przelew na kwotę brutto dostawy")
                 .contains("Termin płatności: 22.10.2026").contains("dni od zamówienia: 16").contains("teraz: brak")
@@ -89,14 +89,49 @@ class InvoiceSyncPreviewTemplateTest {
         InvoiceSyncPreview preview = typical();
         preview.setInvoicePaid(false);
         preview.setDeliveryPaid(true);
-        preview.setDeliveryPaymentsCount(2);
+        preview.setDeliveryPayments(List.of(new InvoiceSyncPreview.PaymentLine(100.0, "FV/2026/10/0412"),
+                new InvoiceSyncPreview.PaymentLine(20.5, null)));
 
         // when
         String html = render(preview);
 
         // then
         assertThat(html).containsPattern("<li class=\"is-bad\">\\s*<i class=\"fas fa-exclamation-circle\"")
-                .contains("Płatności dostawy do usunięcia: 2").doesNotContain("dodamy przelew");
+                .contains("Płatności dostawy do usunięcia: 2")
+                .contains("<span class=\"cl-effects-was\">100,00 PLN · FV/2026/10/0412</span>")
+                .contains("<span class=\"cl-effects-was\">20,50 PLN</span>")
+                .contains("dostawa przestanie być opłacona").doesNotContain("dodamy przelew");
+    }
+
+    @Test
+    void rowsMatchingTheInvoiceAreNotAnnouncedAsChangedCosts() {
+        // given
+        InvoiceSyncPreview preview = typical();
+        preview.getMappings().get(1).setUnitCost(590.00);
+        preview.getMappings().remove(2);
+
+        // when
+        String html = render(preview);
+
+        // then
+        assertThat(html).contains("Wszystkie produkty zgadzają się z fakturą")
+                .contains("<strong data-cl-effect-text>Koszty produktów bez zmian</strong>");
+    }
+
+    @Test
+    void anInvoiceInAnotherCurrencyWarnsThatTheSaveDoesNotConvertIt() {
+        // given
+        InvoiceSyncPreview preview = typical();
+        preview.setCurrency("EUR");
+        preview.setExchangeRate(4.25);
+
+        // when
+        String html = render(preview);
+
+        // then
+        assertThat(html).contains("Faktura w EUR, kurs 4,2500")
+                .contains("Faktura jest w EUR. Zapis przepisze kwoty faktury bez przeliczenia na PLN");
+        assertThat(render(typical())).doesNotContain("bez przeliczenia na PLN");
     }
 
     @Test
@@ -122,7 +157,8 @@ class InvoiceSyncPreviewTemplateTest {
         // then
         assertThat(js).contains("var EPS = 0.005;").contains("var CLOSE_DELTA = 0.01;")
                 .contains("text.split('{' + i + '}').join(value)").doesNotContain(".replace('{'")
-                .contains("NO_COST").contains("'is-neutral'");
+                .contains("NO_COST").contains("'is-neutral'")
+                .contains("window.addEventListener('pageshow'").contains("r.choice && r.state !== 'EXACT'");
         assertThat(css).contains(".cl-page .cl-table.is-match {").contains(".cl-page .cl-status-row {")
                 .contains(".cl-page .cl-effects {");
     }

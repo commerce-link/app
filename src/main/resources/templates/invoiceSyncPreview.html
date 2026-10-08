@@ -40,6 +40,11 @@
                 <p class="cl-alert-text" th:text="#{invoiceSync.locked}"></p>
             </div>
 
+            <div th:if="${p.foreignCurrency}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{invoiceSync.foreignCurrency(${p.currency})}"></p>
+            </div>
+
             <form th:action="@{/dashboard/deliveries/sync/apply}" th:object="${preview}" method="post" class="cl-layout-aside"
                   data-cl-invoice-sync
                   th:attr="data-label-exact=#{invoiceSync.state.exact}, data-label-close=#{invoiceSync.state.close},
@@ -161,15 +166,15 @@
                 <aside class="cl-layout-side is-sticky">
                     <section class="cl-card" aria-labelledby="sync-effects-title">
                         <div class="cl-card-head"><h2 class="cl-card-title" id="sync-effects-title" th:text="#{invoiceSync.effects.title}"></h2></div>
-                        <ul class="cl-effects" aria-live="polite" th:with="assigned=${p.assignedItemCount}, total=${p.mappings.size()}">
+                        <ul class="cl-effects" aria-live="polite" th:with="changed=${p.changedItemCount}, total=${p.mappings.size()}">
                             <li data-cl-effect-items
                                 th:attr="data-template=#{invoiceSync.effect.items('{0}', '{1}')}, data-template-none=#{invoiceSync.effect.items.none},
                                          data-template-rest=#{invoiceSync.effect.items.rest('{0}')}">
                                 <i class="fas fa-tags" aria-hidden="true"></i>
                                 <span><strong data-cl-effect-text
-                                              th:text="${assigned == 0} ? #{invoiceSync.effect.items.none} : #{invoiceSync.effect.items(${assigned}, ${total})}"></strong>
-                                    <span class="cl-effects-was" data-cl-effect-sub th:hidden="${assigned == 0 or assigned == total}"
-                                          th:text="#{invoiceSync.effect.items.rest(${total - assigned})}"></span></span>
+                                              th:text="${changed == 0} ? #{invoiceSync.effect.items.none} : #{invoiceSync.effect.items(${changed}, ${total})}"></strong>
+                                    <span class="cl-effects-was" data-cl-effect-sub th:hidden="${changed == 0 or changed == total}"
+                                          th:text="#{invoiceSync.effect.items.rest(${total - changed})}"></span></span>
                             </li>
                             <li th:replace="~{::extraEffect('shipping', 'fa-truck', 'invoiceSync.effect.shipping', ${p.shippingCost}, ${p.shippingCostPositionId})}"></li>
                             <li th:replace="~{::extraEffect('payment', 'fa-credit-card', 'invoiceSync.effect.paymentCost', ${p.paymentCost}, ${p.paymentCostPositionId})}"></li>
@@ -181,6 +186,8 @@
                             <li th:if="${p.paymentSync.name() == 'REMOVE'}" class="is-bad">
                                 <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                                 <span><strong th:text="#{invoiceSync.effect.payment.remove(${p.deliveryPaymentsCount})}"></strong>
+                                    <span class="cl-effects-was" th:each="payment : ${p.deliveryPayments}"
+                                          th:text="${payment.reference == null} ? ${p.money(payment.amount)} : #{invoiceSync.effect.payment.line(${p.money(payment.amount)}, ${payment.reference})}"></span>
                                     <span class="cl-effects-was" th:text="#{invoiceSync.effect.payment.remove.why}"></span></span>
                             </li>
                             <li th:if="${p.paymentDueDateDiffers}">

@@ -45,7 +45,7 @@ public class InvoiceSyncPreview {
     private String deliveryOrderedAt;
     private boolean deliveryAwaitingApproval;
     private boolean deliverySynced;
-    private int deliveryPaymentsCount;
+    private List<PaymentLine> deliveryPayments = new ArrayList<>();
     private Integer paymentTermDays;
 
     private List<Option> options = new ArrayList<>();
@@ -247,8 +247,9 @@ public class InvoiceSyncPreview {
         return invoicePaid != deliveryPaid;
     }
 
+    /** The save writes the due date only as days from the order date, so without them it changes nothing. */
     public boolean isPaymentDueDateDiffers() {
-        if (invoicePaymentToDate == null) {
+        if (invoicePaymentToDate == null || paymentTermDays == null) {
             return false;
         }
         return !invoicePaymentToDate.equals(deliveryPaymentDueDate);
@@ -311,12 +312,16 @@ public class InvoiceSyncPreview {
         this.deliverySynced = deliverySynced;
     }
 
-    public int getDeliveryPaymentsCount() {
-        return deliveryPaymentsCount;
+    public List<PaymentLine> getDeliveryPayments() {
+        return deliveryPayments;
     }
 
-    public void setDeliveryPaymentsCount(int deliveryPaymentsCount) {
-        this.deliveryPaymentsCount = deliveryPaymentsCount;
+    public void setDeliveryPayments(List<PaymentLine> deliveryPayments) {
+        this.deliveryPayments = deliveryPayments;
+    }
+
+    public int getDeliveryPaymentsCount() {
+        return deliveryPayments.size();
     }
 
     public Integer getPaymentTermDays() {
@@ -328,7 +333,7 @@ public class InvoiceSyncPreview {
     }
 
     public InvoicePaymentSync getPaymentSync() {
-        return InvoicePaymentSync.of(invoicePaid, deliveryPaymentsCount > 0);
+        return InvoicePaymentSync.of(invoicePaid, !deliveryPayments.isEmpty());
     }
 
     public boolean isForeignCurrency() {
@@ -350,8 +355,9 @@ public class InvoiceSyncPreview {
         return isoDate == null || isoDate.isBlank() ? null : OrderFormats.date(LocalDate.parse(isoDate));
     }
 
+    /** The price leads: a long line name is cut in the closed select, and the price is what the row is compared by. */
     public String optionLabel(Option option) {
-        return option.getQty() + " \u00d7 " + option.getName() + " \u2014 " + invoiceMoney(option.getPriceNet());
+        return invoiceMoney(option.getPriceNet()) + " \u00b7 " + option.getQty() + " \u00d7 " + option.getName();
     }
 
     /** The state of a product row from its current choice; invoice-sync.js applies the same rule after every change. */
@@ -377,8 +383,9 @@ public class InvoiceSyncPreview {
         return List.of(MatchState.EXACT, MatchState.CLOSE, MatchState.DIFFERENT, MatchState.UNASSIGNED);
     }
 
-    public long getAssignedItemCount() {
-        return mappings.stream().filter(m -> option(m.getSelectedPositionId()) != null).count();
+    /** The rows whose unit cost the save changes: assigned to an invoice line of another price. */
+    public long getChangedItemCount() {
+        return mappings.stream().filter(m -> option(m.getSelectedPositionId()) != null && stateOf(m) != MatchState.EXACT).count();
     }
 
     /** The invoice positions no row has chosen, which the save leaves out of the delivery. */
@@ -454,6 +461,10 @@ public class InvoiceSyncPreview {
         public String getLabelKey() {
             return labelKey;
         }
+    }
+
+    /** A payment the delivery records, as the removal effect names it. */
+    public record PaymentLine(double amount, String reference) {
     }
 
     public static class Option {
