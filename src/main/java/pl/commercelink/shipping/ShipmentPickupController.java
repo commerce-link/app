@@ -70,7 +70,8 @@ public class ShipmentPickupController {
         if (selected != null) {
             try {
                 ShipmentPickupService.PageWindows pageWindows =
-                        pickupService.pageWindows(store, selected.provider(), externalIds(selected), DAYS_AHEAD);
+                        pickupService.pageWindows(store, selected.provider(), selected.pickUpAddressId(),
+                                externalIds(selected), DAYS_AHEAD);
                 windows = pageWindows.windows().stream().map(w -> windowOption(w, locale)).toList();
                 refused = pageWindows.refused();
             } catch (ShippingUnavailableException e) {
@@ -119,8 +120,8 @@ public class ShipmentPickupController {
 
         PickupStart start;
         try {
-            start = pickupService.order(storesRepository.findById(storeId()), chosen.get().provider(), targets,
-                    chosenWindow.get());
+            start = pickupService.order(storesRepository.findById(storeId()), chosen.get().provider(),
+                    chosen.get().pickUpAddressId(), targets, chosenWindow.get());
         } catch (ShippingUnavailableException e) {
             redirectAttributes.addFlashAttribute("errorMessage", message("shipping.pickup.no.provider", locale));
             return "redirect:" + safeBack;

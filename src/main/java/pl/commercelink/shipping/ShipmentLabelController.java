@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.shipping.api.Label;
+import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -50,7 +51,9 @@ public class ShipmentLabelController {
             return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
         }
         try {
-            Label label = shippingService.providerFor(store).getLabel(externalId);
+            ShippingProvider shippingProvider = shippingService.providerNamed(store, provider)
+                    .orElseThrow(() -> new ShippingUnavailableException(store.getStoreId()));
+            Label label = shippingProvider.getLabel(externalId);
             if (label.content() == null || label.content().length == 0) {
                 // an empty download looks like a broken printer to the operator; the provider has no label yet
                 log.warn("Label of package {} in store {} came back empty", externalId, storeId());

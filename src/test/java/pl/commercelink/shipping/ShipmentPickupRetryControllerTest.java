@@ -16,6 +16,7 @@ import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -28,6 +29,7 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,6 +46,7 @@ class ShipmentPickupRetryControllerTest {
     @Mock private ShippingService shippingService;
     @Mock private ImmediatePickup immediatePickup;
     @Mock private Store store;
+    @Mock private ShippingProvider provider;
 
     private ShipmentPickupRetryController controller;
 
@@ -52,7 +55,7 @@ class ShipmentPickupRetryControllerTest {
         StaticMessageSource messages = new StaticMessageSource();
         messages.setUseCodeAsDefaultMessage(true);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingService.providerName(store)).thenReturn("furgonetka");
+        when(shippingService.providerNamed(store, "furgonetka")).thenReturn(java.util.Optional.of(provider));
         controller = new ShipmentPickupRetryController(rmaRepository, storesRepository, shippingService, immediatePickup,
                 messages, ShippingIntegrationNamesFixture.names()) {
             @Override
@@ -129,10 +132,10 @@ class ShipmentPickupRetryControllerTest {
     }
 
     @Test
-    void aPackageOfAnotherIntegrationThanTheStoresIsRefused() {
+    void aReturnOfAnIntegrationTheStoreNoLongerHasIsNotOrderedAgain() {
         // given
         rmaWithReturn(ShipmentPickup.awaiting().failed("x"));
-        when(shippingService.providerName(store)).thenReturn("allegro");
+        when(shippingService.providerNamed(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         controller.orderAgain("rma-1", "21480003", new RedirectAttributesModelMap(), PL);

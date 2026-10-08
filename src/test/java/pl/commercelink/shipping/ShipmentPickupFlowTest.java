@@ -127,10 +127,9 @@ class ShipmentPickupFlowTest {
 
         when(store.getStoreId()).thenReturn("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingService.providerName(store)).thenReturn("furgonetka");
-        when(shippingService.providerFor(store)).thenReturn(provider);
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
+        when(shippingService.providerNamed(store, "furgonetka")).thenReturn(java.util.Optional.of(provider));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(3)));
         security = mockStatic(CustomSecurityContext.class);
         security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
     }
@@ -187,7 +186,7 @@ class ShipmentPickupFlowTest {
                 .containsExactly(tuple(ShipmentOwnerType.ORDER, "order-1"),
                         tuple(ShipmentOwnerType.RMA, "rma-1")));
         assertThat(view).isEqualTo("redirect:/dashboard/orders/order-1");
-        verify(provider).orderPickup(eq(List.of("1", "2")), eq(WINDOW), anyString());
+        verify(provider).orderPickup(eq(List.of("1", "2")), any(), eq(WINDOW), anyString());
         assertThat(listed()).isEmpty();
         String commandId = order.getShipments().get(0).getPickup().getCommand().getCommandId();
 
@@ -299,7 +298,7 @@ class ShipmentPickupFlowTest {
         // then
         assertThat(ordered.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
-        verify(provider, never()).orderPickup(anyList(), any(), anyString());
+        verify(provider, never()).orderPickup(anyList(), any(), any(), anyString());
         verify(ordersRepository, never()).save(any());
         assertThat(otherStoresOrder.getShipments().get(0).getPickup().isAwaiting()).isTrue();
     }

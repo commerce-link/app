@@ -21,6 +21,11 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -40,9 +45,8 @@ class ShipmentLabelControllerTest {
     @BeforeEach
     void setUp() {
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingService.providerName(store)).thenReturn("furgonetka");
         when(shippingService.supportsLabels(store, "furgonetka")).thenReturn(true);
-        when(shippingService.providerFor(store)).thenReturn(provider);
+        when(shippingService.providerNamed(store, "furgonetka")).thenReturn(java.util.Optional.of(provider));
         StaticMessageSource messages = new StaticMessageSource();
         messages.setUseCodeAsDefaultMessage(true);
         controller = new ShipmentLabelController(storesRepository, shippingService, messages,
@@ -189,5 +193,37 @@ class ShipmentLabelControllerTest {
 
         // then
         assertThat(result).isEqualTo("redirect:/dashboard/orders");
+    }
+
+    @Test
+    void labelForDisconnectedIntegrationRedirects() {
+        // given: Wysyłam z Allegro was switched off after the shipment was created
+        when(shippingService.supportsLabels(store, "allegro")).thenReturn(false);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        Object result = controller.label("allegro", "shp-1", "/dashboard/orders/o-1", redirect, PL);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/dashboard/orders/o-1");
+        assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
+        verify(shippingService, never()).providerNamed(any(), eq("allegro"));
+    }
+
+    @Test
+    void aLabelOfTheSecondIntegrationIsDownloadedFromIt() {
+        // given
+        ShippingProvider allegro = mock(ShippingProvider.class);
+        when(shippingService.supportsLabels(store, "allegro")).thenReturn(true);
+        when(shippingService.providerNamed(store, "allegro")).thenReturn(java.util.Optional.of(allegro));
+        when(allegro.getLabel("shp-1")).thenReturn(new Label("ZPL".getBytes(), "text/plain", "etykieta-A1.zpl"));
+
+        // when
+        Object result = controller.label("allegro", "shp-1", null, new RedirectAttributesModelMap(), PL);
+
+        // then
+        assertThat(result).isInstanceOf(ResponseEntity.class);
+        verify(allegro).getLabel("shp-1");
+        verifyNoInteractions(provider);
     }
 }

@@ -48,6 +48,7 @@ import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptPageProblem;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.shipping.ShippingProviderFactory;
+import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.IntegrationType;
@@ -883,6 +884,7 @@ class OrderPageModelFactoryTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         ShippingService realShipping = new ShippingService();
         ReflectionTestUtils.setField(realShipping, "shippingProviderFactory", mock(ShippingProviderFactory.class));
+        ReflectionTestUtils.setField(realShipping, "shippingProviders", mock(ShippingProviders.class));
         OrderPageModelFactory withRealShipping = new OrderPageModelFactory(storesRepository, orderEventsRepository,
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
                 new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,

@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.ShippingException;
@@ -34,5 +35,27 @@ class ProviderErrorsTest {
         // when / then
         assertThat(ProviderErrors.describe(new ShippingException("Shipment cannot be cancelled")))
                 .isEqualTo("Shipment cannot be cancelled");
+    }
+
+    @Test
+    void theAdaptersOwnProviderMessagesAreShownBeforeTheBodyIsParsed() {
+        // given: Allegro answers {"errors":[{"code":"…","userMessage":"Waga przekracza limit"}]}
+        HttpClientException http = new HttpClientException(422, "{\"errors\":[{\"code\":\"VALIDATION_ERROR\"}]}");
+        ShippingException refusal = new ShippingException("Allegro refused the shipment", http,
+                List.of("Waga przekracza limit", "Brak numeru telefonu"));
+
+        // when / then
+        assertThat(ProviderErrors.describe(refusal)).isEqualTo("Waga przekracza limit; Brak numeru telefonu");
+        assertThat(ProviderErrors.isRefusal(refusal)).isTrue();
+    }
+
+    @Test
+    void providerMessagesAreFoundDeeperInTheCauseChain() {
+        // given
+        ShippingException inner = new ShippingException("refused", null, List.of("Kod pocztowy niepoprawny"));
+        RuntimeException outer = new RuntimeException("wrapped", inner);
+
+        // when / then
+        assertThat(ProviderErrors.describe(outer)).isEqualTo("Kod pocztowy niepoprawny");
     }
 }

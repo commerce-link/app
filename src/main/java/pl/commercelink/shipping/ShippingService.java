@@ -29,6 +29,9 @@ public class ShippingService {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
+    @Autowired
+    private ShippingProviders shippingProviders;
+
     /**
      * Whether the store can price and book a courier: a shipping provider is connected and its adapter is installed.
      * The one rule behind the order's "Zamów kuriera" action and every step of the courier page. The adapter is looked
@@ -77,16 +80,30 @@ public class ShippingService {
         return shippingProvider;
     }
 
+    /** The integration of a shipment or a pickup group, if the store still has it and its adapter is installed. */
+    public Optional<ShippingProvider> providerNamed(Store store, String provider) {
+        return shippingProviders.forName(store, provider);
+    }
+
+    /** The store's address a shipment leaves from, for the pickup calls; null when it leaves from the customer. */
+    public ShipmentAddress pickupAddress(Store store, String pickUpAddressId) {
+        if (store == null || pickUpAddressId == null) {
+            return null;
+        }
+        ShippingDetails details = store.getPickUpAddress(pickUpAddressId);
+        return details == null ? null : toShipmentAddress(details);
+    }
+
     /**
-     * "Pobierz etykietę" can work for a package of this integration: it is the store's own (a label lives on the
+     * "Pobierz etykietę" can work for a package of this integration: the store still has it (a label lives on the
      * account that created it) and its adapter hands out labels. Loads the account, so pages ask once per integration.
      */
     public boolean supportsLabels(Store store, String provider) {
-        if (store == null || provider == null || !provider.equals(providerName(store))) {
+        if (store == null || provider == null) {
             return false;
         }
         try {
-            return providerFor(store).supportsLabels();
+            return providerNamed(store, provider).map(ShippingProvider::supportsLabels).orElse(false);
         } catch (RuntimeException e) {
             // the link is left out, the page itself still shows; the label endpoint says why when asked directly
             log.warn("Shipping provider {} of store {} could not be loaded to offer labels", provider, store.getStoreId(), e);

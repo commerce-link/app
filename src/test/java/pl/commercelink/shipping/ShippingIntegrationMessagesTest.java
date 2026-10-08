@@ -38,6 +38,7 @@ class ShippingIntegrationMessagesTest {
                 Arguments.of("shipping.notification.warehouse.pickup.failed",
                         new Object[]{"TRK-1", null, null, null, "Brak kuriera", null, NAME}),
                 Arguments.of("order.shipments.cancel.error.pending", nameOnly),
+                Arguments.of("order.shipments.cancel.error.not.cancellable", nameOnly),
                 Arguments.of("shipment.cancel.requested", nameOnly),
                 Arguments.of("shipment.cancel.rechecking", nameOnly),
                 Arguments.of("shipment.cancel.failed", new Object[]{"Przesyłka została już odebrana", NAME}),

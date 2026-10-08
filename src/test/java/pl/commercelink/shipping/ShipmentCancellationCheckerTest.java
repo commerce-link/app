@@ -30,9 +30,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +54,7 @@ class ShipmentCancellationCheckerTest {
     @Mock
     private OrderEventsRepository orderEventsRepository;
     @Mock
-    private ShippingProviderFactory shippingProviderFactory;
+    private ShippingProviders shippingProviders;
     @Mock
     private ShipmentCancellationEventPublisher publisher;
     @Mock
@@ -68,12 +71,12 @@ class ShipmentCancellationCheckerTest {
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(shippingProviderFactory.get(store)).thenReturn(provider);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.of(provider));
         // the real settler: its own write rules are pinned in ShipmentCancellationSettlerTest
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
                         new OrderRealizationStepBack(orderEventsRepository));
-        checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviderFactory, publisher, settler);
+        checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviders, publisher, settler);
     }
 
     private static Shipment pendingShipment(String commandId) {
@@ -95,7 +98,7 @@ class ShipmentCancellationCheckerTest {
     }
 
     private static ShipmentCancellationCheckRequest attempt(int attempt) {
-        return new ShipmentCancellationCheckRequest(STORE_ID, ORDER_ID, EXTERNAL_ID, COMMAND_ID, attempt);
+        return new ShipmentCancellationCheckRequest(STORE_ID, ORDER_ID, EXTERNAL_ID, COMMAND_ID, attempt, null);
     }
 
     @Test
@@ -243,7 +246,7 @@ class ShipmentCancellationCheckerTest {
     void missingProviderIsUnconfirmed() {
         // given
         Order order = orderWith(pendingShipment(COMMAND_ID));
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(attempt(1));
@@ -251,5 +254,37 @@ class ShipmentCancellationCheckerTest {
         // then
         assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
         verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void aCancellationCheckWithoutProviderUsesDefaultIntegration() {
+        // given: attempt(1) carries no provider, as a message queued by the previous version
+        orderWith(pendingShipment(COMMAND_ID));
+        when(provider.checkShipmentCancellation(COMMAND_ID, EXTERNAL_ID)).thenReturn(ShipmentCancellation.pending(COMMAND_ID));
+
+        // when
+        checker.check(attempt(1));
+
+        // then
+        verify(shippingProviders).forCommand(store, null);
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2));
+    }
+
+    @Test
+    void aCancellationCheckGoesToTheIntegrationOfTheShipment() {
+        // given
+        orderWith(pendingShipment(COMMAND_ID));
+        ShippingProvider allegro = mock(ShippingProvider.class);
+        ShipmentCancellationCheckRequest request = new ShipmentCancellationCheckRequest(STORE_ID, ORDER_ID, EXTERNAL_ID,
+                COMMAND_ID, 1, "allegro");
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.of(allegro));
+        when(allegro.checkShipmentCancellation(COMMAND_ID, EXTERNAL_ID)).thenReturn(ShipmentCancellation.pending(COMMAND_ID));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(allegro).checkShipmentCancellation(COMMAND_ID, EXTERNAL_ID);
+        verify(publisher).publish(argThat(r -> "allegro".equals(r.getProvider()) && r.getAttempt() == 2));
     }
 }

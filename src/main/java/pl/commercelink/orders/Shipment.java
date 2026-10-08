@@ -52,6 +52,9 @@ public class Shipment {
     private ShipmentCreationState creation;
     @DynamoDBAttribute(attributeName = "pickup")
     private ShipmentPickup pickup;
+    /** False when the integration cannot cancel it (One by Allegro); null = it can (older records, Furgonetka). */
+    @DynamoDBAttribute(attributeName = "cancellable")
+    private Boolean cancellable;
 
     public Shipment() {
     }
@@ -219,6 +222,14 @@ public class Shipment {
     public void setCreation(ShipmentCreationState creation) { this.creation = creation; }
     public ShipmentPickup getPickup() { return pickup; }
     public void setPickup(ShipmentPickup pickup) { this.pickup = pickup; }
+    public Boolean getCancellable() { return cancellable; }
+    public void setCancellable(Boolean cancellable) { this.cancellable = cancellable; }
+
+    /** Named apart from the getter: the DynamoDB mapper would read isCancellable() as a second "cancellable". */
+    @DynamoDBIgnore
+    public boolean allowsCancellation() {
+        return !Boolean.FALSE.equals(cancellable);
+    }
 
     /**
      * The creation command still waits for its result. One PENDING past ProviderCommandTimeout.UNCONFIRMED_AFTER does
@@ -335,6 +346,7 @@ public class Shipment {
             this.provider = previous.provider;
             this.pickUpAddressId = previous.pickUpAddressId;
             this.pickup = previous.pickup;
+            this.cancellable = previous.cancellable;
         }
     }
 

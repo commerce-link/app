@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 class ShipmentCreationCheckerTest {
 
     @Mock private StoresRepository storesRepository;
-    @Mock private ShippingProviderFactory shippingProviderFactory;
+    @Mock private ShippingProviders shippingProviders;
     @Mock private ShipmentOwners owners;
     @Mock private ShipmentOwner owner;
     @Mock private ShipmentCreationEventPublisher publisher;
@@ -36,10 +36,10 @@ class ShipmentCreationCheckerTest {
     @BeforeEach
     void setUp() {
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingProviderFactory.get(store)).thenReturn(provider);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.of(provider));
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owner.awaits(any())).thenReturn(true);
-        checker = new ShipmentCreationChecker(storesRepository, shippingProviderFactory, owners, publisher, settler);
+        checker = new ShipmentCreationChecker(storesRepository, shippingProviders, owners, publisher, settler);
     }
 
     private static ShipmentCreationCheckRequest request(int attempt) {
@@ -114,7 +114,7 @@ class ShipmentCreationCheckerTest {
     @Test
     void missingProviderFailsTheCreation() {
         // given
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(request(1));
@@ -149,5 +149,34 @@ class ShipmentCreationCheckerTest {
 
         // then
         verify(settler).succeeded(argThat(r -> "21480009".equals(r.getExternalId())), eq(result));
+    }
+
+    @Test
+    void aCheckWithoutProviderUsesDefaultIntegration() {
+        // given: a message queued by the previous version has no provider field
+        when(provider.checkShipmentCreation("cmd-1", "21480003")).thenReturn(ShipmentCreation.pending("cmd-1", "21480003"));
+
+        // when
+        checker.check(request(1));
+
+        // then
+        verify(shippingProviders).forCommand(store, null);
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2));
+    }
+
+    @Test
+    void aCheckGoesToTheIntegrationNamedInTheMessage() {
+        // given
+        ShippingProvider allegro = mock(ShippingProvider.class);
+        ShipmentCreationCheckRequest request = request(1).toBuilder().provider("allegro").externalId(null).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.of(allegro));
+        when(allegro.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.pending("cmd-1", null));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(allegro).checkShipmentCreation("cmd-1", null);
+        verifyNoInteractions(provider);
     }
 }

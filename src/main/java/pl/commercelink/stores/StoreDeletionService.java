@@ -147,6 +147,8 @@ public class StoreDeletionService {
         deleteConfiguration(store, IntegrationType.SHIPPING_PROVIDER, shippingProviderFactory);
         deleteConfiguration(store, IntegrationType.INVOICING_PROVIDER, invoicingProviderFactory);
         deleteConfiguration(store, IntegrationType.RECEIPT_PROVIDER, receiptProviderFactory);
+        store.additionalShippingIntegrations()
+                .forEach(name -> shippingProviderFactory.deleteConfiguration(store, name));
         store.getMarketplaces()
                 .forEach(integration -> marketplaceProviderFactory.deleteConfiguration(store, integration.getName()));
         store.getPayments()

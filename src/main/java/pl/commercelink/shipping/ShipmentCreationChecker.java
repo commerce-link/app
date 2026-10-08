@@ -24,7 +24,7 @@ public class ShipmentCreationChecker {
     static final String NO_PROVIDER_KEY = "shipping.creation.no.provider";
 
     private final StoresRepository storesRepository;
-    private final ShippingProviderFactory shippingProviderFactory;
+    private final ShippingProviders shippingProviders;
     private final ShipmentOwners owners;
     private final ShipmentCreationEventPublisher publisher;
     private final ShipmentCreationSettler settler;
@@ -35,7 +35,7 @@ public class ShipmentCreationChecker {
                     request.getStoreId(), request.getOwnerType(), request.getOwnerId(), request.getCommandId());
             return;
         }
-        ShippingProvider provider = provider(request.getStoreId());
+        ShippingProvider provider = provider(request.getStoreId(), request.getProvider());
         if (provider == null) {
             settler.failedWithKey(request, NO_PROVIDER_KEY);
             return;
@@ -62,8 +62,9 @@ public class ShipmentCreationChecker {
         }
     }
 
-    private ShippingProvider provider(String storeId) {
+    // the integration the command was sent to; a message from before the field existed belongs to the default one
+    private ShippingProvider provider(String storeId, String providerName) {
         Store store = storesRepository.findById(storeId);
-        return store == null ? null : shippingProviderFactory.get(store);
+        return shippingProviders.forCommand(store, providerName).orElse(null);
     }
 }

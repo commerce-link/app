@@ -25,7 +25,7 @@ public class ShipmentCancellationChecker {
 
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
-    private final ShippingProviderFactory shippingProviderFactory;
+    private final ShippingProviders shippingProviders;
     private final ShipmentCancellationEventPublisher publisher;
     private final ShipmentCancellationSettler settler;
 
@@ -36,7 +36,7 @@ public class ShipmentCancellationChecker {
                     request.getStoreId(), request.getOrderId(), request.getCommandId());
             return;
         }
-        ShippingProvider provider = provider(request.getStoreId());
+        ShippingProvider provider = provider(request.getStoreId(), request.getProvider());
         if (provider == null) {
             settler.unconfirmed(request);
             return;
@@ -63,8 +63,9 @@ public class ShipmentCancellationChecker {
         }
     }
 
-    private ShippingProvider provider(String storeId) {
+    // the integration the command was sent to; a message from before the field existed belongs to the default one
+    private ShippingProvider provider(String storeId, String providerName) {
         Store store = storesRepository.findById(storeId);
-        return store == null ? null : shippingProviderFactory.get(store);
+        return shippingProviders.forCommand(store, providerName).orElse(null);
     }
 }
