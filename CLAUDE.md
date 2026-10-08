@@ -179,6 +179,7 @@ Async work is driven through `@SqsListener` methods. Queue names follow `{domain
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
 - Hourly: `DemoStoreCleanupJob` — clean up demo stores
 - Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
+- Hourly: `ShipmentTrackingSweepScheduler` — local-only trigger for the shipment tracking sweep (parcels of integrations without webhooks, e.g. Wysyłam z Allegro); in prod the trigger is `shipment-tracking-sweep-queue` (EventBridge Scheduler, no payload) consumed by `ShipmentTrackingSweepListener`. The sweep sends one message per due parcel to `shipment-tracking-poll-queue`, handled by `ShipmentTrackingPollListener` → `ShipmentTrackingPoller`
 - Hourly: `StoreLifecycleSweepScheduler` — local-only trigger for the store lifecycle sweep (every minute in `localdev`); in prod the trigger is `store-lifecycle-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `StoreLifecycleSweepListener`
 
 ### Scheduled Execution Counters
