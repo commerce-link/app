@@ -26,7 +26,7 @@ class InvoiceSyncPreviewTemplateTest {
         assertThat(html).contains("Synchronizacja z fakturą FV/2026/10/0412")
                 .contains("class=\"cl-back\" href=\"/dashboard/deliveries/details?deliveryId=d-1\"")
                 .contains("Dostawa 3F2A9C").contains("<strong>AB S.A.</strong>").contains("Nr dostawy ZK/88123")
-                .contains("Zamówiona 06.10.2026").contains("Bez synchronizacji")
+                .contains("Zamówiona 06.10.2026").contains("<span class=\"cl-status is-warn\">Do synchronizacji</span>")
                 .contains("href=\"https://invoices.example/FV-412\"")
                 .doesNotContain("??").doesNotContain("class=\"box").doesNotContain("class=\"tag").doesNotContain("style=")
                 .doesNotContain("notification");

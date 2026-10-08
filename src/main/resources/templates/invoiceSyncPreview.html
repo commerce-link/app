@@ -17,7 +17,7 @@
                 <th:block th:fragment="syncStatus">
                     <span th:if="${p.deliveryAwaitingApproval}" class="cl-status is-info" th:text="#{deliveries.list.state.awaitingApproval}"></span>
                     <span th:if="${!p.deliveryAwaitingApproval}" class="cl-status" th:classappend="${p.deliverySynced} ? 'is-ok' : 'is-warn'"
-                          th:text="${p.deliverySynced} ? #{invoiceSync.pill.synced} : #{invoiceSync.pill.notSynced}"></span>
+                          th:text="${p.deliverySynced} ? #{deliveries.details.documents.synced} : #{deliveries.details.documents.notSynced}"></span>
                 </th:block>
                 <th:block th:fragment="syncMeta">
                     <p class="cl-record-meta">
