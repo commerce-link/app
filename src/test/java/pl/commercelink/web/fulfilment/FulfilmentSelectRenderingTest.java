@@ -358,7 +358,7 @@ class FulfilmentSelectRenderingTest {
         assertThat(chip).contains("href=\"/dashboard/orders/w1-a\"").contains("target=\"_blank\"").contains("rel=\"noopener\"")
                 .contains("aria-pressed=\"false\"").contains("data-cl-coverage")
                 .contains("aria-label=\"Pokaż tylko oferty zamówienia ")
-                .contains(": 0 z 2 pozycji ma dostawcę\"")
+                .contains(": 0/2 pozycji ma dostawcę\"")
                 .contains("cl-order-chip-bar").contains("data-cl-coverage-fill")
                 .contains("data-cl-coverage-count").contains("0/2");
         assertThat(chip.indexOf("</a>")).isLessThan(chip.indexOf("<button"));

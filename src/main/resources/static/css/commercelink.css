@@ -3936,9 +3936,12 @@ a.cl-link-button:hover {
     cursor: not-allowed;
 }
 
-/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
+/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it; a disabled one
+   (nothing to act on, e.g. "Zaznacz widoczne" with every category collapsed) looks the same */
 .cl-page .cl-link-button[aria-disabled="true"],
-.cl-page .cl-link-button[aria-disabled="true"]:hover {
+.cl-page .cl-link-button[aria-disabled="true"]:hover,
+.cl-page .cl-link-button:disabled,
+.cl-page .cl-link-button:disabled:hover {
     color: var(--cl-ink-3);
     text-decoration: none;
     cursor: not-allowed;
@@ -10536,6 +10539,7 @@ a.cl-link-button:hover {
     --cl-missing-line: #f1d9ad;
     --cl-chip-track: rgba(14, 23, 33, .12);
     --cl-chip-hover: rgba(14, 23, 33, .06);
+    --cl-on-accent: #fff;
 }
 
 .cl-page .cl-supplier-pill {
@@ -10548,7 +10552,7 @@ a.cl-link-button:hover {
     font-size: 13px;
     font-weight: 600;
     line-height: 20px;
-    color: #fff;
+    color: var(--cl-on-accent);
     white-space: nowrap;
 }
 
@@ -11068,7 +11072,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-offer-toggle:has(input:checked) {
     background: var(--cl-accent);
-    color: #fff;
+    color: var(--cl-on-accent);
 }
 
 .cl-page .cl-offer-toggle:has(input:focus-visible) {
@@ -11107,19 +11111,21 @@ a.cl-link-button:hover {
 }
 
 /* Covered cheaper: one compact line nested under its winner — a connector, the supplier, how much dearer (or why
-   nothing is ordered), the net price and the toggle; name, codes, orders and the other numbers fold away. */
+   nothing is ordered), the net price and the toggle; name, codes, orders and the other numbers fold away. The name,
+   codes and orders fold away only while the winner is on screen right above (is-nested, set by the script); a covered
+   offer whose winner a filter hides or that sits in another category keeps them, or nothing would say what it is. */
 .cl-page .cl-table.is-supplier-offers tbody tr.is-covered > * {
     padding-top: 6px;
     padding-bottom: 6px;
     background: var(--cl-surface-2);
 }
 
-.cl-page .cl-table.is-supplier-offers tbody tr.is-covered th.cl-table-key {
+.cl-page .cl-table.is-supplier-offers tbody tr.is-covered.is-nested th.cl-table-key {
     position: relative;
     padding-left: 46px;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key::before {
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested th.cl-table-key::before {
     content: "";
     position: absolute;
     left: 22px;
@@ -11132,7 +11138,7 @@ a.cl-link-button:hover {
 }
 
 /* the winner row above carries the name; here it stays for screen readers only (same technique as .cl-visually-hidden) */
-.cl-page .cl-table.is-supplier-offers tr.is-covered .cl-offer-name {
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested .cl-offer-name {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -11144,12 +11150,13 @@ a.cl-link-button:hover {
     border: 0;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered .cl-offer-line {
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested .cl-offer-line {
     margin: 0;
     font-size: 13.5px;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes, .cl-cell-price .cl-table-sub, .cl-cell-qty > *, .cl-cell-profit > *) {
+.cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-cell-price .cl-table-sub, .cl-cell-qty > *, .cl-cell-profit > *),
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes) {
     display: none;
 }
 
@@ -11451,7 +11458,7 @@ a.cl-link-button:hover {
         grid-row: 1;
     }
 
-    .cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key {
+    .cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested th.cl-table-key {
         padding-left: 0;
     }
 

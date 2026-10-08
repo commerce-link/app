@@ -243,7 +243,13 @@
             var label = document.createElement('span');
             button.appendChild(icon);
             button.appendChild(label);
+            // why a locked fold does not close, for screen readers (aria-describedby) and on hover (title)
+            var reasonText = document.createElement('span');
+            reasonText.className = 'cl-visually-hidden';
+            reasonText.id = parent.row.id + '-fold-locked';
+            reasonText.textContent = texts.foldLocked;
             cell.appendChild(button);
+            cell.appendChild(reasonText);
             row.appendChild(cell);
             button.addEventListener('click', function () {
                 // a group holding a ticked offer stays open (aria-disabled): folding it would hide part of the selection
@@ -332,8 +338,12 @@
                 fold.button.setAttribute('aria-expanded', String(open));
                 if (locked) {
                     fold.button.setAttribute('aria-disabled', 'true');
+                    fold.button.setAttribute('aria-describedby', primary.row.id + '-fold-locked');
+                    fold.button.title = texts.foldLocked;
                 } else {
                     fold.button.removeAttribute('aria-disabled');
+                    fold.button.removeAttribute('aria-describedby');
+                    fold.button.removeAttribute('title');
                 }
                 fold.button.setAttribute('aria-controls', children.map(function (child) {
                     return child.row.id;
@@ -562,6 +572,8 @@
                     return;
                 }
                 offer.row.hidden = !onScreen(offer);
+                // compact under its winner only while that winner is on screen right above it
+                offer.row.classList.toggle('is-nested', !!offer.parent && onScreen(offer.parent));
                 any = any || offer.visible;
             });
             tbody.hidden = !any;

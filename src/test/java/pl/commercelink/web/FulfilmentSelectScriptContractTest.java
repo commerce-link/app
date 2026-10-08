@@ -41,7 +41,7 @@ class FulfilmentSelectScriptContractTest {
 
         // then
         assertThat(used).contains("dearer", "fold", "ratio", "money", "chipFilter", "chipFilterSplit", "categoryChosen",
-                "selectVisible", "clearVisible", "coveredOff", "foldPlain");
+                "selectVisible", "clearVisible", "coveredOff", "foldPlain", "foldLocked");
         assertThat(used).allSatisfy(key -> assertThat(texts).as(key).contains(dataAttribute(key)));
         assertThat(texts).doesNotContain("data-category=");
     }

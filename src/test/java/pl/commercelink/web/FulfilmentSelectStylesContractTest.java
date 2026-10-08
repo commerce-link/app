@@ -42,7 +42,7 @@ class FulfilmentSelectStylesContractTest {
         assertThat(css).contains("--cl-supplier-1: #1b4db1;").contains("--cl-supplier-2: #9a3f0f;").contains("--cl-supplier-3: #1d6b45;")
                 .contains("--cl-supplier-4: #6a2fa0;").contains("--cl-supplier-5: #0b6170;").contains("--cl-supplier-6: #8f1659;")
                 .contains("--cl-supplier-0: #47566a;").doesNotContain("-soft:").doesNotContain("cl-supplier-dot");
-        assertThat(ruleBody(css, ".cl-page .cl-supplier-pill")).contains("color: #fff;");
+        assertThat(ruleBody(css, ".cl-page .cl-supplier-pill")).contains("color: var(--cl-on-accent);");
     }
 
     @Test
