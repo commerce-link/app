@@ -91,16 +91,12 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
-     * cancelCourierLockedKey: why "Cancel shipment" shows greyed (its cancellation is already in progress), null
-     * when it can run or is absent; cancelCourierIntegration names the shipping integration it waits for (its
-     * argument), null without the button. cancellationPollHref: the JSON shipments state the page polls while a command of
+     * cancellationPollHref: the JSON shipments state the page polls while a command of
      * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
      * does; null when nothing waits or the page is read-only. "Zamów odbiór" is not here: it is ordered from the orders
      * list, for every package of the store at once (client decision 2026-10-07).
      */
-    public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
-                                String cancelCourierLockedKey, String cancelCourierIntegration,
-                                String cancellationPollHref,
+    public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, String cancellationPollHref,
                                 List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
@@ -120,7 +116,11 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * labelHref: "Pobierz etykietę", when the store's integration hands out labels of the package; retryHref: "Spróbuj
      * ponownie" of a failed creation, the shipping page with the fields filled from the order. integration: the name of
      * the shipment's shipping integration (ShippingIntegrationNames), the argument of the tracking and cancellation
-     * pills and of the removal confirmation, which name it.
+     * pills and of the removal confirmation, which name it. integrationPill: the shipment's integration name when
+     * the store ships through several, else null; integrationNoteKey: a sentence about the integration (Wysyłam z
+     * Allegro adds the number to the Allegro order itself), null for others; cancelHref: "Cancel shipment" of this
+     * row's courier order (the confirmation page, data-cl-confirm intercepts it); cancelReasonKey: it is greyed with
+     * this reason (its argument is integration).
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
@@ -129,12 +129,18 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               String removeHref, String removeReasonKey, String removeMessageKey,
                               String removeActionKey, boolean placeholder, String stateKey, Object[] stateArgs,
                               String stateTone, boolean stateInProgress, String labelHref, String retryHref,
-                              String integration) {
+                              String integration, String integrationPill, String integrationNoteKey,
+                              String cancelHref, String cancelReasonKey) {
+
+        /** The ⋯ menu holds the rare and blocking actions: edit, cancel and remove, live or greyed with a reason. */
+        public boolean hasMenu() {
+            return editHref != null || removeHref != null || removeReasonKey != null || cancelHref != null
+                    || cancelReasonKey != null;
+        }
 
         /** Any action of the row is offered, live or greyed with its reason. */
         public boolean hasActions() {
-            return editHref != null || removeHref != null || removeReasonKey != null || labelHref != null
-                    || retryHref != null;
+            return hasMenu() || labelHref != null || retryHref != null;
         }
     }
 

@@ -60,6 +60,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Locale;
 import java.util.Set;
@@ -435,8 +436,34 @@ class OrderPageModelFactoryTest {
         OrderPageModel delivered = factory.build(order, List.of(item(FulfilmentStatus.Delivered)), admin, PL);
 
         // then
-        assertThat(onTheWay.shipments().canCancelCourier()).isTrue();
-        assertThat(delivered.shipments().canCancelCourier()).isFalse();
+        assertThat(offersCancel(onTheWay.shipments())).isTrue();
+        assertThat(offersCancel(delivered.shipments())).isFalse();
+    }
+
+    /** "Anuluj przesyłkę" is on some row, live or greyed with its reason. */
+    private static boolean offersCancel(OrderPageModel.ShipmentsCard card) {
+        return card.rows().stream().anyMatch(r -> r.cancelHref() != null || r.cancelReasonKey() != null);
+    }
+
+    private static String cancelLockedKey(OrderPageModel.ShipmentsCard card) {
+        return card.rows().stream().map(OrderPageModel.ShipmentRow::cancelReasonKey)
+                .filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    @Test
+    void shipmentTheProviderCannotCancelGreysItsCancelWithTheReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        labelled(sent, "T-1", "PKG-1");
+        sent.setCancellable(false);
+
+        // when
+        OrderPageModel.ShipmentRow row = factory.build(order, List.of(), ADMIN, PL).shipments().rows().get(0);
+
+        // then
+        assertThat(row.cancelHref()).isNull();
+        assertThat(row.cancelReasonKey()).isEqualTo("order.shipments.cancel.locked.notCancellable");
     }
 
     @Test
@@ -451,7 +478,7 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(page.header().primaryAction()).isNull();
-        assertThat(page.shipments().canCancelCourier()).isTrue();
+        assertThat(offersCancel(page.shipments())).isTrue();
         assertThat(page.shipments().rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
     }
 
@@ -480,13 +507,13 @@ class OrderPageModelFactoryTest {
         OrderPageModel.ShipmentsCard parcels = factory.build(twoParcels, List.of(), ADMIN, PL).shipments();
 
         // then: the reason never points to a button the page does not show
-        assertThat(early.canCancelCourier()).isFalse();
+        assertThat(offersCancel(early)).isFalse();
         assertThat(early.rows().get(0).removeHref()).isNull();
         assertThat(early.rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courierLater");
-        assertThat(shipping.canCancelCourier()).isTrue();
+        assertThat(offersCancel(shipping)).isTrue();
         assertThat(shipping.rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
         assertThat(shipping.rows().get(1).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courierNotFirst");
-        assertThat(parcels.canCancelCourier()).isTrue();
+        assertThat(offersCancel(parcels)).isTrue();
         assertThat(parcels.rows()).extracting(OrderPageModel.ShipmentRow::removeReasonKey)
                 .containsExactly("order.shipments.remove.locked.courier", "order.shipments.remove.locked.courier");
     }
@@ -541,8 +568,8 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.pending");
         assertThat(row.cancellationTone()).isEqualTo("is-info");
-        assertThat(card.canCancelCourier()).isTrue();
-        assertThat(card.cancelCourierLockedKey()).isEqualTo("order.shipments.cancel.locked.pending");
+        assertThat(offersCancel(card)).isTrue();
+        assertThat(cancelLockedKey(card)).isEqualTo("order.shipments.cancel.locked.pending");
         assertThat(card.cancellationPollHref())
                 .isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state");
         assertThat(row.removeHref()).isNull();
@@ -561,7 +588,7 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(card.rows().get(0).cancellationKey()).isEqualTo("shipment.cancellation.unconfirmed");
         assertThat(card.rows().get(0).cancellationTone()).isEqualTo("is-warn");
-        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(cancelLockedKey(card)).isNull();
         assertThat(card.cancellationPollHref()).isNull();
     }
 
@@ -580,8 +607,8 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.unconfirmed");
         assertThat(row.cancellationTone()).isEqualTo("is-warn");
-        assertThat(card.canCancelCourier()).isTrue();
-        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(offersCancel(card)).isTrue();
+        assertThat(cancelLockedKey(card)).isNull();
         assertThat(card.cancellationPollHref()).isNull();
         assertThat(row.removeHref()).isNotNull();
         assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.message.cancellationUnresolved");
@@ -604,7 +631,7 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.failed");
         assertThat(row.cancellationTone()).isEqualTo("is-bad");
-        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(cancelLockedKey(card)).isNull();
         assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.message.cancellationUnresolved");
     }
 
@@ -758,8 +785,8 @@ class OrderPageModelFactoryTest {
                     assertThat(b.available()).isFalse();
                     assertThat(b.reasonKey()).isEqualTo("order.items.action.dropship.locked");
                 });
-        assertThat(withoutPackage.shipments().canCancelCourier()).isFalse();
-        assertThat(withPackage.shipments().canCancelCourier()).isTrue();
+        assertThat(offersCancel(withoutPackage.shipments())).isFalse();
+        assertThat(offersCancel(withPackage.shipments())).isTrue();
     }
 
     @Test
