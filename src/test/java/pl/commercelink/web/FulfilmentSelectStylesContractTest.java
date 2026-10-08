@@ -46,9 +46,9 @@ class FulfilmentSelectStylesContractTest {
         String css = section();
 
         // when / then
-        assertThat(ruleBody(css, ".cl-page .cl-table.is-offers tr.is-on > td.cl-table-check")).contains("var(--cl-accent)");
-        assertThat(ruleBody(css, ".cl-page .cl-table.is-offers tr.is-covered > *")).contains("var(--cl-surface-2)");
-        assertThat(css).contains(".cl-page .cl-table.is-offers tr.is-off");
+        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tr.is-on > td.cl-table-check")).contains("var(--cl-accent)");
+        assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tr.is-covered > *")).contains("var(--cl-surface-2)");
+        assertThat(css).contains(".cl-page .cl-table.is-supplier-offers tr.is-off");
     }
 
     @Test
@@ -60,10 +60,10 @@ class FulfilmentSelectStylesContractTest {
         String block = css.substring(media);
 
         // when / then
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers td.cl-table-check")).contains("grid-column: 1;").contains("grid-row: 1 / span 2;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers td.cl-cell-qty")).contains("grid-column: 2;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers td.cl-cell-price")).contains("grid-column: 3;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers td.cl-cell-profit")).contains("grid-column: 4;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-table-check")).contains("grid-column: 1;").contains("grid-row: 1 / span 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-qty")).contains("grid-column: 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price")).contains("grid-column: 3;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-profit")).contains("grid-column: 4;");
     }
 
     @Test
@@ -94,7 +94,7 @@ class FulfilmentSelectStylesContractTest {
         String block = css.substring(css.indexOf("@media screen and (max-width: 719px)"));
 
         // when / then
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers tbody tr[data-cl-offer] > :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before"))
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before"))
                 .contains("content: attr(data-label);");
         assertThat(block).doesNotContain("tr[data-cl-offer] > ::before");
     }
