@@ -260,10 +260,6 @@ public class InvoiceSyncPreview {
         return invoiceShortcut != null && !invoiceShortcut.isBlank() && !invoiceShortcut.equals(deliveryProvider);
     }
 
-    public boolean isAllExact() {
-        return !mappings.isEmpty() && count(MatchState.EXACT) == mappings.size();
-    }
-
     public String getDeliveryShortId() {
         return deliveryShortId;
     }

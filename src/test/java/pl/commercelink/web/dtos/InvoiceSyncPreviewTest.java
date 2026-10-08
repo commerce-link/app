@@ -28,7 +28,6 @@ class InvoiceSyncPreviewTest {
         assertThat(preview.stateOf(preview.getMappings().get(3))).isEqualTo(MatchState.UNASSIGNED);
         assertThat(preview.count(MatchState.EXACT)).isEqualTo(1);
         assertThat(preview.getChangedItemCount()).isEqualTo(2);
-        assertThat(preview.isAllExact()).isFalse();
     }
 
     @Test

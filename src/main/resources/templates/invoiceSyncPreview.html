@@ -74,12 +74,6 @@
                             </ul>
                         </div>
                         <p class="cl-card-desc" th:text="#{invoiceSync.items.desc}"></p>
-                        <div class="cl-card-inset" data-cl-sync-all-exact th:hidden="${!p.allExact}">
-                            <div class="cl-alert is-ok" role="status">
-                                <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
-                                <p class="cl-alert-text" th:text="#{invoiceSync.allExact}"></p>
-                            </div>
-                        </div>
                         <div class="cl-card-inset" data-cl-sync-duplicates hidden>
                             <div class="cl-alert is-warn" role="status">
                                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>

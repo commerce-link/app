@@ -114,8 +114,9 @@ class InvoiceSyncPreviewTemplateTest {
         String html = render(preview);
 
         // then
-        assertThat(html).contains("Wszystkie produkty zgadzają się z fakturą")
-                .contains("<strong data-cl-effect-text>Koszty produktów bez zmian</strong>");
+        assertThat(html).contains("<span class=\"cl-status is-ok\">Zgodne: 2</span>")
+                .contains("<strong data-cl-effect-text>Koszty produktów bez zmian</strong>")
+                .doesNotContain("cl-alert is-ok");
     }
 
     @Test

@@ -105,10 +105,6 @@
             li.hidden = n === 0;
             li.querySelector('.cl-status').textContent = fill(form.dataset.templateCount, [form.dataset[LABELS[state]], n]);
         });
-        var allExact = form.querySelector('[data-cl-sync-all-exact]');
-        if (allExact) {
-            allExact.hidden = !(items.length > 0 && items.every(function (r) { return r.state === 'EXACT'; }));
-        }
     }
 
     function drawUnassigned(form, results) {
