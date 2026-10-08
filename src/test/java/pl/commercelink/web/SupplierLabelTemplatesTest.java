@@ -34,6 +34,7 @@ class SupplierLabelTemplatesTest {
                 .doesNotContain("${offer.supplier}");
     }
 
+    @Test
     void fulfilmentRowsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
         // when
         String html = template("fulfilment.html");
