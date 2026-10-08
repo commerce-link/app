@@ -23,6 +23,8 @@ public class ShipmentCreationState {
 
     /** The reason of a creation the provider never confirmed. */
     public static final String UNCONFIRMED_KEY = "shipping.creation.unconfirmed";
+    /** Unconfirmed, and the integration the command went to has been disconnected since. */
+    public static final String UNCONFIRMED_DISCONNECTED_KEY = "shipping.creation.unconfirmed.disconnected";
 
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum

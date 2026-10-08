@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.shipping.api.*;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -120,20 +121,21 @@ class ShipmentCreationCheckerTest {
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.creation.no.provider"));
+        verify(settler).failedWithKey(any(), eq("shipping.creation.unconfirmed.disconnected"));
         verifyNoInteractions(publisher);
     }
 
     @Test
-    void checkerWithDisconnectedIntegrationFailsTheCreationReadably() {
+    void checkerWithDisconnectedIntegrationSettlesTheCreationAsUnconfirmed() {
         // given: the store dropped Wysyłam z Allegro while the command was queued
         when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(request(3).toBuilder().provider("allegro").build());
 
-        // then: settled once with the readable key, nothing re-queued, nothing thrown (no DLQ loop)
-        verify(settler).failedWithKey(any(), eq(ShipmentCreationChecker.NO_PROVIDER_KEY));
+        // then: Allegro may have created (and charged) the shipment, so the outcome is unconfirmed, not a refusal;
+        // settled once, nothing re-queued, nothing thrown (no DLQ loop)
+        verify(settler).failedWithKey(any(), eq(ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY));
         verifyNoInteractions(publisher, provider);
     }
 

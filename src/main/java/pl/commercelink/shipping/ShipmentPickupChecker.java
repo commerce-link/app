@@ -3,6 +3,7 @@ package pl.commercelink.shipping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.shipping.api.PickupOrder;
 import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.stores.Store;
@@ -22,7 +23,7 @@ public class ShipmentPickupChecker {
 
     static final int MAX_ATTEMPTS = 6;
     static final String UNCONFIRMED_KEY = ShipmentPickupService.UNCONFIRMED_KEY;
-    static final String NO_PROVIDER_KEY = "shipping.pickup.no.provider";
+    static final String DISCONNECTED_KEY = ShipmentPickup.UNCONFIRMED_DISCONNECTED_KEY;
 
     private final StoresRepository storesRepository;
     private final ShippingProviders shippingProviders;
@@ -32,7 +33,8 @@ public class ShipmentPickupChecker {
     public void check(ShipmentPickupCheckRequest request) {
         ShippingProvider provider = provider(request.getStoreId(), request.getProvider());
         if (provider == null) {
-            settler.failedWithKey(request, NO_PROVIDER_KEY);
+            // the command was sent and its outcome is unknown: the courier may still come
+            settler.failedWithKey(request, DISCONNECTED_KEY);
             return;
         }
         PickupOrder result;

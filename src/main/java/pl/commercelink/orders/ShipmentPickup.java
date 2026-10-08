@@ -26,6 +26,8 @@ public class ShipmentPickup {
 
     /** The reason of a pickup the provider never confirmed. */
     public static final String UNCONFIRMED_KEY = "shipping.pickup.unconfirmed";
+    /** Unconfirmed, and the integration the command went to has been disconnected since. */
+    public static final String UNCONFIRMED_DISCONNECTED_KEY = "shipping.pickup.unconfirmed.disconnected";
 
     @DynamoDBAttribute(attributeName = "status")
     @DynamoDBTypeConvertedEnum

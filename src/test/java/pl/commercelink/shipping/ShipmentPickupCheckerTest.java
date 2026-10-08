@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.shipping.api.PickupOrder;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
@@ -136,12 +137,12 @@ class ShipmentPickupCheckerTest {
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.pickup.no.provider"));
+        verify(settler).failedWithKey(any(), eq("shipping.pickup.unconfirmed.disconnected"));
         verify(publisher, never()).publish(any());
     }
 
     @Test
-    void checkerWithDisconnectedIntegrationFailsThePickupReadably() {
+    void checkerWithDisconnectedIntegrationSettlesThePickupAsUnconfirmed() {
         // given
         ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").provider("allegro")
                 .commandId("pick-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00").attempt(1).build();
@@ -150,8 +151,8 @@ class ShipmentPickupCheckerTest {
         // when
         checker.check(request);
 
-        // then
-        verify(settler).failedWithKey(request, ShipmentPickupChecker.NO_PROVIDER_KEY);
+        // then: the command was sent, the courier may still come: unconfirmed, nothing re-queued
+        verify(settler).failedWithKey(request, ShipmentPickup.UNCONFIRMED_DISCONNECTED_KEY);
         verifyNoInteractions(publisher, provider);
     }
 
@@ -164,7 +165,7 @@ class ShipmentPickupCheckerTest {
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.pickup.no.provider"));
+        verify(settler).failedWithKey(any(), eq("shipping.pickup.unconfirmed.disconnected"));
     }
 
     @Test

@@ -40,7 +40,8 @@ public final class OrderLabels {
      * after the failure prefix, as the provider's own words are.
      */
     private static final Set<String> OUTCOME_KEYS = Set.of(ShipmentCreationState.UNCONFIRMED_KEY,
-            ShipmentPickup.UNCONFIRMED_KEY, "shipping.pickup.not.sent", "shipping.pickup.no.provider");
+            ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY, ShipmentPickup.UNCONFIRMED_KEY,
+            ShipmentPickup.UNCONFIRMED_DISCONNECTED_KEY, "shipping.pickup.not.sent", "shipping.pickup.no.provider");
 
     /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
     static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";

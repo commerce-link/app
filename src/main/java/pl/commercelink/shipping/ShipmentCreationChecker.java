@@ -21,7 +21,7 @@ public class ShipmentCreationChecker {
 
     static final int MAX_ATTEMPTS = 8;
     static final String UNCONFIRMED_KEY = ShipmentCreationState.UNCONFIRMED_KEY;
-    static final String NO_PROVIDER_KEY = "shipping.creation.no.provider";
+    static final String DISCONNECTED_KEY = ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY;
 
     private final StoresRepository storesRepository;
     private final ShippingProviders shippingProviders;
@@ -37,7 +37,9 @@ public class ShipmentCreationChecker {
         }
         ShippingProvider provider = provider(request.getStoreId(), request.getProvider());
         if (provider == null) {
-            settler.failedWithKey(request, NO_PROVIDER_KEY);
+            // the command was sent and nothing says how it ended: the provider may hold a paid label, so the
+            // operator is told to check its panel before sending again, as when the result never came
+            settler.failedWithKey(request, DISCONNECTED_KEY);
             return;
         }
         ShipmentCreation result;
