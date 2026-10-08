@@ -681,7 +681,7 @@ public class Order {
     }
 
     /**
-     * The shipment whose courier order "Cancel courier order" cancels (ShipmentCancelService): the first one booked with
+     * The shipment whose courier order "Cancel shipment" cancels (ShipmentCancelService): the first one booked with
      * a courier (externalId) whose parcel is not delivered yet. Found by the courier order, never by the shipped date,
      * which the operator may have changed.
      */

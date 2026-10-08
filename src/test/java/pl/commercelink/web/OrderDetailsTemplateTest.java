@@ -629,7 +629,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void eachShipmentHasEditAndRemoveAndTheCardHeadAddsOne() {
-        // given: the second shipment has a courier order, cancelled with "Cancel courier order" instead of removed
+        // given: the second shipment has a courier order, cancelled with "Cancel shipment" instead of removed
         Order order = order(OrderStatus.Realization);
         Shipment labelled = new Shipment(ShipmentType.Courier);
         labelled.setCarrier("DPD");
@@ -651,7 +651,7 @@ class OrderDetailsTemplateTest {
                 .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
                 .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia. Klient nie dostanie o tym wiadomości.\"")
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
-                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
+                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj przesyłkę, potem ją usuniesz.</p>")
                 .doesNotContain("shipment-1-remove-reason");
     }
 
@@ -675,7 +675,7 @@ class OrderDetailsTemplateTest {
                         + "/shipments/cancellation-state\"")
                 .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
                 .containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\"[^>]*"
-                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj zamówienie kuriera</button>")
+                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj przesyłkę</button>")
                 .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
                 .doesNotContain("/cancelShipment\"");
         assertThat(html).contains("/js/shipment-cancellation.js");
@@ -991,7 +991,7 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).doesNotContain("shipment-0-carrierSelect")
                 .containsPattern("id=\"shipment-0-carrier\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
                 .containsPattern("id=\"shipment-0-trackingNo\"[^>]*value=\"T-1\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
-                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując zamówienie kuriera.</p>")
+                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując przesyłkę.</p>")
                 .containsPattern("<select[^>]*id=\"shipment-0-type\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*disabled")
                 .contains("<input type=\"hidden\" name=\"type\" value=\"Courier\">")
                 .doesNotContainPattern("id=\"shipment-0-collectionPointCode\"[^>]*readonly")

@@ -2085,7 +2085,7 @@ public class OrdersController extends BaseController {
      * the dropship flow then fall back to their defaults, and the operator types the choice with the next shipment;
      * an order without shipments is never delivered nor completed before Delivered (Order#hasNothingLeftToDeliver).
      * Once no shipment has shipping data left, the shipping
-     * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
+     * e-mail is forgotten (as "Cancel shipment" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
      * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
      * Realization; the confirmation and the notice say so (OrderPageModelFactory.removeShipmentMessageKey).
@@ -2172,7 +2172,7 @@ public class OrdersController extends BaseController {
 
     /**
      * A shipment taken back (removed, or its shipped date cleared) that the customer was told about: once no other
-     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel courier order" does), so the
+     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel shipment" does), so the
      * shipment entered next announces itself again instead of the customer keeping the old number or pickup notice.
      */
     private void forgetShipmentEmails(Order order, Shipment takenBack) {

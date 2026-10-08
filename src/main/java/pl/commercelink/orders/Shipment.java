@@ -325,7 +325,7 @@ public class Shipment {
 
     /**
      * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
-     * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
+     * only "Cancel shipment" cancels it at the carrier, and a shipment that lost it could be removed and leave the
      * label orphaned. It keeps the state of its cancellation together with it.
      */
     public void inheritCourierOrderFrom(Shipment previous) {

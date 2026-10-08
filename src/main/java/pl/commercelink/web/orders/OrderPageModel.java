@@ -91,7 +91,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
-     * cancelCourierLockedKey: why "Cancel courier order" shows greyed (its cancellation is already in progress), null
+     * cancelCourierLockedKey: why "Cancel shipment" shows greyed (its cancellation is already in progress), null
      * when it can run or is absent. cancellationPollHref: the JSON shipments state the page polls while a command of
      * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
      * does; null when nothing waits or the page is read-only. "Zamów odbiór" is not here: it is ordered from the orders
@@ -105,7 +105,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * number counts from 1. editHref leads to the shipment page (its dialog, dialogId, intercepts it) and removeHref to
      * the removal confirmation; both null on a read-only page. For a shipment of a delivered order, one with a delivery
-     * date and one with a courier order (cancelled with "Cancel courier order" instead) removeHref is null and
+     * date and one with a courier order (cancelled with "Cancel shipment" instead) removeHref is null and
      * removeReasonKey says why, so "Remove" shows greyed with that reason instead of disappearing. The only shipment
      * with nothing but the delivery choice has neither: removing it would change nothing. removeMessageKey and
      * removeActionKey are the confirmation's text and button, which say when the removal delivers the order or moves it

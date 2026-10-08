@@ -1229,7 +1229,7 @@ class OrdersControllerTest {
             // when
             ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: the next shipment with a number sends the e-mail again, as after "Cancel courier order"
+            // then: the next shipment with a number sends the e-mail again, as after "Cancel shipment"
             verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
         }
 
@@ -1285,7 +1285,7 @@ class OrdersControllerTest {
             // when
             save(0, OrderShipmentForm.version(labelled), courier("TRACK-1", null), "fetch", response, model);
 
-            // then: nothing stored, so "Cancel courier order" stays and "Book courier" does not come back
+            // then: nothing stored, so "Cancel shipment" stays and "Book courier" does not come back
             assertThat(response.getStatus()).isEqualTo(422);
             OrderShipmentForm form = (OrderShipmentForm) model.getAttribute("shipment");
             assertThat(form.errors()).containsOnly(

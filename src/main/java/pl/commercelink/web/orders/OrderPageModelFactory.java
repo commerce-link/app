@@ -451,7 +451,7 @@ public class OrderPageModelFactory {
 
     /**
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
-     * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment's
+     * shipment with a courier order points to "Cancel shipment" only when the card offers it for that shipment's
      * courier order (which covers every parcel of it): before the order is ready to ship the button is not there yet,
      * and it only ever cancels the first courier order on the list whose parcel is not delivered.
      */
@@ -473,7 +473,7 @@ public class OrderPageModelFactory {
      * choice (the user's decision of 2026-09-30): the order waits for the next one (OrderLifecycle neither delivers nor
      * completes an order without shipments before Delivered; a Shipping order left with nothing shipped goes back to
      * Realization). A delivered order keeps its shipments, they are the record of the delivery; so does a shipment with
-     * a delivery date. One with a courier order is cancelled with "Cancel courier order", which also cancels the paid
+     * a delivery date. One with a courier order is cancelled with "Cancel shipment", which also cancels the paid
      * label at the carrier, never by dropping the record; after a failed or unconfirmed cancellation the operator settles
      * the label in the provider's panel and may drop the record. The only shipment with nothing but the customer's choice
      * of delivery (the one every order is created with) is not removed either: its row reads as "no shipment yet" with

@@ -454,7 +454,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aCourierShipmentOfAnOrderNotYetShippingSaysWhenItCanBeCancelled() {
-        // given: a courier ordered while the order is still being assembled; "Cancel courier order" is not offered yet
+        // given: a courier ordered while the order is still being assembled; "Cancel shipment" is not offered yet
         Order assembling = order(OrderStatus.Assembly);
         labelled(assembling.getShipments().get(0), "T-1", "PKG-1");
         // two couriers: the button only ever cancels the first courier order on the list
@@ -464,7 +464,7 @@ class OrderPageModelFactoryTest {
         labelled(second, "T-2", "PKG-2");
         twoCouriers.getShipments().add(second);
 
-        // one courier order of two parcels: they share its externalId and "Cancel courier order" cancels both
+        // one courier order of two parcels: they share its externalId and "Cancel shipment" cancels both
         Order twoParcels = order(OrderStatus.Shipping);
         labelled(twoParcels.getShipments().get(0), "T-1", "PKG-1");
         Shipment parcel = new Shipment(ShipmentType.Courier);
@@ -667,7 +667,7 @@ class OrderPageModelFactoryTest {
         // when
         List<OrderShipmentForm> forms = factory.build(order, List.of(), ADMIN, PL).shipments().forms();
 
-        // then: the carrier gave the number; only "Cancel courier order" changes it
+        // then: the carrier gave the number; only "Cancel shipment" changes it
         assertThat(forms.get(0).courierOrder()).isTrue();
         assertThat(forms.get(1).courierOrder()).isFalse();
         assertThat(forms.get(0).today()).isEqualTo(java.time.LocalDate.now(OrderShipmentForm.OPERATOR_ZONE));
