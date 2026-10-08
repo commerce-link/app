@@ -4,7 +4,9 @@
 // price; a tie goes to the offer the server listed first, so a click elsewhere never flips it. From that the script
 // keeps the rows (on, off, covered cheaper), the pieces, profit and margin of each offer, the order chips, the summary
 // and the proposal radios in step, filters the table in the browser and, at submit, writes the entries[...] fields
-// FulfilmentForm binds. It writes text only: labels, names and categories are operator data.
+// FulfilmentForm binds. A covered offer sits under the offer that beats it, folded behind one "dearer offers" row
+// (variant A4, plan 2026-10-08-fulfilment-select-a4-plan.md). It writes text only: labels, names and categories are
+// operator data.
 (function () {
     'use strict';
 
@@ -66,7 +68,10 @@
             gross: gross,
             vat: net > 0 ? gross / net : 1,
             check: row.querySelector('input[data-cl-offer-check]'),
+            nameId: row.querySelector('.cl-cell-toggle .cl-visually-hidden').id,
             category: row.closest('tbody'),
+            parent: null,
+            folded: false,
             visible: true,
             covered: false,
             won: 0,
@@ -90,7 +95,9 @@
     var chips = all(form, 'button[data-cl-coverage]');
     var variants = all(form, 'input[data-cl-variant]');
     var customVariant = form.querySelector('input[data-cl-variant-custom]');
-    var selectAll = form.querySelector('input[data-cl-select-all]');
+    var selectVisible = form.querySelector('button[data-cl-select-visible]');
+    var expandAllButton = form.querySelector('button[data-cl-expand-all]');
+    var collapseAllButton = form.querySelector('button[data-cl-collapse-all]');
     var providerBoxes = all(form, 'input[data-cl-filter-provider]');
     var minInput = form.querySelector('input[data-cl-filter-min]');
     var maxInput = form.querySelector('input[data-cl-filter-max]');
@@ -98,6 +105,14 @@
     var reason = form.querySelector('[data-cl-select-reason]');
     var needsSelection = all(form, 'button[data-cl-needs-selection]');
     var focusedOrder = null;
+    // per winner (group id): whether its dearer offers are unfolded, and which of them were ticked at the last render
+    var unfolded = {};
+    var tickedUnder = {};
+    var foldRows = {};
+
+    function beats(a, b) {
+        return a.gross < b.gross || (a.gross === b.gross && a.index < b.index);
+    }
 
     function winners() {
         var winner = {};
@@ -107,12 +122,42 @@
             }
             offer.allocations.forEach(function (allocation) {
                 var current = winner[allocation.key];
-                if (!current || offer.gross < current.gross || (offer.gross === current.gross && offer.index < current.index)) {
+                if (!current || beats(offer, current)) {
                     winner[allocation.key] = offer;
                 }
             });
         });
         return winner;
+    }
+
+    // a ticked covered offer orders nothing and says who takes its items; an unticked one says how much dearer it is
+    // than the offer it sits under (net, per piece), the amount in the bad colour
+    function renderCovered(offer, winner, beaters) {
+        var covered = offer.row.querySelector('[data-cl-covered]');
+        covered.textContent = '';
+        covered.hidden = !offer.covered;
+        if (!offer.covered) {
+            return;
+        }
+        if (offer.check.checked) {
+            covered.textContent = format(texts.coveredOn, beaters.join(', '));
+            return;
+        }
+        var template = String(texts.dearer);
+        var at = template.indexOf('{0}');
+        var amount = document.createElement('span');
+        amount.className = 'cl-offer-dearer';
+        amount.textContent = format(template.slice(at), money(offer.net - winner[offer.allocations[0].key].net));
+        covered.appendChild(document.createTextNode(template.slice(0, at)));
+        covered.appendChild(amount);
+    }
+
+    // WCAG 2.5.3: the checkbox is named by the toggle text on screen ("Zamawiam", "Zamów", "Zamów tę", "Zaznaczona")
+    // followed by the offer and the supplier; CSS picks the same text from the same two facts
+    function renderToggleName(offer) {
+        var state = offer.covered ? (offer.check.checked ? 'kept' : 'alt') : (offer.check.checked ? 'on' : 'off');
+        var text = offer.check.parentNode.querySelector('.cl-offer-toggle-' + state);
+        offer.check.setAttribute('aria-labelledby', text.id + ' ' + offer.nameId);
     }
 
     function renderOffer(offer, winner) {
@@ -123,8 +168,7 @@
             var sales = allocation.price / offer.vat * allocation.qty;
             var profit = sales - offer.net * allocation.qty;
             // an allocation is lost only to a ticked winner that beats this offer (cheaper, or equal price listed earlier)
-            var lost = !!owner && owner !== offer
-                && (owner.gross < offer.gross || (owner.gross === offer.gross && owner.index < offer.index));
+            var lost = !!owner && owner !== offer && beats(owner, offer);
             allocation.element.classList.toggle('is-lost', lost);
             allocation.element.classList.toggle('cl-tooltip', lost);
             if (lost) {
@@ -153,9 +197,8 @@
         offer.row.classList.toggle('is-off', !ticked && !offer.covered);
         offer.row.classList.toggle('is-covered', offer.covered);
 
-        var covered = offer.row.querySelector('[data-cl-covered]');
-        covered.hidden = !offer.covered;
-        covered.textContent = offer.covered ? format(ticked ? texts.coveredOn : texts.coveredOff, beaters.join(', ')) : '';
+        renderCovered(offer, winner, beaters);
+        renderToggleName(offer);
         offer.row.querySelector('[data-cl-qty]').textContent = String(ticked ? won : open);
 
         if (!profitKnown) {
@@ -169,12 +212,46 @@
         var sales = ticked ? wonSales : openSales;
         box.classList.toggle('is-ok', pieces > 0 && profit > 1);
         box.classList.toggle('is-bad', pieces > 0 && profit < -1);
-        value.textContent = pieces > 0 ? signed(profit) : '—';
+        value.textContent = pieces > 0 ? format(texts.money, signed(profit)) : '—';
         margin.textContent = pieces > 0 && sales > 0 ? format(texts.margin, percent(profit / sales)) : '';
     }
 
-    // a covered offer moves under the offer that wins its first item, as on the old page
+    function foldRow(parent) {
+        var fold = foldRows[parent.id];
+        if (!fold) {
+            var row = document.createElement('tr');
+            row.className = 'cl-alt-fold';
+            var cell = document.createElement('td');
+            cell.colSpan = 5;
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'cl-alt-fold-toggle';
+            var icon = document.createElement('i');
+            icon.className = 'fas fa-chevron-down';
+            icon.setAttribute('aria-hidden', 'true');
+            var label = document.createElement('span');
+            button.appendChild(icon);
+            button.appendChild(label);
+            cell.appendChild(button);
+            row.appendChild(cell);
+            button.addEventListener('click', function () {
+                unfolded[parent.id] = button.getAttribute('aria-expanded') !== 'true';
+                render();
+            });
+            fold = foldRows[parent.id] = {row: row, button: button, label: label, children: []};
+        }
+        return fold;
+    }
+
+    // a covered offer moves under the offer that wins its first item, as on the old page, behind one fold row that is
+    // closed until the operator opens it or ticks one of the offers under it
     function reorder(winner) {
+        var focused = document.activeElement;
+        var used = {};
+        offers.forEach(function (offer) {
+            offer.parent = null;
+            offer.folded = false;
+        });
         categories.forEach(function (tbody) {
             var under = new Map();
             var primaries = [];
@@ -188,13 +265,13 @@
                         under.set(owner, []);
                     }
                     under.get(owner).push(offer);
+                    offer.parent = owner;
                 } else {
                     primaries.push(offer);
                 }
             });
             // move a row only when its place changes: re-inserting a row that holds the focused control drops the focus
             var previous = tbody.firstElementChild;
-            var focused = document.activeElement;
             var moved = false;
             function place(row) {
                 if (previous.nextElementSibling !== row) {
@@ -205,7 +282,40 @@
             }
             primaries.forEach(function (primary) {
                 place(primary.row);
-                (under.get(primary) || []).forEach(function (child) {
+                var children = under.get(primary) || [];
+                if (!children.length) {
+                    return;
+                }
+                var fold = foldRow(primary);
+                used[primary.id] = true;
+                var ticked = children.filter(function (child) {
+                    return child.check.checked;
+                }).map(function (child) {
+                    return child.id;
+                });
+                var before = tickedUnder[primary.id] || [];
+                if (ticked.some(function (id) {
+                    return before.indexOf(id) < 0;
+                })) {
+                    unfolded[primary.id] = true;
+                }
+                tickedUnder[primary.id] = ticked;
+                // the focus never lands on a row that folds away
+                var open = unfolded[primary.id] === true || children.some(function (child) {
+                    return child.row.contains(focused);
+                });
+                var cheapest = Math.min.apply(null, children.map(function (child) {
+                    return child.net - primary.net;
+                }));
+                fold.children = children;
+                fold.label.textContent = format(texts.fold, children.length, money(cheapest));
+                fold.button.setAttribute('aria-expanded', String(open));
+                fold.button.setAttribute('aria-controls', children.map(function (child) {
+                    return child.row.id;
+                }).join(' '));
+                place(fold.row);
+                children.forEach(function (child) {
+                    child.folded = !open;
                     place(child.row);
                 });
             });
@@ -214,17 +324,46 @@
                 focused.focus();
             }
         });
+        Object.keys(foldRows).forEach(function (id) {
+            if (!used[id]) {
+                foldRows[id].row.remove();
+                delete foldRows[id];
+                delete tickedUnder[id];
+            }
+        });
     }
 
+    function isOpen(tbody) {
+        return tbody.querySelector('.cl-group-toggle').getAttribute('aria-expanded') !== 'false';
+    }
+
+    // "ofert: n · zamawiane: k" (k = ticked offers that order something); a collapsed category adds who supplies it and
+    // the net value: "· Elko, Magazyn sklepu · 1 890,95 zł netto"
     function renderCategoryCounts() {
         categories.forEach(function (tbody) {
             var inGroup = offers.filter(function (offer) {
                 return offer.category === tbody;
             });
-            var ticked = inGroup.filter(function (offer) {
-                return offer.check.checked;
-            }).length;
-            tbody.querySelector('[data-cl-category-count]').textContent = format(texts.category, inGroup.length, ticked);
+            var ordering = inGroup.filter(function (offer) {
+                return offer.check.checked && offer.won > 0;
+            });
+            var count = tbody.querySelector('[data-cl-category-count]');
+            count.textContent = format(texts.categoryOffers, inGroup.length) + ' · ';
+            var ordered = document.createElement('strong');
+            ordered.textContent = format(texts.categoryOrdered, ordering.length);
+            count.appendChild(ordered);
+
+            var chosen = tbody.querySelector('[data-cl-category-chosen]');
+            var labels = [];
+            var value = 0;
+            ordering.forEach(function (offer) {
+                if (labels.indexOf(offer.label) < 0) {
+                    labels.push(offer.label);
+                }
+                value += offer.won * offer.net;
+            });
+            chosen.hidden = isOpen(tbody) || !ordering.length;
+            chosen.textContent = chosen.hidden ? '' : '· ' + format(texts.categoryChosen, labels.join(', '), money(value));
         });
     }
 
@@ -262,11 +401,16 @@
                 });
             });
             var done = Object.keys(keys).length;
+            var split = Object.keys(providers).length > 1;
             chip.classList.toggle('is-ok', total > 0 && done === total);
             chip.classList.toggle('is-warn', done > 0 && done < total);
             chip.classList.toggle('is-bad', done === 0);
-            chip.querySelector('[data-cl-coverage-count]').textContent = format(texts.count, done, total);
-            chip.querySelector('.cl-coverage-split').hidden = Object.keys(providers).length < 2;
+            chip.querySelector('[data-cl-coverage-count]').textContent = format(texts.ratio, done, total);
+            chip.querySelector('[data-cl-coverage-fill]').style.width = (total > 0 ? Math.round(done / total * 100) : 0) + '%';
+            chip.querySelector('.cl-coverage-split').hidden = !split;
+            // the label replaces the button's content for screen readers, so it carries the split mark too
+            chip.setAttribute('aria-label', format(split ? texts.chipFilterSplit : texts.chipFilter,
+                chip.getAttribute('data-number'), done, total));
             if (done === 0) {
                 uncovered.push({chip: chip, done: done, total: total});
             } else if (done < total) {
@@ -385,16 +529,22 @@
             }
         });
         categories.forEach(function (tbody) {
-            var open = tbody.querySelector('.cl-group-toggle').getAttribute('aria-expanded') !== 'false';
+            var open = isOpen(tbody);
             var any = false;
             offers.forEach(function (offer) {
                 if (offer.category !== tbody) {
                     return;
                 }
-                offer.row.hidden = !offer.visible || !open;
+                offer.row.hidden = !offer.visible || !open || offer.folded;
                 any = any || offer.visible;
             });
             tbody.hidden = !any;
+        });
+        Object.keys(foldRows).forEach(function (id) {
+            var fold = foldRows[id];
+            fold.row.hidden = !isOpen(fold.row.parentNode) || !fold.children.some(function (child) {
+                return child.visible;
+            });
         });
         hiddenNotice.hidden = hiddenTicked === 0;
         setText('[data-cl-hidden-text]', format(texts.hidden, hiddenTicked));
@@ -406,21 +556,26 @@
         setText('[data-cl-filter-value="price"]', min === null && max === null ? texts.any
             : (min === null ? format(texts.to, money(max))
                 : (max === null ? format(texts.from, money(min)) : format(texts.range, money(min), money(max)))));
-        renderSelectAll();
+        renderSelectVisible();
     }
 
-    function renderSelectAll() {
-        if (!selectAll) {
-            return;
-        }
-        var shown = offers.filter(function (offer) {
+    function shownOffers() {
+        return offers.filter(function (offer) {
             return offer.visible;
         });
-        var ticked = shown.filter(function (offer) {
-            return offer.check.checked;
-        }).length;
-        selectAll.checked = shown.length > 0 && ticked === shown.length;
-        selectAll.indeterminate = ticked > 0 && ticked < shown.length;
+    }
+
+    // one button for the offers the filters leave: it ticks them while one of them is unticked, otherwise it clears them
+    function renderSelectVisible() {
+        if (!selectVisible) {
+            return;
+        }
+        var shown = shownOffers();
+        var tick = shown.length === 0 || shown.some(function (offer) {
+            return !offer.check.checked;
+        });
+        selectVisible.textContent = tick ? texts.selectVisible : texts.clearVisible;
+        selectVisible.disabled = shown.length === 0;
     }
 
     function matchVariant() {
@@ -456,14 +611,36 @@
         render();
     }
 
-    function expandAll() {
+    // E7 swap: ticking an offer that cheaper ticked ones cover unticks every ticked offer that beats it on one of its
+    // items, so the chosen one really orders them; their other items go to the next ticked offer or stay uncovered
+    function toggled(offer) {
+        if (offer.check.checked && offer.covered) {
+            var keys = offer.allocations.map(function (allocation) {
+                return allocation.key;
+            });
+            offers.forEach(function (other) {
+                if (other !== offer && other.check.checked && beats(other, offer) && other.allocations.some(function (allocation) {
+                    return keys.indexOf(allocation.key) >= 0;
+                })) {
+                    other.check.checked = false;
+                }
+            });
+        }
+        changed();
+    }
+
+    function setAllExpanded(expanded) {
         all(table, '.cl-group-toggle').forEach(function (toggle) {
-            toggle.setAttribute('aria-expanded', 'true');
+            toggle.setAttribute('aria-expanded', String(expanded));
         });
+        renderCategoryCounts();
+        applyFilters();
     }
 
     offers.forEach(function (offer) {
-        offer.check.addEventListener('change', changed);
+        offer.check.addEventListener('change', function () {
+            toggled(offer);
+        });
     });
 
     // a click anywhere on the row ticks it, except on its own controls and links
@@ -479,15 +656,26 @@
             return o.row === row;
         })[0];
         offer.check.checked = !offer.check.checked;
-        changed();
+        toggled(offer);
     });
 
     all(table, '.cl-group-toggle').forEach(function (toggle) {
         toggle.addEventListener('click', function () {
             toggle.setAttribute('aria-expanded', String(toggle.getAttribute('aria-expanded') === 'false'));
+            renderCategoryCounts();
             applyFilters();
         });
     });
+    if (expandAllButton) {
+        expandAllButton.addEventListener('click', function () {
+            setAllExpanded(true);
+        });
+    }
+    if (collapseAllButton) {
+        collapseAllButton.addEventListener('click', function () {
+            setAllExpanded(false);
+        });
+    }
 
     variants.forEach(function (radio) {
         radio.addEventListener('change', function () {
@@ -507,18 +695,16 @@
             var order = chip.getAttribute('data-order');
             focusedOrder = focusedOrder === order ? null : order;
             if (focusedOrder) {
-                expandAll();
+                setAllExpanded(true);
+            } else {
+                applyFilters();
             }
-            applyFilters();
         });
     });
 
-    if (selectAll) {
-        selectAll.hidden = false;
-        selectAll.addEventListener('change', function () {
-            var shown = offers.filter(function (offer) {
-                return offer.visible;
-            });
+    if (selectVisible) {
+        selectVisible.addEventListener('click', function () {
+            var shown = shownOffers();
             var tick = shown.some(function (offer) {
                 return !offer.check.checked;
             });

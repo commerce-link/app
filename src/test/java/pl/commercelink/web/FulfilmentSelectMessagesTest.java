@@ -83,6 +83,18 @@ class FulfilmentSelectMessagesTest {
     }
 
     @Test
+    void englishAmountsUseTheZlotySignLikeTheRestOfTheSelectionTexts() throws Exception {
+        // given
+        Properties en = load("messages_en.properties");
+
+        // then
+        for (String key : List.of("fulfilment.select.money", "fulfilment.select.unit.perPiece", "fulfilment.select.category.chosen",
+                "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold", "fulfilment.select.filter.range")) {
+            assertThat(en.getProperty(key)).as("en " + key).contains("zł").doesNotContain("PLN");
+        }
+    }
+
+    @Test
     void theReadabilityKeysAreUsedAndTheHeaderCheckboxKeysAreGone() throws Exception {
         // given
         Properties pl = load("messages_pl.properties");
@@ -96,8 +108,10 @@ class FulfilmentSelectMessagesTest {
                 "fulfilment.select.toggle.on", "fulfilment.select.toggle.off", "fulfilment.select.toggle.alt", "fulfilment.select.toggle.kept",
                 "fulfilment.select.list.expand", "fulfilment.select.list.collapse", "fulfilment.select.list.selectVisible",
                 "fulfilment.select.list.clearVisible", "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold",
-                "fulfilment.select.orders.filter", "fulfilment.select.ratio", "fulfilment.select.category.chosen", "fulfilment.select.mfn");
-        for (String key : List.of("fulfilment.select.all", "fulfilment.select.column.price.short")) {
+                "fulfilment.select.orders.filter", "fulfilment.select.orders.filter.split", "fulfilment.select.ratio",
+                "fulfilment.select.category.chosen", "fulfilment.select.mfn", "fulfilment.select.offer.name");
+        for (String key : List.of("fulfilment.select.all", "fulfilment.select.column.price.short", "fulfilment.select.category.count",
+                "fulfilment.select.covered.off", "fulfilment.select.offer.label")) {
             assertThat(pl.getProperty(key)).as("pl " + key).isNull();
             assertThat(en.getProperty(key)).as("en " + key).isNull();
         }

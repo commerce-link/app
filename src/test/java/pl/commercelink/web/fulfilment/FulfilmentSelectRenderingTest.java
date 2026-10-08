@@ -280,6 +280,24 @@ class FulfilmentSelectRenderingTest {
     }
 
     @Test
+    void theToggleIsNamedByItsVisibleTextThenTheOfferAndSupplier() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then -- WCAG 2.5.3: the accessible name starts with the text on the button
+        String cheap = row(html, "Elko-k1");
+        assertThat(cheap).contains("aria-labelledby=\"offers-category-1-o0-on offers-category-1-o0-name\"")
+                .contains("id=\"offers-category-1-o0-on\"").contains("id=\"offers-category-1-o0-off\"")
+                .contains("id=\"offers-category-1-o0-alt\"").contains("id=\"offers-category-1-o0-kept\"")
+                .contains("<span class=\"cl-visually-hidden\" id=\"offers-category-1-o0-name\">")
+                .doesNotContain("aria-label=\"Zamów: ");
+        assertThat(row(html, "AB-k2")).contains("aria-labelledby=\"offers-category-1-o1-off offers-category-1-o1-name\"");
+    }
+
+    @Test
     void theHeaderRowIsForScreenReadersAndTheCellsCarryTheirUnits() {
         // given
         FulfilmentForm form = warehouseGroup();

@@ -68,9 +68,9 @@
             <input type="hidden" name="skippedGroups" th:value="${form.skippedGroups}">
             <div data-cl-payload hidden></div>
             <div hidden data-cl-select-text
-                 th:attr="data-covered-on=#{fulfilment.select.covered.on}, data-covered-off=#{fulfilment.select.covered.off},
+                 th:attr="data-covered-on=#{fulfilment.select.covered.on},
                           data-lost=#{fulfilment.select.lost}, data-margin=#{fulfilment.select.margin},
-                          data-count=#{fulfilment.select.count}, data-category=#{fulfilment.select.category.count},
+                          data-count=#{fulfilment.select.count},
                           data-hidden=#{fulfilment.select.filter.hidden}, data-partial=#{fulfilment.select.partial},
                           data-uncovered=#{fulfilment.select.uncovered}, data-partial-end=#{fulfilment.select.partial.end},
                           data-all=#{fulfilment.select.filter.all}, data-many=#{fulfilment.select.filter.many},
@@ -79,6 +79,7 @@
                           data-category-offers=#{fulfilment.select.category.offers}, data-category-ordered=#{fulfilment.select.category.ordered},
                           data-category-chosen=#{fulfilment.select.category.chosen}, data-money=#{fulfilment.select.money},
                           data-ratio=#{fulfilment.select.ratio}, data-chip-filter=#{fulfilment.select.orders.filter},
+                          data-chip-filter-split=#{fulfilment.select.orders.filter.split},
                           data-dearer=#{fulfilment.select.alt.dearer}, data-fold=#{fulfilment.select.alt.fold},
                           data-select-visible=#{fulfilment.select.list.selectVisible}, data-clear-visible=#{fulfilment.select.list.clearVisible}"></div>
 
@@ -227,7 +228,7 @@
                                     <span class="cl-group-chosen" data-cl-category-chosen hidden></span>
                                 </th>
                             </tr>
-                            <tr th:each="o : ${c.offers()}" th:with="e=${o.entry()}" data-cl-offer th:class="${e.accepted} ? 'is-on' : 'is-off'"
+                            <tr th:each="o, oStat : ${c.offers()}" th:with="e=${o.entry()}, tid=|${c.id()}-o${oStat.index}|" th:id="${tid}" data-cl-offer th:class="${e.accepted} ? 'is-on' : 'is-off'"
                                 th:data-groupid="${e.id}" th:data-provider="${e.source.provider}" th:data-provider-label="${o.label()}"
                                 th:data-name="${e.source.name}" th:data-ean="${e.source.ean}" th:data-mfn="${e.source.mfn}"
                                 th:data-sourceqty="${e.source.qty}" th:data-net="${e.source.priceNet}" th:data-gross="${e.source.priceGross}"
@@ -262,12 +263,14 @@
                                     <span th:unless="${page.profitKnown()}" class="cl-profit is-unknown cl-tooltip" tabindex="0" role="img"
                                           th:attr="data-tooltip=#{fulfilment.select.profit.unknown}, aria-label=#{fulfilment.select.profit.unknown}">—</span>
                                 </td>
-                                <!--/* the toggle is a label around the offer's checkbox: the checkbox keeps the state, the keyboard and
-                                       the name for screen readers; CSS shows the one text that fits the row (ticked or not, covered
-                                       cheaper or not) */-->
+                                <!--/* the toggle is a label around the offer's checkbox: the checkbox keeps the state and the keyboard;
+                                       CSS shows the one text that fits the row (ticked or not, covered cheaper or not). The checkbox
+                                       is named by that visible text plus the offer and supplier (WCAG 2.5.3): fulfilment-select.js
+                                       points aria-labelledby at the text shown */-->
                                 <td class="cl-cell-toggle">
                                     <label class="cl-offer-toggle"><input type="checkbox" data-cl-offer-check autocomplete="off" th:checked="${e.accepted}"
-                                                                          th:attr="aria-label=#{fulfilment.select.offer.label(${e.source.name}, ${o.label()})}"><span class="cl-offer-toggle-on"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.on}"></span></span><span class="cl-offer-toggle-off" th:text="#{fulfilment.select.toggle.off}"></span><span class="cl-offer-toggle-alt" th:text="#{fulfilment.select.toggle.alt}"></span><span class="cl-offer-toggle-kept"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.kept}"></span></span></label>
+                                                                          th:attr="aria-labelledby=|${tid}-${e.accepted ? 'on' : 'off'} ${tid}-name|"><span class="cl-offer-toggle-on" th:id="|${tid}-on|"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.on}"></span></span><span class="cl-offer-toggle-off" th:id="|${tid}-off|" th:text="#{fulfilment.select.toggle.off}"></span><span class="cl-offer-toggle-alt" th:id="|${tid}-alt|" th:text="#{fulfilment.select.toggle.alt}"></span><span class="cl-offer-toggle-kept" th:id="|${tid}-kept|"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.kept}"></span></span></label>
+                                    <span class="cl-visually-hidden" th:id="|${tid}-name|" th:text="#{fulfilment.select.offer.name(${e.source.name}, ${o.label()})}"></span>
                                 </td>
                             </tr>
                             </tbody>

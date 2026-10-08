@@ -10755,6 +10755,10 @@ a.cl-link-button:hover {
     align-items: center;
     min-height: 32px;
     color: var(--cl-ink);
+}
+
+/* only a number with an address is a link; without one it is plain text */
+.cl-page a.cl-order-chip-link {
     text-decoration: underline dotted;
     text-underline-offset: 3px;
 }
@@ -10953,7 +10957,8 @@ a.cl-link-button:hover {
     white-space: nowrap;
 }
 
-.cl-page .cl-order-ref a {
+/* one class more than the quiet link of the key cell (.cl-table .cl-table-key a): order numbers are accent links */
+.cl-page .cl-table .cl-table-key .cl-order-ref a {
     font-weight: 600;
     color: var(--cl-accent);
 }
