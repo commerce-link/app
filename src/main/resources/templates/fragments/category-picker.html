@@ -89,9 +89,108 @@
     <span class="cl-visually-hidden" role="status" data-picker-status></span>
 </div>
 
+<!--/* The same single picker over a flat list the server draws, for a value that is not the name it shows (an id) and
+       a top line of the caller's own instead of a breadcrumb. options are FlatPickerOption rows: the label is the name
+       line and the trigger text, meta the grey line above it, starred a word after a star at the end of that line.
+
+       Progressive enhancement: the native select is the field without JavaScript ("label — meta (starred)" per
+       option). optionPickerScript hides and disables it, enables the hidden input, gives its id to the trigger (the
+       label's for and an error summary's link follow) and fires "cl:picker-change" on the .cl-picker when a pick
+       (Enter, a click) changes the value -- never on the arrows. describedBy is the id list of the help and the error
+       under the field, or null; the label carries the id fieldId + '-label'. */-->
+<div th:fragment="optionPicker(fieldId, name, options, selected, placeholder, filter, required, autofocus, describedBy, invalid)"
+     class="cl-picker is-flat"
+     th:with="labelledBy=${fieldId + '-label'},
+              selectedLabel=${T(pl.commercelink.web.dtos.FlatPickerOption).labelOf(options, selected)}">
+    <select class="cl-select" th:id="${fieldId}" th:name="${name}" th:required="${required}" data-picker-select
+            th:autofocus="${autofocus}" th:classappend="${invalid} ? 'is-invalid'"
+            th:attr="aria-invalid=${invalid} ? 'true' : null, aria-describedby=${describedBy}">
+        <option value="" th:selected="${selectedLabel == null}" th:text="${placeholder}"></option>
+        <option th:each="option : ${options}" th:value="${option.value()}"
+                th:selected="${option.value() == selected}" th:text="${option.selectText()}"></option>
+    </select>
+    <!--/* Disabled, so the form does not post it next to the select; the script enables it as it hides the select. */-->
+    <input type="hidden" th:name="${name}" th:value="${selectedLabel == null} ? '' : ${selected}" disabled data-picker-value>
+
+    <div class="cl-picker-field" data-option-picker hidden
+         th:attr="data-picker-required=${required} ? 'true' : null, data-picker-unset=${placeholder},
+                  data-picker-count=#{catalog.category.count}">
+        <button type="button" class="cl-picker-trigger" data-picker-trigger
+                aria-haspopup="listbox" aria-expanded="false" th:classappend="${invalid} ? 'is-invalid'"
+                th:attr="aria-labelledby=${labelledBy + ' ' + fieldId + '-value'}, aria-describedby=${describedBy},
+                         aria-invalid=${invalid} ? 'true' : null">
+            <span data-picker-label th:id="${fieldId + '-value'}"
+                  th:text="${selectedLabel == null} ? ${placeholder} : ${selectedLabel}"></span>
+            <span class="icon is-small" aria-hidden="true">
+                <i class="fas fa-angle-down"></i>
+            </span>
+        </button>
+        <div class="cl-picker-menu" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-picker-search
+                   role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   th:attr="aria-controls=${fieldId + '-listbox'}, aria-labelledby=${labelledBy}"
+                   th:placeholder="${filter}">
+            <!--/* The rows are drawn here rather than by the script, so the script only moves them in and out. */-->
+            <div class="cl-picker-list" role="listbox" tabindex="-1" data-picker-list
+                 th:id="${fieldId + '-listbox'}" th:attr="aria-labelledby=${labelledBy}">
+                <div class="cl-picker-option" role="option" th:each="option : ${options}"
+                     th:classappend="${option.value() == selected} ? 'is-selected'"
+                     th:attr="aria-selected=${option.value() == selected}, data-value=${option.value()},
+                              data-label=${option.label()}, aria-label=${option.accessibleName()}">
+                    <span class="cl-picker-option-text">
+                        <span class="cl-picker-path" th:if="${option.meta() != null or option.starred() != null}"
+                              th:title="${option.meta()}"><th:block th:text="${option.meta()}"></th:block><th:block
+                              th:if="${option.meta() != null and option.starred() != null}"> · </th:block><span
+                              class="cl-picker-star" th:if="${option.starred() != null}"><i class="fas fa-star"
+                              aria-hidden="true"></i> <th:block th:text="${option.starred()}"></th:block></span></span>
+                        <span class="cl-picker-name" th:text="${option.label()}"></span>
+                    </span>
+                </div>
+            </div>
+            <p class="cl-picker-empty" data-picker-empty hidden th:text="#{catalog.category.empty}"></p>
+            <p class="cl-help cl-picker-count" role="status" data-picker-count></p>
+        </div>
+    </div>
+</div>
+
 <th:block th:fragment="pickerHelpers">
     <script>
         (function () {
+            const CHUNK = 60;
+
+            const format = (template, ...values) =>
+                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template);
+
+            const normalize = text => text.toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\u0142/g, 'l');
+
+            const pathElement = option => {
+                if (!option.path) {
+                    return document.createDocumentFragment();
+                }
+                const path = document.createElement('span');
+                path.className = 'cl-picker-path';
+                path.title = option.path;
+                path.textContent = option.shortPath;
+                return path;
+            };
+
+            // The count is a status line: written a moment after the typing stops, so a screen reader reads the
+            // result once instead of after every key.
+            const announceLater = (() => {
+                const timers = new WeakMap();
+                return (element, text) => {
+                    clearTimeout(timers.get(element));
+                    timers.set(element, setTimeout(() => {
+                        element.textContent = text;
+                    }, 600));
+                };
+            })();
+
+            // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
+            const menuOf = picker => picker.querySelector('.cl-picker-menu');
+
             const closeMenu = picker => {
                 const menu = picker.querySelector('.cl-picker-menu');
                 const trigger = picker.querySelector('[data-picker-trigger]');
@@ -113,12 +212,227 @@
                 }
             };
 
+            // The option the arrows (or the mouse) reached: highlighted and announced through the combobox; scrolled
+            // into view unless the mouse is on it already.
+            const showActive = (search, list, active, scroll = true) => {
+                let activeId = null;
+                Array.from(list.querySelectorAll('[role="option"]')).forEach((item, index) => {
+                    item.classList.toggle('is-active', index === active);
+                    if (index === active) {
+                        activeId = item.id;
+                        if (scroll) {
+                            item.scrollIntoView({block: 'nearest'});
+                        }
+                    }
+                });
+                if (activeId) {
+                    search.setAttribute('aria-activedescendant', activeId);
+                } else {
+                    search.removeAttribute('aria-activedescendant');
+                }
+            };
+
+            // The popup closes when the focus leaves the field (Tab out of the search) and on Escape from anywhere
+            // inside the picker, chips included; the focus then returns to the trigger. A press inside the menu
+            // keeps the focus in the search, so choosing an option with the mouse does not count as leaving.
+            const closeOnLeave = (picker, isOpen, close) => {
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const search = picker.querySelector('[data-picker-search]');
+                const menu = picker.querySelector('.cl-picker-menu');
+                picker.addEventListener('focusout', event => {
+                    if (isOpen() && !picker.contains(event.relatedTarget)) {
+                        close();
+                    }
+                });
+                menu.addEventListener('mousedown', event => {
+                    if (event.target !== search) {
+                        event.preventDefault();
+                    }
+                });
+                // A browser that does not focus a pressed button (Safari) would close the menu on the press and
+                // open it again on the click.
+                trigger.addEventListener('mousedown', event => {
+                    if (isOpen()) {
+                        event.preventDefault();
+                    }
+                });
+                (picker.closest('.cl-picker') || picker).addEventListener('keydown', event => {
+                    if (event.key === 'Escape' && isOpen()) {
+                        event.preventDefault();
+                        close();
+                        trigger.focus();
+                    }
+                });
+            };
+
+            // One value out of many: the PIM category tree (pickerScript, where the value is the name and the row is
+            // built here with its breadcrumb) and the flat list of optionPicker (an id as the value, rows drawn by the
+            // server and handed in as option.element). A pick that changes the value fires "cl:picker-change" on the
+            // .cl-picker; the arrows and the mouse only move the highlight.
+            const singlePicker = (picker, field, options, messages, labelOf = value => value) => {
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const label = picker.querySelector('[data-picker-label]');
+                const search = picker.querySelector('[data-picker-search]');
+                const list = picker.querySelector('[data-picker-list]');
+                const counter = picker.querySelector('[data-picker-count]');
+                const empty = picker.querySelector('[data-picker-empty]');
+                const menu = menuOf(picker);
+
+                let matches = [];
+                let shown = [];
+                let active = -1;
+
+                const showSelection = () => {
+                    label.textContent = field.value ? (labelOf(field.value) || field.value) : messages.unset;
+                };
+
+                const isOpen = () => !menu.hidden;
+                const close = () => closeMenu(picker);
+
+                const select = option => {
+                    const changed = field.value !== option.value;
+                    field.value = option.value;
+                    trigger.classList.remove('is-invalid');
+                    trigger.removeAttribute('aria-invalid');
+                    showSelection();
+                    close();
+                    if (changed) {
+                        (picker.closest('.cl-picker') || picker).dispatchEvent(
+                                new CustomEvent('cl:picker-change', {bubbles: true, detail: {value: option.value}}));
+                    }
+                };
+
+                const rowOf = option => {
+                    if (option.element) {
+                        return option.element;
+                    }
+                    const item = document.createElement('div');
+                    item.className = 'cl-picker-option';
+                    const text = document.createElement('span');
+                    text.className = 'cl-picker-option-text';
+                    text.appendChild(pathElement(option));
+                    const name = document.createElement('span');
+                    name.className = 'cl-picker-name';
+                    name.textContent = option.label;
+                    text.appendChild(name);
+                    item.appendChild(text);
+                    return item;
+                };
+
+                const appendChunk = () => {
+                    matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
+                        const item = rowOf(option);
+                        item.id = list.id + '-option-' + shown.length;
+                        item.setAttribute('role', 'option');
+                        item.setAttribute('aria-selected', String(option.value === field.value));
+                        item.classList.toggle('is-selected', option.value === field.value);
+                        item.classList.remove('is-active');
+                        // A server-drawn row comes back into the list on every filter; it is bound once.
+                        if (!item.dataset.pickerBound) {
+                            item.dataset.pickerBound = 'true';
+                            item.addEventListener('click', event => {
+                                event.preventDefault();
+                                select(option);
+                            });
+                        }
+                        list.appendChild(item);
+                        shown.push(option);
+                    });
+                };
+
+                const render = () => {
+                    const query = normalize(search.value.trim());
+                    matches = query
+                            ? options.filter(option => option.haystack.includes(query))
+                            : options;
+                    shown = [];
+                    active = -1;
+                    list.replaceChildren();
+                    list.scrollTop = 0;
+                    search.removeAttribute('aria-activedescendant');
+                    // The listbox holds options only; "nothing matches" is a line below it.
+                    empty.hidden = matches.length > 0;
+
+                    appendChunk();
+                    announceLater(counter, format(messages.count, matches.length, options.length));
+                };
+
+                list.addEventListener('scroll', () => {
+                    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 48) {
+                        appendChunk();
+                    }
+                });
+
+                // The row under the mouse becomes the active one, so the mouse and the arrows share one highlight.
+                list.addEventListener('mouseover', event => {
+                    const item = event.target.closest('[role="option"]');
+                    const index = item ? Array.from(list.children).indexOf(item) : -1;
+                    if (index >= 0 && index !== active) {
+                        active = index;
+                        showActive(search, list, active, false);
+                    }
+                });
+
+                const move = step => {
+                    if (!shown.length) {
+                        return;
+                    }
+                    if (active + step >= shown.length - 1) {
+                        appendChunk();
+                    }
+                    active = Math.min(Math.max(active + step, 0), shown.length - 1);
+                    showActive(search, list, active);
+                };
+
+                const open = () => {
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
+                    search.setAttribute('aria-expanded', 'true');
+                    search.value = '';
+                    render();
+                    search.focus();
+                };
+
+                trigger.addEventListener('click', () => isOpen() ? close() : open());
+                search.addEventListener('input', render);
+
+                search.addEventListener('keydown', event => {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        move(1);
+                    } else if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        move(-1);
+                    } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (active >= 0) {
+                            select(shown[active]);
+                        } else if (shown.length === 1) {
+                            select(shown[0]);
+                        }
+                    }
+                });
+                closeOnLeave(picker, isOpen, close);
+
+                // A button marked formnovalidate (the no-script "Zmień kategorię") still goes without a value.
+                if (field.form && picker.dataset.pickerRequired) {
+                    field.form.addEventListener('submit', event => {
+                        if (!field.value && !(event.submitter && event.submitter.formNoValidate)) {
+                            event.preventDefault();
+                            trigger.classList.add('is-invalid');
+                            trigger.setAttribute('aria-invalid', 'true');
+                            open();
+                        }
+                    });
+                }
+
+                showSelection();
+                close();
+            };
+
             window.pickerHelpers = {
-                format: (template, ...values) =>
-                        values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
-                normalize: text => text.toLowerCase()
-                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                        .replace(/\u0142/g, 'l'),
+                format: format,
+                normalize: normalize,
                 // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
                 breadcrumbs: (ancestors, separator = ' \u203a ', maxLevels = 3) => {
                     const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
@@ -143,67 +457,13 @@
                         return {path: names.join(separator), shortPath: shortened.join(separator)};
                     };
                 },
-                pathElement: option => {
-                    if (!option.path) {
-                        return document.createDocumentFragment();
-                    }
-                    const path = document.createElement('span');
-                    path.className = 'cl-picker-path';
-                    path.title = option.path;
-                    path.textContent = option.shortPath;
-                    return path;
-                },
-                // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
-                menuOf: picker => picker.querySelector('.cl-picker-menu'),
+                pathElement: pathElement,
+                announceLater: announceLater,
+                menuOf: menuOf,
                 closeMenu: closeMenu,
-                // The option the arrows reached: highlighted, scrolled into view and announced through the combobox.
-                showActive: (search, list, active) => {
-                    let activeId = null;
-                    Array.from(list.querySelectorAll('[role="option"]')).forEach((item, index) => {
-                        item.classList.toggle('is-active', index === active);
-                        if (index === active) {
-                            activeId = item.id;
-                            item.scrollIntoView({block: 'nearest'});
-                        }
-                    });
-                    if (activeId) {
-                        search.setAttribute('aria-activedescendant', activeId);
-                    } else {
-                        search.removeAttribute('aria-activedescendant');
-                    }
-                },
-                // The popup closes when the focus leaves the field (Tab out of the search) and on Escape from anywhere
-                // inside the picker, chips included; the focus then returns to the trigger. A press inside the menu
-                // keeps the focus in the search, so choosing an option with the mouse does not count as leaving.
-                closeOnLeave: (picker, isOpen, close) => {
-                    const trigger = picker.querySelector('[data-picker-trigger]');
-                    const search = picker.querySelector('[data-picker-search]');
-                    const menu = picker.querySelector('.cl-picker-menu');
-                    picker.addEventListener('focusout', event => {
-                        if (isOpen() && !picker.contains(event.relatedTarget)) {
-                            close();
-                        }
-                    });
-                    menu.addEventListener('mousedown', event => {
-                        if (event.target !== search) {
-                            event.preventDefault();
-                        }
-                    });
-                    // A browser that does not focus a pressed button (Safari) would close the menu on the press and
-                    // open it again on the click.
-                    trigger.addEventListener('mousedown', event => {
-                        if (isOpen()) {
-                            event.preventDefault();
-                        }
-                    });
-                    (picker.closest('.cl-picker') || picker).addEventListener('keydown', event => {
-                        if (event.key === 'Escape' && isOpen()) {
-                            event.preventDefault();
-                            close();
-                            trigger.focus();
-                        }
-                    });
-                },
+                showActive: showActive,
+                closeOnLeave: closeOnLeave,
+                singlePicker: singlePicker,
                 // Pickers arrive with the page, inside a repeat row added by JavaScript and inside a form
                 // replaced after an async save, so every entry point initialises the ones it can reach.
                 initialiseOn: (selector, setUp) => {
@@ -237,15 +497,13 @@
 
     <script th:inline="javascript">
         (function () {
-            const CHUNK = 60;
             const categories = /*[[${categories}]]*/ [];
             const categoryAncestors = /*[[${categoryAncestors}]]*/ [];
             const messages = {
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
-            const {showActive, closeOnLeave} = window.pickerHelpers;
+            const {normalize, breadcrumbs, singlePicker, initialiseOn} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -256,14 +514,6 @@
                 picker.dataset.pickerReady = 'true';
 
                 const field = picker.parentElement.querySelector('[data-picker-value]');
-                const trigger = picker.querySelector('[data-picker-trigger]');
-                const label = picker.querySelector('[data-picker-label]');
-                const search = picker.querySelector('[data-picker-search]');
-                const list = picker.querySelector('[data-picker-list]');
-                const counter = picker.querySelector('[data-picker-count]');
-                const empty = picker.querySelector('[data-picker-empty]');
-                const menu = menuOf(picker);
-
                 const options = categories.map(category => {
                     const {path, shortPath} = breadcrumbOf(category);
                     return {
@@ -275,132 +525,61 @@
                         haystack: normalize(category.name + ' ' + path)
                     };
                 });
-
-                let matches = [];
-                let shown = [];
-                let active = -1;
-                let query = '';
-
-                const showSelection = () => {
-                    label.textContent = field.value ? field.value : messages.unset;
-                };
-
-                const select = option => {
-                    field.value = option.value;
-                    trigger.classList.remove('is-invalid');
-                    showSelection();
-                    close();
-                };
-
-                const appendChunk = () => {
-                    matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
-                        const item = document.createElement('div');
-                        item.className = 'cl-picker-option';
-                        item.id = list.id + '-option-' + shown.length;
-                        item.setAttribute('role', 'option');
-                        item.setAttribute('aria-selected', String(option.value === field.value));
-                        const text = document.createElement('span');
-                        text.className = 'cl-picker-option-text';
-                        text.appendChild(optionPath(option));
-                        const name = document.createElement('span');
-                        name.className = 'cl-picker-name';
-                        name.textContent = option.label;
-                        text.appendChild(name);
-                        item.appendChild(text);
-                        item.addEventListener('click', event => {
-                            event.preventDefault();
-                            select(option);
-                        });
-                        list.appendChild(item);
-                        shown.push(option);
-                    });
-                };
-
-                const render = () => {
-                    query = normalize(search.value.trim());
-                    matches = query
-                            ? options.filter(option => option.haystack.includes(query))
-                            : options;
-                    shown = [];
-                    active = -1;
-                    list.innerHTML = '';
-                    list.scrollTop = 0;
-                    search.removeAttribute('aria-activedescendant');
-                    // The listbox holds options only; "nothing matches" is a line below it.
-                    empty.hidden = matches.length > 0;
-
-                    appendChunk();
-                    counter.textContent = format(messages.count, matches.length, options.length);
-                };
-
-                list.addEventListener('scroll', () => {
-                    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 48) {
-                        appendChunk();
-                    }
-                });
-
-                const highlightActive = () => showActive(search, list, active);
-
-                const move = step => {
-                    if (!shown.length) {
-                        return;
-                    }
-                    if (active + step >= shown.length - 1) {
-                        appendChunk();
-                    }
-                    active = Math.min(Math.max(active + step, 0), shown.length - 1);
-                    highlightActive();
-                };
-
-                const isOpen = () => !menu.hidden;
-
-                const open = () => {
-                    menu.hidden = false;
-                    trigger.setAttribute('aria-expanded', 'true');
-                    search.setAttribute('aria-expanded', 'true');
-                    search.value = '';
-                    render();
-                    search.focus();
-                };
-
-                const close = () => closeMenu(picker);
-
-                trigger.addEventListener('click', () => isOpen() ? close() : open());
-                search.addEventListener('input', render);
-
-                search.addEventListener('keydown', event => {
-                    if (event.key === 'ArrowDown') {
-                        event.preventDefault();
-                        move(1);
-                    } else if (event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        move(-1);
-                    } else if (event.key === 'Enter') {
-                        event.preventDefault();
-                        if (active >= 0) {
-                            select(shown[active]);
-                        } else if (shown.length === 1) {
-                            select(shown[0]);
-                        }
-                    }
-                });
-                closeOnLeave(picker, isOpen, close);
-
-                if (field.form && picker.dataset.pickerRequired) {
-                    field.form.addEventListener('submit', event => {
-                        if (!field.value) {
-                            event.preventDefault();
-                            trigger.classList.add('is-invalid');
-                            open();
-                        }
-                    });
-                }
-
-                showSelection();
-                close();
+                singlePicker(picker, field, options, messages);
             };
 
             initialiseOn('[data-category-picker]', setUp);
+        })();
+    </script>
+</th:block>
+
+<!--/* The script of optionPicker: takes the field over from the native select and runs the shared single picker on the
+       rows the server drew. */-->
+<th:block th:fragment="optionPickerScript">
+    <th:block th:insert="~{fragments/category-picker :: pickerHelpers}"></th:block>
+
+    <script>
+        (function () {
+            const {normalize, singlePicker, initialiseOn} = window.pickerHelpers;
+
+            const setUp = picker => {
+                if (picker.dataset.pickerReady) {
+                    return;
+                }
+                picker.dataset.pickerReady = 'true';
+
+                const root = picker.closest('.cl-picker');
+                const select = root.querySelector('[data-picker-select]');
+                const field = root.querySelector('[data-picker-value]');
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const options = Array.from(picker.querySelectorAll('[data-picker-list] [role="option"]')).map(row => ({
+                    value: row.dataset.value,
+                    label: row.dataset.label,
+                    element: row,
+                    // The grey line is searchable too: typing a catalog's name lists its categories.
+                    haystack: normalize(row.textContent.replace(/\s+/g, ' '))
+                }));
+                const labels = new Map(options.map(option => [option.value, option.label]));
+                const hadFocus = document.activeElement === select || select.hasAttribute('autofocus');
+
+                // The trigger takes the select's id, so the label's for and an error summary's link reach it.
+                const id = select.id;
+                select.removeAttribute('id');
+                trigger.id = id;
+                select.hidden = true;
+                select.disabled = true;
+                field.disabled = false;
+                picker.hidden = false;
+
+                singlePicker(picker, field, options,
+                        {count: picker.dataset.pickerCount, unset: picker.dataset.pickerUnset},
+                        value => labels.get(value));
+                if (hadFocus) {
+                    trigger.focus();
+                }
+            };
+
+            initialiseOn('[data-option-picker]', setUp);
         })();
     </script>
 </th:block>
@@ -421,7 +600,7 @@
                 removed: /*[[#{catalog.category.pim.removed}]]*/ ''
             };
             const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
-            const {showActive, closeOnLeave} = window.pickerHelpers;
+            const {showActive, closeOnLeave, announceLater} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -585,7 +764,7 @@
                     empty.hidden = matches.length > 0;
 
                     appendChunk();
-                    counter.textContent = format(messages.count, matches.length, entries.length);
+                    announceLater(counter, format(messages.count, matches.length, entries.length));
                 };
 
                 list.addEventListener('scroll', () => {

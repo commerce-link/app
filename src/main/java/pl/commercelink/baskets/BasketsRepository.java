@@ -10,8 +10,10 @@ import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -55,53 +57,87 @@ public class BasketsRepository extends DynamoDbRepository<Basket> {
         return Optional.ofNullable(dynamoDBMapper.load(Basket.class, storeId, basketId));
     }
 
-    public List<Basket> search(String storeId, BasketFilter filter, int page, int pageSize) {
-        if (isNotBlank(filter.getBasketId())) {
-            Optional<Basket> basket = findById(storeId, filter.getBasketId());
-            return basket.map(Collections::singletonList).orElseGet(Collections::emptyList);
-        } else {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            Map<String, String> expressionAttributeNames = new HashMap<>();
-            StringBuilder filterExpression = new StringBuilder();
-            eav.put(":storeId", new AttributeValue().withS(storeId));
+    /**
+     * One page of the offers list (spec §5.2). The query reads only the light projection of the index (basketId, name,
+     * type, expiresAt), so filtering, counting and slicing are cheap; only the shown page is then loaded in full.
+     * A filter may use only projected attributes — hence no search by e-mail (spec §10).
+     */
+    public OfferListResult findForList(String storeId, OfferListCriteria criteria, int page, int pageSize) {
+        Map<String, AttributeValue> values = new HashMap<>();
+        Map<String, String> names = new HashMap<>();
+        values.put(":storeId", new AttributeValue().withS(storeId));
+        values.put(":type", new AttributeValue().withS(criteria.type().name()));
+        names.put("#type", "type");
 
-            if (isNotBlank(filter.getNamePrefix())) {
-                eav.put(":namePrefix", new AttributeValue().withS(filter.getNamePrefix()));
-                expressionAttributeNames.put("#name", "name");
-                appendFilter(filterExpression, "begins_with(#name, :namePrefix)");
-            }
-            if (filter.getType() != null) {
-                eav.put(":type", new AttributeValue().withS(filter.getType().name()));
-                expressionAttributeNames.put("#type", "type");
-                appendFilter(filterExpression, "#type = :type");
-            }
-
-            String keyCondition = "storeId = :storeId";
-            LocalDate createdAtStart = filter.getCreatedAtStart();
-            LocalDate createdAtEnd = filter.getCreatedAtEnd();
-            if (createdAtStart != null && createdAtEnd != null) {
-                keyCondition += " AND createdAt BETWEEN :createdAtStart AND :createdAtEnd";
-                eav.put(":createdAtStart", new AttributeValue().withS(createdAtStart.toString()));
-                eav.put(":createdAtEnd", new AttributeValue().withS(createdAtEnd.toString()));
-            } else if (createdAtStart != null) {
-                keyCondition += " AND createdAt >= :createdAtStart";
-                eav.put(":createdAtStart", new AttributeValue().withS(createdAtStart.toString()));
-            } else if (createdAtEnd != null) {
-                keyCondition += " AND createdAt <= :createdAtEnd";
-                eav.put(":createdAtEnd", new AttributeValue().withS(createdAtEnd.toString()));
-            }
-
-            DynamoDBQueryExpression<Basket> queryExpression = new DynamoDBQueryExpression<Basket>()
-                    .withIndexName("BasketCreatedAtIndex")
-                    .withConsistentRead(false) // required for GSI
-                    .withKeyConditionExpression(keyCondition)
-                    .withExpressionAttributeValues(eav)
-                    .withExpressionAttributeNames(expressionAttributeNames.isEmpty() ? null : expressionAttributeNames)
-                    .withFilterExpression(filterExpression.length() > 0 ? filterExpression.toString() : null)
-                    .withScanIndexForward(false);
-
-            return queryWithPagination(queryExpression, page, pageSize, Basket.class);
+        String keyCondition = "storeId = :storeId";
+        String from = criteria.from() == null ? null : criteria.from().atStartOfDay().format(DATE_TIME_FORMATTER);
+        // the whole "to" day: createdAt is a date-time string, so "<= 2026-09-30" alone would miss that day
+        String to = criteria.to() == null ? null : criteria.to().atTime(LocalTime.MAX).format(DATE_TIME_FORMATTER);
+        if (from != null && to != null) {
+            keyCondition += " AND createdAt BETWEEN :from AND :to";
+        } else if (from != null) {
+            keyCondition += " AND createdAt >= :from";
+        } else if (to != null) {
+            keyCondition += " AND createdAt <= :to";
         }
+        if (from != null) values.put(":from", new AttributeValue().withS(from));
+        if (to != null) values.put(":to", new AttributeValue().withS(to));
+
+        StringBuilder filter = new StringBuilder("#type = :type");
+        if (criteria.text() != null) {
+            values.put(":q", new AttributeValue().withS(criteria.text()));
+            names.put("#name", "name");
+            filter.append(" AND (contains(#name, :q) OR begins_with(basketId, :q))");
+        }
+        if (!criteria.validity().isEmpty()) {
+            List<String> alternatives = new ArrayList<>();
+            for (OfferValidity v : EnumSet.copyOf(criteria.validity())) {
+                alternatives.add(switch (v) {
+                    case ACTIVE -> "expiresAt > :soon";
+                    case EXPIRING -> "(expiresAt >= :now AND expiresAt <= :soon)";
+                    case EXPIRED -> "expiresAt < :now";
+                    case NO_EXPIRY -> "attribute_not_exists(expiresAt)";
+                });
+            }
+            String joined = String.join(" OR ", alternatives);
+            if (joined.contains(":now")) values.put(":now", new AttributeValue().withS(criteria.now().format(DATE_TIME_FORMATTER)));
+            if (joined.contains(":soon")) values.put(":soon", new AttributeValue().withS(
+                    criteria.now().plusDays(OfferValidity.EXPIRING_DAYS).format(DATE_TIME_FORMATTER)));
+            // DynamoDB rejects redundant parentheses, and EXPIRING already carries its own pair
+            filter.append(alternatives.size() == 1 ? " AND " + joined : " AND (" + joined + ")");
+        }
+
+        DynamoDBQueryExpression<Basket> query = new DynamoDBQueryExpression<Basket>()
+                .withIndexName("BasketCreatedAtIndex")
+                .withConsistentRead(false)
+                .withKeyConditionExpression(keyCondition)
+                .withFilterExpression(filter.toString())
+                .withExpressionAttributeNames(names)
+                .withExpressionAttributeValues(values)
+                .withScanIndexForward(false);
+
+        List<String> ids = dynamoDBMapper.query(Basket.class, query).stream().map(Basket::getBasketId).toList();
+        int total = ids.size();
+        int lastPage = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+        int shown = Math.min(Math.max(1, page), lastPage);
+        List<String> pageIds = ids.subList(Math.min((shown - 1) * pageSize, total), Math.min(shown * pageSize, total));
+        if (pageIds.isEmpty()) {
+            return new OfferListResult(List.of(), total, shown);
+        }
+
+        List<Basket> keys = pageIds.stream().map(id -> {
+            Basket key = new Basket();
+            key.setStoreId(storeId);
+            key.setBasketId(id);
+            return key;
+        }).toList();
+        Map<String, Basket> loaded = dynamoDBMapper.batchLoad(keys).values().stream()
+                .flatMap(List::stream)
+                .map(Basket.class::cast)
+                .collect(Collectors.toMap(Basket::getBasketId, b -> b, (a, b) -> a));
+        // batchLoad has no order and skips a record deleted since the index read
+        List<Basket> rows = pageIds.stream().map(loaded::get).filter(Objects::nonNull).toList();
+        return new OfferListResult(rows, total, shown);
     }
 
     public void deleteAllBasketsOlderThan(LocalDateTime date) {

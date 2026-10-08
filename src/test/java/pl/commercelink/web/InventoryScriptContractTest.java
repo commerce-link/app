@@ -20,6 +20,7 @@ class InventoryScriptContractTest {
         // given
         String script = read("src/main/resources/static/js/inventory.js");
         String templates = read("src/main/resources/templates/inventory.html")
+                + read("src/main/resources/templates/inventory-prices.html")
                 + read("src/main/resources/templates/fragments/inventory-summary.html")
                 + read("src/main/resources/templates/fragments/inventory-results.html")
                 + read("src/main/resources/templates/fragments/inventory-technical.html");
@@ -34,5 +35,28 @@ class InventoryScriptContractTest {
             assertThat(script).as("script references " + hook).contains(hook);
             assertThat(templates).as("templates render " + hook).contains(hook);
         }
+    }
+
+    @Test
+    void buildingScriptUsesOnlyHooksTheTemplatesRender() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/inventory-building.js");
+        String templates = read("src/main/resources/templates/fragments/inventory-browse.html");
+
+        // when / then
+        for (String hook : List.of("data-browse-building", "data-browse-building-stalled", "data-cl-list-results",
+                "data-cl-list-fragment", "data-cl-list-focus")) {
+            assertThat(script).as("script references " + hook).containsAnyOf(hook, datasetName(hook));
+            assertThat(templates).as("templates render " + hook).contains(hook);
+        }
+    }
+
+    private static String datasetName(String hook) {
+        String[] parts = hook.substring("data-".length()).split("-");
+        StringBuilder name = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            name.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+        }
+        return name.toString();
     }
 }

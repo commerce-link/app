@@ -89,9 +89,10 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         assertThat(deliveries.findInTransit("store-2")).hasSize(1);
         assertThat(deliveries.findToSettle("store-1")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0001-0000-0000-0000-000000000000");
-        assertThat(deliveries.findReceivedBetween("store-1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+        assertThat(deliveries.findReceivedSince("store-1", LocalDate.of(2026, 9, 20)))
                 .extracting(Delivery::getDeliveryId).containsExactly("bbbb0001-0000-0000-0000-000000000000");
-        assertThat(deliveries.findReceivedBetween("store-1", null, null)).hasSize(2);
+        assertThat(deliveries.findReceivedSince("store-1", LocalDate.of(2026, 9, 21))).isEmpty();
+        assertThat(deliveries.findReceivedSince("store-1", null)).hasSize(2);
         assertThat(deliveries.findByDeliveryIdPrefix("store-1", "bbbb0002")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0002-0000-0000-0000-000000000000");
         // COUNT on the active index

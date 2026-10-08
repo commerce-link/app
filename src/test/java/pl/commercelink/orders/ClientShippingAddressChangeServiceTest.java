@@ -261,6 +261,17 @@ class ClientShippingAddressChangeServiceTest {
     }
 
     @Test
+    @DisplayName("isEditable is false while the store has no e-mail sender, since the code could not be sent")
+    void notEditableWithoutNotificationSender() {
+        // given
+        Store store = store(true, true);
+        store.getClientNotificationsConfiguration().setReplyToEmail(null);
+
+        // when / then
+        assertThat(service.isEditable(editableOrder(), store)).isFalse();
+    }
+
+    @Test
     @DisplayName("isEditable is false when the store has not enabled the address changed notification")
     void notEditableWithoutAddressChangedTemplate() {
         // given
@@ -383,6 +394,8 @@ class ClientShippingAddressChangeServiceTest {
         storeBilling.setEmail("shop@example.com");
         store.setBillingDetails(storeBilling);
         ClientNotificationsConfiguration notifications = new ClientNotificationsConfiguration();
+        notifications.setSenderName("Sklep");
+        notifications.setReplyToEmail("shop@example.com");
         notifications.enableNotification(EmailNotificationType.CLIENT_VERIFICATION_CODE, "ClientVerificationCodeTemplate");
         notifications.enableNotification(EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED, "OrderShippingAddressChangedTemplate");
         store.setClientNotificationsConfiguration(notifications);

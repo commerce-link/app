@@ -20,7 +20,7 @@ class NavigationModelTest {
 
         // then
         assertThat(itemKeys(model)).contains("offers", "orders", "clients", "fulfilment", "deliveries", "rma",
-                "warehouse", "warehouseDocuments", "catalogs", "inventory", "payments", "reports");
+                "warehouse", "warehouseDocuments", "catalogs", "inventory", "inventoryPrices", "payments", "reports");
         assertThat(model.footer()).extracting(NavItem::key).containsExactly("settings");
     }
 
@@ -41,7 +41,7 @@ class NavigationModelTest {
 
         // then
         assertThat(itemKeys(model)).containsExactly("fulfilmentQueue", "deliveriesQueue", "inventory",
-                "stores", "rmaCenters");
+                "inventoryPrices", "stores", "rmaCenters");
         assertThat(itemKeys(model)).doesNotContain("offers", "orders");
     }
 
@@ -122,5 +122,39 @@ class NavigationModelTest {
 
         // then
         assertThat(model.activeMessageKey()).isNull();
+    }
+
+    @Test
+    void priceComparisonFollowsTheSupplierAssortmentForEveryRoleThatSeesIt() {
+        for (UserRole role : List.of(UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN)) {
+            // when
+            NavigationModel model = NavigationModel.forRoleAndPath(role, "/dashboard/orders");
+
+            // then
+            List<String> keys = itemKeys(model);
+            assertThat(keys.indexOf("inventoryPrices")).as(role.name()).isEqualTo(keys.indexOf("inventory") + 1);
+        }
+    }
+
+    @Test
+    void priceComparisonPathLightsUpOnlyThePriceComparison() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/inventory/prices");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("inventoryPrices");
+        assertThat(model.activeMessageKey()).isEqualTo("nav.inventory.prices");
+        assertThat(model.activeSectionMessageKey()).isEqualTo("nav.group.catalog");
+    }
+
+    @Test
+    void inventoryPathAndItsFragmentsLightUpTheSupplierAssortment() {
+        // when
+        NavigationModel page = NavigationModel.forRoleAndPath(UserRole.USER, "/dashboard/inventory");
+        NavigationModel fragment = NavigationModel.forRoleAndPath(UserRole.USER, "/dashboard/inventory/browse");
+
+        // then
+        assertThat(page.active().key()).isEqualTo("inventory");
+        assertThat(fragment.active().key()).isEqualTo("inventory");
     }
 }

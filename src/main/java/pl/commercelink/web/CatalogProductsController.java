@@ -28,11 +28,11 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
-import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductAvailabilityType;
 import pl.commercelink.products.ProductCatalog;
@@ -53,9 +53,11 @@ import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.CategoryTypeLabels;
 import pl.commercelink.web.catalog.ProductRow;
 import pl.commercelink.web.catalog.ProductStatus;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.inventory.InventoryReturnTo;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
@@ -120,6 +122,8 @@ public class CatalogProductsController {
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
+    private final CatalogPlacement catalogPlacement;
+    private final ProductsAddReview review;
 
     /**
      * Raised for the review form, whose list grows to one entry per selected proposal; Spring stops at 256 by default
@@ -246,9 +250,21 @@ public class CatalogProductsController {
         return "catalog/products-add";
     }
 
+    /**
+     * The review and the save answer a POST; a reload, a bookmark or a history entry asks for them with a GET and gets
+     * the products to choose from again instead of a 405.
+     */
+    @GetMapping({"/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/review",
+            "/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/save"})
+    public String reviewReloaded(@PathVariable String catalogId, @PathVariable String categoryId) {
+        access.requireCategory(access.requireCatalog(storeId(), catalogId), categoryId);
+        return "redirect:" + CatalogPaths.productsAdd(catalogId, categoryId);
+    }
+
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/review")
     public String reviewProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                                 @RequestParam(required = false) List<String> eans, Model model, Locale locale,
+                                 @RequestParam(required = false) List<String> eans,
+                                 @RequestParam(required = false) String returnTo, Model model, Locale locale,
                                  RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
@@ -261,36 +277,18 @@ public class CatalogProductsController {
                     messageSource.getMessage("catalog.products.review.none", null, locale));
             return "redirect:" + CatalogPaths.productsAdd(catalogId, categoryId);
         }
-        InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
-        // Read once: the same selection sent twice (Back, a double click) must not add the product a second time.
-        List<InventoryKey> alreadyInCategory = productRepository.findAll(category.getCategoryId()).stream()
-                .map(InventoryKey::fromProduct)
-                .toList();
-        List<Product> products = new ArrayList<>();
-        List<String> skipped = new ArrayList<>();
-        List<String> skippedExisting = new ArrayList<>();
-        for (String ean : eans) {
-            MatchedInventory matched = enabled.findByEan(ean);
-            // The proposals were read before the page was shown; a product can leave the inventory in the meantime.
-            if (matched.isEmpty()) {
-                skipped.add(ean);
-                continue;
-            }
-            InventoryKey key = matched.getInventoryKey();
-            if (alreadyInCategory.stream().anyMatch(key::matches)) {
-                skippedExisting.add(ean);
-                continue;
-            }
-            Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
-            products.add(new ProductRecommendation(category, matched, entry).toProduct());
-        }
-        return renderReview(catalog, category, ProductsBulkAddForm.of(products), skipped, skippedExisting, Map.of(),
-                model, locale);
+        ProductsAddReview.Prepared prepared = review.prepare(storeId(), category, eans, null);
+        String view = review.render(catalog, category, prepared.form(), prepared.skipped(), prepared.skippedExisting(),
+                Map.of(), model, locale);
+        applyReturnTo(returnTo, model, prepared.skippedExisting().size());
+        return view;
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/save")
     public String saveProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                               @ModelAttribute ProductsBulkAddForm form, Model model, Locale locale,
+                               @ModelAttribute ProductsBulkAddForm form,
+                               @RequestParam(required = false) String returnTo,
+                               @RequestParam(defaultValue = "0") int skippedBefore, Model model, Locale locale,
                                RedirectAttributes redirectAttributes, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
@@ -301,38 +299,18 @@ public class CatalogProductsController {
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category));
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
-            return renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
+            String view = review.render(catalog, category, form, List.of(), List.of(), errors, model, locale);
+            applyReturnTo(returnTo, model, skippedBefore);
+            return view;
         }
-        // The review skipped what the category had when it was rendered; the same review sent again (Back, a double
-        // click) is decided here once more, against the category as it is now.
-        List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
-                .map(InventoryKey::fromProduct)
-                .toList());
-        InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
-        int added = 0;
-        for (int index = 0; index < form.getProducts().size(); index++) {
-            // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
-            // form would bind the product to an arbitrary entry of the catalog.
-            Product product = form.toProduct(index, category.getCategoryId());
-            InventoryKey key = InventoryKey.fromProduct(product);
-            if (alreadyInCategory.stream().anyMatch(key::matches)) {
-                continue;
-            }
-            pimEntryOf(enabled, key, product).ifPresent(entry -> {
-                product.setPimId(entry.pimId());
-                product.setBrand(brandMapper.unifyBrand(entry.brand()));
-            });
-            try {
-                productRepository.save(product);
-            } catch (ConditionalCheckFailedException e) {
-                // The same review, saved by a parallel request that read the category at the same moment, wrote this
-                // row first under the same id: the category has it, exactly as if the read above had found it -- so
-                // its key guards the rows after it, as the key of a row saved here would.
-                alreadyInCategory.add(key);
-                continue;
-            }
-            alreadyInCategory.add(key);
-            added++;
+        int added = review.save(storeId(), category, form);
+        // A review opened from the inventory before "Dodaj do katalogu" chose its category on the review page itself.
+        Optional<String> backToInventory = InventoryReturnTo.safe(returnTo);
+        if (backToInventory.isPresent()) {
+            // The review already dropped what the category had then; only the inventory notice reports that number.
+            int skipped = form.getProducts().size() - added + reviewSkipped(skippedBefore);
+            review.noticeForInventory(redirectAttributes, catalogId, category, added, skipped, locale);
+            return "redirect:" + backToInventory.get();
         }
         // Nothing saved is not a success: the category page shows it in its warning alert.
         if (added == 0) {
@@ -417,11 +395,12 @@ public class CatalogProductsController {
         }
         // Resolved the way the prefill and the review resolve it, through the whole inventory key: asked by its own
         // two codes alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
-        pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
+        review.pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
             product.setPimId(entry.pimId());
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
         productRepository.save(product);
+        catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.added", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
@@ -485,7 +464,7 @@ public class CatalogProductsController {
             Product asSaved = new Product();
             asSaved.setEan(StringUtils.trimToNull(form.getEan()));
             asSaved.setManufacturerCode(StringUtils.trimToNull(form.getManufacturerCode()));
-            joined = pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
+            joined = review.pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
         }
         if (form.identifiersChanged() || joined.isPresent()) {
             // Corrected codes, or the entry they lead to, must not be another product's of the category: the category
@@ -515,6 +494,8 @@ public class CatalogProductsController {
                     Map.of(PRODUCT_FORM, "product.conflict"), null, currentFilter, model, locale);
             return async ? PRODUCT_FRAGMENT : view;
         }
+        // An edit may change the codes the inventory's "W katalogu" compares.
+        catalogPlacement.evict(storeId());
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage(joined.isPresent() ? "product.saved.pimAttached" : "product.saved",
                         new Object[]{product.getName()}, locale), async, model,
@@ -556,6 +537,7 @@ public class CatalogProductsController {
         }
         // Deleted whatever its version: a save of the product landing after this page read it does not fail the delete.
         productRepository.deleteWhateverItsVersion(product);
+        catalogPlacement.evict(storeId());
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("product.deleted", new Object[]{product.getName()}, locale));
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
@@ -571,19 +553,6 @@ public class CatalogProductsController {
      * inventory between the review and the save, and the key the inventory does know it by may not carry the
      * identifier the operator has just corrected in the review.
      */
-    private Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
-        MatchedInventory matched = inventory.findByInventoryKey(key);
-        if (!matched.isEmpty()) {
-            InventoryKey known = matched.getInventoryKey();
-            Optional<PimEntry> byInventoryKey = pimCatalog.findByPimIdOrGtinsOrMpns(
-                    known.getId(), known.getProductEans(), known.getProductCodes());
-            if (byInventoryKey.isPresent()) {
-                return byInventoryKey;
-            }
-        }
-        return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
-    }
-
     private static List<String> marketplaceNames(Store store) {
         return store.getMarketplaces().stream().map(MarketplaceIntegration::getName).toList();
     }
@@ -681,25 +650,18 @@ public class CatalogProductsController {
         return "redirect:" + nextPath;
     }
 
-    /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */
-    private String renderReview(ProductCatalog catalog, CategoryDefinition category, ProductsBulkAddForm form,
-                                List<String> skipped, List<String> skippedExisting, Map<String, String> errors,
-                                Model model, Locale locale) {
-        Map<String, String> texts = new LinkedHashMap<>();
-        errors.forEach((field, key) -> texts.put(field, messageSource.getMessage(key, null, locale)));
-        model.addAttribute("form", form);
-        model.addAttribute("errors", texts);
-        model.addAttribute("errorSummary", ProductsBulkAddForm.summary(texts, (number, text) ->
-                messageSource.getMessage(ProductsBulkAddForm.SUMMARY_LINE, new Object[]{number, text}, locale)));
-        model.addAttribute("catalog", catalog);
-        model.addAttribute("category", category);
-        model.addAttribute("labels", category.getGroupingOrder());
-        model.addAttribute("pricingGroups", pricingGroups(category));
-        model.addAttribute("skipped", skipped);
-        model.addAttribute("skippedExisting", skippedExisting);
-        model.addAttribute("saveAction", CatalogPaths.productsAddSave(catalog.getCatalogId(), category.getCategoryId()));
-        model.addAttribute("backHref", CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()));
-        return "catalog/products-add-review";
+    /** A review opened from the inventory list goes back there: "Back", "Cancel" and the redirect after saving. */
+    private static void applyReturnTo(String returnTo, Model model, int skippedBefore) {
+        InventoryReturnTo.safe(returnTo).ifPresent(target -> {
+            model.addAttribute("backHref", target);
+            model.addAttribute("returnTo", target);
+            model.addAttribute("skippedBefore", reviewSkipped(skippedBefore));
+        });
+    }
+
+    /** Sent back by the review form, so a forged value only changes the text of the notice; kept within the review limit. */
+    private static int reviewSkipped(int skippedBefore) {
+        return Math.clamp(skippedBefore, 0, MAX_ADDED_PRODUCTS);
     }
 
     /**
@@ -717,7 +679,7 @@ public class CatalogProductsController {
     }
 
     private static List<String> pricingGroups(CategoryDefinition category) {
-        return category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().toList();
+        return ProductsAddReview.pricingGroups(category);
     }
 
     private List<ProductRow> rowsOf(ProductCatalog catalog, CategoryDefinition category) {
@@ -790,6 +752,7 @@ public class CatalogProductsController {
     /** What the operator chose goes, even when it was saved meanwhile: the delete does not ask for the version it read. */
     private int delete(List<Product> products) {
         products.forEach(productRepository::deleteWhateverItsVersion);
+        catalogPlacement.evict(storeId());
         return products.size();
     }
 

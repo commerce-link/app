@@ -213,7 +213,7 @@ public class ReceiptEffects {
             } else {
                 // A skipped e-mail (type off, no address) never gets here: this is a real send failure, which the
                 // operator retries with "Resend e-mail" once the template or mail setup is fixed.
-                a.setLastError("E-receipt e-mail could not be sent (send failed or no template); use Resend e-mail on the order");
+                a.setLastError("E-receipt e-mail could not be sent (send failed, no template or no sender); use Resend e-mail on the order");
                 a.setLastErrorAt(now);
             }
             return true;

@@ -5,129 +5,190 @@
 <body>
 
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
-                <h1 class="mb-0" th:text="#{warehouse.documents.title}"></h1>
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{warehouse.documents.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
             </div>
+            <p class="cl-page-lead" th:text="#{warehouse.documents.list.lead}"></p>
+        </header>
 
-            <div th:replace="~{fragments/screen-intro :: panel('warehouse-documents', 'fas fa-file-alt')}"></div>
+        <div th:replace="~{fragments/screen-intro :: panel('warehouse-documents', 'fas fa-file-alt')}"></div>
 
-            <div class="box" th:if="${documentsDisabled}">
-                <div class="notification is-warning">
-                    <span th:text="#{warehouse.documents.disabled}"></span>
-                </div>
-            </div>
-
-            <div class="box" th:unless="${documentsDisabled}">
-                <form method="get" th:action="${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents'">
-                    <div class="columns">
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.type}"></label>
-                                <div class="control">
-                                    <div class="select is-fullwidth">
-                                        <select name="type">
-                                            <option value="" th:text="#{general.all}"></option>
-                                            <option th:each="docType : ${documentTypes}"
-                                                    th:value="${docType.name()}"
-                                                    th:text="${enumI18n.localize(docType)}"
-                                                    th:selected="${docType.name() == searchParams.type}"></option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.warehouse.id}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="warehouseId" th:value="${searchParams.warehouseId}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.item.ean}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="ean" th:value="${searchParams.ean}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.item.mfn}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="mfn" th:value="${searchParams.mfn}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="columns">
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.date.from}"></label>
-                                <div class="control">
-                                    <input class="input" type="date" name="dateFrom" th:value="${searchParams.dateFrom}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column">
-                            <div class="field">
-                                <label class="label" th:text="#{warehouse.documents.date.to}"></label>
-                                <div class="control">
-                                    <input class="input" type="date" name="dateTo" th:value="${searchParams.dateTo}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <div class="control">
-                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
-                        </div>
-                    </div>
-                </form>
-
-                <div class="mt-5">
-                    <table class="table is-fullwidth is-narrow">
-                        <thead>
-                        <tr>
-                            <th th:if="${isSuperAdmin}" th:text="#{general.store.id}"></th>
-                            <th th:text="#{warehouse.documents.warehouse.id}"></th>
-                            <th th:text="#{warehouse.documents.document.no}"></th>
-                            <th th:text="#{warehouse.documents.type}"></th>
-                            <th th:text="#{warehouse.documents.counterparty}"></th>
-                            <th th:text="#{warehouse.documents.created.at}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="doc : ${documents}"
-                            th:with="detailPath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard'">
-                            <td th:if="${isSuperAdmin}" th:text="${doc.storeId}"></td>
-                            <td th:text="${doc.warehouseId}"></td>
-                            <td>
-                                <a th:href="@{${detailPath + '/warehouse-documents/details'}(documentId=${doc.documentId})}">
-                                    <span th:text="${doc.documentNo}"></span>
-                                </a>
-                            </td>
-                            <td th:text="${enumI18n.localize(doc.type)}"></td>
-                            <td th:text="${doc.counterparty?.companyName} ?: (${doc.counterparty?.name} != null ? ${doc.counterparty.name + (doc.counterparty.surname != null ? ' ' + doc.counterparty.surname : '')} : '')"></td>
-                            <td th:text="${#temporals.format(doc.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
-                        </tr>
-                        <tr th:if="${#lists.isEmpty(documents)}">
-                            <td th:colspan="${isSuperAdmin} ? 6 : 5" class="has-text-centered" th:text="#{warehouse.documents.no.documents}"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-
-                    <div th:replace="~{fragments/pagination :: pagination(${isSuperAdmin} ? '/dashboard/store/' + ${storeId} + '/warehouse-documents' : '/dashboard/warehouse-documents', ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
-                </div>
-            </div>
+        <!--/* Documents switched off in the store settings: say what it means and where to change it, nothing else. */-->
+        <div th:fragment="disabled" th:unless="${page.documentsEnabled()}" class="cl-alert is-warn" role="status">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text">
+                <span th:text="#{warehouse.documents.list.disabled}"></span>
+                <a th:unless="${page.superAdmin()}" th:href="@{${page.settingsHref()}}" th:text="#{warehouse.documents.list.disabled.link}"></a>
+            </p>
         </div>
-    </section>
+
+        <th:block th:fragment="results">
+        <div th:if="${page.documentsEnabled()}" data-cl-list-results th:attr="data-cl-list-path=${page.query().path()}, data-cl-list-fragment=${page.fragmentPath()}"
+             th:with="q=${page.query()}">
+
+            <!--/* Inside the swapped block: the fragment request carries no flash, so the notice goes away with the next swap;
+                   list-page.js focuses it once (data-cl-list-notice). */-->
+            <div th:if="${documentsNotice != null}" class="cl-alert is-warn" role="status" tabindex="-1" data-cl-list-notice>
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${documentsNotice}"></p>
+            </div>
+
+            <section class="cl-card" aria-labelledby="documents-table-title">
+                <h2 class="cl-visually-hidden" id="documents-table-title" th:text="#{warehouse.documents.list.table}"></h2>
+
+                <div class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{warehouse.documents.list.kind.label}">
+                            <a class="cl-segment" th:each="s : ${page.segments()}" th:href="@{${s.href()}}"
+                               th:attr="title=${s.title()}, aria-current=${s.active()} ? 'page' : null" data-cl-list-nav><span th:text="${s.label()}"></span></a>
+                        </nav>
+                        <div class="cl-toolbar-search">
+                            <form method="get" th:action="@{${q.path()}}" class="cl-search-form" role="search" data-cl-list-form>
+                                <th:block th:replace="~{fragments/warehouse-documents-list :: hidden('search')}"></th:block>
+                                <label class="cl-visually-hidden" for="documents-search" th:text="#{warehouse.documents.list.search.label}"></label>
+                                <div class="cl-search-field is-wide">
+                                    <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <input class="cl-input cl-table-search" type="search" id="documents-search" name="q" autocomplete="off"
+                                           th:value="${q.q()}" th:attr="placeholder=#{warehouse.documents.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                                    <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                       th:attr="aria-label=#{warehouse.documents.list.search.clear}" data-cl-list-nav>
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                                <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                    <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                                </button>
+                            </form>
+                            <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="documents-filters" aria-expanded="true">
+                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                <span class="cl-toolbar-toggle-label"><span th:text="#{warehouse.documents.list.filters}"></span><th:block th:if="${q.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${q.activeFilterCount()}"></span></th:block></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cl-toolbar-filters" id="documents-filters">
+                        <details class="cl-filter-menu" data-cl-filter-menu="reason">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.documents.list.reason.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.reasonSummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{${q.path()}}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/warehouse-documents-list :: hidden('reason')}"></th:block>
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{warehouse.documents.list.reason.menu}">
+                                    <label class="cl-filter-menu-check" th:each="o : ${page.reasonOptions()}">
+                                        <input type="checkbox" name="reason" th:value="${o.value()}" th:checked="${o.selected()}"/>
+                                        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                    </label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.documents.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <details class="cl-filter-menu is-end" data-cl-filter-menu="dates">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.documents.list.dates.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{${q.path()}}" class="cl-filter-menu-panel" data-cl-list-form>
+                                <th:block th:replace="~{fragments/warehouse-documents-list :: hidden('dates')}"></th:block>
+                                <div class="cl-filter-menu-dates">
+                                    <label><span th:text="#{warehouse.documents.list.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/></label>
+                                    <label><span th:text="#{warehouse.documents.list.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/></label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" th:text="#{warehouse.documents.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                    </div>
+                </div>
+
+                <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                       th:text="${page.resultsLine()}"></p>
+                </div>
+
+                <!--/* Below 720 px the table turns into cards without a header row, so the order is stated on this bar. */-->
+                <nav class="cl-table-sortbar" th:unless="${page.isEmpty()}" th:attr="aria-label=#{warehouse.documents.list.sort.newest}">
+                    <span class="cl-eyebrow" th:text="#{warehouse.documents.list.sort.newest}"></span>
+                </nav>
+
+                <!--/* Newest first, always: the index is read one way only, so the header states the order without a toggle. */-->
+                <table class="cl-table is-orders is-documents" th:unless="${page.isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" class="cl-col-document" th:text="#{warehouse.documents.list.column.document}"></th>
+                        <th scope="col" class="cl-col-store" th:if="${page.superAdmin()}" th:text="#{warehouse.documents.list.column.store}"></th>
+                        <th scope="col" class="cl-col-reason" th:text="#{warehouse.documents.list.column.reason}"></th>
+                        <th scope="col" class="cl-col-source is-secondary-column" th:text="#{warehouse.documents.list.column.source}"></th>
+                        <th scope="col" class="cl-col-counterparty" th:text="#{warehouse.documents.list.column.counterparty}"></th>
+                        <th scope="col" class="cl-col-created" aria-sort="descending"><span th:text="#{warehouse.documents.list.column.created}"></span> <span class="cl-sort-mark" aria-hidden="true">▼</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.rows()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.documents.list.column.document}">
+                            <a class="cl-row-link cl-doc-no" th:href="@{${row.href()}}"><th:block th:replace="~{fragments/doc-number :: parts(${row.number()})}"></th:block></a>
+                            <span class="cl-table-sub"><span class="cl-icon-text"><i class="fas" th:classappend="${row.incoming()} ? 'fa-sign-in-alt' : 'fa-sign-out-alt'" aria-hidden="true"></i><th:block th:text="${row.typeName()}"></th:block></span></span>
+                        </th>
+                        <td th:if="${page.superAdmin()}" th:attr="data-label=#{warehouse.documents.list.column.store}">
+                            <span class="cl-table-code" th:text="${row.storeId()}" th:title="${row.storeId()}"></span>
+                        </td>
+                        <td th:attr="data-label=#{warehouse.documents.list.column.reason}">
+                            <span th:if="${row.reason() != null}" th:text="${row.reason()}"></span>
+                            <span th:unless="${row.reason() != null}" class="cl-table-sub" th:text="#{warehouse.documents.list.none}"></span>
+                            <span th:if="${row.note() != null}" class="cl-table-sub" th:text="${row.note()}"></span>
+                        </td>
+                        <td class="is-secondary-column cl-cards-hide" th:attr="data-label=#{warehouse.documents.list.column.source}">
+                            <span th:if="${row.source() != null}" th:text="${row.source()}"></span>
+                            <span th:unless="${row.source() != null}" class="cl-table-sub" th:text="#{warehouse.documents.list.none}"></span>
+                        </td>
+                        <td th:attr="data-label=#{warehouse.documents.list.column.counterparty}">
+                            <span th:if="${row.counterparty() != null}" class="cl-cell-client" th:text="${row.counterparty()}" th:title="${row.counterparty()}"></span>
+                            <span th:unless="${row.counterparty() != null}" class="cl-table-sub" th:text="#{warehouse.documents.list.none}"></span>
+                        </td>
+                        <td th:attr="data-label=#{warehouse.documents.list.column.created}">
+                            <span class="cl-cell-date" th:text="${row.date()}"></span>
+                            <span class="cl-table-sub" th:text="${row.timeAndAuthor()}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
+                       th:text="${es.actionLabel()}" data-cl-list-nav></a>
+                </div>
+
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
+        </div>
+        </th:block>
+    </div>
+</section>
+
+<script th:src="@{/js/list-page.js}" defer></script>
 </div>
 </body>
 </html>

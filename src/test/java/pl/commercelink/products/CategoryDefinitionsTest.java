@@ -38,6 +38,8 @@ class CategoryDefinitionsTest {
     private ProductRepository products;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private CatalogPlacement placement;
     @InjectMocks
     private CategoryDefinitions definitions;
 
@@ -152,6 +154,21 @@ class CategoryDefinitionsTest {
     }
 
     @Test
+    void savedChangesOfACategoryDropTheStoresCatalogPlacement() {
+        // given
+        CategoryDefinitions.Basics basics = new CategoryDefinitions.Basics("Karty graficzne", 0, List.of("pim-gpu"),
+                CategoryDefinitionType.Managed, 3, false, false, false, List.of());
+
+        // when
+        definitions.create(catalog, basics);
+        definitions.saveBasics(catalog, gpu, basics);
+        definitions.remove(catalog, gpu);
+
+        // then
+        verify(placement, times(3)).evict("store");
+    }
+
+    @Test
     void aRemovalWhoseCatalogSaveConflictsLeavesTheProductsUntouched() {
         // given -- every attempt reads the catalog anew, as DynamoDB would answer it
         gpu.setDeletionProtection(false);
@@ -171,6 +188,7 @@ class CategoryDefinitionsTest {
         // when / then
         assertThatThrownBy(() -> definitions.remove(catalog, gpu)).isInstanceOf(OptimisticLockingExhaustedException.class);
         verify(catalogs, times(3)).save(any());
+        verify(placement, never()).evict(any());
         verify(products, never()).findAll(any(String.class));
         verify(products, never()).deleteWhateverItsVersion(any());
     }

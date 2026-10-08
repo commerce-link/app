@@ -542,9 +542,19 @@ body.cl-drawer-open .cl-sidebar {
     z-index: 40;
 }
 
-/* a tooltip of several facts, one per line (a "\n" in the text) */
+/* a tooltip of several facts, one per line (a "\n" in the text); a name without spaces breaks inside the bubble
+   instead of widening it past the page edge */
 .cl-tooltip.is-lines::after {
     white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* the bubble grows leftwards from the mark's right edge: for marks right of the middle (a table's last columns, a
+   price, the "?" after a page title), where a centred bubble would run past the page edge and scroll it sideways */
+.cl-tooltip.is-end::after {
+    left: auto;
+    right: -8px;
+    transform: translateY(4px);
 }
 
 .cl-tooltip:hover::after,
@@ -552,6 +562,11 @@ body.cl-drawer-open .cl-sidebar {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);
+}
+
+.cl-tooltip.is-end:hover::after,
+.cl-tooltip.is-end:focus::after {
+    transform: translateY(0);
 }
 
 .cl-tooltip:hover::before,
@@ -610,6 +625,17 @@ body.cl-drawer-open .cl-sidebar {
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+/* A title followed only by the "?" of the screen guide: the title wraps and the "?" stays right after it. Wrapped onto
+   a line of its own, the "?" stood at the left edge, where its end-anchored bubble had no room. */
+.cl-page .cl-page-header-row:has(> .screen-intro-toggle:last-child) {
+    flex-wrap: nowrap;
+}
+
+.cl-page .cl-page-header-row:has(> .screen-intro-toggle:last-child) > .cl-page-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-page-title {
@@ -760,6 +786,8 @@ body.cl-drawer-open .cl-sidebar {
     font-size: 15px;
     font-weight: 600;
     line-height: 1.3;
+    /* a name joined by "/" ("Profesjonalne/konsumenckie AV i foto") is one word to the browser and overflowed the tile */
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-tile-desc {
@@ -1383,6 +1411,7 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink);
 }
 
+.cl-page .cl-card .cl-card-head + .cl-table,
 .cl-page .cl-card .cl-card-head + .cl-list,
 .cl-page .cl-card .cl-card-desc + .cl-list,
 .cl-page .cl-card .cl-card-head + .cl-list-empty,
@@ -1727,6 +1756,8 @@ a.cl-link-button:hover {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-choice-title {
@@ -3935,6 +3966,18 @@ a.cl-link-button:hover {
         margin-top: -7px;
         margin-bottom: -7px;
     }
+
+    /* a 30 px button reaches 44 px through the same invisible hit area as the menus: the row stays as tall as the
+       header it covers (card mode below 720 px draws the buttons 44 px tall instead) */
+    .cl-page .cl-selection-row .cl-button {
+        position: relative;
+    }
+
+    .cl-page .cl-selection-row .cl-button::after {
+        content: "";
+        position: absolute;
+        inset: -7px 0;
+    }
 }
 
 /* --- Catalog: Selectable rows --- */
@@ -4010,6 +4053,7 @@ a.cl-link-button:hover {
     text-decoration: underline;
     text-decoration-color: var(--cl-ink-3);
     text-underline-offset: 3px;
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-table .cl-table-key a:hover {
@@ -4395,6 +4439,24 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* The flat option picker (category-picker :: optionPicker): one tinted row at most -- the script makes the row under the
+   mouse the active one, so the hover tint never lands on a second row while the arrows hold another. */
+.cl-page .cl-picker.is-flat .cl-picker-option:hover:not(.is-active) {
+    background: transparent;
+}
+
+/* A suggested option: a star in --cl-warn (6.8:1 on white, 5.8:1 on the active row) before the word, in the grey line.
+   :is(i, svg): the FontAwesome script swaps the i for an svg. */
+.cl-page .cl-picker-star :is(i, svg) {
+    font-size: 10px;
+    color: var(--cl-warn);
+}
+
+/* The category picker redraws the rows itself, so the "Zmień kategorię" next to it is hidden and the field takes the row. */
+.cl-page .cl-input-row:has(> .cl-button[hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 /* --- Catalog: One-field repeat rows (labels list): numbered lines instead of a fieldset per entry --- */
 .cl-page .cl-repeat-lines {
     display: grid;
@@ -4634,6 +4696,17 @@ a.cl-link-button:hover {
     padding-top: 14px;
 }
 
+/* .is-toolbar-inset: the toolbar stands as far from the card's top edge as from its sides (20 px, 16 px below 720 px) */
+.cl-page .cl-card.is-toolbar-inset > .cl-table-toolbar {
+    padding-top: 20px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-card.is-toolbar-inset > .cl-table-toolbar {
+        padding-top: 16px;
+    }
+}
+
 /* The review ("Uzupełnij dane") in table mode: the name, subcategory and group fields start on the line of the EAN field
    of the product cell -- below its brand line and the EAN label, 60 px from the top of the row -- instead of being
    centred on the row, which put them between the EAN and the code. Card mode (< 720 px) stacks the cells anyway. */
@@ -4720,7 +4793,7 @@ a.cl-link-button:hover {
         font-size: 14px;
     }
 
-    .cl-page .cl-selection-row .cl-menu > summary::after {
+    .cl-page .cl-selection-row :is(.cl-menu > summary, .cl-button)::after {
         content: none;
     }
 
@@ -5203,6 +5276,14 @@ a.cl-link-button:hover {
     pointer-events: none;
 }
 
+/* A field whose placeholder names three things (warehouse documents: number, EAN, manufacturer code) did not fit in 300 px;
+   below 720 px every field takes the row anyway. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-search-field.is-wide {
+        width: 360px;
+    }
+}
+
 .cl-page .cl-search-field .cl-table-search {
     width: 100%;
     padding-left: 36px;
@@ -5401,6 +5482,21 @@ a.cl-link-button:hover {
 @media screen and (max-width: 719px) {
     .cl-page .cl-table.is-orders[data-cl-select-table] .cl-table-check {
         display: none;
+    }
+
+    /* the same for any table whose selection row is wide-only (the supplier assortment): a box with no action
+       behind it would be a dead end; single rows are still added from the row menu */
+    .cl-page .cl-selection-row.is-wide-only ~ .cl-table[data-cl-select-table] .cl-table-check {
+        display: none;
+    }
+
+    /* without its checkbox a product card starts the name where the field names below it start */
+    .cl-page .cl-selection-row.is-wide-only ~ .cl-table.is-products[data-cl-select-table] tbody th.cl-table-key {
+        padding-left: 0;
+    }
+
+    .cl-page .cl-selection-row.is-wide-only ~ .cl-table[data-cl-select-table] tr.is-selected {
+        background: transparent;
     }
 
     .cl-page .cl-table.is-orders[data-cl-select-table] tbody th.cl-table-key {
@@ -5983,6 +6079,12 @@ a.cl-link-button:hover {
     outline: none;
 }
 
+/* the tint alone is 1.17:1 to the white list: the focused item gets the ring every other control has */
+.cl-page .cl-menu-item:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+
 .cl-page .cl-menu-item.is-danger {
     color: var(--cl-bad);
 }
@@ -6358,6 +6460,9 @@ a.cl-link-button:hover {
 
 .cl-page .cl-record-name > .cl-page-title {
     min-width: 0;
+    /* a word longer than the line breaks instead of widening the page at 320 px; break-word, not anywhere, so it never
+       narrows the title of other record pages (a document number brings its own <wbr> break points) */
+    overflow-wrap: break-word;
 }
 
 .cl-page .cl-record-meta {
@@ -9120,6 +9225,297 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }
 /* --cl-info-soft is --cl-accent-soft, the tint of a checked row: an info pill there gets the surface and a 1 px ring */
 .cl-page .cl-table.is-warehouse tr.is-selected .cl-status.is-info { background: var(--cl-surface); box-shadow: inset 0 0 0 1px var(--cl-accent); }
+/* Warehouse documents list (docs/active/warehouse-documents-redesign). A document number wraps after a "/" (the
+   fragments/doc-number <wbr> break points), never inside the sequence digits; break-word only splits a segment that is
+   longer than the whole column. The direction icon repeats the type name in colour (the name carries the meaning). */
+.cl-page .cl-doc-no { overflow-wrap: break-word; }
+.cl-page .cl-table.is-documents .cl-doc-no { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Fixed column widths from 720 px: with auto layout each kind segment (PZ, WZ, …) sized the columns to its own texts and
+   the table jumped between tabs. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-documents { table-layout: fixed; }
+    .cl-page .cl-table.is-documents .cl-col-document { width: 27%; }
+    .cl-page .cl-table.is-documents .cl-col-reason { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-source { width: 17%; }
+    .cl-page .cl-table.is-documents .cl-col-counterparty { width: 20%; }
+    .cl-page .cl-table.is-documents .cl-col-created { width: 16%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-document { width: 24%; }
+    .cl-page .cl-table.is-documents .cl-col-store { width: 11%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-reason { width: 17%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-source { width: 15%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-counterparty { width: 18%; }
+    .cl-page .cl-table.is-documents:has(.cl-col-store) .cl-col-created { width: 15%; }
+}
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-in-alt { color: var(--cl-ok); }
+.cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }
+
+/* Offers list (spec docs/active/offers-redesign). The row link's ::after covers the whole row, so the actions cell rises
+   above it or its menu and buttons could not be clicked. Scoped to is-offers: payments.html also has td.cl-table-actions
+   inside an is-orders table and must keep its own layout. */
+.cl-page .cl-table.is-offers .cl-table-actions {
+    position: relative;
+    z-index: 1;
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+/* Every actions cell is its own layer; without this the next row's cell paints over the open menu and takes its clicks. */
+.cl-page .cl-table.is-offers .cl-table-actions:has(.cl-menu[open]) {
+    z-index: 2;
+}
+
+.cl-page .cl-table.is-offers .cl-table-actions > * + * {
+    margin-left: 4px;
+}
+
+/* Row actions without a frame at rest (S1, audit 2026-10-03): two framed 36 px buttons per row were the loudest thing in
+   the table. The frame comes back under the pointer, on an open menu, and the focus ring stays; the size (36 px,
+   44 px below 1024 px) does not change. */
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon {
+    border-color: transparent;
+    background: transparent;
+}
+
+.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon:hover,
+.cl-page .cl-table.is-offers .cl-table-actions .cl-menu[open] > summary.cl-button.is-icon {
+    border-color: var(--cl-accent);
+    background: var(--cl-surface);
+}
+
+/* A name of two lines at most; the whole name is in title. Long names made a row 168 px high at 1024 px. In the table
+   the name also stops at 26ch, so one long name does not take the client column's width on every row. */
+.cl-page .cl-table.is-offers .cl-cell-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-weight: 600;
+}
+
+@media (min-width: 720px) {
+    .cl-page .cl-table.is-offers .cl-cell-name {
+        max-width: 26ch;
+    }
+}
+
+/* The author (often an e-mail address) ends in an ellipsis instead of breaking letter by letter under the date; width 0
+   keeps it out of the column's minimum, as .cl-cell-email does. */
+.cl-page .cl-table.is-offers .cl-who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 0;
+    min-width: 100%;
+}
+
+.cl-page .cl-table.is-offers .cl-status {
+    white-space: nowrap;
+}
+
+/* "· pozycje: n" wraps as a whole under the id, never between the label and the number */
+.cl-page .cl-table.is-offers .cl-offer-items {
+    white-space: nowrap;
+}
+
+/* The list is always newest first: the date header says so like a sorted header of the other lists (aria-sort on th). */
+.cl-page .cl-table.is-offers .cl-sort-mark {
+    font-size: .8em;
+}
+
+/* A neutral validity note ("do 23.10 (20 dni)", "minęła 01.10") is plain text; only the note of an expiring offer
+   (is-warn: "jutro, 04.10", "dziś, 20:10") keeps the weight of the orders' due note. On the hover row it moves to --cl-ink-2: --cl-ink-3 is 4.48:1 on --cl-surface-2. */
+.cl-page .cl-table.is-offers .cl-due-note:not(.is-warn) {
+    font-weight: 400;
+}
+
+.cl-page .cl-table.is-offers tbody tr:hover .cl-due-note:not(.is-warn) {
+    color: var(--cl-ink-2);
+}
+
+/* Items of a template or a basket: the bare number under the "Pozycje" header, "pozycje: n" on the phone card, which
+   has no header. */
+.cl-page .cl-table.is-offers .cl-cell-count {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-offers .cl-cell-count-text {
+    display: none;
+}
+
+/* A menu entry that needs a word on what happens next ("Nowa oferta ▾"); not used in row menus. */
+.cl-page .cl-menu-item .cl-menu-desc {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-page-actions .cl-menu > summary.is-primary {
+    gap: 6px;
+}
+
+/* 720-1215 px (rail or drawer): the quick copy icon goes (the same action is in the row menu), so do the item count and
+   the author, which gives the name and client columns their width back (short names wrapped at 1024 px). */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers .cl-copy-quick,
+    .cl-page .cl-table.is-offers .cl-offer-items,
+    .cl-page .cl-table.is-offers .cl-who {
+        display: none;
+    }
+}
+
+/* In the same range the offer name and the client name are one line each, ending in an ellipsis (the full text is in
+   title): wrapped, they made rows 84-103 px instead of ~66 px. Width 0 keeps them out of the column's minimum, as
+   .cl-cell-email does; a nowrap name with a ch cap pushed the table 22-146 px past its card at 720-1024 px. The two
+   columns take what the other columns leave, at least 7em, so a name never shrinks to a few letters. Templates follow
+   the same rule since their "Utwórz ofertę" became an icon (the dates, counts and amounts no longer take the space). */
+@media (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 0;
+        min-width: 100%;
+    }
+
+    .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+        min-width: 7em;
+    }
+
+    .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+        width: 1%;
+        white-space: nowrap;
+    }
+}
+
+/* Beside the open sidebar the card is 790 px at 1216 px, narrower than at 1215 px (977 px), and rows grew to 103 px:
+   the compact row follows the card there, not the window (as the Metoda column of Payments does). Below 960 px of
+   card the quick copy icon, the item count and the author go and the names are one line, as at 720-1215 px. With an
+   850 px threshold the full row came back at 1280x720 (card 854 px) in a name column of ~130 px: "pozycje: 1" broke
+   between label and number and rows reached 147 px; 1366x768 (card 940 px) gave 105 px rows. From about 1406 px
+   (card 960 px) the full row fits. */
+.cl-page .cl-card:has(.cl-table.is-offers) {
+    container-type: inline-size;
+}
+
+@media (min-width: 1216px) {
+    @container (max-width: 959px) {
+        .cl-page .cl-table.is-offers .cl-copy-quick,
+        .cl-page .cl-table.is-offers .cl-offer-items,
+        .cl-page .cl-table.is-offers .cl-who {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-offers :is(.cl-cell-name, .cl-cell-client) {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 0;
+            min-width: 100%;
+        }
+
+        .cl-page .cl-table.is-offers :is(th, td):has(> :is(.cl-cell-name, .cl-cell-client)) {
+            min-width: 7em;
+        }
+
+        .cl-page .cl-table.is-offers tbody tr > :not(:has(> :is(.cl-cell-name, .cl-cell-client))) {
+            width: 1%;
+            white-space: nowrap;
+        }
+    }
+}
+
+/* 720-1023 px (drawer, card 606-909 px): six columns do not fit beside one-line names. The creation date moves under
+   the offer's id ("25b6f02f · 03.10", the deliveries' collapsed-column pattern) and the net amount goes (it is on the
+   offer page; the phone card has no net line either). */
+.cl-page .cl-table.is-offers .cl-narrow-only {
+    display: none;
+}
+
+@media (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-offers .is-secondary-column,
+    .cl-page .cl-table.is-offers .cl-cell-net {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-narrow-only {
+        display: inline;
+    }
+}
+
+/* Phone card: name + pill / id / client / date + amount / validity note + ⋯; no author, no quick icon. The note and the
+   menu share the fifth line explicitly (auto-placement put the menu's 44 px box under the note's text). The menu keeps
+   its 44 px target, and the negative margin gives the growth back to the line above and the card padding, as the chip
+   "×" does, so the line is as high as its text. */
+@media (max-width: 719px) {
+    .cl-page .cl-table.is-offers tr {
+        grid-auto-flow: row dense;
+    }
+
+    .cl-page .cl-table.is-offers .cl-due-note {
+        grid-row: 5;
+        align-self: center;
+    }
+
+    .cl-page .cl-table.is-offers .cl-table-actions {
+        display: flex;
+        width: auto;
+        grid-column: 2;
+        justify-self: end;
+        align-self: center;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-offers tr:has(.cl-status) .cl-table-actions {
+        grid-row: 5;
+        margin: -12px 0 -10px;
+    }
+
+    /* template card: "Utwórz ofertę" and ⋯ as its last line; on the name's line they left the name a few letters */
+    .cl-page .cl-table.is-templates .cl-table-actions {
+        grid-column: 1 / -1;
+        order: 5;
+        justify-content: flex-end;
+    }
+
+    .cl-page .cl-table.is-offers .cl-copy-quick,
+    .cl-page .cl-table.is-offers .cl-who,
+    .cl-page .cl-table.is-offers .cl-cell-count {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-offers .cl-cell-count-text {
+        display: block;
+        font-size: 12.5px;
+        color: var(--cl-ink-3);
+    }
+
+    /* on the tinted hover/tap row --cl-ink-3 is 4.47:1; muted text on a toned background uses --cl-ink-2 (§9) */
+    .cl-page .cl-table.is-offers tbody tr:hover .cl-cell-count-text {
+        color: var(--cl-ink-2);
+    }
+
+    /* template card: under the id, like the client line of an offer; basket card: beside the id */
+    .cl-page .cl-table.is-templates .cl-cell-count-text {
+        grid-column: 1 / -1;
+        order: 2;
+    }
+
+    .cl-page .cl-table.is-baskets .cl-cell-count-text {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-offers .cl-table-actions .cl-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
 
 /* --- Delivery details (spec docs/active/delivery-details-redesign/2026-10-01-delivery-details-design.md §13):
    P1 items table with destination rows, P2 selection row docked on phones, P3 status card with actions, P4 dialog list,
@@ -9713,7 +10109,9 @@ a.cl-link-button:hover {
     white-space: nowrap;
 }
 
-.cl-page .cl-margin {
+/* A mark: a 20 px status icon whose facts are in its tooltip and accessible name (span.cl-mark.cl-tooltip[tabindex=0]
+   [role=img]), focusable so the tooltip opens from the keyboard and on tap. Neutral grey; tones as modifiers. */
+.cl-page .cl-mark {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -9725,32 +10123,334 @@ a.cl-link-button:hover {
     cursor: help;
 }
 
-.cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
-.cl-page .cl-margin.is-unknown { opacity: .55; }
-.cl-page .cl-margin.is-loss { color: var(--cl-bad); }
+.cl-page .cl-mark.is-positive { color: var(--cl-ok); }
 
-.cl-page .cl-margin:focus-visible {
+.cl-page .cl-mark:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
 }
 
-/* the tooltip opens to the left: the price column stands right of the middle and a centred box hid the state pill */
-.cl-page .cl-margin.cl-tooltip::after {
-    left: auto;
-    right: -8px;
-    transform: translateY(4px);
-    text-align: left;
-}
-
-.cl-page .cl-margin.cl-tooltip:is(:hover, :focus)::after {
-    transform: translateY(0);
-}
-
 @media screen and (max-width: 1023px) {
     /* a 44 px tap target around the 20 px mark without growing the row */
-    .cl-page .cl-margin {
+    .cl-page .cl-mark {
         box-sizing: content-box;
         padding: 12px;
         margin: -12px;
+    }
+}
+
+/* Warehouse document details: the item table gives the name what the fixed numeric columns leave (width: 1% does not
+   work with the table-layout: fixed of .is-wrap — the columns overlapped); a code part never breaks inside */
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: 8.5rem; white-space: nowrap; }
+.cl-page .cl-table.is-line-items :is(th, td).is-numeric.is-qty { width: 5.5rem; }
+.cl-page .cl-table.is-line-items .cl-table-actions { width: 4rem; }
+.cl-page .cl-table.is-line-items .cl-code-part { white-space: nowrap; }
+.cl-page .cl-record-type { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--cl-ink-2); }
+.cl-page .cl-label-print[hidden] { display: none; }
+.cl-page .cl-label-print [aria-busy="true"] { opacity: .6; cursor: progress; }
+/* As cards (< 720 px) the amounts carry their column names ("Koszt netto/szt.: 489,99 PLN"), like the yes/no column of
+   order items: two bare amounts could not be told apart */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: auto; }
+    .cl-page .cl-table.is-line-items.is-wrap tbody tr > td.is-numeric::before { content: attr(data-label) ": "; }
+}
+
+/* Signed quantity change (item history): the sign carries the direction, the colour only repeats it */
+.cl-page .cl-qty-change { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cl-page .cl-qty-change.is-in { color: var(--cl-ok); }
+.cl-page .cl-qty-change.is-out { color: var(--cl-ink); }
+
+/* the margin of an order item (ItemMargin tones); its tooltip is end-anchored (.is-end): the price column stands right
+   of the middle and a centred box hid the state pill */
+.cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
+.cl-page .cl-margin.is-unknown { opacity: .55; }
+.cl-page .cl-margin.is-loss { color: var(--cl-bad); }
+
+/* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
+.cl-page .cl-subnav {
+    padding: 4px 20px 12px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-subnav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cl-page .cl-subnav li + li {
+    margin-top: 0;
+}
+
+.cl-page .cl-subnav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    min-height: 32px;
+    padding: 4px 10px;
+    border: 1px solid var(--cl-line);
+    border-radius: 999px;
+    background: var(--cl-surface);
+    color: var(--cl-ink);
+    font-size: 13.5px;
+    text-decoration: none;
+}
+
+.cl-page .cl-subnav-item:hover {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-subnav-item:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-subnav-item[aria-current="page"] {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-weight: 600;
+}
+
+/* the count is one unit: it never wraps or shrinks, only the label beside it wraps (it broke "12" into two lines at
+   390 px, inheriting the pill's overflow-wrap: anywhere) */
+.cl-page .cl-subnav-count {
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    color: var(--cl-ink-2);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-subnav-item[aria-current="page"] .cl-subnav-count {
+    color: var(--cl-accent-ink);
+}
+
+/* --- Result head: title of the current category and the path to it --- */
+.cl-page .cl-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    padding: 20px 20px 4px;
+}
+
+/* the card title role (16 px / 650, like .cl-card-title) */
+.cl-page .cl-result-head h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-result-path {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+/* underlined: by colour alone a crumb is 1.4:1 to the text around it (WCAG 1.4.1) */
+.cl-page .cl-result-path a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cl-page .cl-result-path a:hover {
+    text-decoration-thickness: 2px;
+}
+
+.cl-page .cl-result-path a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* the toolbar under the head sits as far from it as the head's text from the card's sides */
+.cl-page .cl-card > .cl-result-head + .cl-table-toolbar {
+    padding-top: 16px;
+}
+
+/* --- Collapsed path: "…" stands for the middle crumbs of a long path (collapse-path.js) --- */
+.cl-page .cl-path-crumb[hidden] {
+    display: none;
+}
+
+.cl-page .cl-path-more {
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: var(--cl-radius);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    line-height: inherit;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+.cl-page .cl-path-more:hover {
+    text-decoration: underline;
+}
+
+.cl-page .cl-path-more:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* Below 1024 px every crumb and "…" is a 44 px target, like the subcategory pills: the path is a wrapping row of
+   44 px tall items (the separators keep their spaces as margins). The negative block margin gives the extra height
+   back to the head's padding and the title above, so the text keeps its place; it never reaches the pills below. */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-result-path[data-cl-collapse-path] {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-block: -13px -8px;
+    }
+
+    .cl-page .cl-result-path .cl-path-crumb {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .cl-page .cl-result-path .cl-path-crumb[hidden] {
+        display: none;
+    }
+
+    .cl-page .cl-result-path .cl-path-crumb > [aria-hidden="true"] {
+        margin-inline: 4px;
+    }
+
+    .cl-page .cl-result-path .cl-path-crumb > a,
+    .cl-page .cl-result-path .cl-path-crumb > [aria-current] {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    .cl-page .cl-path-more {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* --- Category path in a table cell or under a product name --- */
+.cl-page .cl-category-path {
+    display: block;
+    max-width: 34ch;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-category-path strong {
+    color: var(--cl-ink);
+    font-weight: 600;
+}
+
+.cl-page .cl-table .cl-category-cell {
+    white-space: normal;
+}
+
+/* A path deeper than two levels collapsed to "first › … › leaf" (fragment inventory-browse :: categoryPath). The "…" is
+   the tooltip trigger (focusable, so the keyboard and a tap open it); the bubble is laid out against the whole path, not
+   the one-character trigger: it starts at the path's left edge and is at most as wide as the path, so it stays inside
+   the cell or card at every width. Hovering anywhere on the path opens it too. No arrow: it could not point at the "…". */
+.cl-page .cl-category-path.is-collapsed {
+    position: relative;
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip {
+    position: static;
+    display: inline-block;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-category-path .cl-category-more:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip::after {
+    left: 0;
+    max-width: 100%;
+    transform: translateY(4px);
+}
+
+.cl-page .cl-category-path .cl-category-more.cl-tooltip::before {
+    display: none;
+}
+
+.cl-page .cl-category-path.is-collapsed:hover .cl-category-more.cl-tooltip::after,
+.cl-page .cl-category-path .cl-category-more.cl-tooltip:focus::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* as a table column (from 1216 px) the path is narrow but has the remaining columns to its right: the bubble may take
+   the tooltip's usual 320 px instead of a tall strip as wide as the cell */
+@media screen and (min-width: 1216px) {
+    .cl-page .cl-table td.cl-category-cell .cl-category-more.cl-tooltip::after {
+        max-width: 320px;
+    }
+}
+
+@media screen and (max-width: 1023px) {
+    /* a 44 px tap target around the "…" without moving the text around it or growing the row */
+    .cl-page .cl-category-path .cl-category-more.cl-tooltip {
+        padding: 12px 14px;
+        margin: -12px -11px;
+    }
+}
+
+/* --- Category tile with a count --- */
+.cl-page .cl-tile-grid.is-categories {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.cl-page .cl-tile .cl-tile-count {
+    grid-column: 2;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-subnav-item {
+        min-height: 44px;
+    }
+}
+
+/* the card's side inset on a phone, like .cl-table-toolbar and .cl-list-meta */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-result-head {
+        padding: 16px 16px 4px;
+    }
+
+    .cl-page .cl-subnav {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-card > .cl-result-head + .cl-table-toolbar {
+        padding-top: 12px;
     }
 }
