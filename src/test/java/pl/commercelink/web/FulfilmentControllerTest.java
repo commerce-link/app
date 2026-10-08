@@ -19,6 +19,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
+import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.FulfilmentQueue;
 import pl.commercelink.orders.fulfilment.ManualOrderFulfilment;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -123,5 +124,37 @@ class FulfilmentControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/fulfilment/queue");
         verifyNoInteractions(manualOrderFulfilment);
+    }
+
+    @Test
+    void submittingSelectedOrdersPassesTheChosenStrategyAndOptionsToTheSelectionPage() {
+        // given
+        FulfilmentForm form = new FulfilmentForm();
+        when(manualOrderFulfilment.init("store-1", List.of("o-1", "o-2"), "suggest-exact", true, false, true)).thenReturn(form);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = controller.initiateMultiOrderManualFulfilment(List.of("o-1", "o-2"), "suggest-exact", true, false, true, false, model);
+
+        // then
+        assertThat(view).isEqualTo("fulfilment");
+        verify(manualOrderFulfilment).init("store-1", List.of("o-1", "o-2"), "suggest-exact", true, false, true);
+        assertThat(model.getAttribute("form")).isSameAs(form);
+        assertThat(form.getPathSelector()).isEqualTo("suggest-exact");
+        assertThat(form.getSelectedOrders()).containsExactly("o-1", "o-2");
+    }
+
+    @Test
+    void superAdminSubmittingSelectedOrdersUsesTheStoreFromThePath() {
+        // given
+        FulfilmentForm form = new FulfilmentForm();
+        when(manualOrderFulfilment.init("store-9", List.of("o-1"), "suggest", false, true, false)).thenReturn(form);
+
+        // when
+        String view = controller.initiateMultiOrderManualFulfilmentForSuperAdmin("store-9", List.of("o-1"), "suggest", false, true, false, false, new ConcurrentModel());
+
+        // then
+        assertThat(view).isEqualTo("fulfilment");
+        verify(manualOrderFulfilment).init("store-9", List.of("o-1"), "suggest", false, true, false);
     }
 }
