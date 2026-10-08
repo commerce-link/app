@@ -56,7 +56,8 @@
 <!--/* Header of a record page with a status (an order): back link (or none, backHref null), h1 with the status pill and
        its action beside it, the meta lines below and actions on the right. titleAction (the copy icon of the number),
        status, meta and actions are fragment blocks (~{::x}) or null; titleAction stays glued to the end of the h1, so
-       on a narrow screen it never wraps alone onto the next line. */-->
+       on a narrow screen it never wraps alone onto the next line. title is plain text, printed escaped, or a fragment block
+       when the heading needs markup (a document number with break opportunities). */-->
 <div th:fragment="record(backHref, backLabel, title, titleAction, status, meta, actions)" class="cl-page-header">
     <a th:if="${backHref != null}" class="cl-back" th:href="@{${backHref}}">
         <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
@@ -65,7 +66,8 @@
     <div class="cl-page-header-row is-record">
         <div class="cl-record-title">
             <div class="cl-record-name">
-                <h1 class="cl-page-title" th:text="${title}"></h1>
+                <h1 th:if="${title instanceof T(org.thymeleaf.standard.expression.Fragment)}" class="cl-page-title"><th:block th:insert="${title}"></th:block></h1>
+                <h1 th:unless="${title instanceof T(org.thymeleaf.standard.expression.Fragment)}" class="cl-page-title" th:text="${title}"></h1>
                 <th:block th:if="${titleAction != null}">
                     <th:block th:insert="${titleAction}"></th:block>
                 </th:block>

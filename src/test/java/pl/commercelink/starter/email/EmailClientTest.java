@@ -76,22 +76,35 @@ class EmailClientTest {
     }
 
     @Test
-    void sendsFromTheBareAddressInsteadOfTheWordNullWhenThereIsNoSenderName() {
+    void nothingIsSentWithoutASenderName() {
         // given
-        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, null, null));
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, null, "kontakt@sklep-demo.pl"));
 
         // when
-        emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
+        boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
 
         // then
-        assertThat(sentRequest().fromEmailAddress()).isEqualTo(SENDER);
-        assertThat(sentRequest().replyToAddresses()).containsExactly(SENDER);
+        assertThat(sent).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(sesClient);
+    }
+
+    @Test
+    void nothingIsSentWithoutAReplyToAddress() {
+        // given
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+
+        // when
+        boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
+
+        // then
+        assertThat(sent).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(sesClient);
     }
 
     @Test
     void aTypeTheStoreDoesNotSendIsSkippedWithoutCallingSes() {
         // given
-        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", "kontakt@sklep-demo.pl"));
 
         // when
         boolean sent = emailClient.send("store-1", EmailNotificationType.RMA_REJECTED, new EmailNotification("klient@example.com", "Jan"));
@@ -107,7 +120,7 @@ class EmailClientTest {
         EmailTemplate withoutBody = new EmailTemplate();
         withoutBody.setSubject("Wysłane");
         when(templateProvider.getTemplate("store-1", "OrderShippingTemplate")).thenReturn(withoutBody);
-        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", "kontakt@sklep-demo.pl"));
 
         // when
         boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
@@ -124,7 +137,7 @@ class EmailClientTest {
         withoutSubject.setSubject("  ");
         withoutSubject.setTextBody("Paczka w drodze");
         when(templateProvider.getTemplate("store-1", "OrderShippingTemplate")).thenReturn(withoutSubject);
-        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", "kontakt@sklep-demo.pl"));
 
         // when
         boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));

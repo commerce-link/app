@@ -168,7 +168,7 @@ public class Inventory {
         });
     }
 
-    private static List<String> ownConnectionFingerprint(Store store) {
+    static List<String> ownConnectionFingerprint(Store store) {
         return store.getOwnAndManualConnections().stream()
                 .map(connection -> connection.getSupplierName() + ":" + connection.getMode() + ":" + connection.isEnabled())
                 .sorted()

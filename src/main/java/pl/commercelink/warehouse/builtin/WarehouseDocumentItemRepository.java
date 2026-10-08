@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,26 +35,23 @@ class WarehouseDocumentItemRepository extends DynamoDbRepository<WarehouseDocume
         return dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression);
     }
 
-    boolean documentContainsProduct(String documentId, String ean, String mfn) {
+    /** True when an item of the document has this EAN or this manufacturer code (either may be null, not both). */
+    boolean containsProduct(String documentId, String ean, String mfn) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":documentId", new AttributeValue().withS(documentId));
-        StringBuilder filterExpression = new StringBuilder();
-
+        List<String> alternatives = new ArrayList<>();
         if (isNotBlank(ean)) {
             eav.put(":ean", new AttributeValue().withS(ean));
-            appendFilter(filterExpression, "ean = :ean");
+            alternatives.add("ean = :ean");
         }
-
         if (isNotBlank(mfn)) {
             eav.put(":mfn", new AttributeValue().withS(mfn));
-            appendFilter(filterExpression, "mfn = :mfn");
+            alternatives.add("mfn = :mfn");
         }
-
         DynamoDBQueryExpression<WarehouseDocumentItem> queryExpression = new DynamoDBQueryExpression<WarehouseDocumentItem>()
                 .withKeyConditionExpression("documentId = :documentId")
-                .withFilterExpression(filterExpression.toString())
+                .withFilterExpression(String.join(" or ", alternatives))
                 .withExpressionAttributeValues(eav);
-
         return !dynamoDBMapper.query(WarehouseDocumentItem.class, queryExpression).isEmpty();
     }
 

@@ -26,6 +26,7 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
@@ -49,6 +50,7 @@ import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
@@ -104,6 +106,8 @@ class CatalogProductsControllerTest {
     @Mock
     private MatchedInventory emptyInventory;
     @Mock
+    private MatchedInventory foundInventory;
+    @Mock
     private MarketplaceConnections marketplaces;
     @Mock
     private PimCategoryOptions pimCategoryOptions;
@@ -123,6 +127,8 @@ class CatalogProductsControllerTest {
     private Store store;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private CatalogPlacement catalogPlacement;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
@@ -156,7 +162,9 @@ class CatalogProductsControllerTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, optimisticLockingExecutor)).build();
+                brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
     }
 
     @AfterEach
@@ -458,6 +466,7 @@ class CatalogProductsControllerTest {
         mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "p1"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"));
         verify(productRepository).deleteWhateverItsVersion(a);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test
@@ -580,6 +589,146 @@ class CatalogProductsControllerTest {
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).isEmpty();
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
                 .extracting(ProductsBulkAddForm.Row::getName).containsExactly("MSI RTX 5070");
+    }
+
+    /** The review and the save answer a POST; a reload or Back asks for them with a GET, which is not a 405. */
+    @Test
+    void reloadOfTheReviewOrTheSaveGoesBackToTheProposals() throws Exception {
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/add/review")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
+        mvc.perform(get(categoryPath() + "/products/add/save")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
+    }
+
+    @Test
+    void saveWithInventoryReturnToRedirectsBackToTheListWithANotice() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo))
+                .andExpect(flash().attribute("inventoryNotice", "inventory.browse.added"))
+                .andExpect(flash().attributeExists("inventoryNoticeHref"));
+        verify(catalogPlacement).evict(STORE_ID);
+    }
+
+    @Test
+    void saveIgnoresForeignReturnTo() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", "//evil.com"))
+                .andExpect(redirectedUrl(categoryPath()));
+    }
+
+    @Test
+    void reviewKeepsTheInventoryReturnToForTheSaveForm() throws Exception {
+        // given
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("returnTo", returnTo))
+                .andExpect(model().attribute("backHref", returnTo));
+    }
+
+    /** The review drops what the category already has, so the save alone cannot know it for the inventory notice. */
+    @Test
+    void reviewFromTheInventoryCarriesTheCountOfProductsTheCategoryAlreadyHas() throws Exception {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", "/dashboard/inventory?cat=11"))
+                .andExpect(model().attribute("skippedBefore", 1));
+    }
+
+    /** "Pominięto (już były)" counts the products the review dropped as well as the ones the save found again. */
+    @Test
+    void saveToTheInventoryCountsProductsSkippedByTheReview() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("skippedBefore", "2")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added.skipped"), eq(new Object[]{"GPU", 1, 2}), any(Locale.class));
+    }
+
+    /** "Pominięto (już były): 0" is noise: with nothing skipped the notice only says what was added. */
+    @Test
+    void saveToTheInventoryWithNothingSkippedLeavesTheSkippedPartOut() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added"), eq(new Object[]{"GPU", 1, 0}), any(Locale.class));
+    }
+
+    /** A validation round renders the review again; the count must survive it, and a forged one is not believed. */
+    @Test
+    void saveWithErrorsKeepsTheSkippedCountAndRefusesANegativeOne() throws Exception {
+        // given
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "3")
+                        .param("returnTo", returnTo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("skippedBefore", 3));
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "-4")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("skippedBefore", 0));
     }
 
     /**
@@ -896,10 +1045,9 @@ class CatalogProductsControllerTest {
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1"))
@@ -972,12 +1120,11 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
-        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
@@ -1380,10 +1527,12 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(get(categoryPath() + "/products/p1/delete")).andExpect(view().name("settings-confirm"));
         verify(productRepository, never()).delete(any(Product.class));
+        verify(catalogPlacement, never()).evict(any());
         mvc.perform(post(categoryPath() + "/products/p1/delete"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.deleted"));
         verify(productRepository).deleteWhateverItsVersion(existing);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test
@@ -1671,7 +1820,9 @@ class CatalogProductsControllerTest {
                 .thenReturn("Enabled 0, skipped 1");
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create())).build();
+                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
 
         // when / then
         real.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))

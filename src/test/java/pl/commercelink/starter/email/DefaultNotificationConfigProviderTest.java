@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -47,12 +48,16 @@ class DefaultNotificationConfigProviderTest {
     }
 
     @Test
-    void aBlankSenderNameFallsBackToTheStoreName() {
+    void aBlankSenderNameIsNotReplacedWithTheStoreName() {
         // given
-        store("  ", null, null);
+        store("  ", "kontakt@sklep-demo.pl", null);
 
-        // when / then
-        assertThat(provider.settings("store-1").senderName()).isEqualTo("Sklep Demo");
+        // when
+        NotificationSettings settings = provider.settings("store-1");
+
+        // then
+        assertThat(settings.senderName()).isNull();
+        assertThat(settings.hasSender()).isFalse();
     }
 
     @Test
@@ -65,26 +70,50 @@ class DefaultNotificationConfigProviderTest {
     }
 
     @Test
-    void aBlankReplyToAddressFallsBackToTheCompanyEmail() {
+    void aBlankReplyToAddressIsNotReplacedWithTheCompanyEmail() {
         // given
-        store(null, "", "biuro@sklep-demo.pl");
+        store("Sklep Demo", "", "biuro@sklep-demo.pl");
 
-        // when / then
-        assertThat(provider.settings("store-1").replyToEmail()).isEqualTo("biuro@sklep-demo.pl");
+        // when
+        NotificationSettings settings = provider.settings("store-1");
+
+        // then
+        assertThat(settings.replyToEmail()).isNull();
+        assertThat(settings.hasSender()).isFalse();
+    }
+
+    @Test
+    void aStoreWithBothSenderFieldsHasASender() {
+        // given
+        store(" Sklep Demo ", " kontakt@sklep-demo.pl ", null);
+
+        // when
+        NotificationSettings settings = provider.settings("store-1");
+
+        // then
+        assertThat(settings.hasSender()).isTrue();
+        assertThat(settings.senderName()).isEqualTo("Sklep Demo");
+        assertThat(settings.replyToEmail()).isEqualTo("kontakt@sklep-demo.pl");
+    }
+
+    @Test
+    void aStoreThatNeverConfiguredNotificationsHasNoSender() {
+        // given
+        Store store = new Store();
+        store.setName("Sklep Demo");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        NotificationSettings settings = provider.settings("store-1");
+
+        // then
+        assertThat(settings.hasSender()).isFalse();
+        assertThat(settings.supports(EmailNotificationType.ORDER_SHIPPING)).isFalse();
     }
 
     @Test
     void anUnknownStoreHasNoSettings() {
         // when / then
         assertThat(provider.settings("missing")).isNull();
-    }
-
-    @Test
-    void thereIsNoReplyToAddressWhenTheStoreHasNeitherOne() {
-        // given
-        store(null, null, null);
-
-        // when / then
-        assertThat(provider.settings("store-1").replyToEmail()).isNull();
     }
 }

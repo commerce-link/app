@@ -113,7 +113,7 @@ public class StoreNotificationSettingsController {
         model.addAttribute("formAction", SettingsPaths.store(storeId, "/notification"));
         model.addAttribute("senderPreviewName", StringUtils.isNotBlank(form.getSenderName()) && !errors.containsKey("senderName")
                 ? form.getSenderName().trim()
-                : store.getName());
+                : null);
         model.addAttribute("senderEmail", senderEmail);
         String templatesHref = SettingsPaths.store(storeId, "/email-templates");
         model.addAttribute("templatesHref", templatesHref);

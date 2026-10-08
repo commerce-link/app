@@ -30,4 +30,38 @@ class PaginationTest {
         assertThat(empty.fromIndex()).isZero();
         assertThat(empty.toIndex()).isZero();
     }
+
+    @Test
+    void openEndedSecondPageShowsItsRangeAndBothNeighbours() {
+        // when
+        Pagination p = Pagination.openEnded(2, 25, 25, true, n -> "/list?page=" + n);
+
+        // then
+        assertThat(p.isNeeded()).isTrue();
+        assertThat(p.fromIndex()).isEqualTo(25);
+        assertThat(p.toIndex()).isEqualTo(50);
+        assertThat(p.previousHref()).isEqualTo("/list?page=1");
+        assertThat(p.nextHref()).isEqualTo("/list?page=3");
+        assertThat(p.openEnded()).isTrue();
+    }
+
+    @Test
+    void openEndedSinglePageIsNotNeeded() {
+        // when
+        Pagination p = Pagination.openEnded(1, 25, 7, false, n -> "/list?page=" + n);
+
+        // then
+        assertThat(p.isNeeded()).isFalse();
+        assertThat(p.nextHref()).isNull();
+    }
+
+    @Test
+    void ofKeepsItsTotal() {
+        // when
+        Pagination p = Pagination.of(2, 60, 25, n -> "/x?page=" + n);
+
+        // then
+        assertThat(p.openEnded()).isFalse();
+        assertThat(p.totalItems()).isEqualTo(60);
+    }
 }

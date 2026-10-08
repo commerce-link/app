@@ -11,10 +11,12 @@ import static pl.commercelink.orders.notifications.EmailNotificationType.*;
 
 /**
  * The notifications page's summary of the customer emails: how many actually go out, how many are switched on without
- * content, and whether the customer address change lacks one of its two emails. The emails themselves are listed and
- * edited on the email templates page only, so the two pages cannot disagree about a message's state.
+ * content, whether the customer address change lacks one of its two emails, and whether all of them are held back for
+ * lack of a sender. The emails themselves are listed and edited on the email templates page only, so the two pages
+ * cannot disagree about a message's state.
  */
-public record NotificationOverview(int sentCount, int totalCount, int brokenCount, boolean addressChangeBlocked) {
+public record NotificationOverview(int sentCount, int totalCount, int brokenCount, boolean addressChangeBlocked,
+                                   boolean senderMissing) {
 
     // ClientShippingAddressChangeService lets a customer change the delivery address only when both are enabled.
     public static final Set<EmailNotificationType> ADDRESS_CHANGE_TYPES =
@@ -37,7 +39,8 @@ public record NotificationOverview(int sentCount, int totalCount, int brokenCoun
     public static NotificationOverview of(Store store, List<EmailTemplateView> emails) {
         int sent = (int) emails.stream().filter(EmailTemplateView::sent).count();
         int broken = (int) emails.stream().filter(EmailTemplateView::broken).count();
-        return new NotificationOverview(sent, emails.size(), broken, addressChangeBlocked(store, emails));
+        return new NotificationOverview(sent, emails.size(), broken, addressChangeBlocked(store, emails),
+                !store.hasNotificationSender());
     }
 
     /** The customer address change is on, but one of its two emails would not go out. */
