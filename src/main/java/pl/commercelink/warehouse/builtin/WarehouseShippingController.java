@@ -69,6 +69,12 @@ public class WarehouseShippingController extends AbstractShippingController {
                     allowed);
         }
 
+        Optional<WarehouseItem> withoutDelivery = deliveredPredicate.firstWithoutDelivery(getStoreId(), warehouseItems);
+        if (withoutDelivery.isPresent()) {
+            return refuse(ra, back, locale, "warehouse.error.no.delivery", withoutDelivery.get().getName(),
+                    messageSource.getMessage("warehouse.bulk.ship.label", null, locale));
+        }
+
         if (!deliveredPredicate.isFromSameSource(getStoreId(), warehouseItems)) {
             return refuse(ra, back, locale, "warehouse.error.same.source");
         }

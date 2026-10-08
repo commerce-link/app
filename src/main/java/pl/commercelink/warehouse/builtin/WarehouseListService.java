@@ -59,7 +59,8 @@ class WarehouseListService {
         Pagination pagination = Pagination.of(query.page(), shown.size(), WarehouseListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         List<WarehouseItem> pageItems = shown.subList(pagination.fromIndex(), pagination.toIndex());
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
-        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, deliveries(storeId, pageItems), labels::of);
+        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, deliveries(storeId, pageItems), labels::of,
+                labels::has, admin);
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);

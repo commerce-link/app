@@ -94,6 +94,27 @@ class WarehouseShippingGuardTest {
     }
 
     @Test
+    void anItemWithoutADeliveryRecordIsSentBackToTheListInsteadOfFailing() {
+        // given
+        WarehouseItem item = stored("a", FulfilmentStatus.InRMA);
+        item.setDeliveryId("Unknown");
+        when(deliveredPredicate.firstWithoutDelivery(eq("store-1"), anyList())).thenReturn(java.util.Optional.of(item));
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+            view = controller.initiate(List.of("a"), listView("statuses", "InRMA"), PL, ra, new ConcurrentModel());
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
+        assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage"))
+                .contains("RTX a").contains("nie pochodzi z żadnej dostawy").contains("Nic nie zmieniono");
+    }
+
+    @Test
     void itemsInTheWrongStatusAreRefusedWithTheStatusMessage() {
         // given
         stored("a", FulfilmentStatus.Delivered);

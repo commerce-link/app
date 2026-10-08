@@ -239,6 +239,13 @@ class WarehouseController {
                 }
             }
         }
+        if (action.sameSource()) {
+            Optional<WarehouseItem> withoutDelivery = deliveredPredicate.firstWithoutDelivery(getStoreId(), into);
+            if (withoutDelivery.isPresent()) {
+                return refuse(ra, locale, back, "warehouse.error.no.delivery",
+                        withoutDelivery.get().getName(), msg(locale, "warehouse.bulk." + action.key() + ".label"));
+            }
+        }
         if (action.sameSource() && !deliveredPredicate.isFromSameSource(getStoreId(), into)) {
             return refuse(ra, locale, back, "warehouse.error.same.source");
         }

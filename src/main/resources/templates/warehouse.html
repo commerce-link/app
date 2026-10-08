@@ -135,7 +135,7 @@
                         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
                                th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label>
                         <span class="cl-selection-count"><span data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span> <span data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span></span>
-                        <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}">
+                        <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}, data-reason-no-delivery=#{warehouse.bulk.reason.noDelivery}">
                             <details class="cl-menu">
                                 <summary class="cl-button"><span th:text="#{warehouse.bulk.menu}"></span>
                                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span></summary>
@@ -183,7 +183,7 @@
                             <td class="cl-table-check">
                                 <label class="cl-check-target" th:if="${row.selectable()}">
                                     <input class="cl-check-input" type="checkbox" data-cl-select-row hidden th:value="${row.itemId()}"
-                                           th:attr="data-status=${row.status()}, data-qty=${row.qty()}, data-source=${row.source()},
+                                           th:attr="data-status=${row.status()}, data-qty=${row.qty()}, data-source=${row.source()}, data-has-delivery=${row.hasDelivery()},
                                                     data-name=${row.name()}, data-status-label=${row.statusLabel()},
                                                     aria-label=#{warehouse.row.select(${row.name()})}">
                                 </label>
@@ -209,8 +209,9 @@
                             <td class="is-secondary-column" th:attr="data-label=#{warehouse.list.column.delivery}">
                                 <span class="cl-cell-stack">
                                     <a th:if="${row.deliveryHref() != null}" class="cl-cell-delivery" th:href="@{${row.deliveryHref()}}" th:title="${row.deliveryNumber()}" th:text="${row.deliveryNumber()}"></a>
-                                    <span th:unless="${row.deliveryHref() != null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
-                                    <span class="cl-table-sub" th:if="${row.supplier() != null}" th:text="${row.supplier()}"></span>
+                                    <span th:if="${row.deliveryHref() == null and row.supplier() != null}" class="cl-cell-supplier" th:text="${row.supplier()}"></span>
+                                    <span th:if="${row.deliveryHref() == null and row.supplier() == null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
+                                    <span class="cl-table-sub" th:if="${row.deliveryHref() != null and row.supplier() != null}" th:text="${row.supplier()}"></span>
                                     <span class="cl-table-sub cl-cell-serial" th:if="${row.serialNo() != null}" th:title="${row.serialNo()}" th:text="${row.serialNo()}"></span>
                                 </span>
                             </td>

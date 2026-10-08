@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -23,7 +24,9 @@ import java.util.stream.Stream;
  * <p>
  * The Delivery cell links only where the link leads somewhere: a delivery of the store (short id, the supplier's label
  * under it) or, for an item still waiting for its supplier, that supplier's delivery planning page (the supplier's label
- * as the link). Anything else ("Unknown" of an item added by hand, a removed delivery, the warehouse itself) is a dash.
+ * as the link, for an admin only: the planning page is an admin page, so a user reads the supplier as text). An item
+ * ordered from a connected supplier without a delivery record names that supplier without a link. Anything else
+ * ("Unknown" of an item added by hand, a removed delivery, the warehouse itself) is a dash.
  */
 class WarehouseRowMapper {
 
@@ -32,15 +35,22 @@ class WarehouseRowMapper {
     private final DeliveryRedirectResolver redirects;
     private final Map<String, Delivery> deliveries;
     private final UnaryOperator<String> supplierLabel;
+    private final Predicate<String> connectedSupplier;
+    private final boolean admin;
 
-    /** deliveries holds the store's deliveries found for the items' delivery ids; an id missing there has no record. */
+    /**
+     * deliveries holds the store's deliveries found for the items' delivery ids; an id missing there has no record.
+     * connectedSupplier tells a supplier identity of the store's connections from any other delivery id.
+     */
     WarehouseRowMapper(MessageSource messages, Locale locale, DeliveryRedirectResolver redirects, Map<String, Delivery> deliveries,
-                       UnaryOperator<String> supplierLabel) {
+                       UnaryOperator<String> supplierLabel, Predicate<String> connectedSupplier, boolean admin) {
         this.messages = messages;
         this.locale = locale;
         this.redirects = redirects;
         this.deliveries = deliveries;
         this.supplierLabel = supplierLabel;
+        this.connectedSupplier = connectedSupplier;
+        this.admin = admin;
     }
 
     static boolean uncategorized(String category) {
@@ -76,7 +86,7 @@ class WarehouseRowMapper {
                 StringUtils.isBlank(item.getSerialNo()) ? null : text("warehouse.row.serial", item.getSerialNo()),
                 item.getStatus().name(), text(WarehouseStatuses.labelKey(item.getStatus())), WarehouseStatuses.tone(item.getStatus()),
                 WarehouseStatuses.selectable(item.getStatus()),
-                provider(item));
+                provider(item), item.getDeliveryId() != null && deliveries.containsKey(item.getDeliveryId()));
     }
 
     private record DeliveryLink(String href, String text, String supplier) {
@@ -85,11 +95,13 @@ class WarehouseRowMapper {
 
     private DeliveryLink deliveryLink(WarehouseItem item) {
         if (redirects.pointsToPlanning(item)) {
-            return new DeliveryLink(redirects.resolveFor(item), supplierLabel.apply(item.getDeliveryId()), null);
+            return admin ? new DeliveryLink(redirects.resolveFor(item), supplierLabel.apply(item.getDeliveryId()), null)
+                    : new DeliveryLink(null, null, supplierLabel.apply(item.getDeliveryId()));
         }
         Delivery delivery = redirects.pointsToDelivery(item) ? deliveries.get(item.getDeliveryId()) : null;
         if (delivery == null) {
-            return DeliveryLink.NONE;
+            return connectedSupplier.test(item.getDeliveryId())
+                    ? new DeliveryLink(null, null, supplierLabel.apply(item.getDeliveryId())) : DeliveryLink.NONE;
         }
         return new DeliveryLink(redirects.resolveFor(item), item.getShortenedDeliveryId(),
                 StringUtils.isBlank(delivery.getProvider()) ? null : supplierLabel.apply(delivery.getProvider()));

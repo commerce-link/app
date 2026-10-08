@@ -31,9 +31,14 @@ class WarehouseRowMapperTest {
         return delivery;
     }
 
-    private final WarehouseRowMapper mapper = new WarehouseRowMapper(messages(), PL, new DeliveryRedirectResolver(),
-            Map.of("delivery-1", delivery("delivery-1", "Acme"), "delivery-2", delivery("delivery-2", null)),
-            identity -> "Acme".equals(identity) ? "Acme Polska" : identity);
+    private final WarehouseRowMapper mapper = mapper(true);
+
+    /** A store connected to Acme only; admin tells whether the viewer may open the new-delivery page. */
+    private static WarehouseRowMapper mapper(boolean admin) {
+        return new WarehouseRowMapper(messages(), PL, new DeliveryRedirectResolver(),
+                Map.of("delivery-1", delivery("delivery-1", "Acme"), "delivery-2", delivery("delivery-2", null)),
+                identity -> "Acme".equals(identity) ? "Acme Polska" : identity, "Acme"::equals, admin);
+    }
 
     private static WarehouseItem item() {
         WarehouseItem item = new WarehouseItem("store-1", "delivery-1", "Karty graficzne", "Gigabyte RTX 4060 Ti",
@@ -154,5 +159,54 @@ class WarehouseRowMapperTest {
         assertThat(row.deliveryNumber()).isEqualTo("Acme Polska");
         assertThat(row.supplier()).isNull();
         assertThat(row.source()).isEqualTo("Acme");
+    }
+
+    @Test
+    void userSeesTheSupplierOfAWaitingItemAsTextBecauseThePlanningPageIsForAdminsOnly() {
+        // given
+        WarehouseItem item = item();
+        item.setDeliveryId("Acme");
+        item.setStatus(FulfilmentStatus.New);
+
+        // when
+        WarehouseItemRow row = mapper(false).map(item);
+
+        // then
+        assertThat(row.deliveryHref()).isNull();
+        assertThat(row.deliveryNumber()).isNull();
+        assertThat(row.supplier()).isEqualTo("Acme Polska");
+    }
+
+    @Test
+    void orderedItemCarryingItsSupplierNameShowsThatSupplierWithoutALink() {
+        // given
+        WarehouseItem connected = item();
+        connected.setDeliveryId("Acme");
+        connected.setStatus(FulfilmentStatus.Ordered);
+        WarehouseItem notConnected = item();
+        notConnected.setDeliveryId("Kosatec");
+        notConnected.setStatus(FulfilmentStatus.Ordered);
+
+        // when
+        WarehouseItemRow connectedRow = mapper.map(connected);
+        WarehouseItemRow notConnectedRow = mapper.map(notConnected);
+
+        // then
+        assertThat(connectedRow.deliveryHref()).isNull();
+        assertThat(connectedRow.supplier()).isEqualTo("Acme Polska");
+        assertThat(notConnectedRow.supplier()).isNull();
+    }
+
+    @Test
+    void rowTellsWhetherItsDeliveryIsARecordOfTheStore() {
+        // given
+        WarehouseItem fromDelivery = item();
+        WarehouseItem addedByHand = item();
+        addedByHand.setDeliveryId("Unknown");
+        addedByHand.setStatus(FulfilmentStatus.InRMA);
+
+        // when / then
+        assertThat(mapper.map(fromDelivery).hasDelivery()).isTrue();
+        assertThat(mapper.map(addedByHand).hasDelivery()).isFalse();
     }
 }

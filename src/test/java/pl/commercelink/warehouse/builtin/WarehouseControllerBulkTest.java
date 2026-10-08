@@ -167,6 +167,24 @@ class WarehouseControllerBulkTest {
     }
 
     @Test
+    void externalServiceRefusesAnItemWithoutADeliveryRecordInPolishBeforeIssuingAnything() throws Exception {
+        // given
+        WarehouseItem item = stored("a", InRMA, 1);
+        item.setDeliveryId("Unknown");
+        when(deliveredPredicate.firstWithoutDelivery(eq("store-1"), anyList())).thenReturn(java.util.Optional.of(item));
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsInExternalService(List.of("a"), view("statuses", "InRMA"), PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=InRMA");
+        assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage"))
+                .contains("RTX a").contains("nie pochodzi z żadnej dostawy").contains("Nic nie zmieniono");
+        verifyNoInteractions(warehouseGoodsOutService);
+    }
+
+    @Test
     void refusesItemOfAnotherStore() throws Exception {
         // given
         when(warehouseRepository.findById("store-1", "x")).thenReturn(null);

@@ -48,7 +48,7 @@ class WarehouseListRenderingTest {
                                         String supplier) {
         return new WarehouseItemRow(id, "/dashboard/warehouse/items/" + id, "RTX " + id, List.of("EAN 590", "GV-1"), "Damaged", "is-bad",
                 "comment " + id, "GPU", false, 3, "1 243,00", "gross 1 528,89", null, null, deliveryHref,
-                deliveryNumber, supplier, "S/N 1", status, status, "is-ok", selectable, "Acme");
+                deliveryNumber, supplier, "S/N 1", status, status, "is-ok", selectable, "Acme", deliveryHref != null);
     }
 
     private static String deliveryCell(String html) {
@@ -274,6 +274,43 @@ class WarehouseListRenderingTest {
         // then
         assertThat(cell).contains("<a class=\"cl-cell-delivery\" href=\"/dashboard/deliveries/details?deliveryId=d1\" title=\"d1\">d1</a>");
         assertThat(cell.indexOf("Acme Polska")).isGreaterThan(cell.indexOf(">d1</a>")).isLessThan(cell.indexOf("S/N 1"));
+    }
+
+    @Test
+    void supplierWithoutALinkIsTheCellsTextInsteadOfADash() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "Ordered", false, null, null, "Acme Polska")), false);
+
+        // when
+        String cell = deliveryCell(render(page));
+
+        // then
+        assertThat(cell).contains("<span class=\"cl-cell-supplier\">Acme Polska</span>").doesNotContain("—").doesNotContain("<a ");
+    }
+
+    @Test
+    void checkboxTellsWhetherTheItemCameFromADelivery() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "InRMA", true), row("a2", "InRMA", true, null, null, null)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("value=\"a1\" data-status=\"InRMA\"").containsPattern("value=\"a1\"[^>]*data-has-delivery=\"true\"")
+                .containsPattern("value=\"a2\"[^>]*data-has-delivery=\"false\"");
+    }
+
+    @Test
+    void selectionRowCarriesTheReasonForItemsWithoutADelivery() {
+        // given
+        WarehousePageModel page = model(List.of(row("a1", "InRMA", true)), false);
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("data-reason-no-delivery=\"Item without a delivery (e.g. added by hand)\"");
     }
 
     @Test

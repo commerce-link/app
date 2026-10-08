@@ -46,6 +46,13 @@
             return { fits: false, reason: button.getAttribute('data-reason-status') || '' };
         }
         if (button.hasAttribute('data-cl-action-same-source')) {
+            // goods out and shipping read the counterparty from the delivery the item came from (DeliveredPredicate)
+            var withoutDelivery = boxes.some(function (box) {
+                return box.getAttribute('data-has-delivery') === 'false';
+            });
+            if (withoutDelivery) {
+                return { fits: false, reason: bar().getAttribute('data-reason-no-delivery') || '' };
+            }
             var first = boxes.length ? boxes[0].getAttribute('data-source') : null;
             var same = boxes.every(function (box) {
                 return box.getAttribute('data-source') === first;
