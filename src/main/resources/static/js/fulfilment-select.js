@@ -190,12 +190,27 @@
                     primaries.push(offer);
                 }
             });
+            // move a row only when its place changes: re-inserting a row that holds the focused control drops the focus
+            var previous = tbody.firstElementChild;
+            var focused = document.activeElement;
+            var moved = false;
+            function place(row) {
+                if (previous.nextElementSibling !== row) {
+                    previous.after(row);
+                    moved = moved || row.contains(focused);
+                }
+                previous = row;
+            }
             primaries.forEach(function (primary) {
-                tbody.appendChild(primary.row);
+                place(primary.row);
                 (under.get(primary) || []).forEach(function (child) {
-                    tbody.appendChild(child.row);
+                    place(child.row);
                 });
             });
+            // a moved row that held the focus is the one case the browser cannot keep
+            if (moved && focused && focused !== document.activeElement) {
+                focused.focus();
+            }
         });
     }
 
@@ -516,16 +531,16 @@
         box.addEventListener('change', applyFilters);
     });
     [minInput, maxInput].forEach(function (input) {
-        if (!input) {
-            return;
+        if (input) {
+            input.addEventListener('input', applyFilters);
         }
-        input.addEventListener('input', applyFilters);
-        // the filter fields sit inside the selection form: Enter there would confirm the selection
-        input.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-            }
-        });
+    });
+    // Enter on any field of the selection form would confirm it (implicit submission); buttons keep their Enter
+    form.addEventListener('keydown', function (event) {
+        var target = event.target;
+        if (event.key === 'Enter' && target.tagName === 'INPUT' && ['submit', 'button', 'image', 'reset'].indexOf(target.type) < 0) {
+            event.preventDefault();
+        }
     });
     form.querySelector('[data-cl-show-all]').addEventListener('click', function () {
         focusedOrder = null;
