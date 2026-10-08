@@ -111,7 +111,7 @@ A provider's per-store configuration (API keys and other settings) lives in Secr
 
 The system is organized around `Store` entities. Each store has independent product catalogs, supplier connections, service provider configuration (payment/shipping/invoicing), branding, and RMA settings.
 
-Shipping, invoicing and WMS providers are single-instance per store (selected provider stored as a single `Integration` entry in `Store.integrations`, keyed by `IntegrationType`). Marketplace and payment integrations are multi-instance — a store can connect any number of them via `Store.marketplaces` (`List<MarketplaceIntegration>`) and `Store.payments` (`List<PaymentIntegration>`). Payment integrations carry a `default` flag and exactly one is treated as the store's default (used by `Checkout` for now); `Store.getDefaultPaymentIntegration()` resolves it.
+Invoicing and WMS providers are single-instance per store (selected provider stored as a single `Integration` entry in `Store.integrations`, keyed by `IntegrationType`). Shipping has a default integration (the `SHIPPING_PROVIDER` entry, e.g. Furgonetka) plus additional ones listed by adapter name in `ShippingConfiguration.additionalIntegrations` (today only `allegro`, Wysyłam z Allegro; kept out of `IntegrationType` so an older app version can still read the store). `Store.shippingIntegrationNames()` / `hasShippingIntegration(name)` list them, and `ShippingProviders` resolves the provider per shipment (`forShipment` uses `Shipment.provider`, falling back to the default integration for older shipments; `forName` for a chosen integration). Never call `ShippingProviderFactory.get(store)` for an operation on an existing shipment. Marketplace and payment integrations are multi-instance — a store can connect any number of them via `Store.marketplaces` (`List<MarketplaceIntegration>`) and `Store.payments` (`List<PaymentIntegration>`). Payment integrations carry a `default` flag and exactly one is treated as the store's default (used by `Checkout` for now); `Store.getDefaultPaymentIntegration()` resolves it.
 
 Self-registration outside demo mode (`app.registration.demo=false`) creates an empty store on a trial: `Store.trial` (`TrialPeriod`) ends `app.registration.trial-days` days (14) after registration, and a store without it is a full account. A super admin converts the store to a full account on `/dashboard/stores` (`StoreTrialService.convertToFullAccount`); deleting a trial store also deletes its owner's Cognito account, but only while that account still points at the store.
 
@@ -172,6 +172,8 @@ Products are matched across suppliers by EAN and manufacturer code via `Inventor
 ### Event-Driven Processing
 
 Async work is driven through `@SqsListener` methods. Queue names follow `{domain}-{action}-queue[.fifo]` (e.g. `order-fulfilment-queue.fifo`, `supplier-feed-import-queue`, `marketplace-orders-import-queue`, `basket-cleanup-queue`).
+
+Shipping runs on its own queues, each message naming the integration (`provider`; a message without one belongs to the store's default integration): `shipment-creation-queue`, `shipment-pickup-queue`, `shipment-cancellation-queue` (checks of commands sent to the carrier), `shipment-tracking-queue` (webhook statuses), `shipment-tracking-sweep-queue` and `shipment-tracking-poll-queue` (hourly polling of integrations without webhooks, below).
 
 **Scheduled tasks** (`@Scheduled`):
 - Every 5 min: `FeedReloaderScheduler` — reload global inventory feeds
