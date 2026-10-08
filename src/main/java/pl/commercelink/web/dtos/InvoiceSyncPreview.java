@@ -336,12 +336,12 @@ public class InvoiceSyncPreview {
 
     /** An amount of the delivery, kept in złoty. */
     public String money(double amount) {
-        return Money.format(amount) + " z\u0142";
+        return Money.format(amount) + " PLN";
     }
 
     /** An amount of the invoice, in the invoice's currency. */
     public String invoiceMoney(double amount) {
-        return isForeignCurrency() ? Money.format(amount) + " " + currency : money(amount);
+        return Money.format(amount) + " " + (currency == null ? "PLN" : currency);
     }
 
     /** A date the page carries as ISO text, the way the order screens show dates. */
@@ -369,6 +369,11 @@ public class InvoiceSyncPreview {
 
     public long count(MatchState state) {
         return mappings.stream().filter(m -> stateOf(m) == state).count();
+    }
+
+    /** The states a product row can be in, in the order of the counts above the table. */
+    public List<MatchState> getRowStates() {
+        return List.of(MatchState.EXACT, MatchState.CLOSE, MatchState.DIFFERENT, MatchState.UNASSIGNED);
     }
 
     public long getAssignedItemCount() {

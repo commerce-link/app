@@ -3,159 +3,50 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
-<div layout:fragment="content">
-
-    <style>
-        .invoice-sync-mapping tr.match-row td:first-child {
-            border-left-width: 4px;
-            border-left-style: solid;
-        }
-        .invoice-sync-mapping tr.match-exact td:first-child { border-left-color: hsl(141, 71%, 48%); }
-        .invoice-sync-mapping tr.match-close td:first-child { border-left-color: hsl(48, 100%, 67%); }
-        .invoice-sync-mapping tr.match-none  td:first-child { border-left-color: hsl(348, 86%, 61%); }
-        .invoice-sync-mapping tr.match-exact { background-color: hsla(141, 71%, 48%, 0.08); }
-        .invoice-sync-mapping tr.match-close { background-color: hsla(48, 100%, 67%, 0.10); }
-        .invoice-sync-mapping tr.match-none  { background-color: hsla(348, 86%, 61%, 0.08); }
-        .invoice-sync-mapping td { vertical-align: middle !important; }
-        .invoice-sync-mapping select option { padding: 4px; }
-        .invoice-sync-mapping .delta-cell {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .invoice-sync-mapping .delta-zero  { color: hsl(141, 71%, 38%); }
-        .invoice-sync-mapping .delta-close { color: hsl(38, 90%, 45%); font-weight: 600; }
-        .invoice-sync-mapping .delta-far   { color: hsl(348, 86%, 51%); font-weight: 600; }
-        .invoice-sync-mapping .delta-empty { color: #b5b5b5; }
-        .invoice-sync-summary .tag { margin-right: 0.5rem; font-size: 0.95rem; }
-    </style>
-
-    <section class="section">
-        <div class="container">
-
-            <h2 th:text="#{invoiceSync.title}"></h2>
-
-            <div class="columns">
-                <div class="column is-half">
-                    <div class="box">
-                        <h4 class="title is-5" th:text="#{invoiceSync.invoiceDetails}"></h4>
-                        <table class="table is-fullwidth is-narrow">
-                            <tbody>
-                            <tr>
-                                <th th:text="#{invoiceSync.invoiceNumber}"></th>
-                                <td>
-                                    <a th:href="${preview.viewUrl}" target="_blank" th:text="${preview.invoiceNumber}"></a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th th:text="#{invoiceSync.orderNo}"></th>
-                                <td th:text="${preview.externalDeliveryId}"></td>
-                            </tr>
-                            <tr>
-                                <th th:text="#{invoiceSync.priceNet}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></td>
-                            </tr>
-                            <tr>
-                                <th th:text="#{invoiceSync.priceGross}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></td>
-                            </tr>
-                            <tr>
-                                <th th:text="#{invoiceSync.currency}"></th>
-                                <td th:text="${preview.currency}"></td>
-                            </tr>
-                            <tr>
-                                <th th:text="#{invoiceSync.exchangeRate}"></th>
-                                <td th:text="${#numbers.formatDecimal(preview.exchangeRate, 1, 4)}"></td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="column is-half">
-                    <div class="box">
-                        <h4 class="title is-5" th:text="#{invoiceSync.synchronization}"></h4>
-                        <table class="table is-fullwidth is-narrow">
-                            <colgroup>
-                                <col style="width: 35%"/>
-                                <col style="width: 25%"/>
-                                <col style="width: 10%"/>
-                                <col style="width: 30%"/>
-                            </colgroup>
-                            <tbody>
-                            <tr>
-                                <th th:text="#{invoiceSync.paymentStatus}"></th>
-                                <td th:unless="${preview.paymentStatusDiffers}" colspan="3">
-                                    <span th:if="${preview.invoicePaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
-                                    <span th:unless="${preview.invoicePaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
-                                </td>
-                                <td th:if="${preview.paymentStatusDiffers}">
-                                    <span th:if="${preview.deliveryPaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
-                                    <span th:unless="${preview.deliveryPaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
-                                </td>
-                                <td th:if="${preview.paymentStatusDiffers}" class="has-text-centered">&rarr;</td>
-                                <td th:if="${preview.paymentStatusDiffers}">
-                                    <span th:if="${preview.invoicePaid}" class="tag is-success" th:text="#{invoiceSync.paid}"></span>
-                                    <span th:unless="${preview.invoicePaid}" class="tag is-warning" th:text="#{invoiceSync.unpaid}"></span>
-                                </td>
-                            </tr>
-                            <tr th:if="${preview.invoicePaymentToDate}">
-                                <th th:text="#{invoiceSync.paymentToDate}"></th>
-                                <td th:unless="${preview.paymentDueDateDiffers}" colspan="3">
-                                    <span class="tag" th:text="${preview.invoicePaymentToDate}"></span>
-                                </td>
-                                <td th:if="${preview.paymentDueDateDiffers}">
-                                    <span class="tag" th:text="${preview.deliveryPaymentDueDate} ?: '-'"></span>
-                                </td>
-                                <td th:if="${preview.paymentDueDateDiffers}" class="has-text-centered">&rarr;</td>
-                                <td th:if="${preview.paymentDueDateDiffers}">
-                                    <span class="tag is-info" th:text="${preview.invoicePaymentToDate}"></span>
-                                </td>
-                            </tr>
-                            <tr th:if="${preview.invoiceShortcut}">
-                                <th>
-                                    <span th:text="#{invoiceSync.provider}"></span>
-                                    <p class="help has-text-weight-normal" th:text="#{invoiceSync.provider.hint}"></p>
-                                </th>
-                                <td th:unless="${preview.shortcutDiffers}" colspan="3">
-                                    <span class="tag" th:text="${preview.invoiceShortcut}"></span>
-                                </td>
-                                <td th:if="${preview.shortcutDiffers}">
-                                    <span class="tag" th:text="${preview.deliveryProvider} ?: '-'"></span>
-                                </td>
-                                <td th:if="${preview.shortcutDiffers}" class="has-text-centered">&rarr;</td>
-                                <td th:if="${preview.shortcutDiffers}">
-                                    <span class="tag is-info" th:text="${preview.invoiceShortcut}"></span>
-                                </td>
-                            </tr>
-                            <tr th:if="${preview.priceNetDiffers}">
-                                <th th:text="#{invoiceSync.priceNet}"></th>
-                                <td>
-                                    <span class="tag" th:text="${#numbers.formatDecimal(preview.deliveryTotalCostNet, 1, 2)} + ' PLN'"></span>
-                                </td>
-                                <td class="has-text-centered">&rarr;</td>
-                                <td>
-                                    <span class="tag is-info" th:text="${#numbers.formatDecimal(preview.invoicePriceNet, 1, 2)} + ' ' + ${preview.currency}"></span>
-                                </td>
-                            </tr>
-                            <tr th:if="${preview.priceGrossDiffers}">
-                                <th th:text="#{invoiceSync.priceGross}"></th>
-                                <td>
-                                    <span class="tag" th:text="${#numbers.formatDecimal(preview.deliveryTotalCostGross, 1, 2)} + ' PLN'"></span>
-                                </td>
-                                <td class="has-text-centered">&rarr;</td>
-                                <td>
-                                    <span class="tag is-info" th:text="${#numbers.formatDecimal(preview.invoicePriceGross, 1, 2)} + ' ' + ${preview.currency}"></span>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+<!--/* Synchronizing a purchase invoice with its delivery (variant A of docs/active/invoice-sync-preview-redesign): the
+       assignments on the left, the effects of the save and the decision in the sticky side column. The server draws
+       the state of every row, the counts and the unassigned invoice lines from the current choice; invoice-sync.js
+       redraws them after every change with the same rule (InvoiceSyncPreview.MatchState). The automatic match never
+       chooses one invoice line twice nor a line of another quantity, so their warnings only appear in the script. */-->
+<div layout:fragment="content" th:with="p=${preview}">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <div th:replace="~{fragments/settings-header :: record(|/dashboard/deliveries/details?deliveryId=${p.deliveryId}|,
+                    #{invoiceSync.back(${p.deliveryShortId})}, #{invoiceSync.page.title(${p.invoiceNumber})}, ${null},
+                    ~{::syncStatus}, ~{::syncMeta}, ~{::syncActions})}">
+                <th:block th:fragment="syncStatus">
+                    <span th:if="${p.deliveryAwaitingApproval}" class="cl-status is-info" th:text="#{deliveries.list.state.awaitingApproval}"></span>
+                    <span th:if="${!p.deliveryAwaitingApproval}" class="cl-status" th:classappend="${p.deliverySynced} ? 'is-ok' : 'is-warn'"
+                          th:text="${p.deliverySynced} ? #{invoiceSync.pill.synced} : #{invoiceSync.pill.notSynced}"></span>
+                </th:block>
+                <th:block th:fragment="syncMeta">
+                    <p class="cl-record-meta">
+                        <span th:if="${p.supplierName != null}"><strong th:text="${p.supplierName}"></strong></span>
+                        <span th:if="${!#strings.isEmpty(p.externalDeliveryId)}" th:text="#{invoiceSync.meta.number(${p.externalDeliveryId})}"></span>
+                        <span th:if="${p.deliveryOrderedAt != null}" th:text="#{invoiceSync.meta.ordered(${p.deliveryOrderedAt})}"></span>
+                        <span th:if="${p.foreignCurrency}" th:text="#{invoiceSync.meta.currency(${p.currency}, ${#numbers.formatDecimal(p.exchangeRate, 1, 4)})}"></span>
+                    </p>
+                </th:block>
+                <th:block th:fragment="syncActions">
+                    <a th:if="${!#strings.isEmpty(p.viewUrl)}" class="cl-button" th:href="${p.viewUrl}" target="_blank" rel="noopener">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+                        <span th:text="#{invoiceSync.openInvoice}"></span>
+                    </a>
+                </th:block>
             </div>
 
-            <form th:action="@{/dashboard/deliveries/sync/apply}" th:object="${preview}" method="post">
+            <div th:if="${p.deliveryAwaitingApproval}" class="cl-alert is-warn">
+                <i class="fas fa-lock cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{invoiceSync.locked}"></p>
+            </div>
 
+            <form th:action="@{/dashboard/deliveries/sync/apply}" th:object="${preview}" method="post" class="cl-layout-aside"
+                  data-cl-invoice-sync
+                  th:attr="data-label-exact=#{invoiceSync.state.exact}, data-label-close=#{invoiceSync.state.close},
+                           data-label-different=#{invoiceSync.state.different}, data-label-unassigned=#{invoiceSync.state.unassigned},
+                           data-label-no-cost=#{invoiceSync.state.noCost}, data-template-diff=#{invoiceSync.diff('{0}')},
+                           data-template-duplicate=#{invoiceSync.warn.duplicate('{0}')}, data-template-qty=#{invoiceSync.warn.qty('{0}', '{1}')},
+                           data-template-count=#{invoiceSync.state.count('{0}', '{1}')}, data-currency=${p.currency}">
                 <input type="hidden" th:field="*{deliveryId}"/>
                 <input type="hidden" th:field="*{externalDeliveryId}"/>
                 <input type="hidden" th:field="*{invoiceId}"/>
@@ -165,195 +56,217 @@
                 <input type="hidden" th:field="*{invoiceShortcut}"/>
                 <input type="hidden" th:field="*{deliveryProvider}"/>
 
-                <div th:if="${preview.allExact}" class="notification is-success">
-                    <strong th:text="#{invoiceSync.allExactBanner}"></strong>
-                </div>
-
-                <div th:if="${!preview.allExact and !preview.mappings.isEmpty()}" class="box invoice-sync-summary">
-                    <span class="tag is-success is-medium" th:if="${preview.exactMatchCount > 0}">
-                        <span>&#10003;</span>&nbsp;<span th:text="${preview.exactMatchCount} + ' ' + #{invoiceSync.summary.exact}"></span>
-                    </span>
-                    <span class="tag is-warning is-medium" th:if="${preview.closeMatchCount > 0}">
-                        <span>~</span>&nbsp;<span th:text="${preview.closeMatchCount} + ' ' + #{invoiceSync.summary.close}"></span>
-                    </span>
-                    <span class="tag is-danger is-light is-medium" th:if="${preview.noMatchCount > 0}">
-                        <span>&#9675;</span>&nbsp;<span th:text="${preview.noMatchCount} + ' ' + #{invoiceSync.summary.none}"></span>
-                    </span>
-                </div>
-
-                <div class="box">
-                    <h4 class="title is-5" th:text="#{invoiceSync.itemMapping}"></h4>
-                    <table class="table is-fullwidth invoice-sync-mapping" data-cost-mode="unit">
-                        <colgroup>
-                            <col style="width: 23%"/>
-                            <col style="width: 12%"/>
-                            <col style="width: 5%"/>
-                            <col style="width: 12%"/>
-                            <col style="width: 40%"/>
-                            <col style="width: 8%"/>
-                        </colgroup>
-                        <thead>
-                        <tr>
-                            <th th:text="#{general.name}"></th>
-                            <th th:text="#{general.manufacturer.code}"></th>
-                            <th th:text="#{general.quantity}"></th>
-                            <th th:text="#{invoiceSync.deliveryUnitCost}"></th>
-                            <th th:text="#{invoiceSync.invoicePosition}"></th>
-                            <th th:text="#{invoiceSync.priceDelta}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="mapping, stat : ${preview.mappings}"
-                            th:classappend="${mapping.exact} ? 'match-row match-exact' : (${mapping.close} ? 'match-row match-close' : 'match-row match-none')"
-                            th:attr="data-unit-cost=${mapping.unitCost}">
-                            <td th:text="${mapping.name}" th:title="${mapping.name}"></td>
-                            <td th:text="${mapping.mfn}"></td>
-                            <td th:text="${mapping.qty}"></td>
-                            <td th:text="${#numbers.formatDecimal(mapping.unitCost, 1, 2)} + ' PLN'"></td>
-                            <td>
-                                <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
-                                <div class="select is-fullwidth">
-                                    <select th:field="*{mappings[__${stat.index}__].selectedPositionId}">
-                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
-                                        <option th:each="pos : ${preview.options}"
-                                                th:value="${pos.id}"
-                                                th:title="${pos.name}"
-                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
-                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
-                                        </option>
+                <div class="cl-layout-main">
+                    <section class="cl-card" aria-labelledby="sync-items-title">
+                        <div class="cl-card-head">
+                            <h2 class="cl-card-title" id="sync-items-title" th:text="#{invoiceSync.items.title}"></h2>
+                            <ul th:if="${!p.mappings.isEmpty()}" class="cl-status-row" data-cl-sync-counts th:attr="aria-label=#{invoiceSync.items.summary}">
+                                <li th:each="state : ${p.rowStates}" th:with="n=${p.count(state)}" th:hidden="${n == 0}"
+                                    th:attr="data-state=${state.name()}">
+                                    <span class="cl-status" th:classappend="${state.tone}"
+                                          th:text="#{invoiceSync.state.count(#{${state.labelKey}}, ${n})}"></span>
+                                </li>
+                            </ul>
+                        </div>
+                        <p class="cl-card-desc" th:text="#{invoiceSync.items.desc}"></p>
+                        <div class="cl-card-inset" data-cl-sync-all-exact th:hidden="${!p.allExact}">
+                            <div class="cl-alert is-ok" role="status">
+                                <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="#{invoiceSync.allExact}"></p>
+                            </div>
+                        </div>
+                        <div class="cl-card-inset" data-cl-sync-duplicates hidden>
+                            <div class="cl-alert is-warn" role="status">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="#{invoiceSync.duplicates}"></p>
+                            </div>
+                        </div>
+                        <p th:if="${p.mappings.isEmpty()}" class="cl-list-empty" th:text="#{invoiceSync.items.empty}"></p>
+                        <table th:if="${!p.mappings.isEmpty()}" class="cl-table is-match">
+                            <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
+                            <thead>
+                            <tr>
+                                <th scope="col" th:text="#{invoiceSync.col.product}"></th>
+                                <th scope="col" th:text="#{invoiceSync.col.position}"></th>
+                                <th scope="col" th:text="#{invoiceSync.col.match}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="mapping, stat : ${p.mappings}" data-cl-sync-row="item" th:with="state=${p.stateOf(mapping)}"
+                                th:attr="data-cost=${mapping.unitCost}, data-qty=${mapping.qty}, data-name=${mapping.name}">
+                                <th scope="row" class="cl-table-key" th:attr="data-label=#{invoiceSync.col.product}">
+                                    <span th:text="${mapping.name}"></span>
+                                    <span class="cl-table-sub"><th:block th:if="${!#strings.isEmpty(mapping.mfn)}"><span
+                                            th:text="#{invoiceSync.item.mfn(${mapping.mfn})}"></span> · </th:block><span
+                                            th:text="#{invoiceSync.item.qty(${mapping.qty})}"></span> · <span
+                                            th:text="#{invoiceSync.item.cost(${p.money(mapping.unitCost)})}"></span></span>
+                                </th>
+                                <td class="cl-cell-pick" th:attr="data-label=#{invoiceSync.col.position}">
+                                    <input type="hidden" th:field="*{mappings[__${stat.index}__].mfn}"/>
+                                    <select class="cl-select" th:field="*{mappings[__${stat.index}__].selectedPositionId}" data-cl-sync-select
+                                            th:attr="aria-label=#{invoiceSync.position.for(${mapping.name})}">
+                                        <option value="" th:text="#{invoiceSync.noMatch}"></option>
+                                        <option th:replace="~{::positionOption}"></option>
                                     </select>
+                                    <div data-cl-sync-warnings></div>
+                                </td>
+                                <td data-cl-sync-state th:attr="data-label=#{invoiceSync.col.match}">
+                                    <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
+                                    <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
+                                          th:with="o=${p.option(mapping.selectedPositionId)}"
+                                          th:text="#{invoiceSync.diff(${(o.priceNet > mapping.unitCost ? '+' : '') + p.invoiceMoney(o.priceNet - mapping.unitCost)})}"></span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <section class="cl-card" aria-labelledby="sync-extras-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="sync-extras-title" th:text="#{invoiceSync.extras.title}"></h2></div>
+                        <p class="cl-card-desc" th:text="#{invoiceSync.extras.desc}"></p>
+                        <table class="cl-table is-match">
+                            <colgroup><col><col class="cl-col-pick"><col class="cl-col-state"></colgroup>
+                            <thead>
+                            <tr>
+                                <th scope="col" th:text="#{invoiceSync.col.cost}"></th>
+                                <th scope="col" th:text="#{invoiceSync.col.position}"></th>
+                                <th scope="col" th:text="#{invoiceSync.col.match}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:replace="~{::extraRow('shipping', #{invoiceSync.shippingCost}, ${p.shippingCost}, 'shippingCostPositionId', ${p.shippingCostState}, ${p.shippingCostPositionId})}"></tr>
+                            <tr th:replace="~{::extraRow('payment', #{invoiceSync.paymentCost}, ${p.paymentCost}, 'paymentCostPositionId', ${p.paymentCostState}, ${p.paymentCostPositionId})}"></tr>
+                            </tbody>
+                        </table>
+                    </section>
+
+                    <section class="cl-card" aria-labelledby="sync-unassigned-title" data-cl-sync-unassigned
+                             th:with="left=${p.unassignedOptions}" th:hidden="${left.isEmpty()}">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="sync-unassigned-title"
+                                                      th:attr="data-template=#{invoiceSync.unassigned.title('{0}')}"
+                                                      th:text="#{invoiceSync.unassigned.title(${left.size()})}"></h2></div>
+                        <p class="cl-card-desc" th:text="#{invoiceSync.unassigned.desc}"></p>
+                        <ul class="cl-list">
+                            <li class="cl-list-item" th:each="pos : ${p.options}" th:hidden="${!left.contains(pos)}"
+                                th:attr="data-position-id=${pos.id}">
+                                <div>
+                                    <p class="cl-list-title" th:text="${pos.qty} + ' × ' + ${pos.name}"></p>
+                                    <p class="cl-list-desc" th:text="#{invoiceSync.unassigned.net(${p.invoiceMoney(pos.totalNet)})}"></p>
                                 </div>
-                            </td>
-                            <td class="delta-cell">—</td>
-                        </tr>
-                        </tbody>
-                    </table>
+                            </li>
+                        </ul>
+                    </section>
                 </div>
 
-                <div class="box">
-                    <h4 class="title is-5" th:text="#{invoiceSync.additionalCosts}"></h4>
-                    <table class="table is-fullwidth invoice-sync-mapping" data-cost-mode="total">
-                        <colgroup>
-                            <col style="width: 23%"/>
-                            <col style="width: 12%"/>
-                            <col style="width: 5%"/>
-                            <col style="width: 12%"/>
-                            <col style="width: 40%"/>
-                            <col style="width: 8%"/>
-                        </colgroup>
-                        <thead>
-                        <tr>
-                            <th th:text="#{general.name}"></th>
-                            <th></th>
-                            <th th:text="#{general.quantity}"></th>
-                            <th th:text="#{invoiceSync.deliveryUnitCost}"></th>
-                            <th th:text="#{invoiceSync.invoicePosition}"></th>
-                            <th th:text="#{invoiceSync.priceDelta}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:classappend="${preview.allExact or (preview.shippingCostPositionId != null and !preview.shippingCostPositionId.isBlank())} ? 'match-row match-exact' : 'match-row match-none'"
-                            th:attr="data-unit-cost=${preview.shippingCost}">
-                            <td th:text="#{invoiceSync.shippingCost}"></td>
-                            <td>-</td>
-                            <td>1</td>
-                            <td th:text="${#numbers.formatDecimal(preview.shippingCost, 1, 2)} + ' PLN'"></td>
-                            <td>
-                                <div class="select is-fullwidth">
-                                    <select th:field="*{shippingCostPositionId}">
-                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
-                                        <option th:each="pos : ${preview.options}"
-                                                th:value="${pos.id}"
-                                                th:title="${pos.name}"
-                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
-                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
-                                        </option>
-                                    </select>
-                                </div>
-                            </td>
-                            <td class="delta-cell">—</td>
-                        </tr>
-                        <tr th:classappend="${preview.allExact or (preview.paymentCostPositionId != null and !preview.paymentCostPositionId.isBlank())} ? 'match-row match-exact' : 'match-row match-none'"
-                            th:attr="data-unit-cost=${preview.paymentCost}">
-                            <td th:text="#{invoiceSync.paymentCost}"></td>
-                            <td>-</td>
-                            <td>1</td>
-                            <td th:text="${#numbers.formatDecimal(preview.paymentCost, 1, 2)} + ' PLN'"></td>
-                            <td>
-                                <div class="select is-fullwidth">
-                                    <select th:field="*{paymentCostPositionId}">
-                                        <option value="" th:text="#{invoiceSync.noMatch}">-- Brak dopasowania --</option>
-                                        <option th:each="pos : ${preview.options}"
-                                                th:value="${pos.id}"
-                                                th:title="${pos.name}"
-                                                th:attr="data-price-net=${pos.priceNet},data-total-net=${pos.priceNet * pos.qty}"
-                                                th:text="${pos.qty} + ' &#215; ' + ${pos.name} + ' — ' + ${#numbers.formatDecimal(pos.priceNet, 1, 2)} + ' ' + ${pos.currency}">
-                                        </option>
-                                    </select>
-                                </div>
-                            </td>
-                            <td class="delta-cell">—</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <section class="cl-card" aria-labelledby="sync-effects-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="sync-effects-title" th:text="#{invoiceSync.effects.title}"></h2></div>
+                        <ul class="cl-effects" aria-live="polite" th:with="assigned=${p.assignedItemCount}, total=${p.mappings.size()}">
+                            <li data-cl-effect-items
+                                th:attr="data-template=#{invoiceSync.effect.items('{0}', '{1}')}, data-template-none=#{invoiceSync.effect.items.none},
+                                         data-template-rest=#{invoiceSync.effect.items.rest('{0}')}">
+                                <i class="fas fa-tags" aria-hidden="true"></i>
+                                <span><strong data-cl-effect-text
+                                              th:text="${assigned == 0} ? #{invoiceSync.effect.items.none} : #{invoiceSync.effect.items(${assigned}, ${total})}"></strong>
+                                    <span class="cl-effects-was" data-cl-effect-sub th:hidden="${assigned == 0 or assigned == total}"
+                                          th:text="#{invoiceSync.effect.items.rest(${total - assigned})}"></span></span>
+                            </li>
+                            <li th:replace="~{::extraEffect('shipping', 'fa-truck', 'invoiceSync.effect.shipping', ${p.shippingCost}, ${p.shippingCostPositionId})}"></li>
+                            <li th:replace="~{::extraEffect('payment', 'fa-credit-card', 'invoiceSync.effect.paymentCost', ${p.paymentCost}, ${p.paymentCostPositionId})}"></li>
+                            <li th:if="${p.paymentSync.name() == 'ADD'}">
+                                <i class="fas fa-university" aria-hidden="true"></i>
+                                <span><strong th:text="#{invoiceSync.effect.payment.add}"></strong>
+                                    <span class="cl-effects-was" th:text="#{invoiceSync.effect.payment.add.why}"></span></span>
+                            </li>
+                            <li th:if="${p.paymentSync.name() == 'REMOVE'}" class="is-bad">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span><strong th:text="#{invoiceSync.effect.payment.remove(${p.deliveryPaymentsCount})}"></strong>
+                                    <span class="cl-effects-was" th:text="#{invoiceSync.effect.payment.remove.why}"></span></span>
+                            </li>
+                            <li th:if="${p.paymentDueDateDiffers}">
+                                <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+                                <span><strong th:text="#{invoiceSync.effect.dueDate(${p.date(p.invoicePaymentToDate)})}"></strong>
+                                    <span class="cl-effects-was" th:if="${p.paymentTermDays != null}"
+                                          th:text="#{invoiceSync.effect.dueDate.days(${p.paymentTermDays})}"></span>
+                                    <span class="cl-effects-was"
+                                          th:text="#{invoiceSync.effect.now(${p.deliveryPaymentDueDate == null} ? #{invoiceSync.effect.none} : ${p.date(p.deliveryPaymentDueDate)})}"></span></span>
+                            </li>
+                            <li th:if="${p.shortcutDiffers}">
+                                <i class="fas fa-id-card" aria-hidden="true"></i>
+                                <span><strong th:text="#{invoiceSync.effect.counterparty(${p.invoiceShortcut})}"></strong>
+                                    <span class="cl-effects-was"
+                                          th:text="#{invoiceSync.effect.now(${#strings.isEmpty(p.deliveryProvider)} ? #{invoiceSync.effect.none} : ${p.deliveryProvider})}"></span>
+                                    <span class="cl-effects-was" th:text="#{invoiceSync.effect.counterparty.hint}"></span></span>
+                            </li>
+                            <li>
+                                <i class="fas fa-check" aria-hidden="true"></i>
+                                <span th:text="#{invoiceSync.effect.synced}"></span>
+                            </li>
+                        </ul>
+                        <div class="cl-card-footer is-stacked">
+                            <button type="submit" class="cl-button is-primary" th:disabled="${p.deliveryAwaitingApproval}"
+                                    th:attr="aria-describedby=${p.deliveryAwaitingApproval} ? 'sync-locked-reason' : null"
+                                    th:text="#{invoiceSync.apply}"></button>
+                            <p th:if="${p.deliveryAwaitingApproval}" class="cl-help is-warn" id="sync-locked-reason" th:text="#{invoiceSync.locked.reason}"></p>
+                            <a class="cl-button" th:href="@{/dashboard/deliveries/details(deliveryId=${p.deliveryId})}" th:text="#{general.cancel}"></a>
+                        </div>
+                    </section>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button type="submit" class="button is-primary" th:text="#{invoiceSync.apply}"></button>
-                    </div>
-                </div>
-
+                    <section class="cl-card" aria-labelledby="sync-compare-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="sync-compare-title" th:text="#{invoiceSync.compare.title}"></h2></div>
+                        <dl class="cl-kv is-column">
+                            <div><dt th:text="#{invoiceSync.compare.invoiceNet}"></dt><dd class="is-numeric" th:text="${p.invoiceMoney(p.invoicePriceNet)}"></dd></div>
+                            <div><dt th:text="#{invoiceSync.compare.invoiceGross}"></dt><dd class="is-numeric" th:text="${p.invoiceMoney(p.invoicePriceGross)}"></dd></div>
+                            <div><dt th:text="#{invoiceSync.compare.deliveryNet}"></dt><dd class="is-numeric" th:text="${p.money(p.deliveryTotalCostNet)}"></dd></div>
+                            <div class="cl-kv-total"><dt th:text="#{invoiceSync.compare.assigned}"></dt>
+                                <dd class="is-numeric"><output data-cl-sync-assigned aria-live="polite" th:text="${p.invoiceMoney(p.assignedNet)}"></output></dd></div>
+                            <div><dt th:text="#{invoiceSync.compare.unassigned}"></dt>
+                                <dd class="is-numeric" data-cl-sync-left th:classappend="${p.unassignedNet >= 0.005} ? 'is-bad'">
+                                    <output aria-live="polite" th:text="${p.invoiceMoney(p.unassignedNet)}"></output></dd></div>
+                        </dl>
+                    </section>
+                </aside>
             </form>
-
         </div>
     </section>
 
-    <script th:inline="javascript">
-        /*<![CDATA[*/
-        (function () {
-            const fmt = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    <!--/* fragments of this page */-->
+    <th:block th:remove="all">
+        <option th:fragment="positionOption" th:each="pos : ${p.options}" th:value="${pos.id}" th:text="${p.optionLabel(pos)}"
+                th:attr="data-price-net=${pos.priceNet}, data-total-net=${pos.totalNet}, data-qty=${pos.qty}, data-name=${pos.name}"></option>
 
-            function updateDelta(select) {
-                const row = select.closest('tr');
-                if (!row) return;
-                const cell = row.querySelector('.delta-cell');
-                if (!cell) return;
+        <tr th:fragment="extraRow(kind, label, cost, field, state, selected)" th:attr="data-cl-sync-row=${kind}, data-cost=${cost}, data-name=${label}">
+            <th scope="row" class="cl-table-key" th:attr="data-label=#{invoiceSync.col.cost}">
+                <span th:text="${label}"></span>
+                <span class="cl-table-sub" th:text="#{invoiceSync.extra.current(${p.money(cost)})}"></span>
+            </th>
+            <td class="cl-cell-pick" th:attr="data-label=#{invoiceSync.col.position}">
+                <select class="cl-select" th:name="${field}" th:id="${field}" data-cl-sync-select
+                        th:attr="aria-label=#{invoiceSync.position.for(${label})}">
+                    <option value="" th:text="#{invoiceSync.noMatch}"></option>
+                    <option th:each="pos : ${p.options}" th:value="${pos.id}" th:text="${p.optionLabel(pos)}" th:selected="${pos.id == selected}"
+                            th:attr="data-price-net=${pos.priceNet}, data-total-net=${pos.totalNet}, data-qty=${pos.qty}, data-name=${pos.name}"></option>
+                </select>
+                <div data-cl-sync-warnings></div>
+            </td>
+            <td data-cl-sync-state th:attr="data-label=#{invoiceSync.col.match}">
+                <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
+                <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
+                      th:with="o=${p.option(selected)}"
+                      th:text="#{invoiceSync.diff(${(o.totalNet > cost ? '+' : '') + p.invoiceMoney(o.totalNet - cost)})}"></span>
+            </td>
+        </tr>
 
-                const table = select.closest('table');
-                const mode = table && table.dataset.costMode === 'total' ? 'data-total-net' : 'data-price-net';
+        <li th:fragment="extraEffect(kind, icon, key, cost, selected)" th:with="o=${p.option(selected)}"
+            th:attr="data-cl-effect-extra=${kind}, data-template=#{${key}('{0}')}, data-template-now=#{invoiceSync.effect.now('{0}')},
+                     data-current=${p.money(cost)}" th:hidden="${o == null}">
+            <i class="fas" th:classappend="${icon}" aria-hidden="true"></i>
+            <span><strong data-cl-effect-text th:text="${o == null} ? '' : #{${key}(${p.invoiceMoney(o.totalNet)})}"></strong>
+                <span class="cl-effects-was" th:text="#{invoiceSync.effect.now(${p.money(cost)})}"></span></span>
+        </li>
+    </th:block>
 
-                const opt = select.options[select.selectedIndex];
-                const priceAttr = opt ? opt.getAttribute(mode) : null;
-                const unitCost = parseFloat(row.dataset.unitCost);
-
-                cell.classList.remove('delta-zero', 'delta-close', 'delta-far', 'delta-empty');
-
-                if (priceAttr === null || priceAttr === '' || isNaN(unitCost)) {
-                    cell.textContent = '—';
-                    cell.classList.add('delta-empty');
-                    return;
-                }
-
-                const delta = parseFloat(priceAttr) - unitCost;
-                const rounded = Math.round(delta * 100) / 100;
-                const sign = rounded > 0 ? '+' : (rounded < 0 ? '−' : '');
-                cell.textContent = sign + fmt.format(Math.abs(rounded)) + ' PLN';
-
-                const abs = Math.abs(rounded);
-                if (abs < 0.005)      cell.classList.add('delta-zero');
-                else if (abs <= 0.01) cell.classList.add('delta-close');
-                else                  cell.classList.add('delta-far');
-            }
-
-            document.querySelectorAll('.invoice-sync-mapping select').forEach(function (select) {
-                updateDelta(select);
-                select.addEventListener('change', function () { updateDelta(select); });
-            });
-        })();
-        /*]]>*/
-    </script>
-
+    <script th:src="@{/js/invoice-sync.js}" defer></script>
 </div>
 </body>
 </html>

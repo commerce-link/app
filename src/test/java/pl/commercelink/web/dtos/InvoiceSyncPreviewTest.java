@@ -84,7 +84,7 @@ class InvoiceSyncPreviewTest {
 
         // when / then
         assertThat(preview.invoiceMoney(1234.5)).isEqualTo("1 234,50 EUR");
-        assertThat(preview.money(1234.5)).isEqualTo("1 234,50 zł");
+        assertThat(preview.money(1234.5)).isEqualTo("1\u00a0234,50 PLN");
         assertThat(preview.date("2026-10-22")).isEqualTo("22.10.2026");
     }
 
