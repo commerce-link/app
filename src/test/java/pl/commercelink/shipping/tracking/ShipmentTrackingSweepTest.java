@@ -131,6 +131,23 @@ class ShipmentTrackingSweepTest {
     }
 
     @Test
+    void aRowWithAStateFromANewerVersionIsLeftAloneAndTheStoreIsStillSwept() {
+        // given
+        ShipmentTracking unknown = row("AD1", "allegro", "shp-1", NOW.minusDays(1));
+        unknown.setState("RETURNED");
+        ShipmentTracking collected = row("AD3", "allegro", "shp-3", NOW.minusDays(1));
+        collected.setState("COLLECTED");
+        when(shipmentTrackingsRepository.findByStore("store-1")).thenReturn(List.of(unknown, collected));
+
+        // when
+        sweep.sweep();
+
+        // then
+        verify(publisher).publish(new ShipmentTrackingPollRequest("store-1", "AD3", "allegro"));
+        verify(publisher, never()).publish(new ShipmentTrackingPollRequest("store-1", "AD1", "allegro"));
+    }
+
+    @Test
     void parcelWithoutDeliveryAfterThirtyDaysExpiresInsteadOfBeingPolled() {
         // given
         when(shipmentTrackingsRepository.findByStore("store-1"))

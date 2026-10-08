@@ -61,4 +61,9 @@ public class ShipmentTracking {
     public ShipmentTrackingState currentState() {
         return ShipmentTrackingState.parse(state);
     }
+
+    /** A state written by a newer version: this one neither polls nor advances the parcel, so it cannot undo it. */
+    public boolean hasUnknownState() {
+        return state != null && currentState() == null;
+    }
 }

@@ -38,4 +38,10 @@ class ShipmentTrackingStateTest {
         assertThat(ShipmentTrackingState.parse(null)).isNull();
         assertThat(ShipmentTrackingState.parse("DELIVERED")).isEqualTo(DELIVERED);
     }
+
+    @Test
+    void parseReadsAStateFromANewerVersionAsNoneInsteadOfThrowing() {
+        // when / then
+        assertThat(ShipmentTrackingState.parse("RETURNED")).isNull();
+    }
 }

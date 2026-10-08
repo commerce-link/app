@@ -140,6 +140,18 @@ class ShipmentTrackingPollerTest {
     }
 
     @Test
+    void parcelWithAStateFromANewerVersionIsNotAsked() {
+        // given
+        row.setState("RETURNED");
+
+        // when
+        poller.poll(REQUEST);
+
+        // then
+        verifyNoInteractions(allegro, shipmentTrackingUpdates);
+    }
+
+    @Test
     void unknownEventStatesAreIgnored() {
         // given
         when(allegro.getTrackingEvents("shp-1")).thenReturn(List.of(new TrackingEvent("OTHER", "ISSUE", DELIVERED_AT)));

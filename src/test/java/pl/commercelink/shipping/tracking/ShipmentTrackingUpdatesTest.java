@@ -129,6 +129,20 @@ class ShipmentTrackingUpdatesTest {
     }
 
     @Test
+    void aParcelWithAStateFromANewerVersionIsNotAdvanced() {
+        // given
+        indexedForOrder("PKG-1").setState("RETURNED");
+
+        // when
+        boolean applied = apply("PKG-1", ShipmentTrackingState.DELIVERED);
+
+        // then
+        assertThat(applied).isFalse();
+        verify(shipmentTrackingsRepository, never()).advance(any(), any());
+        verifyNoInteractions(ordersRepository, rmaRepository, orderLifecycle);
+    }
+
+    @Test
     void unknownTrackingNoIsIgnored() {
         // given
         when(shipmentTrackingsRepository.find(STORE_ID, "PKG-X")).thenReturn(Optional.empty());

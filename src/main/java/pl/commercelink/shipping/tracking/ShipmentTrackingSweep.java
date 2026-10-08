@@ -84,7 +84,7 @@ public class ShipmentTrackingSweep {
             }
         }
         if (published + expired > 0) {
-            log.info("Shipment tracking sweep published {} polls, expired {} parcels", published, expired);
+            log.debug("Shipment tracking sweep published {} polls, expired {} parcels", published, expired);
         }
     }
 
@@ -109,6 +109,7 @@ public class ShipmentTrackingSweep {
         ShipmentTrackingState state = row.currentState();
         return row.getProvider() != null && polled.contains(row.getProvider())
                 && row.getExternalId() != null
+                && !row.hasUnknownState()
                 && (state == null || !state.isFinal());
     }
 

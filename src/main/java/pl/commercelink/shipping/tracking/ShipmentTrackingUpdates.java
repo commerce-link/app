@@ -60,6 +60,11 @@ public class ShipmentTrackingUpdates {
             return false;
         }
         ShipmentTracking row = found.get();
+        if (row.hasUnknownState()) {
+            log.warn("Shipment status ignored: store={} trackingNo={} has state {} unknown to this version (got {})",
+                    storeId, trackingNo, row.getState(), state);
+            return false;
+        }
         if (!ShipmentTrackingState.isForward(row.currentState(), state)) {
             log.debug("Shipment status ignored: store={} trackingNo={} already {} (got {})",
                     storeId, trackingNo, row.getState(), state);

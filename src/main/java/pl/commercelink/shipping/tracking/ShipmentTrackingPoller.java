@@ -38,7 +38,7 @@ public class ShipmentTrackingPoller {
             return;
         }
         Optional<ShipmentTracking> row = shipmentTrackingsRepository.find(request.getStoreId(), request.getTrackingNo());
-        if (row.isEmpty() || row.get().getExternalId() == null
+        if (row.isEmpty() || row.get().getExternalId() == null || row.get().hasUnknownState()
                 || (row.get().currentState() != null && row.get().currentState().isFinal())) {
             return;
         }
