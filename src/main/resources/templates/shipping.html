@@ -375,6 +375,12 @@
                                th:attr="aria-invalid=${errors['cashOnDeliveryAmount'] != null ? 'true' : null},
                                         aria-describedby=${errors['cashOnDeliveryAmount'] != null ? 'allegro-cod-help allegro-cod-error' : 'allegro-cod-help'}">
                         <p class="cl-help" id="allegro-cod-help" th:text="${a.codHelp()}"></p>
+                        <p th:if="${a.codAccount() != null}" class="cl-help" id="allegro-cod-account"
+                           th:text="#{shipping.allegro.cod.account(${a.codAccount()})}"></p>
+                        <div th:if="${a.codAccount() == null}" class="cl-alert is-warn" id="allegro-cod-no-account">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <p class="cl-alert-text" th:text="#{shipping.allegro.cod.account.missing}"></p>
+                        </div>
                         <p th:if="${errors['cashOnDeliveryAmount'] != null}" class="cl-field-error" id="allegro-cod-error">
                             <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                             <span th:text="${errors['cashOnDeliveryAmount']}"></span>

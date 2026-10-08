@@ -25,6 +25,11 @@ public final class AllegroShipmentFormCheck {
     }
 
     public static List<Problem> check(ShippingForm form, ShipmentProposal proposal) {
+        return check(form, proposal, true);
+    }
+
+    /** storeHasBankAccount: cash on delivery is paid out to the store's default bank account, so without one it is refused. */
+    public static List<Problem> check(ShippingForm form, ShipmentProposal proposal, boolean storeHasBankAccount) {
         List<Problem> problems = new ArrayList<>();
         List<ParcelForm> parcels = form.getCompleteParcels();
         if (parcels.isEmpty()) {
@@ -38,8 +43,7 @@ public final class AllegroShipmentFormCheck {
         ParcelForm parcel = parcels.get(0);
         PackageOption option = packageOption(proposal);
         if (option != null) {
-            if (exceeds(parcel.getDepth(), option.maxLength()) || exceeds(parcel.getWidth(), option.maxWidth())
-                    || exceeds(parcel.getHeight(), option.maxHeight())) {
+            if (exceedsDimensions(parcel, option)) {
                 problems.add(new Problem("parcel", "shipping.allegro.error.dimensions", new Object[]{
                         plain(option.maxLength()), plain(option.maxWidth()), plain(option.maxHeight())}));
             }
@@ -51,6 +55,9 @@ public final class AllegroShipmentFormCheck {
         if (proposal.maxCashOnDelivery() != null && cod.compareTo(proposal.maxCashOnDelivery()) > 0) {
             problems.add(new Problem("cashOnDeliveryAmount", "shipping.allegro.error.cod",
                     new Object[]{plain(proposal.maxCashOnDelivery())}));
+        }
+        if (form.isCashOnDelivery() && !storeHasBankAccount) {
+            problems.add(new Problem("cashOnDeliveryAmount", "shipping.allegro.error.cod.noAccount", new Object[0]));
         }
         BigDecimal insurance = BigDecimal.valueOf(parcel.getValue());
         // the insured value is whole zloty (ParcelForm#value): at least the cash on delivery rounded up
@@ -73,6 +80,24 @@ public final class AllegroShipmentFormCheck {
 
     static String plain(BigDecimal value) {
         return value == null ? "–" : value.stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * The parcel's longest side against the method's longest limit, and so on down: a box fits whichever way it lies,
+     * and the template's depth and width reach the form's length and width columns in either order. A missing limit
+     * leaves its rank unlimited.
+     */
+    private static boolean exceedsDimensions(ParcelForm parcel, PackageOption option) {
+        List<Integer> sides = new ArrayList<>(List.of(parcel.getDepth(), parcel.getWidth(), parcel.getHeight()));
+        sides.sort(java.util.Comparator.reverseOrder());
+        List<BigDecimal> limits = new ArrayList<>(java.util.Arrays.asList(option.maxLength(), option.maxWidth(), option.maxHeight()));
+        limits.sort(java.util.Comparator.nullsLast(java.util.Comparator.<BigDecimal>naturalOrder()).reversed());
+        for (int i = 0; i < 3; i++) {
+            if (exceeds(sides.get(i), limits.get(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean exceeds(int value, BigDecimal max) {

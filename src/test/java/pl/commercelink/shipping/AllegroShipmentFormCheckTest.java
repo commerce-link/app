@@ -91,4 +91,44 @@ class AllegroShipmentFormCheckTest {
         assertThat(AllegroShipmentFormCheck.check(form, proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.oneParcel");
     }
+
+    @Test
+    void boxThatFitsOnlyTurnedAroundIsAccepted() {
+        // given: the template's depth and width reach the form swapped, so 30 x 60 is the 60 x 30 box
+        ShippingForm form = form(30, 60, 15, 2, 100, null);
+
+        // when / then
+        assertThat(AllegroShipmentFormCheck.check(form, proposal(null, null))).isEmpty();
+    }
+
+    @Test
+    void boxWhoseLongestSideExceedsTheLongestLimitIsReportedWhicheverWayItLies() {
+        // when / then
+        assertThat(AllegroShipmentFormCheck.check(form(20, 65, 15, 2, 100, null), proposal(null, null)))
+                .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.dimensions");
+    }
+
+    @Test
+    void boxWithTwoLongSidesIsReportedAgainstTheSecondLimit() {
+        // given: the limits sorted are 64, 41, 38, so the second side 42 does not fit
+        assertThat(AllegroShipmentFormCheck.check(form(60, 42, 15, 2, 100, null), proposal(null, null)))
+                .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.dimensions");
+    }
+
+    @Test
+    void cashOnDeliveryWithoutAStoreBankAccountIsRefused() {
+        // when
+        List<AllegroShipmentFormCheck.Problem> problems =
+                AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 920, 919.99), proposal(null, null), false);
+
+        // then
+        assertThat(problems).extracting(AllegroShipmentFormCheck.Problem::field, AllegroShipmentFormCheck.Problem::key)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("cashOnDeliveryAmount", "shipping.allegro.error.cod.noAccount"));
+    }
+
+    @Test
+    void prepaidOrderNeedsNoBankAccount() {
+        // when / then
+        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 100, null), proposal(null, null), false)).isEmpty();
+    }
 }

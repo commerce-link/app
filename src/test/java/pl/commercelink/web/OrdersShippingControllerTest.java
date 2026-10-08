@@ -288,7 +288,7 @@ class OrdersShippingControllerTest {
         when(shippingIntegrationViews.allegro(any(), eq(order), any(), any())).thenReturn(new AllegroShippingView(
                 "Allegro One Box, One Kurier", "One by Allegro", "ALBOX-WAW-0231", "shipping.allegro.deliveryType.LOCKER",
                 "Katarzyna Wiśniewska", "limits", "cod", "insurance", "shipping.allegro.labelFormat.PDF_A6",
-                "/dashboard/store/shipping/allegro"));
+                "/dashboard/store/shipping/allegro", null));
     }
 
     @Test
