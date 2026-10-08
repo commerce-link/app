@@ -40,7 +40,10 @@ import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
+import org.springframework.web.util.UriComponentsBuilder;
+import pl.commercelink.shipping.AllegroCarrierNames;
 import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingIntegrationChoice;
 import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
@@ -409,7 +412,7 @@ public class OrderPageModelFactory {
             OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale, integration);
             // the form rebuilds the shipment without its command: a late result would find nothing waiting for it
             boolean editable = !readOnly && s.getCreation() == null;
-            rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
+            rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), carrierName(s),
                     s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                     OrderFormats.moment(s.getShippedAt()), OrderFormats.moment(s.getDeliveredAt()),
                     order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
@@ -430,7 +433,7 @@ public class OrderPageModelFactory {
                     state == null ? null : state.tone(), state != null && state.inProgress(),
                     ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
-                    !readOnly && s.creationFailed() ? details + "/shipping" : null, integration));
+                    !readOnly && s.creationFailed() ? retryHref(details, s) : null, integration));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -846,5 +849,18 @@ public class OrderPageModelFactory {
             return receiptLock.key("order.items.add.locked.receipt");
         }
         return hasDropshipItems ? "order.items.action.dropship.locked" : null;
+    }
+
+    /** Wysyłam z Allegro keeps Allegro's carrier id on the shipment; the operator reads its name. */
+    private static String carrierName(Shipment s) {
+        return ShippingIntegrationChoice.ALLEGRO.equals(s.getProvider())
+                ? AllegroCarrierNames.displayName(s.getCarrier()) : s.getCarrier();
+    }
+
+    /** "Spróbuj ponownie" opens the shipping page on the integration the failed shipment went through. */
+    private static String retryHref(String details, Shipment s) {
+        return s.getProvider() == null ? details + "/shipping"
+                : UriComponentsBuilder.fromPath(details + "/shipping").queryParam("provider", s.getProvider())
+                        .build().encode().toUriString();
     }
 }

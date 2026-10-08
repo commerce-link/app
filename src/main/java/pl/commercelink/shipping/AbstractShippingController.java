@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.rest.client.HttpClientException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.shipping.api.OrderReference;
 import pl.commercelink.shipping.api.ShipmentRequest;
 import pl.commercelink.shipping.api.ShippingEstimate;
 import pl.commercelink.orders.*;
@@ -93,6 +94,9 @@ public abstract class AbstractShippingController {
         // second label once the first booking is saved; the check is not atomic, so two requests in flight at the same
         // time are only kept apart by the button being disabled on submit (shipping-booking.js)
         String refusal = refuseBooking(form);
+        if (refusal == null) {
+            refusal = refuseIntegration(form);
+        }
         if (refusal != null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
             return "redirect:" + getEntityUrl(form);
@@ -101,13 +105,20 @@ public abstract class AbstractShippingController {
         ShipmentCreationStart start;
         try {
             DeliveryTarget target = resolveDeliveryTarget(form);
-            ShipmentRequest request = shippingService.buildRequest(form, store, target);
+            ShipmentRequest request = ShippingService.withOrderReference(
+                    shippingService.buildRequest(form, store, target), orderReference(form));
             start = shipmentCreationService.start(creationSeed(form).storeId(getStoreId()).build(), request, store,
                     placeholder(form, store, target));
         } catch (ShippingUnavailableException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(noProviderKey(), null, locale));
             return "redirect:" + getEntityUrl(form);
         }
+        return redirectAfterStart(start, form, redirectAttributes, locale);
+    }
+
+    /** Where the operator lands after a creation started, was refused or found its owner gone. */
+    protected String redirectAfterStart(ShipmentCreationStart start, ShippingForm form, RedirectAttributes redirectAttributes,
+                                        Locale locale) {
         switch (start.outcome()) {
             case REFUSED -> {
                 redirectAttributes.addFlashAttribute("errorMessage", start.error());
@@ -170,7 +181,7 @@ public abstract class AbstractShippingController {
                 .collect(Collectors.toList());
     }
 
-    private String getEntityUrl(ShippingForm form) {
+    protected String getEntityUrl(ShippingForm form) {
         String url = "/dashboard/" + form.getShippingEntityType();
         String entityId = form.getShippingEntityId();
         if (StringUtils.isNotBlank(entityId)) {
@@ -197,6 +208,19 @@ public abstract class AbstractShippingController {
      * courier is booked, since the page may be older than the record.
      */
     protected String refuseBooking(ShippingForm form) {
+        return null;
+    }
+
+    /**
+     * Message key of the reason the integration named by the form must not book here, or null. These steps always book
+     * through the store's default integration: another one (Wysyłam z Allegro) has its own step.
+     */
+    protected String refuseIntegration(ShippingForm form) {
+        return null;
+    }
+
+    /** The marketplace order the shipment is for, null for any other record. */
+    protected OrderReference orderReference(ShippingForm form) {
         return null;
     }
 

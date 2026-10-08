@@ -24,10 +24,6 @@ public final class AllegroShipmentFormCheck {
     private AllegroShipmentFormCheck() {
     }
 
-    public static List<Problem> check(ShippingForm form, ShipmentProposal proposal) {
-        return check(form, proposal, true);
-    }
-
     /** storeHasBankAccount: cash on delivery is paid out to the store's default bank account, so without one it is refused. */
     public static List<Problem> check(ShippingForm form, ShipmentProposal proposal, boolean storeHasBankAccount) {
         List<Problem> problems = new ArrayList<>();

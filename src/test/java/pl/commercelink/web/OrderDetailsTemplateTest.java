@@ -723,11 +723,34 @@ class OrderDetailsTemplateTest {
         // then: the array of arguments is spread, never printed as one value
         assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków na koncie</span>")
                 .doesNotContain("[Ljava")
-                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping\"")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping?provider=furgonetka\"")
                 .contains(">Spróbuj ponownie</a>")
                 .contains("/shipments/0/remove")
                 .doesNotContain(">Edytuj<")
                 .doesNotContain("data-cl-cancellation-poll");
+    }
+
+    @Test
+    void allegroShipmentShowsTheCarrierByItsNameAndRetriesThroughAllegro() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        Shipment created = order.getShipments().get(0);
+        created.setProvider("allegro");
+        created.setExternalId("shp-1");
+        created.setCarrier("ALLEGRO_ONE_KURIER");
+        created.setTrackingNo("A000123456");
+        created.setShippedAt(java.time.LocalDateTime.of(2026, 10, 8, 9, 0));
+        Shipment failed = new Shipment(ShipmentType.PickupPoint);
+        failed.setProvider("allegro");
+        failed.setCreation(ShipmentCreationState.pending("cmd-2", java.time.LocalDateTime.now()).failed("Allegro odmówiło"));
+        order.addShipment(failed);
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("One by Allegro")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping?provider=allegro\"");
     }
 
     @Test

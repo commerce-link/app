@@ -151,6 +151,47 @@ public class ShippingService {
                 .build();
     }
 
+    /**
+     * A Wysyłam z Allegro shipment of an order: the store's pickup and sender addresses, one parcel, cash on delivery
+     * to the store's default account and the order's reference. The adapter takes the recipient and the delivery
+     * method from Allegro's own proposal for the order (the buyer's masked e-mail), never from this request: the
+     * receiver here is only what the order knows.
+     */
+    public ShipmentRequest buildAllegroRequest(ShippingForm form, Store store, Order order) {
+        ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
+        ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
+        ShipmentOptions.CashOnDelivery cod = null;
+        if (form.isCashOnDelivery()) {
+            BankAccount bankAccount = store.getDefaultBankAccount();
+            cod = new ShipmentOptions.CashOnDelivery(
+                    form.getCashOnDeliveryAmount(), bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
+        }
+        return ShipmentRequest.builder()
+                .pickup(toShipmentAddress(pickupAddress))
+                .sender(toShipmentAddress(senderAddress))
+                .receiver(toShipmentAddress(order.getShippingDetails()))
+                .parcels(toParcels(form.getCompleteParcels()))
+                .options(new ShipmentOptions(false, false, cod))
+                .orderReference(orderReference(order))
+                .build();
+    }
+
+    /** The marketplace order a shipment is for (Allegro needs its checkout form); null for any other order. */
+    public static OrderReference orderReference(Order order) {
+        if (order == null || !order.isMarketplaceOrder()) {
+            return null;
+        }
+        return new OrderReference(order.getSource().getName(), order.getExternalOrderId(), order.getShortenedOrderId());
+    }
+
+    public static ShipmentRequest withOrderReference(ShipmentRequest request, OrderReference reference) {
+        if (reference == null) {
+            return request;
+        }
+        return new ShipmentRequest(request.pickup(), request.sender(), request.receiver(), request.parcels(),
+                request.carrierId(), request.options(), request.deliveryPoint(), reference);
+    }
+
     /** A customer return: picked up at the customer's address, delivered to the store's default pickup address. */
     public ShipmentRequest buildReturnRequest(ShippingDetails customerAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
         providerFor(store);

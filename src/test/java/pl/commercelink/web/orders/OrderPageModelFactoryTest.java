@@ -2071,7 +2071,7 @@ class OrderPageModelFactoryTest {
         assertThat(row.stateArgs()).containsExactly("Brak środków na koncie");
         assertThat(row.stateTone()).isEqualTo("is-warn");
         assertThat(row.stateInProgress()).isFalse();
-        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping");
+        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping?provider=furgonetka");
         assertThat(row.removeHref()).startsWith("/dashboard/orders/" + order.getOrderId() + "/shipments/0/remove");
         assertThat(row.editHref()).isNull();
         assertThat(card.cancellationPollHref()).isNull();
@@ -2106,7 +2106,7 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(row.stateKey()).isEqualTo("shipping.creation.unconfirmed");
         assertThat(row.stateInProgress()).isFalse();
-        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping");
+        assertThat(row.retryHref()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipping?provider=furgonetka");
         assertThat(row.removeHref()).startsWith("/dashboard/orders/" + order.getOrderId() + "/shipments/0/remove");
         assertThat(OrderPageModelFactory.removeLockedKey(order, 0)).isNull();
         assertThat(card.cancellationPollHref()).isNull();

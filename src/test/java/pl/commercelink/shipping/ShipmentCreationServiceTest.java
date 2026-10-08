@@ -18,8 +18,10 @@ import pl.commercelink.shipping.api.*;
 import pl.commercelink.stores.Store;
 
 import java.util.Locale;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -32,6 +34,8 @@ class ShipmentCreationServiceTest {
     @Mock private ShipmentOwner owner;
     @Mock private ShipmentCreationEventPublisher publisher;
     @Mock private ShippingProvider provider;
+    @Mock private ShippingProviders providers;
+    @Mock private ShippingProvider allegroProvider;
     @Mock private Store store;
     @Mock private MessageSource messageSource;
 
@@ -49,7 +53,7 @@ class ShipmentCreationServiceTest {
                 .thenReturn("Integracja wysyłki (Furgonetka) nie potwierdziła nadania");
         when(messageSource.getMessage(eq("shipping.creation.notCreated"), argThat(namesTheIntegration()), any(Locale.class)))
                 .thenReturn("Integracja wysyłki (Furgonetka) nie utworzyła paczki");
-        service = new ShipmentCreationService(shippingService, owners, publisher, messageSource,
+        service = new ShipmentCreationService(shippingService, providers, owners, publisher, messageSource,
                 ShippingIntegrationNamesFixture.names());
     }
 
@@ -207,5 +211,37 @@ class ShipmentCreationServiceTest {
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("Nieprawidłowy kod pocztowy");
         verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void startWithANamedIntegrationSendsTheCommandThereAndRecordsIt() {
+        // given
+        when(providers.forName(store, "allegro")).thenReturn(Optional.of(allegroProvider));
+        when(allegroProvider.createShipment(any(), anyString()))
+                .thenAnswer(invocation -> ShipmentCreation.pending(invocation.getArgument(1), null));
+        Shipment placeholder = new Shipment(ShipmentType.PickupPoint);
+
+        // when
+        ShipmentCreationStart start = service.start(seed(), request, store, placeholder, "allegro");
+
+        // then
+        assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.STARTED);
+        assertThat(placeholder.getProvider()).isEqualTo("allegro");
+        verify(allegroProvider).createShipment(eq(request), anyString());
+        verify(provider, never()).createShipment(any(), anyString());
+        // the shipment id comes with the result: nothing to record before
+        verify(owner, never()).recordExternalId(any());
+        verify(publisher).publish(argThat(check -> "allegro".equals(check.getProvider()) && check.getExternalId() == null));
+    }
+
+    @Test
+    void startWithAnIntegrationTheStoreDoesNotHaveIsUnavailable() {
+        // given
+        when(providers.forName(store, "allegro")).thenReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> service.start(seed(), request, store, new Shipment(ShipmentType.Courier), "allegro"))
+                .isInstanceOf(ShippingUnavailableException.class);
+        verify(owner, never()).markCreating(any(), any());
     }
 }

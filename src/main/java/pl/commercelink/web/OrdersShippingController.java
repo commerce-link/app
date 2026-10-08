@@ -13,7 +13,16 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.*;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.shipping.AbstractShippingController;
+import pl.commercelink.shipping.AllegroShipmentFormCheck;
+import pl.commercelink.shipping.ShipmentCreationStart;
+import pl.commercelink.shipping.ShippingService;
+import pl.commercelink.shipping.ShippingUnavailableException;
+import pl.commercelink.shipping.api.DeliveryType;
+import pl.commercelink.shipping.api.OrderReference;
 import pl.commercelink.shipping.ParcelForm;
 import pl.commercelink.shipping.ShippingIntegrationChoice;
 import pl.commercelink.shipping.ShippingIntegrationOption;
@@ -92,7 +101,7 @@ public class OrdersShippingController extends AbstractShippingController {
             prefillAllegro(form, order, store, allegro.get().proposal());
             model.addAttribute("allegroShipping",
                     shippingIntegrationViews.allegro(allegro.get().proposal(), order, store, locale));
-        } else if (options.size() > 1) {
+        } else {
             // the default integration's steps carry it, so a re-rendered step does not switch back to Allegro
             form.setProvider(selected);
         }
@@ -139,6 +148,72 @@ public class OrdersShippingController extends AbstractShippingController {
         }
         parcel.setValue(insurance);
         form.setParcels(new ArrayList<>(List.of(parcel)));
+    }
+
+    @Override
+    protected String refuseIntegration(ShippingForm form) {
+        String provider = form.getProvider();
+        return provider == null || provider.equals(getStore().defaultShippingIntegration())
+                ? null : "shipping.integration.error.unavailable";
+    }
+
+    @Override
+    protected OrderReference orderReference(ShippingForm form) {
+        return ShippingService.orderReference(requireOrder(form.getShippingEntityId()));
+    }
+
+    /**
+     * "Utwórz przesyłkę" of Wysyłam z Allegro. The integration must be one the order can ship through right now (the
+     * same choice the page showed: an order placed on Allegro whose method Allegro accepts); a post outside it is a
+     * forged or long-stale form and is answered with 400 before Allegro is asked for anything. Limits are checked
+     * first; a refused field re-renders the form with its reason.
+     */
+    @PostMapping("/allegro/create")
+    public String createAllegroShipping(@PathVariable("orderId") String orderId, @ModelAttribute ShippingForm form,
+                                        Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        form.setShippingEntityId(orderId);
+        form.setShippingEntityType("orders");
+        form.setProvider(ShippingIntegrationChoice.ALLEGRO);
+        Order order = requireOrder(orderId);
+        String refusal = refuseBooking(order);
+        if (refusal != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+        Store store = getStore();
+        List<ShippingIntegrationOption> options = shippingIntegrationChoice.forOrder(store, order);
+        model.addAttribute("integrationOptions", options);
+        ShipmentProposal proposal = ShippingIntegrationChoice.availableNamed(options, ShippingIntegrationChoice.ALLEGRO)
+                .map(ShippingIntegrationOption::proposal)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Order " + orderId + " cannot be shipped through Wysyłam z Allegro"));
+        List<AllegroShipmentFormCheck.Problem> problems =
+                AllegroShipmentFormCheck.check(form, proposal, store.getDefaultBankAccount() != null);
+        if (!problems.isEmpty()) {
+            model.addAttribute("allegroErrors", shippingIntegrationViews.errors(problems, locale));
+            return renderShippingForm(store, form, retrieveShippingDetailsList(form), model);
+        }
+        ShipmentCreationStart start;
+        try {
+            start = shipmentCreationService.start(creationSeed(form).storeId(getStoreId()).build(),
+                    shippingService.buildAllegroRequest(form, store, order), store, allegroPlaceholder(proposal),
+                    ShippingIntegrationChoice.ALLEGRO);
+        } catch (ShippingUnavailableException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("shipping.integration.error.unavailable", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+        return redirectAfterStart(start, form, redirectAttributes, locale);
+    }
+
+    /** What the order shows while Allegro creates the shipment: the buyer's method and point. */
+    static Shipment allegroPlaceholder(ShipmentProposal proposal) {
+        String point = proposal.deliveryPoint() == null ? null : StringUtils.trimToNull(proposal.deliveryPoint().code());
+        boolean toPoint = point != null && proposal.deliveryType() != DeliveryType.DOOR;
+        Shipment placeholder = new Shipment(toPoint ? ShipmentType.PickupPoint : ShipmentType.Courier);
+        placeholder.setCollectionPointCode(toPoint ? point : null);
+        placeholder.setCarrier(proposal.methodName());
+        return placeholder;
     }
 
     @Override

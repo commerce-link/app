@@ -21,6 +21,11 @@ class AllegroShipmentFormCheckTest {
                         new BigDecimal("41"), new BigDecimal("25"))), maxCod, maxInsurance);
     }
 
+    /** The store has a default bank account: only the form and the proposal decide. */
+    static List<AllegroShipmentFormCheck.Problem> checkWithAccount(ShippingForm form, ShipmentProposal proposal) {
+        return AllegroShipmentFormCheck.check(form, proposal, true);
+    }
+
     static ShippingForm form(int length, int width, int height, int weight, int insurance, Double cod) {
         ShippingForm form = new ShippingForm("order-1", "orders");
         ParcelForm parcel = new ParcelForm(length, width, height, weight, insurance, "Akcesoria", "package");
@@ -34,13 +39,13 @@ class AllegroShipmentFormCheckTest {
 
     @Test
     void parcelWithinTheLimitsPasses() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 920, 919.99),
+        assertThat(checkWithAccount(form(30, 20, 15, 2, 920, 919.99),
                 proposal(new BigDecimal("5000"), new BigDecimal("5000")))).isEmpty();
     }
 
     @Test
     void incompleteParcelIsReported() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 0, 15, 2, 100, null), proposal(null, null)))
+        assertThat(checkWithAccount(form(30, 0, 15, 2, 100, null), proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::field, AllegroShipmentFormCheck.Problem::key)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("parcel", "shipping.allegro.error.parcel"));
     }
@@ -48,7 +53,7 @@ class AllegroShipmentFormCheckTest {
     @Test
     void parcelLargerThanTheMethodAllowsIsReportedWithTheLimit() {
         List<AllegroShipmentFormCheck.Problem> problems =
-                AllegroShipmentFormCheck.check(form(65, 20, 15, 2, 100, null), proposal(null, null));
+                checkWithAccount(form(65, 20, 15, 2, 100, null), proposal(null, null));
 
         assertThat(problems).extracting(AllegroShipmentFormCheck.Problem::key)
                 .containsExactly("shipping.allegro.error.dimensions");
@@ -57,13 +62,13 @@ class AllegroShipmentFormCheckTest {
 
     @Test
     void heavierParcelIsReported() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 26, 100, null), proposal(null, null)))
+        assertThat(checkWithAccount(form(30, 20, 15, 26, 100, null), proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.weight");
     }
 
     @Test
     void cashOnDeliveryAboveTheLimitIsReported() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 6000, 5500.0),
+        assertThat(checkWithAccount(form(30, 20, 15, 2, 6000, 5500.0),
                 proposal(new BigDecimal("5000"), new BigDecimal("10000"))))
                 .extracting(AllegroShipmentFormCheck.Problem::field, AllegroShipmentFormCheck.Problem::key)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("cashOnDeliveryAmount", "shipping.allegro.error.cod"));
@@ -71,14 +76,14 @@ class AllegroShipmentFormCheckTest {
 
     @Test
     void insuranceBelowTheCashOnDeliveryIsReported() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 900, 919.99), proposal(null, null)))
+        assertThat(checkWithAccount(form(30, 20, 15, 2, 900, 919.99), proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::field, AllegroShipmentFormCheck.Problem::key)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("insurance", "shipping.allegro.error.insurance.min"));
     }
 
     @Test
     void insuranceAboveTheLimitIsReported() {
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 6000, null),
+        assertThat(checkWithAccount(form(30, 20, 15, 2, 6000, null),
                 proposal(null, new BigDecimal("5000"))))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.insurance.max");
     }
@@ -88,7 +93,7 @@ class AllegroShipmentFormCheckTest {
         ShippingForm form = form(30, 20, 15, 2, 100, null);
         form.getParcels().add(new ParcelForm(30, 20, 15, 2, 100, "Drugi karton", "package"));
 
-        assertThat(AllegroShipmentFormCheck.check(form, proposal(null, null)))
+        assertThat(checkWithAccount(form, proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.oneParcel");
     }
 
@@ -98,20 +103,20 @@ class AllegroShipmentFormCheckTest {
         ShippingForm form = form(30, 60, 15, 2, 100, null);
 
         // when / then
-        assertThat(AllegroShipmentFormCheck.check(form, proposal(null, null))).isEmpty();
+        assertThat(checkWithAccount(form, proposal(null, null))).isEmpty();
     }
 
     @Test
     void boxWhoseLongestSideExceedsTheLongestLimitIsReportedWhicheverWayItLies() {
         // when / then
-        assertThat(AllegroShipmentFormCheck.check(form(20, 65, 15, 2, 100, null), proposal(null, null)))
+        assertThat(checkWithAccount(form(20, 65, 15, 2, 100, null), proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.dimensions");
     }
 
     @Test
     void boxWithTwoLongSidesIsReportedAgainstTheSecondLimit() {
         // given: the limits sorted are 64, 41, 38, so the second side 42 does not fit
-        assertThat(AllegroShipmentFormCheck.check(form(60, 42, 15, 2, 100, null), proposal(null, null)))
+        assertThat(checkWithAccount(form(60, 42, 15, 2, 100, null), proposal(null, null)))
                 .extracting(AllegroShipmentFormCheck.Problem::key).containsExactly("shipping.allegro.error.dimensions");
     }
 

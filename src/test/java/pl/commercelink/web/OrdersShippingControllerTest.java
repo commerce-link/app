@@ -26,6 +26,9 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.shipping.AllegroShippingView;
 import pl.commercelink.shipping.ParcelForm;
 import pl.commercelink.shipping.ShipmentCreationService;
+import pl.commercelink.shipping.ShipmentCreationStart;
+import pl.commercelink.shipping.ShipmentOwnerType;
+import pl.commercelink.shipping.api.ShipmentRequest;
 import pl.commercelink.shipping.ShippingIntegrationChoice;
 import pl.commercelink.shipping.ShippingIntegrationChoiceView;
 import pl.commercelink.shipping.ShippingIntegrationOption;
@@ -47,12 +50,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -351,5 +357,138 @@ class OrdersShippingControllerTest {
         ShippingForm form = (ShippingForm) model.get("shippingForm");
         assertThat(form.getParcels()).hasSize(1);
         assertThat(form.getPackageTemplateId()).isEqualTo("t-m");
+    }
+
+    static ShippingForm allegroForm(String orderId) {
+        ShippingForm form = new ShippingForm(orderId, "orders");
+        form.setProvider("allegro");
+        form.setPickUpAddressId("addr-1");
+        form.setParcels(new ArrayList<>(List.of(new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"))));
+        return form;
+    }
+
+    @Test
+    void createRefusesAllegroForOrderOutsideChoice() {
+        // given: a shop order; the post claims Wysyłam z Allegro anyway (a forged form)
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.allegroOnly", null),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+
+        // when / then
+        assertThatThrownBy(() -> controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        verifyNoInteractions(shipmentCreationService);
+        verify(shippingService, never()).buildAllegroRequest(any(), any(), any());
+    }
+
+    @Test
+    void createRefusesAllegroWhenItsProposalIsUnavailable() {
+        // given: an Allegro order whose delivery method Allegro does not ship
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.proposal", "x"),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+
+        // when / then
+        assertThatThrownBy(() -> controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void forgedAllegroProviderOnTheDefaultStepsIsRefused() {
+        // given
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        Store store = new Store();
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.createShipping(allegroForm(order.getOrderId()), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.integration.error.unavailable");
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void allegroCreateStartsTheCommandWithThePlaceholderOfTheBuyersMethod() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ShipmentRequest request = ShipmentRequest.builder().build();
+        when(shippingService.buildAllegroRequest(any(), any(), eq(order))).thenReturn(request);
+        when(shipmentCreationService.start(any(), eq(request), any(), any(), eq("allegro")))
+                .thenReturn(ShipmentCreationStart.startedForTest());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        verify(shipmentCreationService).start(argThat(seed -> seed.getOwnerType() == ShipmentOwnerType.ORDER
+                        && order.getOrderId().equals(seed.getOwnerId()) && "addr-1".equals(seed.getPickUpAddressId())),
+                eq(request), any(), argThat(placeholder -> "Allegro One Box, One Kurier".equals(placeholder.getCarrier())
+                        && "ALBOX-WAW-0231".equals(placeholder.getCollectionPointCode())
+                        && placeholder.getType() == ShipmentType.PickupPoint), eq("allegro"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void allegroCreateWithParcelOverTheLimitRendersTheFormWithTheReason() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(shippingIntegrationViews.errors(any(), any())).thenReturn(Map.of("parcel", "Paczka przekracza wagę metody: najwyżej 25 kg."));
+        ShippingForm form = allegroForm(order.getOrderId());
+        form.getParcels().get(0).setWeight(30);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), form, model, new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("shipping");
+        assertThat(((Map<String, String>) model.get("allegroErrors"))).containsKey("parcel");
+        verifyNoInteractions(shipmentCreationService);
+        // the choice is asked once in the request: the page reuses it
+        verify(shippingIntegrationChoice, times(1)).forOrder(any(), eq(order));
+    }
+
+    @Test
+    void defaultStepsOfAMarketplaceOrderCarryItsReference() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        Store store = new Store();
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ShipmentRequest built = ShipmentRequest.builder().carrierId("svc-1").build();
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(built);
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+        ShippingForm form = new ShippingForm(order.getOrderId(), "orders");
+        form.setProvider("furgonetka");
+
+        // when
+        controller.createShipping(form, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        verify(shipmentCreationService).start(any(), argThat(r -> r.orderReference() != null
+                && order.getExternalOrderId().equals(r.orderReference().externalOrderId())), any(), any());
     }
 }

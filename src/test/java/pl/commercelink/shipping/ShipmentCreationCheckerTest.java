@@ -193,4 +193,34 @@ class ShipmentCreationCheckerTest {
         verify(allegro).checkShipmentCreation("cmd-1", null);
         verifyNoInteractions(provider);
     }
+
+    @Test
+    void checkWithoutExternalIdSettlesWithTheShipmentIdOfTheResult() {
+        // given: Wysyłam z Allegro names its shipment only once the command succeeded
+        ShipmentCreationCheckRequest request = ShipmentCreationCheckRequest.builder().storeId("store-1")
+                .ownerType(ShipmentOwnerType.ORDER).ownerId("order-1").commandId("cmd-1").attempt(1).build();
+        ShipmentResult result = new ShipmentResult("shp-9", List.of(
+                new ShipmentResult.ShipmentParcelResult("WB-1", "DPD", null, true, null, false)), null);
+        when(provider.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.succeeded("cmd-1", result));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(settler).succeeded(argThat(r -> "shp-9".equals(r.getExternalId())), eq(result));
+    }
+
+    @Test
+    void pendingWithoutExternalIdIsAskedAgainWithoutOne() {
+        // given
+        ShipmentCreationCheckRequest request = ShipmentCreationCheckRequest.builder().storeId("store-1")
+                .ownerType(ShipmentOwnerType.ORDER).ownerId("order-1").commandId("cmd-1").attempt(1).build();
+        when(provider.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.pending("cmd-1", null));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2 && r.getExternalId() == null));
+    }
 }
