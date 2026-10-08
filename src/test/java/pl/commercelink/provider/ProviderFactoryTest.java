@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -461,5 +462,53 @@ class ProviderFactoryTest {
 
         // then
         org.mockito.Mockito.verify(secretsManager).deleteSecret("store-1-paynow");
+    }
+
+    /** Settings stored apart from the credentials they share with another integration (Wysyłam z Allegro). */
+    private ProviderFactory<OAuth2Descriptor, Object> sharedCredentialsFactory() {
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository) {
+            @Override
+            protected String credentialNameFor(String providerName, OAuth2Descriptor descriptor) {
+                return "shared_marketplace";
+            }
+
+            @Override
+            protected String configurationNameFor(String providerName, OAuth2Descriptor descriptor) {
+                return "own_settings";
+            }
+        };
+        factory.registerDescriptor(new OAuth2Descriptor());
+        return factory;
+    }
+
+    @Test
+    void settingsAreReadAndSavedUnderTheConfigurationName() {
+        // given
+        ProviderFactory<OAuth2Descriptor, Object> factory = sharedCredentialsFactory();
+        when(configurationManager.loadConfiguration(store, "own_settings")).thenReturn(Map.of("labelFormat", "ZPL"));
+
+        // when
+        Map<String, String> loaded = factory.loadConfiguration(store, "TestOAuth");
+        factory.saveConfiguration(store, "TestOAuth", Map.of("labelFormat", "PDF_A4"));
+        factory.loadConfigurationForUI(store, "TestOAuth");
+
+        // then
+        assertThat(loaded).containsEntry("labelFormat", "ZPL");
+        verify(configurationManager).saveConfiguration(eq(store), eq("own_settings"), any(), eq(Map.of("labelFormat", "PDF_A4")));
+        verify(configurationManager).getConfigurationForUI(eq(store), eq("own_settings"), any());
+    }
+
+    @Test
+    void deletingSettingsKeepsCredentialsSharedWithAnotherIntegration() {
+        // given
+        ProviderFactory<OAuth2Descriptor, Object> factory = sharedCredentialsFactory();
+
+        // when
+        factory.deleteConfiguration(store, "TestOAuth");
+
+        // then
+        verify(configurationManager).deleteConfiguration(store, "own_settings");
+        verifyNoInteractions(credentialStore, tokenStore);
     }
 }
