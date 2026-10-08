@@ -118,7 +118,7 @@ class ShipmentPickupServiceTest {
     }
 
     @Test
-    void windowsOfAnotherIntegrationThanTheStoresAreNotAsked() {
+    void windowsOfAnIntegrationTheStoreNoLongerHasAreNotAsked() {
         // when
         List<PickupWindow> windows = service.windows(store, "allegro", null, List.of("1"), 4);
 
@@ -286,7 +286,7 @@ class ShipmentPickupServiceTest {
     }
 
     @Test
-    void anotherProviderThanTheStoresIsRejected() {
+    void aPickupOfAnIntegrationTheStoreNoLongerHasIsRejected() {
         // when / then
         assertThat(service.order(store, "allegro", null, List.of(target("1")), WINDOW).outcome())
                 .isEqualTo(PickupStart.Outcome.GONE);

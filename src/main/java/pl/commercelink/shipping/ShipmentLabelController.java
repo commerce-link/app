@@ -24,8 +24,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /**
- * "Pobierz etykietę": the label file through the store's own integration account, or back with the reason. A package
- * of another integration than the store's is refused: its label lives on an account the store has no access to.
+ * "Pobierz etykietę": the label file through the integration that created the package, if the store still has it, or
+ * back with the reason. A package of an integration the store has since disconnected is refused with a message that
+ * says so: its label lives on an account the store no longer has.
  */
 @Slf4j
 @Controller
@@ -34,6 +35,7 @@ import java.util.Locale;
 public class ShipmentLabelController {
 
     private static final String UNAVAILABLE = "shipping.label.unavailable";
+    private static final String DISCONNECTED = "shipping.label.integration.disconnected";
     private static final String EMPTY = "shipping.label.empty";
 
     private final StoresRepository storesRepository;
@@ -48,7 +50,12 @@ public class ShipmentLabelController {
         String safeBack = ShipmentPickupController.safeBack(back);
         Store store = storesRepository.findById(storeId());
         if (!shippingService.supportsLabels(store, provider)) {
-            return backWith(messageSource.getMessage(UNAVAILABLE, null, locale), safeBack, redirectAttributes);
+            // a disconnected integration is told apart from a connected one that hands out no label
+            String message = shippingService.providerNamed(store, provider).isEmpty()
+                    ? messageSource.getMessage(DISCONNECTED,
+                            new Object[]{shippingIntegrationNames.of(provider, store, locale)}, locale)
+                    : messageSource.getMessage(UNAVAILABLE, null, locale);
+            return backWith(message, safeBack, redirectAttributes);
         }
         try {
             ShippingProvider shippingProvider = shippingService.providerNamed(store, provider)

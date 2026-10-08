@@ -141,6 +141,21 @@ class ShipmentPickupCheckerTest {
     }
 
     @Test
+    void checkerWithDisconnectedIntegrationFailsThePickupReadably() {
+        // given
+        ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").provider("allegro")
+                .commandId("pick-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00").attempt(1).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(settler).failedWithKey(request, ShipmentPickupChecker.NO_PROVIDER_KEY);
+        verifyNoInteractions(publisher, provider);
+    }
+
+    @Test
     void aDeletedStoreFailsThePickup() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(null);

@@ -121,6 +121,20 @@ class ShipmentCreationCheckerTest {
 
         // then
         verify(settler).failedWithKey(any(), eq("shipping.creation.no.provider"));
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void checkerWithDisconnectedIntegrationFailsTheCreationReadably() {
+        // given: the store dropped Wysyłam z Allegro while the command was queued
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
+
+        // when
+        checker.check(request(3).toBuilder().provider("allegro").build());
+
+        // then: settled once with the readable key, nothing re-queued, nothing thrown (no DLQ loop)
+        verify(settler).failedWithKey(any(), eq(ShipmentCreationChecker.NO_PROVIDER_KEY));
+        verifyNoInteractions(publisher, provider);
     }
 
     @Test

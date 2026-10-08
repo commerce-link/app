@@ -169,9 +169,10 @@ class ShipmentLabelControllerTest {
     }
 
     @Test
-    void aPackageWhoseLabelTheStoreCannotGetIsRefusedWithoutAskingForIt() {
-        // given: another integration than the store's, one without labels or a disconnected one
+    void aConnectedIntegrationThatHandsOutNoLabelIsRefusedAsUnavailable() {
+        // given
         when(shippingService.supportsLabels(store, "allegro")).thenReturn(false);
+        when(shippingService.providerNamed(store, "allegro")).thenReturn(java.util.Optional.of(provider));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -206,8 +207,8 @@ class ShipmentLabelControllerTest {
 
         // then
         assertThat(result).isEqualTo("redirect:/dashboard/orders/o-1");
-        assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
-        verify(shippingService, never()).providerNamed(any(), eq("allegro"));
+        assertThat(redirect.getFlashAttributes().get("errorMessage").toString())
+                .startsWith("shipping.label.integration.disconnected");
     }
 
     @Test
