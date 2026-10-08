@@ -100,6 +100,8 @@ class OrderDetailsTemplateTest {
         Store store = new Store();
         store.setStoreId("store-1");
         store.setName("Demo");
+        // names the integration of a shipment typed in by hand (ShippingIntegrationNames)
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
         if (documentsGenerationEnabled) {
             pl.commercelink.stores.WarehouseConfiguration warehouse = new pl.commercelink.stores.WarehouseConfiguration();
             warehouse.setDocumentsGenerationEnabled(true);
@@ -122,7 +124,8 @@ class OrderDetailsTemplateTest {
         when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
-                receiptService, mock(ReceiptAlerts.class), courierAvailable());
+                receiptService, mock(ReceiptAlerts.class), courierAvailable(),
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names());
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -676,7 +679,8 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
                 .containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\"[^>]*"
                         + "aria-describedby=\"shipment-cancel-reason\">Anuluj przesyłkę</button>")
-                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
+                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z integracji "
+                        + "wysyłki (Furgonetka).</p>")
                 .doesNotContain("/cancelShipment\"");
         assertThat(html).contains("/js/shipment-cancellation.js");
     }
@@ -737,8 +741,8 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(card).contains("<span class=\"cl-status is-warn\">Furgonetka nie potwierdziła nadania — sprawdź "
-                + "przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Integracja wysyłki (Furgonetka) nie potwierdziła "
+                + "nadania — sprawdź przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
                 .doesNotContain("Nie udało się nadać");
     }
 
@@ -753,8 +757,9 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Furgonetka nie utworzyła "
-                + "paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj ponownie za chwilę.</span>");
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Integracja wysyłki (Furgonetka) "
+                + "nie utworzyła paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj "
+                + "ponownie za chwilę.</span>");
     }
 
     @Test
@@ -834,7 +839,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aFailedCancellationSendsTheOperatorToFurgonetkaAndItsRemovalWarnsAboutTheLabel() {
+    void aFailedCancellationSendsTheOperatorToTheIntegrationsPanelAndItsRemovalWarnsAboutTheLabel() {
         // given
         Order order = order(OrderStatus.Shipping);
         Shipment sent = order.getShipments().get(0);
@@ -850,10 +855,12 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(card).doesNotContain("data-cl-cancellation-poll")
-                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu Furgonetki</span>")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu integracji wysyłki "
+                        + "(Furgonetka)</span>")
                 .contains("/cancelShipment\"")
-                .contains("data-cl-confirm-message=\"Anulowanie w Furgonetce nie zostało potwierdzone. Usuń przesyłkę tylko "
-                        + "wtedy, gdy etykieta jest anulowana w panelu Furgonetki — inaczej kurier może ją nadal odebrać.\"")
+                .contains("data-cl-confirm-message=\"Anulowanie w integracji wysyłki (Furgonetka) nie zostało potwierdzone. "
+                        + "Usuń przesyłkę tylko wtedy, gdy etykieta jest anulowana w panelu tej integracji — inaczej kurier "
+                        + "może ją nadal odebrać.\"")
                 .doesNotContain("shipment-cancel-reason");
     }
 
@@ -1901,8 +1908,8 @@ class OrderDetailsTemplateTest {
         String withoutTracking = page(render(untracked, ADMIN));
 
         // then
-        assertThat(withTracking).contains("Śledzona w Furgonetce");
-        assertThat(withoutTracking).doesNotContain("Śledzona w Furgonetce");
+        assertThat(withTracking).contains("Śledzona (Furgonetka)");
+        assertThat(withoutTracking).doesNotContain("Śledzona");
     }
 
     @Test

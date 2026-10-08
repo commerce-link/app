@@ -45,7 +45,8 @@ class ShipmentLabelControllerTest {
         when(shippingService.providerFor(store)).thenReturn(provider);
         StaticMessageSource messages = new StaticMessageSource();
         messages.setUseCodeAsDefaultMessage(true);
-        controller = new ShipmentLabelController(storesRepository, shippingService, messages) {
+        controller = new ShipmentLabelController(storesRepository, shippingService, messages,
+                ShippingIntegrationNamesFixture.names()) {
             @Override
             String storeId() {
                 return "store-1";
@@ -112,6 +113,27 @@ class ShipmentLabelControllerTest {
         // then
         assertThat(result).isEqualTo("redirect:/dashboard/rma/r-1");
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("shipping.label.empty");
+    }
+
+    @Test
+    void theMissingLabelMessageNamesTheIntegrationOfThePackage() {
+        // given: the application's own bundles instead of the codes
+        ShipmentLabelController withBundles = new ShipmentLabelController(storesRepository, shippingService,
+                ShippingIntegrationNamesFixture.bundles(), ShippingIntegrationNamesFixture.names()) {
+            @Override
+            String storeId() {
+                return "store-1";
+            }
+        };
+        when(provider.getLabel("21480003")).thenReturn(new Label(new byte[0], "application/pdf", "etykieta-21480003.pdf"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        withBundles.label("furgonetka", "21480003", "/dashboard/rma/r-1", redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Etykieta tej przesyłki nie jest jeszcze "
+                + "dostępna w integracji wysyłki (Furgonetka). Spróbuj później albo pobierz ją w jej panelu.");
     }
 
     @Test

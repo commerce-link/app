@@ -56,7 +56,8 @@ class WarehouseShipmentOwnerTest {
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
         when(goodsOutService.issueGoodsOutForExternalService(any(), any(), any(), any()))
                 .thenReturn(OperationResult.success());
-        owner = new WarehouseShipmentOwner(notifications, goodsOutService, reservations, messageSource);
+        owner = new WarehouseShipmentOwner(notifications, goodsOutService, reservations, messageSource,
+                ShippingIntegrationNamesFixture.names());
     }
 
     private ShipmentCreationCheckRequest request() {
@@ -225,13 +226,13 @@ class WarehouseShipmentOwnerTest {
     }
 
     @Test
-    void aFailedPickupTellsTheOperatorHowToSendTheParcelInBothLanguagesWithTheReasonLast() {
+    void aFailedPickupTellsTheOperatorWhichIntegrationsPanelToUseInBothLanguagesWithTheReasonLast() {
         // given: a warehouse shipment is stored nowhere in the app, so its pickup cannot be ordered again here; the
         // provider's reason may come without a closing period, so nothing may follow it
         ResourceBundleMessageSource bundles = new ResourceBundleMessageSource();
         bundles.setBasename("messages");
         bundles.setDefaultEncoding("UTF-8");
-        Object[] args = {"A", null, null, null, "Brak kuriera w rejonie", null};
+        Object[] args = {"A", null, null, null, "Brak kuriera w rejonie", null, "Furgonetka"};
 
         // when
         String pl = bundles.getMessage("shipping.notification.warehouse.pickup.failed", args, Locale.forLanguageTag("pl"));
@@ -239,9 +240,20 @@ class WarehouseShipmentOwnerTest {
 
         // then
         assertThat(pl).isEqualTo("Nie udało się zamówić odbioru przesyłki A. Zamów kuriera w panelu integracji wysyłki "
-                + "(np. Furgonetki) albo nadaj paczkę w punkcie przewoźnika. Powód: Brak kuriera w rejonie");
-        assertThat(en).isEqualTo("The pickup of shipment A could not be ordered. Book a courier in the shipping "
-                + "integration's panel (e.g. Furgonetka) or hand the parcel in at a carrier point. Reason: Brak kuriera w rejonie");
+                + "(Furgonetka) albo nadaj paczkę w punkcie przewoźnika. Powód: Brak kuriera w rejonie");
+        assertThat(en).isEqualTo("The pickup of shipment A could not be ordered. Book a courier in the panel of the "
+                + "shipping integration (Furgonetka) or hand the parcel in at a carrier point. Reason: Brak kuriera w rejonie");
+    }
+
+    @Test
+    void aFailedPickupNamesTheIntegrationOfThePackageAsTheLastArgument() {
+        // when
+        owner.onPickupSettled("store-1", "furgonetka", target(), pending().failed("Brak kuriera"));
+
+        // then
+        verify(messageSource).getMessage(eq("shipping.notification.warehouse.pickup.failed"),
+                argThat(args -> args.length == 7 && "Brak kuriera".equals(args[4])
+                        && ShippingIntegrationNamesFixture.DISPLAY_NAME.equals(args[6])), any());
     }
 
     @Test
@@ -251,7 +263,7 @@ class WarehouseShipmentOwnerTest {
 
         // then
         verify(messageSource).getMessage(eq("shipping.notification.warehouse.pickup.carrier"),
-                argThat(args -> args.length == 6 && "APP/CRIN/13023761".equals(args[5])), any());
+                argThat(args -> args.length == 7 && "APP/CRIN/13023761".equals(args[5])), any());
         verify(notifications).publish(eq("store-1"), argThat((StoreNotification n) ->
                 n.getSeverity() == StoreNotificationSeverity.INFO
                         && "shipping.notification.warehouse.pickup.carrier".equals(n.getMessage())));

@@ -79,7 +79,7 @@ class RmaReturnShipmentOwnerTest {
         rma.setShipments(new ArrayList<>(List.of(shipment)));
         when(rmaRepository.findById("store-1", "rma-1")).thenAnswer(i -> rma);
         owner = new RmaReturnShipmentOwner(rmaRepository, optimisticLockingExecutor, rmaItemsRepository, rmaLifecycle,
-                trackingSubscriber, emailClient, notifications, messageSource);
+                trackingSubscriber, emailClient, notifications, messageSource, ShippingIntegrationNamesFixture.names());
     }
 
     private static PickupTarget target() {
@@ -203,6 +203,22 @@ class RmaReturnShipmentOwnerTest {
                 n.getType() == StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED && "rma-1:cmd-1".equals(n.getObject())));
         verify(messageSource).getMessage(eq("shipping.notification.return.failed"),
                 argThat(args -> "rma-1".equals(args[0]) && "Nieprawidłowy kod pocztowy".equals(args[1])), any());
+    }
+
+    @Test
+    void anUnconfirmedCreationTellsTheStoreWhichIntegrationsPanelToCheck() {
+        // given
+        Shipment placeholder = new Shipment(ShipmentType.Courier);
+        placeholder.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        rma.setShipments(new ArrayList<>(List.of(placeholder)));
+        ShipmentCreationCheckRequest request = creation("cmd-1").toBuilder().provider("furgonetka").build();
+
+        // when
+        owner.failed(request, null, ShipmentCreationState.UNCONFIRMED_KEY);
+
+        // then
+        verify(messageSource).getMessage(eq(ShipmentCreationState.UNCONFIRMED_KEY),
+                argThat(args -> args.length == 1 && ShippingIntegrationNamesFixture.DISPLAY_NAME.equals(args[0])), any());
     }
 
     @Test

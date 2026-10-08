@@ -41,6 +41,7 @@ import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
 import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
@@ -84,6 +85,7 @@ public class OrderPageModelFactory {
     private final ReceiptAttemptService receiptAttemptService;
     private final ReceiptAlerts receiptAlerts;
     private final ShippingService shippingService;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     /** Fiscal dates are Polish dates, whatever zone the server runs in (as ReceiptEffects dates the document). */
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
@@ -403,7 +405,8 @@ public class OrderPageModelFactory {
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
-            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+            String integration = shippingIntegrationNames.of(s.getProvider(), store, locale);
+            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale, integration);
             // the form rebuilds the shipment without its command: a late result would find nothing waiting for it
             boolean editable = !readOnly && s.getCreation() == null;
             rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
@@ -427,7 +430,7 @@ public class OrderPageModelFactory {
                     state == null ? null : state.tone(), state != null && state.inProgress(),
                     ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
-                    !readOnly && s.creationFailed() ? details + "/shipping" : null));
+                    !readOnly && s.creationFailed() ? details + "/shipping" : null, integration));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -439,10 +442,13 @@ public class OrderPageModelFactory {
         // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
         String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
                 ? "order.shipments.cancel.locked.pending" : null;
+        String cancelCourierIntegration = canCancelCourier
+                ? shippingIntegrationNames.of(courierCancellable.getProvider(), store, locale) : null;
         // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
         String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now))
                 ? details + "/shipments/cancellation-state" : null;
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey,
+                cancelCourierIntegration, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 

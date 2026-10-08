@@ -36,6 +36,7 @@ public class ShipmentPickupRetryController {
     private final ShippingService shippingService;
     private final ImmediatePickup immediatePickup;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     @PostMapping("/dashboard/rma/{rmaId}/shipments/{externalId}/pickup")
     public String orderAgain(@PathVariable String rmaId, @PathVariable String externalId,
@@ -80,8 +81,10 @@ public class ShipmentPickupRetryController {
         switch (outcome.kind()) {
             case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
                     message("shipping.pickup.started", locale));
+            // a stored reason of ours may name the integration (not confirmed): it gets the name, the others ignore it
             case FAILED -> redirectAttributes.addFlashAttribute("errorMessage", outcome.errorKey() != null
-                    ? message(outcome.errorKey(), locale) : outcome.error());
+                    ? messageSource.getMessage(outcome.errorKey(),
+                    new Object[]{shippingIntegrationNames.of(provider, store, locale)}, locale) : outcome.error());
             case GONE, NOT_REQUIRED -> redirectAttributes.addFlashAttribute("errorMessage",
                     message("shipping.pickup.gone", locale));
         }

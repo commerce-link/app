@@ -67,7 +67,7 @@ class RmaShipmentOwnerTest {
 
     private RmaShipmentOwner returnOwner() {
         return new RmaReturnShipmentOwner(rmaRepository, optimisticLockingExecutor, rmaItemsRepository, rmaLifecycle,
-                trackingSubscriber, emailClient, notifications, messageSource);
+                trackingSubscriber, emailClient, notifications, messageSource, ShippingIntegrationNamesFixture.names());
     }
 
     private static ShipmentCreationCheckRequest settled(boolean toClient) {

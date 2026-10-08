@@ -1,5 +1,6 @@
 package pl.commercelink.web.orders;
 
+import pl.commercelink.shipping.ShippingIntegrationNamesFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -104,7 +105,8 @@ class OrderPageModelFactoryTest {
     void setUp() {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
                 deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
-                messageSource, receiptAttemptService, receiptAlerts, shippingService);
+                messageSource, receiptAttemptService, receiptAlerts, shippingService,
+                ShippingIntegrationNamesFixture.names());
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
         store.setStoreId("store-1");
@@ -884,7 +886,8 @@ class OrderPageModelFactoryTest {
         OrderPageModelFactory withRealShipping = new OrderPageModelFactory(storesRepository, orderEventsRepository,
                 dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
                 new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,
-                messageSource, receiptAttemptService, receiptAlerts, realShipping);
+                messageSource, receiptAttemptService, receiptAlerts, realShipping,
+                ShippingIntegrationNamesFixture.names());
         ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");
 
         // when
@@ -2073,7 +2076,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void aFailedCreationWithOurOwnReasonShowsThatReasonInTheViewersLanguage() {
+    void aFailedCreationWithOurOwnReasonShowsThatReasonNamingTheShipmentsIntegration() {
         // given
         Shipment failed = creating();
         failed.setCreation(failed.getCreation().failedWithKey("shipping.creation.unconfirmed"));
@@ -2083,7 +2086,8 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(row.stateKey()).isEqualTo("shipping.creation.unconfirmed");
-        assertThat(row.stateArgs()).isEmpty();
+        assertThat(row.stateArgs()).containsExactly(ShippingIntegrationNamesFixture.DISPLAY_NAME);
+        assertThat(row.integration()).isEqualTo(ShippingIntegrationNamesFixture.DISPLAY_NAME);
     }
 
     @Test

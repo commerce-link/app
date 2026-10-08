@@ -39,6 +39,7 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
     private final WarehouseGoodsOutService goodsOutService;
     private final WarehouseShippingReservations reservations;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     @Override
     public ShipmentOwnerType type() {
@@ -92,6 +93,10 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
                 : packageObject(request.getProvider(), request.getExternalId());
     }
 
+    private String integration(String provider) {
+        return shippingIntegrationNames.of(provider, OperatorMessages.OPERATOR_LOCALE);
+    }
+
     private static String packageObject(String provider, String externalId) {
         return provider + ":" + externalId;
     }
@@ -118,7 +123,7 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
         notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_FAILED, request.getCommandId(),
                 message(messageSource, "shipping.notification.warehouse.failed",
-                        reason(messageSource, error, errorKey))));
+                        reason(messageSource, error, errorKey, integration(request.getProvider())))));
     }
 
     @Override
@@ -135,9 +140,10 @@ public class WarehouseShipmentOwner implements ShipmentOwner {
                 : result.isFailed() ? "shipping.notification.warehouse.pickup.failed"
                 : "shipping.notification.warehouse.pickup.point";
         ShipmentPickupWindow window = result.getWindow();
+        String integration = integration(provider);
         String message = message(messageSource, key, target.trackingNo(), window != null ? window.getDate() : null,
                 window != null ? window.getFrom() : null, window != null ? window.getTo() : null,
-                reason(messageSource, result.getCommand()), result.getPickupId());
+                reason(messageSource, result.getCommand(), integration), result.getPickupId(), integration);
         notifications.publish(storeId, new StoreNotification(
                 result.isFailed() ? StoreNotificationSeverity.WARNING : StoreNotificationSeverity.INFO,
                 StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP, packageObject(provider, target.externalId()), message));

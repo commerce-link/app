@@ -54,7 +54,7 @@ class ShipmentPickupRetryControllerTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(shippingService.providerName(store)).thenReturn("furgonetka");
         controller = new ShipmentPickupRetryController(rmaRepository, storesRepository, shippingService, immediatePickup,
-                messages) {
+                messages, ShippingIntegrationNamesFixture.names()) {
             @Override
             String storeId() {
                 return "store-1";
@@ -155,6 +155,30 @@ class ShipmentPickupRetryControllerTest {
         // then
         assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo(ImmediatePickup.NO_WINDOWS_KEY);
         assertThat(redirect.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
+    void anUnconfirmedPickupNamesTheIntegrationOfTheReturn() {
+        // given: the application's own bundles instead of the codes
+        ShipmentPickupRetryController withBundles = new ShipmentPickupRetryController(rmaRepository, storesRepository,
+                shippingService, immediatePickup, ShippingIntegrationNamesFixture.bundles(),
+                ShippingIntegrationNamesFixture.names()) {
+            @Override
+            String storeId() {
+                return "store-1";
+            }
+        };
+        rmaWithReturn(ShipmentPickup.awaiting().failed("x"));
+        when(immediatePickup.orderFor(any(), anyList()))
+                .thenReturn(ImmediatePickup.Outcome.failed(null, ShipmentPickup.UNCONFIRMED_KEY));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        withBundles.orderAgain("rma-1", "21480003", redirect, PL);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Integracja wysyłki (Furgonetka) nie "
+                + "potwierdziła odbioru — sprawdź go w jej panelu, zanim zamówisz ponownie.");
     }
 
     @Test

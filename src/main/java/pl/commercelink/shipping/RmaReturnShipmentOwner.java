@@ -37,15 +37,18 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
     private final EmailClient emailClient;
     private final StoreNotificationService notifications;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     public RmaReturnShipmentOwner(RMARepository rmaRepository, OptimisticLockingExecutor optimisticLockingExecutor,
                                   RMAItemsRepository rmaItemsRepository, RMALifecycle rmaLifecycle,
                                   ShipmentTrackingSubscriber trackingSubscriber, EmailClient emailClient,
-                                  StoreNotificationService notifications, MessageSource messageSource) {
+                                  StoreNotificationService notifications, MessageSource messageSource,
+                                  ShippingIntegrationNames shippingIntegrationNames) {
         super(rmaRepository, optimisticLockingExecutor, rmaItemsRepository, rmaLifecycle, trackingSubscriber);
         this.emailClient = emailClient;
         this.notifications = notifications;
         this.messageSource = messageSource;
+        this.shippingIntegrationNames = shippingIntegrationNames;
     }
 
     @Override
@@ -99,13 +102,13 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         notifications.publish(request.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED, request.getOwnerId() + ":" + request.getCommandId(),
                 message(messageSource, "shipping.notification.return.failed", request.getOwnerId(),
-                        reason(messageSource, error, errorKey))));
+                        reason(messageSource, error, errorKey, integration(request.getProvider())))));
     }
 
     @Override
     public void onPickupSettled(String storeId, String provider, PickupTarget target, ShipmentPickup result) {
         if (result.isFailed()) {
-            reportFailedPickup(storeId, target, result);
+            reportFailedPickup(storeId, provider, target, result);
             return;
         }
         // recorded first and sent only by the call that recorded it: a repeated message, or a retry of the write after
@@ -123,7 +126,11 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         }
     }
 
-    private void reportFailedPickup(String storeId, PickupTarget target, ShipmentPickup result) {
+    private String integration(String provider) {
+        return shippingIntegrationNames.of(provider, OperatorMessages.OPERATOR_LOCALE);
+    }
+
+    private void reportFailedPickup(String storeId, String provider, PickupTarget target, ShipmentPickup result) {
         log.error("Pickup of the return of RMA {} in store {} (package {}) was not ordered: {}", target.ownerId(),
                 storeId, target.externalId(), result.getCommand().failureReason());
         // keyed by the pickup command, so ordering it again and failing again is heard of again; a pickup that failed
@@ -133,7 +140,7 @@ public class RmaReturnShipmentOwner extends RmaShipmentOwner {
         notifications.publish(storeId, new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.RMA_RETURN_PICKUP_FAILED, target.ownerId() + ":" + attempt,
                 message(messageSource, "shipping.notification.return.pickup.failed", target.ownerId(),
-                        reason(messageSource, result.getCommand()))));
+                        reason(messageSource, result.getCommand(), integration(provider)))));
     }
 
     // the e-mail the customer got when the return was booked in one step, unchanged

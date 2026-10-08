@@ -14,6 +14,7 @@ import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -33,6 +34,7 @@ public class ShipmentCreationService {
     private final ShipmentOwners owners;
     private final ShipmentCreationEventPublisher publisher;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     public ShipmentCreationStart start(ShipmentCreationCheckRequest seed, ShipmentRequest request, Store store,
                                        Shipment placeholder) {
@@ -106,8 +108,7 @@ public class ShipmentCreationService {
                     check.getOwnerId(), check.getStoreId(), check.getExternalId(), reasonKey != null ? reasonKey : reason, e);
         }
         if (reasonKey != null) {
-            return ShipmentCreationStart.refused(messageSource.getMessage(reasonKey, null, LocaleContextHolder.getLocale()),
-                    false);
+            return ShipmentCreationStart.refused(ownMessage(reasonKey, check), false);
         }
         return ShipmentCreationStart.refused(reason, true);
     }
@@ -137,7 +138,13 @@ public class ShipmentCreationService {
                     + "PENDING: marking it failed did not work", check.getCommandId(), check.getOwnerType(),
                     check.getOwnerId(), check.getStoreId(), check.getExternalId(), e);
         }
-        return ShipmentCreationStart.refused(messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale()),
-                false);
+        return ShipmentCreationStart.refused(ownMessage(UNCONFIRMED_KEY, check), false);
+    }
+
+    /** Our own reason in the operator's language, naming the integration the command went to. */
+    private String ownMessage(String key, ShipmentCreationCheckRequest check) {
+        Locale locale = LocaleContextHolder.getLocale();
+        return messageSource.getMessage(key, new Object[]{shippingIntegrationNames.of(check.getProvider(), locale)},
+                locale);
     }
 }

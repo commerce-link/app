@@ -4,6 +4,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import pl.commercelink.shipping.ShippingIntegrationNames;
+import pl.commercelink.shipping.ShippingIntegrationNamesFixture;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -40,6 +43,7 @@ class RmaShipmentsViewFactoryTest {
     @Mock private ShippingService shippingService;
     @Mock private StoresRepository storesRepository;
     @Mock private Store store;
+    @Spy private ShippingIntegrationNames shippingIntegrationNames = ShippingIntegrationNamesFixture.names();
 
     @InjectMocks
     private RmaShipmentsViewFactory factory;
@@ -325,11 +329,13 @@ class RmaShipmentsViewFactoryTest {
                 "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
 
         // then
-        assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Furgonetka nie utworzyła "
-                        + "paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj ponownie za chwilę.</span>")
-                .contains("<span class=\"cl-status is-warn\">Furgonetka nie potwierdziła nadania — sprawdź przesyłkę "
-                        + "w jej panelu, zanim nadasz ponownie.</span>")
-                .doesNotContain("Nie udało się nadać: Furgonetka nie potwierdziła")
+        assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Integracja wysyłki (Furgonetka) "
+                        + "nie utworzyła paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj "
+                        + "ponownie za chwilę.</span>")
+                .contains("<span class=\"cl-status is-warn\">Integracja wysyłki (Furgonetka) nie potwierdziła nadania — "
+                        + "sprawdź przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
+                .doesNotContain("Nie udało się nadać: Integracja wysyłki (Furgonetka) nie potwierdziła")
+                .doesNotContain("{0}")
                 .doesNotContain("??");
     }
 

@@ -38,6 +38,7 @@ public class ShipmentLabelController {
     private final StoresRepository storesRepository;
     private final ShippingService shippingService;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     @GetMapping("/dashboard/shipping/labels/{provider}/{externalId}")
     public Object label(@PathVariable String provider, @PathVariable String externalId,
@@ -53,7 +54,7 @@ public class ShipmentLabelController {
             if (label.content() == null || label.content().length == 0) {
                 // an empty download looks like a broken printer to the operator; the provider has no label yet
                 log.warn("Label of package {} in store {} came back empty", externalId, storeId());
-                return backWith(messageSource.getMessage(EMPTY, null, locale), safeBack, redirectAttributes);
+                return backWith(empty(provider, store, locale), safeBack, redirectAttributes);
             }
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
@@ -64,9 +65,13 @@ public class ShipmentLabelController {
             log.warn("Label of package {} in store {} could not be downloaded", externalId, storeId(), e);
             // the provider's own answer is shown as it is; the adapter's words (no label yet, no answer) are not
             String message = ProviderErrors.isProviderAnswer(e) ? ProviderErrors.describe(e)
-                    : messageSource.getMessage(EMPTY, null, locale);
+                    : empty(provider, store, locale);
             return backWith(message, safeBack, redirectAttributes);
         }
+    }
+
+    private String empty(String provider, Store store, Locale locale) {
+        return messageSource.getMessage(EMPTY, new Object[]{shippingIntegrationNames.of(provider, store, locale)}, locale);
     }
 
     private static String backWith(String message, String back, RedirectAttributes redirectAttributes) {

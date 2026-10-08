@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -43,11 +44,17 @@ class ShipmentCreationServiceTest {
         when(shippingService.providerName(store)).thenReturn("furgonetka");
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
         when(owner.markCreating(any(), any())).thenReturn(true);
-        when(messageSource.getMessage(eq("shipping.creation.unconfirmed"), any(), any(Locale.class)))
-                .thenReturn("Furgonetka nie potwierdziła nadania");
-        when(messageSource.getMessage(eq("shipping.creation.notCreated"), any(), any(Locale.class)))
-                .thenReturn("Furgonetka nie utworzyła paczki");
-        service = new ShipmentCreationService(shippingService, owners, publisher, messageSource);
+        // answered only when the integration the command went to is named
+        when(messageSource.getMessage(eq("shipping.creation.unconfirmed"), argThat(namesTheIntegration()), any(Locale.class)))
+                .thenReturn("Integracja wysyłki (Furgonetka) nie potwierdziła nadania");
+        when(messageSource.getMessage(eq("shipping.creation.notCreated"), argThat(namesTheIntegration()), any(Locale.class)))
+                .thenReturn("Integracja wysyłki (Furgonetka) nie utworzyła paczki");
+        service = new ShipmentCreationService(shippingService, owners, publisher, messageSource,
+                ShippingIntegrationNamesFixture.names());
+    }
+
+    private static ArgumentMatcher<Object[]> namesTheIntegration() {
+        return args -> args != null && args.length == 1 && ShippingIntegrationNamesFixture.DISPLAY_NAME.equals(args[0]);
     }
 
     private ShipmentCreationCheckRequest seed() {
@@ -106,7 +113,7 @@ class ShipmentCreationServiceTest {
 
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
-        assertThat(start.error()).isEqualTo("Furgonetka nie utworzyła paczki");
+        assertThat(start.error()).isEqualTo("Integracja wysyłki (Furgonetka) nie utworzyła paczki");
         assertThat(start.providerAnswer()).isFalse();
         // stored as a key: the adapter's English words are for the log, not for whoever opens the shipment
         verify(owner).refused(any(), isNull(), eq("shipping.creation.notCreated"));
@@ -180,7 +187,7 @@ class ShipmentCreationServiceTest {
 
         // then
         assertThat(start.outcome()).isEqualTo(ShipmentCreationStart.Outcome.REFUSED);
-        assertThat(start.error()).isEqualTo("Furgonetka nie potwierdziła nadania");
+        assertThat(start.error()).isEqualTo("Integracja wysyłki (Furgonetka) nie potwierdziła nadania");
         // stored as a key, so the reason is shown in the language of whoever opens the shipment later
         verify(owner).failed(argThat(r -> "21480003".equals(r.getExternalId())), isNull(), eq("shipping.creation.unconfirmed"));
         verify(owner, never()).refused(any(), any(), any());

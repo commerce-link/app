@@ -121,7 +121,7 @@ class ShipmentPickupFlowTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         service = new ShipmentPickupService(new PickupCandidates(ordersRepository, rmaRepository), owners,
-                shippingService, publisher, messages);
+                shippingService, publisher, messages, ShippingIntegrationNamesFixture.names());
         settler = new ShipmentPickupSettler(owners);
         controller = new ShipmentPickupController(service, storesRepository, providerFactory, messages);
 

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -21,6 +22,7 @@ public class RmaShipmentsViewFactory {
 
     private final ShippingService shippingService;
     private final StoresRepository storesRepository;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     /** closed: a closed RMA keeps its record, only the label stays downloadable. */
     public RmaShipmentsView build(RMA rma, boolean closed, Locale locale) {
@@ -32,7 +34,9 @@ public class RmaShipmentsViewFactory {
         Set<String> labelProviders = ShipmentLinks.labelProviders(shipments,
                 provider -> shippingService.supportsLabels(store, provider));
         List<RmaShipmentsView.Row> rows = shipments.stream().map(s -> {
-            OrderLabels.ShipmentState state = shownState(s, locale);
+            // only a shipment created through an integration has a state line, and it names its own provider
+            OrderLabels.ShipmentState state = shownState(s, locale,
+                    shippingIntegrationNames.of(s.getProvider(), store, locale));
             return new RmaShipmentsView.Row(s,
                     state == null ? null : state.key(), state == null ? null : state.args(),
                     state == null ? null : state.tone(),
@@ -54,8 +58,8 @@ public class RmaShipmentsViewFactory {
      * 2026-10-07): the courier brings the printed label to the customer, so a return that went well has nothing to
      * check and nothing to print, and its label is not offered either.
      */
-    private static OrderLabels.ShipmentState shownState(Shipment s, Locale locale) {
-        OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale);
+    private static OrderLabels.ShipmentState shownState(Shipment s, Locale locale, String integration) {
+        OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale, integration);
         if (state == null || !isCustomerReturn(s)) {
             return state;
         }

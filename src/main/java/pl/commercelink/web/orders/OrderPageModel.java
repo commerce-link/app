@@ -92,13 +92,15 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
      * cancelCourierLockedKey: why "Cancel shipment" shows greyed (its cancellation is already in progress), null
-     * when it can run or is absent. cancellationPollHref: the JSON shipments state the page polls while a command of
+     * when it can run or is absent; cancelCourierIntegration names the shipping integration it waits for (its
+     * argument), null without the button. cancellationPollHref: the JSON shipments state the page polls while a command of
      * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
      * does; null when nothing waits or the page is read-only. "Zamów odbiór" is not here: it is ordered from the orders
      * list, for every package of the store at once (client decision 2026-10-07).
      */
     public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
-                                String cancelCourierLockedKey, String cancellationPollHref,
+                                String cancelCourierLockedKey, String cancelCourierIntegration,
+                                String cancellationPollHref,
                                 List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
@@ -116,7 +118,9 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * #shipmentState), null for one typed in by hand; stateInProgress: it waits for the provider (spinner). A shipment
      * being created or whose creation failed has no editHref: the form would rebuild it without its command.
      * labelHref: "Pobierz etykietę", when the store's integration hands out labels of the package; retryHref: "Spróbuj
-     * ponownie" of a failed creation, the shipping page with the fields filled from the order.
+     * ponownie" of a failed creation, the shipping page with the fields filled from the order. integration: the name of
+     * the shipment's shipping integration (ShippingIntegrationNames), the argument of the tracking and cancellation
+     * pills and of the removal confirmation, which name it.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
@@ -124,7 +128,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               String cancellationTone, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
                               String removeActionKey, boolean placeholder, String stateKey, Object[] stateArgs,
-                              String stateTone, boolean stateInProgress, String labelHref, String retryHref) {
+                              String stateTone, boolean stateInProgress, String labelHref, String retryHref,
+                              String integration) {
 
         /** Any action of the row is offered, live or greyed with its reason. */
         public boolean hasActions() {

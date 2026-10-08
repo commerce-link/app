@@ -11,6 +11,8 @@
        While a command of a shipment waits for the provider (a courier cancellation, a creation, a pickup order) the
        card carries data-cl-cancellation-poll: shipment-cancellation.js asks it every few seconds and reloads the page
        once the provider answers; without JavaScript the line says what is going on and the operator refreshes.
+       The pills, the state line and the removal text that name the shipping integration take its name as an argument
+       (s.integration()): messages never name one themselves, a store may ship through several.
        A shipment created through an integration has a state line under its numbers (OrderLabels#shipmentState):
        a spinner while it waits for the provider, else a pill. "Zamów odbiór" is on the orders list, not here (client
        decision 2026-10-07); "Pobierz etykietę" downloads the label, "Spróbuj ponownie" opens the shipping page again after a failed creation;
@@ -38,7 +40,7 @@
             </a>
         </div>
         <p th:if="${shipments.cancelCourierLockedKey() != null}" class="cl-help is-note"
-           id="shipment-cancel-reason" th:text="#{${shipments.cancelCourierLockedKey()}}"></p>
+           id="shipment-cancel-reason" th:text="#{${shipments.cancelCourierLockedKey()}(${shipments.cancelCourierIntegration()})}"></p>
     </div>
     <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
         <li th:each="s : ${shipments.rows()}" th:if="${s.placeholder()}" class="cl-list-item is-placeholder" id="shipment-placeholder">
@@ -63,10 +65,10 @@
                     <!--/* the pill text carries the state; the title only adds what to do about a failure */-->
                     <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
                           th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
-                          th:text="#{${s.trackingKey()}}"></span>
+                          th:text="#{${s.trackingKey()}(${s.integration()})}"></span>
                     <!--/* the courier cancellation: the text carries the state, the tone only repeats it */-->
                     <span th:if="${s.cancellationKey() != null}" class="cl-status" th:classappend="${s.cancellationTone()}"
-                          th:text="#{${s.cancellationKey()}}"></span>
+                          th:text="#{${s.cancellationKey()}(${s.integration()})}"></span>
                 </p>
                 <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
                 <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">
@@ -110,7 +112,7 @@
                 <a th:if="${s.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${s.removeHref()}}"
                    th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
                             data-cl-confirm-title=#{order.shipments.remove.confirm.title(${s.number()})},
-                            data-cl-confirm-message=#{${s.removeMessageKey()}},
+                            data-cl-confirm-message=#{${s.removeMessageKey()}(${s.integration()})},
                             data-cl-confirm-action=#{${s.removeActionKey()}}"
                    th:text="#{general.delete}"></a>
                 <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->

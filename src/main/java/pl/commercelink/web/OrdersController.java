@@ -57,6 +57,7 @@ import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShipmentsState;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
@@ -183,6 +184,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+    @Autowired
+    private ShippingIntegrationNames shippingIntegrationNames;
     @Autowired
     private OrderRealizationStepBack realizationStepBack;
 
@@ -2072,7 +2075,8 @@ public class OrdersController extends BaseController {
         // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index),
+                        new Object[]{integrationOf(order.getShipments().get(index).getProvider(), locale)}, locale),
                 messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
                 "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
@@ -2326,16 +2330,20 @@ public class OrdersController extends BaseController {
                 ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
+        // the integration the courier order went through, named by the texts about its cancellation
+        String integration = integrationOf(courier.map(Shipment::getProvider).orElse(null), locale);
         if (refusal != null) {
-            return refuse(redirectAttributes, orderId, refusal, locale);
+            // only "already in progress" names the integration; the others have no courier order to name it by
+            return courier.isPresent() ? refuse(redirectAttributes, orderId, refusal, locale, integration)
+                    : refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
             ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
             switch (result.outcome()) {
                 case REQUESTED -> OrderFlash.saved(redirectAttributes,
-                        messageSource.getMessage("shipment.cancel.requested", null, locale));
+                        messageSource.getMessage("shipment.cancel.requested", new Object[]{integration}, locale));
                 case RECHECKING -> OrderFlash.saved(redirectAttributes,
-                        messageSource.getMessage("shipment.cancel.rechecking", null, locale));
+                        messageSource.getMessage("shipment.cancel.rechecking", new Object[]{integration}, locale));
                 case CANCELLED -> {
                     // an immediate confirmation settles the shipments here, the step back included; after one in
                     // the background the reloaded page shows the new status instead
@@ -2346,8 +2354,8 @@ public class OrdersController extends BaseController {
                 case FAILED -> {
                     String reasonKey = OrderLabels.cancellationReasonKey(result.error());
                     return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
-                            reasonKey != null ? messageSource.getMessage(reasonKey, null, locale)
-                                    : Objects.toString(result.error(), ""));
+                            reasonKey != null ? messageSource.getMessage(reasonKey, new Object[]{integration}, locale)
+                                    : Objects.toString(result.error(), ""), integration);
                 }
                 case GONE -> {
                     return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
@@ -2355,7 +2363,7 @@ public class OrdersController extends BaseController {
             }
         } catch (ShipmentCancellationInProgressException e) {
             // a concurrent request marked the cancellation between the check above and the service's fresh read
-            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale, integration);
         } catch (ShippingUnavailableException e) {
             // the store's carrier authorisation was lost: nothing was cancelled nor changed
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
@@ -2380,6 +2388,10 @@ public class OrdersController extends BaseController {
         LocalDateTime now = LocalDateTime.now();
         boolean inProgress = order.getShipments().stream().anyMatch(s -> s.awaitsProviderAnswer(now));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new ShipmentsState(inProgress));
+    }
+
+    private String integrationOf(String provider, Locale locale) {
+        return shippingIntegrationNames.of(provider, storesRepository.findById(getStoreId()), locale);
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,

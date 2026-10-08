@@ -35,7 +35,7 @@ public final class OrderLabels {
 
     /**
      * Our own failure sentences that already state the outcome (not confirmed, not ordered): shown alone, since
-     * "Nie udało się nadać: Furgonetka nie potwierdziła nadania" would claim a failure nobody knows of, and "Nie udało
+     * "Nie udało się nadać: Integracja wysyłki (…) nie potwierdziła nadania" would claim a failure nobody knows of, and "Nie udało
      * się zamówić odbioru: Odbiór nie został zamówiony" says it twice. Every other stored key names a cause and is put
      * after the failure prefix, as the provider's own words are.
      */
@@ -205,8 +205,8 @@ public final class OrderLabels {
 
     /**
      * The message key of an immediate cancellation failure's reason (the flash after the click) when it is the
-     * adapter's own English text, or null: every other reason is Furgonetka's answer, already in Polish, and is shown
-     * as it came.
+     * adapter's own English text, or null: every other reason is the provider's answer, already in Polish, and is shown
+     * as it came. The key takes the integration's name as its argument.
      */
     public static String cancellationReasonKey(String error) {
         return CANCEL_NOT_RECEIVED.equals(error) ? "shipment.cancellation.reason.notReceived" : null;
@@ -217,16 +217,18 @@ public final class OrderLabels {
      * being ordered, ordered (by us, or by the carrier with the shipment), handed in at a point, pickup failed; null
      * for one typed in by hand. The provider's words (error) are the argument of the failure line, shown as they came;
      * a stored reason of our own (errorKey) is resolved in the viewer's language, as that argument when it names a
-     * cause, or as the line itself when it already states the outcome (OUTCOME_KEYS).
+     * cause, or as the line itself when it already states the outcome (OUTCOME_KEYS). Only the key is stored, so the
+     * integration's name (ShippingIntegrationNames) is its argument here, when the line is shown.
      */
-    public static ShipmentState shipmentState(Shipment shipment, Locale locale) {
+    public static ShipmentState shipmentState(Shipment shipment, Locale locale, String integration) {
         if (shipment.isCreating()) {
             return new ShipmentState("order.shipments.state.creating", NO_ARGS, INFO, true);
         }
         if (shipment.creationFailed()) {
             ShipmentCreationState creation = shipment.getCreation();
             return failure("order.shipments.state.creation.failed", creation.getCommand().getError(),
-                    creation.isPending() ? ShipmentCreationState.UNCONFIRMED_KEY : creation.getCommand().getErrorKey());
+                    creation.isPending() ? ShipmentCreationState.UNCONFIRMED_KEY : creation.getCommand().getErrorKey(),
+                    integration);
         }
         ShipmentPickup pickup = shipment.getPickup();
         if (shipment.getProvider() == null || pickup == null || pickup.getStatus() == null) {
@@ -239,7 +241,7 @@ public final class OrderLabels {
         return switch (pickup.getStatus()) {
             case AWAITING -> new ShipmentState("order.shipments.state.pickup.awaiting", NO_ARGS, NEUTRAL, false);
             case PENDING -> pickup.isUnconfirmed(LocalDateTime.now())
-                    ? failure("order.shipments.state.pickup.failed", null, ShipmentPickup.UNCONFIRMED_KEY)
+                    ? failure("order.shipments.state.pickup.failed", null, ShipmentPickup.UNCONFIRMED_KEY, integration)
                     : new ShipmentState("order.shipments.state.pickup.pending", NO_ARGS, INFO, true);
             case ORDERED -> pickup.isBookedByCarrier()
                     ? new ShipmentState("order.shipments.state.pickup.carrier", new Object[]{pickup.getPickupId()}, OK,
@@ -249,16 +251,19 @@ public final class OrderLabels {
                     OK, false);
             case NOT_REQUIRED -> new ShipmentState("order.shipments.state.pickup.point", NO_ARGS, NEUTRAL, false);
             case FAILED -> failure("order.shipments.state.pickup.failed", pickup.getCommand().getError(),
-                    pickup.getCommand().getErrorKey());
+                    pickup.getCommand().getErrorKey(), integration);
         };
     }
 
-    private static ShipmentState failure(String key, String error, String errorKey) {
+    private static ShipmentState failure(String key, String error, String errorKey, String integration) {
+        // every stored key gets the name: the ones that do not name the integration ignore it
+        Object[] keyArgs = {integration};
         if (errorKey != null && OUTCOME_KEYS.contains(errorKey)) {
-            return new ShipmentState(errorKey, NO_ARGS, WARN, false);
+            return new ShipmentState(errorKey, keyArgs, WARN, false);
         }
         // the message source resolves a resolvable argument in the locale of the line itself
-        Object reason = errorKey != null ? new DefaultMessageSourceResolvable(errorKey) : error == null ? "" : error;
+        Object reason = errorKey != null ? new DefaultMessageSourceResolvable(new String[]{errorKey}, keyArgs)
+                : error == null ? "" : error;
         return new ShipmentState(key, new Object[]{reason}, WARN, false);
     }
 

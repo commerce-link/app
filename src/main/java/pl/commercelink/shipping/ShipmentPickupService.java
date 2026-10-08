@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -42,6 +43,7 @@ public class ShipmentPickupService {
     private final ShippingService shippingService;
     private final ShipmentPickupEventPublisher publisher;
     private final MessageSource messageSource;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     /**
      * The store's packages that can be ordered, by integration, carrier and pickup address. A package whose pickup is
@@ -183,7 +185,9 @@ public class ShipmentPickupService {
             log.error("Check of pickup command {} in store {} for packages {} could not be sent; the courier may be "
                     + "ordered", check.getCommandId(), check.getStoreId(), externalIds(check), e);
             settle(check.getStoreId(), check.getTargets(), check.getCommandId(), p -> p.failedWithKey(UNCONFIRMED_KEY));
-            String reason = messageSource.getMessage(UNCONFIRMED_KEY, null, LocaleContextHolder.getLocale());
+            Locale locale = LocaleContextHolder.getLocale();
+            String reason = messageSource.getMessage(UNCONFIRMED_KEY,
+                    new Object[]{shippingIntegrationNames.of(check.getProvider(), locale)}, locale);
             return PickupStart.refused(check.getCommandId(), reason);
         }
     }

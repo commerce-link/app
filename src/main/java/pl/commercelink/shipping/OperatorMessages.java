@@ -9,7 +9,7 @@ import java.util.Locale;
 final class OperatorMessages {
 
     // the bell is read by the store's staff, whose language is Polish whatever thread settles the message
-    private static final Locale OPERATOR_LOCALE = Locale.forLanguageTag("pl");
+    static final Locale OPERATOR_LOCALE = Locale.forLanguageTag("pl");
 
     private OperatorMessages() {
     }
@@ -18,16 +18,19 @@ final class OperatorMessages {
         return messageSource.getMessage(key, args, OPERATOR_LOCALE);
     }
 
-    /** Our own reason (a message key) in the operator's words, else the provider's words as they are. */
-    static String reason(MessageSource messageSource, String error, String errorKey) {
+    /**
+     * Our own reason (a message key) in the operator's words, else the provider's words as they are. integration: the
+     * name of the shipping integration, which the keys that name it take as their argument.
+     */
+    static String reason(MessageSource messageSource, String error, String errorKey, String integration) {
         if (errorKey != null) {
-            return messageSource.getMessage(errorKey, null, OPERATOR_LOCALE);
+            return messageSource.getMessage(errorKey, new Object[]{integration}, OPERATOR_LOCALE);
         }
         return error != null ? error : "";
     }
 
     /** The failure reason of a command, as above; none for no command. */
-    static String reason(MessageSource messageSource, ProviderCommand command) {
-        return command == null ? "" : reason(messageSource, command.getError(), command.getErrorKey());
+    static String reason(MessageSource messageSource, ProviderCommand command, String integration) {
+        return command == null ? "" : reason(messageSource, command.getError(), command.getErrorKey(), integration);
     }
 }

@@ -219,6 +219,10 @@ class OrdersControllerTest {
     private pl.commercelink.inventory.deliveries.DeliveryRedirectResolver deliveryRedirectResolver =
             new pl.commercelink.inventory.deliveries.DeliveryRedirectResolver();
 
+    @Spy
+    private pl.commercelink.shipping.ShippingIntegrationNames shippingIntegrationNames =
+            pl.commercelink.shipping.ShippingIntegrationNamesFixture.names();
+
     @InjectMocks
     private OrdersController ordersController;
 
@@ -4404,6 +4408,7 @@ class OrdersControllerTest {
             sent.setTrackingNo("TRACK-1");
             sent.setShippedAt(LocalDateTime.now());
             sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
             sent.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
             order.setShipments(new ArrayList<>(List.of(sent)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -4414,7 +4419,7 @@ class OrdersControllerTest {
 
             // then
             verifyNoInteractions(shipmentCancelService);
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending [Furgonetka]");
         }
 
         @Test
@@ -4426,6 +4431,7 @@ class OrdersControllerTest {
             sent.setTrackingNo("TRACK-1");
             sent.setShippedAt(LocalDateTime.now());
             sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
             order.setShipments(new ArrayList<>(List.of(sent)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             doThrow(new ShipmentCancellationInProgressException())
@@ -4436,7 +4442,7 @@ class OrdersControllerTest {
             ordersController.cancelShipment(ORDER_ID, redirect, polish);
 
             // then
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending [Furgonetka]");
         }
 
         private void orderWithASentShipment() {
@@ -4446,6 +4452,7 @@ class OrdersControllerTest {
             sent.setTrackingNo("TRACK-1");
             sent.setShippedAt(LocalDateTime.now());
             sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
             order.setShipments(new ArrayList<>(List.of(sent)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         }
@@ -4463,7 +4470,7 @@ class OrdersControllerTest {
             // then
             verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
             assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
-                    .isEqualTo("shipment.cancel.requested");
+                    .isEqualTo("shipment.cancel.requested [Furgonetka]");
         }
 
         @Test
@@ -4478,7 +4485,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
-                    .isEqualTo("shipment.cancel.rechecking");
+                    .isEqualTo("shipment.cancel.rechecking [Furgonetka]");
             assertThat(flash(redirect)).doesNotContainKey("errorMessage");
         }
 
@@ -4511,7 +4518,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(flash(redirect))
-                    .containsEntry("errorMessage", "shipment.cancel.failed [Przesyłka została już odebrana]")
+                    .containsEntry("errorMessage", "shipment.cancel.failed [Przesyłka została już odebrana, Furgonetka]")
                     .doesNotContainKey(OrderFlash.ATTRIBUTE);
         }
 
@@ -4528,7 +4535,7 @@ class OrdersControllerTest {
 
             // then
             assertThat(flash(redirect))
-                    .containsEntry("errorMessage", "shipment.cancel.failed [shipment.cancellation.reason.notReceived]");
+                    .containsEntry("errorMessage", "shipment.cancel.failed [shipment.cancellation.reason.notReceived [Furgonetka], Furgonetka]");
         }
 
         @Test

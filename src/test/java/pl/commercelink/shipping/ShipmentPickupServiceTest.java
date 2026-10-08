@@ -65,7 +65,8 @@ class ShipmentPickupServiceTest {
         when(provider.supportsPickups()).thenReturn(true);
         when(orderOwner.applyPickup(anyString(), anyString(), anyCollection(), any())).thenReturn(1);
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
-        service = new ShipmentPickupService(candidates, owners, shippingService, publisher, messageSource);
+        service = new ShipmentPickupService(candidates, owners, shippingService, publisher, messageSource,
+                ShippingIntegrationNamesFixture.names());
     }
 
     private static PickupCandidate candidate(String externalId, String carrier, String ownerId) {
@@ -228,6 +229,8 @@ class ShipmentPickupServiceTest {
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
         assertThat(start.error()).isEqualTo("shipping.pickup.unconfirmed");
+        verify(messageSource).getMessage(eq("shipping.pickup.unconfirmed"),
+                argThat(args -> args.length == 1 && ShippingIntegrationNamesFixture.DISPLAY_NAME.equals(args[0])), any());
         List<UnaryOperator<ShipmentPickup>> changes = changesApplied(2);
         String commandId = changes.get(0).apply(ShipmentPickup.awaiting()).getCommand().getCommandId();
         ShipmentPickup settled = changes.get(1).apply(pending(commandId));
