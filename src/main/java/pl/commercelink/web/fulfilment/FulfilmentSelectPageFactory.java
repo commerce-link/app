@@ -14,6 +14,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentGroup;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentVariant;
 import pl.commercelink.orders.fulfilment.UnmatchedItem;
+import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.fulfilment.FulfilmentSelectPage.*;
@@ -145,7 +146,7 @@ public class FulfilmentSelectPageFactory {
         if (order != null) {
             return mapper.map(order, today).number();
         }
-        return "#" + (orderId == null ? "" : orderId.split("-")[0]);
+        return orderId == null ? "" : ConversionUtil.getShortenedId(orderId);
     }
 
     private static String orderHref(String storeId, String orderId, boolean superAdmin) {
@@ -275,7 +276,7 @@ public class FulfilmentSelectPageFactory {
         return form.getUnmatched().stream()
                 .map(item -> {
                     OrderRef ref = byId.get(item.orderId());
-                    String number = ref != null ? ref.number() : "#" + item.orderId().split("-")[0];
+                    String number = ref != null ? ref.number() : ConversionUtil.getShortenedId(item.orderId());
                     String href = ref != null ? ref.href() : orderHref(storeId, item.orderId(), superAdmin);
                     String reason = item.reason() == UnmatchedItem.Reason.NARROWED
                             ? "fulfilment.select.missing.reason.narrowed" : "fulfilment.select.missing.reason.noOffer";
