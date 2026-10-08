@@ -59,11 +59,11 @@
                     <!--/* the courier cancellation: the text carries the state, the tone only repeats it */-->
                     <span th:if="${s.cancellationKey() != null}" class="cl-status" th:classappend="${s.cancellationTone()}"
                           th:text="#{${s.cancellationKey()}(${s.integration()})}"></span>
-                    <!--/* the integration, only when the store ships through several: the state pills name it anyway */-->
-                    <span th:if="${s.integrationPill() != null}" class="cl-status is-neutral" th:text="${s.integrationPill()}"></span>
                 </p>
                 <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
                 <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">
+                    <!--/* the integration, only when the store ships through several; in the description line, because in the title it wraps the state pill on narrow screens */-->
+                    <span th:if="${s.integrationPill() != null}" class="cl-status is-neutral" th:text="${s.integrationPill()}"></span>
                     <th:block th:if="${s.trackingNo() != null}">
                         <span th:text="#{order.shipments.tracking}"></span>
                         <a th:if="${s.trackingUrl() != null}" th:href="${s.trackingUrl()}" target="_blank" rel="noopener"

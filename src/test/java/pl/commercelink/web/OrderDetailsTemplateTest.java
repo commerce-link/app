@@ -774,7 +774,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(single).doesNotContain("cl-status is-neutral");
-        assertThat(several).contains("<span class=\"cl-status is-neutral\">Furgonetka</span>")
+        assertThat(several).containsPattern("<p class=\"cl-list-desc\"[^>]*>\\s*<span class=\"cl-status is-neutral\">Furgonetka</span>")
                 .contains("Numer przesyłki Allegro dopisuje do zamówienia samo.");
     }
 
