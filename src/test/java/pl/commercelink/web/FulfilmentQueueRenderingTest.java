@@ -43,7 +43,7 @@ class FulfilmentQueueRenderingTest {
                 .contains("name=\"pathSelector\" value=\"suggest-exact\"")
                 .contains("name=\"onlyWithProfit\"").contains("name=\"onlyLocalSuppliers\"")
                 .contains("name=\"onlyMultiOrder\"").contains("name=\"orderByOrder\"")
-                .contains("Pominięte zamówienia: 2").contains("Pomiń grupę").contains("name=\"orderIds\" value=\"s1\"")
+                .contains("<span>Pomiń</span>").contains("name=\"orderIds\" value=\"s1\"")
                 .contains("po terminie: 3 dni").contains("2 z 2").contains("fulfilment-queue.js")
                 .doesNotContain("??");
         String content = html.substring(html.indexOf("cl-page-body is-wide"));
@@ -53,6 +53,43 @@ class FulfilmentQueueRenderingTest {
         assertThat(html).contains("value=\"default\" class=\"cl-button is-primary\"")
                 .contains("value=\"suggest\" class=\"cl-button\"").contains("value=\"suggest-exact\" class=\"cl-button\"");
         assertThat(html.indexOf("value=\"default\"")).isLessThan(html.indexOf("value=\"suggest\""));
+    }
+
+    @Test
+    void skippedOrdersAreRestoredFromAButtonNextToSkip() {
+        // when
+        String html = render(group(false));
+
+        // then
+        String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
+        assertThat(actions).contains("href=\"/dashboard/fulfilment/queue\"").contains("Przywróć pominięte: 2")
+                .contains("fa-undo-alt").contains("<span>Pomiń</span>");
+        assertThat(actions.indexOf("Przywróć pominięte")).isLessThan(actions.indexOf("<span>Pomiń</span>"));
+        assertThat(html).doesNotContain("Pominięte zamówienia: 2");
+    }
+
+    @Test
+    void withNothingSkippedThereIsNoRestoreButton() {
+        // given
+        FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 0, List.of("o1"),
+                "/dashboard/orders/fulfilment", 1, null, false);
+
+        // when
+        String html = render(page);
+
+        // then
+        String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
+        assertThat(actions).contains("<span>Pomiń</span>").doesNotContain("Przywróć").doesNotContain("fa-undo-alt");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void theGuideExplainsSkippingAndRestoring() {
+        // when
+        String html = render(group(false));
+
+        // then
+        assertThat(html).contains("Pomiń i przywróć").contains("nic nie zmienia w zamówieniach");
     }
 
     @Test
@@ -75,7 +112,7 @@ class FulfilmentQueueRenderingTest {
 
         // then
         assertThat(html).contains("Nic nie czeka na zamówienie u dostawców").contains("Przejdź do zamówień")
-                .doesNotContain("Pomiń grupę").doesNotContain("pathSelector").doesNotContain("Pominięte zamówienia")
+                .doesNotContain("fa-forward").doesNotContain("pathSelector").doesNotContain("Pominięte zamówienia")
                 .doesNotContain("??");
     }
 
@@ -90,7 +127,7 @@ class FulfilmentQueueRenderingTest {
         // then
         assertThat(html).contains("Pominięte zostały wszystkie czekające zamówienia").contains("Pominięte zamówienia: 7.")
                 .contains("Przywróć pominięte").contains("href=\"/dashboard/fulfilment/queue\"")
-                .doesNotContain("Pomiń grupę").doesNotContain("??");
+                .doesNotContain("fa-forward").doesNotContain("??");
     }
 
     @Test
