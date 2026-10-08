@@ -77,6 +77,17 @@ class InvoiceSyncPreviewTest {
     }
 
     @Test
+    void blankInvoiceShortcutIsNoCounterpartyChange() {
+        // given
+        InvoiceSyncPreview preview = preview();
+        preview.setInvoiceShortcut(" ");
+        preview.setDeliveryProvider("AB");
+
+        // when / then
+        assertThat(preview.isShortcutDiffers()).isFalse();
+    }
+
+    @Test
     void invoiceAmountsCarryTheInvoiceCurrency() {
         // given
         InvoiceSyncPreview preview = preview();

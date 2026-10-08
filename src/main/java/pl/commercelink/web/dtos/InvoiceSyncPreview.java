@@ -254,8 +254,9 @@ public class InvoiceSyncPreview {
         return !invoicePaymentToDate.equals(deliveryPaymentDueDate);
     }
 
+    /** A blank shortcut on the invoice changes nothing: the save writes only a non-blank one (InvoiceSyncService). */
     public boolean isShortcutDiffers() {
-        return invoiceShortcut != null && !invoiceShortcut.equals(deliveryProvider);
+        return invoiceShortcut != null && !invoiceShortcut.isBlank() && !invoiceShortcut.equals(deliveryProvider);
     }
 
     public boolean isAllExact() {
