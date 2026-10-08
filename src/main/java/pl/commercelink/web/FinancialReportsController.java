@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,18 +17,17 @@ import pl.commercelink.financials.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.warehouse.builtin.StockLedgerClosingResult;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Blocked;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
-import pl.commercelink.warehouse.builtin.StockLedgerMonthClosing;
+import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
+import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
 import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingView;
+import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -67,7 +65,7 @@ public class FinancialReportsController {
     private SupplierLabels supplierLabels;
 
     @Autowired
-    private StockLedgerMonthClosing stockLedgerMonthClosing;
+    private StockLedgerPeriodClosing stockLedgerPeriodClosing;
 
     @Autowired
     private MessageSource messageSource;
@@ -95,7 +93,10 @@ public class FinancialReportsController {
         model.addAttribute("providerSales", providerSales);
         model.addAttribute("dateFrom", dateFrom);
         model.addAttribute("dateTo", dateTo);
-        model.addAttribute("ledgerClosing", StockLedgerClosingView.of(stockLedgerMonthClosing.status(getStoreId()), locale));
+        // after a held closing the range picker keeps the range that was held, so it can be corrected or closed anyway
+        StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
+        model.addAttribute("ledgerClosing", StockLedgerClosingView.of(stockLedgerPeriodClosing.closedPeriods(getStoreId()),
+                warning != null ? warning.dateFrom() : dateFrom, warning != null ? warning.dateTo() : dateTo));
 
         return "reports";
     }
@@ -124,42 +125,36 @@ public class FinancialReportsController {
         writeStockLedger(response, dateFrom, dateTo, csv);
     }
 
-    @GetMapping("/dashboard/reports/stock-ledger/{month}")
-    public void closedStockLedger(@PathVariable String month, HttpServletResponse response) throws IOException {
-        YearMonth closed = parseMonth(month);
-        byte[] csv = stockLedgerMonthClosing.closedReport(getStoreId(), closed)
+    @GetMapping("/dashboard/reports/stock-ledger/closed")
+    public void closedStockLedger(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                  HttpServletResponse response) throws IOException {
+        byte[] csv = stockLedgerPeriodClosing.closedReport(getStoreId(), new StockLedgerPeriod(dateFrom, dateTo))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        writeStockLedger(response, closed.atDay(1).toString(), closed.atEndOfMonth().toString(), csv);
+        writeStockLedger(response, dateFrom.toString(), dateTo.toString(), csv);
     }
 
-    @PostMapping("/dashboard/reports/stock-ledger/{month}/close")
-    public String closeStockLedgerMonth(@PathVariable String month, RedirectAttributes redirectAttributes, Locale locale) throws IOException {
-        YearMonth closing = parseMonth(month);
-        return showClosingResult(stockLedgerMonthClosing.close(getStoreId(), closing), closing,
-                "reports.stockLedger.closing.closed", "reports.stockLedger.closing.blocked", redirectAttributes, locale);
-    }
-
-    @PostMapping("/dashboard/reports/stock-ledger/{month}/regenerate")
-    public String regenerateStockLedgerMonth(@PathVariable String month, RedirectAttributes redirectAttributes, Locale locale) throws IOException {
-        YearMonth regenerated = parseMonth(month);
-        return showClosingResult(stockLedgerMonthClosing.regenerate(getStoreId(), regenerated), regenerated,
-                "reports.stockLedger.closing.regenerated", "reports.stockLedger.closing.regenerateBlocked", redirectAttributes, locale);
-    }
-
-    private String showClosingResult(StockLedgerClosingResult result, YearMonth month, String doneKey, String blockedKey,
-                                     RedirectAttributes redirectAttributes, Locale locale) {
-        String label = StockLedgerClosingView.label(month, locale);
-        switch (result) {
-            case Closed closed -> redirectAttributes.addFlashAttribute("successMessage",
-                    messageSource.getMessage(doneKey, new Object[]{label}, locale));
+    /** Closes the range, or generates it again when it is closed already; force closes it despite unsettled deliveries. */
+    @PostMapping("/dashboard/reports/stock-ledger/close")
+    public String closeStockLedgerPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                         @RequestParam(defaultValue = "false") boolean force,
+                                         RedirectAttributes redirectAttributes, Locale locale) throws IOException {
+        StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
+        Object[] label = {period.label()};
+        switch (stockLedgerPeriodClosing.close(getStoreId(), period, force)) {
+            case Closed closed -> redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
+                    closed.regenerated() ? "reports.stockLedger.closing.regenerated" : "reports.stockLedger.closing.closed",
+                    label, locale));
             case Blocked blocked -> {
                 SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(blockedKey, new Object[]{label}, locale));
-                redirectAttributes.addFlashAttribute("ledgerBlockers",
-                        blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList());
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        messageSource.getMessage("reports.stockLedger.closing.blocked", label, locale));
+                redirectAttributes.addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(dateFrom, dateTo,
+                        blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList()));
             }
             case NotAllowed notAllowed -> redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage(notAllowed.messageKey(), new Object[]{label}, locale));
+                    messageSource.getMessage(notAllowed.messageKey(), label, locale));
         }
         return "redirect:" + CLOSING_SECTION;
     }
@@ -199,14 +194,6 @@ public class FinancialReportsController {
         response.setHeader("Content-Disposition", "attachment; filename=\"stock-ledger-" + dateFrom + "_" + dateTo + ".csv\"");
         response.getOutputStream().write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         response.getOutputStream().write(csv);
-    }
-
-    private static YearMonth parseMonth(String month) {
-        try {
-            return YearMonth.parse(month);
-        } catch (DateTimeParseException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
     }
 
     private String getStoreId() {

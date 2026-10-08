@@ -35,7 +35,7 @@ class StockLedgerClosingMessagesTest {
                 Path.of("src/main/resources/templates/reports.html"),
                 Path.of("src/main/java/pl/commercelink/web/FinancialReportsController.java"),
                 Path.of("src/main/java/pl/commercelink/web/reports/StockLedgerClosingBlocker.java"),
-                Path.of("src/main/java/pl/commercelink/warehouse/builtin/StockLedgerMonthClosing.java"))) {
+                Path.of("src/main/java/pl/commercelink/warehouse/builtin/StockLedgerPeriodClosing.java"))) {
             Matcher m = KEY.matcher(Files.readString(file, StandardCharsets.UTF_8));
             while (m.find()) {
                 keys.add(m.group(1) != null ? m.group(1) : m.group(2));

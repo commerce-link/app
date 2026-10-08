@@ -238,9 +238,9 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void openingBalanceComesFromTheLastClosedMonthInsteadOfTheHistory() {
+    void openingBalanceComesFromTheLastClosedPeriodInsteadOfTheHistory() {
         // given
-        closed(YearMonth.of(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
         inPeriod(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD));
         items("pz", item("pz", "MFN-A", "Widget", 5, 50.0));
 
@@ -256,9 +256,9 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void monthsBetweenTheClosedMonthAndThePeriodAreAddedToTheOpeningBalance() {
+    void daysBetweenTheClosedPeriodAndTheReportAreAddedToTheOpeningBalance() {
         // given
-        closed(YearMonth.of(2026, 3), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 3), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
         when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 1).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
                 .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, BEFORE))));
         items("wz", item("wz", "MFN-A", "Widget", 4, 50.0));
@@ -275,7 +275,7 @@ class StockLedgerServiceTest {
     void periodStartingMidMonthAddsTheDaysBeforeItToTheOpeningBalance() {
         // given
         LocalDate from = LocalDate.of(2026, 5, 15);
-        closed(YearMonth.of(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
         when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 5, 1).atStartOfDay(), from.atStartOfDay().minusNanos(1)))
                 .thenReturn(new ArrayList<>(List.of(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD))));
         items("pz", item("pz", "MFN-A", "Widget", 2, 50.0));
@@ -290,9 +290,28 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void closedMonthNotEndingBeforeThePeriodIsNotUsed() {
+    void latestClosedPeriodOfAnyLengthOpensTheDaysAfterIt() {
         // given
-        when(closings.closedMonths(STORE_ID)).thenReturn(List.of(YearMonth.of(2026, 5)));
+        StockLedgerPeriod firstTwentyDays = new StockLedgerPeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 20));
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 3), firstTwentyDays));
+        when(closings.closingBalances(STORE_ID, firstTwentyDays)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 21).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
+                .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, LocalDateTime.of(2026, 4, 25, 9, 0)))));
+        items("wz", item("wz", "MFN-A", "Widget", 1, 50.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(9);
+        assertThat(money(row, "BO wartość")).isEqualTo(450.0);
+        verify(closings, never()).closingBalances(STORE_ID, month(2026, 3));
+    }
+
+    @Test
+    void closedPeriodNotEndingBeforeTheReportIsNotUsed() {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 5)));
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
         items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
 
@@ -305,10 +324,10 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void unreadableClosedMonthLeavesTheOpeningBalanceToTheHistory() {
+    void unreadableClosedPeriodLeavesTheOpeningBalanceToTheHistory() {
         // given
-        when(closings.closedMonths(STORE_ID)).thenReturn(List.of(YearMonth.of(2026, 4)));
-        when(closings.closingBalances(STORE_ID, YearMonth.of(2026, 4))).thenThrow(new IllegalStateException("broken file"));
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 4)));
+        when(closings.closingBalances(STORE_ID, month(2026, 4))).thenThrow(new IllegalStateException("broken file"));
         historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
         items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
 
@@ -321,7 +340,7 @@ class StockLedgerServiceTest {
     }
 
     @Test
-    void closingBalanceOfAClosedMonthIsTheOpeningBalanceOfTheNext() throws Exception {
+    void closingBalanceOfAClosedPeriodIsTheOpeningBalanceOfTheNext() throws Exception {
         // given
         LocalDate aprilFirst = LocalDate.of(2026, 4, 1);
         LocalDate aprilLast = LocalDate.of(2026, 4, 30);
@@ -332,7 +351,7 @@ class StockLedgerServiceTest {
         items("march", item("march", "MFN-A", "Widget", 1, 10.004));
         items("april", item("april", "MFN-A", "Widget", 1, 10.004));
         StockLedgerRow april = service.generate(STORE_ID, aprilFirst, aprilLast).get(0);
-        closed(YearMonth.of(2026, 4), StockLedgerClosings.parse(StockLedgerRow.toCsv(List.of(april))));
+        closed(month(2026, 4), StockLedgerClosings.parse(StockLedgerRow.toCsv(List.of(april))));
 
         // when
         StockLedgerRow may = single();
@@ -344,9 +363,14 @@ class StockLedgerServiceTest {
 
     // --- helpers ---
 
-    private void closed(YearMonth month, Map<String, ClosingBalance> balances) {
-        when(closings.closedMonths(STORE_ID)).thenReturn(List.of(month));
-        when(closings.closingBalances(STORE_ID, month)).thenReturn(balances);
+    private void closed(StockLedgerPeriod period, Map<String, ClosingBalance> balances) {
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(period));
+        when(closings.closingBalances(STORE_ID, period)).thenReturn(balances);
+    }
+
+    private static StockLedgerPeriod month(int year, int month) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        return new StockLedgerPeriod(yearMonth.atDay(1), yearMonth.atEndOfMonth());
     }
 
     private StockLedgerRow single() {

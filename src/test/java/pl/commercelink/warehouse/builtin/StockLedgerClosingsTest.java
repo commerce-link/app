@@ -8,7 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -23,8 +23,8 @@ class StockLedgerClosingsTest {
 
     private static final String BUCKET = "stores";
     private static final String STORE_ID = "store-1";
-    private static final YearMonth SEPTEMBER = YearMonth.of(2026, 9);
-    private static final String SEPTEMBER_KEY = "store-1/stock-ledger/2026-09.csv";
+    private static final StockLedgerPeriod SEPTEMBER = new StockLedgerPeriod(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+    private static final String SEPTEMBER_KEY = "store-1/stock-ledger/2026-09-01_2026-09-30.csv";
 
     @Mock
     private FileStorage fileStorage;
@@ -37,19 +37,21 @@ class StockLedgerClosingsTest {
     }
 
     @Test
-    void closedMonthsAreTheMonthFilesOfTheStoreOldestFirst() {
+    void closedPeriodsAreThePeriodFilesOfTheStoreByTheirEnd() {
         // given
         when(fileStorage.findAllKeysByKeyOrder(BUCKET, "store-1/stock-ledger/")).thenReturn(List.of(
+                "store-1/stock-ledger/2026-09-01_2026-09-30.csv",
+                "store-1/stock-ledger/2026-08-01_2026-08-15.csv",
+                "store-1/stock-ledger/2026-08-31_2026-08-01.csv",
                 "store-1/stock-ledger/2026-09.csv",
-                "store-1/stock-ledger/2026-08.csv",
-                "store-1/stock-ledger/notes.txt",
-                "store-1/stock-ledger/draft.csv"));
+                "store-1/stock-ledger/notes.txt"));
 
         // when
-        List<YearMonth> closed = closings.closedMonths(STORE_ID);
+        List<StockLedgerPeriod> closed = closings.closedPeriods(STORE_ID);
 
         // then
-        assertThat(closed).containsExactly(YearMonth.of(2026, 8), SEPTEMBER);
+        assertThat(closed).containsExactly(
+                new StockLedgerPeriod(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 15)), SEPTEMBER);
     }
 
     @Test
@@ -68,7 +70,7 @@ class StockLedgerClosingsTest {
     }
 
     @Test
-    void monthWithoutAFileHasNoReport() {
+    void periodWithoutAFileHasNoReport() {
         // given
         when(fileStorage.canRead(BUCKET, SEPTEMBER_KEY)).thenReturn(false);
 
@@ -87,7 +89,7 @@ class StockLedgerClosingsTest {
     }
 
     @Test
-    void reportIsSavedAsTheFileOfTheMonth() {
+    void reportIsSavedAsTheFileOfThePeriod() {
         // given
         byte[] report = {1, 2, 3};
 

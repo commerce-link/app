@@ -10,7 +10,6 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -69,22 +68,22 @@ public class StockLedgerService {
         }
 
         closing.get().balances().forEach((mfn, balance) -> aggregates.put(mfn, Aggregate.opening(balance)));
-        LocalDateTime afterClosedMonth = closing.get().month().plusMonths(1).atDay(1).atStartOfDay();
-        if (afterClosedMonth.isBefore(periodStart)) {
+        LocalDateTime afterClosedPeriod = closing.get().period().to().plusDays(1).atStartOfDay();
+        if (afterClosedPeriod.isBefore(periodStart)) {
             List<WarehouseDocument> sinceClosing =
-                    warehouseDocumentRepository.findAllInDateRange(storeId, afterClosedMonth, periodStart.minusNanos(1));
+                    warehouseDocumentRepository.findAllInDateRange(storeId, afterClosedPeriod, periodStart.minusNanos(1));
             accumulate(sinceClosing, aggregates, Bucket.OPENING);
         }
         return aggregates;
     }
 
-    // a closed month that cannot be read leaves the opening balance to the whole history: slower, but still right
+    // a closed period that cannot be read leaves the opening balance to the whole history: slower, but still right
     private Optional<Closing> lastClosingBefore(String storeId, LocalDate dateFrom) {
         try {
-            return closings.closedMonths(storeId).stream()
-                    .filter(month -> month.atEndOfMonth().isBefore(dateFrom))
-                    .max(Comparator.naturalOrder())
-                    .map(month -> new Closing(month, closings.closingBalances(storeId, month)));
+            return closings.closedPeriods(storeId).stream()
+                    .filter(period -> period.to().isBefore(dateFrom))
+                    .max(StockLedgerPeriod.BY_END)
+                    .map(period -> new Closing(period, closings.closingBalances(storeId, period)));
         } catch (RuntimeException e) {
             log.error("Closed stock ledger of store {} could not be read, the opening balance is taken from the whole history", storeId, e);
             return Optional.empty();
@@ -139,7 +138,7 @@ public class StockLedgerService {
 
     private enum Bucket { OPENING, PERIOD }
 
-    private record Closing(YearMonth month, Map<String, ClosingBalance> balances) {
+    private record Closing(StockLedgerPeriod period, Map<String, ClosingBalance> balances) {
     }
 
     private static class Aggregate {
