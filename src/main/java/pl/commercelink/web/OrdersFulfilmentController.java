@@ -11,15 +11,16 @@ import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.*;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.web.fulfilment.FulfilmentQueuePageFactory;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -38,34 +39,29 @@ class FulfilmentController extends BaseController {
     @Autowired
     private SupplierLabels supplierLabels;
 
+    @Autowired
+    private FulfilmentQueuePageFactory fulfilmentQueuePageFactory;
+
     @GetMapping("/dashboard/fulfilment/queue")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    public String fulfilmentQueue(@RequestParam(value = "orderIds", required = false) List<String> orderIdsParam, Model model) {
-        List<String> orderIds = (orderIdsParam != null && !orderIdsParam.isEmpty()) ? orderIdsParam : new ArrayList<>();
+    public String fulfilmentQueue(@RequestParam(value = "orderIds", required = false) List<String> orderIdsParam, Model model, Locale locale) {
+        List<String> skipped = orderIdsParam == null ? new ArrayList<>() : new ArrayList<>(orderIdsParam);
 
         Map<String, Integer> itemsToOrder = new HashMap<>();
+        // the criteria already loads every candidate order; keeping them lets the rows be built without a second read
+        Map<String, Order> loadedOrders = new HashMap<>();
         Predicate<Order> fulfilmentCriteria = order -> {
             int count = orderItemsRepository.findByOrderIdAndStatus(order.getOrderId(), FulfilmentStatus.New).size();
             itemsToOrder.put(order.getOrderId(), count);
+            loadedOrders.put(order.getOrderId(), order);
             return count > 0;
         };
-        List<OrderIndexEntry> ordersPagination = isSuperAdmin()
-                ? fulfilmentQueue.pickFulfilmentGroup(orderIds, fulfilmentCriteria)
-                : fulfilmentQueue.pickFulfilmentGroup(getStoreId(), orderIds, fulfilmentCriteria);
+        List<OrderIndexEntry> group = isSuperAdmin()
+                ? fulfilmentQueue.pickFulfilmentGroup(skipped, fulfilmentCriteria)
+                : fulfilmentQueue.pickFulfilmentGroup(getStoreId(), skipped, fulfilmentCriteria);
 
-        List<String> newOrders = ordersPagination.stream()
-                .map(OrderIndexEntry::getOrderId)
-                .toList();
-
-        Set<String> mergedOrderIds = new LinkedHashSet<>(orderIds);
-        mergedOrderIds.addAll(newOrders);
-
-        model.addAttribute("orders", ordersPagination);
-        model.addAttribute("itemsToOrder", itemsToOrder);
-        model.addAttribute("orderIds", mergedOrderIds);
-        model.addAttribute("hasNext", !newOrders.isEmpty());
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-
+        model.addAttribute("page", fulfilmentQueuePageFactory.build(isSuperAdmin(), skipped, group, loadedOrders,
+                itemsToOrder, LocalDate.now(), locale));
         return "fulfilment-queue";
     }
 
@@ -79,6 +75,10 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "onlyLocalSuppliers", defaultValue = "false") boolean onlyLocalSuppliers,
             @RequestParam(value = "orderByOrder", defaultValue = "false") boolean orderByOrder,
             Model model) {
+        if (selectedOrders.isEmpty()) {
+            // a form sent with nothing ticked (no JavaScript to disable the buttons) would open an empty selection page
+            return "redirect:/dashboard/fulfilment/queue";
+        }
         return renderManualFulfilmentPage(getStoreId(), selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers, orderByOrder, model);
     }
 
@@ -93,6 +93,10 @@ class FulfilmentController extends BaseController {
             @RequestParam(value = "onlyLocalSuppliers", defaultValue = "false") boolean onlyLocalSuppliers,
             @RequestParam(value = "orderByOrder", defaultValue = "false") boolean orderByOrder,
             Model model) {
+        if (selectedOrders.isEmpty()) {
+            // a form sent with nothing ticked (no JavaScript to disable the buttons) would open an empty selection page
+            return "redirect:/dashboard/fulfilment/queue";
+        }
         return renderManualFulfilmentPage(storeId, selectedOrders, pathSelector, onlyWithProfit, onlyMultiOrder, onlyLocalSuppliers, orderByOrder, model);
     }
 
