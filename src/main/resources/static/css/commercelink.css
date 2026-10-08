@@ -10965,16 +10965,26 @@ a.cl-link-button:hover {
     padding-left: 28px;
 }
 
+/* the winner row above carries the name; here it stays for screen readers only (same technique as .cl-visually-hidden) */
+.cl-page .cl-table.is-offers tr.is-covered th.cl-table-key {
+    position: relative;
+}
+
 .cl-page .cl-table.is-offers tr.is-covered .cl-offer-name {
-    display: inline;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--cl-ink-2);
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .cl-page .cl-table.is-offers tr.is-covered .cl-offer-line {
     display: inline-flex;
-    margin: 0 0 0 8px;
+    margin: 0;
 }
 
 .cl-page .cl-table.is-offers tr.is-covered :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes, .cl-cell-price .cl-table-sub, .cl-cell-qty > *, .cl-cell-profit > *) {
