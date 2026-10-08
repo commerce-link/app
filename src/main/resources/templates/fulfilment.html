@@ -224,14 +224,14 @@
                                     <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{general.manufacturer.code}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
                                     <span class="cl-offer-covered" data-cl-covered hidden></span>
                                 </th>
-                                <td class="is-numeric cl-cell-qty" th:attr="data-label=#{fulfilment.select.column.qty}"><output data-cl-qty>0</output></td>
+                                <td class="is-numeric cl-cell-qty" th:attr="data-label=#{fulfilment.select.column.qty}"><span data-cl-qty>0</span></td>
                                 <td class="is-numeric cl-cell-price" th:attr="data-label=#{fulfilment.select.column.price.short}">
                                     <span class="cl-price-main" th:text="${T(pl.commercelink.web.orders.Money).format(e.source.priceNet)}"></span>
                                     <span class="cl-table-sub" th:text="#{fulfilment.select.gross(${T(pl.commercelink.web.orders.Money).format(e.source.priceGross)})}"></span>
                                 </td>
                                 <td class="is-numeric cl-cell-profit" th:attr="data-label=#{fulfilment.select.column.profit}">
                                     <th:block th:if="${page.profitKnown()}">
-                                        <span class="cl-profit" data-cl-profit><span class="cl-loss-icon"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span><output data-cl-profit-value>—</output></span>
+                                        <span class="cl-profit" data-cl-profit><span class="cl-loss-icon"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span><span data-cl-profit-value>—</span></span>
                                         <span class="cl-table-sub" data-cl-margin></span>
                                     </th:block>
                                     <span th:unless="${page.profitKnown()}" class="cl-profit is-unknown cl-tooltip" tabindex="0" role="img"
@@ -268,9 +268,9 @@
 
                 <!--/* below 1366 px the summary sits under the table: this bar keeps the totals in sight (hidden from 1366 px) */-->
                 <div class="cl-summary-peek" data-cl-peek>
-                    <span th:if="${page.isOrders()}"><strong class="cl-num"><output data-cl-peek-items></output></strong> <span th:text="#{fulfilment.select.peek.items}"></span></span>
-                    <span><strong class="cl-num"><output data-cl-peek-cost>0,00</output></strong> PLN</span>
-                    <span th:if="${page.profitKnown()}" class="cl-profit"><output data-cl-peek-profit></output></span>
+                    <span th:if="${page.isOrders()}"><strong class="cl-num"><span data-cl-peek-items></span></strong> <span th:text="#{fulfilment.select.peek.items}"></span></span>
+                    <span><strong class="cl-num"><span data-cl-peek-cost>0,00</span></strong> PLN</span>
+                    <span th:if="${page.profitKnown()}" class="cl-profit"><span data-cl-peek-profit></span></span>
                     <a class="cl-button is-primary" href="#summary" th:text="#{fulfilment.select.summary.title}"></a>
                 </div>
             </div>
@@ -297,7 +297,7 @@
                         <ul class="cl-supplier-totals" data-cl-supplier-totals>
                             <li th:each="s : ${page.suppliers()}" data-cl-supplier-total th:attr="data-provider=${s.provider()}" hidden>
                                 <span th:replace="~{fragments/supplier-pill :: pill(${s.label()}, ${s.color()}, ${s.warehouse()})}"></span>
-                                <output class="cl-num">0,00</output>
+                                <span class="cl-num" data-cl-supplier-value>0,00</span>
                             </li>
                             <li th:each="s : ${page.committed()}" class="is-earlier">
                                 <span class="cl-supplier-line"><span th:replace="~{fragments/supplier-pill :: pill(${s.label()}, ${s.color()}, ${s.warehouse()})}"></span>

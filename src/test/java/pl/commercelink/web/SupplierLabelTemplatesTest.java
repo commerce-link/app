@@ -74,4 +74,14 @@ class SupplierLabelTemplatesTest {
                 .doesNotContain("alternativeSuppliers")
                 .doesNotContain("${row.provider");
     }
+
+    @Test
+    void theSelectionScriptWritesTextNeverHtml() throws Exception {
+        // when -- connection labels, product names and categories are operator data (spec B3)
+        String js = Files.readString(Path.of("src/main/resources/static/js/fulfilment-select.js"));
+
+        // then
+        assertThat(js).doesNotContain("innerHTML").doesNotContain("insertAdjacentHTML").doesNotContain("outerHTML")
+                .contains("textContent");
+    }
 }
