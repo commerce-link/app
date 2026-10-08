@@ -75,7 +75,12 @@
                           data-uncovered=#{fulfilment.select.uncovered}, data-partial-end=#{fulfilment.select.partial.end},
                           data-all=#{fulfilment.select.filter.all}, data-many=#{fulfilment.select.filter.many},
                           data-any=#{fulfilment.select.filter.any}, data-from=#{fulfilment.select.filter.from},
-                          data-to=#{fulfilment.select.filter.to}, data-range=#{fulfilment.select.filter.range}"></div>
+                          data-to=#{fulfilment.select.filter.to}, data-range=#{fulfilment.select.filter.range},
+                          data-category-offers=#{fulfilment.select.category.offers}, data-category-ordered=#{fulfilment.select.category.ordered},
+                          data-category-chosen=#{fulfilment.select.category.chosen}, data-money=#{fulfilment.select.money},
+                          data-ratio=#{fulfilment.select.ratio}, data-chip-filter=#{fulfilment.select.orders.filter},
+                          data-dearer=#{fulfilment.select.alt.dearer}, data-fold=#{fulfilment.select.alt.fold},
+                          data-select-visible=#{fulfilment.select.list.selectVisible}, data-clear-visible=#{fulfilment.select.list.clearVisible}"></div>
 
             <div class="cl-layout-main">
                 <noscript>
@@ -151,16 +156,25 @@
                         </div>
                         <div class="cl-bar-row" th:if="${page.showCoverage()}">
                             <span class="cl-bar-label" id="coverage-label" th:text="#{fulfilment.select.orders}"></span>
-                            <div class="cl-bar-content" role="group" aria-labelledby="coverage-label">
-                                <button type="button" class="cl-chip cl-coverage-chip" aria-pressed="false" th:each="o : ${page.orders()}"
-                                        data-cl-coverage th:attr="data-order=${o.orderId()}, data-total=${o.items()}, data-number=${o.number()}, data-href=@{${o.href()}}">
+                            <!--/* a chip is two controls: the number opens the order in a new tab, the bar part narrows the
+                                   table to its offers. The script keeps the state class on the filter button; the chip
+                                   takes its tint from it, so the icons, bar and count change together. */-->
+                            <div class="cl-bar-content cl-order-chips" role="group" aria-labelledby="coverage-label">
+                                <span class="cl-order-chip" th:each="o : ${page.orders()}" th:attr="data-order=${o.orderId()}">
                                     <span class="cl-coverage-icon is-ok"><i class="fas fa-check-circle" aria-hidden="true"></i></span>
-                                    <span class="cl-coverage-icon is-warn"><i class="fas fa-adjust" aria-hidden="true"></i></span>
+                                    <span class="cl-coverage-icon is-warn"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span>
                                     <span class="cl-coverage-icon is-bad"><i class="fas fa-circle" aria-hidden="true"></i></span>
-                                    <span th:text="${o.number()}"></span>
-                                    <span class="cl-coverage-split" hidden role="img" th:attr="aria-label=#{fulfilment.select.orders.split}, title=#{fulfilment.select.orders.split}"><i class="fas fa-code-branch" aria-hidden="true"></i></span>
-                                    <span class="cl-coverage-count" data-cl-coverage-count th:text="#{fulfilment.select.count(0, ${o.items()})}"></span>
-                                </button>
+                                    <a th:if="${o.href() != null}" class="cl-order-chip-link" th:href="@{${o.href()}}" target="_blank" rel="noopener"
+                                       th:title="#{fulfilment.select.openOrder(${o.number()})}" th:text="${o.number()}"></a>
+                                    <span th:unless="${o.href() != null}" class="cl-order-chip-link" th:text="${o.number()}"></span>
+                                    <button type="button" class="cl-order-chip-filter" aria-pressed="false" data-cl-coverage
+                                            th:attr="data-order=${o.orderId()}, data-total=${o.items()}, data-number=${o.number()}, data-href=@{${o.href()}},
+                                                     aria-label=#{fulfilment.select.orders.filter(${o.number()}, 0, ${o.items()})}">
+                                        <span class="cl-coverage-split" hidden role="img" th:attr="aria-label=#{fulfilment.select.orders.split}, title=#{fulfilment.select.orders.split}"><i class="fas fa-code-branch" aria-hidden="true"></i></span>
+                                        <span class="cl-order-chip-bar" aria-hidden="true"><span class="cl-order-chip-fill" data-cl-coverage-fill></span></span>
+                                        <span class="cl-coverage-count" data-cl-coverage-count th:text="#{fulfilment.select.ratio(0, ${o.items()})}"></span>
+                                    </button>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -174,29 +188,43 @@
                         <p class="cl-alert-text"><span th:text="#{${page.noMatchKey()}}"></span><th:block th:if="${page.multiOnSingleOrder()}"> <span th:text="#{fulfilment.select.noMatch.multi}"></span></th:block></p>
                     </div>
 
-                    <div class="cl-card-section">
+                    <!--/* above the list: tick or clear the visible offers on the left (the header checkbox went with the
+                           visible header row), expand and collapse every category on the right */-->
+                    <div class="cl-list-bar">
+                        <button type="button" class="cl-link-button" data-cl-select-visible th:text="#{fulfilment.select.list.selectVisible}"></button>
+                        <span class="cl-list-bar-end">
+                            <button type="button" class="cl-link-button" data-cl-expand-all>
+                                <i class="fas fa-expand" aria-hidden="true"></i><span th:text="#{fulfilment.select.list.expand}"></span>
+                            </button>
+                            <button type="button" class="cl-link-button" data-cl-collapse-all>
+                                <i class="fas fa-compress" aria-hidden="true"></i><span th:text="#{fulfilment.select.list.collapse}"></span>
+                            </button>
+                        </span>
+                    </div>
+
+                    <!--/* Offers as separated card rows (variant A4). The header row stays for screen readers only: every
+                           value carries its unit in the cell. Only the first category starts expanded, as on the old page;
+                           the script hides the rows of the collapsed ones. */-->
+                    <div class="cl-card-section cl-offers-list">
                         <table class="cl-table is-supplier-offers" data-cl-offers>
-                            <colgroup><col class="cl-col-check"><col><col class="cl-col-qty-s"><col class="cl-col-money"><col class="cl-col-profit"></colgroup>
-                            <thead>
+                            <colgroup><col><col class="cl-col-qty-s"><col class="cl-col-price"><col class="cl-col-profit"><col class="cl-col-toggle"></colgroup>
+                            <thead class="cl-visually-hidden">
                             <tr>
-                                <th scope="col" class="cl-table-check">
-                                    <label class="cl-check-target"><input type="checkbox" class="cl-check-input" data-cl-select-all hidden autocomplete="off"
-                                                                          th:attr="aria-label=#{fulfilment.select.all}"></label>
-                                    <span class="cl-visually-hidden" th:text="#{fulfilment.select.column.select}"></span>
-                                </th>
                                 <th scope="col" th:text="#{fulfilment.select.column.offer}"></th>
-                                <th scope="col" class="is-numeric" th:text="#{fulfilment.select.column.qty}"></th>
-                                <th scope="col" class="is-numeric" th:text="#{fulfilment.select.column.price}"></th>
-                                <th scope="col" class="is-numeric" th:text="#{fulfilment.select.column.profit}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.qty}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.price}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.profit}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.select}"></th>
                             </tr>
                             </thead>
-                            <tbody th:each="c : ${page.categories()}" th:id="${c.id()}" data-cl-category>
+                            <tbody th:each="c, cStat : ${page.categories()}" th:id="${c.id()}" data-cl-category>
                             <tr class="cl-table-group">
                                 <th colspan="5" scope="rowgroup">
-                                    <button type="button" class="cl-group-toggle" aria-expanded="true" th:attr="aria-controls=${c.id()}">
-                                        <i class="fas fa-chevron-down" aria-hidden="true"></i><span th:text="${c.name() != null} ? ${c.name()} : #{fulfilment.select.category.other}"></span>
+                                    <button type="button" class="cl-group-toggle" th:attr="aria-controls=${c.id()}, aria-expanded=${cStat.first}">
+                                        <i class="fas fa-chevron-down" aria-hidden="true"></i><span class="cl-group-name" th:text="${c.name() != null} ? ${c.name()} : #{fulfilment.select.category.other}"></span>
                                     </button>
                                     <span class="cl-group-count" data-cl-category-count></span>
+                                    <span class="cl-group-chosen" data-cl-category-chosen hidden></span>
                                 </th>
                             </tr>
                             <tr th:each="o : ${c.offers()}" th:with="e=${o.entry()}" data-cl-offer th:class="${e.accepted} ? 'is-on' : 'is-off'"
@@ -204,34 +232,29 @@
                                 th:data-name="${e.source.name}" th:data-ean="${e.source.ean}" th:data-mfn="${e.source.mfn}"
                                 th:data-sourceqty="${e.source.qty}" th:data-net="${e.source.priceNet}" th:data-gross="${e.source.priceGross}"
                                 th:data-category="${e.source.category}">
-                                <td class="cl-table-check">
-                                    <label class="cl-check-target"><input type="checkbox" class="cl-check-input" data-cl-offer-check autocomplete="off"
-                                                                          th:checked="${e.accepted}"
-                                                                          th:attr="aria-label=#{fulfilment.select.offer.label(${e.source.name}, ${o.label()})}"></label>
-                                </td>
                                 <th scope="row" class="cl-table-key">
                                     <span class="cl-offer-name" th:text="${e.source.name}"></span>
                                     <span class="cl-offer-line">
                                         <span th:replace="~{fragments/supplier-pill :: pill(${o.label()}, ${o.color()}, ${o.warehouse()})}"></span>
                                         <span class="cl-offer-stock" th:text="#{fulfilment.select.stock(${e.source.qty})}"></span>
-                                        <span class="cl-order-refs" th:hidden="${!page.showOrderRefs()}">
-                                            <span class="cl-order-ref" th:each="a : ${e.allocations}" th:with="ref=${page.order(a.orderId)}" data-cl-alloc
-                                                  th:attr="data-order=${a.orderId}, data-item=${a.orderItemId}, data-qty=${a.orderItemQty}, data-price=${a.orderItemPrice}">
-                                                <a th:if="${ref.href() != null}" th:href="@{${ref.href()}}" target="_blank" rel="noopener" th:text="${ref.number()}"></a>
-                                                <span class="cl-order-ref-qty" th:text="|×${a.orderItemQty}|"></span>
-                                                <span class="cl-order-ref-price" th:text="${T(pl.commercelink.web.orders.Money).format(a.orderItemPrice)}"></span>
-                                            </span>
+                                        <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{general.manufacturer.code}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
+                                        <span class="cl-offer-covered" data-cl-covered hidden></span>
+                                    </span>
+                                    <span class="cl-order-refs" th:hidden="${!page.showOrderRefs()}">
+                                        <span class="cl-order-ref" th:each="a : ${e.allocations}" th:with="ref=${page.order(a.orderId)}" data-cl-alloc
+                                              th:attr="data-order=${a.orderId}, data-item=${a.orderItemId}, data-qty=${a.orderItemQty}, data-price=${a.orderItemPrice}">
+                                            <a th:if="${ref.href() != null}" th:href="@{${ref.href()}}" target="_blank" rel="noopener" th:text="${ref.number()}"></a>
+                                            <span class="cl-order-ref-qty" th:text="|×${a.orderItemQty}|"></span>
+                                            <span class="cl-order-ref-price" th:text="|· ${T(pl.commercelink.web.orders.Money).format(a.orderItemPrice)}|"></span>
                                         </span>
                                     </span>
-                                    <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{general.manufacturer.code}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
-                                    <span class="cl-offer-covered" data-cl-covered hidden></span>
                                 </th>
-                                <td class="is-numeric cl-cell-qty" th:attr="data-label=#{fulfilment.select.column.qty}"><span data-cl-qty>0</span></td>
-                                <td class="is-numeric cl-cell-price" th:attr="data-label=#{fulfilment.select.column.price.short}">
-                                    <span class="cl-price-main" th:text="${T(pl.commercelink.web.orders.Money).format(e.source.priceNet)}"></span>
+                                <td class="is-numeric cl-cell-qty"><span data-cl-qty>0</span> <span class="cl-unit" th:text="#{fulfilment.select.unit.pieces}"></span></td>
+                                <td class="is-numeric cl-cell-price">
+                                    <span class="cl-price-main"><span th:text="${T(pl.commercelink.web.orders.Money).format(e.source.priceNet)}"></span> <span class="cl-unit" th:text="#{fulfilment.select.unit.perPiece}"></span></span>
                                     <span class="cl-table-sub" th:text="#{fulfilment.select.gross(${T(pl.commercelink.web.orders.Money).format(e.source.priceGross)})}"></span>
                                 </td>
-                                <td class="is-numeric cl-cell-profit" th:attr="data-label=#{fulfilment.select.column.profit}">
+                                <td class="is-numeric cl-cell-profit">
                                     <th:block th:if="${page.profitKnown()}">
                                         <span class="cl-profit" data-cl-profit><span class="cl-loss-icon"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span><span data-cl-profit-value>—</span></span>
                                         <span class="cl-table-sub" data-cl-margin></span>
@@ -239,25 +262,30 @@
                                     <span th:unless="${page.profitKnown()}" class="cl-profit is-unknown cl-tooltip" tabindex="0" role="img"
                                           th:attr="data-tooltip=#{fulfilment.select.profit.unknown}, aria-label=#{fulfilment.select.profit.unknown}">—</span>
                                 </td>
+                                <!--/* the toggle is a label around the offer's checkbox: the checkbox keeps the state, the keyboard and
+                                       the name for screen readers; CSS shows the one text that fits the row (ticked or not, covered
+                                       cheaper or not) */-->
+                                <td class="cl-cell-toggle">
+                                    <label class="cl-offer-toggle"><input type="checkbox" data-cl-offer-check autocomplete="off" th:checked="${e.accepted}"
+                                                                          th:attr="aria-label=#{fulfilment.select.offer.label(${e.source.name}, ${o.label()})}"><span class="cl-offer-toggle-on"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.on}"></span></span><span class="cl-offer-toggle-off" th:text="#{fulfilment.select.toggle.off}"></span><span class="cl-offer-toggle-alt" th:text="#{fulfilment.select.toggle.alt}"></span><span class="cl-offer-toggle-kept"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.kept}"></span></span></label>
+                                </td>
                             </tr>
                             </tbody>
                             <tbody th:if="${!page.missing().isEmpty()}" class="cl-offers-missing">
                             <tr class="cl-table-group is-warn">
                                 <th colspan="5" scope="rowgroup">
-                                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                     <span class="cl-group-name" th:text="#{fulfilment.select.missing.title}"></span>
                                     <span class="cl-group-count" th:text="#{fulfilment.select.missing.count(${page.missing().size()})}"></span>
                                 </th>
                             </tr>
                             <tr class="is-missing" th:each="m : ${page.missing()}">
-                                <td class="cl-table-check"></td>
-                                <th scope="row" class="cl-table-key" colspan="4">
+                                <th scope="row" class="cl-table-key" colspan="5">
                                     <span class="cl-offer-name" th:text="${m.name()}"></span>
                                     <span class="cl-offer-line">
                                         <span class="cl-order-ref" th:if="${page.showOrderRefs()}">
                                             <a th:href="@{${m.href()}}" target="_blank" rel="noopener" th:text="${m.number()}"></a>
                                             <span class="cl-order-ref-qty" th:text="|×${m.qty()}|"></span>
-                                            <span class="cl-order-ref-price" th:text="${T(pl.commercelink.web.orders.Money).format(m.price())}"></span>
+                                            <span class="cl-order-ref-price" th:text="|· ${T(pl.commercelink.web.orders.Money).format(m.price())}|"></span>
                                         </span>
                                         <span class="cl-offer-stock" th:text="#{${m.reasonKey()}}"></span>
                                     </span>

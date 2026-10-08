@@ -81,4 +81,25 @@ class FulfilmentSelectMessagesTest {
             assertThat(en.getProperty(key)).as("en " + key).isNull();
         }
     }
+
+    @Test
+    void theReadabilityKeysAreUsedAndTheHeaderCheckboxKeysAreGone() throws Exception {
+        // given
+        Properties pl = load("messages_pl.properties");
+        Properties en = load("messages_en.properties");
+
+        // when
+        Set<String> used = keysUsed();
+
+        // then
+        assertThat(used).contains("fulfilment.select.unit.pieces", "fulfilment.select.unit.perPiece", "fulfilment.select.money",
+                "fulfilment.select.toggle.on", "fulfilment.select.toggle.off", "fulfilment.select.toggle.alt", "fulfilment.select.toggle.kept",
+                "fulfilment.select.list.expand", "fulfilment.select.list.collapse", "fulfilment.select.list.selectVisible",
+                "fulfilment.select.list.clearVisible", "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold",
+                "fulfilment.select.orders.filter", "fulfilment.select.ratio", "fulfilment.select.category.chosen");
+        for (String key : List.of("fulfilment.select.all", "fulfilment.select.column.price.short")) {
+            assertThat(pl.getProperty(key)).as("pl " + key).isNull();
+            assertThat(en.getProperty(key)).as("en " + key).isNull();
+        }
+    }
 }

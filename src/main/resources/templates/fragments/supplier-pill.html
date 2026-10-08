@@ -1,9 +1,10 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* A supplier connection as a pill (design system: Pigułka dostawcy): a tint and a dot of its palette colour
-       (1..6, given by FulfilmentSelectPageFactory), the store's warehouse with its icon instead; the name always
-       stays next to the colour, in the ink colour, so contrast is that of body text. */-->
-<span th:fragment="pill(label, color, warehouse)" class="cl-supplier-pill" th:classappend="|is-c${color}|"><i th:if="${warehouse}" class="fas fa-warehouse" aria-hidden="true"></i><span th:unless="${warehouse}" class="cl-supplier-dot" aria-hidden="true"></span><span th:text="${label}"></span></span>
+<!--/* A supplier connection as a solid pill (design system: Pigułka dostawcy): its palette colour as the background with
+       white text (every colour of --cl-supplier-1..6 holds 4.5:1 against white; 1..6 given by
+       FulfilmentSelectPageFactory) and a truck; the store's warehouse is colour 0 (slate) with its own icon, so the two
+       differ by shape as well as by colour. */-->
+<span th:fragment="pill(label, color, warehouse)" class="cl-supplier-pill" th:classappend="|is-c${color}|"><i class="fas" th:classappend="${warehouse} ? 'fa-warehouse' : 'fa-truck'" aria-hidden="true"></i><span th:text="${label}"></span></span>
 </body>
 </html>

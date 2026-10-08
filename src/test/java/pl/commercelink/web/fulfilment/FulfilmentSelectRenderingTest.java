@@ -251,6 +251,131 @@ class FulfilmentSelectRenderingTest {
 
         // then
         assertThat(one).contains("href=\"/dashboard/orders/o1\"").contains("Otwórz zamówienie ").contains("rel=\"noopener\"");
-        assertThat(content(many)).doesNotContain("Otwórz zamówienie");
+        // the order chips name the order in their link titles; only the header is checked here
+        String header = content(many).substring(0, content(many).indexOf("</header>"));
+        assertThat(header).doesNotContain("Otwórz zamówienie");
+    }
+
+    private static String row(String html, String provider) {
+        String row = html.substring(html.indexOf("data-provider=\"" + provider + "\""));
+        return row.substring(0, row.indexOf("</tr>"));
+    }
+
+    @Test
+    void everyOfferIsToggledByALabelWrappingItsCheckboxInTheLastCell() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String dear = row(html, "AB-k2");
+        String lastCell = dear.substring(dear.lastIndexOf("<td"));
+        assertThat(lastCell).contains("<label class=\"cl-offer-toggle\">").contains("data-cl-offer-check")
+                .contains("Zamawiam").contains("Zamów").contains("Zamów tę").contains("Zaznaczona");
+        assertThat(lastCell.indexOf("<label")).isLessThan(lastCell.indexOf("data-cl-offer-check"));
+        assertThat(lastCell.indexOf("data-cl-offer-check")).isLessThan(lastCell.indexOf("</label>"));
+        assertThat(html).doesNotContain("cl-table-check").doesNotContain("data-cl-select-all");
+    }
+
+    @Test
+    void theHeaderRowIsForScreenReadersAndTheCellsCarryTheirUnits() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        assertThat(html).contains("<thead class=\"cl-visually-hidden\">");
+        String cheap = row(html, "Elko-k1");
+        assertThat(cheap).contains("szt.").contains("zł / szt.").contains("brutto 123,00").contains("100,00");
+        assertThat(cheap).doesNotContain("data-label=");
+    }
+
+    @Test
+    void onlyTheFirstCategoryStartsExpandedAndTheMissingGroupAlwaysShows() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String toggles = html.substring(html.indexOf("data-cl-offers"));
+        assertThat(toggles.split("aria-expanded=", -1)).hasSize(3);
+        assertThat(toggles.indexOf("aria-expanded=\"true\"")).isLessThan(toggles.indexOf("aria-expanded=\"false\""));
+        String missing = html.substring(html.indexOf("cl-offers-missing"));
+        assertThat(missing).contains("Bez oferty").doesNotContain("aria-expanded").doesNotContain("cl-group-toggle");
+    }
+
+    @Test
+    void theListBarExpandsCollapsesAndTicksTheVisibleOffers() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String bar = html.substring(html.indexOf("class=\"cl-list-bar\""), html.indexOf("data-cl-offers"));
+        assertThat(bar).contains("data-cl-select-visible").contains("Zaznacz widoczne")
+                .contains("data-cl-expand-all").contains("Rozwiń wszystkie")
+                .contains("data-cl-collapse-all").contains("Zwiń wszystkie");
+        assertThat(html).contains("data-select-visible=\"Zaznacz widoczne\"").contains("data-clear-visible=\"Odznacz widoczne\"");
+    }
+
+    @Test
+    void orderChipsLinkTheOrderAndFilterWithAProgressBar() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String chip = html.substring(html.indexOf("class=\"cl-order-chip\""));
+        chip = chip.substring(0, chip.indexOf("</button>"));
+        assertThat(chip).contains("href=\"/dashboard/orders/w1-a\"").contains("target=\"_blank\"").contains("rel=\"noopener\"")
+                .contains("aria-pressed=\"false\"").contains("data-cl-coverage")
+                .contains("aria-label=\"Pokaż tylko oferty zamówienia ")
+                .contains(": 0 z 2 pozycji ma dostawcę\"")
+                .contains("cl-order-chip-bar").contains("data-cl-coverage-fill")
+                .contains("data-cl-coverage-count").contains("0/2");
+        assertThat(chip.indexOf("</a>")).isLessThan(chip.indexOf("<button"));
+        assertThat(html).doesNotContain("cl-coverage-legend").doesNotContain("cl-chip cl-coverage-chip");
+    }
+
+    @Test
+    void supplierPillsAreSolidWithATruckOrTheWarehouseIcon() {
+        // given
+        warehouseOrder("w1-a");
+        FulfilmentForm form = form(List.of("w1-a"), offer("Elko-k1", "CPU", 100, true, "w1-a:i1:200"),
+                offer("Warehouse", "CPU", 90, false, "w1-a:i1:200"));
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        assertThat(row(html, "Elko-k1")).contains("class=\"cl-supplier-pill is-c1\"").contains("fa-truck");
+        assertThat(row(html, "Warehouse")).contains("class=\"cl-supplier-pill is-c0\"").contains("fa-warehouse")
+                .doesNotContain("fa-truck");
+        assertThat(html).doesNotContain("cl-supplier-dot");
+    }
+
+    @Test
+    void theOrdersOfAnOfferReadAsNumberQuantityAndPrice() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String gpu = html.substring(html.indexOf("data-category=\"GPU\""));
+        gpu = gpu.substring(0, gpu.indexOf("</tr>"));
+        assertThat(gpu).contains("data-cl-alloc").contains("×1").contains("500,00")
+                .contains("href=\"/dashboard/orders/w2-b\"");
     }
 }

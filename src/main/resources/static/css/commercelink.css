@@ -10514,98 +10514,73 @@ a.cl-link-button:hover {
 }
 
 /* Supplier selection (POST /dashboard/orders/fulfilment and the warehouse restock; spec
-   docs/active/fulfilment-queue-redesign/2026-10-08-fulfilment-select-design.md, variant A2). One table of offers grouped
-   by item category beside the sticky summary. A ticked offer that wins items carries an accent bar (is-on), an unticked
-   one is greyed (is-off), and an offer whose every item a cheaper ticked one takes folds into one line under it
+   docs/active/fulfilment-queue-redesign/2026-10-08-fulfilment-select-design.md, variant A4 of the readability rework,
+   plan 2026-10-08-fulfilment-select-a4-plan.md). Offers are separated card rows grouped by item category beside the
+   sticky summary. A ticked offer that wins items is tinted with a thick accent edge (is-on), an unticked one is white
+   (is-off), and an offer whose every item a cheaper ticked one takes folds into one line under its winner
    (is-covered) — fulfilment-select.js sets the three. Supplier colours come from the server (FulfilmentSelectPageFactory,
-   by label) and always sit next to the name, which keeps the ink colour. */
+   by label) as solid pills with white text. */
 :root {
+    --cl-supplier-0: #47566a;
     --cl-supplier-1: #1b4db1;
-    --cl-supplier-1-soft: #e3eafa;
-    --cl-supplier-2: #b4531b;
-    --cl-supplier-2-soft: #fbe9dd;
+    --cl-supplier-2: #9a3f0f;
     --cl-supplier-3: #1d6b45;
-    --cl-supplier-3-soft: #e0f1e7;
-    --cl-supplier-4: #7a3fb0;
-    --cl-supplier-4-soft: #efe5f8;
-    --cl-supplier-5: #0f7a8a;
-    --cl-supplier-5-soft: #dff1f3;
-    --cl-supplier-6: #a61b6b;
-    --cl-supplier-6-soft: #f8e3ef;
-    --cl-accent-faint: #f7f9fe;
+    --cl-supplier-4: #6a2fa0;
+    --cl-supplier-5: #0b6170;
+    --cl-supplier-6: #8f1659;
+    --cl-offer-on: #eef4ff;
+    --cl-offer-on-line: #b9cdf3;
+    --cl-offer-radius: 10px;
+    --cl-alt-connector: #c3cfdf;
+    --cl-warn-line: #ecc98f;
+    --cl-missing-line: #f1d9ad;
+    --cl-chip-track: rgba(14, 23, 33, .12);
+    --cl-chip-hover: rgba(14, 23, 33, .06);
 }
 
 .cl-page .cl-supplier-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 1px 9px 1px 7px;
+    padding: 2px 10px;
     border-radius: 999px;
-    background: var(--cl-surface-2);
-    font-size: 12.5px;
+    background: var(--cl-supplier-1);
+    font-size: 13px;
     font-weight: 600;
     line-height: 20px;
-    color: var(--cl-ink);
+    color: #fff;
     white-space: nowrap;
 }
 
 .cl-page .cl-supplier-pill i {
     font-size: 11px;
-    color: var(--cl-ink-2);
 }
 
-.cl-page .cl-supplier-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    flex: none;
+.cl-page .cl-supplier-pill.is-c0 {
+    background: var(--cl-supplier-0);
 }
 
 .cl-page .cl-supplier-pill.is-c1 {
-    background: var(--cl-supplier-1-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c1 .cl-supplier-dot {
     background: var(--cl-supplier-1);
 }
 
 .cl-page .cl-supplier-pill.is-c2 {
-    background: var(--cl-supplier-2-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c2 .cl-supplier-dot {
     background: var(--cl-supplier-2);
 }
 
 .cl-page .cl-supplier-pill.is-c3 {
-    background: var(--cl-supplier-3-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c3 .cl-supplier-dot {
     background: var(--cl-supplier-3);
 }
 
 .cl-page .cl-supplier-pill.is-c4 {
-    background: var(--cl-supplier-4-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c4 .cl-supplier-dot {
     background: var(--cl-supplier-4);
 }
 
 .cl-page .cl-supplier-pill.is-c5 {
-    background: var(--cl-supplier-5-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c5 .cl-supplier-dot {
     background: var(--cl-supplier-5);
 }
 
 .cl-page .cl-supplier-pill.is-c6 {
-    background: var(--cl-supplier-6-soft);
-}
-
-.cl-page .cl-supplier-pill.is-c6 .cl-supplier-dot {
     background: var(--cl-supplier-6);
 }
 
@@ -10618,13 +10593,15 @@ a.cl-link-button:hover {
     font-variant-numeric: tabular-nums;
 }
 
-/* Card head: the title with the two filter menus on its right */
+/* Card head: the title with the two filter menus on its right, a line under it */
 .cl-page .cl-offers-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 8px 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--cl-line);
 }
 
 .cl-page .cl-card-head-actions {
@@ -10633,22 +10610,23 @@ a.cl-link-button:hover {
     gap: 8px;
 }
 
-/* The bar: a 96 px label column and its content (proposals, order chips) */
+/* The bar: a 110 px label column and its content (proposals, order chips), closed by a line */
 .cl-page .cl-offers-bar {
     display: grid;
-    gap: 8px;
-    padding: 0 20px 12px;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--cl-line);
 }
 
 .cl-page .cl-bar-row {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 110px minmax(0, 1fr);
     align-items: start;
     gap: 8px 10px;
 }
 
 .cl-page .cl-bar-label {
-    padding-top: 8px;
+    padding-top: 9px;
     font-size: 13px;
     font-weight: 600;
     color: var(--cl-ink-2);
@@ -10658,13 +10636,13 @@ a.cl-link-button:hover {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 8px;
+    gap: 8px 10px;
 }
 
 .cl-page .cl-variant-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px 10px;
     margin: 0;
     padding: 0;
     border: 0;
@@ -10729,83 +10707,171 @@ a.cl-link-button:hover {
     cursor: help;
 }
 
-/* Order chips: the tone class (set by the script) shows one of the three icons, the count says "k z n" */
-.cl-page .cl-coverage-chip {
+/* Order chips (as on the old page): tinted by the state the script keeps on the filter button (none yet = nothing
+   covered), the number opens the order, the bar part filters the table. The tint, the icon and the bar's colour all
+   follow the state, so it never rests on colour alone. */
+.cl-page .cl-order-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    padding-left: 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+    font-size: 13.5px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-ok) {
+    background: var(--cl-ok-soft);
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-warn) {
+    border-color: var(--cl-warn-line);
+    background: var(--cl-warn-soft);
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter[aria-pressed="true"]) {
+    box-shadow: 0 0 0 2px var(--cl-accent);
 }
 
 .cl-page .cl-coverage-icon {
     display: none;
 }
 
-.cl-page .cl-coverage-chip.is-ok .cl-coverage-icon.is-ok,
-.cl-page .cl-coverage-chip.is-warn .cl-coverage-icon.is-warn,
-.cl-page .cl-coverage-chip.is-bad .cl-coverage-icon.is-bad {
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-ok) .cl-coverage-icon.is-ok,
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-warn) .cl-coverage-icon.is-warn,
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-bad) .cl-coverage-icon.is-bad {
     display: inline-flex;
 }
 
-.cl-page .cl-coverage-icon.is-ok {
-    color: var(--cl-ok);
+.cl-page .cl-order-chip-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: var(--cl-ink);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
 }
 
-.cl-page .cl-coverage-icon.is-warn {
-    color: var(--cl-warn);
+.cl-page a.cl-order-chip-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
 
-.cl-page .cl-coverage-icon.is-bad {
-    color: var(--cl-bad);
+.cl-page .cl-order-chip-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 12px 0 6px;
+    border: 0;
+    border-radius: 0 999px 999px 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
 }
 
-.cl-page .cl-coverage-count {
-    font-weight: 500;
-    color: var(--cl-ink-2);
+.cl-page .cl-order-chip-filter:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
 }
 
-.cl-page .cl-coverage-chip.is-warn .cl-coverage-count {
-    font-weight: 600;
-    color: var(--cl-warn);
+.cl-page .cl-order-chip-bar {
+    width: 52px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--cl-chip-track);
+    overflow: hidden;
+}
+
+/* the script sets the fill's width (done / total) */
+.cl-page .cl-order-chip-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 3px;
+    background: currentColor;
 }
 
 .cl-page .cl-coverage-split {
-    color: var(--cl-ink-3);
+    font-size: 12px;
+    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-offers-notice {
-    margin: 0 20px 12px;
+    margin: 12px 20px 0;
 }
 
-/* The offers table */
+/* Above the list: tick or clear the visible offers, expand and collapse all */
+.cl-page .cl-list-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 18px;
+    padding: 6px 16px 0;
+}
+
+.cl-page .cl-list-bar-end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    margin-left: auto;
+}
+
+/* The offers table: rows as separated cards, no visible header row (units sit in the cells) */
+.cl-page .cl-offers-list {
+    padding: 0 12px 8px;
+}
+
 .cl-page .cl-table.is-supplier-offers {
     table-layout: fixed;
-}
-
-.cl-page .cl-table.is-supplier-offers col.cl-col-check {
-    width: 48px;
+    border-collapse: separate;
+    border-spacing: 0 8px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-qty-s {
-    width: 56px;
+    width: 68px;
 }
 
-.cl-page .cl-table.is-supplier-offers col.cl-col-money {
-    width: 116px;
+.cl-page .cl-table.is-supplier-offers col.cl-col-price {
+    width: 124px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-profit {
     width: 112px;
 }
 
-.cl-page .cl-table.is-supplier-offers :is(td, th) {
-    padding-top: 9px;
-    padding-bottom: 9px;
+.cl-page .cl-table.is-supplier-offers col.cl-col-toggle {
+    width: 132px;
 }
 
-.cl-page .cl-table.is-supplier-offers .cl-table-check {
-    padding-left: 16px;
+.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > * {
+    padding: 12px 10px;
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    background: var(--cl-surface);
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :first-child {
+    padding-left: 18px;
+    border-left: 1px solid var(--cl-line);
+    border-radius: var(--cl-offer-radius) 0 0 var(--cl-offer-radius);
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :last-child {
+    padding-right: 10px;
+    border-right: 1px solid var(--cl-line);
+    border-radius: 0 var(--cl-offer-radius) var(--cl-offer-radius) 0;
 }
 
 .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
@@ -10818,29 +10884,37 @@ a.cl-link-button:hover {
         background: var(--cl-surface-2);
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr.is-off:not(.is-on):not(.is-covered):hover td:not(.cl-table-check),
-    .cl-page .cl-table.is-supplier-offers tbody tr.is-off:not(.is-on):not(.is-covered):hover .cl-profit {
-        color: var(--cl-ink-2);
+    .cl-page .cl-offer-toggle:not(:has(input:checked)):hover {
+        background: var(--cl-accent-soft);
+    }
+
+    .cl-page .cl-order-chip-filter:hover {
+        background: var(--cl-chip-hover);
+    }
+
+    .cl-page .cl-alt-fold-toggle:hover {
+        text-decoration: underline;
     }
 }
 
 .cl-page .cl-table.is-supplier-offers tr.is-on > * {
-    background: var(--cl-accent-faint);
+    border-color: var(--cl-offer-on-line);
+    background: var(--cl-offer-on);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-on > td.cl-table-check {
-    box-shadow: inset 4px 0 0 var(--cl-accent);
+.cl-page .cl-table.is-supplier-offers tr.is-on > :first-child {
+    box-shadow: inset 5px 0 0 var(--cl-accent);
 }
 
 .cl-page .cl-table.is-supplier-offers th.cl-table-key {
     white-space: normal;
     overflow-wrap: anywhere;
-    padding-right: 16px;
 }
 
 .cl-page .cl-offer-name {
     display: block;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 650;
     color: var(--cl-ink);
 }
 
@@ -10848,90 +10922,101 @@ a.cl-link-button:hover {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
-    margin-top: 4px;
-    font-weight: 400;
-}
-
-.cl-page .cl-offer-stock {
+    gap: 4px 10px;
+    margin-top: 6px;
     font-size: 12.5px;
-    color: var(--cl-ink-3);
+    font-weight: 400;
+    color: var(--cl-ink-2);
 }
 
+/* the secondary texts sit on white and on the tinted rows: --cl-ink-3 falls under 4.5:1 on the tint, --cl-ink-2 does not */
+.cl-page .cl-offer-stock,
 .cl-page .cl-offer-codes {
-    display: block;
-    margin-top: 3px;
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--cl-ink-3);
+    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-order-refs {
-    display: inline-flex;
+    display: flex;
     flex-wrap: wrap;
-    gap: 4px 6px;
+    gap: 4px 14px;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
 }
 
 .cl-page .cl-order-ref {
     display: inline-flex;
     align-items: baseline;
-    gap: 6px;
-    padding: 1px 8px;
-    border: 1px solid var(--cl-line);
-    border-radius: 999px;
-    background: var(--cl-surface);
-    font-size: 13px;
+    gap: 4px;
+    color: var(--cl-ink-2);
     white-space: nowrap;
 }
 
 .cl-page .cl-order-ref a {
     font-weight: 600;
-}
-
-.cl-page .cl-order-ref-qty,
-.cl-page .cl-order-ref-price {
-    color: var(--cl-ink-2);
-    font-variant-numeric: tabular-nums;
+    color: var(--cl-accent-ink);
 }
 
 /* an item a cheaper ticked offer takes: the reference stays, dashed, its price struck through */
 .cl-page .cl-order-ref.is-lost {
-    border-style: dashed;
+    padding: 0 6px;
+    border: 1px dashed var(--cl-ink-3);
+    border-radius: 999px;
 }
 
 .cl-page .cl-order-ref.is-lost .cl-order-ref-price {
     text-decoration: line-through;
 }
 
-.cl-page .cl-table.is-supplier-offers .cl-price-main {
-    display: block;
+.cl-page .cl-table.is-supplier-offers td.is-numeric {
+    font-size: 15px;
     font-weight: 600;
 }
 
-.cl-page .cl-table.is-supplier-offers .cl-cell-qty {
-    font-weight: 600;
+.cl-page .cl-table.is-supplier-offers .cl-price-main {
+    display: block;
+}
+
+.cl-page .cl-unit {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-supplier-offers .cl-table-sub {
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-profit {
-    display: block;
-    font-weight: 600;
+    display: inline-block;
+    font-weight: 650;
     font-variant-numeric: tabular-nums;
 }
 
+/* profit as a tinted pill, in the table and the summary; the loss carries an icon too, not only the colour */
+.cl-page .cl-profit:is(.is-ok, .is-bad) {
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
 .cl-page .cl-profit.is-ok {
+    background: var(--cl-ok-soft);
     color: var(--cl-ok);
 }
 
 .cl-page .cl-profit.is-bad {
+    background: var(--cl-bad-soft);
     color: var(--cl-bad);
 }
 
 .cl-page .cl-profit.is-unknown {
-    display: inline-block;
-    color: var(--cl-ink-3);
+    color: var(--cl-ink-2);
 }
 
-/* a loss changes the glyph too, not only the colour */
 .cl-page .cl-loss-icon {
     display: none;
     margin-right: 4px;
@@ -10941,41 +11026,107 @@ a.cl-link-button:hover {
     display: inline;
 }
 
-/* unticked: the name stays readable, the numbers step back */
-.cl-page .cl-table.is-supplier-offers tr.is-off .cl-offer-name {
+/* unticked: the numbers step back, the name and the solid pill stay readable */
+.cl-page .cl-table.is-supplier-offers tr.is-off td.is-numeric {
     font-weight: 500;
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-off td:not(.cl-table-check),
-.cl-page .cl-table.is-supplier-offers tr.is-off .cl-profit {
-    color: var(--cl-ink-3);
+/* The toggle: a label around the offer's checkbox. The checkbox stays focusable and keeps the state; the label shows
+   one of four texts — "Zamów" / "✓ Zamawiam" and, for an offer covered cheaper, "Zamów tę" / "✓ Zaznaczona". */
+.cl-page .cl-offer-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 8px;
+    border: 1px solid var(--cl-accent);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--cl-accent-ink);
+    white-space: nowrap;
+    cursor: pointer;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-off :is(.cl-price-main, .cl-cell-qty) {
-    font-weight: 500;
+.cl-page .cl-offer-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-off .cl-supplier-pill {
-    opacity: .75;
+.cl-page .cl-offer-toggle:has(input:checked) {
+    background: var(--cl-accent);
+    color: #fff;
 }
 
-/* covered cheaper: one line under its winner (name, supplier, why), the codes and numbers fold away */
+.cl-page .cl-offer-toggle:has(input:focus-visible) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-offer-toggle > span {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.cl-page .cl-offer-toggle .cl-offer-toggle-off,
+.cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-on,
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-alt,
+.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) .cl-offer-toggle-kept {
+    display: inline-flex;
+}
+
+.cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-off,
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-off,
+.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) :is(.cl-offer-toggle-on, .cl-offer-toggle-alt) {
+    display: none;
+}
+
+/* ticked but beaten: it orders nothing, so it must not look like the winner's filled button */
+.cl-page tr.is-covered .cl-offer-toggle {
+    min-height: 32px;
+    font-size: 13px;
+}
+
+.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) {
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+}
+
+/* Covered cheaper: one compact line nested under its winner — a connector, the supplier, how much dearer (or why
+   nothing is ordered), the net price and the toggle; name, codes, orders and the other numbers fold away. */
 .cl-page .cl-table.is-supplier-offers tr.is-covered > * {
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     background: var(--cl-surface-2);
 }
 
 .cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key {
-    padding-left: 28px;
+    position: relative;
+    padding-left: 46px;
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key::before {
+    content: "";
+    position: absolute;
+    left: 22px;
+    top: -10px;
+    width: 12px;
+    height: calc(50% + 10px);
+    border-left: 2px solid var(--cl-alt-connector);
+    border-bottom: 2px solid var(--cl-alt-connector);
+    border-bottom-left-radius: 6px;
 }
 
 /* the winner row above carries the name; here it stays for screen readers only (same technique as .cl-visually-hidden) */
-.cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key {
-    position: relative;
-}
-
 .cl-page .cl-table.is-supplier-offers tr.is-covered .cl-offer-name {
     position: absolute;
     width: 1px;
@@ -10989,43 +11140,82 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-table.is-supplier-offers tr.is-covered .cl-offer-line {
-    display: inline-flex;
     margin: 0;
+    font-size: 13.5px;
 }
 
 .cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes, .cl-cell-price .cl-table-sub, .cl-cell-qty > *, .cl-cell-profit > *) {
     display: none;
 }
 
-.cl-page .cl-offer-covered {
-    display: block;
-    margin-top: 2px;
-    font-size: 13px;
-    font-weight: 400;
+.cl-page .cl-table.is-supplier-offers tr.is-covered td.is-numeric {
+    font-size: 13.5px;
+    font-weight: 500;
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered .cl-offer-covered {
-    display: inline;
-    margin-left: 8px;
+.cl-page .cl-offer-covered {
+    color: var(--cl-ink-2);
 }
 
-/* Category rows */
-.cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
-    padding-top: 8px;
-    padding-bottom: 6px;
+.cl-page .cl-offer-dearer {
+    font-weight: 600;
+    color: var(--cl-bad);
 }
 
-.cl-page .cl-group-toggle {
+/* The fold under a winner with dearer offers ("▸ Droższe oferty: n · od +x zł/szt."), written by the script */
+.cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
+    padding: 0 10px 0 46px;
+    border: 0;
+    background: none;
+}
+
+.cl-page .cl-alt-fold-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-height: 28px;
     padding: 0;
     border: 0;
     background: none;
     font: inherit;
-    font-weight: 650;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+.cl-page .cl-alt-fold-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-alt-fold-toggle :is(i, svg) {
+    font-size: 11px;
+    transition: transform .15s ease;
+}
+
+.cl-page .cl-alt-fold-toggle[aria-expanded="false"] :is(i, svg) {
+    transform: rotate(-90deg);
+}
+
+/* Category headings: larger than the rows, with the chevron toggle and "ofert: n · zamawiane: k" */
+.cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
+    padding: 14px 4px 0;
+    border: 0;
+    background: none;
+}
+
+.cl-page .cl-group-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
     color: var(--cl-ink);
     cursor: pointer;
 }
@@ -11035,10 +11225,17 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+.cl-page .cl-table.is-supplier-offers .cl-group-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cl-ink);
+}
+
 .cl-page .cl-group-toggle i,
 .cl-page .cl-group-toggle svg {
-    font-size: 12px;
-    color: var(--cl-ink-3);
+    width: 14px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
     transition: transform .15s ease;
 }
 
@@ -11049,19 +11246,24 @@ a.cl-link-button:hover {
 .cl-page .cl-group-count {
     margin-left: 10px;
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 600;
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-table tr.cl-table-group.is-warn > th {
-    background: var(--cl-warn-soft);
-    color: var(--cl-warn);
+.cl-page .cl-group-count strong {
+    font-weight: 600;
+    color: var(--cl-ok);
 }
 
-.cl-page .cl-table tr.cl-table-group.is-warn .cl-group-name {
-    margin-left: 8px;
-    font-weight: 650;
+.cl-page .cl-group-chosen {
+    font-size: 13px;
+    font-weight: 600;
     color: var(--cl-ink);
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-missing > * {
+    border-color: var(--cl-missing-line);
+    background: var(--cl-warn-soft);
 }
 
 /* Summary: amounts per supplier, earlier steps greyed */
@@ -11127,9 +11329,6 @@ a.cl-link-button:hover {
     font-size: 14px;
 }
 
-.cl-page .cl-summary-peek .cl-profit {
-    display: inline;
-}
 
 .cl-page .cl-summary-peek .cl-button {
     margin-left: auto;
@@ -11142,16 +11341,28 @@ a.cl-link-button:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .cl-page .cl-group-toggle :is(i, svg) {
+    .cl-page :is(.cl-group-toggle, .cl-alt-fold-toggle) :is(i, svg) {
         transition: none;
     }
 }
 
-/* Phone: every offer is a card — the checkbox beside, the offer across, then Szt. / Cena / Zysk with their labels.
-   Every cell has an explicit place; nothing is reordered. */
+/* Below 1024 px every control is a 44 px touch target */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-offer-toggle,
+    .cl-page tr.is-covered .cl-offer-toggle,
+    .cl-page .cl-order-chip-link,
+    .cl-page .cl-order-chip-filter,
+    .cl-page .cl-group-toggle,
+    .cl-page .cl-alt-fold-toggle {
+        min-height: 44px;
+    }
+}
+
+/* Phone: every offer is a card — the offer across, then the pieces, price and profit side by side, then the toggle
+   across the bottom. Every cell has an explicit place; nothing is reordered. */
 @media screen and (max-width: 719px) {
     .cl-page .cl-offers-bar {
-        padding: 0 16px 12px;
+        padding: 16px;
     }
 
     .cl-page .cl-bar-row {
@@ -11163,54 +11374,72 @@ a.cl-link-button:hover {
         padding-top: 0;
     }
 
+    .cl-page .cl-list-bar {
+        padding: 6px 12px 0;
+    }
+
+    .cl-page .cl-offers-list {
+        padding: 0 12px 12px;
+    }
+
     .cl-page .cl-table.is-supplier-offers {
         table-layout: auto;
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer],
-    .cl-page .cl-table.is-supplier-offers tbody tr.is-missing {
-        display: grid;
-        grid-template-columns: 40px repeat(3, minmax(0, 1fr));
-        column-gap: 10px;
-        row-gap: 6px;
-        padding: 10px 16px 10px 4px;
+    .cl-page .cl-table.is-supplier-offers tbody tr.cl-table-group {
+        padding: 0;
+        border-top: 0;
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > *,
-    .cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {
+    .cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
+        display: block;
+        padding: 14px 4px 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: 12px;
+        row-gap: 10px;
+        margin-top: 8px;
+        padding: 12px 14px;
+        border: 1px solid var(--cl-line);
+        border-radius: var(--cl-offer-radius);
+        background: var(--cl-surface);
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > *,
+    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :is(:first-child, :last-child) {
         display: block;
         padding: 0;
+        border: 0;
+        border-radius: 0;
         background: none;
+        box-shadow: none;
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :is(td.cl-table-check, th.cl-table-key)::before,
-    .cl-page .cl-table.is-supplier-offers tbody tr.is-missing > *::before {
+    .cl-page .cl-table.is-supplier-offers tbody tr > *::before {
         content: none;
     }
 
     .cl-page .cl-table.is-supplier-offers tr.is-on {
-        background: var(--cl-accent-faint);
-        box-shadow: inset 4px 0 0 var(--cl-accent);
-    }
-
-    .cl-page .cl-table.is-supplier-offers tr.is-on > td.cl-table-check {
-        box-shadow: none;
+        border-color: var(--cl-offer-on-line);
+        background: var(--cl-offer-on);
+        box-shadow: inset 5px 0 0 var(--cl-accent);
     }
 
     .cl-page .cl-table.is-supplier-offers tr.is-covered {
         background: var(--cl-surface-2);
     }
 
-    .cl-page .cl-table.is-supplier-offers td.cl-table-check {
-        grid-column: 1;
-        grid-row: 1 / span 2;
-        padding-left: 8px;
+    .cl-page .cl-table.is-supplier-offers tr.is-missing {
+        border-color: var(--cl-missing-line);
+        background: var(--cl-warn-soft);
     }
 
     .cl-page .cl-table.is-supplier-offers th.cl-table-key {
-        grid-column: 2 / -1;
+        grid-column: 1 / -1;
         grid-row: 1;
-        padding-right: 0;
     }
 
     .cl-page .cl-table.is-supplier-offers tr.is-covered th.cl-table-key {
@@ -11218,42 +11447,46 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-table.is-supplier-offers td.cl-cell-qty {
-        grid-column: 2;
+        grid-column: 1;
         grid-row: 2;
         text-align: left;
         white-space: normal;
     }
 
     .cl-page .cl-table.is-supplier-offers td.cl-cell-price {
-        grid-column: 3;
+        grid-column: 2;
         grid-row: 2;
         text-align: left;
         white-space: normal;
     }
 
     .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
-        grid-column: 4;
+        grid-column: 3;
         grid-row: 2;
         text-align: left;
         white-space: normal;
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before {
-        content: attr(data-label);
-        display: block;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: .06em;
-        text-transform: uppercase;
-        color: var(--cl-ink-2);
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-toggle {
+        grid-column: 1 / -1;
+        grid-row: 3;
     }
 
     .cl-page .cl-table.is-supplier-offers tr.is-covered :is(td.cl-cell-qty, td.cl-cell-profit) {
         display: none;
     }
 
-    .cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
+    .cl-page .cl-table.is-supplier-offers tr.is-covered td.cl-cell-price {
+        grid-column: 1 / -1;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr.cl-alt-fold {
+        padding: 4px 4px 0;
+        border-top: 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
         display: block;
-        padding: 8px 16px;
+        padding: 0;
     }
 }
