@@ -24,7 +24,7 @@ class StockLedgerClosingsTest {
     private static final String BUCKET = "stores";
     private static final String STORE_ID = "store-1";
     private static final StockLedgerPeriod SEPTEMBER = new StockLedgerPeriod(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
-    private static final String SEPTEMBER_KEY = "store-1/stock-ledger/2026-09-01_2026-09-30.csv";
+    private static final String SEPTEMBER_KEY = "store-1/reports/stock-ledger/2026-09-01_2026-09-30.csv";
 
     @Mock
     private FileStorage fileStorage;
@@ -39,12 +39,12 @@ class StockLedgerClosingsTest {
     @Test
     void closedPeriodsAreThePeriodFilesOfTheStoreByTheirEnd() {
         // given
-        when(fileStorage.findAllKeysByKeyOrder(BUCKET, "store-1/stock-ledger/")).thenReturn(List.of(
-                "store-1/stock-ledger/2026-09-01_2026-09-30.csv",
-                "store-1/stock-ledger/2026-08-01_2026-08-15.csv",
-                "store-1/stock-ledger/2026-08-31_2026-08-01.csv",
-                "store-1/stock-ledger/2026-09.csv",
-                "store-1/stock-ledger/notes.txt"));
+        when(fileStorage.findAllKeysByKeyOrder(BUCKET, "store-1/reports/stock-ledger/")).thenReturn(List.of(
+                "store-1/reports/stock-ledger/2026-09-01_2026-09-30.csv",
+                "store-1/reports/stock-ledger/2026-08-01_2026-08-15.csv",
+                "store-1/reports/stock-ledger/2026-08-31_2026-08-01.csv",
+                "store-1/reports/stock-ledger/2026-09.csv",
+                "store-1/reports/stock-ledger/notes.txt"));
 
         // when
         List<StockLedgerPeriod> closed = closings.closedPeriods(STORE_ID);
