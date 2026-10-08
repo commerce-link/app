@@ -11165,8 +11165,8 @@ a.cl-link-button:hover {
         background: none;
     }
 
-    .cl-page .cl-table.is-offers tbody tr[data-cl-offer] > ::before,
-    .cl-page .cl-table.is-offers tbody tr.is-missing > ::before {
+    .cl-page .cl-table.is-offers tbody tr[data-cl-offer] > :is(td.cl-table-check, th.cl-table-key)::before,
+    .cl-page .cl-table.is-offers tbody tr.is-missing > *::before {
         content: none;
     }
 
@@ -11220,7 +11220,7 @@ a.cl-link-button:hover {
         white-space: normal;
     }
 
-    .cl-page .cl-table.is-offers :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before {
+    .cl-page .cl-table.is-offers tbody tr[data-cl-offer] > :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before {
         content: attr(data-label);
         display: block;
         font-size: 11px;

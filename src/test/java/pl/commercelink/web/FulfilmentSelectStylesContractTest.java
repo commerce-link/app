@@ -86,4 +86,16 @@ class FulfilmentSelectStylesContractTest {
         assertThat(css.replaceAll("\\(max-width: (719|1023|1215|1365)px\\)|\\(min-width: (720|1024|1216|1366)px\\)", ""))
                 .doesNotContainPattern("\\((max|min)-width:");
     }
+
+    @Test
+    void theCardLabelsSurviveTheResetOfTheBaseLabels() throws Exception {
+        // given
+        String css = section();
+        String block = css.substring(css.indexOf("@media screen and (max-width: 719px)"));
+
+        // when / then
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-offers tbody tr[data-cl-offer] > :is(td.cl-cell-qty, td.cl-cell-price, td.cl-cell-profit)::before"))
+                .contains("content: attr(data-label);");
+        assertThat(block).doesNotContain("tr[data-cl-offer] > ::before");
+    }
 }
