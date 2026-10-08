@@ -101,8 +101,84 @@
                    th:href="@{'/dashboard/reports/paymentsExport?dateFrom=' + ${dateFrom} + '&dateTo=' + ${dateTo}}"
                    th:text="#{reports.payments.export}"></a>
             </div>
+
+            <div class="box mt-5" id="stock-ledger-closing" th:with="closing=${ledgerClosing}">
+                <h3 class="mb-2" th:text="#{reports.stockLedger.closing.title}"></h3>
+                <p class="mb-4" th:text="#{reports.stockLedger.closing.intro}"></p>
+
+                <div th:if="${ledgerOutdated != null}" class="notification is-warning is-light" th:text="${ledgerOutdated}"></div>
+
+                <div th:if="${ledgerWarning != null}" class="notification is-warning is-light">
+                    <p class="mb-3" th:text="#{reports.stockLedger.closing.blockers}"></p>
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-narrow">
+                            <thead>
+                            <tr>
+                                <th th:text="#{reports.stockLedger.closing.delivery}"></th>
+                                <th th:text="#{reports.stockLedger.closing.supplier}"></th>
+                                <th th:text="#{reports.stockLedger.closing.supplierOrder}"></th>
+                                <th th:text="#{reports.stockLedger.closing.received}"></th>
+                                <th th:text="#{reports.stockLedger.closing.missing}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="blocker : ${ledgerWarning.deliveries()}">
+                                <td><a th:href="@{/dashboard/deliveries/details(deliveryId=${blocker.deliveryId()})}"
+                                       th:text="${blocker.number()}"></a></td>
+                                <td th:text="${blocker.supplier()}"></td>
+                                <td th:text="${blocker.supplierOrder()}"></td>
+                                <td th:text="${blocker.receivedOn()}"></td>
+                                <td th:text="#{${blocker.missingKey()}}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <form method="post" th:action="@{/dashboard/reports/stock-ledger/close}">
+                    <div class="field is-grouped is-flex-wrap-wrap">
+                        <div class="control">
+                            <label class="label" th:text="#{reports.from}"></label>
+                            <input type="date" class="input" name="dateFrom" th:value="${closing.dateFrom()}" required>
+                        </div>
+                        <div class="control">
+                            <label class="label" th:text="#{reports.to}"></label>
+                            <input type="date" class="input" name="dateTo" th:value="${closing.dateTo()}" required>
+                        </div>
+                        <div class="control is-align-self-flex-end">
+                            <button class="button is-link" type="submit" th:text="#{reports.stockLedger.closing.close}"></button>
+                        </div>
+                    </div>
+                </form>
+
+                <table class="table is-fullwidth mt-4" th:unless="${closing.closedPeriods().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th th:text="#{reports.stockLedger.closing.closedPeriods}"></th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="closed : ${closing.closedPeriods()}">
+                        <td th:text="${closed.label()}"></td>
+                        <td class="has-text-right">
+                            <a class="button is-small is-link"
+                               th:href="@{/dashboard/reports/stock-ledger/closed(dateFrom=${closed.from()},dateTo=${closed.to()})}"
+                               th:text="#{reports.stockLedger.closing.download}"></a>
+                            <form class="is-inline-block" method="post" th:action="@{/dashboard/reports/stock-ledger/close}">
+                                <input type="hidden" name="dateFrom" th:value="${closed.from()}">
+                                <input type="hidden" name="dateTo" th:value="${closed.to()}">
+                                <button class="button is-small" type="submit"
+                                        th:text="#{reports.stockLedger.closing.regenerate}"></button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
+
 
     <script th:inline="javascript">
         const reportOwn = {
