@@ -38,6 +38,8 @@
             <p class="cl-page-lead" th:text="#{fulfilment.queue.lead}"></p>
         </header>
 
+        <div th:replace="~{orders/parts :: notice}"></div>
+
         <div th:replace="~{fragments/screen-intro :: panel('fulfilment', 'fas fa-magic')}"></div>
 
         <section class="cl-card" th:unless="${page.hasGroup()}" aria-labelledby="queue-empty-title">
@@ -70,6 +72,8 @@
                The first submit button is the default strategy, so Enter in the form picks it. */-->
         <form th:if="${page.hasGroup()}" method="post" th:action="@{${page.postAction()}}" class="cl-layout-aside"
               data-cl-queue data-cl-submit-once>
+            <input type="hidden" name="skippedOrderIds" th:each="id : ${page.skippedOrderIds()}" th:value="${id}">
+            <input type="hidden" name="skippedGroups" th:value="${page.skippedGroups()}">
             <div class="cl-layout-main">
                 <section class="cl-card cl-queue-card" aria-labelledby="queue-group-title">
                     <div class="cl-card-head">

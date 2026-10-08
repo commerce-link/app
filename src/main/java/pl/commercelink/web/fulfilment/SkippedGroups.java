@@ -75,10 +75,11 @@ public record SkippedGroups(List<String> orderIds, List<Integer> sizes) {
         }
         int keep = orderIds.size() - sizes.get(sizes.size() - 1);
         SkippedGroups previous = new SkippedGroups(orderIds.subList(0, keep), sizes.subList(0, sizes.size() - 1));
-        return previous.href();
+        return previous.queueHref();
     }
 
-    private String href() {
+    /** The queue with exactly these groups skipped; the bare path when none are. The selection page returns here. */
+    public String queueHref() {
         if (orderIds.isEmpty()) {
             return PATH;
         }

@@ -7,10 +7,13 @@ import java.util.List;
  * supplier, what was skipped to get here, and where the form goes. skipOrderIds feeds "Pomiń grupę" (the skipped orders
  * plus this group, with skipGroups the size of each group), so the next GET leaves them all out;
  * backHref is the queue before the last skip and canRestart offers the oldest group once more than one group was skipped.
+ * skippedOrderIds and skippedGroups are the skip state before this group: the selection page carries them, so saving
+ * there returns to the same queue instead of its start.
  */
 public record FulfilmentQueuePage(GroupKind kind, String storeName, List<FulfilmentQueueRow> rows, int skippedCount,
                                   List<String> skipOrderIds, String skipGroups, String backHref, boolean canRestart,
-                                  String postAction, int itemsTotal, EmptyState emptyState, boolean superAdmin) {
+                                  String postAction, int itemsTotal, EmptyState emptyState, boolean superAdmin,
+                                  List<String> skippedOrderIds, String skippedGroups) {
 
     public boolean hasGroup() {
         return !rows.isEmpty();

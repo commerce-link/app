@@ -177,4 +177,20 @@ class FulfilmentQueuePageFactoryTest {
         assertThat(row.itemsToOrder()).isZero();
         assertThat(row.dueText()).isNotBlank();
     }
+
+    @Test
+    void theGroupPageCarriesTheSkipStateBeforeThisGroupForTheSelectionPage() {
+        // given
+        Order order = order("o-1", FulfilmentType.DirectToConsumer, LocalDateTime.of(2026, 10, 2, 9, 14));
+        SkippedGroups skipped = SkippedGroups.from(List.of("w1", "w2"), "2");
+
+        // when
+        FulfilmentQueuePage page = factory.build(false, skipped, List.of(OrderIndexEntry.fromOrder(order)),
+                Map.of("o-1", order), Map.of("o-1", 1), TODAY, PL);
+
+        // then
+        assertThat(page.skippedOrderIds()).containsExactly("w1", "w2");
+        assertThat(page.skippedGroups()).isEqualTo("2");
+        assertThat(page.skipOrderIds()).containsExactly("w1", "w2", "o-1");
+    }
 }

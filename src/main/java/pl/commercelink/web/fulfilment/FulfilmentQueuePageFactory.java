@@ -37,7 +37,8 @@ public class FulfilmentQueuePageFactory {
             FulfilmentQueuePage.EmptyState empty = skipped.count() == 0
                     ? FulfilmentQueuePage.EmptyState.NONE_WAITING : FulfilmentQueuePage.EmptyState.ALL_SKIPPED;
             return new FulfilmentQueuePage(null, null, List.of(), skipped.orderCount(), skipped.orderIds(),
-                    skipped.sizesParam(), skipped.backHref(), canRestart, null, 0, empty, superAdmin);
+                    skipped.sizesParam(), skipped.backHref(), canRestart, null, 0, empty, superAdmin,
+                    skipped.orderIds(), skipped.sizesParam());
         }
 
         String storeId = group.get(0).getStoreId();
@@ -57,7 +58,7 @@ public class FulfilmentQueuePageFactory {
         SkippedGroups afterSkip = skipped.plus(group.stream().map(OrderIndexEntry::getOrderId).toList());
         return new FulfilmentQueuePage(kind, superAdmin ? storeName(storeId) : null, rows, skipped.orderCount(),
                 afterSkip.orderIds(), afterSkip.sizesParam(), skipped.backHref(), canRestart, postAction, itemsTotal, null,
-                superAdmin);
+                superAdmin, skipped.orderIds(), skipped.sizesParam());
     }
 
     private FulfilmentQueueRow row(OrderIndexEntry entry, Order order, int items, boolean superAdmin,

@@ -100,4 +100,25 @@ class SkippedGroupsTest {
         assertThat(skipped.orderIds()).containsExactly("a", "b");
         assertThat(skipped.sizesParam()).isEqualTo("2");
     }
+
+    @Test
+    void theQueueAddressCarriesTheWholeSkipState() {
+        // given
+        SkippedGroups skipped = SkippedGroups.from(List.of("w1", "w2", "d1"), "2,1");
+
+        // when
+        String href = skipped.queueHref();
+
+        // then
+        assertThat(href).isEqualTo("/dashboard/fulfilment/queue?orderIds=w1&orderIds=w2&orderIds=d1&skippedGroups=2,1");
+    }
+
+    @Test
+    void withNothingSkippedTheQueueAddressIsTheBarePath() {
+        // when
+        String href = SkippedGroups.from(List.of(), null).queueHref();
+
+        // then
+        assertThat(href).isEqualTo("/dashboard/fulfilment/queue");
+    }
 }

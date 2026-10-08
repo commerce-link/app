@@ -23,7 +23,8 @@ class FulfilmentQueueRenderingTest {
     private static FulfilmentQueuePage group(boolean superAdmin) {
         return new FulfilmentQueuePage(GroupKind.WAREHOUSE, superAdmin ? "Sklep Demo" : null, List.of(row("o1", 4), row("o2", 2)), 2,
                 List.of("s1", "s2", "o1", "o2"), "1,1,2", "/dashboard/fulfilment/queue?orderIds=s1&skippedGroups=1", true,
-                superAdmin ? "/dashboard/store/store-1/orders/fulfilment" : "/dashboard/orders/fulfilment", 6, null, superAdmin);
+                superAdmin ? "/dashboard/store/store-1/orders/fulfilment" : "/dashboard/orders/fulfilment", 6, null, superAdmin,
+                List.of("s1", "s2"), "1,1");
     }
 
     private static String render(FulfilmentQueuePage page) {
@@ -74,7 +75,7 @@ class FulfilmentQueueRenderingTest {
     void afterOneSkippedGroupThereIsBackButNoStartOver() {
         // given
         FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 3,
-                List.of("w1", "w2", "w3", "o1"), "3,1", "/dashboard/fulfilment/queue", false, "/dashboard/orders/fulfilment", 1, null, false);
+                List.of("w1", "w2", "w3", "o1"), "3,1", "/dashboard/fulfilment/queue", false, "/dashboard/orders/fulfilment", 1, null, false, List.of(), "");
 
         // when
         String html = render(page);
@@ -88,7 +89,7 @@ class FulfilmentQueueRenderingTest {
     void withNothingSkippedOnlySkipIsOffered() {
         // given
         FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 0, List.of("o1"),
-                "1", null, false, "/dashboard/orders/fulfilment", 1, null, false);
+                "1", null, false, "/dashboard/orders/fulfilment", 1, null, false, List.of(), "");
 
         // when
         String html = render(page);
@@ -121,7 +122,7 @@ class FulfilmentQueueRenderingTest {
     @Test
     void anEmptyQueueShowsNoGroupNoSkipAndNoSidePanel() {
         // given
-        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 0, List.of(), "", null, false, null, 0, EmptyState.NONE_WAITING, false);
+        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 0, List.of(), "", null, false, null, 0, EmptyState.NONE_WAITING, false, List.of(), "");
 
         // when
         String html = render(page);
@@ -135,7 +136,7 @@ class FulfilmentQueueRenderingTest {
     @Test
     void everythingSkippedOffersToRestore() {
         // given
-        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 7, List.of("a"), "6,1", "/dashboard/fulfilment/queue?orderIds=a&skippedGroups=6", true, null, 0, EmptyState.ALL_SKIPPED, false);
+        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 7, List.of("a"), "6,1", "/dashboard/fulfilment/queue?orderIds=a&skippedGroups=6", true, null, 0, EmptyState.ALL_SKIPPED, false, List.of(), "");
 
         // when
         String html = render(page);
@@ -160,5 +161,40 @@ class FulfilmentQueueRenderingTest {
         assertThat(html).contains("<th scope=\"col\" class=\"is-secondary-column\">Złożone</th>")
                 .contains("<td class=\"is-secondary-column\">")
                 .contains("class=\"cl-card cl-queue-card\"");
+    }
+
+    @Test
+    void theFormSendsTheSkipStateSoTheSelectionPageCanReturnToTheSameQueue() {
+        // when
+        String html = render(group(false));
+
+        // then
+        String form = html.substring(html.indexOf("data-cl-queue"));
+        assertThat(form).contains("name=\"skippedOrderIds\" value=\"s1\"").contains("name=\"skippedOrderIds\" value=\"s2\"")
+                .contains("name=\"skippedGroups\" value=\"1,1\"");
+    }
+
+    @Test
+    void theOutcomeOfTheLastSelectionIsShownAboveTheGroup() {
+        // given
+        Map<String, Object> model = Map.of("page", group(false),
+                "orderNotice", new pl.commercelink.web.orders.OrderNotice("is-ok", "Zapisano dobór", "/dashboard/deliveries/preview", "Oczekujące dostawy ›"));
+
+        // when
+        String html = SettingsTemplateRenderer.render("fulfilment-queue", model);
+
+        // then
+        assertThat(html).contains("cl-alert is-ok").contains("Zapisano dobór")
+                .contains("href=\"/dashboard/deliveries/preview\"");
+        assertThat(html.indexOf("Zapisano dobór")).isLessThan(html.indexOf("queue-group-title"));
+    }
+
+    @Test
+    void theGuideNoLongerPromisesDeliveriesOnTheNextScreen() {
+        // when
+        String html = render(group(false));
+
+        // then
+        assertThat(html).doesNotContain("dostawy utworzą się").contains("Oczekujących dostaw");
     }
 }
