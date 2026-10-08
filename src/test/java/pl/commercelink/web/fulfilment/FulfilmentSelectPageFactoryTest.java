@@ -333,4 +333,35 @@ class FulfilmentSelectPageFactoryTest {
         // then
         assertThat(page.emptyState()).isEqualTo(FulfilmentSelectPage.EmptyState.RESTOCK_EMPTY);
     }
+
+    @Test
+    void oneWarehouseOrderInOrderByOrderModeStillNamesTheOrder() {
+        // given
+        order("o2", FulfilmentType.WarehouseFulfilment, "Jan", "Kraków");
+        FulfilmentForm form = form(List.of("o2", "o3"), offer("Elko-k1", "CPU", 100, true, "o2:i1:200"));
+        form.setOrderByOrder(true);
+        form.setOrderCountAtStart(2);
+
+        // when
+        FulfilmentSelectPage page = factory.forOrders(form, "store-1", false, labels, TODAY, PL);
+
+        // then
+        assertThat(page.kind()).isEqualTo(FulfilmentSelectPage.Kind.WAREHOUSE);
+        assertThat(page.context()).startsWith("Zamówienie ").contains("Jan").endsWith("pozycje do zamówienia: 1");
+        assertThat(page.orders()).hasSize(1);
+        assertThat(page.orders().get(0).href()).isEqualTo("/dashboard/orders/o2");
+    }
+
+    @Test
+    void aSingleOrderWithoutARecordIsMixedNotDropship() {
+        // given
+        FulfilmentForm form = form(List.of("gone"), offer("AB-k2", "Monitor", 800, false, "gone:i1:1149"));
+
+        // when
+        FulfilmentSelectPage page = factory.forOrders(form, "store-1", false, labels, TODAY, PL);
+
+        // then
+        assertThat(page.kind()).isEqualTo(FulfilmentSelectPage.Kind.MIXED);
+        assertThat(page.context()).startsWith("Zamówienie ").doesNotContain("Robert");
+    }
 }

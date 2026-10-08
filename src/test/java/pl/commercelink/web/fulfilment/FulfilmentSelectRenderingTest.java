@@ -235,4 +235,22 @@ class FulfilmentSelectRenderingTest {
         // then
         assertThat(html).contains("<noscript>").contains("Ten ekran wymaga włączonego JavaScriptu.");
     }
+
+    @Test
+    void theHeaderLinksTheOrderOnlyWhenThePageHasExactlyOne() {
+        // given
+        warehouseOrder("o1");
+        FulfilmentForm single = form(List.of("o1", "o2"), offer("Elko-k1", "CPU", 100, true, "o1:i1:200"));
+        single.setOrderByOrder(true);
+        single.setOrderCountAtStart(2);
+        FulfilmentForm several = warehouseGroup();
+
+        // when
+        String one = render(single, factory.forOrders(single, "store-1", false, labels, TODAY, PL));
+        String many = render(several, factory.forOrders(several, "store-1", false, labels, TODAY, PL));
+
+        // then
+        assertThat(one).contains("href=\"/dashboard/orders/o1\"").contains("Otwórz zamówienie ").contains("rel=\"noopener\"");
+        assertThat(content(many)).doesNotContain("Otwórz zamówienie");
+    }
 }

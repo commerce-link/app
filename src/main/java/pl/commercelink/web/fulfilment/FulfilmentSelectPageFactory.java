@@ -119,21 +119,22 @@ public class FulfilmentSelectPageFactory {
         if (allWarehouse) {
             return Kind.WAREHOUSE;
         }
-        return stepOrders.stream().distinct().count() == 1 ? Kind.DROPSHIP : Kind.MIXED;
+        // A single order we cannot read is not known to be dropship either.
+        return stepOrders.stream().distinct().count() == 1 && !orders.isEmpty() ? Kind.DROPSHIP : Kind.MIXED;
     }
 
     private String context(Kind kind, List<OrderRef> refs, Map<String, Order> orders, OrderRowMapper mapper, LocalDate today,
                            int itemsTotal, Locale locale) {
-        if (kind == Kind.WAREHOUSE) {
-            return text("fulfilment.select.context.warehouse", locale, refs.size(), itemsTotal);
-        }
-        if (kind == Kind.DROPSHIP && !refs.isEmpty()) {
+        if (refs.size() == 1) {
             OrderRef ref = refs.get(0);
             Order order = orders.get(ref.orderId());
             String client = order == null ? "" : client(mapper.map(order, today));
             return client.isEmpty()
                     ? text("fulfilment.select.context.single.noClient", locale, ref.number(), itemsTotal)
                     : text("fulfilment.select.context.single", locale, ref.number(), client, itemsTotal);
+        }
+        if (kind == Kind.WAREHOUSE) {
+            return text("fulfilment.select.context.warehouse", locale, refs.size(), itemsTotal);
         }
         return text("fulfilment.select.context.orders", locale, refs.size(), itemsTotal);
     }
