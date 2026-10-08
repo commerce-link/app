@@ -76,7 +76,7 @@ class InvoiceSyncPreviewTemplateTest {
 
         // then
         assertThat(html).contains("Koszty produktów z faktury: 2 z 3").contains("Bez przypisania, bez zmian: 1")
-                .contains("Koszt dostawy: 35,00 PLN")
+                .contains("Koszt dostawy: 35,00 PLN</strong><span class=\"cl-effects-was\" data-cl-effect-sub>bez zmian</span>")
                 .contains("Płatność: dodamy przelew na kwotę brutto dostawy")
                 .contains("Termin płatności: 22.10.2026").contains("dni od zamówienia: 16").contains("teraz: brak")
                 .contains("Kontrahent: ABSA").contains("teraz: AB")

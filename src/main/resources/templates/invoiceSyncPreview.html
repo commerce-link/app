@@ -258,11 +258,13 @@
         </tr>
 
         <li th:fragment="extraEffect(kind, icon, key, cost, selected)" th:with="o=${p.option(selected)}"
-            th:attr="data-cl-effect-extra=${kind}, data-template=#{${key}('{0}')}, data-template-now=#{invoiceSync.effect.now('{0}')},
-                     data-current=${p.money(cost)}" th:hidden="${o == null}">
+            th:attr="data-cl-effect-extra=${kind}, data-template=#{${key}('{0}')}, data-cost=${cost},
+                     data-now=#{invoiceSync.effect.now(${p.money(cost)})}, data-unchanged=#{invoiceSync.effect.unchanged}"
+            th:hidden="${o == null}">
             <i class="fas" th:classappend="${icon}" aria-hidden="true"></i>
             <span><strong data-cl-effect-text th:text="${o == null} ? '' : #{${key}(${p.invoiceMoney(o.totalNet)})}"></strong>
-                <span class="cl-effects-was" th:text="#{invoiceSync.effect.now(${p.money(cost)})}"></span></span>
+                <span class="cl-effects-was" data-cl-effect-sub
+                      th:text="${o != null and o.totalNet - cost < 0.005 and cost - o.totalNet < 0.005} ? #{invoiceSync.effect.unchanged} : #{invoiceSync.effect.now(${p.money(cost)})}"></span></span>
         </li>
     </th:block>
 

@@ -160,6 +160,9 @@
             if (r.choice) {
                 effect.querySelector('[data-cl-effect-text]').textContent =
                     fill(effect.getAttribute('data-template'), [money(r.choice.totalNet, form.dataset.currency)]);
+                var unchanged = Math.abs(r.choice.totalNet - parseFloat(effect.getAttribute('data-cost'))) < EPS;
+                effect.querySelector('[data-cl-effect-sub]').textContent =
+                    effect.getAttribute(unchanged ? 'data-unchanged' : 'data-now');
             }
         });
     }
