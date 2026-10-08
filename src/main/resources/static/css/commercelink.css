@@ -10812,8 +10812,16 @@ a.cl-link-button:hover {
     cursor: pointer;
 }
 
-.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:hover > * {
-    background: var(--cl-surface-2);
+/* Hover only on devices that hover (touch keeps it stuck) and never over a selected or covered row, whose own state wins. */
+@media screen and (hover: hover) {
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover > * {
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr.is-off:not(.is-on):not(.is-covered):hover td:not(.cl-table-check),
+    .cl-page .cl-table.is-supplier-offers tbody tr.is-off:not(.is-on):not(.is-covered):hover .cl-profit {
+        color: var(--cl-ink-2);
+    }
 }
 
 .cl-page .cl-table.is-supplier-offers tr.is-on > * {

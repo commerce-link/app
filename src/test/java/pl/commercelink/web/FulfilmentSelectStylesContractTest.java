@@ -98,4 +98,18 @@ class FulfilmentSelectStylesContractTest {
                 .contains("content: attr(data-label);");
         assertThat(block).doesNotContain("tr[data-cl-offer] > ::before");
     }
+
+    @Test
+    void hoverOnlyPaintsRowsThatAreNeitherSelectedNorCoveredAndOnlyOnHoverDevices() throws Exception {
+        // given
+        String css = section();
+        int media = css.indexOf("@media screen and (hover: hover) {");
+
+        // when / then
+        assertThat(media).isPositive();
+        String block = css.substring(media, css.indexOf("\n}\n", media));
+        assertThat(block).contains("tr[data-cl-offer]:not(.is-on):not(.is-covered):hover > *");
+        assertThat(block).contains("tr.is-off:not(.is-on):not(.is-covered):hover td:not(.cl-table-check)").contains("color: var(--cl-ink-2);");
+        assertThat(css.replace(block, "")).doesNotContain("tr[data-cl-offer]:hover");
+    }
 }
