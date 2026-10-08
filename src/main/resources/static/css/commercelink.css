@@ -10413,6 +10413,13 @@ a.cl-link-button:hover {
     }
 }
 
+/* "Wróć" and "Zacznij od początku" side by side when every waiting order was skipped. */
+.cl-page .cl-queue-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
 /* A list of checkboxes with an optional line under the name (the queue's narrowing). */
 .cl-page .cl-check-stack {
     display: grid;

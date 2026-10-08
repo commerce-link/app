@@ -12,16 +12,22 @@
             <div class="cl-page-header-row">
                 <h1 class="cl-page-title" th:text="#{fulfilment.queue}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-                <!--/* Skipping sends the skipped orders plus this group back as orderIds: FulfilmentQueue leaves them out
-                       and picks the next group. It skips the whole group, ticked or not. The skipped orders live only in
-                       the address, so restoring is a plain link to the page without them. */-->
+                <!--/* Skipping sends the skipped orders plus this group back as orderIds, with skippedGroups the size
+                       of each skipped group: FulfilmentQueue leaves them out and picks the next group. It skips the whole
+                       group, ticked or not. The skipped orders live only in the address, so "Wróć" is the address before
+                       the last skip and "Zacznij od początku" the page without any (SkippedGroups). */-->
                 <div class="cl-page-actions" th:if="${page.hasGroup()}">
-                    <a th:if="${page.skippedCount() > 0}" class="cl-button" th:href="@{/dashboard/fulfilment/queue}">
+                    <a th:if="${page.backHref() != null}" class="cl-button" th:href="@{${page.backHref()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
+                        <span th:text="#{fulfilment.queue.back}"></span>
+                    </a>
+                    <a th:if="${page.canRestart()}" class="cl-button" th:href="@{/dashboard/fulfilment/queue}">
                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-undo-alt"></i></span>
-                        <span th:text="#{fulfilment.queue.restore.count(${page.skippedCount()})}"></span>
+                        <span th:text="#{fulfilment.queue.restart}"></span>
                     </a>
                     <form method="get" th:action="@{/dashboard/fulfilment/queue}" class="cl-page-action-form">
                         <input type="hidden" name="orderIds" th:each="id : ${page.skipOrderIds()}" th:value="${id}">
+                        <input type="hidden" name="skippedGroups" th:value="${page.skipGroups()}">
                         <button type="submit" class="cl-button">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-forward"></i></span>
                             <span th:text="#{fulfilment.queue.skip}"></span>
@@ -46,10 +52,14 @@
             </div>
             <div class="cl-list-empty" th:if="${page.allSkipped()}">
                 <span th:text="#{fulfilment.queue.empty.skipped.text(${page.skippedCount()})}"></span>
-                <div class="cl-list-empty-action">
-                    <a class="cl-button is-primary" th:href="@{/dashboard/fulfilment/queue}">
+                <div class="cl-list-empty-action cl-queue-empty-actions">
+                    <a class="cl-button is-primary" th:href="@{${page.backHref()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
+                        <span th:text="#{fulfilment.queue.back}"></span>
+                    </a>
+                    <a th:if="${page.canRestart()}" class="cl-button" th:href="@{/dashboard/fulfilment/queue}">
                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-undo-alt"></i></span>
-                        <span th:text="#{fulfilment.queue.restore}"></span>
+                        <span th:text="#{fulfilment.queue.restart}"></span>
                     </a>
                 </div>
             </div>

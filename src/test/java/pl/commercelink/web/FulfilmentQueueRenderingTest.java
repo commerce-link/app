@@ -22,7 +22,7 @@ class FulfilmentQueueRenderingTest {
 
     private static FulfilmentQueuePage group(boolean superAdmin) {
         return new FulfilmentQueuePage(GroupKind.WAREHOUSE, superAdmin ? "Sklep Demo" : null, List.of(row("o1", 4), row("o2", 2)), 2,
-                List.of("s1", "s2", "o1", "o2"),
+                List.of("s1", "s2", "o1", "o2"), "1,1,2", "/dashboard/fulfilment/queue?orderIds=s1&skippedGroups=1", true,
                 superAdmin ? "/dashboard/store/store-1/orders/fulfilment" : "/dashboard/orders/fulfilment", 6, null, superAdmin);
     }
 
@@ -56,30 +56,46 @@ class FulfilmentQueueRenderingTest {
     }
 
     @Test
-    void skippedOrdersAreRestoredFromAButtonNextToSkip() {
+    void afterTwoSkippedGroupsTheHeaderOffersBackStartOverAndSkip() {
         // when
         String html = render(group(false));
 
         // then
         String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
-        assertThat(actions).contains("href=\"/dashboard/fulfilment/queue\"").contains("Przywróć pominięte: 2")
-                .contains("fa-undo-alt").contains("<span>Pomiń</span>");
-        assertThat(actions.indexOf("Przywróć pominięte")).isLessThan(actions.indexOf("<span>Pomiń</span>"));
+        assertThat(actions).contains("href=\"/dashboard/fulfilment/queue?orderIds=s1&amp;skippedGroups=1\"")
+                .contains("<span>Wróć</span>").contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
+                .contains("name=\"skippedGroups\" value=\"1,1,2\"").contains("<span>Pomiń</span>");
+        assertThat(actions.indexOf("Wróć")).isLessThan(actions.indexOf("Zacznij od początku"));
+        assertThat(actions.indexOf("Zacznij od początku")).isLessThan(actions.indexOf("<span>Pomiń</span>"));
         assertThat(html).doesNotContain("Pominięte zamówienia: 2");
     }
 
     @Test
-    void withNothingSkippedThereIsNoRestoreButton() {
+    void afterOneSkippedGroupThereIsBackButNoStartOver() {
         // given
-        FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 0, List.of("o1"),
-                "/dashboard/orders/fulfilment", 1, null, false);
+        FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 3,
+                List.of("w1", "w2", "w3", "o1"), "3,1", "/dashboard/fulfilment/queue", false, "/dashboard/orders/fulfilment", 1, null, false);
 
         // when
         String html = render(page);
 
         // then
         String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
-        assertThat(actions).contains("<span>Pomiń</span>").doesNotContain("Przywróć").doesNotContain("fa-undo-alt");
+        assertThat(actions).contains("<span>Wróć</span>").doesNotContain("Zacznij od początku").contains("<span>Pomiń</span>");
+    }
+
+    @Test
+    void withNothingSkippedOnlySkipIsOffered() {
+        // given
+        FulfilmentQueuePage page = new FulfilmentQueuePage(GroupKind.DROPSHIP, null, List.of(row("o1", 1)), 0, List.of("o1"),
+                "1", null, false, "/dashboard/orders/fulfilment", 1, null, false);
+
+        // when
+        String html = render(page);
+
+        // then
+        String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
+        assertThat(actions).contains("<span>Pomiń</span>").doesNotContain("Wróć").doesNotContain("Zacznij od początku");
         assertThat(html).doesNotContain("??");
     }
 
@@ -89,7 +105,7 @@ class FulfilmentQueueRenderingTest {
         String html = render(group(false));
 
         // then
-        assertThat(html).contains("Pomiń i przywróć").contains("nic nie zmienia w zamówieniach");
+        assertThat(html).contains("Pomiń i wróć").contains("nic nie zmienia w zamówieniach");
     }
 
     @Test
@@ -105,7 +121,7 @@ class FulfilmentQueueRenderingTest {
     @Test
     void anEmptyQueueShowsNoGroupNoSkipAndNoSidePanel() {
         // given
-        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 0, List.of(), null, 0, EmptyState.NONE_WAITING, false);
+        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 0, List.of(), "", null, false, null, 0, EmptyState.NONE_WAITING, false);
 
         // when
         String html = render(page);
@@ -119,14 +135,15 @@ class FulfilmentQueueRenderingTest {
     @Test
     void everythingSkippedOffersToRestore() {
         // given
-        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 7, List.of("a"), null, 0, EmptyState.ALL_SKIPPED, false);
+        FulfilmentQueuePage page = new FulfilmentQueuePage(null, null, List.of(), 7, List.of("a"), "6,1", "/dashboard/fulfilment/queue?orderIds=a&skippedGroups=6", true, null, 0, EmptyState.ALL_SKIPPED, false);
 
         // when
         String html = render(page);
 
         // then
         assertThat(html).contains("Pominięte zostały wszystkie czekające zamówienia").contains("Pominięte zamówienia: 7.")
-                .contains("Przywróć pominięte").contains("href=\"/dashboard/fulfilment/queue\"")
+                .contains("<span>Wróć</span>").contains("href=\"/dashboard/fulfilment/queue?orderIds=a&amp;skippedGroups=6\"")
+                .contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
                 .doesNotContain("fa-forward").doesNotContain("??");
     }
 

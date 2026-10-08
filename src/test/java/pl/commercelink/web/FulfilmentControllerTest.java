@@ -25,6 +25,7 @@ import pl.commercelink.orders.fulfilment.ManualOrderFulfilment;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.fulfilment.FulfilmentQueuePage;
 import pl.commercelink.web.fulfilment.FulfilmentQueuePageFactory;
+import pl.commercelink.web.fulfilment.SkippedGroups;
 
 import java.util.List;
 import java.util.Locale;
@@ -89,19 +90,19 @@ class FulfilmentControllerTest {
             return List.of(OrderIndexEntry.fromOrder(order));
         });
         FulfilmentQueuePage page = mock(FulfilmentQueuePage.class);
-        when(fulfilmentQueuePageFactory.build(eq(false), eq(List.of("skipped-1")), anyList(), anyMap(), anyMap(), any(), eq(PL)))
+        when(fulfilmentQueuePageFactory.build(eq(false), eq(SkippedGroups.from(List.of("skipped-1"), "1")), anyList(), anyMap(), anyMap(), any(), eq(PL)))
                 .thenReturn(page);
         Model model = new ConcurrentModel();
 
         // when
-        String view = controller.fulfilmentQueue(List.of("skipped-1"), model, PL);
+        String view = controller.fulfilmentQueue(List.of("skipped-1"), "1", model, PL);
 
         // then
         assertThat(view).isEqualTo("fulfilment-queue");
         assertThat(model.getAttribute("page")).isSameAs(page);
         ArgumentCaptor<Map<String, Order>> orders = ArgumentCaptor.forClass(Map.class);
         ArgumentCaptor<Map<String, Integer>> items = ArgumentCaptor.forClass(Map.class);
-        verify(fulfilmentQueuePageFactory).build(anyBoolean(), anyList(), anyList(), orders.capture(), items.capture(), any(), any());
+        verify(fulfilmentQueuePageFactory).build(anyBoolean(), any(), anyList(), orders.capture(), items.capture(), any(), any());
         assertThat(orders.getValue()).containsEntry("o-1", order);
         assertThat(items.getValue()).containsEntry("o-1", 2);
     }

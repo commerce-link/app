@@ -5,11 +5,12 @@ import java.util.List;
 /**
  * The fulfilment queue page (spec docs/active/fulfilment-queue-redesign): the current group of orders waiting for a
  * supplier, what was skipped to get here, and where the form goes. skipOrderIds feeds "Pomiń grupę" (the skipped orders
- * plus this group), so the next GET leaves them all out.
+ * plus this group, with skipGroups the size of each group), so the next GET leaves them all out;
+ * backHref is the queue before the last skip and canRestart offers the oldest group once more than one group was skipped.
  */
 public record FulfilmentQueuePage(GroupKind kind, String storeName, List<FulfilmentQueueRow> rows, int skippedCount,
-                                  List<String> skipOrderIds, String postAction, int itemsTotal, EmptyState emptyState,
-                                  boolean superAdmin) {
+                                  List<String> skipOrderIds, String skipGroups, String backHref, boolean canRestart,
+                                  String postAction, int itemsTotal, EmptyState emptyState, boolean superAdmin) {
 
     public boolean hasGroup() {
         return !rows.isEmpty();

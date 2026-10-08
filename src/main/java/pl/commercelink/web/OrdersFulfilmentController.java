@@ -12,6 +12,7 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.*;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.web.fulfilment.FulfilmentQueuePageFactory;
+import pl.commercelink.web.fulfilment.SkippedGroups;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -44,8 +45,11 @@ class FulfilmentController extends BaseController {
 
     @GetMapping("/dashboard/fulfilment/queue")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    public String fulfilmentQueue(@RequestParam(value = "orderIds", required = false) List<String> orderIdsParam, Model model, Locale locale) {
-        List<String> skipped = orderIdsParam == null ? new ArrayList<>() : new ArrayList<>(orderIdsParam);
+    public String fulfilmentQueue(@RequestParam(value = "orderIds", required = false) List<String> orderIdsParam,
+                                  @RequestParam(value = "skippedGroups", required = false) String skippedGroups,
+                                  Model model, Locale locale) {
+        SkippedGroups skippedOrders = SkippedGroups.from(orderIdsParam == null ? List.of() : orderIdsParam, skippedGroups);
+        List<String> skipped = new ArrayList<>(skippedOrders.orderIds());
 
         Map<String, Integer> itemsToOrder = new HashMap<>();
         // the criteria already loads every candidate order; keeping them lets the rows be built without a second read
@@ -60,7 +64,7 @@ class FulfilmentController extends BaseController {
                 ? fulfilmentQueue.pickFulfilmentGroup(skipped, fulfilmentCriteria)
                 : fulfilmentQueue.pickFulfilmentGroup(getStoreId(), skipped, fulfilmentCriteria);
 
-        model.addAttribute("page", fulfilmentQueuePageFactory.build(isSuperAdmin(), skipped, group, loadedOrders,
+        model.addAttribute("page", fulfilmentQueuePageFactory.build(isSuperAdmin(), skippedOrders, group, loadedOrders,
                 itemsToOrder, LocalDate.now(), locale));
         return "fulfilment-queue";
     }

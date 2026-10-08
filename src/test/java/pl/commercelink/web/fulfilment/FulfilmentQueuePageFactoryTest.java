@@ -77,7 +77,7 @@ class FulfilmentQueuePageFactoryTest {
         List<OrderIndexEntry> group = List.of(OrderIndexEntry.fromOrder(first), OrderIndexEntry.fromOrder(second));
 
         // when
-        FulfilmentQueuePage page = factory.build(false, List.of("old-1"), group, byId(first, second),
+        FulfilmentQueuePage page = factory.build(false, SkippedGroups.from(List.of("old-1"), "1"), group, byId(first, second),
                 Map.of("aaaaaaaa-1", 4, "bbbbbbbb-2", 2), TODAY, PL);
 
         // then
@@ -87,6 +87,9 @@ class FulfilmentQueuePageFactoryTest {
         assertThat(page.itemsTotal()).isEqualTo(6);
         assertThat(page.skippedCount()).isEqualTo(1);
         assertThat(page.skipOrderIds()).containsExactly("old-1", "aaaaaaaa-1", "bbbbbbbb-2");
+        assertThat(page.skipGroups()).isEqualTo("1,2");
+        assertThat(page.backHref()).isEqualTo("/dashboard/fulfilment/queue");
+        assertThat(page.canRestart()).isFalse();
         assertThat(page.postAction()).isEqualTo("/dashboard/orders/fulfilment");
         assertThat(page.storeName()).isNull();
         assertThat(page.rows()).extracting(FulfilmentQueueRow::href, FulfilmentQueueRow::orderedAtText, FulfilmentQueueRow::itemsToOrder)
@@ -107,7 +110,7 @@ class FulfilmentQueuePageFactoryTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
 
         // when
-        FulfilmentQueuePage page = factory.build(true, List.of(), List.of(OrderIndexEntry.fromOrder(only)), byId(only),
+        FulfilmentQueuePage page = factory.build(true, SkippedGroups.from(List.of(), null), List.of(OrderIndexEntry.fromOrder(only)), byId(only),
                 Map.of("cccccccc-3", 1), TODAY, PL);
 
         // then
@@ -124,7 +127,7 @@ class FulfilmentQueuePageFactoryTest {
         when(storesRepository.findById("store-1")).thenReturn(null);
 
         // when
-        FulfilmentQueuePage page = factory.build(true, List.of(), List.of(OrderIndexEntry.fromOrder(only)), byId(only),
+        FulfilmentQueuePage page = factory.build(true, SkippedGroups.from(List.of(), null), List.of(OrderIndexEntry.fromOrder(only)), byId(only),
                 Map.of("dddddddd-4", 1), TODAY, PL);
 
         // then
@@ -134,7 +137,7 @@ class FulfilmentQueuePageFactoryTest {
     @Test
     void emptyGroupWithoutSkipsMeansNothingIsWaiting() {
         // when
-        FulfilmentQueuePage page = factory.build(false, List.of(), List.of(), Map.of(), Map.of(), TODAY, PL);
+        FulfilmentQueuePage page = factory.build(false, SkippedGroups.from(List.of(), null), List.of(), Map.of(), Map.of(), TODAY, PL);
 
         // then
         assertThat(page.hasGroup()).isFalse();
@@ -147,12 +150,14 @@ class FulfilmentQueuePageFactoryTest {
     @Test
     void emptyGroupAfterSkipsMeansEverythingWasSkippedAndDuplicatesAreCountedOnce() {
         // when
-        FulfilmentQueuePage page = factory.build(false, List.of("a", "b", "a"), List.of(), Map.of(), Map.of(), TODAY, PL);
+        FulfilmentQueuePage page = factory.build(false, SkippedGroups.from(List.of("a", "b", "a"), "1,1"), List.of(), Map.of(), Map.of(), TODAY, PL);
 
         // then
         assertThat(page.emptyState()).isEqualTo(FulfilmentQueuePage.EmptyState.ALL_SKIPPED);
         assertThat(page.skippedCount()).isEqualTo(2);
         assertThat(page.skipOrderIds()).containsExactly("a", "b");
+        assertThat(page.canRestart()).isTrue();
+        assertThat(page.backHref()).isEqualTo("/dashboard/fulfilment/queue?orderIds=a&skippedGroups=1");
     }
 
     @Test
@@ -162,7 +167,7 @@ class FulfilmentQueuePageFactoryTest {
                 LocalDateTime.of(2026, 10, 1, 7, 5), OrderStatus.New, null);
 
         // when
-        FulfilmentQueuePage page = factory.build(false, List.of(), List.of(entry), Map.of(), Map.of(), TODAY, PL);
+        FulfilmentQueuePage page = factory.build(false, SkippedGroups.from(List.of(), null), List.of(entry), Map.of(), Map.of(), TODAY, PL);
 
         // then
         assertThat(page.kind()).isEqualTo(FulfilmentQueuePage.GroupKind.DROPSHIP);

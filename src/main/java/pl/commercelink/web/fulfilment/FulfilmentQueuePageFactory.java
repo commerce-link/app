@@ -15,11 +15,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -31,35 +29,35 @@ public class FulfilmentQueuePageFactory {
     private final MessageSource messages;
     private final StoresRepository storesRepository;
 
-    public FulfilmentQueuePage build(boolean superAdmin, List<String> skipped, List<OrderIndexEntry> group,
+    public FulfilmentQueuePage build(boolean superAdmin, SkippedGroups skipped, List<OrderIndexEntry> group,
                                      Map<String, Order> orders, Map<String, Integer> itemsToOrder,
                                      LocalDate today, Locale locale) {
-        Set<String> skippedIds = new LinkedHashSet<>(skipped);
+        boolean canRestart = skipped.count() > 1;
         if (group.isEmpty()) {
-            FulfilmentQueuePage.EmptyState empty = skippedIds.isEmpty()
+            FulfilmentQueuePage.EmptyState empty = skipped.count() == 0
                     ? FulfilmentQueuePage.EmptyState.NONE_WAITING : FulfilmentQueuePage.EmptyState.ALL_SKIPPED;
-            return new FulfilmentQueuePage(null, null, List.of(), skippedIds.size(), List.copyOf(skippedIds), null, 0,
-                    empty, superAdmin);
+            return new FulfilmentQueuePage(null, null, List.of(), skipped.orderCount(), skipped.orderIds(),
+                    skipped.sizesParam(), skipped.backHref(), canRestart, null, 0, empty, superAdmin);
         }
 
         String storeId = group.get(0).getStoreId();
         // the documents flag only drives the WZ/FV marks of the orders list, which this page does not show
         OrderRowMapper mapper = new OrderRowMapper(messages, locale, false);
         List<FulfilmentQueueRow> rows = new ArrayList<>();
-        Set<String> skipOrderIds = new LinkedHashSet<>(skippedIds);
         int itemsTotal = 0;
         for (OrderIndexEntry entry : group) {
             int items = itemsToOrder.getOrDefault(entry.getOrderId(), 0);
             itemsTotal += items;
-            skipOrderIds.add(entry.getOrderId());
             rows.add(row(entry, orders.get(entry.getOrderId()), items, superAdmin, mapper, today));
         }
 
         FulfilmentQueuePage.GroupKind kind = group.get(0).getFulfilmentType() == FulfilmentType.WarehouseFulfilment
                 ? FulfilmentQueuePage.GroupKind.WAREHOUSE : FulfilmentQueuePage.GroupKind.DROPSHIP;
         String postAction = superAdmin ? "/dashboard/store/" + storeId + "/orders/fulfilment" : "/dashboard/orders/fulfilment";
-        return new FulfilmentQueuePage(kind, superAdmin ? storeName(storeId) : null, rows, skippedIds.size(),
-                List.copyOf(skipOrderIds), postAction, itemsTotal, null, superAdmin);
+        SkippedGroups afterSkip = skipped.plus(group.stream().map(OrderIndexEntry::getOrderId).toList());
+        return new FulfilmentQueuePage(kind, superAdmin ? storeName(storeId) : null, rows, skipped.orderCount(),
+                afterSkip.orderIds(), afterSkip.sizesParam(), skipped.backHref(), canRestart, postAction, itemsTotal, null,
+                superAdmin);
     }
 
     private FulfilmentQueueRow row(OrderIndexEntry entry, Order order, int items, boolean superAdmin,
