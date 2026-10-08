@@ -137,6 +137,36 @@ class WarehouseControllerBulkTest {
     }
 
     @Test
+    void refusesAnItemDestroyedSinceTheListWasOpenedWithAMessage() throws Exception {
+        // given
+        stored("a", FulfilmentStatus.Destroyed, 1);
+        RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
+
+        // when
+        String view = asStore(() -> controller.markAsReserved(List.of("a"), List.of(1), VIEW, PL, ra));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse");
+        assertThat((String) ra.getFlashAttributes().get("settingsErrorMessage"))
+                .contains("RTX a").contains("Zniszczone").contains("Nic nie zmieniono");
+        verifyNoInteractions(warehouseInternalReservationService);
+    }
+
+    @Test
+    void everyFulfilmentStatusHasAWarehouseLabelInBothLanguages() {
+        // given
+        ResourceBundleMessageSource messages = messages();
+
+        // when / then
+        for (FulfilmentStatus status : FulfilmentStatus.values()) {
+            for (Locale locale : List.of(PL, Locale.ENGLISH)) {
+                assertThat(messages.getMessage(WarehouseStatuses.labelKey(status), null, null, locale))
+                        .as("%s in %s", status, locale).isNotBlank();
+            }
+        }
+    }
+
+    @Test
     void refusesItemOfAnotherStore() throws Exception {
         // given
         when(warehouseRepository.findById("store-1", "x")).thenReturn(null);
