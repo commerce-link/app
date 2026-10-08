@@ -12,7 +12,7 @@
     var LABELS = {EXACT: 'labelExact', CLOSE: 'labelClose', DIFFERENT: 'labelDifferent', UNASSIGNED: 'labelUnassigned', NO_COST: 'labelNoCost'};
 
     function fill(template, values) {
-        return values.reduce(function (text, value, i) { return text.replace('{' + i + '}', value); }, template || '');
+        return values.reduce(function (text, value, i) { return text.split('{' + i + '}').join(value); }, template || '');
     }
 
     // Money.format (NBSP thousands, comma decimals, U+2212 minus) followed by the invoice's currency code: money.js
