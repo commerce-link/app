@@ -67,8 +67,8 @@ class ShippingIntegrationNamesTest {
         Store withoutIntegration = new Store();
 
         // when / then
-        assertThat(names.of(null, withoutIntegration, PL)).isEqualTo("integracja wysyłki");
-        assertThat(names.of(null, null, Locale.ENGLISH)).isEqualTo("the shipping integration");
+        assertThat(names.of(null, withoutIntegration, PL)).isEqualTo("nieustalona");
+        assertThat(names.of(null, null, Locale.ENGLISH)).isEqualTo("unknown");
     }
 
     @Test
@@ -77,13 +77,13 @@ class ShippingIntegrationNamesTest {
         String name = names.of("uninstalled", storeShippingThrough("furgonetka"), PL);
 
         // then
-        assertThat(name).isEqualTo("integracja wysyłki");
+        assertThat(name).isEqualTo("nieustalona");
     }
 
     @Test
     void withoutTheStoreAtHandTheProviderStillNamesTheShipment() {
         // when / then
         assertThat(names.of("furgonetka", PL)).isEqualTo("Furgonetka");
-        assertThat(names.of(null, PL)).isEqualTo("integracja wysyłki");
+        assertThat(names.of(null, PL)).isEqualTo("nieustalona");
     }
 }

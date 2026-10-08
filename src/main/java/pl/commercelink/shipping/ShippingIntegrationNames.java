@@ -26,7 +26,7 @@ public class ShippingIntegrationNames {
 
     /**
      * The integration of a shipment: the one that created it (provider), else the store's own for a shipment without
-     * one (typed in by hand, or older than the provider field), else the generic "integracja wysyłki". A provider whose
+     * one (typed in by hand, or older than the provider field), else the generic "nieustalona" ("unknown"). A provider whose
      * adapter is no longer installed reads as generic: the store's integration is another one and would be the wrong name.
      */
     public String of(String provider, Store store, Locale locale) {
