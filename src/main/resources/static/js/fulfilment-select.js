@@ -122,7 +122,9 @@
             var owner = winner[allocation.key];
             var sales = allocation.price / offer.vat * allocation.qty;
             var profit = sales - offer.net * allocation.qty;
-            var lost = !!owner && owner !== offer;
+            // an allocation is lost only to a ticked winner that beats this offer (cheaper, or equal price listed earlier)
+            var lost = !!owner && owner !== offer
+                && (owner.gross < offer.gross || (owner.gross === offer.gross && owner.index < offer.index));
             allocation.element.classList.toggle('is-lost', lost);
             allocation.element.classList.toggle('cl-tooltip', lost);
             if (lost) {
