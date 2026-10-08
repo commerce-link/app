@@ -1,0 +1,129 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${shippingHref}, ${backLabel}, ${pageTitle}, #{shipping.allegro.page.lead}, null)}"></div>
+
+            <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="alert">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="${errorMessage}"></span>
+            </div>
+
+            <div class="cl-stack" th:with="works=${status.name() == 'READY' or status.name() == 'ENABLED'}">
+                <!--/* Status card: what Allegro said about the borrowed marketplace connection on this visit. */-->
+                <section class="cl-card is-status" aria-labelledby="allegro-status-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="allegro-status-title">
+                            <i class="fas" th:classappend="${works} ? 'fa-check-circle is-ok' : 'fa-exclamation-triangle is-warn'"
+                               aria-hidden="true"></i>
+                            <span th:switch="${status.name()}">
+                                <th:block th:case="'ENABLED'" th:text="#{shipping.allegro.status.enabled}"></th:block>
+                                <th:block th:case="'READY'" th:text="#{shipping.allegro.status.ready}"></th:block>
+                                <th:block th:case="'MISSING_SHIPMENTS_CONSENT'" th:text="#{shipping.allegro.status.consent.title}"></th:block>
+                                <th:block th:case="'MARKETPLACE_NOT_CONNECTED'" th:text="#{shipping.allegro.status.marketplace.title}"></th:block>
+                                <th:block th:case="*" th:text="#{shipping.allegro.status.failed.title}"></th:block>
+                            </span>
+                        </h2>
+                    </div>
+                    <p class="cl-card-desc" th:switch="${status.name()}">
+                        <th:block th:case="'MISSING_SHIPMENTS_CONSENT'" th:text="#{shipping.allegro.status.consent.text}"></th:block>
+                        <th:block th:case="'MARKETPLACE_NOT_CONNECTED'" th:text="#{shipping.allegro.status.marketplace.text}"></th:block>
+                        <th:block th:case="'CHECK_FAILED'" th:text="#{shipping.allegro.status.failed.text}"></th:block>
+                        <th:block th:case="*" th:text="#{shipping.allegro.status.borrowed}"></th:block>
+                    </p>
+
+                    <details th:if="${works}" class="cl-disclosure cl-card-extras">
+                        <summary th:text="#{shipping.allegro.status.details}"></summary>
+                        <div class="cl-disclosure-body">
+                            <ul class="cl-list">
+                                <li class="cl-list-item"><div>
+                                    <p class="cl-list-title"><span th:text="#{shipping.allegro.check.connection}"></span>
+                                        <span class="cl-status is-ok" th:text="#{shipping.allegro.check.connected}"></span></p>
+                                </div></li>
+                                <li class="cl-list-item"><div>
+                                    <p class="cl-list-title"><span th:text="#{shipping.allegro.check.consent}"></span>
+                                        <span class="cl-status is-ok" th:text="#{shipping.allegro.check.present}"></span></p>
+                                    <p class="cl-list-desc" th:text="#{shipping.allegro.check.consent.ok}"></p>
+                                </div></li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <th:block th:if="${status.name() == 'MISSING_SHIPMENTS_CONSENT'}">
+                        <ul class="cl-list">
+                            <li class="cl-list-item"><div>
+                                <p class="cl-list-title"><span th:text="#{shipping.allegro.check.connection}"></span>
+                                    <span class="cl-status is-ok" th:text="#{shipping.allegro.check.connected}"></span></p>
+                            </div></li>
+                            <li class="cl-list-item">
+                                <div>
+                                    <p class="cl-list-title"><span th:text="#{shipping.allegro.check.consent}"></span>
+                                        <span class="cl-status is-warn" th:text="#{shipping.allegro.check.missing}"></span></p>
+                                    <p class="cl-list-desc is-warn" th:text="#{shipping.allegro.check.consent.missing}"></p>
+                                </div>
+                                <div class="cl-list-actions">
+                                    <a class="cl-link-button" th:href="@{${reconnectHref}}" th:text="#{shipping.allegro.reconnect}"
+                                       th:attr="aria-label=#{shipping.allegro.reconnect.for}"></a>
+                                </div>
+                            </li>
+                        </ul>
+                        <div class="cl-card-inset">
+                            <ol class="cl-steps">
+                                <li th:text="#{shipping.allegro.steps.reconnect}"></li>
+                                <li th:text="#{shipping.allegro.steps.approve}"></li>
+                                <li th:text="#{shipping.allegro.steps.back}"></li>
+                            </ol>
+                        </div>
+                    </th:block>
+
+                    <ul th:if="${status.name() == 'MARKETPLACE_NOT_CONNECTED'}" class="cl-list">
+                        <li class="cl-list-item">
+                            <div>
+                                <p class="cl-list-title"><span th:text="#{shipping.allegro.check.connection}"></span>
+                                    <span class="cl-status is-warn" th:text="#{shipping.allegro.check.notConnected}"></span></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${marketplacesHref}}" th:text="#{shipping.allegro.marketplaces}"></a>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div th:if="${status.name() == 'CHECK_FAILED'}" class="cl-list-actions">
+                        <a class="cl-link-button" th:href="@{${pageHref}}" th:text="#{shipping.allegro.status.retry}"></a>
+                    </div>
+                </section>
+
+                <!--/* The only setting of its own; shown only while Allegro lets the store ship. */-->
+                <form th:if="${works}" id="allegro-shipping-form" class="cl-form" method="post" th:action="@{${formAction}}" novalidate>
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{shipping.allegro.form.legend}"></legend>
+                            <fieldset class="cl-choice-group is-row">
+                                <legend class="cl-label" th:text="#{shipping.allegro.labelFormat}"></legend>
+                                <label class="cl-choice" th:each="format : ${labelFormats}">
+                                    <input type="radio" name="labelFormat" th:value="${format.name()}"
+                                           th:checked="${format == labelFormat}">
+                                    <span class="cl-choice-text">
+                                        <span class="cl-choice-title" th:text="#{${format.messageKey()}}"></span>
+                                        <span class="cl-choice-description" th:text="#{${format.messageKey() + '.description'}}"></span>
+                                    </span>
+                                </label>
+                            </fieldset>
+                        </fieldset>
+                        <div class="cl-card-footer">
+                            <button type="submit" class="cl-button is-primary"
+                                    th:text="${status.name() == 'ENABLED'} ? #{shipping.allegro.save} : #{shipping.allegro.enable}"></button>
+                            <a class="cl-button" th:href="@{${shippingHref}}" th:text="#{shipping.allegro.cancel}"></a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>
