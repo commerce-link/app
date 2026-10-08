@@ -81,4 +81,20 @@ class ShippingIntegrationViewsTest {
         // then
         assertThat(errors).containsEntry("parcel", "a b");
     }
+
+    @Test
+    void theAllegroOrderWarningNamesTheAccountInCorrectPolish() {
+        // given
+        org.springframework.context.support.ResourceBundleMessageSource messages =
+                new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+
+        // when
+        String warning = messages.getMessage("shipping.integration.warning.allegroOrder",
+                new Object[]{"Allegro One Box", "Furgonetka"}, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(warning).contains("z konta integracji Furgonetka");
+    }
 }

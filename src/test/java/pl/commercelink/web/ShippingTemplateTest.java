@@ -386,7 +386,7 @@ class ShippingTemplateTest {
         variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
                 ShippingIntegrationOption.available("allegro", "Wysyłam z Allegro", allegroProposal()).suggestedCopy(),
                 ShippingIntegrationOption.available("furgonetka", "Furgonetka", null)),
-                "furgonetka", null, "Kupujący wybrał Allegro One Box, One Kurier. Koszt pokryjesz z konta Furgonetka, "
+                "furgonetka", null, "Kupujący wybrał Allegro One Box, One Kurier. Koszt pokryjesz z konta integracji Furgonetka, "
                         + "a numer przesyłki wyślemy do Allegro jak dziś."));
 
         // when
