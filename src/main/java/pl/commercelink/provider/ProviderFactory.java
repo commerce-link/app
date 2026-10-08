@@ -143,9 +143,11 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     void handleAuthorizationLost(String storeId, D descriptor) {
         Store store = storesRepository.findById(storeId);
-        onAuthorizationLost(store, descriptor);
-        storesRepository.save(store);
-        afterAuthorizationLostSaved(store, descriptor);
+        // a save of an unchanged store would only risk a version conflict inside the token path
+        if (onAuthorizationLost(store, descriptor)) {
+            storesRepository.save(store);
+            afterAuthorizationLostSaved(store, descriptor);
+        }
     }
 
     public static String resolveAuthEndpoint(String apiUrl, String path) {
@@ -163,7 +165,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return headers;
     }
 
-    protected void onAuthorizationLost(Store store, D descriptor) {
+    /** Records the lost authorization on the store; returns false when the store was left unchanged. */
+    protected boolean onAuthorizationLost(Store store, D descriptor) {
+        return false;
     }
 
     protected void afterAuthorizationLostSaved(Store store, D descriptor) {

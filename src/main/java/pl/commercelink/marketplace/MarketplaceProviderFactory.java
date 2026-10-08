@@ -30,8 +30,9 @@ public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProvi
     }
 
     @Override
-    protected void onAuthorizationLost(Store store, MarketplaceProviderDescriptor descriptor) {
+    protected boolean onAuthorizationLost(Store store, MarketplaceProviderDescriptor descriptor) {
         store.markConnectionAsLost(descriptor.name());
+        return true;
     }
 
     @Override

@@ -41,12 +41,13 @@ public class ShippingProviderFactory extends ProviderFactory<ShippingProviderDes
     }
 
     @Override
-    protected void onAuthorizationLost(Store store, ShippingProviderDescriptor descriptor) {
+    protected boolean onAuthorizationLost(Store store, ShippingProviderDescriptor descriptor) {
         if (ShippingProviders.ALLEGRO.equals(descriptor.name())) {
             // the tokens are the marketplace's: its own factory marks the connection lost and tells the store
             log.warn("Allegro refused the marketplace tokens of store {} for a shipping call", store.getStoreId());
-            return;
+            return false;
         }
         store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, null);
+        return true;
     }
 }

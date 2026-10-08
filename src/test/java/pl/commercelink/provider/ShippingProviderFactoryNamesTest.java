@@ -103,9 +103,10 @@ class ShippingProviderFactoryNamesTest {
         // when
         base.handleAuthorizationLost("store-1", allegro);
 
-        // then
+        // then: nothing changed, so nothing is saved (a save could only fail on a version conflict)
         assertThat(store.defaultShippingIntegration()).isEqualTo("furgonetka");
         assertThat(store.hasShippingIntegration("allegro")).isTrue();
+        verify(storesRepository, never()).save(any());
     }
 
     @Test
@@ -119,5 +120,6 @@ class ShippingProviderFactoryNamesTest {
         // then
         assertThat(store.defaultShippingIntegration()).isNull();
         assertThat(store.hasShippingIntegration("allegro")).isTrue();
+        verify(storesRepository).save(store);
     }
 }

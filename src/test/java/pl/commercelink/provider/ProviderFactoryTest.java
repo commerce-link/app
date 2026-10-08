@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -370,8 +371,9 @@ class ProviderFactoryTest {
         ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
                 configurationManager, credentialStore, tokenStore, storesRepository) {
             @Override
-            protected void onAuthorizationLost(Store lostStore, OAuth2Descriptor lostDescriptor) {
+            protected boolean onAuthorizationLost(Store lostStore, OAuth2Descriptor lostDescriptor) {
                 calls.add("onAuthorizationLost");
+                return true;
             }
 
             @Override
@@ -387,6 +389,28 @@ class ProviderFactoryTest {
 
         // then
         assertEquals(List.of("onAuthorizationLost", "save", "afterAuthorizationLostSaved"), calls);
+    }
+
+    @Test
+    void aLostAuthorizationThatChangesNothingDoesNotSaveTheStore() {
+        // given: the default hook leaves the store as it is
+        OAuth2Descriptor descriptor = new OAuth2Descriptor();
+        List<String> calls = new ArrayList<>();
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository) {
+            @Override
+            protected void afterAuthorizationLostSaved(Store lostStore, OAuth2Descriptor lostDescriptor) {
+                calls.add("afterAuthorizationLostSaved");
+            }
+        };
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        factory.handleAuthorizationLost("store-1", descriptor);
+
+        // then
+        verify(storesRepository, never()).save(any());
+        assertTrue(calls.isEmpty());
     }
 
     @Test
