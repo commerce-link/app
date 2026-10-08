@@ -9,17 +9,22 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +39,13 @@ class StockLedgerServiceTest {
 
     @Mock private WarehouseDocumentRepository documentRepository;
     @Mock private WarehouseDocumentItemRepository itemRepository;
+    @Mock private StockLedgerClosings closings;
 
     private StockLedgerService service;
 
     @BeforeEach
     void setUp() {
-        service = new StockLedgerService(documentRepository, itemRepository);
+        service = new StockLedgerService(documentRepository, itemRepository, closings);
         when(documentRepository.findAllBeforeDate(anyString(), any())).thenReturn(new ArrayList<>());
         when(documentRepository.findAllInDateRange(anyString(), any(), any())).thenReturn(new ArrayList<>());
     }
@@ -231,7 +237,141 @@ class StockLedgerServiceTest {
         assertThat(row.asStringArray()[row.asStringArray().length - 1]).isEqualTo("PLN");
     }
 
+    @Test
+    void openingBalanceComesFromTheLastClosedPeriodInsteadOfTheHistory() {
+        // given
+        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        inPeriod(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD));
+        items("pz", item("pz", "MFN-A", "Widget", 5, 50.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(10);
+        assertThat(money(row, "BO wartość")).isEqualTo(500.0);
+        assertThat(qty(row, "BZ ilość")).isEqualTo(15);
+        assertThat(money(row, "BZ wartość")).isEqualTo(750.0);
+        verify(documentRepository, never()).findAllBeforeDate(anyString(), any());
+    }
+
+    @Test
+    void daysBetweenTheClosedPeriodAndTheReportAreAddedToTheOpeningBalance() {
+        // given
+        closed(month(2026, 3), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 1).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
+                .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, BEFORE))));
+        items("wz", item("wz", "MFN-A", "Widget", 4, 50.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(6);
+        assertThat(money(row, "BO wartość")).isEqualTo(300.0);
+    }
+
+    @Test
+    void periodStartingMidMonthAddsTheDaysBeforeItToTheOpeningBalance() {
+        // given
+        LocalDate from = LocalDate.of(2026, 5, 15);
+        closed(month(2026, 4), Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 5, 1).atStartOfDay(), from.atStartOfDay().minusNanos(1)))
+                .thenReturn(new ArrayList<>(List.of(doc("pz", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, IN_PERIOD))));
+        items("pz", item("pz", "MFN-A", "Widget", 2, 50.0));
+
+        // when
+        List<StockLedgerRow> rows = service.generate(STORE_ID, from, TO);
+
+        // then
+        assertThat(rows).hasSize(1);
+        assertThat(qty(rows.get(0), "BO ilość")).isEqualTo(12);
+        assertThat(money(rows.get(0), "BO wartość")).isEqualTo(600.0);
+    }
+
+    @Test
+    void latestClosedPeriodOfAnyLengthOpensTheDaysAfterIt() {
+        // given
+        StockLedgerPeriod firstTwentyDays = new StockLedgerPeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 20));
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 3), firstTwentyDays));
+        when(closings.closingBalances(STORE_ID, firstTwentyDays)).thenReturn(Map.of("MFN-A", new ClosingBalance("Widget", 10, 500.0)));
+        when(documentRepository.findAllInDateRange(STORE_ID, LocalDate.of(2026, 4, 21).atStartOfDay(), FROM.atStartOfDay().minusNanos(1)))
+                .thenReturn(new ArrayList<>(List.of(doc("wz", DocumentType.GoodsIssue, DocumentReason.CustomerOrder, LocalDateTime.of(2026, 4, 25, 9, 0)))));
+        items("wz", item("wz", "MFN-A", "Widget", 1, 50.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(9);
+        assertThat(money(row, "BO wartość")).isEqualTo(450.0);
+        verify(closings, never()).closingBalances(STORE_ID, month(2026, 3));
+    }
+
+    @Test
+    void closedPeriodNotEndingBeforeTheReportIsNotUsed() {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 5)));
+        historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
+        items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(3);
+        verify(closings, never()).closingBalances(any(), any());
+    }
+
+    @Test
+    void unreadableClosedPeriodLeavesTheOpeningBalanceToTheHistory() {
+        // given
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(month(2026, 4)));
+        when(closings.closingBalances(STORE_ID, month(2026, 4))).thenThrow(new IllegalStateException("broken file"));
+        historical(doc("bo", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE));
+        items("bo", item("bo", "MFN-A", "Widget", 3, 10.0));
+
+        // when
+        StockLedgerRow row = single();
+
+        // then
+        assertThat(qty(row, "BO ilość")).isEqualTo(3);
+        assertThat(money(row, "BO wartość")).isEqualTo(30.0);
+    }
+
+    @Test
+    void closingBalanceOfAClosedPeriodIsTheOpeningBalanceOfTheNext() throws Exception {
+        // given
+        LocalDate aprilFirst = LocalDate.of(2026, 4, 1);
+        LocalDate aprilLast = LocalDate.of(2026, 4, 30);
+        when(documentRepository.findAllBeforeDate(STORE_ID, aprilFirst.atStartOfDay()))
+                .thenReturn(new ArrayList<>(List.of(doc("march", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, LocalDateTime.of(2026, 3, 10, 9, 0)))));
+        when(documentRepository.findAllInDateRange(STORE_ID, aprilFirst.atStartOfDay(), aprilLast.atTime(LocalTime.MAX)))
+                .thenReturn(new ArrayList<>(List.of(doc("april", DocumentType.GoodsReceipt, DocumentReason.SupplierDelivery, BEFORE))));
+        items("march", item("march", "MFN-A", "Widget", 1, 10.004));
+        items("april", item("april", "MFN-A", "Widget", 1, 10.004));
+        StockLedgerRow april = service.generate(STORE_ID, aprilFirst, aprilLast).get(0);
+        closed(month(2026, 4), StockLedgerClosings.parse(StockLedgerRow.toCsv(List.of(april))));
+
+        // when
+        StockLedgerRow may = single();
+
+        // then
+        assertThat(cell(may, "BO ilość")).isEqualTo(cell(april, "BZ ilość"));
+        assertThat(cell(may, "BO wartość")).isEqualTo(cell(april, "BZ wartość")).isEqualTo("20,00");
+    }
+
     // --- helpers ---
+
+    private void closed(StockLedgerPeriod period, Map<String, ClosingBalance> balances) {
+        when(closings.closedPeriods(STORE_ID)).thenReturn(List.of(period));
+        when(closings.closingBalances(STORE_ID, period)).thenReturn(balances);
+    }
+
+    private static StockLedgerPeriod month(int year, int month) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        return new StockLedgerPeriod(yearMonth.atDay(1), yearMonth.atEndOfMonth());
+    }
 
     private StockLedgerRow single() {
         List<StockLedgerRow> rows = service.generate(STORE_ID, FROM, TO);

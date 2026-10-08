@@ -159,10 +159,8 @@ public class DeliveryListService {
 
     private static boolean matchesSettle(Delivery d, List<Settle> settle) {
         return settle.stream().allMatch(s -> switch (s) {
-            // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
-            case NO_INVOICE -> !d.isInvoiced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
-            // only the sync flag counts (client's decision): a delivery still waiting for its invoice is unsynced too
-            case NO_SYNC -> !d.isSynced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
+            case NO_INVOICE -> d.isMissingInvoice();
+            case NO_SYNC -> d.isMissingInvoiceSync();
             case UNPAID -> !d.isPaid();
         });
     }
