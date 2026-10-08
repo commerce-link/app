@@ -11,6 +11,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
@@ -56,6 +59,39 @@ class ShippingServiceAvailabilityTest {
         assertThat(shippingService.isAvailable(store(null))).isFalse();
         assertThat(shippingService.isAvailable(store("removed-adapter"))).isFalse();
         assertThat(shippingService.isAvailable(null)).isFalse();
+    }
+
+    private static Order orderFrom(String source, OrderSourceType type) {
+        Order order = new Order("store-1");
+        order.setExternalOrderId("29a9b8c0-a87a-11f1-8456-8d3ada2e8e1c");
+        order.setSource(new OrderSource(source, type));
+        return order;
+    }
+
+    @Test
+    void anAllegroOrderOfAStoreWithOnlyWysylamZAllegroCanBeShipped() {
+        // given
+        Store store = store(null);
+        store.addAdditionalShippingIntegration("allegro");
+
+        // when / then
+        assertThat(shippingService.isAvailableFor(store, orderFrom("Allegro", OrderSourceType.Marketplace))).isTrue();
+        assertThat(shippingService.isAvailableFor(store, orderFrom("Sklep", OrderSourceType.Other))).isFalse();
+    }
+
+    @Test
+    void aStoreWithoutAnyIntegrationCannotShipAnAllegroOrder() {
+        // when / then
+        assertThat(shippingService.isAvailableFor(store(null), orderFrom("Allegro", OrderSourceType.Marketplace))).isFalse();
+    }
+
+    @Test
+    void theDefaultIntegrationShipsEveryOrder() {
+        // given
+        when(shippingProviderFactory.getDescriptor("furgonetka")).thenReturn(mock(ShippingProviderDescriptor.class));
+
+        // when / then
+        assertThat(shippingService.isAvailableFor(store("furgonetka"), orderFrom("Sklep", OrderSourceType.Other))).isTrue();
     }
 
     @Test

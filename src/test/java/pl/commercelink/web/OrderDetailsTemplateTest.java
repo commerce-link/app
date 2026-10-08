@@ -133,7 +133,7 @@ class OrderDetailsTemplateTest {
     /** A store with a courier account: the page offers "Nadaj przesyłkę" where a shipment waits for it. */
     static ShippingService courierAvailable() {
         ShippingService shipping = mock(ShippingService.class);
-        when(shipping.isAvailable(any())).thenReturn(true);
+        when(shipping.isAvailableFor(any(), any())).thenReturn(true);
         when(shipping.supportsLabels(any(), any())).thenReturn(true);
         return shipping;
     }

@@ -18,7 +18,7 @@
         });
     }
 
-    var createForm = document.getElementById('shipping-create-form');
+    var createForm = document.getElementById('shipping-create-form') || document.getElementById('allegro-create-form');
     if (createForm) {
         createForm.addEventListener('submit', function (event) {
             if (event.submitter && event.submitter.id === 'shipping-create-submit') {

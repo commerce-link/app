@@ -21,7 +21,21 @@ import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.shipping.AllegroShippingView;
+import pl.commercelink.shipping.ParcelForm;
 import pl.commercelink.shipping.ShipmentCreationService;
+import pl.commercelink.shipping.ShippingIntegrationChoice;
+import pl.commercelink.shipping.ShippingIntegrationChoiceView;
+import pl.commercelink.shipping.ShippingIntegrationOption;
+import pl.commercelink.shipping.ShippingIntegrationViews;
+import pl.commercelink.shipping.api.DeliveryPoint;
+import pl.commercelink.shipping.api.DeliveryType;
+import pl.commercelink.shipping.api.PackageOption;
+import pl.commercelink.shipping.api.ShipmentProposal;
+import pl.commercelink.stores.PackageTemplate;
+import java.math.BigDecimal;
 import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.shipping.ShippingUnavailableException;
@@ -37,6 +51,7 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,6 +69,8 @@ class OrdersShippingControllerTest {
     @Mock private MessageSource messageSource;
     @Mock private ShippingService shippingService;
     @Mock private ShipmentCreationService shipmentCreationService;
+    @Mock private ShippingIntegrationChoice shippingIntegrationChoice;
+    @Mock private ShippingIntegrationViews shippingIntegrationViews;
 
     @InjectMocks
     private OrdersShippingController controller;
@@ -68,6 +85,11 @@ class OrdersShippingControllerTest {
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(shippingService.isAvailable(any())).thenReturn(true);
+        when(shippingService.isAvailableFor(any(), any())).thenReturn(true);
+        when(shippingIntegrationChoice.forOrder(any(), any())).thenReturn(List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(shippingIntegrationViews.choice(any(), any(), any())).thenAnswer(invocation ->
+                new ShippingIntegrationChoiceView(invocation.getArgument(0), invocation.getArgument(1), null, null));
     }
 
     @AfterEach
@@ -90,7 +112,7 @@ class OrdersShippingControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("shipping");
@@ -108,7 +130,7 @@ class OrdersShippingControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), model, redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, model, redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("shipping");
@@ -127,7 +149,7 @@ class OrdersShippingControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
@@ -141,7 +163,7 @@ class OrdersShippingControllerTest {
         ShippingForm form = new ShippingForm("foreign", "orders");
 
         // when / then
-        assertThatThrownBy(() -> controller.initiate("foreign", new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
+        assertThatThrownBy(() -> controller.initiate("foreign", null, null, new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> controller.createShipping(form, new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOf(ResponseStatusException.class);
@@ -155,11 +177,11 @@ class OrdersShippingControllerTest {
         // given
         Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
-        when(shippingService.isAvailable(any())).thenReturn(false);
+        when(shippingService.isAvailableFor(any(), eq(order))).thenReturn(false);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
@@ -243,5 +265,91 @@ class OrdersShippingControllerTest {
         assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
                 .containsEntry("errorMessage", "shipping.error.creating");
         verify(shipmentCreationService, never()).start(any(), any(), any(), any());
+    }
+
+    static Order allegroOrder() {
+        Order order = orderWithShipments(new Shipment(ShipmentType.PickupPoint));
+        order.setExternalOrderId("29a9b8c0-a87a-11f1-8456-8d3ada2e8e1c");
+        order.setSource(new OrderSource("Allegro", OrderSourceType.Marketplace));
+        order.setTotalPrice(919.99);
+        return order;
+    }
+
+    static ShipmentProposal proposal() {
+        return ShipmentProposal.available("Allegro One Box, One Kurier", "ALLEGRO", new DeliveryPoint("ALBOX-WAW-0231"),
+                DeliveryType.LOCKER, List.of(new PackageOption("PACKAGE", new BigDecimal("64"), new BigDecimal("38"),
+                        new BigDecimal("41"), new BigDecimal("25"))), new BigDecimal("5000"), new BigDecimal("5000"));
+    }
+
+    private void allegroSuggested(Order order) {
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null),
+                ShippingIntegrationOption.available("allegro", "Wysyłam z Allegro", proposal()).suggestedCopy()));
+        when(shippingIntegrationViews.allegro(any(), eq(order), any(), any())).thenReturn(new AllegroShippingView(
+                "Allegro One Box, One Kurier", "One by Allegro", "ALBOX-WAW-0231", "shipping.allegro.deliveryType.LOCKER",
+                "Katarzyna Wiśniewska", "limits", "cod", "insurance", "shipping.allegro.labelFormat.PDF_A6",
+                "/dashboard/store/shipping/allegro"));
+    }
+
+    @Test
+    void allegroOrderOpensTheAllegroFormSuggestedByTheChoice() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("shipping");
+        assertThat(model.get("allegroShipping")).isNotNull();
+        assertThat(((ShippingForm) model.get("shippingForm")).getProvider()).isEqualTo("allegro");
+        assertThat(((ShippingIntegrationChoiceView) model.get("integrationChoice")).selected()).isEqualTo("allegro");
+    }
+
+    @Test
+    void theOperatorCanSwitchAnAllegroOrderToTheDefaultIntegration() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), "furgonetka", null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(((ShippingForm) model.get("shippingForm")).getProvider()).isEqualTo("furgonetka");
+    }
+
+    @Test
+    void theAllegroFormStartsWithOneParcelOfTheDefaultTemplateAndTheUnpaidAmount() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        Store store = new Store();
+        PackageTemplate template = new PackageTemplate("Karton M", List.of());
+        template.setId("t-m");
+        template.setDefault(true);
+        store.setShippingConfiguration(new pl.commercelink.stores.ShippingConfiguration());
+        store.getShippingConfiguration().getPackageTemplates().add(template);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(shippingService.retrieveParcelsListBasedOnPackageTemplate(919.99, "t-m", store)).thenReturn(new ArrayList<>(List.of(
+                new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"),
+                new ParcelForm(10, 10, 10, 1, 920, "Drugi", "package"))));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingForm form = (ShippingForm) model.get("shippingForm");
+        assertThat(form.getParcels()).hasSize(1);
+        assertThat(form.getPackageTemplateId()).isEqualTo("t-m");
     }
 }

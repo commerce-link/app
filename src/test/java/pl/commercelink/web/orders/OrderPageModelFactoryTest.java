@@ -116,7 +116,7 @@ class OrderPageModelFactoryTest {
         when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of());
         when(orderEventsRepository.findByOrderId(anyString())).thenReturn(List.of());
         when(receiptAttemptService.orderState(any(), any(), any(), any())).thenReturn(ReceiptOrderState.NONE);
-        when(shippingService.isAvailable(any())).thenReturn(true);
+        when(shippingService.isAvailableFor(any(), any())).thenReturn(true);
     }
 
     private static Order order(OrderStatus status) {
@@ -863,7 +863,7 @@ class OrderPageModelFactoryTest {
     void noCourierActionWithoutAShippingProvider() {
         // given: a store that types its shipping data in by hand (no courier account connected)
         Order order = assembledOrderWithOneEmptyShipment();
-        when(shippingService.isAvailable(any())).thenReturn(false);
+        when(shippingService.isAvailableFor(any(), any())).thenReturn(false);
 
         // when
         OrderPageModel page = factory.build(order, List.of(), viewer(), PL);

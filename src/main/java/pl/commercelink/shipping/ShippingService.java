@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.orders.rma.InvalidReturnConfigurationException;
@@ -41,6 +42,17 @@ public class ShippingService {
     public boolean isAvailable(Store store) {
         return store != null
                 && shippingProviderFactory.getDescriptor(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)) != null;
+    }
+
+    /**
+     * Whether "Nadaj przesyłkę" can work for this order: the store's default integration is there, or the store ships
+     * orders placed on Allegro through Wysyłam z Allegro and this is one. Asks nobody: whether Allegro accepts the
+     * order's delivery method is said by the page itself (ShippingIntegrationChoice).
+     */
+    public boolean isAvailableFor(Store store, Order order) {
+        return isAvailable(store) || (store != null
+                && store.hasShippingIntegration(ShippingIntegrationChoice.ALLEGRO)
+                && ShippingIntegrationChoice.isAllegroOrder(order));
     }
 
     public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
