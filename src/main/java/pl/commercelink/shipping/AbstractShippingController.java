@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.rest.client.HttpClientException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.shipping.api.ShipmentRequest;
 import pl.commercelink.shipping.api.ShippingEstimate;
-import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.rma.RMACenter;
 import pl.commercelink.orders.rma.RMACentersRepository;
@@ -42,6 +42,9 @@ public abstract class AbstractShippingController {
 
     @Autowired
     protected MessageSource messageSource;
+
+    @Autowired
+    protected ShipmentCreationService shipmentCreationService;
 
     @PostMapping("/template")
     public String loadTemplates(@ModelAttribute ShippingForm form, Model model) {
@@ -95,23 +98,40 @@ public abstract class AbstractShippingController {
             return "redirect:" + getEntityUrl(form);
         }
         Store store = getStore();
-        OperationResult<List<Shipment>> result;
+        ShipmentCreationStart start;
         try {
-            result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
+            DeliveryTarget target = resolveDeliveryTarget(form);
+            ShipmentRequest request = shippingService.buildRequest(form, store, target);
+            start = shipmentCreationService.start(creationSeed(form).storeId(getStoreId()).build(), request, store,
+                    placeholder(form, store, target));
         } catch (ShippingUnavailableException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(noProviderKey(), null, locale));
             return "redirect:" + getEntityUrl(form);
         }
-        if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
-            return "redirect:" + form.getShippingAction();
+        switch (start.outcome()) {
+            case REFUSED -> {
+                redirectAttributes.addFlashAttribute("errorMessage", start.error());
+                return "redirect:" + form.getShippingAction();
+            }
+            case GONE -> redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(goneMessageKey(), null, locale));
+            case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage(startedMessageKey(), null, locale));
         }
-        List<Shipment> shipments = result.getPayload();
-        onShippingCreated(form, shipments);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("shipping.create.success", null, locale));
-
         return "redirect:" + getEntityUrl(form);
+    }
+
+    /** The shipment shown while the provider creates it: the chosen carrier and the delivery point. */
+    private static Shipment placeholder(ShippingForm form, Store store, DeliveryTarget target) {
+        Shipment placeholder = new Shipment(target.pointCode() != null ? ShipmentType.PickupPoint : ShipmentType.Courier);
+        placeholder.setCollectionPointCode(target.pointCode());
+        if (store.getShippingConfiguration() != null) {
+            store.getShippingConfiguration().getAuthorizedCarriers().stream()
+                    .filter(carrier -> carrier.getId().equals(form.getServiceId()))
+                    .findFirst()
+                    .ifPresent(carrier -> placeholder.setCarrier(carrier.getName()));
+        }
+        return placeholder;
     }
 
     protected String renderShippingForm(Store store, ShippingForm shippingForm, List<ShippingDetails> shippingDetailsList, Model model) {
@@ -184,7 +204,18 @@ public abstract class AbstractShippingController {
 
     protected abstract List<ShippingDetails> retrieveShippingDetailsList(ShippingForm form);
 
-    protected abstract void onShippingCreated(ShippingForm form, List<Shipment> shipments);
+    /** Who the shipment belongs to and what settling it needs; commandId, provider and attempt are filled in later. */
+    protected abstract ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form);
+
+    /** Message key of the reason shown when the owner refused the new shipment (gone, or one is being created). */
+    protected String goneMessageKey() {
+        return "shipping.create.gone";
+    }
+
+    /** Message key of the note shown once the creation started. */
+    protected String startedMessageKey() {
+        return "shipping.create.started";
+    }
 
     protected abstract DeliveryTarget resolveDeliveryTarget(ShippingForm form);
 

@@ -40,6 +40,8 @@ import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
+import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
@@ -83,6 +85,7 @@ public class OrderPageModelFactory {
     private final ReceiptAttemptService receiptAttemptService;
     private final ReceiptAlerts receiptAlerts;
     private final ShippingService shippingService;
+    private final ShippingIntegrationNames shippingIntegrationNames;
 
     /** Fiscal dates are Polish dates, whatever zone the server runs in (as ReceiptEffects dates the document). */
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
@@ -114,7 +117,7 @@ public class OrderPageModelFactory {
                 header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
-                shipments(order, store, readOnly),
+                shipments(order, store, readOnly, locale),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 payments(order, readOnly, receiptLock),
@@ -145,7 +148,7 @@ public class OrderPageModelFactory {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
                     links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
                     "fa-truck");
-        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()
+        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook() && !order.hasShipmentBeingCreated()
                 && shippingService.isAvailable(store)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
             // the shipping data into the shipment, so the page would only end on its refusal
@@ -385,9 +388,12 @@ public class OrderPageModelFactory {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
+    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly, Locale locale) {
         List<Shipment> shipments = order.getShipments();
         LocalDateTime now = LocalDateTime.now();
+        String details = "/dashboard/orders/" + order.getOrderId();
+        Set<String> labelProviders = readOnly ? Set.of()
+                : ShipmentLinks.labelProviders(shipments, provider -> shippingService.supportsLabels(store, provider));
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
@@ -399,6 +405,10 @@ public class OrderPageModelFactory {
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
+            String integration = shippingIntegrationNames.of(s.getProvider(), store, locale);
+            OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale, integration);
+            // the form rebuilds the shipment without its command: a late result would find nothing waiting for it
+            boolean editable = !readOnly && s.getCreation() == null;
             rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
                     s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                     OrderFormats.moment(s.getShippedAt()), OrderFormats.moment(s.getDeliveredAt()),
@@ -408,14 +418,19 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     OrderLabels.cancellation(s, now), OrderLabels.cancellationTone(s, now),
-                    form.dialogId(), readOnly ? null : base + i,
+                    form.dialogId(), editable ? base + i : null,
                     readOnly || removeLockedKey(order, i) != null ? null
                             : base + i + "/remove?version=" + form.version(),
                     // every parcel of one courier order carries its externalId, and cancelling it cancels them all
                     readOnly ? null : removeReasonKey(order, i, courierCancellable != null
                             && Objects.equals(s.getExternalId(), courierCancellable.getExternalId())),
                     removeShipmentMessageKey(order, i),
-                    removeShipmentActionKey(order, i), placeholder));
+                    removeShipmentActionKey(order, i), placeholder,
+                    state == null ? null : state.key(), state == null ? null : state.args(),
+                    state == null ? null : state.tone(), state != null && state.inProgress(),
+                    ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
+                            ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
+                    !readOnly && s.creationFailed() ? details + "/shipping" : null, integration));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -427,18 +442,22 @@ public class OrderPageModelFactory {
         // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
         String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
                 ? "order.shipments.cancel.locked.pending" : null;
+        String cancelCourierIntegration = canCancelCourier
+                ? shippingIntegrationNames.of(courierCancellable.getProvider(), store, locale) : null;
         // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
-        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.isCancellationInProgress(now))
-                ? "/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state" : null;
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
+        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now))
+                ? details + "/shipments/cancellation-state" : null;
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey,
+                cancelCourierIntegration, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";
+    private static final String CREATING_LOCKED = "order.shipments.remove.locked.creating";
 
     /**
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
-     * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment's
+     * shipment with a courier order points to "Cancel shipment" only when the card offers it for that shipment's
      * courier order (which covers every parcel of it): before the order is ready to ship the button is not there yet,
      * and it only ever cancels the first courier order on the list whose parcel is not delivered.
      */
@@ -460,24 +479,31 @@ public class OrderPageModelFactory {
      * choice (the user's decision of 2026-09-30): the order waits for the next one (OrderLifecycle neither delivers nor
      * completes an order without shipments before Delivered; a Shipping order left with nothing shipped goes back to
      * Realization). A delivered order keeps its shipments, they are the record of the delivery; so does a shipment with
-     * a delivery date. One with a courier order is cancelled with "Cancel courier order", which also cancels the paid
+     * a delivery date. One with a courier order is cancelled with "Cancel shipment", which also cancels the paid
      * label at the carrier, never by dropping the record; after a failed or unconfirmed cancellation the operator settles
      * the label in the provider's panel and may drop the record. The only shipment with nothing but the customer's choice
      * of delivery (the one every order is created with) is not removed either: its row reads as "no shipment yet" with
-     * "Uzupełnij", and removing it would only lose the choice.
+     * "Uzupełnij", and removing it would only lose the choice. A shipment being created waits for its result; one
+     * whose creation failed can go, its package is settled in the provider's panel as after an unresolved
+     * cancellation.
      */
     public static String removeLockedKey(Order order, int index) {
         if (order.getStatus() == OrderStatus.Delivered) {
             return "order.shipments.remove.error.delivered";
         }
+        Shipment shipment = order.getShipments().get(index);
+        // the result still comes: without the shipment waiting for it, a paid label would be lost
+        if (shipment.isCreating()) {
+            return CREATING_LOCKED;
+        }
         if (order.onlyPlaceholder().isPresent()) {
             return PLACEHOLDER_LOCKED;
         }
-        Shipment shipment = order.getShipments().get(index);
         if (shipment.getDeliveredAt() != null) {
             return "order.shipments.remove.error.shipmentDelivered";
         }
-        return shipment.getExternalId() != null && !shipment.isCancellationUnresolved()
+        // a failed creation has no courier order to cancel here: its package is left in the provider's basket
+        return shipment.getExternalId() != null && !shipment.creationFailed() && !shipment.isCancellationUnresolved()
                 ? "order.shipments.remove.error.courier" : null;
     }
 

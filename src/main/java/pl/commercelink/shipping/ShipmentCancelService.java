@@ -6,7 +6,6 @@ import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.ShipmentCancellation;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
@@ -15,10 +14,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -127,7 +123,7 @@ public class ShipmentCancelService {
         try {
             result = provider.cancelShipment(externalId, commandId);
         } catch (RuntimeException e) {
-            if (isRefusal(e)) {
+            if (ProviderErrors.isRefusal(e)) {
                 restore(storeId, orderId, externalId, commandId, previous.get());
                 throw e;
             }
@@ -149,28 +145,6 @@ public class ShipmentCancelService {
                 yield ShipmentCancelResult.failed(result.error());
             }
         };
-    }
-
-    /**
-     * Only a clear refusal means the command was not run: a check before sending (no HTTP answer behind it) or a 4xx
-     * answer. A 5xx, a timeout or any other error may come after the provider already accepted the command.
-     */
-    static boolean isRefusal(RuntimeException e) {
-        HttpClientException http = httpCause(e);
-        if (http != null) {
-            return http.getStatusCode() >= 400 && http.getStatusCode() < 500;
-        }
-        return e instanceof ShippingException;
-    }
-
-    private static HttpClientException httpCause(Throwable e) {
-        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Throwable current = e; current != null && seen.add(current); current = current.getCause()) {
-            if (current instanceof HttpClientException http) {
-                return http;
-            }
-        }
-        return null;
     }
 
     /** The provider refused the command, so nothing is being cancelled: the shipment gets back its earlier state. */

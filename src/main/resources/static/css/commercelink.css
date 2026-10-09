@@ -705,6 +705,23 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-accent-ink);
 }
 
+/* A number inside a button: how many records the action would take ("Zamów odbiór" on the orders list counts the
+   packages waiting for a courier); the text before it for a screen reader is visually hidden */
+.cl-button-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .cl-page .cl-back:focus-visible,
 .cl-button:focus-visible {
     outline: 2px solid var(--cl-accent);
@@ -5673,7 +5690,8 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-page-actions .cl-page-action-form,
-    .cl-page .cl-page-actions .cl-page-action-form .cl-button {
+    .cl-page .cl-page-actions .cl-page-action-form .cl-button,
+    .cl-page .cl-page-actions .cl-button.is-page-action {
         width: 100%;
         justify-content: center;
     }
@@ -7872,6 +7890,14 @@ a.cl-link-button:hover {
     flex: none;
 }
 
+/* Work in progress in a list row (a shipment being created or its pickup ordered): the line above at the size of the
+   row description, with the compact spinner. */
+.cl-page .cl-list-desc.cl-loading {
+    font-size: 13.5px;
+    gap: 8px;
+    margin-top: 2px;
+}
+
 /* A spinner in running text or a disclosure title (restock suggestions loading): the size of the text beside it. */
 .cl-page .cl-spinner.is-compact {
     width: 14px;
@@ -10031,6 +10057,17 @@ a.cl-link-button:hover {
         padding: 12px;
         margin: -12px;
     }
+}
+
+/* A note under a row of a check list: why the row cannot be ticked (a package the carrier refuses on the pickup page) */
+.cl-page .cl-check-list .cl-check-note {
+    margin: 0 0 4px 24px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-check-list .cl-check-note.is-warn {
+    color: var(--cl-warn);
 }
 
 /* Warehouse document details: the item table gives the name what the fixed numeric columns leave (width: 1% does not

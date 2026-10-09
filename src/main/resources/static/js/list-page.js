@@ -36,6 +36,16 @@
         });
     }
 
+    // Links outside the results block that lead away and back ("Zamów odbiór" in the orders list header) return to
+    // the list as it is narrowed now, not as the page was first loaded.
+    function syncBackLinks(target) {
+        document.querySelectorAll('a[data-cl-list-back]').forEach(function (link) {
+            var url = new URL(link.getAttribute('href'), window.location.href);
+            url.searchParams.set('back', target.pathname + target.search);
+            link.setAttribute('href', url.pathname + url.search);
+        });
+    }
+
     function load(href, push, focusSearch) {
         var target = new URL(href, window.location.href);
         if (target.pathname !== listPath) {
@@ -58,6 +68,7 @@
                 applyFold();
                 hideAutosubmitButtons();
                 if (push) { history.pushState({ listPage: true }, '', target.pathname + target.search); }
+                syncBackLinks(target);
                 if (reopen) {
                     var menu = root.querySelector('details[data-cl-filter-menu="' + reopen.menu + '"]');
                     var box = menu && menu.querySelector('input[value="' + reopen.value + '"]');

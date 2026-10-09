@@ -31,6 +31,8 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -44,6 +46,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -538,7 +541,7 @@ class RMAControllerTest {
                 endpoint("updateShipments", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
-                    c.updateShipments(RMA_ID, postedRma, ra, Locale.ENGLISH);
+                    c.updateShipments(RMA_ID, postedRma, List.of(), ra, Locale.ENGLISH);
                 }));
     }
 
@@ -689,6 +692,35 @@ class RMAControllerTest {
         return templateEngine.process(tag, context);
     }
 
+    @Test
+    void aNewShipmentRowTakesAnIndexPastTheHiddenCreationRows() {
+        // given: the failed creation is not shown, yet the shipment after it keeps index 1
+        Shipment failedCreation = new Shipment(ShipmentType.Courier);
+        failedCreation.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failed("Błąd"));
+        RMA rma = rmaWithStatus(RMAStatus.Processing);
+        rma.setShipments(new ArrayList<>(List.of(failedCreation, new Shipment(ShipmentType.Courier))));
+        String template = readTemplate("templates/rma-detail.html");
+        Matcher tbody = Pattern.compile("<tbody\\b[^>]*id=\"editRmaShipmentsBody\"[^>]*>").matcher(template);
+        assertThat(tbody.find()).withFailMessage("no editRmaShipmentsBody in rma-detail.html").isTrue();
+
+        // when
+        String html = render(tbody.group() + "</tbody>", rma);
+
+        // then: two shipments, so the added row is shipments[2], not shipments[1] (which would merge into the second)
+        assertThat(html).contains("data-next-index=\"2\"");
+    }
+
+    private static String render(String fragment, RMA rma) {
+        StringTemplateResolver resolver = new StringTemplateResolver();
+        resolver.setTemplateMode(TemplateMode.HTML);
+        TemplateEngine templateEngine = new TemplateEngine();
+        templateEngine.setDialect(new SpringStandardDialect());
+        templateEngine.setTemplateResolver(resolver);
+        Context context = new Context();
+        context.setVariable("rma", rma);
+        return templateEngine.process(fragment, context);
+    }
+
     private static String readTemplate(String classpathLocation) {
         try (InputStream template = RMAControllerTest.class.getClassLoader()
                 .getResourceAsStream(classpathLocation)) {
@@ -699,5 +731,135 @@ class RMAControllerTest {
         } catch (IOException e) {
             throw new IllegalStateException("cannot read " + classpathLocation, e);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // updateShipments: the form edits what it shows, the courier order stays
+    // ------------------------------------------------------------------
+
+    private static Shipment typed(String trackingNo, String externalId) {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo(trackingNo);
+        shipment.setShippedAt(LocalDateTime.of(2026, 10, 6, 9, 0));
+        shipment.setExternalId(externalId);
+        return shipment;
+    }
+
+    private static Shipment courierOrder(String trackingNo, String externalId) {
+        Shipment shipment = typed(trackingNo, externalId);
+        shipment.setProvider("furgonetka");
+        shipment.setPickUpAddressId("addr-1");
+        shipment.setPickup(ShipmentPickup.awaiting());
+        return shipment;
+    }
+
+    /** Posts the form as the page renders it: it shows every package of the RMA that is not being created. */
+    private RMA saveShipments(RMA existing, Shipment... posted) {
+        List<String> shown = existing.getShipments().stream()
+                .filter(s -> s.getCreation() == null && s.getExternalId() != null)
+                .map(Shipment::getExternalId).toList();
+        return saveShipments(existing, shown, posted);
+    }
+
+    private RMA saveShipments(RMA existing, List<String> shownPackages, Shipment... posted) {
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existing);
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setShipments(new ArrayList<>(List.of(posted)));
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateShipments(RMA_ID, postedRma, shownPackages, redirectAttributes, Locale.ENGLISH);
+        }
+        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
+        verify(rmaRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void aShipmentBeingCreatedSurvivesAnEditOfTheOthers() {
+        // given: it has no shipping data yet, and losing it would drop the label its command pays for
+        Shipment inFlight = new Shipment(ShipmentType.Courier);
+        inFlight.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null), inFlight)));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1-fixed", null), new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(saved.getShipments()).hasSize(2);
+        assertThat(saved.getShipments().get(0).getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(saved.getShipments().get(1)).isSameAs(inFlight);
+    }
+
+    @Test
+    void theCourierOrderAndItsPickupStayWithTheirPackage() {
+        // given: the form carries the package id, not the courier order
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"))));
+
+        // when: the operator corrects the tracking number
+        RMA saved = saveShipments(existing, typed("T-1-fixed", "EXT-1"));
+
+        // then
+        Shipment shipment = saved.getShipments().get(0);
+        assertThat(shipment.getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(shipment.getProvider()).isEqualTo("furgonetka");
+        assertThat(shipment.getPickUpAddressId()).isEqualTo("addr-1");
+        assertThat(shipment.awaitsPickup()).isTrue();
+    }
+
+    @Test
+    void aPackageIdTheRmaNeverHadIsNotTakenFromTheForm() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null))));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1", "FORGED"));
+
+        // then
+        assertThat(saved.getShipments().get(0).getExternalId()).isNull();
+    }
+
+    @Test
+    void aRemovedPackageLeavesThePickupList() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-2", "EXT-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
+    }
+
+    @Test
+    void aPackageCreatedAfterTheFormWasOpenedSurvivesItsSave() {
+        // given: the form was rendered while EXT-2 was still being created, so it neither shows nor posts it;
+        // the creation settled in the background before the operator saved
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: the operator saves the form as it was, showing only EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1"), typed("T-1", "EXT-1"));
+
+        // then: the paid package stays, still waiting for its pickup
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-1", "EXT-2");
+        assertThat(saved.getShipments().get(1).awaitsPickup()).isTrue();
+    }
+
+    @Test
+    void aPackageTheFormShowedCanStillBeRemoved() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: both were shown, the operator removed EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1", "EXT-2"), typed("T-2", "EXT-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
     }
 }

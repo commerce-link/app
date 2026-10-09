@@ -195,13 +195,67 @@ class NotificationViewFactoryTest {
             // given
             ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
             List<String> keys = new ArrayList<>(List.of("store.notification.type.default",
-                    "store.notification.action.reconnect", "store.notification.action.viewReturn"));
+                    "store.notification.action.reconnect", "store.notification.action.viewReturn",
+                    "store.notification.action.downloadLabel"));
             for (StoreNotificationType type : StoreNotificationType.values()) {
                 keys.add("store.notification.type." + type.name());
             }
 
             // when / then
             keys.forEach(key -> assertThat(messages.containsKey(key)).as(language + " " + key).isTrue());
+        }
+    }
+
+    @Test
+    void aWarehouseShipmentLeadsTheStoreAdminToItsLabelAndBack() {
+        for (StoreNotificationType type : List.of(StoreNotificationType.WAREHOUSE_SHIPMENT_CREATED,
+                StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP)) {
+            // given
+            StoreNotificationRecord record = record(StoreNotificationSeverity.INFO, type, "furgonetka:2148 0003",
+                    "Przesyłka A nadana");
+
+            // when
+            NotificationView admin = factory.toView(record, UserRole.ADMIN);
+            NotificationView superAdmin = factory.toView(record, UserRole.SUPER_ADMIN);
+
+            // then
+            assertThat(admin.actionHref()).isEqualTo(
+                    "/dashboard/shipping/labels/furgonetka/2148%200003?back=/dashboard/notifications");
+            assertThat(admin.actionKey()).isEqualTo("store.notification.action.downloadLabel");
+            assertThat(admin.warning()).isFalse();
+            assertThat(superAdmin.actionHref()).isNull();
+        }
+    }
+
+    @Test
+    void aWarehouseShipmentWithoutAPackageIdHasNoLabelLink() {
+        // given
+        StoreNotificationRecord record = record(StoreNotificationSeverity.INFO,
+                StoreNotificationType.WAREHOUSE_SHIPMENT_CREATED, "cmd-1", "Przesyłka A nadana");
+
+        // when
+        NotificationView admin = factory.toView(record, UserRole.ADMIN);
+
+        // then
+        assertThat(admin.actionHref()).isNull();
+    }
+
+    @Test
+    void aFailedReturnLeadsTheStoreAdminToTheRma() {
+        for (StoreNotificationType type : List.of(StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED,
+                StoreNotificationType.RMA_RETURN_PICKUP_FAILED)) {
+            // given
+            StoreNotificationRecord record = record(StoreNotificationSeverity.WARNING, type, "rma-1:cmd-1",
+                    "Zwrot RMA rma-1 nie został nadany");
+
+            // when
+            NotificationView admin = factory.toView(record, UserRole.ADMIN);
+            NotificationView superAdmin = factory.toView(record, UserRole.SUPER_ADMIN);
+
+            // then
+            assertThat(admin.actionHref()).isEqualTo("/dashboard/rma/rma-1");
+            assertThat(admin.actionKey()).isEqualTo("store.notification.action.viewReturn");
+            assertThat(superAdmin.actionHref()).isNull();
         }
     }
 }

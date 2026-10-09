@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriUtils;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.receipts.ReceiptAttemptKeys;
+import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
@@ -45,6 +46,20 @@ public class NotificationViewFactory {
             // the pending deliveries screen resolves the store from the logged-in admin, so only the store admin gets the link
             actionHref = "/dashboard/deliveries/preview";
             actionKey = "store.notification.action.viewPendingDeliveries";
+        } else if ((type == StoreNotificationType.WAREHOUSE_SHIPMENT_CREATED
+                || type == StoreNotificationType.WAREHOUSE_SHIPMENT_PICKUP) && role == UserRole.ADMIN
+                && StringUtils.contains(record.getObject(), ':')) {
+            // the label is fetched with the logged-in admin's store integration; an error there returns to the bell
+            actionHref = ShipmentLinks.label(StringUtils.substringBefore(record.getObject(), ":"),
+                    StringUtils.substringAfter(record.getObject(), ":"), "/dashboard/notifications");
+            actionKey = "store.notification.action.downloadLabel";
+        } else if ((type == StoreNotificationType.RMA_RETURN_SHIPMENT_FAILED
+                || type == StoreNotificationType.RMA_RETURN_PICKUP_FAILED) && role == UserRole.ADMIN
+                && StringUtils.isNotBlank(record.getObject())) {
+            // the object is rmaId:attempt, so each failed attempt is its own notification
+            actionHref = "/dashboard/rma/" + UriUtils.encodePathSegment(
+                    StringUtils.substringBefore(record.getObject(), ":"), StandardCharsets.UTF_8);
+            actionKey = "store.notification.action.viewReturn";
         }
         return new NotificationView(record.getNotificationId(), titleKey, record.getMessage(), record.getCreatedAt(),
                 record.isUnread(), record.getSeverity() == StoreNotificationSeverity.WARNING, actionHref, actionKey,
