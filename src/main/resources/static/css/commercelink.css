@@ -10401,3 +10401,118 @@ a.cl-link-button:hover {
         padding-top: 12px;
     }
 }
+
+/* --- Invoice sync preview (/dashboard/deliveries/sync/preview, docs/active/invoice-sync-preview-redesign, variant A) --- */
+
+/* Assignment table: a row of the record (product or cost) against a choice from another document. The key column
+   wraps, the choice takes the larger share, the match state (pill + optional difference) keeps a fixed width. */
+.cl-page .cl-table.is-match {
+    table-layout: fixed;
+}
+
+.cl-page .cl-table.is-match col.cl-col-pick {
+    width: 46%;
+}
+
+.cl-page .cl-table.is-match col.cl-col-state {
+    width: 152px;
+}
+
+.cl-page .cl-table.is-match .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-match td {
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-match .cl-select {
+    width: 100%;
+    font-size: 14px;
+}
+
+.cl-page .cl-table.is-match .cl-help.is-warn {
+    margin: 6px 0 0;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-match .cl-diff {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--cl-ink-2);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-match {
+        table-layout: auto;
+    }
+
+    .cl-page .cl-table.is-match colgroup {
+        display: none;
+    }
+
+    /* the select takes the whole card width; its aria-label names it, so the column name is not repeated */
+    .cl-page .cl-table.is-match td.cl-cell-pick {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-match td.cl-cell-pick::before {
+        display: none;
+    }
+
+    /* Safari on iOS zooms the page when a field it focuses has text smaller than 16px */
+    .cl-page .cl-table.is-match .cl-select {
+        font-size: 16px;
+    }
+}
+
+/* Row of count pills (a summary in a card head); a pill with nothing to count is hidden by its li */
+.cl-page .cl-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Effects of a save, one per line with an icon, the new value in bold and what it replaces below */
+.cl-page .cl-effects {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 20px 16px;
+    list-style: none;
+}
+
+.cl-page .cl-effects > li {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-effects > li > :is(i, svg) {
+    margin-top: 3px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-effects > li strong {
+    font-weight: 600;
+    color: inherit;
+}
+
+.cl-page .cl-effects .cl-effects-was {
+    display: block;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-effects > li.is-bad,
+.cl-page .cl-effects > li.is-bad > :is(i, svg) {
+    color: var(--cl-bad);
+}

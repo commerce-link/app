@@ -1,7 +1,11 @@
 package pl.commercelink.warehouse.builtin;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,29 +16,22 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class StockLedgerService {
 
     private final WarehouseDocumentRepository warehouseDocumentRepository;
     private final WarehouseDocumentItemRepository warehouseDocumentItemRepository;
-
-    StockLedgerService(
-            WarehouseDocumentRepository warehouseDocumentRepository,
-            WarehouseDocumentItemRepository warehouseDocumentItemRepository
-    ) {
-        this.warehouseDocumentRepository = warehouseDocumentRepository;
-        this.warehouseDocumentItemRepository = warehouseDocumentItemRepository;
-    }
+    private final StockLedgerClosings closings;
 
     public List<StockLedgerRow> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         LocalDateTime periodStart = dateFrom.atStartOfDay();
         LocalDateTime periodEnd = dateTo.atTime(LocalTime.MAX);
 
-        Map<String, Aggregate> aggregates = new HashMap<>();
-
-        List<WarehouseDocument> historical = warehouseDocumentRepository.findAllBeforeDate(storeId, periodStart);
-        accumulate(historical, aggregates, Bucket.OPENING);
+        Map<String, Aggregate> aggregates = openingBalance(storeId, periodStart);
 
         List<WarehouseDocument> inPeriod = warehouseDocumentRepository.findAllInDateRange(storeId, periodStart, periodEnd);
         accumulate(inPeriod, aggregates, Bucket.PERIOD);
@@ -60,6 +57,37 @@ public class StockLedgerService {
 
         rows.sort(Comparator.comparing(StockLedgerRow::mfn, Comparator.nullsLast(Comparator.naturalOrder())));
         return rows;
+    }
+
+    private Map<String, Aggregate> openingBalance(String storeId, LocalDateTime periodStart) {
+        Map<String, Aggregate> aggregates = new HashMap<>();
+        Optional<Closing> closing = lastClosingBefore(storeId, periodStart.toLocalDate());
+        if (closing.isEmpty()) {
+            accumulate(warehouseDocumentRepository.findAllBeforeDate(storeId, periodStart), aggregates, Bucket.OPENING);
+            return aggregates;
+        }
+
+        closing.get().balances().forEach((mfn, balance) -> aggregates.put(mfn, Aggregate.opening(balance)));
+        LocalDateTime afterClosedPeriod = closing.get().period().to().plusDays(1).atStartOfDay();
+        if (afterClosedPeriod.isBefore(periodStart)) {
+            List<WarehouseDocument> sinceClosing =
+                    warehouseDocumentRepository.findAllInDateRange(storeId, afterClosedPeriod, periodStart.minusNanos(1));
+            accumulate(sinceClosing, aggregates, Bucket.OPENING);
+        }
+        return aggregates;
+    }
+
+    // a closed period that cannot be read leaves the opening balance to the whole history: slower, but still right
+    private Optional<Closing> lastClosingBefore(String storeId, LocalDate dateFrom) {
+        try {
+            return closings.closedPeriods(storeId).stream()
+                    .filter(period -> period.to().isBefore(dateFrom))
+                    .max(StockLedgerPeriod.BY_END)
+                    .map(period -> new Closing(period, closings.closingBalances(storeId, period)));
+        } catch (RuntimeException e) {
+            log.error("Closed stock ledger of store {} could not be read, the opening balance is taken from the whole history", storeId, e);
+            return Optional.empty();
+        }
     }
 
     private void accumulate(List<WarehouseDocument> documents, Map<String, Aggregate> aggregates, Bucket bucket) {
@@ -110,12 +138,23 @@ public class StockLedgerService {
 
     private enum Bucket { OPENING, PERIOD }
 
+    private record Closing(StockLedgerPeriod period, Map<String, ClosingBalance> balances) {
+    }
+
     private static class Aggregate {
         String latestName;
         int boQty;
         double boValue;
         final Map<LedgerCategory, Integer> qty = new EnumMap<>(LedgerCategory.class);
         final Map<LedgerCategory, Double> value = new EnumMap<>(LedgerCategory.class);
+
+        static Aggregate opening(ClosingBalance balance) {
+            Aggregate aggregate = new Aggregate();
+            aggregate.latestName = balance.name();
+            aggregate.boQty = balance.qty();
+            aggregate.boValue = balance.value();
+            return aggregate;
+        }
 
         void add(LedgerCategory category, int q, double v) {
             qty.merge(category, q, Integer::sum);

@@ -1231,6 +1231,7 @@ public class DeliveriesController {
             return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
         }
 
+        preview.setSupplierName(supplierLabels.forStoreId(getStoreId()).of(preview.getDeliverySupplier()));
         model.addAttribute("preview", preview);
         return "invoiceSyncPreview";
     }
