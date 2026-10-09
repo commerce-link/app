@@ -396,10 +396,27 @@ class OrderRowMapperTest {
     }
 
     @Test
+    void completedWarehouseOrderWithoutWzShowsItAsToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).anyMatch(m -> m.kind().equals("wz") && m.todo());
+    }
+
+    @Test
     void cancelledOrderNeverShowsAToDo() {
         // given
         Order order = new Order("s1");
         order.setStatus(OrderStatus.Cancelled);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
         OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
 
         // when
@@ -422,6 +439,21 @@ class OrderRowMapperTest {
 
         // then
         assertThat(row.marks()).filteredOn(OrderRow.DocMark::todo).extracting(OrderRow.DocMark::label)
-                .containsExactly("WZ: do wystawienia", "Paragon: do wystawienia", "Opinia: do zebrania");
+                .containsExactly("WZ: do wystawienia", "Paragon: do wystawienia");
+    }
+
+    @Test
+    void archivedOrderNeverShowsTheReviewToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).noneMatch(m -> m.kind().equals("review"));
     }
 }

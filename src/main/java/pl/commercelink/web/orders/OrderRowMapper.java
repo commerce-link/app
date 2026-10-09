@@ -144,7 +144,6 @@ public class OrderRowMapper {
                 || (archive && order.getStatus() == OrderStatus.Completed);
         // a closed order is past the point a missing document could hold it open, so its to-do says only what is missing
         String todo = archive ? "orders.archive.mark.todo" : "orders.list.mark.todo";
-        String reviewTodo = archive ? "orders.archive.mark.review.todo" : "orders.list.mark.review.todo";
         List<DocMark> marks = new ArrayList<>();
 
         Optional<Document> goodsIssue = order.getDocumentByType(DocumentType.GoodsIssue);
@@ -172,8 +171,9 @@ public class OrderRowMapper {
 
         OrderReviewStatus review = order.getReview() == null ? null : order.getReview().getStatus();
         String reviewName = text("orders.list.mark.review");
-        if (review == OrderReviewStatus.ToBeCollected && delivered) {
-            marks.add(mark("review", "", "is-todo", text(reviewTodo, reviewName)));
+        // a closed order is past collecting the review (ruling 5), so the archive never shows it as a to-do
+        if (review == OrderReviewStatus.ToBeCollected && delivered && !archive) {
+            marks.add(mark("review", "", "is-todo", text("orders.list.mark.review.todo", reviewName)));
         } else if (review == OrderReviewStatus.Positive || review == OrderReviewStatus.Negative || review == OrderReviewStatus.NoResponse) {
             marks.add(mark("review", "", "is-done", text("orders.list.mark.review.done", reviewName, text("OrderReviewStatus." + review.name()))));
         }
