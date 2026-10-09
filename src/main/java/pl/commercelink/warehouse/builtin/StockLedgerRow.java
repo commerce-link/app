@@ -1,7 +1,9 @@
 package pl.commercelink.warehouse.builtin;
 
 import pl.commercelink.starter.csv.CSVReady;
+import pl.commercelink.starter.csv.CSVWriter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +17,11 @@ public record StockLedgerRow(
         Map<LedgerCategory, Integer> qtyByCategory,
         Map<LedgerCategory, Double> valueByCategory
 ) implements CSVReady {
+
+    static final String MFN_HEADER = "SKU (MFN)";
+    static final String NAME_HEADER = "Nazwa";
+    static final String CLOSING_QTY_HEADER = "BZ ilość";
+    static final String CLOSING_VALUE_HEADER = "BZ wartość";
 
     @Override
     public String[] asStringArray() {
@@ -62,10 +69,14 @@ public record StockLedgerRow(
         return categories.stream().mapToDouble(this::value).sum();
     }
 
+    public static byte[] toCsv(List<StockLedgerRow> rows) throws IOException {
+        return new CSVWriter().writeAllRowsToBytes(rows, headers());
+    }
+
     public static String[] headers() {
         List<String> headers = new ArrayList<>();
-        headers.add("SKU (MFN)");
-        headers.add("Nazwa");
+        headers.add(MFN_HEADER);
+        headers.add(NAME_HEADER);
         headers.add("J.m.");
         headers.add("BO ilość");
         headers.add("BO wartość");
@@ -73,8 +84,8 @@ public record StockLedgerRow(
         appendHeaders(headers, LedgerCategory.receipts(), "Przychód RAZEM");
         appendHeaders(headers, LedgerCategory.issues(), "Rozchód RAZEM");
 
-        headers.add("BZ ilość");
-        headers.add("BZ wartość");
+        headers.add(CLOSING_QTY_HEADER);
+        headers.add(CLOSING_VALUE_HEADER);
         headers.add("Waluta");
 
         return headers.toArray(new String[0]);
@@ -91,5 +102,9 @@ public record StockLedgerRow(
 
     private static String formatMoney(double value) {
         return String.format(Locale.US, "%.2f", value).replace('.', ',');
+    }
+
+    static double parseMoney(String cell) {
+        return Double.parseDouble(cell.replace(',', '.'));
     }
 }
