@@ -1,13 +1,16 @@
 package pl.commercelink.web.orders;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCancellationStatus;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
@@ -191,7 +194,17 @@ public final class OrderLabels {
         if (shipment.isCancellationInProgress(now)) {
             return "shipment.cancellation.pending";
         }
-        return shipment.needsCancellationRecheck(now) ? "shipment.cancellation.unconfirmed" : "shipment.cancellation.failed";
+        if (shipment.needsCancellationRecheck(now)) {
+            return "shipment.cancellation.unconfirmed";
+        }
+        return cancellationReason(shipment) != null ? "shipment.cancellation.failedWithReason" : "shipment.cancellation.failed";
+    }
+
+    /** The provider's words for refusing the cancellation, or null when none were stored (rows from before). */
+    public static String cancellationReason(Shipment shipment) {
+        CourierCancellation cancellation = shipment.getCancellation();
+        return cancellation == null || cancellation.getStatus() != ShipmentCancellationStatus.FAILED
+                ? null : StringUtils.trimToNull(cancellation.getError());
     }
 
     public static String cancellationTone(Shipment shipment, LocalDateTime now) {

@@ -439,7 +439,8 @@ public class OrderPageModelFactory {
                     ShippingIntegrationChoice.ALLEGRO.equals(s.getProvider()) && s.getExternalId() != null
                             ? "order.shipments.allegro.note" : null,
                     cancelHref(readOnly, courierCancellable, s, now, details),
-                    cancelReasonKey(readOnly, courierCancellable, s, now)));
+                    cancelReasonKey(readOnly, courierCancellable, s, now),
+                    OrderLabels.cancellationReason(s)));
             if (!readOnly) {
                 forms.add(form);
             }

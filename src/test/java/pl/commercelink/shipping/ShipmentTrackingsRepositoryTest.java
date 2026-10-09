@@ -104,6 +104,29 @@ class ShipmentTrackingsRepositoryTest {
     }
 
     @Test
+    void expireSilentlyClosesAnOpenRowAndLeavesAFinalOrMissingOne() {
+        // given
+        ShipmentTracking open = new ShipmentTracking("store-1", "PKG-1", "order-1", null, LocalDateTime.now());
+        ShipmentTracking delivered = new ShipmentTracking("store-1", "PKG-2", "order-1", null, LocalDateTime.now());
+        delivered.setState("DELIVERED");
+        when(dynamoDBMapper.load(ShipmentTracking.class, "store-1", "PKG-1")).thenReturn(open);
+        when(dynamoDBMapper.load(ShipmentTracking.class, "store-1", "PKG-2")).thenReturn(delivered);
+
+        // when
+        boolean closed = repository.expireSilently("store-1", "PKG-1");
+        boolean untouched = repository.expireSilently("store-1", "PKG-2");
+        boolean missing = repository.expireSilently("store-1", "PKG-3");
+
+        // then
+        assertThat(closed).isTrue();
+        assertThat(open.getState()).isEqualTo("EXPIRED");
+        assertThat(untouched).isFalse();
+        assertThat(delivered.getState()).isEqualTo("DELIVERED");
+        assertThat(missing).isFalse();
+        verify(dynamoDBMapper, org.mockito.Mockito.times(1)).save(any(ShipmentTracking.class), any(DynamoDBSaveExpression.class));
+    }
+
+    @Test
     void advanceFromNoStateExpectsTheStateAttributeToBeAbsent() {
         // given
         ShipmentTracking row = new ShipmentTracking("store-1", "PKG-1", "order-1", null, LocalDateTime.now(), "allegro", "shp-1");

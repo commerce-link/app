@@ -120,7 +120,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * the store ships through several, else null; integrationNoteKey: a sentence about the integration (Wysyłam z
      * Allegro adds the number to the Allegro order itself), null for others; cancelHref: "Cancel shipment" of this
      * row's courier order (the confirmation page, data-cl-confirm intercepts it); cancelReasonKey: it is greyed with
-     * this reason (its argument is integration).
+     * this reason (its argument is integration). cancellationReason: the provider's words for refusing the cancellation,
+     * the second argument of the failed-with-reason pill, null without one.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
@@ -130,7 +131,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               String removeActionKey, boolean placeholder, String stateKey, Object[] stateArgs,
                               String stateTone, boolean stateInProgress, String labelHref, String retryHref,
                               String integration, String integrationPill, String integrationNoteKey,
-                              String cancelHref, String cancelReasonKey) {
+                              String cancelHref, String cancelReasonKey, String cancellationReason) {
 
         /** The ⋯ menu holds the rare and blocking actions: edit, cancel and remove, live or greyed with a reason. */
         public boolean hasMenu() {

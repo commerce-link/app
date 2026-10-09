@@ -49,6 +49,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -243,7 +244,7 @@ class ShipmentPickupFlowTest {
         orderShips(shipment);
         List<String> beforeCancellation = listed();
         ShipmentCancellationSettler cancellation = new ShipmentCancellationSettler(ordersRepository,
-                orderEventsRepository, optimisticLockingExecutor, new OrderRealizationStepBack(orderEventsRepository));
+                orderEventsRepository, optimisticLockingExecutor, new OrderRealizationStepBack(orderEventsRepository), mock(ShipmentTrackingsRepository.class));
 
         // when
         cancellation.succeed(ShipmentCancellationCheckRequest.first("store-1", "order-1", "1", "cancel-1"));

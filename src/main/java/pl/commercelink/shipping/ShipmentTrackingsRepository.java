@@ -65,6 +65,20 @@ public class ShipmentTrackingsRepository extends DynamoDbRepository<ShipmentTrac
         return saved;
     }
 
+    /**
+     * Closes the row of a parcel that no longer exists (its shipment was cancelled) without any effect on the order:
+     * EXPIRED is final, so the sweep stops polling it. A missing row, one already final or one moved by another writer
+     * is left alone.
+     */
+    public boolean expireSilently(String storeId, String trackingNo) {
+        Optional<ShipmentTracking> found = find(storeId, trackingNo);
+        if (found.isEmpty() || found.get().hasUnknownState()
+                || !ShipmentTrackingState.isForward(found.get().currentState(), ShipmentTrackingState.EXPIRED)) {
+            return false;
+        }
+        return advance(found.get(), ShipmentTrackingState.EXPIRED);
+    }
+
     /** Puts back the state the row was read with, only while it still holds the one {@link #advance} wrote. */
     public boolean revert(ShipmentTracking row, String previousState) {
         String advancedState = row.getState();

@@ -636,6 +636,23 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aFailedCancellationWithTheProvidersReasonShowsItInThePill() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2))
+                .failed("Wybrana przesyłka nie może już być anulowana"));
+
+        // when
+        OrderPageModel.ShipmentRow row = factory.build(order, List.of(), ADMIN, PL).shipments().rows().get(0);
+
+        // then
+        assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.failedWithReason");
+        assertThat(row.cancellationReason()).isEqualTo("Wybrana przesyłka nie może już być anulowana");
+        assertThat(row.cancellationTone()).isEqualTo("is-bad");
+    }
+
+    @Test
     void aShipmentWithoutACancellationHasNoPillAndTheUsualRemovalText() {
         // given
         Order order = order(OrderStatus.Shipping);

@@ -84,6 +84,9 @@ public class ShipmentTrackingUpdates {
         if (order == null) {
             return false;
         }
+        if (parcelIsGone(order, row.getTrackingNo(), state)) {
+            return closeSilently(row);
+        }
         if (state == ShipmentTrackingState.COLLECTED
                 && !order.getStatus().isOneOf(OrderStatus.Shipping, OrderStatus.Delivered, OrderStatus.Completed)) {
             // not remembered: a later webhook or poll applies it once the order ships
@@ -102,6 +105,28 @@ public class ShipmentTrackingUpdates {
             revertAfterFailedEffects(row, previousState, state, e);
             throw e;
         }
+    }
+
+    /**
+     * The order no longer has the parcel (its shipment was cancelled or its number edited), or a late "no delivery
+     * data" would only repeat what the order already says: it is closed, or delivered by hand, or cancelled.
+     */
+    private boolean parcelIsGone(Order order, String trackingNo, ShipmentTrackingState state) {
+        List<Shipment> shipments = order.getShipments().stream().filter(s -> s.hasTrackingNo(trackingNo)).toList();
+        if (shipments.isEmpty()) {
+            return true;
+        }
+        return state == ShipmentTrackingState.EXPIRED
+                && (order.getStatus().isOneOf(OrderStatus.Delivered, OrderStatus.Completed, OrderStatus.Cancelled)
+                || shipments.stream().allMatch(s -> s.getDeliveredAt() != null));
+    }
+
+    /** Ends the parcel's polling without a timeline entry or any change to the order or RMA. */
+    private boolean closeSilently(ShipmentTracking row) {
+        if (!shipmentTrackingsRepository.advance(row, ShipmentTrackingState.EXPIRED)) {
+            log.warn("Shipment already moved by another writer: store={} trackingNo={}", row.getStoreId(), row.getTrackingNo());
+        }
+        return false;
     }
 
     private boolean applyOrderEffects(Order order, ShipmentTracking row, ShipmentTrackingState state, LocalDateTime occurredAt) {
@@ -149,6 +174,9 @@ public class ShipmentTrackingUpdates {
         if (rma == null) {
             return false;
         }
+        if (rmaParcelIsGone(rma, row.getTrackingNo(), state)) {
+            return closeSilently(row);
+        }
         if (state == ShipmentTrackingState.DELIVERED && rma.getStatus() != RMAStatus.WaitingForItems) {
             log.warn("Shipment DELIVERED ignored: rma={} status={}", rma.getRmaId(), rma.getStatus());
             return false;
@@ -163,6 +191,13 @@ public class ShipmentTrackingUpdates {
             revertAfterFailedEffects(row, previousState, state, e);
             throw e;
         }
+    }
+
+    private boolean rmaParcelIsGone(RMA rma, String trackingNo, ShipmentTrackingState state) {
+        List<Shipment> shipments = rma.getShipments().stream().filter(s -> s.hasTrackingNo(trackingNo)).toList();
+        return shipments.isEmpty() || (state == ShipmentTrackingState.EXPIRED
+                && (rma.getStatus() == RMAStatus.Completed || rma.getStatus() == RMAStatus.Rejected
+                || shipments.stream().allMatch(s -> s.getDeliveredAt() != null)));
     }
 
     private boolean applyRmaEffects(RMA rma, ShipmentTracking row, ShipmentTrackingState state, LocalDateTime occurredAt) {

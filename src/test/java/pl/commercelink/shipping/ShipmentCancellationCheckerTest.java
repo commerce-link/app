@@ -75,7 +75,7 @@ class ShipmentCancellationCheckerTest {
         // the real settler: its own write rules are pinned in ShipmentCancellationSettlerTest
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                        new OrderRealizationStepBack(orderEventsRepository));
+                        new OrderRealizationStepBack(orderEventsRepository), mock(ShipmentTrackingsRepository.class));
         checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviders, publisher, settler);
     }
 

@@ -981,6 +981,25 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aRefusedCancellationShowsTheProvidersReasonAndAnOldRowKeepsTheGenericText() {
+        // given
+        Order refused = order(OrderStatus.Shipping);
+        Shipment sent = refused.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1))
+                .failed("Wybrana przesyłka nie może już być anulowana"));
+
+        // when
+        String card = card(page(render(refused, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("Anulowanie nieudane: Wybrana przesyłka nie może już być anulowana (integracja: Furgonetka)");
+    }
+
+    @Test
     void theOnlyShipmentCanBeRemovedCompletelyButABarePlaceholderOffersNoRemove() {
         // given: a number typed by hand on the only shipment; another order with nothing but the delivery choice
         Order order = order(OrderStatus.Realization);

@@ -266,6 +266,95 @@ class ShipmentTrackingUpdatesTest {
     }
 
     @Test
+    void expiredForAShipmentCancelledSinceRecordsNoEventAndClosesTheRow() {
+        // given: the cancellation removed the shipment, the row was left open
+        Order order = order(OrderStatus.Realization, courier("OTHER-1"));
+        ShipmentTracking row = indexedForOrder("PKG-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        boolean applied = apply("PKG-1", ShipmentTrackingState.EXPIRED);
+
+        // then
+        assertThat(applied).isFalse();
+        verify(shipmentTrackingsRepository).advance(row, ShipmentTrackingState.EXPIRED);
+        verifyNoInteractions(orderEventsRepository, orderLifecycle, goodsOutEventPublisher);
+    }
+
+    @Test
+    void expiredForAnOrderClosedMeanwhileRecordsNoEvent() {
+        // given
+        for (OrderStatus closed : List.of(OrderStatus.Delivered, OrderStatus.Completed, OrderStatus.Cancelled)) {
+            Order order = order(closed, courier("PKG-1"));
+            ShipmentTracking row = indexedForOrder("PKG-1");
+            when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+            // when
+            boolean applied = apply("PKG-1", ShipmentTrackingState.EXPIRED);
+
+            // then
+            assertThat(applied).as(closed.name()).isFalse();
+            verify(shipmentTrackingsRepository).advance(row, ShipmentTrackingState.EXPIRED);
+            verifyNoInteractions(orderEventsRepository);
+            org.mockito.Mockito.clearInvocations(shipmentTrackingsRepository);
+        }
+    }
+
+    @Test
+    void expiredForAParcelAlreadyMarkedDeliveredByHandRecordsNoEvent() {
+        // given
+        Shipment shipment = courier("PKG-1");
+        shipment.setDeliveredAt(DELIVERED_AT);
+        Order order = order(OrderStatus.Shipping, shipment);
+        indexedForOrder("PKG-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        boolean applied = apply("PKG-1", ShipmentTrackingState.EXPIRED);
+
+        // then
+        assertThat(applied).isFalse();
+        verifyNoInteractions(orderEventsRepository);
+    }
+
+    @Test
+    void deliveredForAShipmentCancelledSinceClosesTheRowQuietly() {
+        // given
+        Order order = order(OrderStatus.Realization, courier("OTHER-1"));
+        ShipmentTracking row = indexedForOrder("PKG-1");
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
+
+        // when
+        boolean applied = apply("PKG-1", ShipmentTrackingState.DELIVERED);
+
+        // then
+        assertThat(applied).isFalse();
+        verify(shipmentTrackingsRepository).advance(row, ShipmentTrackingState.EXPIRED);
+        verifyNoInteractions(orderEventsRepository, orderLifecycle);
+    }
+
+    @Test
+    void expiredForAnRmaWithoutThatShipmentRecordsNoEvent() {
+        // given
+        RMA rma = new RMA();
+        rma.setStoreId(STORE_ID);
+        rma.setRmaId("rma-1");
+        rma.setStatus(RMAStatus.WaitingForItems);
+        ShipmentTracking row = new ShipmentTracking(STORE_ID, "PKG-1", null, "rma-1", DELIVERED_AT);
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1")).thenReturn(Optional.of(row));
+        when(rmaRepository.findById(STORE_ID, "rma-1")).thenReturn(rma);
+
+        // when
+        boolean applied = apply("PKG-1", ShipmentTrackingState.EXPIRED);
+
+        // then
+        assertThat(applied).isFalse();
+        verify(shipmentTrackingsRepository).advance(row, ShipmentTrackingState.EXPIRED);
+        verify(rmaRepository, never()).save(any());
+        assertThat(rma.getEvents()).isEmpty();
+    }
+
+    @Test
     void deliveredForRmaMarksItemsReceivedWhenAllShipmentsDelivered() {
         // given
         RMA rma = new RMA();

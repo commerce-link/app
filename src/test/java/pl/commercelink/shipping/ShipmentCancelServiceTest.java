@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -84,7 +85,7 @@ class ShipmentCancelServiceTest {
         // the real settler: an immediate provider result is written by the same rules as the checker's
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                        new OrderRealizationStepBack(orderEventsRepository));
+                        new OrderRealizationStepBack(orderEventsRepository), mock(ShipmentTrackingsRepository.class));
         shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, shippingProviders,
                 publisher, optimisticLockingExecutor, settler);
     }
