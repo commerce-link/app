@@ -30,6 +30,8 @@ import pl.commercelink.shipping.ParcelForm;
 import pl.commercelink.shipping.ShipmentCreationReconciler;
 import pl.commercelink.shipping.ShipmentCreationService;
 import pl.commercelink.shipping.ShipmentCreationSettler;
+import pl.commercelink.shipping.ShipmentOwner;
+import pl.commercelink.shipping.ShipmentOwners;
 import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.shipping.api.ShipmentCreation;
@@ -91,6 +93,8 @@ class OrdersShippingControllerTest {
     @Mock private ShippingProviders shippingProviders;
     @Mock private ShipmentCreationSettler settler;
     @Mock private ShippingProvider allegroProvider;
+    @Mock private ShipmentOwners owners;
+    @Mock private ShipmentOwner orderOwner;
 
     @InjectMocks
     private OrdersShippingController controller;
@@ -112,9 +116,10 @@ class OrdersShippingControllerTest {
                 new ShippingIntegrationChoiceView(invocation.getArgument(0), invocation.getArgument(1), null, null));
         // the real reconciler, so these tests see what the provider's answer does to the booking
         ReflectionTestUtils.setField(controller, "shipmentCreationReconciler",
-                new ShipmentCreationReconciler(shippingProviders, settler));
+                new ShipmentCreationReconciler(shippingProviders, settler, owners));
         when(shippingProviders.forShipment(any(), any())).thenReturn(java.util.Optional.of(allegroProvider));
         when(shippingIntegrationNames.of(eq("allegro"), any(), any())).thenReturn("Wysyłam z Allegro");
+        when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(orderOwner);
     }
 
     @AfterEach
@@ -666,8 +671,8 @@ class OrdersShippingControllerTest {
     }
 
     @Test
-    void allegroCreateBooksAsBeforeWhenTheEarlierCommandIsStillUnknown() {
-        // given: nothing more is knowable; the row already warned the operator to check the panel
+    void allegroCreateBooksAsBeforeWhenTheEarlierCommandIsPendingWithoutAPackage() {
+        // given: nothing says the command reached Allegro; the row already warned the operator to check the panel
         Order order = allegroOrderWithUnconfirmedCreation();
         allegroSuggested(order);
         when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", null));
@@ -682,5 +687,87 @@ class OrdersShippingControllerTest {
         // then
         verifyNoInteractions(settler);
         verify(shipmentCreationService).start(any(), any(), any(), any(), eq("allegro"));
+    }
+
+    private void pendingWithAPackage(Order order) {
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", "shp-9"));
+    }
+
+    @Test
+    void theFormOfAnOrderWhosePackageAwaitsItsNumberReturnsToTheOrder() {
+        // given: Allegro answered SUCCESS without the waybill
+        Order order = allegroOrderWithUnconfirmedCreation();
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then: the package id is kept on the row, the row stays, nothing is booked
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(messageSource).getMessage(eq("shipping.creation.createdWithoutNumber"),
+                argThat(args -> args.length == 1 && "Wysyłam z Allegro".equals(args[0])), eq(Locale.ENGLISH));
+        verify(orderOwner).recordExternalId(argThat(r -> "shp-9".equals(r.getExternalId())));
+        verifyNoInteractions(settler);
+        verify(shippingIntegrationChoice, never()).forOrder(any(), any());
+    }
+
+    @Test
+    void allegroCreateDoesNotBookAgainWhileThePackageAwaitsItsNumber() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateDoesNotBookAgainWhileThePackageAwaitsItsNumber() {
+        // given: the row was already settled as never confirmed ("Spróbuj ponownie" leads here)
+        Order order = allegroOrderWithUnconfirmedCreation();
+        Shipment stuck = order.getShipments().get(0);
+        stuck.setCreation(stuck.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateBooksWhenTheEarlierCommandIsPendingWithoutAPackage() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", null));
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        verifyNoInteractions(settler, orderOwner);
+        verify(shipmentCreationService).start(any(), any(), any(), any());
     }
 }

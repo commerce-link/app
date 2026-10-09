@@ -40,6 +40,8 @@ class ShipmentCreationReconcilerTest {
     @Mock private ShippingProviders shippingProviders;
     @Mock private ShipmentCreationSettler settler;
     @Mock private ShippingProvider allegro;
+    @Mock private ShipmentOwners owners;
+    @Mock private ShipmentOwner owner;
 
     @InjectMocks
     private ShipmentCreationReconciler reconciler;
@@ -52,6 +54,7 @@ class ShipmentCreationReconcilerTest {
         order = new Order("store-1");
         order.setOrderId("order-1");
         when(shippingProviders.forShipment(eq(store), any())).thenReturn(Optional.of(allegro));
+        when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(owner);
     }
 
     private Shipment row(ShipmentCreationState creation) {
@@ -83,10 +86,10 @@ class ShipmentCreationReconcilerTest {
         when(allegro.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.succeeded("cmd-0", created()));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
-        assertThat(result).contains(stuck);
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(ShipmentCreationReconciler.Outcome.CREATED, stuck));
         verify(settler).succeeded(argThat(r -> "shp-9".equals(r.getExternalId()) && "cmd-0".equals(r.getCommandId())
                 && r.getOwnerType() == ShipmentOwnerType.ORDER && "order-1".equals(r.getOwnerId())
                 && "store-1".equals(r.getStoreId()) && "allegro".equals(r.getProvider())
@@ -101,10 +104,10 @@ class ShipmentCreationReconcilerTest {
         when(allegro.checkShipmentCreation("cmd-0", "shp-9")).thenReturn(ShipmentCreation.succeeded("cmd-0", created()));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
-        assertThat(result).contains(stuck);
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(ShipmentCreationReconciler.Outcome.CREATED, stuck));
         verify(settler).succeeded(any(), eq(created()));
     }
 
@@ -116,7 +119,7 @@ class ShipmentCreationReconcilerTest {
                 .thenReturn(ShipmentCreation.failed("cmd-0", null, "Nieprawidłowy kod pocztowy"));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
         assertThat(result).isEmpty();
@@ -125,17 +128,49 @@ class ShipmentCreationReconcilerTest {
     }
 
     @Test
-    void aCommandStillPendingChangesNothing() {
-        // given
+    void aCommandPendingWithoutAPackageLetsTheBookingGoOn() {
+        // given: nothing says the command ever reached the provider
         row(overdue());
-        when(allegro.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", "shp-9"));
+        when(allegro.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", null));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
         assertThat(result).isEmpty();
+        verifyNoInteractions(settler, owner);
+    }
+
+    @Test
+    void aPackageTheProviderHoldsWithoutItsNumberIsRecordedAndStopsTheBooking() {
+        // given: Allegro answered SUCCESS without the waybill: the paid shipment exists
+        Shipment stuck = row(unconfirmed(ShipmentCreationState.UNCONFIRMED_KEY));
+        when(allegro.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", "shp-9"));
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(
+                ShipmentCreationReconciler.Outcome.CREATED_WITHOUT_NUMBER, stuck));
+        verify(owner).recordExternalId(argThat(r -> "shp-9".equals(r.getExternalId()) && "cmd-0".equals(r.getCommandId())));
         verifyNoInteractions(settler);
+    }
+
+    @Test
+    void aPackageIdAlreadyOnTheRowIsNotRecordedAgainButStillStopsTheBooking() {
+        // given: Furgonetka names its package from the start
+        Shipment stuck = row(overdue());
+        stuck.setExternalId("21480003");
+        when(allegro.checkShipmentCreation("cmd-0", "21480003")).thenReturn(ShipmentCreation.pending("cmd-0", "21480003"));
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).map(ShipmentCreationReconciler.Found::outcome)
+                .contains(ShipmentCreationReconciler.Outcome.CREATED_WITHOUT_NUMBER);
+        verifyNoInteractions(owner, settler);
     }
 
     @Test
@@ -145,7 +180,7 @@ class ShipmentCreationReconcilerTest {
         when(allegro.checkShipmentCreation("cmd-0", null)).thenThrow(new ShippingException("HTTP 502"));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
         assertThat(result).isEmpty();
@@ -160,10 +195,10 @@ class ShipmentCreationReconcilerTest {
         doThrow(new IllegalStateException("throttled")).when(settler).succeeded(any(), any());
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
-        assertThat(result).contains(stuck);
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(ShipmentCreationReconciler.Outcome.CREATED, stuck));
     }
 
     @Test
@@ -173,7 +208,7 @@ class ShipmentCreationReconcilerTest {
         when(shippingProviders.forShipment(eq(store), any())).thenReturn(Optional.empty());
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
         assertThat(result).isEmpty();
@@ -192,7 +227,7 @@ class ShipmentCreationReconcilerTest {
         order.setShipments(new ArrayList<>(List.of(inProgress, refused, done)));
 
         // when
-        Optional<Shipment> result = reconciler.reconcile(store, order);
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
 
         // then
         assertThat(result).isEmpty();

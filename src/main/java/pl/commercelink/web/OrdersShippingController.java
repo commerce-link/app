@@ -244,15 +244,17 @@ public class OrdersShippingController extends AbstractShippingController {
     /**
      * A shipment whose creation never got a result may exist at the provider all the same (paid, its number already on
      * the buyer's marketplace order): it is asked once more before the form opens and before booking, and a shipment
-     * found created ends the booking here. A row the check found refused stays a failed creation, so what the
+     * found created, or a package the provider holds without its number yet, ends the booking here. A row the check found refused stays a failed creation, so what the
      * caller decides from the order read before is unchanged.
      */
     private String redirectIfCreatedAfterAll(Store store, Order order, RedirectAttributes redirectAttributes, Locale locale) {
         return shipmentCreationReconciler.reconcile(store, order)
-                .map(created -> {
-                    redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
-                            "shipping.creation.createdAfterAll",
-                            new Object[]{shippingIntegrationNames.of(created.getProvider(), store, locale)}, locale));
+                .map(found -> {
+                    String key = found.outcome() == ShipmentCreationReconciler.Outcome.CREATED
+                            ? "shipping.creation.createdAfterAll" : "shipping.creation.createdWithoutNumber";
+                    redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(key,
+                            new Object[]{shippingIntegrationNames.of(found.shipment().getProvider(), store, locale)},
+                            locale));
                     return "redirect:/dashboard/orders/" + order.getOrderId();
                 })
                 .orElse(null);

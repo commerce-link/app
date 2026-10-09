@@ -26,13 +26,25 @@ public class ShipmentCreationReconciler {
 
     private final ShippingProviders shippingProviders;
     private final ShipmentCreationSettler settler;
+    private final ShipmentOwners owners;
+
+    /** What the check found about an earlier command, and the row it concerns. */
+    public enum Outcome {
+        /** Created after all, now settled on the order: no second booking. */
+        CREATED,
+        /** The provider holds the package but has not finished it (no waybill yet): no second booking either. */
+        CREATED_WITHOUT_NUMBER
+    }
+
+    public record Found(Outcome outcome, Shipment shipment) {
+    }
 
     /**
-     * The shipment whose command turned out to have created it: the caller must not book again. Empty when nothing was
-     * created, or nothing more is knowable (still pending, the check failed, the integration is gone): the operator
+     * A shipment the provider holds for an earlier command: the caller must not book again. Empty when nothing was
+     * created, or nothing more is knowable (no package named, the check failed, the integration is gone): the operator
      * was warned by the row's message.
      */
-    public Optional<Shipment> reconcile(Store store, Order order) {
+    public Optional<Found> reconcile(Store store, Order order) {
         LocalDateTime now = LocalDateTime.now();
         for (Shipment shipment : order.getShipments()) {
             ShipmentCreationState creation = shipment.getCreation();
@@ -40,14 +52,15 @@ public class ShipmentCreationReconciler {
                     || !creation.isOutcomeUnknown(now)) {
                 continue;
             }
-            if (foundCreated(store, order, shipment)) {
-                return Optional.of(shipment);
+            Optional<Outcome> outcome = check(store, order, shipment);
+            if (outcome.isPresent()) {
+                return Optional.of(new Found(outcome.get(), shipment));
             }
         }
         return Optional.empty();
     }
 
-    private boolean foundCreated(Store store, Order order, Shipment shipment) {
+    private Optional<Outcome> check(Store store, Order order, Shipment shipment) {
         ShipmentCreationCheckRequest request = ShipmentCreationCheckRequest.builder()
                 .storeId(order.getStoreId())
                 .ownerType(ShipmentOwnerType.ORDER)
@@ -61,7 +74,7 @@ public class ShipmentCreationReconciler {
         if (provider.isEmpty()) {
             log.warn("Creation command {} of order {} in store {} not checked again: its integration {} is gone",
                     request.getCommandId(), request.getOwnerId(), request.getStoreId(), request.getProvider());
-            return false;
+            return Optional.empty();
         }
         ShipmentCreation result;
         try {
@@ -69,18 +82,39 @@ public class ShipmentCreationReconciler {
         } catch (RuntimeException e) {
             log.warn("Creation command {} of order {} in store {} could not be checked again: {}",
                     request.getCommandId(), request.getOwnerId(), request.getStoreId(), e.getMessage(), e);
-            return false;
+            return Optional.empty();
         }
         switch (result.status()) {
             case SUCCEEDED -> {
                 settleCreated(request.withExternalId(result.result().externalId()), result);
-                return true;
+                return Optional.of(Outcome.CREATED);
             }
             case FAILED -> settleFailed(request, result.error());
-            case PENDING -> log.warn("Creation command {} of order {} in store {} (package {}) is still pending",
-                    request.getCommandId(), request.getOwnerId(), request.getStoreId(), result.externalId());
+            case PENDING -> {
+                // a package id means the provider already holds the (paid) package, only its number is missing
+                // (Allegro's SUCCESS before the waybill); without one nothing says the command ever reached it
+                if (result.externalId() != null) {
+                    recordPackageId(request, result.externalId());
+                    return Optional.of(Outcome.CREATED_WITHOUT_NUMBER);
+                }
+                log.warn("Creation command {} of order {} in store {} is still pending without a package",
+                        request.getCommandId(), request.getOwnerId(), request.getStoreId());
+            }
         }
-        return false;
+        return Optional.empty();
+    }
+
+    private void recordPackageId(ShipmentCreationCheckRequest request, String externalId) {
+        if (externalId.equals(request.getExternalId())) {
+            return;
+        }
+        try {
+            owners.get(request.getOwnerType()).recordExternalId(request.withExternalId(externalId));
+        } catch (RuntimeException e) {
+            // the booking is refused either way; the next check names the package again
+            log.warn("Package {} of creation command {} of order {} in store {} was not recorded on the order",
+                    externalId, request.getCommandId(), request.getOwnerId(), request.getStoreId(), e);
+        }
     }
 
     private void settleCreated(ShipmentCreationCheckRequest request, ShipmentCreation result) {

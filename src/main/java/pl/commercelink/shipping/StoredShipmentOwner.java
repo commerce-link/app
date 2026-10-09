@@ -48,9 +48,10 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
                 && (shipment.getExternalId() != null || shipment.hasShippingData() || shipment.hasCollectionData());
     }
 
+    /** Also on a row marked as never confirmed: the reconciler records the package the provider named later. */
     @Override
     public void recordExternalId(ShipmentCreationCheckRequest request) {
-        modify(request, owner -> ShipmentLists.creating(shipments(owner), request.getCommandId())
+        modify(request, owner -> ShipmentLists.unsettled(shipments(owner), request.getCommandId())
                 .map(s -> {
                     s.setExternalId(request.getExternalId());
                     return true;

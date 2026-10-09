@@ -425,4 +425,19 @@ class OrderShipmentOwnerTest {
         assertThat(order.getShipments().get(0).getCreation().isFailed()).isTrue();
         verifyNoInteractions(lifecycleEventPublisher);
     }
+
+    @Test
+    void aPackageNamedLaterIsRecordedOnARowNeverConfirmed() {
+        // given
+        Shipment unconfirmed = placeholder("cmd-0");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        order.setShipments(new ArrayList<>(List.of(unconfirmed)));
+
+        // when
+        owner.recordExternalId(request("cmd-0").withExternalId("shp-9"));
+
+        // then
+        assertThat(order.getShipments().get(0).getExternalId()).isEqualTo("shp-9");
+        assertThat(order.getShipments().get(0).getCreation().isFailedUnconfirmed()).isTrue();
+    }
 }
