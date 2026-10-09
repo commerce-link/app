@@ -705,6 +705,23 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-accent-ink);
 }
 
+/* A number inside a button: how many records the action would take ("Zamów odbiór" on the orders list counts the
+   packages waiting for a courier); the text before it for a screen reader is visually hidden */
+.cl-button-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 .cl-page .cl-back:focus-visible,
 .cl-button:focus-visible {
     outline: 2px solid var(--cl-accent);
@@ -5679,7 +5696,8 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-page-actions .cl-page-action-form,
-    .cl-page .cl-page-actions .cl-page-action-form .cl-button {
+    .cl-page .cl-page-actions .cl-page-action-form .cl-button,
+    .cl-page .cl-page-actions .cl-button.is-page-action {
         width: 100%;
         justify-content: center;
     }
@@ -7876,6 +7894,14 @@ a.cl-link-button:hover {
     height: 20px;
     border-width: 2px;
     flex: none;
+}
+
+/* Work in progress in a list row (a shipment being created or its pickup ordered): the line above at the size of the
+   row description, with the compact spinner. */
+.cl-page .cl-list-desc.cl-loading {
+    font-size: 13.5px;
+    gap: 8px;
+    margin-top: 2px;
 }
 
 /* A spinner in running text or a disclosure title (restock suggestions loading): the size of the text beside it. */
@@ -10146,6 +10172,17 @@ a.cl-link-button:hover {
     }
 }
 
+/* A note under a row of a check list: why the row cannot be ticked (a package the carrier refuses on the pickup page) */
+.cl-page .cl-check-list .cl-check-note {
+    margin: 0 0 4px 24px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-check-list .cl-check-note.is-warn {
+    color: var(--cl-warn);
+}
+
 /* Warehouse document details: the item table gives the name what the fixed numeric columns leave (width: 1% does not
    work with the table-layout: fixed of .is-wrap — the columns overlapped); a code part never breaks inside */
 .cl-page .cl-table.is-line-items :is(th, td).is-numeric { width: 8.5rem; white-space: nowrap; }
@@ -10460,4 +10497,119 @@ a.cl-link-button:hover {
     .cl-page .cl-card > .cl-result-head + .cl-table-toolbar {
         padding-top: 12px;
     }
+}
+
+/* --- Invoice sync preview (/dashboard/deliveries/sync/preview, docs/active/invoice-sync-preview-redesign, variant A) --- */
+
+/* Assignment table: a row of the record (product or cost) against a choice from another document. The key column
+   wraps, the choice takes the larger share, the match state (pill + optional difference) keeps a fixed width. */
+.cl-page .cl-table.is-match {
+    table-layout: fixed;
+}
+
+.cl-page .cl-table.is-match col.cl-col-pick {
+    width: 46%;
+}
+
+.cl-page .cl-table.is-match col.cl-col-state {
+    width: 152px;
+}
+
+.cl-page .cl-table.is-match .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-match td {
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-match .cl-select {
+    width: 100%;
+    font-size: 14px;
+}
+
+.cl-page .cl-table.is-match .cl-help.is-warn {
+    margin: 6px 0 0;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-match .cl-diff {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--cl-ink-2);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-match {
+        table-layout: auto;
+    }
+
+    .cl-page .cl-table.is-match colgroup {
+        display: none;
+    }
+
+    /* the select takes the whole card width; its aria-label names it, so the column name is not repeated */
+    .cl-page .cl-table.is-match td.cl-cell-pick {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-match td.cl-cell-pick::before {
+        display: none;
+    }
+
+    /* Safari on iOS zooms the page when a field it focuses has text smaller than 16px */
+    .cl-page .cl-table.is-match .cl-select {
+        font-size: 16px;
+    }
+}
+
+/* Row of count pills (a summary in a card head); a pill with nothing to count is hidden by its li */
+.cl-page .cl-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Effects of a save, one per line with an icon, the new value in bold and what it replaces below */
+.cl-page .cl-effects {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 20px 16px;
+    list-style: none;
+}
+
+.cl-page .cl-effects > li {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-effects > li > :is(i, svg) {
+    margin-top: 3px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-effects > li strong {
+    font-weight: 600;
+    color: inherit;
+}
+
+.cl-page .cl-effects .cl-effects-was {
+    display: block;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-effects > li.is-bad,
+.cl-page .cl-effects > li.is-bad > :is(i, svg) {
+    color: var(--cl-bad);
 }

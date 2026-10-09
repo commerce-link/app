@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +56,8 @@ import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
+import pl.commercelink.shipping.ShipmentsState;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
@@ -124,6 +127,7 @@ import java.util.regex.Pattern;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
+@Slf4j
 @Controller
 public class OrdersController extends BaseController {
 
@@ -181,6 +185,8 @@ public class OrdersController extends BaseController {
     @Autowired
     private ShipmentCancelService shipmentCancelService;
     @Autowired
+    private ShippingIntegrationNames shippingIntegrationNames;
+    @Autowired
     private OrderRealizationStepBack realizationStepBack;
 
     @Autowired
@@ -234,20 +240,18 @@ public class OrdersController extends BaseController {
             }
         }
         OrderListQuery query = OrderListQuery.parse(params);
-        addListAttributes(model, query, locale);
+        addFilterFormAttributes(model, query.returnTo(), locale);
+        model.addAttribute("page", orderListService.fullPage(actor(), query, LocalDate.now(), locale));
         return "orders/list";
     }
 
     @GetMapping("/dashboard/orders/list")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String ordersList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
-        addListAttributes(model, OrderListQuery.parse(params), locale);
-        return "orders/list :: results";
-    }
-
-    private void addListAttributes(Model model, OrderListQuery query, Locale locale) {
+        OrderListQuery query = OrderListQuery.parse(params);
         addFilterFormAttributes(model, query.returnTo(), locale);
         model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
+        return "orders/list :: results";
     }
 
     static final String FILTERS_PATH = "/dashboard/orders/filters";
@@ -1996,7 +2000,11 @@ public class OrdersController extends BaseController {
                 shipmentCarriers(existingOrder), null, null, before != null && before.getExternalId() != null, null);
         // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one
         String refusal = existingOrder.isClosed() ? "order.shipments.error.closed"
-                : stale ? "order.shipments.error.stale" : null;
+                : stale ? "order.shipments.error.stale"
+                // the form rebuilds the shipment without its creation command: a late result would be dropped and a
+                // failed one, with its package, would turn into a courier order nobody can remove
+                : before != null && (before.isCreating() || before.creationFailed())
+                        ? "order.shipments.edit.locked.creating" : null;
         if (refusal != null) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -2067,7 +2075,8 @@ public class OrdersController extends BaseController {
         // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index),
+                        new Object[]{integrationOf(order.getShipments().get(index).getProvider(), locale)}, locale),
                 messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
                 "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
@@ -2080,7 +2089,7 @@ public class OrdersController extends BaseController {
      * the dropship flow then fall back to their defaults, and the operator types the choice with the next shipment;
      * an order without shipments is never delivered nor completed before Delivered (Order#hasNothingLeftToDeliver).
      * Once no shipment has shipping data left, the shipping
-     * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
+     * e-mail is forgotten (as "Cancel shipment" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
      * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
      * Realization; the confirmation and the notice say so (OrderPageModelFactory.removeShipmentMessageKey).
@@ -2167,7 +2176,7 @@ public class OrdersController extends BaseController {
 
     /**
      * A shipment taken back (removed, or its shipped date cleared) that the customer was told about: once no other
-     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel courier order" does), so the
+     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel shipment" does), so the
      * shipment entered next announces itself again instead of the customer keeping the old number or pickup notice.
      */
     private void forgetShipmentEmails(Order order, Shipment takenBack) {
@@ -2321,16 +2330,20 @@ public class OrdersController extends BaseController {
                 ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
+        // the integration the courier order went through, named by the texts about its cancellation
+        String integration = integrationOf(courier.map(Shipment::getProvider).orElse(null), locale);
         if (refusal != null) {
-            return refuse(redirectAttributes, orderId, refusal, locale);
+            // only "already in progress" names the integration; the others have no courier order to name it by
+            return courier.isPresent() ? refuse(redirectAttributes, orderId, refusal, locale, integration)
+                    : refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
             ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
             switch (result.outcome()) {
                 case REQUESTED -> OrderFlash.saved(redirectAttributes,
-                        messageSource.getMessage("shipment.cancel.requested", null, locale));
+                        messageSource.getMessage("shipment.cancel.requested", new Object[]{integration}, locale));
                 case RECHECKING -> OrderFlash.saved(redirectAttributes,
-                        messageSource.getMessage("shipment.cancel.rechecking", null, locale));
+                        messageSource.getMessage("shipment.cancel.rechecking", new Object[]{integration}, locale));
                 case CANCELLED -> {
                     // an immediate confirmation settles the shipments here, the step back included; after one in
                     // the background the reloaded page shows the new status instead
@@ -2341,8 +2354,8 @@ public class OrdersController extends BaseController {
                 case FAILED -> {
                     String reasonKey = OrderLabels.cancellationReasonKey(result.error());
                     return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
-                            reasonKey != null ? messageSource.getMessage(reasonKey, null, locale)
-                                    : Objects.toString(result.error(), ""));
+                            reasonKey != null ? messageSource.getMessage(reasonKey, new Object[]{integration}, locale)
+                                    : Objects.toString(result.error(), ""), integration);
                 }
                 case GONE -> {
                     return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
@@ -2350,7 +2363,7 @@ public class OrdersController extends BaseController {
             }
         } catch (ShipmentCancellationInProgressException e) {
             // a concurrent request marked the cancellation between the check above and the service's fresh read
-            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale, integration);
         } catch (ShippingUnavailableException e) {
             // the store's carrier authorisation was lost: nothing was cancelled nor changed
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
@@ -2362,18 +2375,23 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
-    /** Whether a shipment of the order is still being cancelled; the shipments card polls it (shipment-cancellation.js). */
+    /**
+     * Whether a shipment of the order still waits for the provider: a cancellation, a creation or a pickup order. The
+     * shipments card polls it (shipment-cancellation.js); the address keeps its name from when it reported
+     * cancellations only, so pages open during a deploy keep polling.
+     */
     @GetMapping("/dashboard/orders/{orderId}/shipments/cancellation-state")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     @ResponseBody
-    public ResponseEntity<CancellationState> shipmentCancellationState(@PathVariable String orderId) {
+    public ResponseEntity<ShipmentsState> shipmentsState(@PathVariable String orderId) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         LocalDateTime now = LocalDateTime.now();
-        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.isCancellationInProgress(now));
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new CancellationState(inProgress));
+        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.awaitsProviderAnswer(now));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new ShipmentsState(inProgress));
     }
 
-    public record CancellationState(boolean inProgress) {
+    private String integrationOf(String provider, Locale locale) {
+        return shippingIntegrationNames.of(provider, storesRepository.findById(getStoreId()), locale);
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,

@@ -1,26 +1,25 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.orders.rma.InvalidReturnConfigurationException;
 import pl.commercelink.shipping.api.*;
-import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Store;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import pl.commercelink.stores.IntegrationType;
 
+@Slf4j
 @Service
 public class ShippingService {
 
@@ -42,7 +41,7 @@ public class ShippingService {
     }
 
     public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
-        ShippingProvider shippingProvider = requireProvider(store);
+        ShippingProvider shippingProvider = providerFor(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -69,8 +68,39 @@ public class ShippingService {
         return shippingProvider.estimateShipment(request, carrierIds);
     }
 
-    public OperationResult<List<Shipment>> createShipping(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
-        ShippingProvider shippingProvider = requireProvider(store);
+    /** The store's provider, or ShippingUnavailableException when none is connected or its adapter is missing. */
+    public ShippingProvider providerFor(Store store) {
+        ShippingProvider shippingProvider = isAvailable(store) ? shippingProviderFactory.get(store) : null;
+        if (shippingProvider == null) {
+            throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
+        }
+        return shippingProvider;
+    }
+
+    /**
+     * "Pobierz etykietę" can work for a package of this integration: it is the store's own (a label lives on the
+     * account that created it) and its adapter hands out labels. Loads the account, so pages ask once per integration.
+     */
+    public boolean supportsLabels(Store store, String provider) {
+        if (store == null || provider == null || !provider.equals(providerName(store))) {
+            return false;
+        }
+        try {
+            return providerFor(store).supportsLabels();
+        } catch (RuntimeException e) {
+            // the link is left out, the page itself still shows; the label endpoint says why when asked directly
+            log.warn("Shipping provider {} of store {} could not be loaded to offer labels", provider, store.getStoreId(), e);
+            return false;
+        }
+    }
+
+    public String providerName(Store store) {
+        return store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    public ShipmentRequest buildRequest(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
+        // a store without a provider fails with the domain reason here, not on a missing address below
+        providerFor(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -81,7 +111,7 @@ public class ShippingService {
                     form.getCashOnDeliveryAmount(), bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
         }
 
-        ShipmentRequest request = ShipmentRequest.builder()
+        return ShipmentRequest.builder()
                 .pickup(toShipmentAddress(pickupAddress))
                 .sender(toShipmentAddress(senderAddress))
                 .receiver(toReceiverAddress(form.getShippingDetails(), deliveryTarget.pointCode()))
@@ -90,10 +120,22 @@ public class ShippingService {
                 .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
-
-        return executeCreateShipment(request, shippingProvider);
     }
 
+    /** A customer return: picked up at the customer's address, delivered to the store's default pickup address. */
+    public ShipmentRequest buildReturnRequest(ShippingDetails customerAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
+        providerFor(store);
+        ShippingDetails receiverAddress = store.getDefaultPickupAddress()
+                .orElseThrow(() -> new InvalidReturnConfigurationException(
+                        "Default receiver address not configured. Contact store administrator."));
+        return ShipmentRequest.builder()
+                .pickup(toShipmentAddress(customerAddress))
+                .receiver(toShipmentAddress(receiverAddress))
+                .parcels(toParcels(parcels))
+                .carrierId(carrier.id())
+                .options(new ShipmentOptions(false, true, null))
+                .build();
+    }
 
     public List<ParcelForm> retrieveParcelsListBasedOnPackageTemplate(double totalPrice, String packageTemplateId, Store store) {
         PackageTemplate packageTemplate = store.getPackageTemplate(packageTemplateId);
@@ -117,41 +159,6 @@ public class ShippingService {
         for (ParcelForm parcel : parcels) {
             parcel.setValue(perParcel);
         }
-    }
-
-    public OperationResult<List<Shipment>> createShipping(ShippingDetails pickupAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
-        ShippingProvider shippingProvider = requireProvider(store);
-        ShippingDetails receiverAddress = store.getDefaultPickupAddress()
-                .orElseThrow(() -> new InvalidReturnConfigurationException(
-                        "Default receiver address not configured. Contact store administrator."
-                ));
-
-        ShipmentRequest request = ShipmentRequest.builder()
-                .pickup(toShipmentAddress(pickupAddress))
-                .receiver(toShipmentAddress(receiverAddress))
-                .parcels(toParcels(parcels))
-                .carrierId(carrier.id())
-                .options(new ShipmentOptions(false, true, null))
-                .build();
-
-        return executeCreateShipment(request, shippingProvider);
-    }
-
-    private OperationResult<List<Shipment>> executeCreateShipment(ShipmentRequest request, ShippingProvider shippingProvider) {
-        try {
-            ShipmentResult result = shippingProvider.createShipment(request);
-            return OperationResult.success(toShipments(result));
-        } catch (ShippingException e) {
-            return OperationResult.failure(e.getMessage());
-        }
-    }
-
-    private ShippingProvider requireProvider(Store store) {
-        ShippingProvider shippingProvider = isAvailable(store) ? shippingProviderFactory.get(store) : null;
-        if (shippingProvider == null) {
-            throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
-        }
-        return shippingProvider;
     }
 
     static ShipmentAddress toReceiverAddress(ShippingDetails details, String pointCode) {
@@ -210,20 +217,6 @@ public class ShippingService {
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {
         return parcels.stream()
                 .map(p -> new Parcel(p.getWidth(), p.getDepth(), p.getHeight(), p.getWeight(), p.getValue(), p.getDescription(), p.getType()))
-                .collect(Collectors.toList());
-    }
-
-    private static List<Shipment> toShipments(ShipmentResult result) {
-        return result.parcels().stream()
-                .map(parcel -> {
-                    Shipment shipment = new Shipment();
-                    shipment.setExternalId(result.externalId());
-                    shipment.setTrackingNo(parcel.trackingNo());
-                    shipment.setCarrier(parcel.carrier());
-                    shipment.setTrackingUrl(parcel.trackingUrl());
-                    shipment.setShippedAt(LocalDateTime.now());
-                    return shipment;
-                })
                 .collect(Collectors.toList());
     }
 }

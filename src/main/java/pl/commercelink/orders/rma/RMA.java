@@ -69,6 +69,11 @@ public class RMA {
     @Getter
     @Setter
     private MarketplaceReturnStatus externalReturnStatus;
+    /** The package template the customer chose for the return: the operator books a failed return again with it. */
+    @DynamoDBAttribute(attributeName = "returnPackageTemplateId")
+    @Getter
+    @Setter
+    private String returnPackageTemplateId;
     @DynamoDBAttribute(attributeName = "marketplaceDecisions")
     @Getter
     @Setter

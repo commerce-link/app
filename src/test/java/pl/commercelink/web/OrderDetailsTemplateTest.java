@@ -25,6 +25,8 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -98,6 +100,8 @@ class OrderDetailsTemplateTest {
         Store store = new Store();
         store.setStoreId("store-1");
         store.setName("Demo");
+        // names the integration of a shipment typed in by hand (ShippingIntegrationNames)
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
         if (documentsGenerationEnabled) {
             pl.commercelink.stores.WarehouseConfiguration warehouse = new pl.commercelink.stores.WarehouseConfiguration();
             warehouse.setDocumentsGenerationEnabled(true);
@@ -120,15 +124,17 @@ class OrderDetailsTemplateTest {
         when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
-                receiptService, mock(ReceiptAlerts.class), courierAvailable());
+                receiptService, mock(ReceiptAlerts.class), courierAvailable(),
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names());
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
 
-    /** A store with a courier account: the page offers "Zamów kuriera" where a shipment waits for it. */
+    /** A store with a courier account: the page offers "Nadaj przesyłkę" where a shipment waits for it. */
     static ShippingService courierAvailable() {
         ShippingService shipping = mock(ShippingService.class);
         when(shipping.isAvailable(any())).thenReturn(true);
+        when(shipping.supportsLabels(any(), any())).thenReturn(true);
         return shipping;
     }
 
@@ -626,7 +632,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void eachShipmentHasEditAndRemoveAndTheCardHeadAddsOne() {
-        // given: the second shipment has a courier order, cancelled with "Cancel courier order" instead of removed
+        // given: the second shipment has a courier order, cancelled with "Cancel shipment" instead of removed
         Order order = order(OrderStatus.Realization);
         Shipment labelled = new Shipment(ShipmentType.Courier);
         labelled.setCarrier("DPD");
@@ -648,7 +654,7 @@ class OrderDetailsTemplateTest {
                 .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
                 .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia. Klient nie dostanie o tym wiadomości.\"")
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
-                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
+                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj przesyłkę, potem ją usuniesz.</p>")
                 .doesNotContain("shipment-1-remove-reason");
     }
 
@@ -672,14 +678,168 @@ class OrderDetailsTemplateTest {
                         + "/shipments/cancellation-state\"")
                 .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
                 .containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\"[^>]*"
-                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj zamówienie kuriera</button>")
-                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
+                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj przesyłkę</button>")
+                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z integracji "
+                        + "wysyłki (Furgonetka).</p>")
                 .doesNotContain("/cancelShipment\"");
         assertThat(html).contains("/js/shipment-cancellation.js");
     }
 
+    private static Shipment integrationShipment(Order order) {
+        Shipment shipment = order.getShipments().get(0);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("DPD");
+        shipment.setPickUpAddressId("addr-1");
+        return shipment;
+    }
+
     @Test
-    void aFailedCancellationSendsTheOperatorToFurgonetkaAndItsRemovalWarnsAboutTheLabel() {
+    void aShipmentBeingCreatedShowsTheSpinnerLineAndThePagePolls() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<p class=\"cl-list-desc cl-loading\"><span class=\"cl-spinner is-compact\" aria-hidden=\"true\"></span><span>Nadawanie…</span></p>")
+                .doesNotContain(">Edytuj<")
+                .contains("Przesyłka jest nadawana — poczekaj na wynik.");
+    }
+
+    @Test
+    void aFailedCreationShowsTheProviderReasonWithRetryAndRemoveButNoEdit() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment failed = integrationShipment(order);
+        failed.setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()).failed("Brak środków na koncie"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the array of arguments is spread, never printed as one value
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków na koncie</span>")
+                .doesNotContain("[Ljava")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping\"")
+                .contains(">Spróbuj ponownie</a>")
+                .contains("/shipments/0/remove")
+                .doesNotContain(">Edytuj<")
+                .doesNotContain("data-cl-cancellation-poll");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnReasonShowsThatSentence() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.unconfirmed"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Integracja wysyłki (Furgonetka) nie potwierdziła "
+                + "nadania — sprawdź przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
+                .doesNotContain("Nie udało się nadać");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given: POST /packages answered 503, nothing was created
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.notCreated"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Integracja wysyłki (Furgonetka) "
+                + "nie utworzyła paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj "
+                + "ponownie za chwilę.</span>");
+    }
+
+    @Test
+    void aFailedPickupWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.immediate.no.windows"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się zamówić odbioru: Przewoźnik nie podał "
+                + "terminu odbioru w najbliższych dniach.</span>");
+    }
+
+    @Test
+    void aFailedPickupWhoseSentenceStatesTheOutcomeHasNoPrefix() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.not.sent"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Odbiór nie został zamówiony — spróbuj ponownie.</span>")
+                .doesNotContain("Nie udało się zamówić odbioru");
+    }
+
+    @Test
+    void aPackageWaitingForPickupOffersItsLabelButNoPickupButton() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the pickup is ordered from the orders list, for all packages at once (client decision 2026-10-07)
+        assertThat(card).contains("<span class=\"cl-status is-neutral\">Czeka na odbiór</span>")
+                .doesNotContain("/dashboard/shipping/pickups").doesNotContain("Zamów odbiór")
+                .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId() + "\"")
+                .contains("aria-label=\"Pobierz etykietę przesyłki 1\"")
+                .contains(">Edytuj<");
+    }
+
+    @Test
+    void anOrderedPickupShowsItsDayAndHours() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.pending("cmd-2", java.time.LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                java.time.LocalTime.of(9, 0), java.time.LocalTime.of(17, 0)).ordered("P-1"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
+                .doesNotContain("Zamów odbiór");
+    }
+
+    @Test
+    void aFailedCancellationSendsTheOperatorToTheIntegrationsPanelAndItsRemovalWarnsAboutTheLabel() {
         // given
         Order order = order(OrderStatus.Shipping);
         Shipment sent = order.getShipments().get(0);
@@ -695,10 +855,12 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(card).doesNotContain("data-cl-cancellation-poll")
-                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu Furgonetki</span>")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu integracji wysyłki "
+                        + "(Furgonetka)</span>")
                 .contains("/cancelShipment\"")
-                .contains("data-cl-confirm-message=\"Anulowanie w Furgonetce nie zostało potwierdzone. Usuń przesyłkę tylko "
-                        + "wtedy, gdy etykieta jest anulowana w panelu Furgonetki — inaczej kurier może ją nadal odebrać.\"")
+                .contains("data-cl-confirm-message=\"Anulowanie w integracji wysyłki (Furgonetka) nie zostało potwierdzone. "
+                        + "Usuń przesyłkę tylko wtedy, gdy etykieta jest anulowana w panelu tej integracji — inaczej kurier "
+                        + "może ją nadal odebrać.\"")
                 .doesNotContain("shipment-cancel-reason");
     }
 
@@ -836,7 +998,7 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).doesNotContain("shipment-0-carrierSelect")
                 .containsPattern("id=\"shipment-0-carrier\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
                 .containsPattern("id=\"shipment-0-trackingNo\"[^>]*value=\"T-1\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
-                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując zamówienie kuriera.</p>")
+                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując przesyłkę.</p>")
                 .containsPattern("<select[^>]*id=\"shipment-0-type\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*disabled")
                 .contains("<input type=\"hidden\" name=\"type\" value=\"Courier\">")
                 .doesNotContainPattern("id=\"shipment-0-collectionPointCode\"[^>]*readonly")
@@ -1746,8 +1908,8 @@ class OrderDetailsTemplateTest {
         String withoutTracking = page(render(untracked, ADMIN));
 
         // then
-        assertThat(withTracking).contains("Śledzona w Furgonetce");
-        assertThat(withoutTracking).doesNotContain("Śledzona w Furgonetce");
+        assertThat(withTracking).contains("Śledzona (Furgonetka)");
+        assertThat(withoutTracking).doesNotContain("Śledzona");
     }
 
     @Test

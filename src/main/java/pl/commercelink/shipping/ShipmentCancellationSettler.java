@@ -42,7 +42,7 @@ public class ShipmentCancellationSettler {
      * removed and the other shipments stay as they are. When no shipment is left, a bare one of the same type keeps the
      * customer's delivery choice (replaceShipments). When what is left of a Shipping order has nothing shipped it goes
      * back to Realization (OrderRealizationStepBack, no e-mail to the customer), and the shipping e-mail is forgotten
-     * once no other shipment carries it.
+     * once no other shipment carries it. The package no longer waits for a courier pickup either.
      */
     public Success succeed(ShipmentCancellationCheckRequest request) {
         AtomicBoolean backToRealization = new AtomicBoolean();

@@ -14,13 +14,13 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.AbstractShippingController;
-import pl.commercelink.shipping.ShipmentTrackingSubscriber;
+import pl.commercelink.shipping.ShipmentCreationCheckRequest;
+import pl.commercelink.shipping.ShipmentOwnerType;
 import pl.commercelink.stores.RMAConfiguration;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.shipping.ShippingPageView;
@@ -41,17 +41,12 @@ public class RMAShippingController extends AbstractShippingController {
     @Autowired
     private RMAItemsRepository rmaItemsRepository;
 
-    @Autowired
-    private RMALifecycle rmaLifecycle;
-
-    @Autowired
-    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @PostMapping("/shipItemsToDistributor")
     public String initiateShippingToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
 
-        List<RMAItem> qualifiedRmaItems = form.getSelectedRMAItems().stream()
+        List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))
                 .toList();
 
@@ -82,7 +77,7 @@ public class RMAShippingController extends AbstractShippingController {
     public String initiateShippingToClient(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
 
-        List<RMAItem> qualifiedRmaItems = form.getSelectedRMAItems().stream()
+        List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))
                 .toList();
 
@@ -123,17 +118,29 @@ public class RMAShippingController extends AbstractShippingController {
     }
 
     @Override
-    protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
+    protected ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form) {
+        return ShipmentCreationCheckRequest.builder()
+                .ownerType(ShipmentOwnerType.RMA)
+                .ownerId(form.getShippingEntityId())
+                .pickUpAddressId(form.getPickUpAddressId())
+                .toClient(form.isToClient())
+                .itemIds(List.copyOf(form.getOrderItemIds()));
+    }
+
+    /** A shipment still being created would be replaced by this booking, and its paid label lost with it. */
+    @Override
+    protected String refuseBooking(ShippingForm form) {
         RMA rma = rmaRepository.findById(getStoreId(), form.getShippingEntityId());
-        List<RMAItem> selectedItems = filterSelectedItems(rma, form);
+        return rma != null && rma.getShipments().stream().anyMatch(Shipment::isCreating) ? "shipping.error.creating" : null;
+    }
 
-        Consumer<RMAItem> statusUpdater = form.isToClient() ? RMAItem::markAsReturnedToClient : RMAItem::markAsSendToRepair;
-        selectedItems.forEach(statusUpdater);
-        rmaItemsRepository.batchSave(selectedItems);
-
-        rma.setShipments(shipments);
-        shipmentTrackingSubscriber.subscribe(getStoreId(), rma);
-        rmaLifecycle.update(rma, selectedItems);
+    // The RMA page posts only the checkbox and identifiers of each item, so its status and delivery
+    // must come from storage, not from the bound form (where the status would be the default New).
+    private List<RMAItem> storedSelectedItems(String rmaId, RMAItemsForm form) {
+        List<String> selectedIds = form.getSelectedRMAItemIds();
+        return rmaItemsRepository.findByRmaId(rmaId).stream()
+                .filter(item -> selectedIds.contains(item.getRmaItemId()))
+                .toList();
     }
 
     private List<RMAItem> filterSelectedItems(RMA rma, ShippingForm form) {
