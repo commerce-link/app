@@ -4423,6 +4423,30 @@ class OrdersControllerTest {
         }
 
         @Test
+        void cancelShipmentRefusesAShipmentTheIntegrationCannotCancel() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("ALLEGRO");
+            sent.setTrackingNo("A000123");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("shp-1");
+            sent.setProvider("furgonetka");
+            sent.setCancellable(false);
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    "order.shipments.cancel.error.not.cancellable [Furgonetka]");
+        }
+
+        @Test
         void cancelShipmentRefusesWhenAConcurrentRequestMarkedTheCancellationFirst() {
             // given: the order read here shows no cancellation, the service's fresh read finds one in progress
             Order order = order(OrderStatus.Shipping);

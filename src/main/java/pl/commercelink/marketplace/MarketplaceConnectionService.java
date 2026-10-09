@@ -10,11 +10,13 @@ import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.scheduling.InvalidScheduleException;
 import pl.commercelink.scheduling.PollingSchedule;
+import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.AllegroShippingSettings;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ public class MarketplaceConnectionService {
     private final ImportSchedule ordersSchedule;
     private final ImportSchedule returnsSchedule;
     private final StoreNotificationService notificationService;
+    private final ShippingProviders shippingProviders;
     private final int minIntervalMinutes;
 
     public MarketplaceConnectionService(StoresRepository storesRepository,
@@ -52,6 +55,7 @@ public class MarketplaceConnectionService {
                                         MarketplaceOrdersImportScheduler ordersImportScheduler,
                                         MarketplaceReturnsImportScheduler returnsImportScheduler,
                                         StoreNotificationService notificationService,
+                                        ShippingProviders shippingProviders,
                                         @Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
         this.storesRepository = storesRepository;
         this.providerFactory = providerFactory;
@@ -63,6 +67,7 @@ public class MarketplaceConnectionService {
                 MarketplaceIntegration::getReturnsImportSchedule, MarketplaceIntegration::setReturnsImportSchedule,
                 "store.marketplaces.returns.schedule.error");
         this.notificationService = notificationService;
+        this.shippingProviders = shippingProviders;
         this.minIntervalMinutes = minIntervalMinutes;
     }
 
@@ -134,6 +139,14 @@ public class MarketplaceConnectionService {
             deleteSchedule(store, marketplace, ordersSchedule, compensations);
             if (descriptor == null || descriptor.supportsReturns()) {
                 deleteSchedule(store, marketplace, returnsSchedule, compensations);
+            }
+            // Wysyłam z Allegro signs its requests with this connection: it goes with it (its own secret restored on failure)
+            if (AllegroShippingSettings.ALLEGRO_MARKETPLACE.equalsIgnoreCase(marketplace)
+                    && store.hasShippingIntegration(ShippingProviders.ALLEGRO)) {
+                ProviderConfigurationManager.SecretSnapshot shippingSettings =
+                        configurationManager.snapshot(store, ShippingProviders.ALLEGRO);
+                compensations.push(() -> configurationManager.restore(store, ShippingProviders.ALLEGRO, shippingSettings));
+                shippingProviders.disconnectAdditional(store, ShippingProviders.ALLEGRO);
             }
             store.removeMarketplaceIntegration(marketplace);
             storesRepository.save(store);

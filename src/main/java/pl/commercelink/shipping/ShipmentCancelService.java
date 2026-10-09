@@ -29,23 +29,24 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class ShipmentCancelService {
 
+    static final String NOT_CANCELLABLE = "The shipping integration does not cancel this shipment";
     static final String ALREADY_IN_PROGRESS = "Shipment cancellation is already in progress";
 
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
-    private final ShippingProviderFactory shippingProviderFactory;
+    private final ShippingProviders shippingProviders;
     private final ShipmentCancellationEventPublisher publisher;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final ShipmentCancellationSettler settler;
 
     public ShipmentCancelService(StoresRepository storesRepository, OrdersRepository ordersRepository,
-                                 ShippingProviderFactory shippingProviderFactory,
+                                 ShippingProviders shippingProviders,
                                  ShipmentCancellationEventPublisher publisher,
                                  OptimisticLockingExecutor optimisticLockingExecutor,
                                  ShipmentCancellationSettler settler) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
-        this.shippingProviderFactory = shippingProviderFactory;
+        this.shippingProviders = shippingProviders;
         this.publisher = publisher;
         this.optimisticLockingExecutor = optimisticLockingExecutor;
         this.settler = settler;
@@ -59,12 +60,17 @@ public class ShipmentCancelService {
         Shipment shipment = order.courierShipmentToCancel()
                 .orElseThrow(() -> new ShippingException("No courier order to cancel"));
         String externalId = shipment.getExternalId();
+        // One by Allegro cannot be cancelled: refused before anything is marked or sent (the page refuses it too)
+        if (!shipment.allowsCancellation()) {
+            throw new ShippingException(NOT_CANCELLABLE);
+        }
         // resolved before the mark: without a provider nothing can be sent, and a missing one must not look like a
-        // command with an unknown outcome
-        ShippingProvider provider = shippingProviderFactory.get(store);
+        // command with an unknown outcome; the cancellation goes to the integration that created the shipment
+        ShippingProvider provider = shippingProviders.forShipment(store, shipment).orElse(null);
         if (provider == null) {
             throw new ShippingUnavailableException(storeId);
         }
+        String providerName = shippingProviders.nameFor(store, shipment);
 
         // an unknown result is read again rather than cancelled anew: a late success of the old command would make
         // a new one fail and mark a cancelled package as not cancelled
@@ -113,7 +119,8 @@ public class ShipmentCancelService {
             return ShipmentCancelResult.gone();
         }
 
-        ShipmentCancellationCheckRequest check = ShipmentCancellationCheckRequest.first(storeId, orderId, externalId, commandId);
+        ShipmentCancellationCheckRequest check = ShipmentCancellationCheckRequest.first(storeId, orderId, externalId, commandId,
+                providerName);
         if (recheck) {
             publisher.publish(check);
             return ShipmentCancelResult.rechecking();

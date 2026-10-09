@@ -49,6 +49,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -127,10 +128,9 @@ class ShipmentPickupFlowTest {
 
         when(store.getStoreId()).thenReturn("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingService.providerName(store)).thenReturn("furgonetka");
-        when(shippingService.providerFor(store)).thenReturn(provider);
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
+        when(shippingService.providerNamed(store, "furgonetka")).thenReturn(java.util.Optional.of(provider));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(3)));
         security = mockStatic(CustomSecurityContext.class);
         security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
     }
@@ -187,7 +187,7 @@ class ShipmentPickupFlowTest {
                 .containsExactly(tuple(ShipmentOwnerType.ORDER, "order-1"),
                         tuple(ShipmentOwnerType.RMA, "rma-1")));
         assertThat(view).isEqualTo("redirect:/dashboard/orders/order-1");
-        verify(provider).orderPickup(eq(List.of("1", "2")), eq(WINDOW), anyString());
+        verify(provider).orderPickup(eq(List.of("1", "2")), any(), eq(WINDOW), anyString());
         assertThat(listed()).isEmpty();
         String commandId = order.getShipments().get(0).getPickup().getCommand().getCommandId();
 
@@ -244,7 +244,7 @@ class ShipmentPickupFlowTest {
         orderShips(shipment);
         List<String> beforeCancellation = listed();
         ShipmentCancellationSettler cancellation = new ShipmentCancellationSettler(ordersRepository,
-                orderEventsRepository, optimisticLockingExecutor, new OrderRealizationStepBack(orderEventsRepository));
+                orderEventsRepository, optimisticLockingExecutor, new OrderRealizationStepBack(orderEventsRepository), mock(ShipmentTrackingsRepository.class));
 
         // when
         cancellation.succeed(ShipmentCancellationCheckRequest.first("store-1", "order-1", "1", "cancel-1"));
@@ -299,7 +299,7 @@ class ShipmentPickupFlowTest {
         // then
         assertThat(ordered.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
-        verify(provider, never()).orderPickup(anyList(), any(), anyString());
+        verify(provider, never()).orderPickup(anyList(), any(), any(), anyString());
         verify(ordersRepository, never()).save(any());
         assertThat(otherStoresOrder.getShipments().get(0).getPickup().isAwaiting()).isTrue();
     }

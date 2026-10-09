@@ -26,197 +26,241 @@
                     <p class="cl-alert-text" th:text="#{shipping.preferred.shipping.warning(${preferredShippingWarning})}"></p>
                 </div>
 
-                <form id="shipping-template-form" class="cl-form is-wide" method="post" novalidate
-                      th:action="@{${f.shippingTemplateAction}}">
-                    <th:block th:replace="~{shipping :: record(${f})}"></th:block>
-                    <div class="cl-card">
+                <!--/* "Wyślij przez": a GET form, each integration has its own fields; submit-on-change.js sends it on a
+                       change, without JavaScript the "Zmień" button does. An unavailable option is greyed with its reason
+                       (design system: option that cannot be chosen). Not shown with a single available integration. */-->
+                <form th:if="${integrationChoice != null and integrationChoice.shown()}" id="provider-form"
+                      class="cl-form is-wide" method="get" th:action="@{|/dashboard/orders/${f.shippingEntityId}/shipping|}">
+                    <section class="cl-card" aria-labelledby="provider-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="provider-title" th:text="#{shipping.integration.title}"></h2></div>
                         <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title"
-                                    th:text="${deliveryPointCode != null} ? #{shipping.collection.address} : #{shipping.delivery.address}"></legend>
-                            <div th:if="${shippingDetailsList.size() > 1}" class="cl-field">
-                                <label class="cl-label" for="shipping-recipient" th:text="#{shipping.recipient.select}"></label>
-                                <select class="cl-select" id="shipping-recipient" data-cl-recipient-select>
-                                    <option th:each="sd, stat : ${shippingDetailsList}" th:value="${stat.index}"
-                                            th:selected="${recipient != null and sd.streetAndNumber == recipient.streetAndNumber and sd.displayName == recipient.displayName}"
-                                            th:attr="data-name=${sd.name}, data-surname=${sd.surname}, data-company=${sd.companyName},
-                                                     data-street=${sd.streetAndNumber}, data-postal=${sd.postalCode}, data-city=${sd.city},
-                                                     data-country=${sd.country}, data-email=${sd.email}, data-phone=${sd.phone}"
-                                            th:text="${sd.displayName} + ', ' + ${sd.streetAndNumber} + ', ' + ${sd.city}"></option>
-                                </select>
+                            <div class="cl-choice-group is-row" role="radiogroup" aria-labelledby="provider-title">
+                                <label class="cl-choice" th:each="o : ${integrationChoice.options()}">
+                                    <input type="radio" name="provider" th:value="${o.name()}" data-cl-submit-on-change
+                                           th:checked="${integrationChoice.isSelected(o)}" th:disabled="${!o.available()}"
+                                           th:attr="aria-describedby=|provider-${o.name()}-desc| + (${o.available()} ? '' : | provider-${o.name()}-reason|)">
+                                    <span class="cl-choice-text">
+                                        <span class="cl-choice-title" th:text="${o.displayName()}"></span>
+                                        <span class="cl-choice-description" th:id="|provider-${o.name()}-desc|"
+                                              th:text="${!o.available()} ? #{shipping.integration.unavailable}
+                                                       : (${o.isAllegro()} ? #{shipping.integration.option.allegro(${o.proposal().methodName()})}
+                                                       : #{shipping.integration.option.default})"></span>
+                                        <span th:unless="${o.available()}" class="cl-choice-description is-warn"
+                                              th:id="|provider-${o.name()}-reason|"
+                                              th:text="#{${o.reasonKey()}(${o.reasonDetail()})}"></span>
+                                    </span>
+                                </label>
                             </div>
-                            <div class="cl-address" id="shipping-recipient-address">
-                                <div th:if="${deliveryPointCode != null}" th:text="#{shipping.parcel.locker.code(${deliveryPointCode})}"></div>
-                                <div><strong><span data-cl-recipient-view="name" th:text="${recipient?.name}"></span>
-                                    <span data-cl-recipient-view="surname" th:text="${recipient?.surname}"></span></strong></div>
-                                <div data-cl-recipient-view="company" th:text="${recipient?.companyName}"></div>
-                                <div th:if="${deliveryPointCode == null}" data-cl-recipient-view="street" th:text="${recipient?.streetAndNumber}"></div>
-                                <div th:if="${deliveryPointCode == null}"><span data-cl-recipient-view="postal" th:text="${recipient?.postalCode}"></span>
-                                    <span data-cl-recipient-view="city" th:text="${recipient?.city}"></span></div>
-                                <div data-cl-recipient-view="country" th:text="${recipient?.country}"></div>
-                                <div data-cl-recipient-view="email" th:text="${recipient?.email}"></div>
-                                <div><span th:text="#{person.phone} + ':'"></span>
-                                    <span data-cl-recipient-view="phone" th:text="${recipient?.phone}"></span></div>
+                            <p th:if="${integrationChoice.help() != null}" class="cl-help" th:text="${integrationChoice.help()}"></p>
+                            <div th:if="${integrationChoice.warning() != null}" class="cl-alert is-warn">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="${integrationChoice.warning()}"></p>
                             </div>
-                            <!--/* the recipient posted with this step; the keys name the option's data-* attributes */-->
-                            <input th:each="entry : ${ {'name':'name', 'surname':'surname', 'companyName':'company', 'streetAndNumber':'street', 'postalCode':'postal', 'city':'city', 'country':'country', 'email':'email', 'phone':'phone'} }"
-                                   type="hidden" th:name="${'shippingDetails.' + entry.key}"
-                                   th:value="${recipient != null ? recipient[entry.key] : null}"
-                                   th:attr="data-cl-recipient-field=${entry.value}">
+                            <noscript><button type="submit" class="cl-button" th:text="#{shipping.integration.change}"></button></noscript>
                         </fieldset>
-                        <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{shipping.dispatch}"></legend>
-                            <div class="cl-form-grid">
-                                <div class="cl-span-3 cl-field">
-                                    <label class="cl-label" for="pickUpAddress" th:text="#{shipping.pickup.address}"></label>
-                                    <select class="cl-select" id="pickUpAddress" name="pickUpAddressId"
-                                            th:attr="aria-describedby=${pickUpAddresses.isEmpty()} ? 'pickUpAddress-help' : null">
-                                        <option th:each="entry : ${pickUpAddresses}" th:value="${entry.id}"
-                                                th:selected="${entry.id == f.pickUpAddressId}"
-                                                th:text="${entry.streetAndNumber} + ' ' + ${entry.city}"></option>
-                                    </select>
-                                    <p th:if="${pickUpAddresses.isEmpty()}" class="cl-help" id="pickUpAddress-help"
-                                       th:text="#{shipping.pickup.empty}"></p>
-                                </div>
-                                <div class="cl-span-3 cl-field">
-                                    <label class="cl-label" for="packageTemplate" th:text="#{shipping.package.template}"></label>
-                                    <!--/* before the first load nothing is chosen yet: the store's default template is */-->
-                                    <select class="cl-select" id="packageTemplate" name="packageTemplateId"
-                                            th:attr="aria-describedby=${packageTemplates.isEmpty()} ? 'packageTemplate-help' : null">
-                                        <option th:each="template : ${packageTemplates}" th:value="${template.id}"
-                                                th:selected="${f.packageTemplateId != null ? template.id == f.packageTemplateId : template.default}"
-                                                th:text="${template.name}"></option>
-                                    </select>
-                                    <p th:if="${packageTemplates.isEmpty()}" class="cl-help" id="packageTemplate-help"
-                                       th:text="#{shipping.template.empty}"></p>
-                                </div>
-                            </div>
-                        </fieldset>
-                        <div class="cl-card-footer">
-                            <button type="submit" class="cl-button" th:classappend="${!parcelsLoaded} ? 'is-primary'"
-                                    th:text="#{shipping.load.parcels}"></button>
-                        </div>
-                    </div>
+                    </section>
                 </form>
 
-                <form id="shipping-estimate-form" class="cl-form is-wide" method="post" novalidate
-                      th:action="@{${f.shippingEstimateAction}}">
-                    <th:block th:replace="~{shipping :: record(${f})}"></th:block>
-                    <th:block th:replace="~{shipping :: dispatch(${f})}"></th:block>
-                    <th:block th:replace="~{shipping :: recipient(${f})}"></th:block>
-                    <div class="cl-card">
-                        <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{shipping.parcels}"></legend>
-                            <p class="cl-help" th:text="${parcelsLoaded} ? #{shipping.parcels.help} : #{shipping.parcels.empty}"></p>
-                        </fieldset>
-                        <!--/* the insured value is the parcel's "value"; every other column's label is shipping.<field> */-->
-                        <th:block th:if="${parcelsLoaded}" th:with="parcelFields=${ {'depth', 'width', 'height', 'weight', 'value'} }">
-                            <table class="cl-table is-editable is-narrow" id="shipping-parcels">
-                                <thead>
-                                <tr>
-                                    <th scope="col" th:text="#{shipping.parcel}"></th>
-                                    <th:block th:each="field : ${parcelFields}">
-                                        <th scope="col" th:with="labelKey=${field == 'value' ? 'shipping.insurance' : 'shipping.' + field}"
-                                            th:text="#{${labelKey}}"></th>
-                                    </th:block>
-                                    <th scope="col" th:text="#{shipping.parcel.content}"></th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr th:each="parcel, stat : ${f.parcels}">
-                                    <th scope="row" class="cl-table-key" th:text="#{shipping.parcel.row(${stat.count})}"></th>
-                                    <td th:each="field : ${parcelFields}" th:with="labelKey=${field == 'value' ? 'shipping.insurance' : 'shipping.' + field}"
-                                        th:attr="data-label=#{${labelKey}}">
-                                        <input class="cl-input" type="number" min="0" inputmode="numeric" autocomplete="off"
-                                               th:id="${'parcel-' + stat.index + '-' + field}"
-                                               th:name="${'parcels[' + stat.index + '].' + field}" th:value="${parcel[field]}"
-                                               th:attr="aria-label=${#messages.msg('shipping.parcel.field', stat.count, #messages.msg(labelKey))}">
-                                    </td>
-                                    <td th:attr="data-label=#{shipping.parcel.content}">
-                                        <input class="cl-input" type="text" autocomplete="off"
-                                               th:id="${'parcel-' + stat.index + '-description'}"
-                                               th:name="${'parcels[' + stat.index + '].description'}" th:value="${parcel.description}"
-                                               th:attr="aria-label=${#messages.msg('shipping.parcel.field', stat.count, #messages.msg('shipping.parcel.content'))}">
-                                        <!--/* always "package": the carrier API field is fixed, not the operator's choice */-->
-                                        <input type="hidden" th:name="${'parcels[' + stat.index + '].type'}" th:value="${parcel.type}">
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
+                <th:block th:if="${allegroShipping != null}">
+                    <div th:replace="~{shipping :: allegroForm(${f}, ${allegroShipping})}"></div>
+                </th:block>
+
+                <!--/* no available integration (a store with only an unavailable Wysyłam z Allegro): the alert above says what to do */-->
+                <th:block th:if="${allegroShipping == null and (integrationChoice == null or !integrationChoice.nothingAvailable())}">
+                    <form id="shipping-template-form" class="cl-form is-wide" method="post" novalidate
+                          th:action="@{${f.shippingTemplateAction}}">
+                        <th:block th:replace="~{shipping :: record(${f})}"></th:block>
+                        <div class="cl-card">
                             <fieldset class="cl-fieldset">
-                                <legend class="cl-fieldset-title" th:text="#{shipping.delivery.options}"></legend>
-                                <div th:replace="~{fragments/settings-form :: check('saturdayDelivery', 'shipping.saturday', ${f.saturdayDelivery}, null, null, null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('cashOnDelivery', 'shipping.cash.on.delivery', ${f.cashOnDelivery}, null, 'shipping-cod', null)}"></div>
-                                <div class="cl-reveal" id="shipping-cod">
-                                    <div class="cl-field">
-                                        <label class="cl-label" for="cashOnDeliveryAmount" th:text="#{shipping.cod.amount}"></label>
-                                        <input class="cl-input is-price" type="number" min="0" step="0.1" inputmode="decimal"
-                                               autocomplete="off" id="cashOnDeliveryAmount" name="cashOnDeliveryAmount"
-                                               th:value="${f.cashOnDeliveryAmount}">
+                                <legend class="cl-fieldset-title"
+                                        th:text="${deliveryPointCode != null} ? #{shipping.collection.address} : #{shipping.delivery.address}"></legend>
+                                <div th:if="${shippingDetailsList.size() > 1}" class="cl-field">
+                                    <label class="cl-label" for="shipping-recipient" th:text="#{shipping.recipient.select}"></label>
+                                    <select class="cl-select" id="shipping-recipient" data-cl-recipient-select>
+                                        <option th:each="sd, stat : ${shippingDetailsList}" th:value="${stat.index}"
+                                                th:selected="${recipient != null and sd.streetAndNumber == recipient.streetAndNumber and sd.displayName == recipient.displayName}"
+                                                th:attr="data-name=${sd.name}, data-surname=${sd.surname}, data-company=${sd.companyName},
+                                                         data-street=${sd.streetAndNumber}, data-postal=${sd.postalCode}, data-city=${sd.city},
+                                                         data-country=${sd.country}, data-email=${sd.email}, data-phone=${sd.phone}"
+                                                th:text="${sd.displayName} + ', ' + ${sd.streetAndNumber} + ', ' + ${sd.city}"></option>
+                                    </select>
+                                </div>
+                                <div class="cl-address" id="shipping-recipient-address">
+                                    <div th:if="${deliveryPointCode != null}" th:text="#{shipping.parcel.locker.code(${deliveryPointCode})}"></div>
+                                    <div><strong><span data-cl-recipient-view="name" th:text="${recipient?.name}"></span>
+                                        <span data-cl-recipient-view="surname" th:text="${recipient?.surname}"></span></strong></div>
+                                    <div data-cl-recipient-view="company" th:text="${recipient?.companyName}"></div>
+                                    <div th:if="${deliveryPointCode == null}" data-cl-recipient-view="street" th:text="${recipient?.streetAndNumber}"></div>
+                                    <div th:if="${deliveryPointCode == null}"><span data-cl-recipient-view="postal" th:text="${recipient?.postalCode}"></span>
+                                        <span data-cl-recipient-view="city" th:text="${recipient?.city}"></span></div>
+                                    <div data-cl-recipient-view="country" th:text="${recipient?.country}"></div>
+                                    <div data-cl-recipient-view="email" th:text="${recipient?.email}"></div>
+                                    <div><span th:text="#{person.phone} + ':'"></span>
+                                        <span data-cl-recipient-view="phone" th:text="${recipient?.phone}"></span></div>
+                                </div>
+                                <!--/* the recipient posted with this step; the keys name the option's data-* attributes */-->
+                                <input th:each="entry : ${ {'name':'name', 'surname':'surname', 'companyName':'company', 'streetAndNumber':'street', 'postalCode':'postal', 'city':'city', 'country':'country', 'email':'email', 'phone':'phone'} }"
+                                       type="hidden" th:name="${'shippingDetails.' + entry.key}"
+                                       th:value="${recipient != null ? recipient[entry.key] : null}"
+                                       th:attr="data-cl-recipient-field=${entry.value}">
+                            </fieldset>
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{shipping.dispatch}"></legend>
+                                <div class="cl-form-grid">
+                                    <div class="cl-span-3 cl-field">
+                                        <label class="cl-label" for="pickUpAddress" th:text="#{shipping.pickup.address}"></label>
+                                        <select class="cl-select" id="pickUpAddress" name="pickUpAddressId"
+                                                th:attr="aria-describedby=${pickUpAddresses.isEmpty()} ? 'pickUpAddress-help' : null">
+                                            <option th:each="entry : ${pickUpAddresses}" th:value="${entry.id}"
+                                                    th:selected="${entry.id == f.pickUpAddressId}"
+                                                    th:text="${entry.streetAndNumber} + ' ' + ${entry.city}"></option>
+                                        </select>
+                                        <p th:if="${pickUpAddresses.isEmpty()}" class="cl-help" id="pickUpAddress-help"
+                                           th:text="#{shipping.pickup.empty}"></p>
+                                    </div>
+                                    <div class="cl-span-3 cl-field">
+                                        <label class="cl-label" for="packageTemplate" th:text="#{shipping.package.template}"></label>
+                                        <!--/* before the first load nothing is chosen yet: the store's default template is */-->
+                                        <select class="cl-select" id="packageTemplate" name="packageTemplateId"
+                                                th:attr="aria-describedby=${packageTemplates.isEmpty()} ? 'packageTemplate-help' : null">
+                                            <option th:each="template : ${packageTemplates}" th:value="${template.id}"
+                                                    th:selected="${f.packageTemplateId != null ? template.id == f.packageTemplateId : template.default}"
+                                                    th:text="${template.name}"></option>
+                                        </select>
+                                        <p th:if="${packageTemplates.isEmpty()}" class="cl-help" id="packageTemplate-help"
+                                           th:text="#{shipping.template.empty}"></p>
                                     </div>
                                 </div>
                             </fieldset>
                             <div class="cl-card-footer">
-                                <button type="submit" class="cl-button" th:classappend="${!priced} ? 'is-primary'"
-                                        th:text="#{shipping.estimate}"></button>
+                                <button type="submit" class="cl-button" th:classappend="${!parcelsLoaded} ? 'is-primary'"
+                                        th:text="#{shipping.load.parcels}"></button>
                             </div>
-                        </th:block>
-                    </div>
-                </form>
-
-                <form id="shipping-create-form" class="cl-form is-wide" method="post"
-                      th:action="@{${f.shippingCreateAction}}">
-                    <th:block th:replace="~{shipping :: record(${f})}"></th:block>
-                    <th:block th:replace="~{shipping :: dispatch(${f})}"></th:block>
-                    <th:block th:replace="~{shipping :: recipient(${f})}"></th:block>
-                    <input type="hidden" name="saturdayDelivery" th:value="${f.saturdayDelivery}">
-                    <input type="hidden" name="cashOnDelivery" th:value="${f.cashOnDelivery}">
-                    <input type="hidden" name="cashOnDeliveryAmount" th:value="${f.cashOnDeliveryAmount}">
-                    <th:block th:each="parcel, stat : ${f.parcels}">
-                        <input th:each="field : ${ {'width', 'depth', 'height', 'weight', 'value', 'type', 'description'} }"
-                               type="hidden" th:name="${'parcels[' + stat.index + '].' + field}" th:value="${parcel[field]}">
-                    </th:block>
-                    <div class="cl-card">
-                        <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{shipping.carrier}"></legend>
-                            <p th:unless="${priced}" class="cl-help" th:text="#{shipping.offers.pending}"></p>
-                            <p th:if="${priced and servicePrices.isEmpty()}" class="cl-help" th:text="#{shipping.offers.empty}"></p>
-                            <!--/* the browser asks for a choice (required radios): without one the carrier API refuses the booking */-->
-                            <fieldset th:if="${priced and !servicePrices.isEmpty()}" class="cl-choice-group"
-                                      th:attr="aria-label=#{shipping.offers.legend}">
-                                <label class="cl-choice" th:each="price, stat : ${servicePrices}">
-                                    <input type="radio" name="serviceId" required th:id="${'shipping-offer-' + stat.index}"
-                                           th:value="${price.carrierId()}" th:checked="${price.carrierId() == f.serviceId}"
-                                           th:disabled="${!price.available()}">
-                                    <span class="cl-choice-text">
-                                        <span class="cl-choice-title" th:text="${price.carrierName()}"></span>
-                                        <span th:if="${price.priceGross() != null}" class="cl-choice-description"
-                                              th:text="#{shipping.offer.price(${price.priceGross()})}"></span>
-                                        <span th:unless="${price.available()}" class="cl-choice-description"
-                                              th:text="#{shipping.offer.unavailable}"></span>
-                                        <span th:each="error : ${price.errors()}" class="cl-choice-description is-warn"
-                                              th:text="${error}"></span>
-                                    </span>
-                                </label>
-                            </fieldset>
-                            <!--/* a warehouse shipment has its pickup ordered at once: no "Zamów odbiór" to point to */-->
-                            <p th:if="${priced and !servicePrices.isEmpty() and f.shippingEntityType != 'warehouse'}" class="cl-help"
-                               th:text="#{shipping.carrier.pickup.hint}"></p>
-                        </fieldset>
-                        <div th:if="${priced and !servicePrices.isEmpty()}" class="cl-card-footer">
-                            <!--/* no name, so disabling it on submit (shipping-booking.js) drops nothing from the post */-->
-                            <button type="submit" id="shipping-create-submit" class="cl-button is-primary" th:text="#{shipping.order.courier}"></button>
                         </div>
-                    </div>
-                </form>
+                    </form>
+
+                    <form id="shipping-estimate-form" class="cl-form is-wide" method="post" novalidate
+                          th:action="@{${f.shippingEstimateAction}}">
+                        <th:block th:replace="~{shipping :: record(${f})}"></th:block>
+                        <th:block th:replace="~{shipping :: dispatch(${f})}"></th:block>
+                        <th:block th:replace="~{shipping :: recipient(${f})}"></th:block>
+                        <div class="cl-card">
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{shipping.parcels}"></legend>
+                                <p class="cl-help" th:text="${parcelsLoaded} ? #{shipping.parcels.help} : #{shipping.parcels.empty}"></p>
+                            </fieldset>
+                            <!--/* the insured value is the parcel's "value"; every other column's label is shipping.<field> */-->
+                            <th:block th:if="${parcelsLoaded}" th:with="parcelFields=${ {'depth', 'width', 'height', 'weight', 'value'} }">
+                                <table class="cl-table is-editable is-narrow" id="shipping-parcels">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col" th:text="#{shipping.parcel}"></th>
+                                        <th:block th:each="field : ${parcelFields}">
+                                            <th scope="col" th:with="labelKey=${field == 'value' ? 'shipping.insurance' : 'shipping.' + field}"
+                                                th:text="#{${labelKey}}"></th>
+                                        </th:block>
+                                        <th scope="col" th:text="#{shipping.parcel.content}"></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="parcel, stat : ${f.parcels}">
+                                        <th scope="row" class="cl-table-key" th:text="#{shipping.parcel.row(${stat.count})}"></th>
+                                        <td th:each="field : ${parcelFields}" th:with="labelKey=${field == 'value' ? 'shipping.insurance' : 'shipping.' + field}"
+                                            th:attr="data-label=#{${labelKey}}">
+                                            <input class="cl-input" type="number" min="0" inputmode="numeric" autocomplete="off"
+                                                   th:id="${'parcel-' + stat.index + '-' + field}"
+                                                   th:name="${'parcels[' + stat.index + '].' + field}" th:value="${parcel[field]}"
+                                                   th:attr="aria-label=${#messages.msg('shipping.parcel.field', stat.count, #messages.msg(labelKey))}">
+                                        </td>
+                                        <td th:attr="data-label=#{shipping.parcel.content}">
+                                            <input class="cl-input" type="text" autocomplete="off"
+                                                   th:id="${'parcel-' + stat.index + '-description'}"
+                                                   th:name="${'parcels[' + stat.index + '].description'}" th:value="${parcel.description}"
+                                                   th:attr="aria-label=${#messages.msg('shipping.parcel.field', stat.count, #messages.msg('shipping.parcel.content'))}">
+                                            <!--/* always "package": the carrier API field is fixed, not the operator's choice */-->
+                                            <input type="hidden" th:name="${'parcels[' + stat.index + '].type'}" th:value="${parcel.type}">
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                                <fieldset class="cl-fieldset">
+                                    <legend class="cl-fieldset-title" th:text="#{shipping.delivery.options}"></legend>
+                                    <div th:replace="~{fragments/settings-form :: check('saturdayDelivery', 'shipping.saturday', ${f.saturdayDelivery}, null, null, null)}"></div>
+                                    <div th:replace="~{fragments/settings-form :: check('cashOnDelivery', 'shipping.cash.on.delivery', ${f.cashOnDelivery}, null, 'shipping-cod', null)}"></div>
+                                    <div class="cl-reveal" id="shipping-cod">
+                                        <div class="cl-field">
+                                            <label class="cl-label" for="cashOnDeliveryAmount" th:text="#{shipping.cod.amount}"></label>
+                                            <input class="cl-input is-price" type="number" min="0" step="0.1" inputmode="decimal"
+                                                   autocomplete="off" id="cashOnDeliveryAmount" name="cashOnDeliveryAmount"
+                                                   th:value="${f.cashOnDeliveryAmount}">
+                                        </div>
+                                    </div>
+                                </fieldset>
+                                <div class="cl-card-footer">
+                                    <button type="submit" class="cl-button" th:classappend="${!priced} ? 'is-primary'"
+                                            th:text="#{shipping.estimate}"></button>
+                                </div>
+                            </th:block>
+                        </div>
+                    </form>
+
+                    <form id="shipping-create-form" class="cl-form is-wide" method="post"
+                          th:action="@{${f.shippingCreateAction}}">
+                        <th:block th:replace="~{shipping :: record(${f})}"></th:block>
+                        <th:block th:replace="~{shipping :: dispatch(${f})}"></th:block>
+                        <th:block th:replace="~{shipping :: recipient(${f})}"></th:block>
+                        <input type="hidden" name="saturdayDelivery" th:value="${f.saturdayDelivery}">
+                        <input type="hidden" name="cashOnDelivery" th:value="${f.cashOnDelivery}">
+                        <input type="hidden" name="cashOnDeliveryAmount" th:value="${f.cashOnDeliveryAmount}">
+                        <th:block th:each="parcel, stat : ${f.parcels}">
+                            <input th:each="field : ${ {'width', 'depth', 'height', 'weight', 'value', 'type', 'description'} }"
+                                   type="hidden" th:name="${'parcels[' + stat.index + '].' + field}" th:value="${parcel[field]}">
+                        </th:block>
+                        <div class="cl-card">
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{shipping.carrier}"></legend>
+                                <p th:unless="${priced}" class="cl-help" th:text="#{shipping.offers.pending}"></p>
+                                <p th:if="${priced and servicePrices.isEmpty()}" class="cl-help" th:text="#{shipping.offers.empty}"></p>
+                                <!--/* the browser asks for a choice (required radios): without one the carrier API refuses the booking */-->
+                                <fieldset th:if="${priced and !servicePrices.isEmpty()}" class="cl-choice-group"
+                                          th:attr="aria-label=#{shipping.offers.legend}">
+                                    <label class="cl-choice" th:each="price, stat : ${servicePrices}">
+                                        <input type="radio" name="serviceId" required th:id="${'shipping-offer-' + stat.index}"
+                                               th:value="${price.carrierId()}" th:checked="${price.carrierId() == f.serviceId}"
+                                               th:disabled="${!price.available()}">
+                                        <span class="cl-choice-text">
+                                            <span class="cl-choice-title" th:text="${price.carrierName()}"></span>
+                                            <span th:if="${price.priceGross() != null}" class="cl-choice-description"
+                                                  th:text="#{shipping.offer.price(${price.priceGross()})}"></span>
+                                            <span th:unless="${price.available()}" class="cl-choice-description"
+                                                  th:text="#{shipping.offer.unavailable}"></span>
+                                            <span th:each="error : ${price.errors()}" class="cl-choice-description is-warn"
+                                                  th:text="${error}"></span>
+                                        </span>
+                                    </label>
+                                </fieldset>
+                                <!--/* a warehouse shipment has its pickup ordered at once: no "Zamów odbiór" to point to */-->
+                                <p th:if="${priced and !servicePrices.isEmpty() and f.shippingEntityType != 'warehouse'}" class="cl-help"
+                                   th:text="#{shipping.carrier.pickup.hint}"></p>
+                            </fieldset>
+                            <div th:if="${priced and !servicePrices.isEmpty()}" class="cl-card-footer">
+                                <!--/* no name, so disabling it on submit (shipping-booking.js) drops nothing from the post */-->
+                                <button type="submit" id="shipping-create-submit" class="cl-button is-primary" th:text="#{shipping.order.courier}"></button>
+                            </div>
+                        </div>
+                    </form>
+                </th:block>
             </div>
         </div>
     </section>
     <script th:src="@{/js/reveal.js}" defer></script>
+    <script th:src="@{/js/submit-on-change.js}" defer></script>
     <script th:src="@{/js/shipping-booking.js}" defer></script>
 </div>
 
 <!--/* Which record ships and in which direction: posted by every step. The warehouse has no record id. */-->
 <th:block th:fragment="record(f)">
+    <input th:if="${f.provider != null}" type="hidden" name="provider" th:value="${f.provider}">
     <input th:if="${f.shippingEntityId != null}" type="hidden" name="shippingEntityId" th:value="${f.shippingEntityId}">
     <input type="hidden" name="shippingEntityType" th:value="${f.shippingEntityType}">
     <input type="hidden" name="toClient" th:value="${f.toClient}">
@@ -235,5 +279,140 @@
            type="hidden" th:name="${'shippingDetails.' + field}"
            th:value="${f.shippingDetails != null ? f.shippingDetails[field] : null}">
 </th:block>
+
+<!--/* Wysyłam z Allegro: one step, no pricing (makieta przesylka-allegro). The delivery is read-only (W1): the buyer
+       chose the method and point on Allegro. One parcel: every carton is a shipment of its own. The template select
+       belongs to the GET form allegro-template-form (form attribute): picking one reloads the page with its parcel.
+       allegroErrors: the field reasons of a refused post (AllegroShipmentFormCheck), by field. */-->
+<div th:fragment="allegroForm(f, a)" class="cl-stack is-wide"
+     th:with="errors=${allegroErrors}, parcel=${f.parcels[0]}">
+    <form id="allegro-template-form" method="get" th:action="@{|/dashboard/orders/${f.shippingEntityId}/shipping|}">
+        <input type="hidden" name="provider" value="allegro">
+    </form>
+    <form id="allegro-create-form" class="cl-form is-wide" method="post" novalidate
+          th:action="@{${f.shippingAllegroCreateAction}}">
+        <th:block th:replace="~{shipping :: record(${f})}"></th:block>
+        <div class="cl-card">
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{shipping.allegro.delivery}"></legend>
+                <dl class="cl-kv">
+                    <div><dt th:text="#{shipping.allegro.method}"></dt><dd th:text="${a.methodName()}"></dd></div>
+                    <div th:if="${a.carrierName() != null}"><dt th:text="#{shipping.allegro.carrier}"></dt><dd th:text="${a.carrierName()}"></dd></div>
+                    <div th:if="${a.deliveryTypeKey() != null}"><dt th:text="#{shipping.allegro.deliveryType}"></dt><dd th:text="#{${a.deliveryTypeKey()}}"></dd></div>
+                    <div th:if="${a.pointCode() != null}"><dt th:text="#{shipping.allegro.point}"></dt><dd th:text="${a.pointCode()}"></dd></div>
+                    <div th:if="${a.recipient() != null}"><dt th:text="#{shipping.allegro.recipient}"></dt><dd th:text="${a.recipient()}"></dd></div>
+                </dl>
+                <p class="cl-help" th:text="#{shipping.allegro.delivery.help}"></p>
+            </fieldset>
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{shipping.dispatch}"></legend>
+                <div class="cl-form-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="allegro-pickup" th:text="#{shipping.pickup.address}"></label>
+                        <select class="cl-select" id="allegro-pickup" name="pickUpAddressId">
+                            <option th:each="entry : ${pickUpAddresses}" th:value="${entry.id}"
+                                    th:selected="${entry.id == f.pickUpAddressId}"
+                                    th:text="${entry.streetAndNumber} + ' ' + ${entry.city}"></option>
+                        </select>
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="allegro-template" th:text="#{shipping.package.template}"></label>
+                        <select class="cl-select" id="allegro-template" name="packageTemplateId" form="allegro-template-form"
+                                data-cl-submit-on-change aria-describedby="allegro-template-help">
+                            <option th:each="template : ${packageTemplates}" th:value="${template.id}"
+                                    th:selected="${template.id == f.packageTemplateId}" th:text="${template.name}"></option>
+                        </select>
+                        <p class="cl-help" id="allegro-template-help" th:text="#{shipping.allegro.template.help}"></p>
+                        <noscript><button type="submit" class="cl-button" form="allegro-template-form"
+                                          th:text="#{shipping.load.parcels}"></button></noscript>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{shipping.allegro.parcel}"></legend>
+                <p class="cl-help" id="allegro-limits" th:text="${a.limits()}"></p>
+                <p class="cl-help" th:text="#{shipping.allegro.parcel.one}"></p>
+                <p th:if="${errors['parcel'] != null}" class="cl-field-error" id="allegro-parcel-error">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${errors['parcel']}"></span>
+                </p>
+            </fieldset>
+            <table class="cl-table is-editable is-narrow" id="allegro-parcel">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{shipping.parcel}"></th>
+                    <th scope="col" th:each="field : ${ {'depth', 'width', 'height', 'weight'} }" th:text="#{|shipping.${field}|}"></th>
+                    <th scope="col" th:text="#{shipping.parcel.content}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <th scope="row" class="cl-table-key" th:text="#{shipping.parcel.row(1)}"></th>
+                    <td th:each="field : ${ {'depth', 'width', 'height', 'weight'} }" th:attr="data-label=#{|shipping.${field}|}">
+                        <input class="cl-input" type="number" min="0" inputmode="numeric" autocomplete="off"
+                               th:id="|allegro-parcel-${field}|" th:name="|parcels[0].${field}|" th:value="${parcel[field]}"
+                               th:attr="aria-label=${#messages.msg('shipping.parcel.field', 1, #messages.msg('shipping.' + field))},
+                                        aria-invalid=${errors['parcel'] != null ? 'true' : null},
+                                        aria-describedby=${errors['parcel'] != null ? 'allegro-limits allegro-parcel-error' : 'allegro-limits'}">
+                    </td>
+                    <td th:attr="data-label=#{shipping.parcel.content}">
+                        <input class="cl-input" type="text" autocomplete="off" id="allegro-parcel-description"
+                               name="parcels[0].description" th:value="${parcel.description}"
+                               th:attr="aria-label=${#messages.msg('shipping.parcel.field', 1, #messages.msg('shipping.parcel.content'))}">
+                        <input type="hidden" name="parcels[0].type" value="package">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{shipping.delivery.options}"></legend>
+                <div th:replace="~{fragments/settings-form :: check('cashOnDelivery', 'shipping.cash.on.delivery', ${f.cashOnDelivery}, null, 'allegro-cod', null)}"></div>
+                <div class="cl-form-grid">
+                    <div class="cl-span-3 cl-field cl-reveal" id="allegro-cod">
+                        <label class="cl-label" for="allegro-cod-amount" th:text="#{shipping.cod.amount}"></label>
+                        <input class="cl-input is-price" type="number" min="0" step="0.01" inputmode="decimal" autocomplete="off"
+                               id="allegro-cod-amount" name="cashOnDeliveryAmount" th:value="${f.cashOnDeliveryAmount}"
+                               th:classappend="${errors['cashOnDeliveryAmount'] != null} ? 'is-invalid'"
+                               th:attr="aria-invalid=${errors['cashOnDeliveryAmount'] != null ? 'true' : null},
+                                        aria-describedby=${errors['cashOnDeliveryAmount'] != null ? 'allegro-cod-help allegro-cod-error' : 'allegro-cod-help'}">
+                        <p class="cl-help" id="allegro-cod-help" th:text="${a.codHelp()}"></p>
+                        <p class="cl-help" id="allegro-cod-payout" th:text="#{shipping.allegro.cod.payout}"></p>
+                        <p th:if="${errors['cashOnDeliveryAmount'] != null}" class="cl-field-error" id="allegro-cod-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="${errors['cashOnDeliveryAmount']}"></span>
+                        </p>
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="allegro-insurance" th:text="#{shipping.insurance}"></label>
+                        <input class="cl-input is-price" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
+                               id="allegro-insurance" name="parcels[0].value" th:value="${parcel.value}"
+                               th:classappend="${errors['insurance'] != null} ? 'is-invalid'"
+                               th:attr="aria-invalid=${errors['insurance'] != null ? 'true' : null},
+                                        aria-describedby=${errors['insurance'] != null ? 'allegro-insurance-help allegro-insurance-error' : 'allegro-insurance-help'}">
+                        <p class="cl-help" id="allegro-insurance-help" th:text="${a.insuranceHelp()}"></p>
+                        <p th:if="${errors['insurance'] != null}" class="cl-field-error" id="allegro-insurance-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="${errors['insurance']}"></span>
+                        </p>
+                    </div>
+                </div>
+            </fieldset>
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{shipping.allegro.cost}"></legend>
+                <dl class="cl-kv">
+                    <div><dt th:text="#{shipping.allegro.price}"></dt><dd th:text="#{shipping.allegro.price.value}"></dd></div>
+                    <div><dt th:text="#{shipping.allegro.label}"></dt>
+                        <dd><span th:text="#{${a.labelFormatKey()}}"></span> · <a th:href="@{${a.settingsHref()}}"
+                                th:text="#{shipping.allegro.label.change}"></a></dd></div>
+                </dl>
+                <p class="cl-help" th:text="#{shipping.allegro.create.help}"></p>
+            </fieldset>
+            <div class="cl-card-footer">
+                <!--/* no name, so disabling it on submit (shipping-booking.js) drops nothing from the post */-->
+                <button type="submit" id="shipping-create-submit" class="cl-button is-primary" th:text="#{shipping.order.courier}"></button>
+            </div>
+        </div>
+    </form>
+</div>
 </body>
 </html>

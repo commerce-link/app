@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import pl.commercelink.shipping.api.ShipmentAddress;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,8 +60,8 @@ class ShipmentPickupServiceTest {
     @BeforeEach
     void setUp() {
         when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(orderOwner);
-        when(shippingService.providerFor(store)).thenReturn(provider);
-        when(shippingService.providerName(store)).thenReturn("furgonetka");
+        when(shippingService.providerNamed(store, "furgonetka")).thenReturn(java.util.Optional.of(provider));
+        when(shippingService.providerNamed(store, "allegro")).thenReturn(java.util.Optional.empty());
         when(store.getStoreId()).thenReturn("store-1");
         when(provider.supportsPickups()).thenReturn(true);
         when(orderOwner.applyPickup(anyString(), anyString(), anyCollection(), any())).thenReturn(1);
@@ -107,39 +108,39 @@ class ShipmentPickupServiceTest {
     @Test
     void windowsAreAskedFromTodayForTheGivenNumberOfDays() {
         // given
-        when(provider.pickupWindows(List.of("1"), LocalDate.now(), 3)).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("1")), any(), eq(LocalDate.now()), eq(3))).thenReturn(List.of(WINDOW));
 
         // when
-        List<PickupWindow> windows = service.windows(store, "furgonetka", List.of("1"), 3);
+        List<PickupWindow> windows = service.windows(store, "furgonetka", null, List.of("1"), 3);
 
         // then
         assertThat(windows).containsExactly(WINDOW);
     }
 
     @Test
-    void windowsOfAnotherIntegrationThanTheStoresAreNotAsked() {
+    void windowsOfAnIntegrationTheStoreNoLongerHasAreNotAsked() {
         // when
-        List<PickupWindow> windows = service.windows(store, "allegro", List.of("1"), 4);
+        List<PickupWindow> windows = service.windows(store, "allegro", null, List.of("1"), 4);
 
         // then
         assertThat(windows).isEmpty();
-        verify(provider, never()).pickupWindows(anyList(), any(), any(Integer.class));
+        verify(provider, never()).pickupWindows(anyList(), any(), any(), any(Integer.class));
     }
 
     @Test
     void orderingMarksTheShipmentsPendingThenSendsOneCommand() {
         // given
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(3)));
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1"), target("2")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1"), target("2")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.STARTED);
         List<UnaryOperator<ShipmentPickup>> marks = changesApplied(2);
         assertThat(marks.get(0).apply(ShipmentPickup.awaiting()).isPending()).isTrue();
-        verify(provider).orderPickup(eq(List.of("1", "2")), eq(WINDOW), anyString());
+        verify(provider).orderPickup(eq(List.of("1", "2")), any(), eq(WINDOW), anyString());
         verify(publisher).publish(argThat(r -> r.getTargets().size() == 2 && "h".equals(r.getToken())
                 && r.getAttempt() == 1 && "furgonetka".equals(r.getProvider())));
     }
@@ -147,9 +148,9 @@ class ShipmentPickupServiceTest {
     @Test
     void aPickupAlreadyPendingOrOrderedIsNotMarkedAgain() {
         // given
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
-        service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(3)));
+        service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // when
         UnaryOperator<ShipmentPickup> mark = changesApplied(1).get(0);
@@ -164,11 +165,11 @@ class ShipmentPickupServiceTest {
     @Test
     void aRefusalMarksThePickupsFailed() {
         // given
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString())).thenThrow(new ShippingException("HTTP 400",
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString())).thenThrow(new ShippingException("HTTP 400",
                 new HttpClientException(400, "{\"errors\":[{\"message\":\"Termin niedostępny\"}]}")));
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
@@ -184,11 +185,11 @@ class ShipmentPickupServiceTest {
     @Test
     void aFailedCommandResultMarksThePickupsFailed() {
         // given
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.failed(i.getArgument(2), "Brak podjazdu"));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.failed(i.getArgument(3), "Brak podjazdu"));
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
@@ -200,10 +201,10 @@ class ShipmentPickupServiceTest {
     @Test
     void unknownOutcomeStaysPendingAndIsChecked() {
         // given
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString())).thenThrow(new RuntimeException("HTTP request failed"));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString())).thenThrow(new RuntimeException("HTTP request failed"));
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.STARTED);
@@ -214,15 +215,15 @@ class ShipmentPickupServiceTest {
     @Test
     void aCheckThatCannotBeSentSettlesThePickupsUnconfirmed() {
         // given: the courier may be ordered, but nothing would ever check it
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString()))
-                .thenAnswer(i -> PickupOrder.pending(i.getArgument(2)));
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString()))
+                .thenAnswer(i -> PickupOrder.pending(i.getArgument(3)));
         doThrow(new RuntimeException("SQS down")).when(publisher).publish(any());
 
         // when
         PickupStart start;
         List<String> errors;
         try (CapturedLogs logs = CapturedLogs.of(ShipmentPickupService.class)) {
-            start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+            start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
             errors = logs.errors();
         }
 
@@ -242,13 +243,13 @@ class ShipmentPickupServiceTest {
     @Test
     void aRefusalThatCannotBeRecordedIsLeftToTheCheck() {
         // given: without the check the pickups would stay pending for good
-        when(provider.orderPickup(anyList(), eq(WINDOW), anyString())).thenThrow(new ShippingException("HTTP 400",
+        when(provider.orderPickup(anyList(), any(), eq(WINDOW), anyString())).thenThrow(new ShippingException("HTTP 400",
                 new HttpClientException(400, "{\"errors\":[{\"message\":\"Termin niedostępny\"}]}")));
         when(orderOwner.applyPickup(anyString(), anyString(), anyCollection(), any()))
                 .thenReturn(1).thenThrow(new RuntimeException("DynamoDB down"));
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.REFUSED);
@@ -262,7 +263,7 @@ class ShipmentPickupServiceTest {
                 .thenReturn(1).thenThrow(new RuntimeException("DynamoDB down")).thenReturn(1);
 
         // when / then
-        assertThatThrownBy(() -> service.order(store, "furgonetka", List.of(target("1"), target("2")), WINDOW))
+        assertThatThrownBy(() -> service.order(store, "furgonetka", null, List.of(target("1"), target("2")), WINDOW))
                 .hasMessage("DynamoDB down");
         verifyNoInteractions(provider);
         verify(publisher, never()).publish(any());
@@ -277,17 +278,17 @@ class ShipmentPickupServiceTest {
         when(orderOwner.applyPickup(anyString(), anyString(), anyCollection(), any())).thenReturn(0);
 
         // when
-        PickupStart start = service.order(store, "furgonetka", List.of(target("1")), WINDOW);
+        PickupStart start = service.order(store, "furgonetka", null, List.of(target("1")), WINDOW);
 
         // then
         assertThat(start.outcome()).isEqualTo(PickupStart.Outcome.GONE);
-        verify(provider, never()).orderPickup(anyList(), any(), anyString());
+        verify(provider, never()).orderPickup(anyList(), any(), any(), anyString());
     }
 
     @Test
-    void anotherProviderThanTheStoresIsRejected() {
+    void aPickupOfAnIntegrationTheStoreNoLongerHasIsRejected() {
         // when / then
-        assertThat(service.order(store, "allegro", List.of(target("1")), WINDOW).outcome())
+        assertThat(service.order(store, "allegro", null, List.of(target("1")), WINDOW).outcome())
                 .isEqualTo(PickupStart.Outcome.GONE);
         verifyNoInteractions(provider);
         verifyNoInteractions(orderOwner);
@@ -301,14 +302,14 @@ class ShipmentPickupServiceTest {
     @Test
     void aPackageTheCarrierRefusesIsLeftOutAndTheOthersGetTheirWindows() {
         // given: the provider refuses the whole request because of package 2 alone
-        when(provider.pickupWindows(eq(List.of("1", "2", "3")), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
-        when(provider.pickupWindows(eq(List.of("1")), any(), eq(4))).thenReturn(List.of(WINDOW));
-        when(provider.pickupWindows(eq(List.of("2")), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
-        when(provider.pickupWindows(eq(List.of("3")), any(), eq(4))).thenReturn(List.of(WINDOW));
-        when(provider.pickupWindows(eq(List.of("1", "3")), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("1", "2", "3")), any(), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
+        when(provider.pickupWindows(eq(List.of("1")), any(), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("2")), any(), any(), eq(4))).thenThrow(refusal("Przesyłka została już zamówiona"));
+        when(provider.pickupWindows(eq(List.of("3")), any(), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("1", "3")), any(), any(), eq(4))).thenReturn(List.of(WINDOW));
 
         // when
-        ShipmentPickupService.PageWindows result = service.pageWindows(store, "furgonetka", List.of("1", "2", "3"), 4);
+        ShipmentPickupService.PageWindows result = service.pageWindows(store, "furgonetka", null, List.of("1", "2", "3"), 4);
 
         // then
         assertThat(result.windows()).containsExactly(WINDOW);
@@ -318,24 +319,46 @@ class ShipmentPickupServiceTest {
     @Test
     void anErrorThatIsNotARefusalIsNotBlamedOnAPackage() {
         // given: the provider is down
-        when(provider.pickupWindows(anyList(), any(), eq(4))).thenThrow(new ShippingException("HTTP 503",
+        when(provider.pickupWindows(anyList(), any(), any(), eq(4))).thenThrow(new ShippingException("HTTP 503",
                 new HttpClientException(503, "unavailable")));
 
         // when / then: one call, the error goes to the page as before
-        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", List.of("1", "2"), 4))
+        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", null, List.of("1", "2"), 4))
                 .isInstanceOf(ShippingException.class);
-        verify(provider, times(1)).pickupWindows(anyList(), any(), eq(4));
+        verify(provider, times(1)).pickupWindows(anyList(), any(), any(), eq(4));
     }
 
     @Test
     void aRefusalNoSinglePackageExplainsIsShownAsBefore() {
         // given: the packages are fine alone, only the pair is refused
-        when(provider.pickupWindows(eq(List.of("1", "2")), any(), eq(4))).thenThrow(refusal("Różne adresy"));
-        when(provider.pickupWindows(eq(List.of("1")), any(), eq(4))).thenReturn(List.of(WINDOW));
-        when(provider.pickupWindows(eq(List.of("2")), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("1", "2")), any(), any(), eq(4))).thenThrow(refusal("Różne adresy"));
+        when(provider.pickupWindows(eq(List.of("1")), any(), any(), eq(4))).thenReturn(List.of(WINDOW));
+        when(provider.pickupWindows(eq(List.of("2")), any(), any(), eq(4))).thenReturn(List.of(WINDOW));
 
         // when / then
-        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", List.of("1", "2"), 4))
+        assertThatThrownBy(() -> service.pageWindows(store, "furgonetka", null, List.of("1", "2"), 4))
                 .isInstanceOf(ShippingException.class);
+    }
+
+    @Test
+    void windowsAndTheOrderCarryTheAddressTheGroupLeavesFrom() {
+        // given
+        ShipmentAddress warehouse = new ShipmentAddress("Magazyn", null, "Testowa 1", "00-001", "Warszawa", "PL",
+                "magazyn@example.com", "+48123123123");
+        when(shippingService.pickupAddress(store, "addr-1")).thenReturn(warehouse);
+        when(provider.pickupWindows(eq(List.of("1")), eq(warehouse), any(LocalDate.class), eq(4))).thenReturn(List.of(WINDOW));
+
+        // when
+        List<PickupWindow> windows = service.windows(store, "furgonetka", "addr-1", List.of("1"), 4);
+
+        // then
+        assertThat(windows).containsExactly(WINDOW);
+        verify(provider).pickupWindows(eq(List.of("1")), eq(warehouse), any(LocalDate.class), eq(4));
+    }
+
+    @Test
+    void aGroupOfAnIntegrationTheStoreNoLongerHasGetsNoWindows() {
+        // when / then
+        assertThat(service.windows(store, "allegro", "addr-1", List.of("1"), 4)).isEmpty();
     }
 }

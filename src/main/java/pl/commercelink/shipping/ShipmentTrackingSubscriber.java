@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ShipmentTrackingSubscriber {
 
     static final int MAX_CHECK_ATTEMPTS = 4;
+    static final String TRACKING_UNAVAILABLE_EVENT = "SHIPMENT_TRACKING_UNAVAILABLE";
     static final String TRACKING_FAILED_EVENT = "SHIPMENT_TRACKING_FAILED";
     static final String DUPLICATE_TRACKING_NO = "Tracking number is already tracked for another order";
     static final String CHECK_TIMED_OUT = "Furgonetka did not confirm the tracking request in time";
@@ -39,7 +41,7 @@ public class ShipmentTrackingSubscriber {
     private static final int HTTP_TOO_MANY_REQUESTS = 429;
 
     private final StoresRepository storesRepository;
-    private final ShippingProviderFactory shippingProviderFactory;
+    private final ShippingProviders shippingProviders;
     private final ShipmentTrackingsRepository shipmentTrackingsRepository;
     private final ShipmentTrackingEventPublisher publisher;
     private final OrderEventsRepository orderEventsRepository;
@@ -51,27 +53,32 @@ public class ShipmentTrackingSubscriber {
     }
 
     public void subscribe(String storeId, RMA rma) {
-        subscribe(storeId, null, rma.getRmaId(), rma.getShipments());
+        subscribe(storeId, null, rma, rma.getShipments());
     }
 
-    private void subscribe(String storeId, String orderId, String rmaId, List<Shipment> shipments) {
+    private void subscribe(String storeId, String orderId, RMA rma, List<Shipment> shipments) {
         List<Shipment> candidates = shipments.stream()
                 .filter(shipment -> shipment.hasShippingData() && !shipment.hasTrackingSubscription())
                 .toList();
         if (candidates.isEmpty()) {
             return;
         }
-        ShippingProvider provider = trackingProvider(storeId);
-        if (provider == null) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
             return;
         }
         for (Shipment shipment : candidates) {
-            subscribeOne(storeId, orderId, rmaId, shipment, provider);
+            subscribeOne(store, orderId, rma, shipment);
         }
     }
 
-    private void subscribeOne(String storeId, String orderId, String rmaId, Shipment shipment, ShippingProvider provider) {
+    private void subscribeOne(Store store, String orderId, RMA rma, Shipment shipment) {
+        String storeId = store.getStoreId();
+        String rmaId = rma == null ? null : rma.getRmaId();
         LocalDateTime now = LocalDateTime.now();
+        Optional<Tracker> tracker = trackerFor(store, shipment);
+        boolean ownParcel = shipment.getExternalId() != null;
+        boolean newlyIndexed = false;
         Optional<ShipmentTracking> existing = shipmentTrackingsRepository.find(storeId, shipment.getTrackingNo());
         if (existing.isPresent()) {
             ShipmentTracking tracking = existing.get();
@@ -82,17 +89,26 @@ public class ShipmentTrackingSubscriber {
                 return;
             }
         } else {
-            boolean indexed = shipmentTrackingsRepository.saveIfAbsent(
-                    new ShipmentTracking(storeId, shipment.getTrackingNo(), orderId, rmaId, now));
-            if (!indexed) {
+            newlyIndexed = shipmentTrackingsRepository.saveIfAbsent(new ShipmentTracking(storeId,
+                    shipment.getTrackingNo(), orderId, rmaId, now,
+                    ownParcel ? shippingProviders.nameFor(store, shipment) : tracker.map(Tracker::name).orElse(null), ownParcel ? shipment.getExternalId() : null));
+            if (!newlyIndexed) {
                 fail(storeId, orderId, shipment, DUPLICATE_TRACKING_NO, now);
                 return;
             }
         }
-        if (shipment.getExternalId() != null) {
+        if (tracker.isEmpty()) {
+            // recorded once: the index row written above marks the parcel as already reported
+            if (newlyIndexed) {
+                recordTrackingUnavailable(storeId, orderId, rma, shipment, now);
+            }
+            return;
+        }
+        if (ownParcel) {
             shipment.markTrackingActive(shipment.getExternalId());
             return;
         }
+        ShippingProvider provider = tracker.get().provider();
         ParcelTrackingSubscription result;
         try {
             result = provider.trackParcel(trackingRequest(shipment, orderId, rmaId));
@@ -117,6 +133,36 @@ public class ShipmentTrackingSubscriber {
         apply(storeId, orderId, shipment, result);
         if (result.status() == ParcelTrackingSubscription.Status.PENDING) {
             publisher.publish(new ShipmentTrackingCheckRequest(storeId, orderId, shipment.getTrackingNo()));
+        }
+    }
+
+    /**
+     * A parcel booked through an integration is tracked by that integration; a foreign number (typed in, reported by
+     * a supplier) by the store's default integration, the only one that follows parcels it did not create.
+     */
+    private Optional<Tracker> trackerFor(Store store, Shipment shipment) {
+        String name = shipment.getExternalId() != null
+                ? shippingProviders.nameFor(store, shipment)
+                : store.defaultShippingIntegration();
+        if (name == null) {
+            return Optional.empty();
+        }
+        return shippingProviders.forName(store, name)
+                .filter(ShippingProvider::supportsParcelTracking)
+                .map(provider -> new Tracker(name, provider));
+    }
+
+    private record Tracker(String name, ShippingProvider provider) {
+    }
+
+    private void recordTrackingUnavailable(String storeId, String orderId, RMA rma, Shipment shipment, LocalDateTime now) {
+        log.warn("No integration can track store={} order={} rma={} trackingNo={}: delivery has to be marked by hand",
+                storeId, orderId, rma == null ? null : rma.getRmaId(), shipment.getTrackingNo());
+        if (orderId != null) {
+            orderEventsRepository.save(new OrderEvent(orderId, EventType.action, TRACKING_UNAVAILABLE_EVENT, now));
+        } else if (rma != null) {
+            // the caller saves this RMA right after subscribing (it saves the tracking marks the same way)
+            rma.addEvent(new Event(EventType.action, TRACKING_UNAVAILABLE_EVENT, now));
         }
     }
 
@@ -204,8 +250,7 @@ public class ShipmentTrackingSubscriber {
         if (store == null) {
             return null;
         }
-        ShippingProvider provider = shippingProviderFactory.get(store);
-        return provider != null && provider.supportsParcelTracking() ? provider : null;
+        return shippingProviders.defaultFor(store).filter(ShippingProvider::supportsParcelTracking).orElse(null);
     }
 
     private static boolean isRateLimited(RuntimeException e) {

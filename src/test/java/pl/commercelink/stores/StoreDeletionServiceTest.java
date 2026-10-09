@@ -504,4 +504,21 @@ class StoreDeletionServiceTest {
                 () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY));
         verifyNoInteractions(cognitoUserService, wipeRepository, storeFilesWipe);
     }
+
+    @Test
+    void additionalShippingIntegrationsLoseTheirSettingsWithTheStore() {
+        // given
+        Store store = regularStore();
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, "Courier");
+        store.addAdditionalShippingIntegration("allegro");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verify(shippingProviderFactory).deleteConfiguration(store, "Courier");
+        verify(shippingProviderFactory).deleteConfiguration(store, "allegro");
+    }
 }

@@ -40,7 +40,10 @@ import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
+import org.springframework.web.util.UriComponentsBuilder;
+import pl.commercelink.shipping.AllegroCarrierNames;
 import pl.commercelink.shipping.ShipmentLinks;
+import pl.commercelink.shipping.ShippingIntegrationChoice;
 import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
@@ -149,7 +152,7 @@ public class OrderPageModelFactory {
                     links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
                     "fa-truck");
         } else if (!readOnly && canOrderShipment && order.hasShipmentToBook() && !order.hasShipmentBeingCreated()
-                && shippingService.isAvailable(store)) {
+                && shippingService.isAvailableFor(store, order)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
             // the shipping data into the shipment, so the page would only end on its refusal
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
@@ -402,6 +405,7 @@ public class OrderPageModelFactory {
         // ShipmentCancelService cancels, found by its courier order whatever its shipped date says
         Shipment courierCancellable = order.canOrderShipment() ? order.courierShipmentToCancel().orElse(null) : null;
         boolean placeholder = order.onlyPlaceholder().isPresent();
+        boolean severalIntegrations = store != null && store.shippingIntegrationNames().size() > 1;
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
@@ -409,7 +413,7 @@ public class OrderPageModelFactory {
             OrderLabels.ShipmentState state = OrderLabels.shipmentState(s, locale, integration);
             // the form rebuilds the shipment without its command: a late result would find nothing waiting for it
             boolean editable = !readOnly && s.getCreation() == null;
-            rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
+            rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), carrierName(s),
                     s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                     OrderFormats.moment(s.getShippedAt()), OrderFormats.moment(s.getDeliveredAt()),
                     order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
@@ -430,7 +434,13 @@ public class OrderPageModelFactory {
                     state == null ? null : state.tone(), state != null && state.inProgress(),
                     ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
-                    !readOnly && s.creationFailed() ? details + "/shipping" : null, integration));
+                    !readOnly && s.creationFailed() ? retryHref(details, s) : null, integration,
+                    severalIntegrations && s.getProvider() != null ? integration : null,
+                    ShippingIntegrationChoice.ALLEGRO.equals(s.getProvider()) && s.getExternalId() != null
+                            ? "order.shipments.allegro.note" : null,
+                    cancelHref(readOnly, courierCancellable, s, now, details),
+                    cancelReasonKey(readOnly, courierCancellable, s, now),
+                    OrderLabels.cancellationReason(s)));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -438,18 +448,38 @@ public class OrderPageModelFactory {
         String emptyKey = readOnly ? "order.shipments.empty.readonly"
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
-        boolean canCancelCourier = !readOnly && courierCancellable != null;
-        // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
-        String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
-                ? "order.shipments.cancel.locked.pending" : null;
-        String cancelCourierIntegration = canCancelCourier
-                ? shippingIntegrationNames.of(courierCancellable.getProvider(), store, locale) : null;
         // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
         String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now))
                 ? details + "/shipments/cancellation-state" : null;
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey,
-                cancelCourierIntegration, pollHref, forms,
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
+    }
+
+    /**
+     * "Anuluj przesyłkę" is offered on the rows of the courier order ShipmentCancelService cancels (every parcel of it
+     * carries its externalId), while it can be cancelled and no cancellation waits for the provider.
+     */
+    private static String cancelHref(boolean readOnly, Shipment courierCancellable, Shipment s, LocalDateTime now,
+                                     String details) {
+        return cancelsThisRow(readOnly, courierCancellable, s) && s.allowsCancellation()
+                && !courierCancellable.isCancellationInProgress(now) ? details + "/cancelShipment" : null;
+    }
+
+    /** Why "Anuluj przesyłkę" of this row is greyed: the provider refuses it (One by Allegro), or it is under way. */
+    private static String cancelReasonKey(boolean readOnly, Shipment courierCancellable, Shipment s, LocalDateTime now) {
+        if (!cancelsThisRow(readOnly, courierCancellable, s)) {
+            return null;
+        }
+        if (!s.allowsCancellation()) {
+            return "order.shipments.cancel.locked.notCancellable";
+        }
+        // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
+        return courierCancellable.isCancellationInProgress(now) ? "order.shipments.cancel.locked.pending" : null;
+    }
+
+    private static boolean cancelsThisRow(boolean readOnly, Shipment courierCancellable, Shipment s) {
+        return !readOnly && courierCancellable != null
+                && Objects.equals(s.getExternalId(), courierCancellable.getExternalId());
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";
@@ -846,5 +876,18 @@ public class OrderPageModelFactory {
             return receiptLock.key("order.items.add.locked.receipt");
         }
         return hasDropshipItems ? "order.items.action.dropship.locked" : null;
+    }
+
+    /** Wysyłam z Allegro keeps Allegro's carrier id on the shipment; the operator reads its name. */
+    private static String carrierName(Shipment s) {
+        return ShippingIntegrationChoice.ALLEGRO.equals(s.getProvider())
+                ? AllegroCarrierNames.displayName(s.getCarrier()) : s.getCarrier();
+    }
+
+    /** "Spróbuj ponownie" opens the shipping page on the integration the failed shipment went through. */
+    private static String retryHref(String details, Shipment s) {
+        return s.getProvider() == null ? details + "/shipping"
+                : UriComponentsBuilder.fromPath(details + "/shipping").queryParam("provider", s.getProvider())
+                        .build().encode().toUriString();
     }
 }

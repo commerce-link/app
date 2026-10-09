@@ -371,4 +371,73 @@ class OrderShipmentOwnerTest {
         assertThat(changed).isZero();
         verify(ordersRepository, never()).save(any());
     }
+
+    @Test
+    void aCreationNeverConfirmedIsSettledByAResultFoundLater() {
+        // given: the checks ran out, the row reads "nie potwierdziła nadania"; Allegro created it after all
+        Shipment unconfirmed = placeholder("cmd-0");
+        unconfirmed.setProvider("allegro");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        order.setShipments(new ArrayList<>(List.of(unconfirmed)));
+        Shipment created = new Shipment(ShipmentType.Courier);
+        created.setExternalId("shp-9");
+        created.setTrackingNo("AD058PZBBXLXNJ5TZ");
+
+        // when
+        boolean settled = owner.succeeded(request("cmd-0"), List.of(created));
+
+        // then
+        assertThat(settled).isTrue();
+        assertThat(order.getShipments()).extracting(Shipment::getExternalId).containsExactly("shp-9");
+        assertThat(order.hasShipmentToBook()).isFalse();
+        verify(lifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Test
+    void aCreationNeverConfirmedTakesTheProvidersRefusalFoundLater() {
+        // given: the integration was disconnected while the command was checked
+        Shipment unconfirmed = placeholder("cmd-0");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY));
+        order.setShipments(new ArrayList<>(List.of(unconfirmed)));
+
+        // when
+        owner.failed(request("cmd-0"), "Nieprawidłowy kod pocztowy", null);
+
+        // then
+        ShipmentCreationState creation = order.getShipments().get(0).getCreation();
+        assertThat(creation.isFailed()).isTrue();
+        assertThat(creation.isFailedUnconfirmed()).isFalse();
+        assertThat(creation.getCommand().getError()).isEqualTo("Nieprawidłowy kod pocztowy");
+    }
+
+    @Test
+    void aCreationTheProviderRefusedIsNotSettledAgain() {
+        // given
+        Shipment refused = placeholder("cmd-0");
+        refused.setCreation(refused.getCreation().failed("Błąd"));
+        order.setShipments(new ArrayList<>(List.of(refused)));
+
+        // when
+        boolean settled = owner.succeeded(request("cmd-0"), List.of(new Shipment(ShipmentType.Courier)));
+
+        // then
+        assertThat(settled).isFalse();
+        assertThat(order.getShipments().get(0).getCreation().isFailed()).isTrue();
+        verifyNoInteractions(lifecycleEventPublisher);
+    }
+
+    @Test
+    void aPackageNamedLaterIsRecordedOnARowNeverConfirmed() {
+        // given
+        Shipment unconfirmed = placeholder("cmd-0");
+        unconfirmed.setCreation(unconfirmed.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        order.setShipments(new ArrayList<>(List.of(unconfirmed)));
+
+        // when
+        owner.recordExternalId(request("cmd-0").withExternalId("shp-9"));
+
+        // then
+        assertThat(order.getShipments().get(0).getExternalId()).isEqualTo("shp-9");
+        assertThat(order.getShipments().get(0).getCreation().isFailedUnconfirmed()).isTrue();
+    }
 }

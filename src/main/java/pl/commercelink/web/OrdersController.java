@@ -2327,13 +2327,14 @@ public class OrdersController extends BaseController {
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
         Optional<Shipment> courier = order.courierShipmentToCancel();
         String refusal = courier.isPresent()
-                ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null)
+                ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending"
+                        : !courier.get().allowsCancellation() ? "order.shipments.cancel.error.not.cancellable" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
         // the integration the courier order went through, named by the texts about its cancellation
         String integration = integrationOf(courier.map(Shipment::getProvider).orElse(null), locale);
         if (refusal != null) {
-            // only "already in progress" names the integration; the others have no courier order to name it by
+            // only the refusals about the courier order name the integration; the others have no courier order to name it by
             return courier.isPresent() ? refuse(redirectAttributes, orderId, refusal, locale, integration)
                     : refuse(redirectAttributes, orderId, refusal, locale);
         }

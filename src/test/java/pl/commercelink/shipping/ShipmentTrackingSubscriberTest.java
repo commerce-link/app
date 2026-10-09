@@ -14,6 +14,7 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.rma.RMA;
@@ -34,6 +35,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,7 +53,7 @@ class ShipmentTrackingSubscriberTest {
     @Mock
     private StoresRepository storesRepository;
     @Mock
-    private ShippingProviderFactory shippingProviderFactory;
+    private ShippingProviders shippingProviders;
     @Mock
     private ShipmentTrackingsRepository shipmentTrackingsRepository;
     @Mock
@@ -94,7 +97,11 @@ class ShipmentTrackingSubscriberTest {
 
     private void providerAvailable() {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(shippingProviderFactory.get(store)).thenReturn(provider);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.defaultShippingIntegration()).thenReturn("furgonetka");
+        when(shippingProviders.nameFor(eq(store), any())).thenReturn("furgonetka");
+        when(shippingProviders.forName(store, "furgonetka")).thenReturn(Optional.of(provider));
+        when(shippingProviders.defaultFor(store)).thenReturn(Optional.of(provider));
         when(provider.supportsParcelTracking()).thenReturn(true);
         when(shipmentTrackingsRepository.saveIfAbsent(any())).thenReturn(true);
     }
@@ -108,7 +115,7 @@ class ShipmentTrackingSubscriberTest {
         subscriber.subscribe(STORE_ID, order);
 
         // then
-        verifyNoInteractions(storesRepository, shippingProviderFactory, shipmentTrackingsRepository, publisher);
+        verifyNoInteractions(storesRepository, shippingProviders, shipmentTrackingsRepository, publisher);
     }
 
     @Test
@@ -128,18 +135,110 @@ class ShipmentTrackingSubscriberTest {
     }
 
     @Test
-    void doesNothingWhenStoreHasNoTrackingCapableProvider() {
-        // given
+    void foreignNumberWithoutTrackingIntegrationIsIndexedAndRecordsAVisibleEventOnce() {
+        // given: no default integration (store ships only through Wysyłam z Allegro), number typed in by hand
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.defaultShippingIntegration()).thenReturn(null);
+        when(shipmentTrackingsRepository.saveIfAbsent(any())).thenReturn(true, false);
+        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
+                .thenReturn(Optional.empty(), Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", ORDER_ID, null, LocalDateTime.now())));
         Order order = orderWith(courier("PKG-1"));
+        ArgumentCaptor<OrderEvent> event = ArgumentCaptor.forClass(OrderEvent.class);
 
-        // when
+        // when: the order is saved twice (e.g. edited again)
+        subscriber.subscribe(STORE_ID, order);
         subscriber.subscribe(STORE_ID, order);
 
         // then
+        verify(orderEventsRepository, times(1)).save(event.capture());
+        assertThat(event.getValue().getName()).isEqualTo(ShipmentTrackingSubscriber.TRACKING_UNAVAILABLE_EVENT);
         assertThat(order.getShipments().get(0).hasTrackingSubscription()).isFalse();
-        verifyNoInteractions(shipmentTrackingsRepository, publisher);
+    }
+
+    @Test
+    void rmaShipmentWithoutTrackingIntegrationGetsTheEventOnTheRma() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.defaultShippingIntegration()).thenReturn(null);
+        when(shipmentTrackingsRepository.saveIfAbsent(any())).thenReturn(true);
+        RMA rma = new RMA();
+        rma.setRmaId("rma-1");
+        rma.setShipments(new java.util.ArrayList<>(List.of(courier("RET-1"))));
+
+        // when
+        subscriber.subscribe(STORE_ID, rma);
+
+        // then
+        assertThat(rma.getEvents()).extracting(Event::getName)
+                .containsExactly(ShipmentTrackingSubscriber.TRACKING_UNAVAILABLE_EVENT);
+    }
+
+    @Test
+    void parcelCreatedThroughAnIntegrationIsTrackedByThatIntegrationNotTheDefault() {
+        // given: Furgonetka is the default, the parcel was booked through Wysyłam z Allegro
+        providerAvailable();
+        ShippingProvider allegro = mock(ShippingProvider.class);
+        when(allegro.supportsParcelTracking()).thenReturn(true);
+        Shipment shipment = courier("AD000123");
+        shipment.setProvider("allegro");
+        shipment.setExternalId("shp-1");
+        when(shippingProviders.nameFor(store, shipment)).thenReturn("allegro");
+        when(shippingProviders.forName(store, "allegro")).thenReturn(Optional.of(allegro));
+        ArgumentCaptor<ShipmentTracking> row = ArgumentCaptor.forClass(ShipmentTracking.class);
+
+        // when
+        subscriber.subscribe(STORE_ID, orderWith(shipment));
+
+        // then
+        verify(shipmentTrackingsRepository).saveIfAbsent(row.capture());
+        assertThat(row.getValue().getProvider()).isEqualTo("allegro");
+        assertThat(row.getValue().getExternalId()).isEqualTo("shp-1");
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        verify(allegro, never()).trackParcel(any());
+        verify(provider, never()).trackParcel(any());
+    }
+
+    @Test
+    void parcelCreatedThroughAnIntegrationThatCannotTrackStillGetsItsProviderOnTheRow() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getStoreId()).thenReturn(STORE_ID);
+        when(store.defaultShippingIntegration()).thenReturn("furgonetka");
+        Shipment shipment = courier("AD000123");
+        shipment.setProvider("allegro");
+        shipment.setExternalId("shp-1");
+        when(shippingProviders.nameFor(store, shipment)).thenReturn("allegro");
+        when(shippingProviders.forName(store, "allegro")).thenReturn(Optional.empty());
+        when(shipmentTrackingsRepository.saveIfAbsent(any())).thenReturn(true);
+        ArgumentCaptor<ShipmentTracking> row = ArgumentCaptor.forClass(ShipmentTracking.class);
+
+        // when
+        subscriber.subscribe(STORE_ID, orderWith(shipment));
+
+        // then
+        verify(shipmentTrackingsRepository).saveIfAbsent(row.capture());
+        assertThat(row.getValue().getProvider()).isEqualTo("allegro");
+        assertThat(row.getValue().getExternalId()).isEqualTo("shp-1");
+        assertThat(shipment.hasTrackingSubscription()).isFalse();
+    }
+
+    @Test
+    void foreignNumberIsTrackedByTheDefaultIntegrationAndIndexedWithItsName() {
+        // given
+        providerAvailable();
+        when(provider.trackParcel(any())).thenReturn(ParcelTrackingSubscription.active("sub-77", "furg-77", "dpd"));
+        ArgumentCaptor<ShipmentTracking> row = ArgumentCaptor.forClass(ShipmentTracking.class);
+
+        // when
+        subscriber.subscribe(STORE_ID, orderWith(courier("PKG-1")));
+
+        // then
+        verify(shipmentTrackingsRepository).saveIfAbsent(row.capture());
+        assertThat(row.getValue().getProvider()).isEqualTo("furgonetka");
+        assertThat(row.getValue().getExternalId()).isNull();
+        verify(provider).trackParcel(any());
     }
 
     @Test
@@ -337,7 +436,7 @@ class ShipmentTrackingSubscriberTest {
         subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 1);
 
         // then
-        verifyNoInteractions(shippingProviderFactory);
+        verifyNoInteractions(shippingProviders);
         verify(ordersRepository, never()).save(any());
     }
 

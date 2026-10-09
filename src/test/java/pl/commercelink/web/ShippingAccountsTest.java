@@ -181,4 +181,17 @@ class ShippingAccountsTest {
         assertThat(form.getSettings()).containsEntry("furgonetka.apiUrl", "https://api.furgonetka.pl")
                 .doesNotContainKey("furgonetka.username").doesNotContainKey("furgonetka.optionalUrl");
     }
+
+    @Test
+    void integrationsWithoutACourierAccountAreNotOfferedAsTheAccount() {
+        // given
+        ShippingProviderDescriptor allegro = org.mockito.Mockito.mock(ShippingProviderDescriptor.class);
+        when(allegro.name()).thenReturn("allegro");
+        when(allegro.displayName()).thenReturn("Wysyłam z Allegro");
+        when(descriptor.name()).thenReturn(PROVIDER);
+        when(shippingProviderFactory.availableProviders()).thenReturn(List.of(descriptor, allegro));
+
+        // when / then
+        assertThat(accounts.installed()).extracting(ShippingProviderDescriptor::name).containsExactly(PROVIDER);
+    }
 }

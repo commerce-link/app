@@ -43,4 +43,15 @@ class MenuScriptContractTest {
         assertThat(js).contains("event.key === 'ArrowDown' || event.key === 'ArrowUp'").contains("event.key === 'Escape'")
                 .contains("event.key === 'Tab'");
     }
+
+    @Test
+    void aListThatFitsNeitherSideIsShiftedInsideTheWindow() throws Exception {
+        // when
+        String js = script();
+
+        // then — right-aligned it leaves on the left, from the left edge it leaves on the right: it is shifted, not left cut
+        assertThat(js).contains("list.classList.add('is-start')")
+                .contains("list.style.left = -Math.min(overRight, list.getBoundingClientRect().left - MARGIN) + 'px'")
+                .contains("list.style.left = '';");
+    }
 }

@@ -3,6 +3,7 @@ package pl.commercelink.orders;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 /** Edits of an owner's shipment list (an order's, an RMA's) shared by the creation and pickup flows. */
@@ -15,11 +16,25 @@ public final class ShipmentLists {
         return shipments.stream().filter(s -> s.isCreationPendingFor(commandId)).findFirst();
     }
 
+    /** The placeholder of that command, PENDING or never confirmed (Shipment#isCreationUnsettledFor). */
+    public static Optional<Shipment> unsettled(List<Shipment> shipments, String commandId) {
+        return shipments.stream().filter(s -> s.isCreationUnsettledFor(commandId)).findFirst();
+    }
+
     /** Puts the created shipments where the placeholder of that command was; false when it is not there any more. */
     public static boolean replaceCreating(List<Shipment> shipments, String commandId, List<Shipment> created) {
+        return replace(shipments, s -> s.isCreationPendingFor(commandId), created);
+    }
+
+    /** As replaceCreating, for a placeholder PENDING or never confirmed. */
+    public static boolean replaceUnsettled(List<Shipment> shipments, String commandId, List<Shipment> created) {
+        return replace(shipments, s -> s.isCreationUnsettledFor(commandId), created);
+    }
+
+    private static boolean replace(List<Shipment> shipments, Predicate<Shipment> placeholder, List<Shipment> created) {
         int index = -1;
         for (int i = 0; i < shipments.size(); i++) {
-            if (shipments.get(i).isCreationPendingFor(commandId)) {
+            if (placeholder.test(shipments.get(i))) {
                 index = i;
                 break;
             }
@@ -27,7 +42,7 @@ public final class ShipmentLists {
         if (index < 0) {
             return false;
         }
-        shipments.removeIf(s -> s.isCreationPendingFor(commandId));
+        shipments.removeIf(placeholder);
         shipments.addAll(index, created);
         return true;
     }

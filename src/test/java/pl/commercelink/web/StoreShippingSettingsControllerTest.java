@@ -38,6 +38,8 @@ class StoreShippingSettingsControllerTest {
     @Mock
     private ShippingAccounts shippingAccounts;
     @Mock
+    private AllegroShippingSettings allegroShippingSettings;
+    @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
 
     @InjectMocks
@@ -48,6 +50,8 @@ class StoreShippingSettingsControllerTest {
         when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         when(shippingAccounts.status(any())).thenReturn(IntegrationStatus.none());
+        when(allegroShippingSettings.summary(any())).thenReturn(new AllegroShippingSettings.AllegroShippingSummary(
+                false, false, false, AllegroShippingLabelFormat.PDF_A6));
     }
 
     private Store storeWithAddress(String id) {

@@ -36,8 +36,15 @@ public final class ProviderErrors {
         return httpCause(e) != null;
     }
 
-    /** The provider's own messages (errors[].message of a JSON body), else the exception's message. */
+    /**
+     * What to show the operator: the provider's words the adapter collected (ShippingException#providerMessages, e.g.
+     * Allegro's userMessage), else the messages of a Furgonetka-style JSON body (errors[].message), else the message.
+     */
     public static String describe(RuntimeException e) {
+        List<String> collected = providerMessages(e);
+        if (!collected.isEmpty()) {
+            return String.join("; ", collected);
+        }
         HttpClientException http = httpCause(e);
         if (http != null && http.getResponseBody() != null) {
             try {
@@ -56,6 +63,17 @@ public final class ProviderErrors {
             }
         }
         return e.getMessage();
+    }
+
+    private static List<String> providerMessages(Throwable e) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable current = e; current != null && seen.add(current); current = current.getCause()) {
+            if (current instanceof ShippingException shipping && shipping.providerMessages() != null
+                    && !shipping.providerMessages().isEmpty()) {
+                return shipping.providerMessages();
+            }
+        }
+        return List.of();
     }
 
     private static HttpClientException httpCause(Throwable e) {

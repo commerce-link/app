@@ -1537,6 +1537,13 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
 }
 
+/* W3: row actions ending with the ⋯ menu (the rare and blocking actions of a shipment): the menu button is as tall as
+   the text actions next to it */
+.cl-page .cl-list-actions .cl-menu > summary.cl-button.is-icon { min-height: 32px; height: 32px; padding: 0 10px; }
+@media screen and (max-width: 1023px) {
+  .cl-page .cl-list-actions .cl-menu > summary.cl-button.is-icon { min-height: 44px; height: 44px; }
+}
+
 /* Secondary records collapsed inside a list row's record column (details.cl-row-disclosure, e.g. an e-receipt's
    earlier attempts): a small summary with the .cl-disclosure arrow, then one line per record. Native details/summary,
    so it opens with the keyboard and without JavaScript. */
@@ -5950,6 +5957,15 @@ a.cl-link-button:hover {
 .cl-page .cl-kv dd.is-bad {
     color: var(--cl-bad);
     font-weight: 600;
+}
+
+/* W1: read-only record description inside a group of fields (the buyer's delivery method, the cost of a shipment):
+   the fieldset already pads its content, so the dl drops the padding it has as a card child */
+.cl-page .cl-fieldset > dl.cl-kv { padding: 0; }
+.cl-page .cl-fieldset > dl.cl-kv + .cl-help { margin: var(--cl-gap-fields) 0 0; }
+@media screen and (max-width: 719px) {
+  .cl-page .cl-fieldset > dl.cl-kv { grid-template-columns: minmax(0, 1fr); }
+  .cl-page .cl-fieldset > dl.cl-kv > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 
 

@@ -164,14 +164,18 @@ class OrderLabelsTest {
     @Test
     void aStoredSentenceThatStatesTheOutcomeIsTheLineItselfWithTheIntegrationsName() {
         // given
-        Shipment unconfirmed = new Shipment(ShipmentType.Courier);
-        unconfirmed.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
-        List<String> pickupKeys = List.of(ShipmentPickup.UNCONFIRMED_KEY, "shipping.pickup.not.sent", "shipping.pickup.no.provider");
+        List<String> creationKeys = List.of(ShipmentCreationState.UNCONFIRMED_KEY,
+                ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY);
+        List<String> pickupKeys = List.of(ShipmentPickup.UNCONFIRMED_KEY, ShipmentPickup.UNCONFIRMED_DISCONNECTED_KEY,
+                "shipping.pickup.not.sent", "shipping.pickup.no.provider");
 
         // when / then
-        assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH, "Furgonetka").key())
-                .isEqualTo(ShipmentCreationState.UNCONFIRMED_KEY);
-        assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH, "Furgonetka").args()).containsExactly("Furgonetka");
+        for (String key : creationKeys) {
+            Shipment unconfirmed = new Shipment(ShipmentType.Courier);
+            unconfirmed.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failedWithKey(key));
+            assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH, "Furgonetka").key()).isEqualTo(key);
+            assertThat(OrderLabels.shipmentState(unconfirmed, Locale.ENGLISH, "Furgonetka").args()).containsExactly("Furgonetka");
+        }
         for (String key : pickupKeys) {
             Shipment parcel = new Shipment(ShipmentType.Courier);
             parcel.setProvider("furgonetka");
