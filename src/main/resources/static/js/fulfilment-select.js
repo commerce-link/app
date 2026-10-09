@@ -48,9 +48,10 @@
         return (share < 0 && tenths > 0 ? '−' : '') + Math.floor(tenths / 10) + ',' + (tenths % 10);
     }
 
+    // rewriting an unchanged text still mutates the node, which a screen reader may announce again in a live region
     function setText(selector, text) {
         var element = form.querySelector(selector);
-        if (element) {
+        if (element && element.textContent !== text) {
             element.textContent = text;
         }
     }
@@ -104,7 +105,15 @@
     var hiddenNotice = form.querySelector('[data-cl-hidden-notice]');
     var reason = form.querySelector('[data-cl-select-reason]');
     var needsSelection = all(form, 'button[data-cl-needs-selection]');
+    var liveRegion = form.querySelector('[data-cl-live]');
     var focusedOrder = null;
+    var filtersActive = false;
+    // the last "Zamów tę" that left items of other orders without a supplier: shown in the chosen row until the next change
+    var swapped = null;
+    var liveTimer = null;
+    var liveText = null;
+    var livePrefix = '';
+    var partialState = null;
     // per winner (group id): whether its dearer offers are unfolded, and which of them were ticked at the last render
     var unfolded = {};
     var tickedUnder = {};
@@ -238,10 +247,15 @@
             button.type = 'button';
             button.className = 'cl-alt-fold-toggle';
             var icon = document.createElement('i');
-            icon.className = 'fas fa-chevron-down';
+            icon.className = 'fas fa-chevron-down cl-fold-open';
             icon.setAttribute('aria-hidden', 'true');
+            // a locked fold shows a lock instead of the chevron (CSS picks one by aria-disabled)
+            var lock = document.createElement('i');
+            lock.className = 'fas fa-lock cl-fold-lock';
+            lock.setAttribute('aria-hidden', 'true');
             var label = document.createElement('span');
             button.appendChild(icon);
+            button.appendChild(lock);
             button.appendChild(label);
             // why a locked fold does not close, for screen readers (aria-describedby) and on hover (title)
             var reasonText = document.createElement('span');
@@ -385,6 +399,7 @@
             var count = tbody.querySelector('[data-cl-category-count]');
             count.textContent = format(texts.categoryOffers, inGroup.length) + ' · ';
             var ordered = document.createElement('strong');
+            ordered.className = ordering.length ? 'is-ok' : '';
             ordered.textContent = format(texts.categoryOrdered, ordering.length);
             count.appendChild(ordered);
 
@@ -458,20 +473,49 @@
             return;
         }
         var covered = Object.keys(winner).length;
+        // one order on the page has no chips: say only that the rest stays in the queue
+        var singleOrderGap = chips.length === 0 && covered < itemsTotal;
+        var shown = covered > 0 && (partial.length > 0 || uncovered.length > 0 || singleOrderGap);
+        // the alert is a live region: rebuild it only when what it says changes
+        var state = JSON.stringify([shown, singleOrderGap, partial, uncovered].map(function (part) {
+            return Array.isArray(part) ? part.map(function (entry) {
+                return [entry.chip.getAttribute('data-order'), entry.done, entry.total];
+            }) : part;
+        }));
+        if (state === partialState) {
+            return;
+        }
+        partialState = state;
         var text = alert.querySelector('[data-cl-partial-text]');
         text.textContent = '';
-        if (covered === 0) {
-            alert.hidden = true;
+        alert.hidden = !shown;
+        if (!shown) {
             return;
         }
         appendOrders(text, texts.partial, partial);
         appendOrders(text, texts.uncovered, uncovered);
-        // one order on the page has no chips: say only that the rest stays in the queue
-        var singleOrderGap = chips.length === 0 && covered < itemsTotal;
-        if (partial.length || uncovered.length || singleOrderGap) {
-            text.appendChild(document.createTextNode(texts.partialEnd));
+        text.appendChild(document.createTextNode(texts.partialEnd));
+    }
+
+    // one sentence for screen readers a moment after the last change, instead of every number in the summary
+    // announcing itself; the page load stays silent
+    function announce(summary) {
+        if (!liveRegion) {
+            return;
         }
-        alert.hidden = !(partial.length || uncovered.length || singleOrderGap);
+        if (liveText === null) {
+            liveText = summary;
+            return;
+        }
+        clearTimeout(liveTimer);
+        liveTimer = setTimeout(function () {
+            var text = (livePrefix ? livePrefix + ' ' : '') + summary;
+            livePrefix = '';
+            if (text !== liveText) {
+                liveText = text;
+                liveRegion.textContent = text;
+            }
+        }, 600);
     }
 
     function renderTotals(winner) {
@@ -487,6 +531,15 @@
             byProvider[offer.provider] = (byProvider[offer.provider] || 0) + value;
         });
         var covered = format(texts.count, Object.keys(winner).length, itemsTotal);
+        var live = [];
+        if (form.querySelector('[data-cl-total-items]')) {
+            live.push(format(texts.liveItems, covered));
+        }
+        live.push(format(texts.liveCost, money(cost)));
+        if (profitKnown) {
+            live.push(format(texts.liveProfit, signed(profit)));
+        }
+        announce(live.join(', ') + '.');
         setText('[data-cl-total-items]', covered);
         setText('[data-cl-peek-items]', covered);
         setText('[data-cl-total-cost]', money(cost));
@@ -607,18 +660,43 @@
         return offers.filter(onScreen);
     }
 
-    // one button for the offers on screen: it ticks them while one of them is unticked, otherwise it clears them; what a
-    // collapsed category or a closed fold holds is never changed unseen
+    function narrowing() {
+        return providerBoxes.some(function (box) {
+            return box.checked;
+        }) || bound(minInput) !== null || bound(maxInput) !== null;
+    }
+
+    // one button: it ticks the offers on screen while one of them is unticked; otherwise it clears every ticked offer
+    // the filters let through, in a collapsed category or a closed fold too, like the old "Odznacz wszystkie", so
+    // "clear, then pick by hand" never saves a suggestion left out of sight. Offers the filters hide are never changed.
+    function selectVisibleMode() {
+        if (shownOffers().some(function (offer) {
+            return !offer.check.checked;
+        })) {
+            return 'tick';
+        }
+        return offers.some(function (offer) {
+            return offer.visible && offer.check.checked;
+        }) ? 'clear' : null;
+    }
+
     function renderSelectVisible() {
         if (!selectVisible) {
             return;
         }
-        var shown = shownOffers();
-        var tick = shown.length === 0 || shown.some(function (offer) {
-            return !offer.check.checked;
+        var mode = selectVisibleMode();
+        selectVisible.textContent = mode !== 'clear' ? texts.selectVisible
+            : (narrowing() || focusedOrder ? texts.clearMatching : texts.clearAll);
+        selectVisible.disabled = mode === null;
+    }
+
+    function renderSwap() {
+        offers.forEach(function (offer) {
+            var line = offer.row.querySelector('[data-cl-swap]');
+            var mine = !!swapped && swapped.offer === offer;
+            line.hidden = !mine;
+            line.textContent = mine ? swapped.text : '';
         });
-        selectVisible.textContent = tick ? texts.selectVisible : texts.clearVisible;
-        selectVisible.disabled = shown.length === 0;
     }
 
     function matchVariant() {
@@ -646,6 +724,7 @@
         renderCoverage(winner);
         renderTotals(winner);
         renderButtons(winner);
+        renderSwap();
         applyFilters();
     }
 
@@ -655,21 +734,54 @@
     }
 
     // E7 swap: ticking an offer that cheaper ticked ones cover unticks every ticked offer that beats it on one of its
-    // items, so the chosen one really orders them; their other items go to the next ticked offer or stay uncovered
+    // items, so the chosen one really orders them; their other items go to the next ticked offer or stay uncovered.
+    // Items left uncovered that way belong to other rows, often other orders, so the chosen row says which.
     function toggled(offer) {
+        swapped = null;
         if (offer.check.checked && offer.covered) {
             var keys = offer.allocations.map(function (allocation) {
                 return allocation.key;
             });
+            var before = winners();
+            var unticked = [];
             offers.forEach(function (other) {
                 if (other !== offer && other.check.checked && beats(other, offer) && other.allocations.some(function (allocation) {
                     return keys.indexOf(allocation.key) >= 0;
                 })) {
                     other.check.checked = false;
+                    if (unticked.indexOf(other.label) < 0) {
+                        unticked.push(other.label);
+                    }
                 }
             });
+            var after = winners();
+            var lost = Object.keys(before).filter(function (key) {
+                return !after[key];
+            });
+            if (lost.length) {
+                swapped = {offer: offer, text: swapText(unticked, lost)};
+                livePrefix = swapped.text;
+            }
         }
         changed();
+    }
+
+    function swapText(labels, lostKeys) {
+        if (!chips.length) {
+            return format(texts.swapItems, labels.join(', '), lostKeys.length);
+        }
+        var numbers = [];
+        lostKeys.forEach(function (key) {
+            var order = key.slice(0, key.indexOf('::'));
+            var chip = chips.filter(function (c) {
+                return c.getAttribute('data-order') === order;
+            })[0];
+            var number = chip ? chip.getAttribute('data-number') : order;
+            if (numbers.indexOf(number) < 0) {
+                numbers.push(number);
+            }
+        });
+        return format(texts.swapOrders, labels.join(', '), numbers.join(', '));
     }
 
     function setAllExpanded(expanded) {
@@ -726,6 +838,7 @@
                 return;
             }
             var ids = (radio.getAttribute('data-groups') || '').split(' ');
+            swapped = null;
             offers.forEach(function (offer) {
                 offer.check.checked = ids.indexOf(offer.id) >= 0;
             });
@@ -747,23 +860,42 @@
 
     if (selectVisible) {
         selectVisible.addEventListener('click', function () {
-            var shown = shownOffers();
-            var tick = shown.some(function (offer) {
-                return !offer.check.checked;
-            });
-            shown.forEach(function (offer) {
-                offer.check.checked = tick;
-            });
+            var mode = selectVisibleMode();
+            swapped = null;
+            if (mode === 'tick') {
+                shownOffers().forEach(function (offer) {
+                    offer.check.checked = true;
+                });
+            } else if (mode === 'clear') {
+                offers.forEach(function (offer) {
+                    if (offer.visible) {
+                        offer.check.checked = false;
+                    }
+                });
+            }
             changed();
         });
     }
 
+    // a filter that starts narrowing opens every category, as the old page did, so what it lets through is on screen
+    // rather than hidden in collapsed ones; later changes keep whatever the operator folded since
+    function filtersChanged() {
+        var active = narrowing();
+        var starts = active && !filtersActive;
+        filtersActive = active;
+        if (starts) {
+            setAllExpanded(true);
+        } else {
+            applyFilters();
+        }
+    }
+
     providerBoxes.forEach(function (box) {
-        box.addEventListener('change', applyFilters);
+        box.addEventListener('change', filtersChanged);
     });
     [minInput, maxInput].forEach(function (input) {
         if (input) {
-            input.addEventListener('input', applyFilters);
+            input.addEventListener('input', filtersChanged);
         }
     });
     // Enter on any field of the selection form would confirm it (implicit submission); buttons keep their Enter
@@ -784,6 +916,7 @@
         if (maxInput) {
             maxInput.value = '';
         }
+        filtersActive = false;
         applyFilters();
     });
     var filters = form.querySelector('[data-cl-select-filters]');

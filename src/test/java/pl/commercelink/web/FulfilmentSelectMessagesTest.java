@@ -107,12 +107,14 @@ class FulfilmentSelectMessagesTest {
         assertThat(used).contains("fulfilment.select.unit.pieces", "fulfilment.select.unit.perPiece", "fulfilment.select.money",
                 "fulfilment.select.toggle.on", "fulfilment.select.toggle.off", "fulfilment.select.toggle.alt", "fulfilment.select.toggle.kept",
                 "fulfilment.select.list.expand", "fulfilment.select.list.collapse", "fulfilment.select.list.selectVisible",
-                "fulfilment.select.list.clearVisible", "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold",
+                "fulfilment.select.list.clearAll", "fulfilment.select.list.clearMatching", "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold",
                 "fulfilment.select.orders.filter", "fulfilment.select.orders.filter.split", "fulfilment.select.ratio",
                 "fulfilment.select.category.chosen", "fulfilment.select.mfn", "fulfilment.select.offer.name",
-                "fulfilment.select.covered.off", "fulfilment.select.alt.fold.plain", "fulfilment.select.alt.fold.locked");
+                "fulfilment.select.covered.off", "fulfilment.select.alt.fold.plain", "fulfilment.select.alt.fold.locked",
+                "fulfilment.select.swap.orders", "fulfilment.select.swap.items", "fulfilment.select.live.items",
+                "fulfilment.select.live.cost", "fulfilment.select.live.profit", "fulfilment.select.saved.none");
         for (String key : List.of("fulfilment.select.all", "fulfilment.select.column.price.short", "fulfilment.select.category.count",
-                "fulfilment.select.offer.label")) {
+                "fulfilment.select.offer.label", "fulfilment.select.list.clearVisible")) {
             assertThat(pl.getProperty(key)).as("pl " + key).isNull();
             assertThat(en.getProperty(key)).as("en " + key).isNull();
         }

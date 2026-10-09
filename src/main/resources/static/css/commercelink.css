@@ -10416,6 +10416,15 @@ a.cl-link-button:hover {
     }
 }
 
+/* WebKit ignores position: relative on a table row, so the row link's stretched ::after covered the whole page there
+   and every click on "Pomiń", the narrowing options or the selection buttons opened an order. A clip-path keeps the
+   overlay (and its hit area) inside its own row; the card mode below 720 px is a positioned block already. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-queue tbody tr {
+        clip-path: inset(0);
+    }
+}
+
 /* "Wróć" and "Zacznij od początku" side by side when every waiting order was skipped. */
 .cl-page .cl-queue-empty-actions {
     display: flex;
@@ -10459,6 +10468,13 @@ a.cl-link-button:hover {
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 8px;
+}
+
+/* Under a page title (the supplier selection's kind, step, store and strategy) it stays quieter than the lead */
+.cl-page .cl-page-header .cl-group-meta {
+    margin-top: 8px;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
 }
 
 @media screen and (max-width: 719px) {
@@ -10900,7 +10916,7 @@ a.cl-link-button:hover {
         background: var(--cl-chip-hover);
     }
 
-    .cl-page .cl-alt-fold-toggle:hover {
+    .cl-page .cl-alt-fold-toggle:not([aria-disabled="true"]):hover {
         text-decoration: underline;
     }
 }
@@ -11175,6 +11191,14 @@ a.cl-link-button:hover {
     color: var(--cl-bad);
 }
 
+/* After "Zamów tę": which supplier was unticked and which orders' items it left without one */
+.cl-page .cl-offer-swap {
+    flex-basis: 100%;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--cl-warn);
+}
+
 /* The fold under a winner with dearer offers ("▸ Droższe oferty: n · od +x zł/szt."), written by the script */
 .cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
     padding: 0 10px 0 46px;
@@ -11198,7 +11222,18 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-alt-fold-toggle[aria-disabled="true"] {
+    color: var(--cl-ink-2);
     cursor: default;
+}
+
+/* a lock instead of the chevron while a ticked offer under it keeps the fold open */
+.cl-page .cl-alt-fold-toggle .cl-fold-lock,
+.cl-page .cl-alt-fold-toggle[aria-disabled="true"] .cl-fold-open {
+    display: none;
+}
+
+.cl-page .cl-alt-fold-toggle[aria-disabled="true"] .cl-fold-lock {
+    display: inline-block;
 }
 
 .cl-page .cl-alt-fold-toggle:focus-visible {
@@ -11268,6 +11303,10 @@ a.cl-link-button:hover {
 
 .cl-page .cl-group-count strong {
     font-weight: 600;
+    color: inherit;
+}
+
+.cl-page .cl-group-count strong.is-ok {
     color: var(--cl-ok);
 }
 
@@ -11275,6 +11314,17 @@ a.cl-link-button:hover {
     font-size: 13px;
     font-weight: 600;
     color: var(--cl-ink);
+}
+
+/* "Bez oferty": the warning icon and colour set it apart from the categories, whose rows can be ordered */
+.cl-page .cl-table.is-supplier-offers tr.cl-table-group.is-warn :is(i, svg) {
+    margin-right: 10px;
+    font-size: 15px;
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-table.is-supplier-offers tr.cl-table-group.is-warn .cl-group-name {
+    color: var(--cl-warn);
 }
 
 .cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {

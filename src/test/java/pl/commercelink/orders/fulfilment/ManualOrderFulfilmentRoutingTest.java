@@ -26,6 +26,7 @@ import pl.commercelink.warehouse.WarehouseFulfilmentService;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -137,10 +138,11 @@ class ManualOrderFulfilmentRoutingTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
 
         // when
-        service().commit(STORE_ID, acceptedFormFor("Bravo"));
+        FulfilmentCommit commit = service().commit(STORE_ID, acceptedFormFor("Bravo"));
 
         // then
         verify(orderItemsRepository, never()).findByOrderId(ORDER_ID);
+        assertThat(commit.isEmpty()).isTrue();
     }
 
     @Test

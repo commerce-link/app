@@ -105,11 +105,12 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         return null;
     }
 
-    public void commit(String storeId, FulfilmentForm form) {
+    public FulfilmentCommit commit(String storeId, FulfilmentForm form) {
         Map<String, List<FulfilmentItem>> entriesByOrderId = form.getAcceptedFulfilmentItemsGroupedByOrderId();
         ExternalSupplierBinding binding = ExternalSupplierBinding.of(
                 storesRepository.findById(storeId), ordersOf(storeId, new ArrayList<>(entriesByOrderId.keySet())));
 
+        List<OrderItem> saved = new ArrayList<>();
         for (String orderId : entriesByOrderId.keySet()) {
             List<FulfilmentItem> permitted = entriesByOrderId.get(orderId).stream().filter(binding).toList();
             if (permitted.isEmpty()) {
@@ -122,7 +123,8 @@ public class ManualOrderFulfilment extends OrderFulfilment {
                     .map(Optional::get)
                     .collect(Collectors.toList());
 
-            super.commit(storeId, orderItems);
+            saved.addAll(super.commit(storeId, orderItems));
         }
+        return FulfilmentCommit.of(saved);
     }
 }

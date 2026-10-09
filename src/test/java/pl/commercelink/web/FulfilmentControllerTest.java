@@ -22,6 +22,7 @@ import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentAllocation;
+import pl.commercelink.orders.fulfilment.FulfilmentCommit;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.FulfilmentGroup;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
@@ -32,6 +33,7 @@ import pl.commercelink.web.fulfilment.FulfilmentQueuePage;
 import pl.commercelink.web.fulfilment.FulfilmentQueuePageFactory;
 import pl.commercelink.web.fulfilment.FulfilmentSelectPage;
 import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.fulfilment.SkippedGroups;
 
@@ -221,7 +223,8 @@ class FulfilmentControllerTest {
         // given
         FulfilmentForm form = postedForm("Elko-k1");
         form.setRedirectUrl("redirect:https://evil.example");
-        when(messageSource.getMessage(eq("fulfilment.select.saved"), any(), eq(PL))).thenReturn("Zapisano dobór 2/0");
+        when(manualOrderFulfilment.commit("store-1", form)).thenReturn(new FulfilmentCommit(1, 1));
+        when(messageSource.getMessage(eq("fulfilment.select.saved"), any(), eq(PL))).thenReturn("Zapisano dobór 1/1");
         when(messageSource.getMessage(eq("fulfilment.select.saved.link"), any(), eq(PL))).thenReturn("Oczekujące dostawy ›");
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -232,15 +235,35 @@ class FulfilmentControllerTest {
         verify(manualOrderFulfilment).commit("store-1", form);
         assertThat(view).isEqualTo("redirect:/dashboard/fulfilment/queue?orderIds=s1&skippedGroups=1");
         OrderNotice notice = (OrderNotice) redirect.getFlashAttributes().get("orderNotice");
-        assertThat(notice.text()).isEqualTo("Zapisano dobór 2/0");
+        assertThat(notice.text()).isEqualTo("Zapisano dobór 1/1");
         assertThat(notice.linkHref()).isEqualTo("/dashboard/deliveries/preview");
-        verify(messageSource).getMessage(eq("fulfilment.select.saved"), eq(new Object[]{2L, 0L}), eq(PL));
+        verify(messageSource).getMessage(eq("fulfilment.select.saved"), eq(new Object[]{1L, 1L}), eq(PL));
+    }
+
+    @Test
+    void aCommitThatSavedNothingWarnsInsteadOfReportingTheForm() {
+        // given
+        FulfilmentForm form = postedForm("Elko-k1");
+        when(manualOrderFulfilment.commit("store-1", form)).thenReturn(new FulfilmentCommit(0, 0));
+        when(messageSource.getMessage(eq("fulfilment.select.saved.none"), any(), eq(PL))).thenReturn("Nic nie zapisano");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.commitFulfilmentForm(form, new ConcurrentModel(), PL, redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/fulfilment/queue?orderIds=s1&skippedGroups=1");
+        OrderNotice notice = (OrderNotice) redirect.getFlashAttributes().get("orderNotice");
+        assertThat(notice.text()).isEqualTo("Nic nie zapisano");
+        assertThat(notice.tone()).isEqualTo(OrderLabels.WARN);
+        assertThat(notice.linkHref()).isNull();
     }
 
     @Test
     void theSuperAdminsNoticeLinksTheStoresPendingDeliveries() {
         // given
         security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+        when(manualOrderFulfilment.commit(eq("store-9"), any())).thenReturn(new FulfilmentCommit(0, 1));
         when(messageSource.getMessage(any(String.class), any(), eq(PL))).thenReturn("x");
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -297,6 +320,7 @@ class FulfilmentControllerTest {
         // given
         FulfilmentForm form = postedForm("Elko-k1");
         when(manualOrderFulfilment.init(eq("store-1"), eq(List.of("o-1")), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(new FulfilmentForm());
+        when(manualOrderFulfilment.commit("store-1", form)).thenReturn(new FulfilmentCommit(2, 0));
         when(messageSource.getMessage(eq("fulfilment.select.saved"), any(), eq(PL))).thenReturn("Zapisano dobór 2/0");
         when(messageSource.getMessage(eq("fulfilment.select.saved.link"), any(), eq(PL))).thenReturn("Oczekujące dostawy ›");
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
@@ -330,6 +354,7 @@ class FulfilmentControllerTest {
         // given
         security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
         when(manualOrderFulfilment.init(eq("store-9"), eq(List.of("o-1")), any(), anyBoolean(), anyBoolean(), anyBoolean())).thenReturn(new FulfilmentForm());
+        when(manualOrderFulfilment.commit(eq("store-9"), any())).thenReturn(new FulfilmentCommit(0, 1));
         when(messageSource.getMessage(any(String.class), any(), eq(PL))).thenReturn("x");
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 

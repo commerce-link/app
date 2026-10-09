@@ -88,6 +88,20 @@ class FulfilmentQueueStylesContractTest {
     }
 
     @Test
+    void theRowLinkOverlayIsClippedToItsRowOutsideCardMode() throws Exception {
+        // given
+        String css = queueSection();
+        int media = css.indexOf("@media screen and (min-width: 720px) {\n    .cl-page .cl-table.is-queue tbody tr {");
+        assertThat(media).as("the row clip block, outside the card mode").isNotNegative();
+
+        // when
+        String rule = ruleBody(css.substring(media), ".cl-page .cl-table.is-queue tbody tr");
+
+        // then
+        assertThat(rule).contains("clip-path: inset(0);");
+    }
+
+    @Test
     void aNarrowCardFoldsTheOrderedColumnUnderTheKeyOnlyOutsideCardMode() throws Exception {
         // given
         String css = queueSection();

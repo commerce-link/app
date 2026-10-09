@@ -73,7 +73,7 @@ public record FulfilmentSelectPage(Mode mode, Kind kind, String storeName, Strin
     public enum Kind {
         WAREHOUSE("fulfilment.select.kind.warehouse", "fa-warehouse"),
         DROPSHIP("fulfilment.select.kind.dropship", "fa-truck"),
-        MIXED("fulfilment.select.kind.mixed", "fa-receipt"),
+        MIXED("fulfilment.select.kind.mixed", "fa-list-alt"),
         RESTOCK("fulfilment.select.kind.restock", "fa-boxes");
 
         private final String key;

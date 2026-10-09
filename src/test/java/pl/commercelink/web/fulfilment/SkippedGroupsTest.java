@@ -114,6 +114,18 @@ class SkippedGroupsTest {
     }
 
     @Test
+    void theQueueAddressEncodesIdsSoNoneReadsAsATemplateVariableOrAnotherParameter() {
+        // given
+        SkippedGroups skipped = SkippedGroups.from(List.of("{x}", "a&orderIds=b"), "2");
+
+        // when
+        String href = skipped.queueHref();
+
+        // then
+        assertThat(href).isEqualTo("/dashboard/fulfilment/queue?orderIds=%7Bx%7D&orderIds=a%26orderIds%3Db&skippedGroups=2");
+    }
+
+    @Test
     void withNothingSkippedTheQueueAddressIsTheBarePath() {
         // when
         String href = SkippedGroups.from(List.of(), null).queueHref();

@@ -197,6 +197,34 @@ class FulfilmentSelectRenderingTest {
     }
 
     @Test
+    void tooltipsAtTheRightEdgeGrowLeftSoTheyNeverWidenThePage() {
+        // given
+        FulfilmentForm form = new FulfilmentForm("warehouse", "redirect:/dashboard/warehouse?statuses=New",
+                new ArrayList<>(List.of(offer("Elko-k1", "Memory", 450, true, ":r1:100000"))));
+
+        // when
+        String html = render(form, factory.forRestock(form, labels, false, PL));
+
+        // then
+        assertThat(html.split("class=\"cl-profit is-unknown cl-tooltip is-end\"", -1)).hasSize(3);
+        assertThat(html).doesNotContain("class=\"cl-profit is-unknown cl-tooltip\"");
+    }
+
+    @Test
+    void theSummaryAnnouncesOneSentenceInsteadOfEveryNumber() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        assertThat(html).contains("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-live></p>");
+        String summary = html.substring(html.indexOf("id=\"summary\""));
+        assertThat(summary.substring(0, summary.indexOf("</dl>"))).doesNotContain("aria-live");
+    }
+
+    @Test
     void nothingLeftToOrderShowsTheEmptyStateWithTheWayBack() {
         // given
         FulfilmentForm form = form(List.of("o1"));
@@ -325,7 +353,8 @@ class FulfilmentSelectRenderingTest {
         assertThat(toggles.split("aria-expanded=", -1)).hasSize(3);
         assertThat(toggles.indexOf("aria-expanded=\"true\"")).isLessThan(toggles.indexOf("aria-expanded=\"false\""));
         String missing = html.substring(html.indexOf("cl-offers-missing"));
-        assertThat(missing).contains("Bez oferty").doesNotContain("aria-expanded").doesNotContain("cl-group-toggle");
+        assertThat(missing).contains("Bez oferty").contains("fa-exclamation-triangle")
+                .doesNotContain("aria-expanded").doesNotContain("cl-group-toggle");
     }
 
     @Test
@@ -341,7 +370,8 @@ class FulfilmentSelectRenderingTest {
         assertThat(bar).contains("data-cl-select-visible").contains("Zaznacz widoczne")
                 .contains("data-cl-expand-all").contains("Rozwiń wszystkie")
                 .contains("data-cl-collapse-all").contains("Zwiń wszystkie");
-        assertThat(html).contains("data-select-visible=\"Zaznacz widoczne\"").contains("data-clear-visible=\"Odznacz widoczne\"");
+        assertThat(html).contains("data-select-visible=\"Zaznacz widoczne\"").contains("data-clear-all=\"Odznacz wszystkie\"")
+                .contains("data-clear-matching=\"Odznacz pasujące do filtra\"");
     }
 
     @Test

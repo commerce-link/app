@@ -3,8 +3,10 @@ package pl.commercelink.web.fulfilment;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -83,8 +85,14 @@ public record SkippedGroups(List<String> orderIds, List<Integer> sizes) {
         if (orderIds.isEmpty()) {
             return PATH;
         }
+        // the ids go in as URI variables, encoded strictly on expansion: a literal "{x}" in an id would otherwise reach
+        // the "redirect:" view as a template variable and fail it, and "&" or "#" could break the query
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath(PATH);
-        orderIds.forEach(id -> builder.queryParam("orderIds", id));
-        return builder.queryParam("skippedGroups", sizesParam()).encode().build().toUriString();
+        Map<String, String> values = new LinkedHashMap<>();
+        for (int i = 0; i < orderIds.size(); i++) {
+            builder.queryParam("orderIds", "{id" + i + "}");
+            values.put("id" + i, orderIds.get(i));
+        }
+        return builder.queryParam("skippedGroups", sizesParam()).encode().buildAndExpand(values).toUriString();
     }
 }

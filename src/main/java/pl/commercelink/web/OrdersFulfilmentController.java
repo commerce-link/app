@@ -1,6 +1,6 @@
 package pl.commercelink.web;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -14,7 +14,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.web.fulfilment.FulfilmentQueuePageFactory;
 import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 import pl.commercelink.web.fulfilment.SkippedGroups;
@@ -32,28 +31,22 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Controller
+@RequiredArgsConstructor
 class FulfilmentController extends BaseController {
 
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
+    private final OrderItemsRepository orderItemsRepository;
 
-    @Autowired
-    private FulfilmentQueue fulfilmentQueue;
+    private final FulfilmentQueue fulfilmentQueue;
 
-    @Autowired
-    private ManualOrderFulfilment manualOrderFulfilment;
+    private final ManualOrderFulfilment manualOrderFulfilment;
 
-    @Autowired
-    private SupplierLabels supplierLabels;
+    private final SupplierLabels supplierLabels;
 
-    @Autowired
-    private FulfilmentQueuePageFactory fulfilmentQueuePageFactory;
+    private final FulfilmentQueuePageFactory fulfilmentQueuePageFactory;
 
-    @Autowired
-    private FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
+    private final FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
 
-    @Autowired
-    private MessageSource messages;
+    private final MessageSource messages;
 
     @GetMapping("/dashboard/fulfilment/queue")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
@@ -173,37 +166,37 @@ class FulfilmentController extends BaseController {
     @PostMapping("/dashboard/orders/fulfilment/commit")
     @PreAuthorize("hasRole('ADMIN')")
     public String commitFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model, Locale locale, RedirectAttributes redirect) {
-        manualOrderFulfilment.commit(getStoreId(), form);
-        return nextOrderOrQueue(getStoreId(), form, true, model, locale, redirect);
+        FulfilmentCommit saved = manualOrderFulfilment.commit(getStoreId(), form);
+        return nextOrderOrQueue(getStoreId(), form, saved, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/orders/fulfilment/skip")
     @PreAuthorize("hasRole('ADMIN')")
     public String skipFulfilmentOrder(@ModelAttribute FulfilmentForm form, Model model, Locale locale, RedirectAttributes redirect) {
-        return nextOrderOrQueue(getStoreId(), form, false, model, locale, redirect);
+        return nextOrderOrQueue(getStoreId(), form, null, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/orders/fulfilment/commitAndContinue")
     @PreAuthorize("hasRole('ADMIN')")
     public String commitAndContinueFulfilmentForm(@ModelAttribute FulfilmentForm form, Model model, Locale locale,
                                                   RedirectAttributes redirect) {
-        manualOrderFulfilment.commit(getStoreId(), form);
-        return continueOrFinish(getStoreId(), form, model, locale, redirect);
+        FulfilmentCommit saved = manualOrderFulfilment.commit(getStoreId(), form);
+        return continueOrFinish(getStoreId(), form, saved, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commit")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String commitFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute FulfilmentForm form,
                                                     Model model, Locale locale, RedirectAttributes redirect) {
-        manualOrderFulfilment.commit(storeId, form);
-        return nextOrderOrQueue(storeId, form, true, model, locale, redirect);
+        FulfilmentCommit saved = manualOrderFulfilment.commit(storeId, form);
+        return nextOrderOrQueue(storeId, form, saved, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/skip")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String skipFulfilmentOrderForSuperAdmin(@PathVariable("storeId") String storeId, @ModelAttribute FulfilmentForm form,
                                                    Model model, Locale locale, RedirectAttributes redirect) {
-        return nextOrderOrQueue(storeId, form, false, model, locale, redirect);
+        return nextOrderOrQueue(storeId, form, null, model, locale, redirect);
     }
 
     @PostMapping("/dashboard/store/{storeId}/orders/fulfilment/commitAndContinue")
@@ -211,19 +204,20 @@ class FulfilmentController extends BaseController {
     public String commitAndContinueFulfilmentFormForSuperAdmin(@PathVariable("storeId") String storeId,
                                                                @ModelAttribute FulfilmentForm form, Model model, Locale locale,
                                                                RedirectAttributes redirect) {
-        manualOrderFulfilment.commit(storeId, form);
-        return continueOrFinish(storeId, form, model, locale, redirect);
+        FulfilmentCommit saved = manualOrderFulfilment.commit(storeId, form);
+        return continueOrFinish(storeId, form, saved, model, locale, redirect);
     }
 
     /**
      * "Commit and pick the rest": when that commit left nothing to pick, the operator who just saved should get the
      * saved notice and the queue, not a page claiming someone else finished the selection.
      */
-    private String continueOrFinish(String storeId, FulfilmentForm committed, Model model, Locale locale, RedirectAttributes redirect) {
+    private String continueOrFinish(String storeId, FulfilmentForm committed, FulfilmentCommit saved, Model model, Locale locale,
+                                    RedirectAttributes redirect) {
         String view = render(storeId, Selection.of(committed), model, locale);
         FulfilmentForm rest = (FulfilmentForm) model.getAttribute("form");
         if (rest.getEntries().isEmpty() && rest.getUnmatched().isEmpty()) {
-            return nextOrderOrQueue(storeId, committed, true, model, locale, redirect);
+            return nextOrderOrQueue(storeId, committed, saved, model, locale, redirect);
         }
         return view;
     }
@@ -231,37 +225,27 @@ class FulfilmentController extends BaseController {
     /**
      * The next order of the one-at-a-time mode, or the queue the operator came from. The address is built here from
      * the skip state: the form's redirectUrl is never followed, so a forged or stale form cannot send the browser
-     * elsewhere (spec B1).
+     * elsewhere (spec B1). {@code saved} is null after a skip.
      */
-    private String nextOrderOrQueue(String storeId, FulfilmentForm form, boolean saved, Model model, Locale locale,
+    private String nextOrderOrQueue(String storeId, FulfilmentForm form, FulfilmentCommit saved, Model model, Locale locale,
                                     RedirectAttributes redirect) {
         if (form.isOrderByOrder() && form.hasRemainingOrders()) {
             Map<String, Double> committed = new LinkedHashMap<>(form.getCommittedSuppliers() == null ? Map.of() : form.getCommittedSuppliers());
             form.getAcceptedValueByProvider().forEach((provider, value) -> committed.merge(provider, value, Double::sum));
             return render(storeId, Selection.of(form).next(form.getRemainingOrders(), committed), model, locale);
         }
-        if (saved) {
-            OrderFlash.savedWithLink(redirect, savedText(form, locale), pendingDeliveries(storeId),
+        if (saved != null && saved.isEmpty()) {
+            OrderFlash.warning(redirect, messages.getMessage("fulfilment.select.saved.none", null, locale));
+        } else if (saved != null) {
+            OrderFlash.savedWithLink(redirect, savedText(saved, form.isOrderByOrder(), locale), pendingDeliveries(storeId),
                     messages.getMessage("fulfilment.select.saved.link", null, locale));
         }
         return "redirect:" + Selection.of(form).skipped().queueHref();
     }
 
-    private String savedText(FulfilmentForm form, Locale locale) {
-        long fromSuppliers = 0;
-        long fromWarehouse = 0;
-        for (FulfilmentGroup group : form.getEntries()) {
-            if (!group.isAccepted() || group.getAllocations() == null) {
-                continue;
-            }
-            if (SupplierRegistry.WAREHOUSE.equals(group.getSource().getProvider())) {
-                fromWarehouse += group.getAllocations().size();
-            } else {
-                fromSuppliers += group.getAllocations().size();
-            }
-        }
-        String key = form.isOrderByOrder() ? "fulfilment.select.saved.last" : "fulfilment.select.saved";
-        return messages.getMessage(key, new Object[]{fromSuppliers, fromWarehouse}, locale);
+    private String savedText(FulfilmentCommit saved, boolean orderByOrder, Locale locale) {
+        String key = orderByOrder ? "fulfilment.select.saved.last" : "fulfilment.select.saved";
+        return messages.getMessage(key, new Object[]{saved.fromSuppliers(), saved.fromWarehouse()}, locale);
     }
 
     private String pendingDeliveries(String storeId) {
