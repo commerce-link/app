@@ -159,7 +159,7 @@ class WarehouseListRenderingTest {
     }
 
     @Test
-    void destroyedArchiveLinkStandsInThePageHeaderEvenWithNoDestroyedItems() {
+    void destroyedArchiveLinkFollowsTheLeadEvenWithNoDestroyedItems() {
         // given
         WarehousePageModel base = model(List.of(row("a1", "Delivered", true)), false);
         WarehousePageModel none = new WarehousePageModel(base.query(), true, false, base.tiles(), base.statusOptions(), "All",
@@ -172,8 +172,13 @@ class WarehouseListRenderingTest {
         String html = EnglishFragmentTemplateEngine.create().process("warehouse", context);
 
         // then
-        String header = html.substring(html.indexOf("<header class=\"cl-page-header\">"), html.indexOf("</header>"));
-        assertThat(header).contains("href=\"/dashboard/warehouse/items/destroyed\"").contains("Destroyed items (0)");
+        // next to the buttons it read as a third action; it is a way to the archive, so it follows the line under the title
+        String lead = html.substring(html.indexOf("<p class=\"cl-page-lead\">"));
+        lead = lead.substring(0, lead.indexOf("</p>"));
+        String actions = html.substring(html.indexOf("<div class=\"cl-page-actions\">"));
+        actions = actions.substring(0, actions.indexOf("</div>"));
+        assertThat(lead).contains("<a class=\"cl-lead-link is-stacked\" href=\"/dashboard/warehouse/items/destroyed\">Destroyed items (0) ›</a>");
+        assertThat(actions).doesNotContain("/dashboard/warehouse/items/destroyed");
         assertThat(html).containsOnlyOnce("/dashboard/warehouse/items/destroyed");
     }
 
