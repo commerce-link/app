@@ -810,4 +810,82 @@ class OrdersShippingControllerTest {
         verifyNoInteractions(settler, orderOwner);
         verify(shipmentCreationService).start(any(), any(), any(), any());
     }
+
+    @Test
+    void allegroCreateDoesNotBookAgainWhenTheCheckOfAHeldPackageFails() {
+        // given: the row names the package Allegro holds, the check of its command fails
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        order.getShipments().get(0).setExternalId("shp-9");
+        when(allegroProvider.checkShipmentCreation("cmd-0", "shp-9"))
+                .thenThrow(new pl.commercelink.shipping.api.ShippingException("HTTP 502"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(shippingService, never()).buildAllegroRequest(any(), any(), any());
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateDoesNotBookAgainWhenTheIntegrationOfAHeldPackageCannotBeBuilt() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        Shipment stuck = order.getShipments().get(0);
+        stuck.setCreation(stuck.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        stuck.setExternalId("shp-9");
+        when(shippingProviders.forShipment(any(), any())).thenThrow(new IllegalStateException("missing secret"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(shippingService, never()).buildRequest(any(), any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void theFormOpensWhenTheIntegrationOfAnUnconfirmedCommandCannotBeBuilt() {
+        // given: no package named, so nothing says the command reached the provider
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(shippingProviders.forShipment(any(), any())).thenThrow(new IllegalStateException("missing secret"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isNotEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("warningMessage");
+        verifyNoInteractions(settler, orderOwner);
+    }
+
+    @Test
+    void defaultCreateBooksWhenTheCheckFailsAndNoPackageIsNamed() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(allegroProvider.checkShipmentCreation("cmd-0", null))
+                .thenThrow(new pl.commercelink.shipping.api.ShippingException("HTTP 502"));
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        verifyNoInteractions(settler, orderOwner);
+        verify(shipmentCreationService).start(any(), any(), any(), any());
+    }
 }

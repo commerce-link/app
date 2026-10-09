@@ -40,9 +40,10 @@ public class ShipmentCreationReconciler {
     }
 
     /**
-     * A shipment the provider holds for an earlier command: the caller must not book again. Empty when nothing was
-     * created, or nothing more is knowable (no package named, the check failed, the integration is gone): the operator
-     * was warned by the row's message.
+     * A shipment the provider holds for an earlier command: the caller must not book again. That includes a row naming
+     * a package whose command could not be checked (the check failed, the integration is gone or cannot be built).
+     * Empty when nothing was created, or nothing more is knowable and no package is named: the operator was warned by
+     * the row's message.
      */
     public Optional<Found> reconcile(Store store, Order order) {
         LocalDateTime now = LocalDateTime.now();
@@ -70,19 +71,19 @@ public class ShipmentCreationReconciler {
                 .provider(shipment.getProvider())
                 .pickUpAddressId(shipment.getPickUpAddressId())
                 .build();
-        Optional<ShippingProvider> provider = shippingProviders.forShipment(store, shipment);
-        if (provider.isEmpty()) {
-            log.warn("Creation command {} of order {} in store {} not checked again: its integration {} is gone",
-                    request.getCommandId(), request.getOwnerId(), request.getStoreId(), request.getProvider());
-            return Optional.empty();
-        }
         ShipmentCreation result;
         try {
+            Optional<ShippingProvider> provider = shippingProviders.forShipment(store, shipment);
+            if (provider.isEmpty()) {
+                log.warn("Creation command {} of order {} in store {} not checked again: its integration {} is gone",
+                        request.getCommandId(), request.getOwnerId(), request.getStoreId(), request.getProvider());
+                return unchecked(request);
+            }
             result = provider.get().checkShipmentCreation(request.getCommandId(), request.getExternalId());
         } catch (RuntimeException e) {
             log.warn("Creation command {} of order {} in store {} could not be checked again: {}",
                     request.getCommandId(), request.getOwnerId(), request.getStoreId(), e.getMessage(), e);
-            return Optional.empty();
+            return unchecked(request);
         }
         switch (result.status()) {
             case SUCCEEDED -> {
@@ -102,6 +103,14 @@ public class ShipmentCreationReconciler {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * A command that could not be checked: a package id on the row means the provider already holds a (paid) package,
+     * and booking again would drop that row and pay twice, so it stops the booking like a pending package does.
+     */
+    private Optional<Outcome> unchecked(ShipmentCreationCheckRequest request) {
+        return request.getExternalId() != null ? Optional.of(Outcome.CREATED_WITHOUT_NUMBER) : Optional.empty();
     }
 
     private void recordPackageId(ShipmentCreationCheckRequest request, String externalId) {

@@ -188,6 +188,68 @@ class ShipmentCreationReconcilerTest {
     }
 
     @Test
+    void aCheckThatFailsForARowNamingAPackageStopsTheBooking() {
+        // given: the provider already holds a (paid) package; booking again would drop this row and pay twice
+        Shipment stuck = row(unconfirmed(ShipmentCreationState.UNCONFIRMED_KEY));
+        stuck.setExternalId("shp-9");
+        when(allegro.checkShipmentCreation("cmd-0", "shp-9")).thenThrow(new ShippingException("HTTP 502"));
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(
+                ShipmentCreationReconciler.Outcome.CREATED_WITHOUT_NUMBER, stuck));
+        verifyNoInteractions(settler, owner);
+    }
+
+    @Test
+    void aRowNamingAPackageWhoseIntegrationIsGoneStopsTheBooking() {
+        // given
+        Shipment stuck = row(overdue());
+        stuck.setExternalId("shp-9");
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(Optional.empty());
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(
+                ShipmentCreationReconciler.Outcome.CREATED_WITHOUT_NUMBER, stuck));
+        verifyNoInteractions(allegro, settler, owner);
+    }
+
+    @Test
+    void anIntegrationThatCannotBeBuiltLetsTheBookingGoOnWhenNoPackageIsNamed() {
+        // given: the stored integration configuration is broken, nothing says the command reached the provider
+        row(overdue());
+        when(shippingProviders.forShipment(eq(store), any())).thenThrow(new IllegalStateException("missing secret"));
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).isEmpty();
+        verifyNoInteractions(allegro, settler, owner);
+    }
+
+    @Test
+    void anIntegrationThatCannotBeBuiltStopsTheBookingOfARowNamingAPackage() {
+        // given
+        Shipment stuck = row(overdue());
+        stuck.setExternalId("shp-9");
+        when(shippingProviders.forShipment(eq(store), any())).thenThrow(new IllegalStateException("missing secret"));
+
+        // when
+        Optional<ShipmentCreationReconciler.Found> result = reconciler.reconcile(store, order);
+
+        // then
+        assertThat(result).contains(new ShipmentCreationReconciler.Found(
+                ShipmentCreationReconciler.Outcome.CREATED_WITHOUT_NUMBER, stuck));
+        verifyNoInteractions(allegro, settler, owner);
+    }
+
+    @Test
     void aShipmentFoundCreatedIsReportedEvenWhenSavingItFails() {
         // given: the provider holds a paid shipment whether or not the order got its number
         Shipment stuck = row(overdue());
