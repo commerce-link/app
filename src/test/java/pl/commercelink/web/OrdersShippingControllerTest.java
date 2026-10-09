@@ -341,6 +341,46 @@ class OrdersShippingControllerTest {
     }
 
     @Test
+    void aStoreWithOnlyAnUnavailableAllegroShowsTheReasonAndOffersNoSteps() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(ShippingIntegrationOption.unavailable(
+                "allegro", "Wysyłam z Allegro", "shipping.integration.reason.consent", null)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingIntegrationChoiceView choice = (ShippingIntegrationChoiceView) model.get("integrationChoice");
+        assertThat(view).isEqualTo("shipping");
+        assertThat(choice.shown()).isTrue();
+        assertThat(choice.nothingAvailable()).isTrue();
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(model.get("shippingUnavailable")).isEqualTo("shipping.integration.none");
+    }
+
+    @Test
+    void aStoreWhoseDefaultAndAllegroAreBothUnavailableOffersNoSteps() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("furgonetka", "Furgonetka", "shipping.integration.reason.notConnected", null),
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.authLost", null)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(((ShippingIntegrationChoiceView) model.get("integrationChoice")).nothingAvailable()).isTrue();
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(model.get("shippingUnavailable")).isEqualTo("shipping.integration.none");
+    }
+
+    @Test
     void theOperatorCanSwitchAnAllegroOrderToTheDefaultIntegration() {
         // given
         Order order = allegroOrder();

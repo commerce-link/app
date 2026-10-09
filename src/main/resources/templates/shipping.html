@@ -28,7 +28,7 @@
 
                 <!--/* "Wyślij przez": a GET form, each integration has its own fields; submit-on-change.js sends it on a
                        change, without JavaScript the "Zmień" button does. An unavailable option is greyed with its reason
-                       (design system: option that cannot be chosen). Not shown with a single integration. */-->
+                       (design system: option that cannot be chosen). Not shown with a single available integration. */-->
                 <form th:if="${integrationChoice != null and integrationChoice.shown()}" id="provider-form"
                       class="cl-form is-wide" method="get" th:action="@{|/dashboard/orders/${f.shippingEntityId}/shipping|}">
                     <section class="cl-card" aria-labelledby="provider-title">
@@ -65,7 +65,8 @@
                     <div th:replace="~{shipping :: allegroForm(${f}, ${allegroShipping})}"></div>
                 </th:block>
 
-                <th:block th:if="${allegroShipping == null}">
+                <!--/* no available integration (a store with only an unavailable Wysyłam z Allegro): the alert above says what to do */-->
+                <th:block th:if="${allegroShipping == null and (integrationChoice == null or !integrationChoice.nothingAvailable())}">
                     <form id="shipping-template-form" class="cl-form is-wide" method="post" novalidate
                           th:action="@{${f.shippingTemplateAction}}">
                         <th:block th:replace="~{shipping :: record(${f})}"></th:block>

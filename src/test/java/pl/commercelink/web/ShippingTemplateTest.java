@@ -411,6 +411,47 @@ class ShippingTemplateTest {
     }
 
     @Test
+    void onlyAnUnavailableAllegroShowsItsReasonAndNeitherFormNorDefaultSteps() {
+        // given
+        Map<String, Object> variables = model(new ShippingForm(ORDER_ID, "orders"),
+                List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.consent", null)),
+                null, null, null));
+        variables.put("shippingUnavailable", "Żadna integracja wysyłki nie nada tego zamówienia.");
+
+        // when
+        String html = SettingsTemplateRenderer.render("shipping", variables).replaceAll("\\s+", " ");
+
+        // then
+        assertThat(html).contains("id=\"provider-form\"").contains("Brak zgody na przesyłki w aplikacji Allegro")
+                .containsPattern("name=\"provider\" value=\"allegro\"[^>]*disabled")
+                .contains("id=\"shipping-unavailable\"").contains("Żadna integracja wysyłki nie nada tego zamówienia.")
+                .doesNotContain("id=\"shipping-template-form\"").doesNotContain("id=\"allegro-create-form\"")
+                .doesNotContain("Wczytaj paczki");
+    }
+
+    @Test
+    void whenTheDefaultAndAllegroAreBothUnavailableBothReasonsShowAndNoStepsDo() {
+        // given
+        Map<String, Object> variables = model(new ShippingForm(ORDER_ID, "orders"),
+                List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.unavailable("furgonetka", "Furgonetka", "shipping.integration.reason.notConnected", null),
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.authLost", null)),
+                null, null, null));
+        variables.put("shippingUnavailable", "Żadna integracja wysyłki nie nada tego zamówienia.");
+
+        // when
+        String html = SettingsTemplateRenderer.render("shipping", variables).replaceAll("\\s+", " ");
+
+        // then
+        assertThat(html).contains("Integracja nie jest podłączona.").contains("Połączenie z Allegro wygasło")
+                .contains("id=\"shipping-unavailable\"").doesNotContain("id=\"shipping-template-form\"")
+                .doesNotContain("Wczytaj paczki");
+    }
+
+    @Test
     void allegroFieldErrorsAreShownNextToTheirFields() {
         // given
         Map<String, Object> variables = allegroModel();
