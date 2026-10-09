@@ -243,13 +243,28 @@ class ShipmentCancellationCheckerTest {
     }
 
     @Test
-    void missingProviderIsUnconfirmed() {
+    void missingProviderIsAskedAgainWhileAttemptsRemain() {
         // given
         Order order = orderWith(pendingShipment(COMMAND_ID));
         when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(attempt(1));
+
+        // then
+        verify(publisher).publish(attempt(2));
+        verify(ordersRepository, never()).save(any());
+        assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.PENDING);
+    }
+
+    @Test
+    void missingProviderIsUnconfirmedOnTheLastAttempt() {
+        // given
+        Order order = orderWith(pendingShipment(COMMAND_ID));
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
+
+        // when
+        checker.check(attempt(ShipmentCancellationChecker.MAX_ATTEMPTS));
 
         // then
         assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);

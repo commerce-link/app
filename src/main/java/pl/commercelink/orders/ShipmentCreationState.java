@@ -71,6 +71,25 @@ public class ShipmentCreationState {
         return isPending() && isOverdue(now);
     }
 
+    /**
+     * FAILED because no result ever came (never confirmed, or the integration was disconnected): the command may still
+     * have created the shipment, unlike one the provider refused.
+     */
+    @DynamoDBIgnore
+    public boolean isFailedUnconfirmed() {
+        return isFailed() && command != null
+                && (UNCONFIRMED_KEY.equals(command.getErrorKey()) || UNCONFIRMED_DISCONNECTED_KEY.equals(command.getErrorKey()));
+    }
+
+    /**
+     * Nothing says whether the provider created the shipment: PENDING past the timeout, or FAILED for want of a result.
+     * A check of the command may still tell, and must before the shipment is booked again.
+     */
+    @DynamoDBIgnore
+    public boolean isOutcomeUnknown(LocalDateTime now) {
+        return isUnconfirmed(now) || isFailedUnconfirmed();
+    }
+
     @DynamoDBIgnore
     public boolean hasCommand(String id) {
         return command != null && command.hasId(id);

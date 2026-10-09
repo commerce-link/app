@@ -255,6 +255,16 @@ public class Shipment {
         return creation != null && creation.isPending() && creation.hasCommand(commandId);
     }
 
+    /**
+     * The placeholder of that command, still PENDING or settled as never confirmed: a result found later
+     * (ShipmentCreationReconciler) still settles it, since the provider may have created the shipment after all.
+     */
+    @DynamoDBIgnore
+    public boolean isCreationUnsettledFor(String commandId) {
+        return isCreationPendingFor(commandId)
+                || (creation != null && creation.isFailedUnconfirmed() && creation.hasCommand(commandId));
+    }
+
     @DynamoDBIgnore
     public boolean awaitsPickup() {
         // a delivered package was evidently collected, whoever brought it to the carrier

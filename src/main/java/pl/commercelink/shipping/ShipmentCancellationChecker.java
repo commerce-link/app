@@ -38,7 +38,11 @@ public class ShipmentCancellationChecker {
         }
         ShippingProvider provider = provider(request.getStoreId(), request.getProvider());
         if (provider == null) {
-            settler.unconfirmed(request);
+            // the integration may be back before the checks run out; only the last attempt settles it as unconfirmed
+            log.warn("Cancellation check without its integration store={} provider={} order={} command={} attempt={}",
+                    request.getStoreId(), request.getProvider(), request.getOrderId(), request.getCommandId(),
+                    request.getAttempt());
+            askAgainOrSettle(request);
             return;
         }
         ShipmentCancellation result;
@@ -51,15 +55,17 @@ public class ShipmentCancellationChecker {
         }
         settler.reportOtherCancelledPackages(request, result);
         switch (result.status()) {
-            case PENDING -> {
-                if (request.getAttempt() < MAX_ATTEMPTS) {
-                    publisher.publish(request.nextAttempt());
-                } else {
-                    settler.unconfirmed(request);
-                }
-            }
+            case PENDING -> askAgainOrSettle(request);
             case SUCCEEDED -> settler.succeed(request);
             case FAILED -> settler.fail(request, result.error());
+        }
+    }
+
+    private void askAgainOrSettle(ShipmentCancellationCheckRequest request) {
+        if (request.getAttempt() < MAX_ATTEMPTS) {
+            publisher.publish(request.nextAttempt());
+        } else {
+            settler.unconfirmed(request);
         }
     }
 

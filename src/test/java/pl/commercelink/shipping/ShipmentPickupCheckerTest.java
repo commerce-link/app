@@ -129,7 +129,7 @@ class ShipmentPickupCheckerTest {
     }
 
     @Test
-    void missingProviderFailsThePickup() {
+    void missingProviderIsAskedAgainWhileAttemptsRemain() {
         // given
         when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
@@ -137,15 +137,16 @@ class ShipmentPickupCheckerTest {
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.pickup.unconfirmed.disconnected"));
-        verify(publisher, never()).publish(any());
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2));
+        verifyNoInteractions(settler);
     }
 
     @Test
-    void checkerWithDisconnectedIntegrationSettlesThePickupAsUnconfirmed() {
+    void checkerWithDisconnectedIntegrationSettlesThePickupAsUnconfirmedOnTheLastAttempt() {
         // given
         ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").provider("allegro")
-                .commandId("pick-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00").attempt(1).build();
+                .commandId("pick-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00")
+                .attempt(ShipmentPickupChecker.MAX_ATTEMPTS).build();
         when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
 
         // when
@@ -157,12 +158,12 @@ class ShipmentPickupCheckerTest {
     }
 
     @Test
-    void aDeletedStoreFailsThePickup() {
+    void aDeletedStoreFailsThePickupOnTheLastAttempt() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(null);
 
         // when
-        checker.check(request(1));
+        checker.check(request(ShipmentPickupChecker.MAX_ATTEMPTS));
 
         // then
         verify(settler).failedWithKey(any(), eq("shipping.pickup.unconfirmed.disconnected"));

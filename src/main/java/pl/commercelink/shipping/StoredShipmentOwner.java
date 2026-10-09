@@ -63,13 +63,17 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
         return owner != null && ShipmentLists.creating(shipments(owner), request.getCommandId()).isPresent();
     }
 
+    /**
+     * Also settles a placeholder already marked as never confirmed: ShipmentCreationReconciler asks the provider again
+     * before the operator books a second, paid shipment, and a command found created after all must land on the owner.
+     */
     @Override
     public boolean succeeded(ShipmentCreationCheckRequest request, List<Shipment> created) {
         boolean replaced = modify(request, owner -> {
             List<Shipment> list = shipments(owner);
-            ShipmentLists.creating(list, request.getCommandId()).ifPresent(placeholder ->
+            ShipmentLists.unsettled(list, request.getCommandId()).ifPresent(placeholder ->
                     created.forEach(s -> takeDeliveryChoice(s, placeholder)));
-            return ShipmentLists.replaceCreating(list, request.getCommandId(), new ArrayList<>(created));
+            return ShipmentLists.replaceUnsettled(list, request.getCommandId(), new ArrayList<>(created));
         });
         if (!replaced) {
             return false;
@@ -97,9 +101,10 @@ abstract class StoredShipmentOwner<T> implements ShipmentOwner {
         failed(request, error, errorKey);
     }
 
+    /** Also a placeholder marked as never confirmed, whose command a later check found refused (see succeeded). */
     @Override
     public void failed(ShipmentCreationCheckRequest request, String error, String errorKey) {
-        modify(request, owner -> ShipmentLists.creating(shipments(owner), request.getCommandId())
+        modify(request, owner -> ShipmentLists.unsettled(shipments(owner), request.getCommandId())
                 .map(s -> {
                     ShipmentCreationState creation = s.getCreation();
                     s.setCreation(errorKey != null ? creation.failedWithKey(errorKey) : creation.failed(error));

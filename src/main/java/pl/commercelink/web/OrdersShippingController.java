@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.shipping.AbstractShippingController;
 import pl.commercelink.shipping.AllegroShipmentFormCheck;
+import pl.commercelink.shipping.ShipmentCreationReconciler;
 import pl.commercelink.shipping.ShipmentCreationStart;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.api.DeliveryType;
@@ -58,6 +60,12 @@ public class OrdersShippingController extends AbstractShippingController {
     @Autowired
     private ShippingIntegrationViews shippingIntegrationViews;
 
+    @Autowired
+    private ShipmentCreationReconciler shipmentCreationReconciler;
+
+    @Autowired
+    private ShippingIntegrationNames shippingIntegrationNames;
+
     @GetMapping("")
     public String initiate(@PathVariable("orderId") String orderId,
                            @RequestParam(value = "provider", required = false) String provider,
@@ -65,6 +73,10 @@ public class OrdersShippingController extends AbstractShippingController {
                            Model model, RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(orderId);
         Store store = getStore();
+        String createdAfterAll = redirectIfCreatedAfterAll(store, order, redirectAttributes, locale);
+        if (createdAfterAll != null) {
+            return createdAfterAll;
+        }
         // the order page offers no "Nadaj przesyłkę" in either case (OrderPageModelFactory#header); an address typed in
         // or an old bookmark gets the reason instead of a page that would fail at "Wyceń przesyłkę"
         String refusal = !shippingService.isAvailableFor(store, order) ? noProviderKey() : refuseBooking(order);
@@ -186,12 +198,16 @@ public class OrdersShippingController extends AbstractShippingController {
         form.setShippingEntityType("orders");
         form.setProvider(ShippingIntegrationChoice.ALLEGRO);
         Order order = requireOrder(orderId);
+        Store store = getStore();
+        String createdAfterAll = redirectIfCreatedAfterAll(store, order, redirectAttributes, locale);
+        if (createdAfterAll != null) {
+            return createdAfterAll;
+        }
         String refusal = refuseBooking(order);
         if (refusal != null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
-        Store store = getStore();
         List<ShippingIntegrationOption> options = shippingIntegrationChoice.forOrder(store, order);
         model.addAttribute("integrationOptions", options);
         // a post outside the page's own choice (a stale tab, a forged form) lands on the order with the same notice as a refused start
@@ -218,6 +234,28 @@ public class OrdersShippingController extends AbstractShippingController {
             return "redirect:/dashboard/orders/" + orderId;
         }
         return redirectAfterStart(start, form, redirectAttributes, locale);
+    }
+
+    @Override
+    protected String redirectIfCreatedAfterAll(ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        return redirectIfCreatedAfterAll(getStore(), requireOrder(form.getShippingEntityId()), redirectAttributes, locale);
+    }
+
+    /**
+     * A shipment whose creation never got a result may exist at the provider all the same (paid, its number already on
+     * the buyer's marketplace order): it is asked once more before the form opens and before booking, and a shipment
+     * found created ends the booking here. A row the check found refused stays a failed creation, so what the
+     * caller decides from the order read before is unchanged.
+     */
+    private String redirectIfCreatedAfterAll(Store store, Order order, RedirectAttributes redirectAttributes, Locale locale) {
+        return shipmentCreationReconciler.reconcile(store, order)
+                .map(created -> {
+                    redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
+                            "shipping.creation.createdAfterAll",
+                            new Object[]{shippingIntegrationNames.of(created.getProvider(), store, locale)}, locale));
+                    return "redirect:/dashboard/orders/" + order.getOrderId();
+                })
+                .orElse(null);
     }
 
     /** What the order shows while Allegro creates the shipment: the buyer's method and point. */

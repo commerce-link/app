@@ -95,6 +95,10 @@ public abstract class AbstractShippingController {
 
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        String createdAfterAll = redirectIfCreatedAfterAll(form, redirectAttributes, locale);
+        if (createdAfterAll != null) {
+            return createdAfterAll;
+        }
         // a tab left open, a page restored from the back/forward cache or a re-sent form must not book (and pay for) a
         // second label once the first booking is saved; the check is not atomic, so two requests in flight at the same
         // time are only kept apart by the button being disabled on submit (shipping-booking.js)
@@ -221,6 +225,14 @@ public abstract class AbstractShippingController {
      * through the store's default integration: another one (Wysyłam z Allegro) has its own step.
      */
     protected String refuseIntegration(ShippingForm form) {
+        return null;
+    }
+
+    /**
+     * Where to send the operator instead of booking, when an earlier creation command with an unknown outcome turns out
+     * to have created the shipment after all (ShipmentCreationReconciler); null to go on booking.
+     */
+    protected String redirectIfCreatedAfterAll(ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
         return null;
     }
 

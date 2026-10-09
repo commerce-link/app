@@ -113,30 +113,48 @@ class ShipmentCreationCheckerTest {
     }
 
     @Test
-    void missingProviderFailsTheCreation() {
-        // given
+    void missingProviderIsAskedAgainWhileAttemptsRemain() {
+        // given: the integration may be reconnected before the checks run out
         when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.creation.unconfirmed.disconnected"));
-        verifyNoInteractions(publisher);
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2 && "21480003".equals(r.getExternalId())));
+        verifyNoInteractions(settler);
     }
 
     @Test
-    void checkerWithDisconnectedIntegrationSettlesTheCreationAsUnconfirmed() {
-        // given: the store dropped Wysyłam z Allegro while the command was queued
+    void checkerWithDisconnectedIntegrationSettlesTheCreationAsUnconfirmedOnTheLastAttempt() {
+        // given: the store dropped Wysyłam z Allegro while the command was queued and never reconnected it
         when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
 
         // when
-        checker.check(request(3).toBuilder().provider("allegro").build());
+        checker.check(request(ShipmentCreationChecker.MAX_ATTEMPTS).toBuilder().provider("allegro").build());
 
         // then: Allegro may have created (and charged) the shipment, so the outcome is unconfirmed, not a refusal;
         // settled once, nothing re-queued, nothing thrown (no DLQ loop)
         verify(settler).failedWithKey(any(), eq(ShipmentCreationState.UNCONFIRMED_DISCONNECTED_KEY));
         verifyNoInteractions(publisher, provider);
+    }
+
+    @Test
+    void anIntegrationBackBeforeTheChecksRunOutSettlesTheCommand() {
+        // given: disconnected at the first attempt, reconnected for the second
+        ShipmentResult result = new ShipmentResult("21480003",
+                List.of(new ShipmentResult.ShipmentParcelResult("A", "dpd", null, true, null)), null);
+        when(shippingProviders.forCommand(eq(store), any()))
+                .thenReturn(java.util.Optional.empty(), java.util.Optional.of(provider));
+        when(provider.checkShipmentCreation("cmd-1", "21480003")).thenReturn(ShipmentCreation.succeeded("cmd-1", result));
+        checker.check(request(1));
+
+        // when
+        checker.check(request(2));
+
+        // then
+        verify(settler).succeeded(any(), eq(result));
+        verify(settler, never()).failedWithKey(any(), any());
     }
 
     @Test
@@ -223,6 +241,64 @@ class ShipmentCreationCheckerTest {
         checker.check(request);
 
         // then
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2 && r.getExternalId() == null));
+    }
+
+    @Test
+    void aPackageIdNamedWhilePendingIsRecordedAndCarriedToTheNextAttempt() {
+        // given: Allegro answered SUCCESS before the waybill: the shipment exists, its number does not yet
+        ShipmentCreationCheckRequest request = request(1).toBuilder().provider("allegro").externalId(null).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.of(provider));
+        when(provider.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.pending("cmd-1", "shp-9"));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(owner).recordExternalId(argThat(r -> "shp-9".equals(r.getExternalId()) && "cmd-1".equals(r.getCommandId())));
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2 && "shp-9".equals(r.getExternalId())));
+    }
+
+    @Test
+    void anUnconfirmedCommandKeepsThePackageIdTheProviderNamed() {
+        // given: still no waybill at the last attempt
+        ShipmentCreationCheckRequest request = request(ShipmentCreationChecker.MAX_ATTEMPTS).toBuilder()
+                .provider("allegro").externalId(null).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.of(provider));
+        when(provider.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.pending("cmd-1", "shp-9"));
+
+        // when
+        checker.check(request);
+
+        // then: the row ends unconfirmed with the id of the shipment Allegro holds
+        verify(owner).recordExternalId(argThat(r -> "shp-9".equals(r.getExternalId())));
+        verify(settler).failedWithKey(argThat(r -> "shp-9".equals(r.getExternalId())), eq(ShipmentCreationState.UNCONFIRMED_KEY));
+    }
+
+    @Test
+    void aPackageIdAlreadyKnownIsNotRecordedAgain() {
+        // given
+        when(provider.checkShipmentCreation("cmd-1", "21480003")).thenReturn(ShipmentCreation.pending("cmd-1", "21480003"));
+
+        // when
+        checker.check(request(2));
+
+        // then
+        verify(owner, never()).recordExternalId(any());
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 3));
+    }
+
+    @Test
+    void aPackageIdThatCouldNotBeRecordedIsAskedForAgain() {
+        // given
+        ShipmentCreationCheckRequest request = request(1).toBuilder().externalId(null).build();
+        when(provider.checkShipmentCreation("cmd-1", null)).thenReturn(ShipmentCreation.pending("cmd-1", "shp-9"));
+        doThrow(new IllegalStateException("throttled")).when(owner).recordExternalId(any());
+
+        // when
+        checker.check(request);
+
+        // then: the next attempt gets the id from the provider again and records it then
         verify(publisher).publish(argThat(r -> r.getAttempt() == 2 && r.getExternalId() == null));
     }
 }
