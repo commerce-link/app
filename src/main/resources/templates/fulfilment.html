@@ -4,898 +4,392 @@
       layout:decorate="~{layout}">
 <body>
 
-<div layout:fragment="content"
-     th:with="type=${isSuperAdmin} ? 'orders' : ${form.fulfilmentType}, isWarehouse=${form.fulfilmentType == 'warehouse'}">
+<div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
 
-    <style>
-        body { padding-bottom: 96px; }
-
-        .range-dual { position: relative; height: 18px; }
-        .range-dual input[type=range] { position: absolute; left: 0; top: 0; width: 100%; height: 18px; margin: 0;
-            -webkit-appearance: none; appearance: none; background: none; pointer-events: none; }
-        .range-dual input[type=range]::-webkit-slider-runnable-track { -webkit-appearance: none; height: 18px; background: transparent; }
-        .range-dual input[type=range]::-moz-range-track { background: transparent; }
-        .range-dual input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; pointer-events: auto;
-            width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; background: #3e8ed0; border: none; cursor: pointer; }
-        .range-dual input[type=range]::-moz-range-thumb { pointer-events: auto; width: 14px; height: 14px;
-            border-radius: 50%; background: #3e8ed0; border: none; cursor: pointer; }
-        .rd-track { position: absolute; top: 6px; left: 0; right: 0; height: 6px; border-radius: 3px; background: #dfe3e7; }
-        .rd-fill { position: absolute; top: 6px; height: 6px; border-radius: 3px; background: #3e8ed0; }
-
-        .fl-toolbar { position: sticky; top: 0; z-index: 30; background: #fff;
-            border-bottom: 1px solid #e6e8eb; padding: .7rem 0 .55rem 0; box-shadow: 0 2px 6px rgba(0,0,0,.04); margin-bottom: 1rem; }
-
-        .variants { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: .55rem; }
-        .variant { flex: 1; min-width: 185px; max-width: 250px; background: #fff; border: 1px solid #e0e3e7; border-radius: 8px;
-            padding: .45rem .7rem; cursor: pointer; user-select: none; position: relative; transition: box-shadow .12s, border-color .12s; }
-        .variant:hover { box-shadow: 0 3px 10px rgba(0,0,0,.08); }
-        .variant.active { border-color: #3273dc; outline: 2px solid #3273dc; background: #f6f9fe; }
-        .variant .v-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
-        .variant .v-count { font-weight: 700; font-size: .8rem; white-space: nowrap; }
-        .variant .v-total { font-weight: 700; font-size: .88rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .variant .v-total small { display: block; font-weight: 500; font-size: .6rem; color: #9aa1ab; text-align: right; }
-        .variant .v-provs { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .3rem; }
-        .variant .v-provs .provider-chip { font-size: .68rem; padding: .1rem .5rem; }
-        .variant .v-badge { position: absolute; top: -0.55rem; left: .6rem; font-size: .6rem; font-weight: 700; letter-spacing: .03em;
-            background: #1b8f5a; color: #fff; border-radius: 999px; padding: .08rem .45rem; }
-        .variant .v-badge.blue { background: #3273dc; }
-        .variant.custom { border-style: dashed; color: #7a8290; display: flex; align-items: center; justify-content: center;
-            font-size: .78rem; font-weight: 600; }
-        .variant.custom.active { color: #3273dc; }
-
-        .filters-row { display: none; border-top: 1px dashed #e6e8eb; padding-top: .5rem; margin-top: .5rem;
-            align-items: center; gap: .8rem; flex-wrap: wrap; }
-        .filters-row.open { display: flex; }
-        .filters-btn-active { border-color: #3273dc !important; color: #3273dc !important; }
-
-        .order-cov { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
-        .order-chip { display: inline-flex; align-items: center; gap: .45rem; font-size: .78rem;
-            padding: .2rem .6rem; border-radius: 999px; border: 1px solid transparent; cursor: pointer; user-select: none;
-            background: #f1f3f5; color: #4a4a4a; }
-        .order-chip .bar { width: 46px; height: 6px; border-radius: 3px; background: #dfe3e7; overflow: hidden; }
-        .order-chip .bar > i { display: block; height: 100%; }
-        .order-chip.full { background: #e9f9f1; color: #1b8f5a; }
-        .order-chip.partial { background: #fff6e5; color: #b06f00; border-color: #ffd98a; }
-        .order-chip.none { background: #fdecec; color: #c0392b; }
-        .order-chip.active { outline: 2px solid #3273dc; outline-offset: 1px; }
-        .order-chip .frac { font-variant-numeric: tabular-nums; font-weight: 700; }
-        .ord-open { color: inherit; text-decoration: underline dotted; }
-        .ord-open:hover { text-decoration: underline; }
-
-        .prov-filter { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
-        .prov-chip-btn { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600;
-            padding: .2rem .6rem; border-radius: 999px; border: 1px solid transparent; cursor: pointer; user-select: none;
-            color: #fff; background: var(--accent, #b5b5b5); }
-        .prov-chip-btn.inactive { opacity: .35; }
-        .prov-chip-btn.active { outline: 2px solid #3273dc; outline-offset: 1px; }
-        .prov-chip-btn .cnt { background: rgba(255,255,255,.25); border-radius: 999px; padding: 0 .4rem; font-size: .7rem; }
-
-        .cat-section { margin-bottom: 1.2rem; }
-        .cat-header { display: flex; align-items: center; gap: .55rem; padding: .5rem .9rem; background: #f4f5f7;
-            border-radius: 8px; cursor: pointer; margin-bottom: .65rem; border: 1px solid rgba(0,0,0,.05); }
-        .cat-header .cat-name { font-weight: 700; font-size: 1rem; color: #2d2d2d; }
-        .cat-header .cat-count { font-size: .72rem; font-weight: 600; color: #5a5a5a; background: rgba(255,255,255,.7); }
-        .cat-header .cat-sel { font-size: .72rem; font-weight: 600; color: #1b8f5a; margin-left: auto; }
-        .cat-header .chevron { color: #7a7a7a; }
-        .cat-section.cat-collapsed .cat-header .chevron { transform: rotate(-90deg); }
-        .cat-section.cat-collapsed .cat-body { display: none; }
-
-        .group-card { position: relative; background: #fff; border: 1px solid #e6e8eb;
-            border-left: 5px solid var(--accent, #b5b5b5); border-radius: 8px; margin-bottom: .85rem;
-            transition: box-shadow .15s, opacity .15s, background .15s, outline .1s; }
-        .group-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.07); }
-        .group-card.is-dimmed { opacity: .6; }
-        .group-card.is-redundant { margin-left: 2.6rem; }
-        .group-card.is-redundant::before {
-            content: ''; position: absolute; left: -1.5rem; top: -0.55rem; bottom: 50%;
-            width: 1.1rem; border-left: 2px solid #cfd3d8; border-bottom: 2px solid #cfd3d8;
-            border-bottom-left-radius: 7px; pointer-events: none;
-        }
-        .group-card.is-hidden { display: none; }
-        .group-card.is-focus-match { outline: 2px solid #3273dc; outline-offset: 2px; }
-
-        .group-head { display: flex; align-items: center; gap: 1rem; padding: .85rem 1.1rem; }
-        .mini-row { display: none; align-items: center; gap: .6rem; padding: .45rem 1.1rem; }
-        .group-card.is-mini .group-head { display: none; }
-        .group-card.is-mini .mini-row { display: flex; }
-        .mini-row .mini-title { font-weight: 600; font-size: .85rem; }
-        .mini-row .provider-chip { font-size: .72rem; }
-        .mini-row .tag { font-size: .68rem; }
-        .mini-row .mini-state { font-size: .72rem; color: #9aa1ab; margin-left: auto; white-space: nowrap; }
-        .group-title { font-weight: 600; line-height: 1.2; }
-        .group-meta { color: #7a8290; font-size: .82rem; margin-top: .15rem; }
-        .group-metrics { display: flex; gap: 1.4rem; align-items: center; white-space: nowrap; }
-        .metric { text-align: right; }
-        .metric .lbl { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: #9aa1ab; }
-        .metric .val { font-weight: 600; font-size: .95rem; }
-
-        .provider-chip { display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; font-size: .8rem;
-            padding: .15rem .6rem; border-radius: 999px; color: #fff; background: var(--accent, #b5b5b5); }
-
-        .group-body { display: none; }
-        .chevron { transition: transform .15s; color: #9aa1ab; }
-
-        .accept-btn { min-width: 116px; }
-        .order-link { cursor: pointer; color: #3273dc; }
-        .head-orders { margin-top: .4rem; display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
-        .head-orders .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: #9aa1ab; margin-right: .2rem; }
-        .ord-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 600;
-            padding: .12rem .5rem; border-radius: 999px; background: #eef0f2; color: #3a3f45; cursor: pointer; border: 1px solid #e0e2e6; }
-        .ord-pill:hover { background: #e6e8ec; }
-        .ord-pill .ord-price { margin-left: .4rem; padding-left: .4rem; border-left: 1px solid rgba(0,0,0,.12); font-weight: 700; }
-        .ord-pill.lost { background: #f3f3f3; color: #b0b0b0; border-color: #eaeaea; text-decoration: line-through; }
-        .ord-pill.lost .ord-price { border-left-color: rgba(0,0,0,.06); }
-        .covered-note { font-size: .78rem; color: #8a6d3b; background: #fcf8ef; border: 1px dashed #e6d3a3;
-            border-radius: 6px; padding: .35rem .6rem; margin-top: .4rem; }
-        .alt-tag { font-size: .68rem; }
-
-        .footer-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff;
-            border-top: 1px solid #e6e8eb; box-shadow: 0 -2px 10px rgba(0,0,0,.06); padding: .7rem 0; }
-        .footer-inner { display: flex; align-items: center; gap: 1.5rem; }
-        .footer-total { font-size: 1.35rem; font-weight: 700; }
-        .footer-total small { font-size: .72rem; font-weight: 500; color: #9aa1ab; display: block; }
-        .footer-profit { font-size: 1.2rem; font-weight: 700; color: #1b8f5a; white-space: nowrap; }
-        .footer-profit small { font-size: .72rem; font-weight: 500; color: #9aa1ab; display: block; }
-        .footer-profit.neg { color: #c0392b; }
-        .prov-breakdown { display: flex; flex-wrap: wrap; gap: .4rem; flex: 1; }
-        .prov-pill { font-size: .78rem; padding: .15rem .55rem; border-radius: 6px; background: #f1f3f5;
-            color: #4a4a4a; border-left: 3px solid var(--accent, #b5b5b5); }
-    </style>
-
-    <div class="container">
-        <h1 class="title is-4 is-spaced mb-2" th:text="#{fulfilment.title}"></h1>
-        <p class="is-size-7 has-text-grey" th:unless="${isWarehouse}">
-            <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
-            <span th:text="#{fulfilment.info.note}"></span>
-        </p>
-    </div>
-
-    <div class="fl-toolbar">
-        <div class="container">
-            <div th:if="${!form.variants.isEmpty()}">
-                <div class="variants" id="variants"></div>
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{${page.backHref()}}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{${page.backKey()}}"></span>
+            </a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{${page.titleKey()}}"></h1>
+                <th:block th:if="${page.isOrders()}"><button th:replace="~{fragments/screen-intro :: toggle}"></button></th:block>
             </div>
-            <div class="level is-mobile mb-0">
-                <div class="level-left" style="flex:1;" th:unless="${isWarehouse}">
-                    <span class="is-size-7 has-text-grey mr-3" style="white-space:nowrap;"><i class="fas fa-receipt mr-1"></i><span th:text="#{fulfilment.coverage}"></span></span>
-                    <div class="order-cov" id="orderCoverage"></div>
+            <p class="cl-page-lead" th:text="#{${page.leadKey()}}"></p>
+            <p class="cl-group-meta">
+                <span class="cl-status is-info"><i class="fas" th:classappend="${page.kind().icon()}" aria-hidden="true"></i><span th:text="#{${page.kind().key()}}"></span></span>
+                <span th:if="${page.step() != null}" class="cl-status is-neutral" th:text="#{fulfilment.select.step(${page.step().index()}, ${page.step().total()})}"></span>
+                <span th:if="${page.storeName() != null}"><span class="cl-icon-text"><i class="fas fa-store" aria-hidden="true"></i><span th:text="#{fulfilment.queue.store}"></span></span> <strong th:text="${page.storeName()}"></strong></span>
+                <span th:text="${page.context()}"></span>
+                <a th:if="${page.isOrders() and page.orders().size() == 1 and page.orders().get(0).href() != null}" class="cl-link-button" th:href="@{${page.orders().get(0).href()}}" target="_blank" rel="noopener"
+                   th:text="#{fulfilment.select.openOrder(${page.orders().get(0).number()})}"></a>
+                <span th:if="${page.strategyKey() != null}" th:text="#{${page.strategyKey()}}"></span>
+                <span th:each="key : ${page.narrowingKeys()}" class="cl-status is-neutral" th:text="#{${key}}"></span>
+            </p>
+        </header>
+
+        <th:block th:if="${page.isOrders()}"><div th:replace="~{fragments/screen-intro :: panel('fulfilmentSelect', 'fas fa-truck-loading')}"></div></th:block>
+
+        <section class="cl-card" th:unless="${page.hasOffers()}" aria-labelledby="select-empty-title">
+            <div class="cl-card-head">
+                <h2 class="cl-card-title" id="select-empty-title" th:text="#{${page.emptyState().titleKey()}}"></h2>
+            </div>
+            <div class="cl-list-empty">
+                <span th:text="#{${page.emptyState().textKey()}}"></span>
+                <div class="cl-list-empty-action">
+                    <a class="cl-button is-primary" th:href="@{${page.backHref()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
+                        <span th:text="#{${page.emptyState().actionKey()}}"></span>
+                    </a>
                 </div>
-                <div class="level-right">
-                    <div class="level-item buttons are-small mb-0">
-                        <button type="button" class="button is-light" id="clearFocus" style="display:none;" onclick="clearFocus()">
-                            <span class="icon"><i class="fas fa-times"></i></span><span th:text="#{fulfilment.show.all}"></span>
-                        </button>
-                        <button type="button" class="button is-light" onclick="setAll(false)">
-                            <span class="icon"><i class="fas fa-eraser"></i></span><span th:text="#{fulfilment.clear.selection}"></span>
-                        </button>
-                        <button type="button" class="button is-light" id="filtersBtn" onclick="toggleFilters()"></button>
+            </div>
+        </section>
+
+        <!--/* Layout of the queue and "Nowa dostawa" (spec 2026-10-08-fulfilment-select-design.md, variant A2): the
+               offers table is the work, the sticky side column the summary with the actions. The offers' state lives
+               in their checkboxes; fulfilment-select.js decides which offer wins each item (the cheapest gross one),
+               keeps every number in step and builds the entries[...] fields at submit. Addresses come from the page,
+               never from hidden fields. */-->
+        <form th:if="${page.hasOffers()}" method="post" th:action="@{${page.actions().commit()}}" class="cl-layout-aside"
+              data-cl-select data-cl-submit-once
+              th:attr="data-items-total=${page.itemsTotal()}, data-profit-known=${page.profitKnown()}">
+            <input type="hidden" name="fulfilmentType" th:value="${form.fulfilmentType}">
+            <input type="hidden" name="pathSelector" th:value="${form.pathSelector}">
+            <input type="hidden" name="onlyWithProfit" th:value="${form.onlyWithProfit}">
+            <input type="hidden" name="onlyMultiOrder" th:value="${form.onlyMultiOrder}">
+            <input type="hidden" name="onlyLocalSuppliers" th:value="${form.onlyLocalSuppliers}">
+            <input type="hidden" name="orderByOrder" th:value="${form.orderByOrder}">
+            <input type="hidden" name="orderCountAtStart" th:value="${form.orderCountAtStart}">
+            <input type="hidden" th:each="order, stat : ${form.selectedOrders}" th:name="|selectedOrders[${stat.index}]|" th:value="${order}">
+            <input type="hidden" th:each="supplier : ${form.committedSuppliers}" th:name="|committedSuppliers[${supplier.key}]|" th:value="${supplier.value}">
+            <input type="hidden" th:each="id : ${form.skippedOrderIds}" name="skippedOrderIds" th:value="${id}">
+            <input type="hidden" name="skippedGroups" th:value="${form.skippedGroups}">
+            <div data-cl-payload hidden></div>
+            <div hidden data-cl-select-text
+                 th:attr="data-covered-off=#{fulfilment.select.covered.off},
+                          data-lost=#{fulfilment.select.lost}, data-margin=#{fulfilment.select.margin},
+                          data-count=#{fulfilment.select.count},
+                          data-hidden=#{fulfilment.select.filter.hidden}, data-partial=#{fulfilment.select.partial},
+                          data-uncovered=#{fulfilment.select.uncovered}, data-partial-end=#{fulfilment.select.partial.end},
+                          data-all=#{fulfilment.select.filter.all}, data-many=#{fulfilment.select.filter.many},
+                          data-any=#{fulfilment.select.filter.any}, data-from=#{fulfilment.select.filter.from},
+                          data-to=#{fulfilment.select.filter.to}, data-range=#{fulfilment.select.filter.range},
+                          data-category-offers=#{fulfilment.select.category.offers}, data-category-ordered=#{fulfilment.select.category.ordered},
+                          data-category-chosen=#{fulfilment.select.category.chosen}, data-money=#{fulfilment.select.money},
+                          data-ratio=#{fulfilment.select.ratio}, data-chip-filter=#{fulfilment.select.orders.filter},
+                          data-chip-filter-split=#{fulfilment.select.orders.filter.split},
+                          data-dearer=#{fulfilment.select.alt.dearer}, data-fold=#{fulfilment.select.alt.fold}, data-fold-plain=#{fulfilment.select.alt.fold.plain},
+                          data-clear-all=#{fulfilment.select.list.clearAll},
+                          data-clear-matching=#{fulfilment.select.list.clearMatching},
+                          data-swap-orders=#{fulfilment.select.swap.orders}, data-swap-items=#{fulfilment.select.swap.items},
+                          data-range-count=#{fulfilment.select.filter.price.count}, data-range-no-min=#{fulfilment.select.filter.price.noMin},
+                          data-range-no-max=#{fulfilment.select.filter.price.noMax}, data-live-items=#{fulfilment.select.live.items}, data-live-cost=#{fulfilment.select.live.cost}, data-live-profit=#{fulfilment.select.live.profit}"></div>
+
+            <div class="cl-layout-main">
+                <noscript>
+                    <div class="cl-alert is-warn" role="status">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text" th:text="#{fulfilment.select.noscript}"></p>
                     </div>
-                </div>
-            </div>
-            <div class="filters-row" id="filtersRow">
-                <span class="is-size-7 has-text-grey" style="white-space:nowrap;" th:text="#{fulfilment.filter.net}"></span>
-                <div class="range-dual" style="width:200px;">
-                    <div class="rd-track"></div>
-                    <div class="rd-fill" id="fNetFill"></div>
-                    <input type="range" id="fNetMin" min="0" max="100" step="1" value="0">
-                    <input type="range" id="fNetMax" min="0" max="100" step="1" value="100">
-                </div>
-                <span class="is-size-7 has-text-weight-semibold" id="fNetRangeVal" style="white-space:nowrap; min-width:8.5rem;"></span>
-                <span class="is-size-7 has-text-grey ml-4" style="white-space:nowrap;"><i class="fas fa-truck mr-1"></i><span th:text="#{fulfilment.filter.supplier}"></span></span>
-                <div class="prov-filter" id="providerFilter"></div>
-            </div>
-        </div>
-    </div>
+                </noscript>
 
-    <input type="hidden" id="isSuperAdmin" th:value="${isSuperAdmin}" />
-    <input type="hidden" id="storeId" th:value="${storeId}" />
-    <input type="hidden" id="fulfilmentType" th:value="${form.fulfilmentType}" />
-
-    <div class="container">
-    <div id="groups">
-        <div class="group-card"
-             th:each="entry : ${form.entries}"
-             th:data-groupid="${entry.id}"
-             th:data-provider="${entry.source.provider}"
-             th:data-provider-label="${supplierLabels.of(entry.source.provider)}"
-             th:data-name="${entry.source.name}"
-             th:data-ean="${entry.source.ean}"
-             th:data-mfn="${entry.source.mfn}"
-             th:data-sourceqty="${entry.source.qty}"
-             th:data-net="${entry.source.priceNet}"
-             th:data-gross="${entry.source.priceGross}"
-             th:data-category="${entry.source.category}"
-             th:data-targetprice="${entry.targetPrice}"
-             th:data-accepted="${entry.accepted}">
-            <div class="group-head">
-                <div style="flex:1; min-width:0;">
-                    <div class="group-title" th:text="${entry.source.name}"></div>
-                    <div class="group-meta">
-                        <span>EAN <span th:text="${entry.source.ean}"></span></span>
-                        <span> &middot; <span th:text="#{fulfilment.product.code}"></span> <span th:text="${entry.source.mfn}"></span></span>
-                        <span> &middot; </span>
-                        <span class="provider-chip"><i class="fas fa-truck"></i><span th:text="${supplierLabels.of(entry.source.provider)}"></span></span>
+                <section class="cl-card" aria-labelledby="offers-title">
+                    <div class="cl-card-head cl-offers-head">
+                        <h2 class="cl-card-title" id="offers-title" th:text="#{fulfilment.select.offers.title}"></h2>
+                        <!--/* filters work in the browser only: no form of their own (it would nest), inputs without names */-->
+                        <div class="cl-card-head-actions" data-cl-select-filters hidden>
+                            <details class="cl-filter-menu" data-cl-filter-menu="supplier">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="#{fulfilment.select.filter.supplier}"></span>
+                                    <span class="cl-filter-menu-value" data-cl-filter-value="supplier" th:text="#{fulfilment.select.filter.all}"></span>
+                                </summary>
+                                <div class="cl-filter-menu-panel">
+                                    <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{fulfilment.select.filter.supplier}">
+                                        <label class="cl-filter-menu-check" th:each="s : ${page.suppliers()}">
+                                            <input type="checkbox" data-cl-filter-provider th:value="${s.provider()}">
+                                            <span class="cl-filter-menu-text"><span th:replace="~{fragments/supplier-pill :: pill(${s.label()}, ${s.color()}, ${s.warehouse()})}"></span></span>
+                                            <span class="cl-filter-menu-meta" th:text="${s.offers()}"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </details>
+                            <details class="cl-filter-menu is-end" data-cl-filter-menu="price">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="#{fulfilment.select.filter.price}"></span>
+                                    <span class="cl-filter-menu-value" data-cl-filter-value="price" th:text="#{fulfilment.select.filter.any}"></span>
+                                </summary>
+                                <div class="cl-filter-menu-panel">
+                                    <!--/* a rough pick on the slider (log scale over the page's net prices, bars = offers per band),
+                                           an exact amount in the fields; both drive the same two fields. Shown by the script only
+                                           when the page has at least two different prices. */-->
+                                    <div class="cl-range-filter" data-cl-price-range hidden>
+                                        <div class="cl-range-hist" aria-hidden="true" data-cl-range-hist></div>
+                                        <div class="cl-range">
+                                            <span class="cl-range-track" aria-hidden="true"></span>
+                                            <span class="cl-range-fill" aria-hidden="true" data-cl-range-fill></span>
+                                            <input type="range" min="0" max="1000" step="1" value="0" data-cl-range-lo
+                                                   th:attr="aria-label=#{fulfilment.select.filter.price.sliderFrom}">
+                                            <input type="range" min="0" max="1000" step="1" value="1000" data-cl-range-hi
+                                                   th:attr="aria-label=#{fulfilment.select.filter.price.sliderTo}">
+                                        </div>
+                                        <div class="cl-range-ends" aria-hidden="true"><span data-cl-range-end-lo></span><span data-cl-range-end-hi></span></div>
+                                    </div>
+                                    <div class="cl-filter-menu-dates is-pair">
+                                        <label>
+                                            <span th:text="#{fulfilment.select.filter.price.from}"></span>
+                                            <input class="cl-input is-price" type="number" inputmode="decimal" min="0" step="0.01" data-cl-filter-min>
+                                        </label>
+                                        <label>
+                                            <span th:text="#{fulfilment.select.filter.price.to}"></span>
+                                            <input class="cl-input is-price" type="number" inputmode="decimal" min="0" step="0.01" data-cl-filter-max>
+                                        </label>
+                                    </div>
+                                    <div class="cl-range-foot">
+                                        <span class="cl-range-count" data-cl-range-count></span>
+                                        <button type="button" class="cl-link-button" data-cl-range-clear th:text="#{fulfilment.select.filter.price.clear}"></button>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
                     </div>
-                </div>
-                <div class="group-metrics">
-                    <span class="tag is-light">marża</span>
-                    <div class="metric"><span class="lbl" th:text="#{fulfilment.target}"></span><span class="val qty-val"></span></div>
-                    <div class="metric"><span class="lbl" th:text="#{fulfilment.net.per.unit}"></span><span class="val net-val"></span></div>
-                </div>
-                <button type="button" class="button accept-btn" onclick="event.stopPropagation(); toggleAccept(this)"></button>
-            </div>
-            <div class="group-body">
-                <table>
-                    <tbody>
-                    <tr th:each="allocation : ${entry.allocations}"
-                        th:data-order="${allocation.orderId ?: ''}"
-                        th:data-item="${(allocation.orderId ?: '') + '::' + allocation.orderItemId}"
-                        th:data-itemid="${allocation.orderItemId}"
-                        th:data-qty="${allocation.orderItemQty}"
-                        th:data-price="${allocation.orderItemPrice}"
-                        th:data-ref="${allocation.key.refName}"
-                        th:data-url="@{${allocation.key.url}}">
-                        <td><a th:href="@{${allocation.key.url}}" th:text="${allocation.key.refName}" target="_blank"></a></td>
-                        <td th:text="${allocation.orderItemQty}"></td>
-                        <td th:text="${allocation.orderItemPrice}"></td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    </div>
 
-    <form id="fulfilment-form" method="post" th:object="${form}">
-        <input type="hidden" th:name="redirectUrl" th:value="${form.redirectUrl}" />
-        <input type="hidden" th:name="pathSelector" th:value="${form.pathSelector}" />
-        <input type="hidden" th:name="onlyWithProfit" th:value="${form.onlyWithProfit}" />
-        <input type="hidden" th:name="onlyMultiOrder" th:value="${form.onlyMultiOrder}" />
-        <input type="hidden" th:name="onlyLocalSuppliers" th:value="${form.onlyLocalSuppliers}" />
-        <input type="hidden" th:name="orderByOrder" th:value="${form.orderByOrder}" />
-        <div th:each="order, stat : ${form.selectedOrders}">
-            <input type="hidden" th:name="selectedOrders[__${stat.index}__]" th:value="${order}" />
-        </div>
-        <div th:each="supplier : ${form.committedSuppliers}">
-            <input type="hidden" th:name="|committedSuppliers[${supplier.key}]|" th:value="${supplier.value}" />
-        </div>
-        <div id="payload-container"></div>
+                    <div class="cl-offers-bar" th:if="${!page.variants().isEmpty() or page.showCoverage()}">
+                        <div class="cl-bar-row" th:if="${!page.variants().isEmpty()}">
+                            <span class="cl-bar-label" id="variant-label" th:text="#{fulfilment.select.variants}"></span>
+                            <div class="cl-bar-content">
+                                <!--/* name clVariant: posted, but FulfilmentForm has no such property, so binding ignores it */-->
+                                <fieldset class="cl-variant-options" aria-labelledby="variant-label">
+                                    <label class="cl-variant-option cl-tooltip" th:each="v : ${page.variants()}" th:attr="data-tooltip=${v.providers()}">
+                                        <input type="radio" name="clVariant" data-cl-variant th:attr="data-groups=${v.groupIds()}" th:checked="${v.applied()}">
+                                        <strong th:text="${v.supplierCount() == 1} ? #{fulfilment.select.suppliers.one} : #{fulfilment.select.suppliers.many(${v.supplierCount()})}"></strong>
+                                        <span class="cl-variant-sub" th:text="#{fulfilment.select.variant.total(${T(pl.commercelink.web.orders.Money).format(v.total())})}"></span>
+                                        <span class="cl-variant-tag" th:if="${v.cheapest()}" th:text="#{fulfilment.select.variant.cheapest}"></span>
+                                        <span class="cl-variant-tag" th:if="${!v.cheapest() and v.fewest()}" th:text="#{fulfilment.select.variant.fewest}"></span>
+                                        <span class="cl-visually-hidden" th:text="${v.providers()}"></span>
+                                    </label>
+                                    <label class="cl-variant-option">
+                                        <input type="radio" name="clVariant" data-cl-variant-custom th:checked="${page.noVariantApplied()}">
+                                        <strong th:text="#{fulfilment.select.variant.custom}"></strong>
+                                    </label>
+                                </fieldset>
+                                <span class="cl-bar-info cl-tooltip is-lines is-end" tabindex="0" role="img"
+                                      th:attr="data-tooltip=#{fulfilment.select.variants.help}, aria-label=#{fulfilment.select.variants.help}"><i class="fas fa-info-circle" aria-hidden="true"></i></span>
+                            </div>
+                        </div>
+                        <div class="cl-bar-row" th:if="${page.showCoverage()}">
+                            <span class="cl-bar-label" id="coverage-label" th:text="#{fulfilment.select.orders}"></span>
+                            <!--/* a chip is two controls: the number opens the order in a new tab, the bar part narrows the
+                                   table to its offers. The script keeps the state class on the filter button; the chip
+                                   takes its tint from it, so the icons, bar and count change together. */-->
+                            <div class="cl-bar-content cl-order-chips" role="group" aria-labelledby="coverage-label">
+                                <span class="cl-order-chip" th:each="o : ${page.orders()}" th:attr="data-order=${o.orderId()}">
+                                    <span class="cl-coverage-icon is-ok"><i class="fas fa-check-circle" aria-hidden="true"></i></span>
+                                    <span class="cl-coverage-icon is-warn"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span>
+                                    <span class="cl-coverage-icon is-bad"><i class="fas fa-circle" aria-hidden="true"></i></span>
+                                    <a th:if="${o.href() != null}" class="cl-order-chip-link" th:href="@{${o.href()}}" target="_blank" rel="noopener"
+                                       th:title="#{fulfilment.select.openOrder(${o.number()})}" th:text="${o.number()}"></a>
+                                    <span th:unless="${o.href() != null}" class="cl-order-chip-link" th:text="${o.number()}"></span>
+                                    <button type="button" class="cl-order-chip-filter" aria-pressed="false" data-cl-coverage
+                                            th:attr="data-order=${o.orderId()}, data-total=${o.items()}, data-number=${o.number()}, data-href=@{${o.href()}},
+                                                     aria-label=#{fulfilment.select.orders.filter(${o.number()}, 0, ${o.items()})}">
+                                        <span class="cl-coverage-split" hidden role="img" th:attr="aria-label=#{fulfilment.select.orders.split}, title=#{fulfilment.select.orders.split}"><i class="fas fa-code-branch" aria-hidden="true"></i></span>
+                                        <span class="cl-order-chip-bar" aria-hidden="true"><span class="cl-order-chip-fill" data-cl-coverage-fill></span></span>
+                                        <span class="cl-coverage-count" data-cl-coverage-count th:text="#{fulfilment.select.ratio(0, ${o.items()})}"></span>
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="footer-bar">
-            <div class="container footer-inner">
-                <div class="footer-total"><small th:text="#{fulfilment.total.net}"></small><span id="grandTotal">0,00</span> PLN</div>
-                <div class="footer-profit" id="footerProfit">
-                    <small th:text="#{fulfilment.total.profit}"></small>
-                    <span id="grandProfit">+0,00</span> PLN
-                </div>
-                <div class="footer-profit" id="footerMargin">
-                    <small th:text="#{fulfilment.total.margin}"></small>
-                    <span id="grandMargin">+0%</span>
-                </div>
-                <div class="prov-breakdown" id="provBreakdown"></div>
-                <div id="partialWarn" class="has-text-danger has-text-weight-semibold is-size-7" style="display:none; white-space:nowrap;">
-                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span><span id="partialWarnText"></span>
-                </div>
-                <p id="emptyWarn" class="help is-danger has-text-weight-semibold mb-0" style="display:none; white-space:nowrap;" th:text="#{fulfilment.empty.selection}"></p>
-                <button class="button is-light is-small" type="button" th:if="${form.orderByOrder}" onclick="skipFulfilment()">
-                    <span class="icon"><i class="fas fa-forward"></i></span><span th:text="#{fulfilment.skip}"></span>
-                </button>
-                <div class="field has-addons mb-0">
-                    <div class="control">
-                        <span class="select is-small">
-                            <select id="action-select" th:disabled="${isCompletedOrder}">
-                                <option value="commit" th:text="#{general.save}"></option>
-                                <option value="commitAndContinue" th:if="${form.fulfilmentType == 'orders' and !form.orderByOrder}" th:text="#{general.saveAndContinue}"></option>
-                            </select>
+                    <div class="cl-alert is-info cl-offers-notice" role="status" data-cl-hidden-notice hidden>
+                        <i class="fas fa-filter cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span data-cl-hidden-text></span> <button type="button" class="cl-link-button" data-cl-show-all th:text="#{fulfilment.select.filter.showAll}"></button></p>
+                    </div>
+                    <div class="cl-alert is-warn cl-offers-notice" role="status" th:if="${page.noOfferMatched()}">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{${page.noMatchKey()}}"></span><th:block th:if="${page.multiOnSingleOrder()}"> <span th:text="#{fulfilment.select.noMatch.multi}"></span></th:block></p>
+                    </div>
+
+                    <!--/* above the list: clear the ticked offers on the left (the header checkbox went with the visible header
+                           row), expand and collapse every category on the right */-->
+                    <div class="cl-list-bar">
+                        <button type="button" class="cl-link-button" data-cl-clear-ticked th:text="#{fulfilment.select.list.clearAll}"></button>
+                        <span class="cl-list-bar-end">
+                            <button type="button" class="cl-link-button" data-cl-expand-all>
+                                <i class="fas fa-expand" aria-hidden="true"></i><span th:text="#{fulfilment.select.list.expand}"></span>
+                            </button>
+                            <button type="button" class="cl-link-button" data-cl-collapse-all>
+                                <i class="fas fa-compress" aria-hidden="true"></i><span th:text="#{fulfilment.select.list.collapse}"></span>
+                            </button>
                         </span>
                     </div>
-                    <div class="control">
-                        <button class="button is-primary is-small" type="button" onclick="submitFulfilment()">
-                            <span class="icon"><i class="fas fa-paper-plane"></i></span><span th:text="#{general.submit}"></span>
-                        </button>
+
+                    <!--/* Offers as separated card rows (variant A4). The header row stays for screen readers only: every
+                           value carries its unit in the cell. Only the first category starts expanded, as on the old page;
+                           the script hides the rows of the collapsed ones. */-->
+                    <div class="cl-card-section cl-offers-list">
+                        <table class="cl-table is-supplier-offers" data-cl-offers>
+                            <colgroup><col><col class="cl-col-qty-s"><col class="cl-col-price"><col class="cl-col-price"><col class="cl-col-profit"><col class="cl-col-toggle"></colgroup>
+                            <thead class="cl-visually-hidden">
+                            <tr>
+                                <th scope="col" th:text="#{fulfilment.select.column.offer}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.qty}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.net}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.gross}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.profit}"></th>
+                                <th scope="col" th:text="#{fulfilment.select.column.select}"></th>
+                            </tr>
+                            </thead>
+                            <tbody th:each="c, cStat : ${page.categories()}" th:id="${c.id()}" data-cl-category>
+                            <tr class="cl-table-group">
+                                <th colspan="6" scope="rowgroup">
+                                    <button type="button" class="cl-group-toggle" th:attr="aria-controls=${c.id()}, aria-expanded=${cStat.first}">
+                                        <i class="fas fa-chevron-down" aria-hidden="true"></i><span class="cl-group-name" th:text="${c.name() != null} ? ${c.name()} : #{fulfilment.select.category.other}"></span>
+                                    </button>
+                                    <span class="cl-group-count" data-cl-category-count></span>
+                                    <span class="cl-group-chosen" data-cl-category-chosen hidden></span>
+                                </th>
+                            </tr>
+                            <tr th:each="o, oStat : ${c.offers()}" th:with="e=${o.entry()}, tid=|${c.id()}-o${oStat.index}|" th:id="${tid}" data-cl-offer th:class="${e.accepted} ? 'is-on' : 'is-off'"
+                                th:data-groupid="${e.id}" th:data-provider="${e.source.provider}" th:data-provider-label="${o.label()}"
+                                th:data-name="${e.source.name}" th:data-ean="${e.source.ean}" th:data-mfn="${e.source.mfn}"
+                                th:data-sourceqty="${e.source.qty}" th:data-net="${e.source.priceNet}" th:data-gross="${e.source.priceGross}"
+                                th:data-category="${e.source.category}">
+                                <th scope="row" class="cl-table-key">
+                                    <span class="cl-offer-name" th:text="${e.source.name}"></span>
+                                    <span class="cl-offer-line">
+                                        <span th:replace="~{fragments/supplier-pill :: pill(${o.label()}, ${o.color()}, ${o.warehouse()})}"></span>
+                                        <span class="cl-offer-stock" th:text="#{fulfilment.select.stock(${e.source.qty})}"></span>
+                                        <span class="cl-offer-codes"><span th:text="#{general.ean}"></span> <span class="cl-code-nowrap" th:text="${e.source.ean}"></span> · <span th:text="#{fulfilment.select.mfn}"></span> <span class="cl-code-nowrap" th:text="${e.source.mfn}"></span></span>
+                                        <span class="cl-offer-covered" data-cl-covered hidden></span>
+                                        <span class="cl-offer-swap" data-cl-swap hidden></span>
+                                    </span>
+                                    <span class="cl-order-refs" th:hidden="${!page.showOrderRefs()}">
+                                        <span class="cl-order-ref" th:each="a : ${e.allocations}" th:with="ref=${page.order(a.orderId)}" data-cl-alloc
+                                              th:attr="data-order=${a.orderId}, data-item=${a.orderItemId}, data-qty=${a.orderItemQty}, data-price=${a.orderItemPrice}">
+                                            <a th:if="${ref.href() != null}" th:href="@{${ref.href()}}" target="_blank" rel="noopener" th:text="${ref.number()}"></a>
+                                            <span class="cl-order-ref-qty" th:text="|×${a.orderItemQty}|"></span>
+                                            <span class="cl-order-ref-price" th:text="|· ${T(pl.commercelink.web.orders.Money).format(a.orderItemPrice)}|"></span>
+                                        </span>
+                                    </span>
+                                </th>
+                                <td class="is-numeric cl-cell-qty"><span data-cl-qty>0</span> <span class="cl-unit" th:text="#{fulfilment.select.unit.pieces}"></span></td>
+                                <!--/* net and gross side by side at the same size: the operator buys by either. "/ szt." sits in the caption,
+                                       which keeps both columns narrow enough for the offer name beside the summary column */-->
+                                <td class="is-numeric cl-cell-price is-net">
+                                    <span class="cl-price-main"><span th:text="${T(pl.commercelink.web.orders.Money).format(e.source.priceNet)}"></span> <span class="cl-unit" th:text="#{fulfilment.select.unit.currency}"></span></span>
+                                    <span class="cl-table-sub" th:text="#{fulfilment.select.price.net}"></span>
+                                </td>
+                                <td class="is-numeric cl-cell-price is-gross">
+                                    <span class="cl-price-main"><span th:text="${T(pl.commercelink.web.orders.Money).format(e.source.priceGross)}"></span> <span class="cl-unit" th:text="#{fulfilment.select.unit.currency}"></span></span>
+                                    <span class="cl-table-sub" th:text="#{fulfilment.select.price.gross}"></span>
+                                </td>
+                                <td class="is-numeric cl-cell-profit">
+                                    <th:block th:if="${page.profitKnown()}">
+                                        <span class="cl-profit" data-cl-profit><span class="cl-loss-icon"><i class="fas fa-exclamation-circle" aria-hidden="true"></i></span><span data-cl-profit-value>—</span></span>
+                                        <span class="cl-table-sub" data-cl-margin></span>
+                                    </th:block>
+                                    <span th:unless="${page.profitKnown()}" class="cl-profit is-unknown cl-tooltip is-end" tabindex="0" role="img"
+                                          th:attr="data-tooltip=#{fulfilment.select.profit.unknown}, aria-label=#{fulfilment.select.profit.unknown}">—</span>
+                                </td>
+                                <!--/* the toggle is a label around the offer's checkbox: the checkbox keeps the state and the keyboard;
+                                       CSS shows the one text that fits the row (ticked or not, covered cheaper or not). The checkbox
+                                       is named by that visible text plus the offer and supplier (WCAG 2.5.3): fulfilment-select.js
+                                       points aria-labelledby at the text shown */-->
+                                <td class="cl-cell-toggle">
+                                    <label class="cl-offer-toggle"><input type="checkbox" data-cl-offer-check autocomplete="off" th:checked="${e.accepted}"
+                                                                          th:attr="aria-labelledby=|${tid}-${e.accepted ? 'on' : 'off'} ${tid}-name|"><span class="cl-offer-toggle-on" th:id="|${tid}-on|"><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{fulfilment.select.toggle.on}"></span></span><span class="cl-offer-toggle-off" th:id="|${tid}-off|" th:text="#{fulfilment.select.toggle.off}"></span><span class="cl-offer-toggle-alt" th:id="|${tid}-alt|" th:text="#{fulfilment.select.toggle.alt}"></span></label>
+                                    <span class="cl-visually-hidden" th:id="|${tid}-name|" th:text="#{fulfilment.select.offer.name(${e.source.name}, ${o.label()})}"></span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
+                </section>
+
+                <!--/* below 1366 px the summary sits under the table: this bar keeps the totals in sight (hidden from 1366 px) */-->
+                <div class="cl-summary-peek" data-cl-peek>
+                    <span th:if="${page.isOrders()}"><strong class="cl-num"><span data-cl-peek-items></span></strong> <span th:text="#{fulfilment.select.peek.items}"></span></span>
+                    <span><strong class="cl-num"><span data-cl-peek-cost>0,00</span></strong> PLN</span>
+                    <span th:if="${page.profitKnown()}" class="cl-profit"><span data-cl-peek-profit></span> PLN</span>
+                    <a class="cl-button is-primary" href="#summary" th:text="#{fulfilment.select.summary.title}"></a>
                 </div>
             </div>
-        </div>
-    </form>
 
-    <script th:inline="javascript">
-        const MSG = {
-            margin: /*[[#{fulfilment.margin}]]*/ 'margin',
-            profit: /*[[#{fulfilment.profit}]]*/ 'profit',
-            unit: /*[[#{fulfilment.unit}]]*/ 'pcs',
-            grossPerUnit: /*[[#{fulfilment.gross.per.unit}]]*/ 'gross / unit',
-            realizes: /*[[#{fulfilment.realizes}]]*/ 'Realizes',
-            order: /*[[#{fulfilment.order}]]*/ 'Order',
-            ordered: /*[[#{fulfilment.ordered}]]*/ 'Ordered',
-            redundant: /*[[#{fulfilment.redundant}]]*/ 'Redundant',
-            coveredCheaper: /*[[#{fulfilment.covered.cheaper}]]*/ 'Covered cheaper',
-            coveredBy: /*[[#{fulfilment.covered.by}]]*/ 'Covered by',
-            alsoOfferedBy: /*[[#{fulfilment.also.offered.by}]]*/ 'also offered by:',
-            coveredElsewhere: /*[[#{fulfilment.covered.elsewhere}]]*/ 'covered cheaper elsewhere',
-            nothingSelected: /*[[#{fulfilment.nothing.selected}]]*/ 'Nothing selected',
-            partialWarn: /*[[#{fulfilment.partial.warning}]]*/ '{0} partially covered',
-            splitProviders: /*[[#{fulfilment.split.providers}]]*/ 'fulfilled by several providers',
-            filters: /*[[#{fulfilment.filters}]]*/ 'Filters',
-            selected: /*[[#{fulfilment.category.selected}]]*/ 'selected',
-            supplierOne: /*[[#{fulfilment.variants.supplier.one}]]*/ 'supplier',
-            supplierMany: /*[[#{fulfilment.variants.supplier.many}]]*/ 'suppliers',
-            variantCheapest: /*[[#{fulfilment.variants.cheapest}]]*/ 'cheapest',
-            variantFewest: /*[[#{fulfilment.variants.fewest.parcels}]]*/ 'fewest parcels',
-            variantCustom: /*[[#{fulfilment.variants.custom}]]*/ 'Custom selection',
-            variantEstimated: /*[[#{fulfilment.variants.estimated}]]*/ 'est. incl. shipping'
-        };
-        const IS_WAREHOUSE = /*[[${isWarehouse}]]*/ false;
-        const COMMITTED_SUPPLIERS = /*[[${form.committedSuppliers}]]*/ {};
-        const VARIANTS = /*[[${form.variants}]]*/ [];
-    </script>
-
-    <script>
-        const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        /* Connection labels and product names are operator-supplied free text that reaches this
-           screen through innerHTML string builds below, so every one of them is escaped here at
-           the sink -- SupplierLabelTemplatesTest fails the build if one is concatenated raw. */
-        const esc = s => String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        const cards = () => Array.from(document.querySelectorAll('.group-card'));
-        /* Identity (posted/compared) -> display label, derived once per call from the rendered cards. */
-        function providerLabels() {
-            const map = {};
-            cards().forEach(c => { map[c.dataset.provider] = c.dataset.providerLabel; });
-            return map;
-        }
-        let activeOrder = null;
-        let activeProviders = new Set();
-        let activeVariant = null;
-
-        const isAccepted = c => c.dataset.accepted === 'true';
-        const gross = c => parseFloat(c.dataset.gross) || 0;
-        const net = c => parseFloat(c.dataset.net) || 0;
-        const vat = c => (net(c) > 0 ? gross(c) / net(c) : 1);
-        const cardOrders = c => [...new Set(Array.from(c.querySelectorAll('tr[data-item]')).map(r => r.dataset.order))];
-
-        function provColor(name) {
-            let h = 0;
-            for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-            return 'hsl(' + (h % 360) + ', 52%, 45%)';
-        }
-
-        function setAccept(card, v) { card.dataset.accepted = v; }
-        function toggleAccept(btn) { const c = btn.closest('.group-card'); setAccept(c, !isAccepted(c)); markCustomVariant(); render(); }
-        function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); markCustomVariant(); render(); }
-
-        function supplierCountLabel(n) { return n + ' ' + (n === 1 ? MSG.supplierOne : MSG.supplierMany); }
-        function variantChip(p) {
-            const label = esc(providerLabels()[p] || p);
-            return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + label + '</span>';
-        }
-
-        function variantMatchesCurrent(v) {
-            const acceptedIds = cards().filter(isAccepted).map(c => c.dataset.groupid).sort();
-            const ids = [...v.groupIds].sort();
-            return acceptedIds.length === ids.length && ids.every((id, i) => id === acceptedIds[i]);
-        }
-
-        function initVariantPicker() {
-            if (!VARIANTS.length) return;
-            const idx = VARIANTS.findIndex(variantMatchesCurrent);
-            activeVariant = idx >= 0 ? idx : 'custom';
-            renderVariants();
-        }
-
-        function selectVariant(i) {
-            activeVariant = i;
-            const ids = new Set(VARIANTS[i].groupIds);
-            cards().forEach(c => setAccept(c, ids.has(c.dataset.groupid)));
-            renderVariants();
-            render();
-        }
-
-        function selectCustomVariant() {
-            activeVariant = 'custom';
-            renderVariants();
-        }
-
-        function markCustomVariant() {
-            if (!VARIANTS.length || activeVariant === 'custom') return;
-            activeVariant = 'custom';
-            renderVariants();
-        }
-
-        function renderVariants() {
-            const wrap = document.getElementById('variants');
-            if (!wrap) return;
-            wrap.innerHTML = '';
-            VARIANTS.forEach((v, i) => {
-                const el = document.createElement('div');
-                el.className = 'variant' + (activeVariant === i ? ' active' : '');
-                el.onclick = () => selectVariant(i);
-                const badge = v.cheapest ? '<span class="v-badge">' + MSG.variantCheapest + '</span>'
-                    : (v.fewestSuppliers ? '<span class="v-badge blue">' + MSG.variantFewest + '</span>' : '');
-                el.innerHTML = badge +
-                    '<div class="v-head"><span class="v-count">' + supplierCountLabel(v.supplierCount) + '</span>' +
-                    '<span class="v-total">' + fmt(v.estimatedTotal) + ' zł<small>' + MSG.variantEstimated + '</small></span></div>' +
-                    '<div class="v-provs">' + v.providers.map(variantChip).join('') + '</div>';
-                wrap.appendChild(el);
-            });
-            const custom = document.createElement('div');
-            custom.className = 'variant custom' + (activeVariant === 'custom' ? ' active' : '');
-            custom.onclick = selectCustomVariant;
-            custom.textContent = MSG.variantCustom;
-            wrap.appendChild(custom);
-        }
-
-        function toggleFilters() {
-            document.getElementById('filtersRow').classList.toggle('open');
-            updateFiltersBtn();
-        }
-
-        function filtersActive() {
-            const [minNet, maxNet] = netRange();
-            return activeProviders.size > 0 || minNet > 0 || maxNet < parseFloat(document.getElementById('fNetMax').max);
-        }
-
-        function updateFiltersBtn() {
-            const btn = document.getElementById('filtersBtn');
-            const open = document.getElementById('filtersRow').classList.contains('open');
-            btn.classList.toggle('filters-btn-active', filtersActive());
-            btn.textContent = MSG.filters + (filtersActive() ? ' •' : '') + (open ? ' ▴' : ' ▾');
-        }
-
-        function focusOrder(ord) {
-            if (!ord) return;
-            activeOrder = (activeOrder === ord) ? null : ord;
-            const cf = document.getElementById('clearFocus');
-            if (cf) cf.style.display = activeOrder ? '' : 'none';
-            if (activeOrder) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
-            render();
-        }
-        function clearFocus() {
-            activeOrder = null;
-            const cf = document.getElementById('clearFocus');
-            if (cf) cf.style.display = 'none';
-            render();
-        }
-
-        function focusProvider(prov) {
-            if (activeProviders.has(prov)) activeProviders.delete(prov); else activeProviders.add(prov);
-            if (activeProviders.size) document.querySelectorAll('.cat-section').forEach(s => s.classList.remove('cat-collapsed'));
-            renderProviderFilter();
-            applyFilters();
-        }
-
-        function renderProviderFilter() {
-            const bar = document.getElementById('providerFilter');
-            if (!bar) return;
-            const counts = {};
-            const labels = providerLabels();
-            cards().forEach(c => { counts[c.dataset.provider] = (counts[c.dataset.provider] || 0) + 1; });
-            bar.innerHTML = '';
-            Object.keys(counts).sort().forEach(p => {
-                const chip = document.createElement('span');
-                chip.className = 'prov-chip-btn' + (activeProviders.has(p) ? ' active' : (activeProviders.size ? ' inactive' : ''));
-                chip.style.setProperty('--accent', provColor(p));
-                chip.onclick = () => focusProvider(p);
-                chip.innerHTML = '<i class="fas fa-truck"></i>' + esc(labels[p]) + '<span class="cnt">' + counts[p] + '</span>';
-                bar.appendChild(chip);
-            });
-        }
-
-        /* winner per order-item = cheapest ACCEPTED card containing it */
-        function computeWinners() {
-            const winner = {}, winnerGross = {};
-            cards().forEach(c => {
-                if (!isAccepted(c)) return;
-                c.querySelectorAll('tr[data-item]').forEach(r => {
-                    const it = r.dataset.item;
-                    if (winner[it] === undefined || gross(c) < winnerGross[it]) { winner[it] = c; winnerGross[it] = gross(c); }
-                });
-            });
-            return winner;
-        }
-        function offerCount() {
-            const m = {};
-            document.querySelectorAll('tr[data-item]').forEach(r => {
-                m[r.dataset.item] = m[r.dataset.item] || new Set();
-                m[r.dataset.item].add(r.closest('.group-card'));
-            });
-            return m;
-        }
-
-        function render() {
-            const winner = computeWinners();
-            const offers = offerCount();
-
-            cards().forEach(c => {
-                let effQty = 0, effProfit = 0, visibleRows = 0, visibleQty = 0, profitNet = 0, allQty = 0, allProfit = 0;
-                const coveredAway = []; const headChips = [];
-                const v = vat(c);
-                c.querySelectorAll('tr[data-item]').forEach(r => {
-                    const it = r.dataset.item, w = winner[it];
-                    const price = parseFloat(r.dataset.price) || 0;
-                    const qty = parseInt(r.dataset.qty) || 0;
-                    allQty += qty;
-                    allProfit += (price / v - net(c)) * qty;
-                    r.querySelectorAll('.alt-tag').forEach(t => t.remove());
-                    if (w && w !== c) {
-                        coveredAway.push({ qty: qty, order: r.dataset.order, by: w.dataset.providerLabel });
-                        headChips.push({ row: r, qty: qty, price: price, lost: true, by: w.dataset.providerLabel });
-                    } else {
-                        headChips.push({ row: r, qty: qty, price: price, lost: false });
-                        visibleRows++;
-                        visibleQty += qty;
-                        profitNet += (price / v - net(c)) * qty;
-                        if (w === c) { effQty += qty; effProfit += (price / v - net(c)) * qty; }
-                    }
-                });
-
-                const old = c.querySelector('.covered-note'); if (old) old.remove();
-                if (coveredAway.length) {
-                    const by = {};
-                    coveredAway.forEach(x => { by[x.by] = (by[x.by] || 0) + x.qty; });
-                    const txt = Object.keys(by).map(p => esc(p) + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
-                    const note = document.createElement('div');
-                    note.className = 'covered-note';
-                    note.innerHTML = '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span> ' +
-                        coveredAway.length + ' ' + MSG.coveredElsewhere + ': <strong>' + txt + '</strong>';
-                    c.querySelector('.group-body').appendChild(note);
-                }
-
-                const titleBlock = c.querySelector('.group-meta').parentElement;
-                let ho = titleBlock.querySelector('.head-orders');
-                if (!ho) { ho = document.createElement('div'); ho.className = 'head-orders'; titleBlock.appendChild(ho); }
-                ho.innerHTML = '<span class="lbl">' + MSG.realizes + '</span>';
-                headChips.forEach(ch => {
-                    const ord = ch.row.dataset.order;
-                    const ref = ch.row.dataset.ref;
-                    const isWh = !ord;
-                    const pill = document.createElement('span');
-                    pill.className = 'ord-pill' + (ch.lost ? ' lost' : '');
-                    pill.title = ch.lost ? (MSG.coveredCheaper + ' — ' + ch.by) : '';
-                    if (!isWh) pill.onclick = (e) => { e.stopPropagation(); focusOrder(ord); };
-                    else pill.style.cursor = 'default';
-                    pill.innerHTML = (isWh ? ref : '<a class="ord-open" href="' + ch.row.dataset.url + '" target="_blank" onclick="event.stopPropagation()">#' + ref + '</a>') +
-                        ' <span style="opacity:.6;">&times;' + ch.qty + '</span>' +
-                        '<span class="ord-price">' + fmt(ch.price) + ' zł</span>' +
-                        (ch.lost ? '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span>' : '');
-                    ho.appendChild(pill);
-                });
-
-                c.dataset.effqty = effQty;
-                c.dataset.effvalue = effQty * net(c);
-                c.dataset.effprofit = effProfit;
-                c.querySelector('.qty-val').textContent = effQty + ' ' + MSG.unit;
-                c.querySelector('.net-val').textContent = fmt(net(c));
-
-                let gm = c.querySelector('.gross-metric');
-                if (!gm) {
-                    gm = document.createElement('div');
-                    gm.className = 'metric gross-metric';
-                    gm.innerHTML = '<span class="lbl">' + MSG.grossPerUnit + '</span><span class="val gross-val"></span>';
-                    c.querySelector('.group-metrics').appendChild(gm);
-                }
-                gm.querySelector('.gross-val').textContent = fmt(gross(c));
-
-                const costNet = net(c) * visibleQty;
-                const marginPct = costNet > 0 ? profitNet / costNet : 0;
-                const redundant = headChips.length > 0 && visibleRows === 0;
-                const allCostNet = net(c) * allQty;
-                const allMarginPct = allCostNet > 0 ? allProfit / allCostNet : 0;
-                c.dataset.margin = redundant ? allMarginPct : marginPct;
-
-                const mtag = c.querySelector('.group-metrics > .tag:not(.profit-tag)');
-                if (visibleQty === 0) {
-                    mtag.className = 'tag is-light';
-                    mtag.textContent = MSG.margin + ' —';
-                } else {
-                    const mcls = marginPct > 0 ? 'is-success' : (marginPct < 0 ? 'is-danger' : 'is-light');
-                    mtag.className = 'tag ' + mcls + ' is-light';
-                    mtag.textContent = MSG.margin + ' ' + (marginPct >= 0 ? '+' : '−') + Math.abs(marginPct * 100).toFixed(0) + '%';
-                }
-
-                let pt = c.querySelector('.profit-tag');
-                if (!pt) { pt = document.createElement('span'); pt.className = 'tag profit-tag'; mtag.after(pt); }
-                if (visibleQty === 0) {
-                    pt.className = 'tag profit-tag is-light';
-                    pt.innerHTML = '<span class="icon is-small"><i class="fas fa-coins"></i></span><span>' + MSG.profit + ' —</span>';
-                } else {
-                    const pcls = profitNet > 1 ? 'is-success' : (profitNet < -1 ? 'is-danger' : 'is-light');
-                    pt.className = 'tag profit-tag ' + pcls + ' is-light';
-                    pt.innerHTML = '<span class="icon is-small"><i class="fas fa-coins"></i></span><span>' + MSG.profit + ' ' + (profitNet >= 0 ? '+' : '−') + fmt(Math.abs(profitNet)) + ' zł</span>';
-                }
-
-                c.dataset.redundant = redundant ? '1' : '0';
-                c.classList.toggle('is-redundant', redundant);
-                c.classList.toggle('is-dimmed', !isAccepted(c) || redundant);
-
-                const btn = c.querySelector('.accept-btn');
-                if (redundant) {
-                    btn.className = 'button accept-btn is-light';
-                    btn.innerHTML = '<span class="icon"><i class="fas fa-ban"></i></span><span>' + (isAccepted(c) ? MSG.redundant : MSG.coveredCheaper) + '</span>';
-                } else if (isAccepted(c)) {
-                    btn.className = 'button accept-btn is-success';
-                    btn.innerHTML = '<span class="icon"><i class="fas fa-check"></i></span><span>' + MSG.ordered + '</span>';
-                } else {
-                    btn.className = 'button accept-btn is-light';
-                    btn.innerHTML = '<span class="icon"><i class="far fa-square"></i></span><span>' + MSG.order + '</span>';
-                }
-
-                let mini = c.querySelector('.mini-row');
-                if (!mini) { mini = document.createElement('div'); mini.className = 'mini-row'; c.querySelector('.group-head').after(mini); }
-                c.classList.toggle('is-mini', redundant);
-                if (redundant) {
-                    const winnerProv = coveredAway.length ? coveredAway[0].by : '';
-                    const coveredByText = winnerProv ? MSG.coveredBy + ' ' + esc(winnerProv) : '';
-                    mini.innerHTML =
-                        '<span class="mini-title">' + esc(c.dataset.name) + '</span>' +
-                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + esc(c.dataset.providerLabel) + '</span>' +
-                        '<span class="tag is-light">' + MSG.margin + ' ' + (allMarginPct >= 0 ? '+' : '−') + Math.abs(allMarginPct * 100).toFixed(0) + '%</span>' +
-                        '<span class="mini-state">' + coveredByText + '</span>';
-                }
-            });
-
-            reorderClusters(winner);
-            recalcFooter();
-            if (!IS_WAREHOUSE) renderCoverage(winner);
-            updateCatSelection();
-            applyFilters();
-        }
-
-        function updateCatSelection() {
-            document.querySelectorAll('.cat-section').forEach(sec => {
-                const selected = Array.from(sec.querySelectorAll('.group-card')).filter(isAccepted).length;
-                const el = sec.querySelector('.cat-sel');
-                if (el) el.textContent = selected ? '✓ ' + selected + ' ' + MSG.selected : '';
-            });
-        }
-
-        function reorderClusters(winner) {
-            document.querySelectorAll('.cat-body').forEach(body => {
-                const cs = Array.from(body.querySelectorAll('.group-card'));
-                const childrenOf = new Map(), primaries = [];
-                cs.forEach(c => {
-                    if (c.dataset.redundant === '1') {
-                        const row = c.querySelector('tr[data-item]');
-                        const w = row ? winner[row.dataset.item] : null;
-                        if (w && w !== c) { if (!childrenOf.has(w)) childrenOf.set(w, []); childrenOf.get(w).push(c); }
-                        else primaries.push(c);
-                    } else primaries.push(c);
-                });
-                primaries.forEach(p => {
-                    body.appendChild(p);
-                    (childrenOf.get(p) || []).forEach(ch => body.appendChild(ch));
-                });
-                childrenOf.forEach((arr, w) => { if (!primaries.includes(w)) arr.forEach(ch => body.appendChild(ch)); });
-            });
-        }
-
-        function recalcFooter() {
-            let total = 0, totalProfit = 0; const byProv = {};
-            const labels = providerLabels();
-            Object.keys(COMMITTED_SUPPLIERS).forEach(p => { byProv[p] = COMMITTED_SUPPLIERS[p]; });
-            cards().forEach(c => {
-                const v = parseFloat(c.dataset.effvalue || 0);
-                if (isAccepted(c) && v > 0) {
-                    total += v;
-                    totalProfit += parseFloat(c.dataset.effprofit || 0);
-                    byProv[c.dataset.provider] = (byProv[c.dataset.provider] || 0) + v;
-                }
-            });
-            document.getElementById('grandTotal').textContent = fmt(total);
-            renderFooterProfit(total, totalProfit);
-            const bd = document.getElementById('provBreakdown'); bd.innerHTML = '';
-            Object.keys(byProv).sort().forEach(p => {
-                const el = document.createElement('span');
-                el.className = 'prov-pill'; el.style.setProperty('--accent', provColor(p));
-                el.innerHTML = '<strong>' + esc(labels[p] || p) + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
-            });
-            if (!Object.keys(byProv).length) bd.innerHTML = '<span class="has-text-grey is-size-7">' + MSG.nothingSelected + '</span>';
-        }
-
-        function renderFooterProfit(total, totalProfit) {
-            const box = document.getElementById('footerProfit');
-            if (!box) return;
-            const marginPct = total > 0 ? totalProfit / total : 0;
-            const neg = totalProfit < 0;
-            box.classList.toggle('neg', neg);
-            document.getElementById('footerMargin').classList.toggle('neg', neg);
-            const sign = totalProfit >= 0 ? '+' : '−';
-            document.getElementById('grandProfit').textContent = sign + fmt(Math.abs(totalProfit));
-            document.getElementById('grandMargin').textContent =
-                (marginPct >= 0 ? '+' : '−') + Math.abs(marginPct * 100).toFixed(0) + '%';
-        }
-
-        function renderCoverage(winner) {
-            const bar = document.getElementById('orderCoverage');
-            if (!bar) return;
-            const orders = {};
-            document.querySelectorAll('tr[data-item]').forEach(r => {
-                const ord = r.dataset.order, it = r.dataset.item;
-                if (!ord) return;
-                orders[ord] = orders[ord] || { items: new Set(), ref: r.dataset.ref, url: r.dataset.url };
-                orders[ord].items.add(it);
-            });
-            bar.innerHTML = '';
-            let partial = 0;
-            Object.keys(orders).sort().forEach(ord => {
-                const items = [...orders[ord].items];
-                const accepted = items.filter(it => winner[it]).length;
-                const total = items.length;
-                const ratio = accepted / total;
-                const cls = ratio === 1 ? 'full' : (ratio === 0 ? 'none' : 'partial');
-                if (cls === 'partial') partial++;
-                const winnerProviders = new Set(items.map(it => winner[it]).filter(Boolean).map(c => c.dataset.provider));
-                const split = winnerProviders.size > 1;
-                const icon = cls === 'full' ? 'fa-check-circle' : (cls === 'none' ? 'fa-circle' : 'fa-exclamation-circle');
-                const chip = document.createElement('span');
-                chip.className = 'order-chip ' + cls + (activeOrder === ord ? ' active' : '');
-                chip.onclick = () => focusOrder(ord);
-                chip.innerHTML = '<i class="fas ' + icon + '"></i><a class="ord-open" href="' + orders[ord].url + '" target="_blank" onclick="event.stopPropagation()"><strong>#' + orders[ord].ref + '</strong></a>' +
-                    (split ? '<span class="icon is-small" title="' + MSG.splitProviders + '"><i class="fas fa-code-branch"></i></span>' : '') +
-                    '<span class="bar"><i style="width:' + (ratio * 100) + '%; background:' + (cls === 'full' ? '#2ecc71' : cls === 'none' ? '#e74c3c' : '#f5a623') + ';"></i></span>' +
-                    '<span class="frac">' + accepted + '/' + total + '</span>';
-                bar.appendChild(chip);
-            });
-            const warn = document.getElementById('partialWarn');
-            if (partial > 0) { warn.style.display = ''; document.getElementById('partialWarnText').textContent = ' ' + MSG.partialWarn.replace('{0}', partial); }
-            else warn.style.display = 'none';
-        }
-
-        function initNetSlider() {
-            const lo = document.getElementById('fNetMin'), hi = document.getElementById('fNetMax');
-            const maxNet = Math.ceil(Math.max(0, ...cards().map(net)));
-            lo.max = maxNet; hi.max = maxNet;
-            lo.value = 0; hi.value = maxNet;
-            updateNetSlider();
-        }
-
-        function netRange() {
-            return [parseFloat(document.getElementById('fNetMin').value), parseFloat(document.getElementById('fNetMax').value)];
-        }
-
-        function updateNetSlider() {
-            const lo = document.getElementById('fNetMin'), hi = document.getElementById('fNetMax');
-            if (parseFloat(lo.value) > parseFloat(hi.value)) {
-                if (document.activeElement === hi) hi.value = lo.value; else lo.value = hi.value;
-            }
-            const [minV, maxV] = netRange();
-            const range = parseFloat(hi.max) || 1;
-            const fill = document.getElementById('fNetFill');
-            fill.style.left = (minV / range * 100) + '%';
-            fill.style.width = ((maxV - minV) / range * 100) + '%';
-            document.getElementById('fNetRangeVal').textContent = fmt(minV) + ' – ' + fmt(maxV) + ' zł';
-        }
-
-        function applyFilters() {
-            const [minNet, maxNet] = netRange();
-            cards().forEach(c => {
-                let show = true;
-                if (activeOrder && !cardOrders(c).includes(activeOrder)) show = false;
-                if (activeProviders.size && !activeProviders.has(c.dataset.provider)) show = false;
-                if (net(c) < minNet || net(c) > maxNet) show = false;
-                c.classList.toggle('is-hidden', !show);
-                c.classList.toggle('is-focus-match', !!activeOrder && cardOrders(c).includes(activeOrder));
-            });
-            document.querySelectorAll('.cat-section').forEach(sec => {
-                const visible = sec.querySelectorAll('.group-card:not(.is-hidden)').length;
-                sec.style.display = visible ? '' : 'none';
-            });
-            updateFiltersBtn();
-        }
-
-        /* meta-grouping by product category (ordered A-Z by label); within a category sort by target price desc */
-        function buildGroups() {
-            const wrap = document.getElementById('groups');
-            const byCat = {};
-            cards().forEach(c => {
-                c.style.setProperty('--accent', provColor(c.dataset.provider));
-                const cat = c.dataset.category || 'Other';
-                (byCat[cat] = byCat[cat] || []).push(c);
-            });
-            const cats = Object.keys(byCat).sort((a, b) => a.localeCompare(b));
-            wrap.innerHTML = '';
-            cats.forEach((cat, ci) => {
-                const list = byCat[cat].sort((a, b) => (parseFloat(b.dataset.targetprice)||0) - (parseFloat(a.dataset.targetprice)||0));
-                const sec = document.createElement('div');
-                sec.className = 'cat-section' + (ci === 0 ? '' : ' cat-collapsed');
-                sec.dataset.category = cat;
-                const head = document.createElement('div');
-                head.className = 'cat-header';
-                head.innerHTML = '<span class="icon chevron"><i class="fas fa-chevron-down"></i></span>' +
-                    '<span class="cat-name">' + cat + '</span>' +
-                    '<span class="tag cat-count">' + list.length + '</span>' +
-                    '<span class="cat-sel"></span>';
-                head.onclick = () => sec.classList.toggle('cat-collapsed');
-                const body = document.createElement('div');
-                body.className = 'cat-body';
-                list.forEach(c => body.appendChild(c));
-                sec.appendChild(head); sec.appendChild(body); wrap.appendChild(sec);
-            });
-        }
-
-        function submitFulfilment() {
-            const winner = computeWinners();
-            const container = document.getElementById('payload-container');
-            container.innerHTML = '';
-            const emptyWarn = document.getElementById('emptyWarn');
-            emptyWarn.style.display = 'none';
-
-            let entryIdx = 0;
-            cards().forEach(c => {
-                if (!isAccepted(c)) return;
-                const wonRows = Array.from(c.querySelectorAll('tr[data-item]')).filter(r => winner[r.dataset.item] === c);
-                if (wonRows.length === 0) return;
-
-                const ep = 'entries[' + entryIdx + ']';
-                addHidden(container, ep + '.accepted', 'true');
-                addHidden(container, ep + '.source.name', c.dataset.name);
-                addHidden(container, ep + '.source.category', c.dataset.category);
-                addHidden(container, ep + '.source.ean', c.dataset.ean);
-                addHidden(container, ep + '.source.mfn', c.dataset.mfn);
-                addHidden(container, ep + '.source.provider', c.dataset.provider);
-                addHidden(container, ep + '.source.qty', c.dataset.sourceqty);
-                addHidden(container, ep + '.source.priceNet', c.dataset.net);
-                addHidden(container, ep + '.source.priceGross', c.dataset.gross);
-
-                wonRows.forEach((r, j) => {
-                    const ap = ep + '.allocations[' + j + ']';
-                    addHidden(container, ap + '.orderId', r.dataset.order);
-                    addHidden(container, ap + '.orderItemId', r.dataset.itemid);
-                    addHidden(container, ap + '.orderItemQty', r.dataset.qty);
-                    addHidden(container, ap + '.orderItemPrice', r.dataset.price);
-                });
-                entryIdx++;
-            });
-
-            if (entryIdx === 0) {
-                container.innerHTML = '';
-                emptyWarn.style.display = '';
-                return;
-            }
-
-            const form = document.getElementById('fulfilment-form');
-            const action = document.getElementById('action-select').value;
-            const isSuperAdmin = document.getElementById('isSuperAdmin').value === 'true';
-            const storeId = document.getElementById('storeId').value;
-            const fulfilmentType = document.getElementById('fulfilmentType').value;
-            const type = isSuperAdmin ? 'orders' : fulfilmentType;
-            const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
-            form.action = basePath + '/' + type + '/fulfilment/' + action;
-
-            document.querySelectorAll('.footer-bar button').forEach(b => b.disabled = true);
-            form.submit();
-        }
-
-        function skipFulfilment() {
-            const form = document.getElementById('fulfilment-form');
-            document.getElementById('payload-container').innerHTML = '';
-            const isSuperAdmin = document.getElementById('isSuperAdmin').value === 'true';
-            const storeId = document.getElementById('storeId').value;
-            const basePath = isSuperAdmin ? '/dashboard/store/' + storeId : '/dashboard';
-            form.action = basePath + '/orders/fulfilment/skip';
-            document.querySelectorAll('.footer-bar button').forEach(b => b.disabled = true);
-            form.submit();
-        }
-
-        function addHidden(container, name, value) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = name;
-            input.value = value == null ? '' : value;
-            container.appendChild(input);
-        }
-
-        document.getElementById('fNetMin').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
-        document.getElementById('fNetMax').addEventListener('input', () => { updateNetSlider(); applyFilters(); });
-
-        buildGroups();
-        renderProviderFilter();
-        initNetSlider();
-        initVariantPicker();
-        render();
-    </script>
-
+            <aside class="cl-layout-side is-sticky">
+                <section class="cl-card" id="summary" aria-labelledby="summary-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{fulfilment.select.summary.title}"></h2></div>
+                    <!--/* one polite sentence a moment after the operator stops clicking, instead of every number announcing itself */-->
+                    <p class="cl-visually-hidden" role="status" data-cl-live></p>
+                    <dl class="cl-kv is-column cl-card-inset">
+                        <div th:if="${page.isOrders()}"><dt th:text="#{fulfilment.select.summary.items}"></dt>
+                            <dd class="is-numeric"><output data-cl-total-items></output></dd></div>
+                        <div class="cl-kv-total"><dt th:text="#{fulfilment.select.summary.cost}"></dt>
+                            <dd class="is-numeric"><output data-cl-total-cost>0,00</output> PLN<span class="cl-help" th:if="${!page.variants().isEmpty()}" th:text="#{fulfilment.select.summary.cost.help}"></span></dd></div>
+                        <div><dt th:text="#{fulfilment.select.summary.profit}"></dt>
+                            <dd class="is-numeric">
+                                <span th:if="${page.profitKnown()}" class="cl-profit" data-cl-total-profit-tone><output data-cl-total-profit></output> PLN</span>
+                                <span th:unless="${page.profitKnown()}" class="cl-profit is-unknown cl-tooltip is-end" tabindex="0" role="img"
+                                      th:attr="data-tooltip=#{fulfilment.select.profit.unknown}, aria-label=#{fulfilment.select.profit.unknown}">—</span>
+                            </dd></div>
+                        <div th:if="${page.profitKnown()}"><dt th:text="#{fulfilment.select.summary.margin}"></dt>
+                            <dd class="is-numeric"><output data-cl-total-margin>—</output></dd></div>
+                    </dl>
+                    <div class="cl-card-inset cl-by-supplier">
+                        <p class="cl-eyebrow" th:text="#{fulfilment.select.summary.suppliers}"></p>
+                        <ul class="cl-supplier-totals" data-cl-supplier-totals>
+                            <li th:each="s : ${page.suppliers()}" data-cl-supplier-total th:attr="data-provider=${s.provider()}" hidden>
+                                <span th:replace="~{fragments/supplier-pill :: pill(${s.label()}, ${s.color()}, ${s.warehouse()})}"></span>
+                                <span class="cl-num" data-cl-supplier-value>0,00</span>
+                            </li>
+                            <li th:each="s : ${page.committed()}" class="is-earlier">
+                                <span class="cl-supplier-line"><span th:replace="~{fragments/supplier-pill :: pill(${s.label()}, ${s.color()}, ${s.warehouse()})}"></span>
+                                    <span class="cl-muted" th:text="#{fulfilment.select.summary.earlier}"></span></span>
+                                <span class="cl-num" th:text="${T(pl.commercelink.web.orders.Money).format(s.amount())}"></span>
+                            </li>
+                            <li data-cl-supplier-empty class="cl-muted" th:text="#{fulfilment.select.summary.nothing}"></li>
+                        </ul>
+                    </div>
+                    <!--/* items no offer covers are not listed among the offers (client, 2026-10-09): one line names their
+                           orders, so a chip short of its total has a reason on the page */-->
+                    <div th:if="${!page.missing().isEmpty()}" class="cl-alert is-warn cl-summary-alert" role="note" data-cl-missing>
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{${page.missingKey()}(${page.missingItems()})}"></span><th:block
+                                th:if="${page.showOrderRefs()}"> <span th:text="#{fulfilment.select.missing.orders}"></span> <th:block
+                                th:each="m, mStat : ${page.missing()}"><a th:href="@{${m.href()}}" target="_blank" rel="noopener" th:text="${m.number()}"></a><th:block
+                                th:unless="${mStat.last}">, </th:block></th:block></th:block></p>
+                    </div>
+                    <div th:if="${page.isOrders()}" class="cl-alert is-warn cl-summary-alert" role="status" data-cl-partial hidden>
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text" data-cl-partial-text></p>
+                    </div>
+                    <div class="cl-card-footer is-stacked">
+                        <p class="cl-help is-warn" id="select-reason" data-cl-select-reason hidden th:text="#{fulfilment.select.reason}"></p>
+                        <button type="submit" class="cl-button is-primary" data-cl-needs-selection data-help="select-help-commit"
+                                th:formaction="@{${page.actions().commit()}}" aria-describedby="select-help-commit" th:text="#{fulfilment.select.commit}"></button>
+                        <p class="cl-help" id="select-help-commit" th:text="#{${page.commitHelpKey()}}"></p>
+                        <th:block th:if="${page.actions().canContinue()}">
+                            <button type="submit" class="cl-button" data-cl-needs-selection data-help="select-help-continue"
+                                    th:formaction="@{${page.actions().commitAndContinue()}}" aria-describedby="select-help-continue" th:text="#{fulfilment.select.continue}"></button>
+                            <p class="cl-help" id="select-help-continue" th:text="#{fulfilment.select.continue.help}"></p>
+                        </th:block>
+                        <th:block th:if="${page.actions().canSkip()}">
+                            <button type="submit" class="cl-button" data-cl-skip th:formaction="@{${page.actions().skip()}}" aria-describedby="select-help-skip">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-forward"></i></span>
+                                <span th:text="#{fulfilment.select.skip}"></span>
+                            </button>
+                            <p class="cl-help" id="select-help-skip" th:text="#{fulfilment.select.skip.help}"></p>
+                        </th:block>
+                    </div>
+                </section>
+            </aside>
+        </form>
+    </div>
+</section>
+<script th:src="@{/js/submit-once.js}" defer></script>
+<script th:src="@{/js/fulfilment-select.js}" defer></script>
 </div>
 
 </body>

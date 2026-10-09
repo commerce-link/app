@@ -32,6 +32,7 @@ import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationItem;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -79,6 +80,9 @@ class WarehouseController {
 
     @Autowired
     private SupplierLabels supplierLabels;
+
+    @Autowired
+    private FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
 
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam(required = false) List<String> categories,
@@ -304,7 +308,7 @@ class WarehouseController {
                    @RequestParam RestockScope scope,
                    @RequestParam(required = false) RestockPriceCategory restockPrice,
                    @RequestParam(required = false) boolean onlyMissingItems,
-                   Model model) {
+                   Model model, Locale locale) {
         List<RestockSuggestion> suggestions = restockSuggestionService.suggestForRestock(
                 getStoreId(), catalogId, categoryId, scope, onlyMissingItems, restockPrice);
 
@@ -322,8 +326,12 @@ class WarehouseController {
 
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 
+        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+
         model.addAttribute("form", fulfilmentForm);
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
+        model.addAttribute("supplierLabels", labels);
+        // without a budget every suggestion is priced at 100000 (getRestockPrice), so profit and margin would be fiction
+        model.addAttribute("page", fulfilmentSelectPageFactory.forRestock(fulfilmentForm, labels, restockPrice != null, locale));
 
         return "fulfilment";
     }
@@ -339,7 +347,8 @@ class WarehouseController {
     @PreAuthorize("hasRole('ADMIN')")
     String handleFulfilment(@ModelAttribute FulfilmentForm form) {
         manualWarehouseFulfilment.accept(getStoreId(), form);
-        return form.getRedirectUrl();
+        // fixed, not the form's redirectUrl: a posted value must not choose where the browser goes (spec B1)
+        return "redirect:/dashboard/warehouse?statuses=New";
     }
 
     @GetMapping("/dashboard/warehouse/items/destroyed")

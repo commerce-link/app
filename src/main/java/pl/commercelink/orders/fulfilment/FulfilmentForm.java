@@ -19,6 +19,10 @@ public class FulfilmentForm {
     private List<String> selectedOrders = new LinkedList<>();
     private List<FulfilmentGroup> entries = new LinkedList<>();
     private List<FulfilmentVariant> variants = new LinkedList<>();
+    private List<UnmatchedItem> unmatched = new LinkedList<>();
+    private List<String> skippedOrderIds = new LinkedList<>();
+    private String skippedGroups;
+    private int orderCountAtStart;
 
     public FulfilmentForm() {
 
@@ -140,6 +144,38 @@ public class FulfilmentForm {
 
     public List<String> getRemainingOrders() {
         return hasRemainingOrders() ? selectedOrders.subList(1, selectedOrders.size()) : new LinkedList<>();
+    }
+
+    public List<UnmatchedItem> getUnmatched() {
+        return unmatched;
+    }
+
+    public void setUnmatched(List<UnmatchedItem> unmatched) {
+        this.unmatched = unmatched;
+    }
+
+    public List<String> getSkippedOrderIds() {
+        return skippedOrderIds;
+    }
+
+    public void setSkippedOrderIds(List<String> skippedOrderIds) {
+        this.skippedOrderIds = skippedOrderIds;
+    }
+
+    public String getSkippedGroups() {
+        return skippedGroups;
+    }
+
+    public void setSkippedGroups(String skippedGroups) {
+        this.skippedGroups = skippedGroups;
+    }
+
+    public int getOrderCountAtStart() {
+        return orderCountAtStart;
+    }
+
+    public void setOrderCountAtStart(int orderCountAtStart) {
+        this.orderCountAtStart = orderCountAtStart;
     }
 
     public List<FulfilmentItem> getAcceptedFulfilmentItems() {

@@ -157,4 +157,31 @@ class NavigationModelTest {
         assertThat(page.active().key()).isEqualTo("inventory");
         assertThat(fragment.active().key()).isEqualTo("inventory");
     }
+
+    @Test
+    void theSupplierSelectionPageBelongsToFulfilment() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders/fulfilment/commitAndContinue");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("fulfilment");
+    }
+
+    @Test
+    void theSuperAdminsSupplierSelectionPageBelongsToTheFulfilmentQueue() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.SUPER_ADMIN, "/dashboard/store/uma2dqukxr/orders/fulfilment");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("fulfilmentQueue");
+    }
+
+    @Test
+    void theOrdersListStillLightsUpOrders() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders/abc-123");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("orders");
+    }
 }
