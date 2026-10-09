@@ -115,8 +115,10 @@ class WarehouseListService {
         List<WarehouseItem> counted = store.stream().filter(i -> statuses.contains(i.getStatus())).toList();
         boolean active = query.statuses().equals(statuses) && query.categories().isEmpty() && query.q() == null;
         String hint = hintKey != null ? text(locale, hintKey) : text(locale, "warehouse.tile.items", counted.size());
+        // an active tile clicked again switches its filter off, back to the default view (orders, deliveries, payments)
+        String href = active ? query.cleared().href() : query.withStatuses(statuses).href();
         return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
-                hint, query.withStatuses(statuses).href(), active);
+                hint, href, active);
     }
 
     private List<Option> statusOptions(WarehouseListQuery query, List<WarehouseItem> base, Locale locale) {

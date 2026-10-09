@@ -120,6 +120,23 @@ class WarehouseListServiceTest {
     }
 
     @Test
+    void activeTileLinksBackToTheDefaultViewSoASecondClickSwitchesItsFilterOff() {
+        // given
+        add("A", "GPU", Reserved, 1, 1);
+
+        // when
+        WarehousePageModel reserved = page("statuses", "Reserved", "sort", "name");
+        WarehousePageModel opened = page("sort", "name");
+
+        // then
+        // like the orders, deliveries and payments tiles: an active tile clicked again removes its own filter
+        WarehousePageModel.Tile reservedTile = reserved.tiles().get(2);
+        assertThat(reservedTile.active()).isTrue();
+        assertThat(reservedTile.href()).isEqualTo("/dashboard/warehouse?sort=name");
+        assertThat(opened.tiles().get(2).href()).isEqualTo("/dashboard/warehouse?statuses=Reserved&sort=name");
+    }
+
+    @Test
     void wmsTilesEndWithAllLinkingToEveryStatus() {
         // given
         add("A", "GPU", Ordered, 3, 1);
