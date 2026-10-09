@@ -17,9 +17,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.shipping.ShipmentCreationService;
 import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.shipping.ShippingUnavailableException;
@@ -51,6 +53,7 @@ class OrdersShippingControllerTest {
     @Mock private StoresRepository storesRepository;
     @Mock private MessageSource messageSource;
     @Mock private ShippingService shippingService;
+    @Mock private ShipmentCreationService shipmentCreationService;
 
     @InjectMocks
     private OrdersShippingController controller;
@@ -188,7 +191,7 @@ class OrdersShippingControllerTest {
         // given
         Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
-        when(shippingService.createShipping(any(ShippingForm.class), any(), any()))
+        when(shippingService.buildRequest(any(ShippingForm.class), any(), any()))
                 .thenThrow(new ShippingUnavailableException(STORE_ID));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
@@ -220,6 +223,25 @@ class OrdersShippingControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
         assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
                 .containsEntry("errorMessage", "shipping.error.all.defined");
-        verify(shippingService, never()).createShipping(any(ShippingForm.class), any(), any());
+        verify(shipmentCreationService, never()).start(any(), any(), any(), any());
+    }
+
+    @Test
+    void aBookingWhileAShipmentIsBeingCreatedIsRefused() {
+        // given: a creation in flight next to a shipment still without data
+        Shipment creating = new Shipment(ShipmentType.Courier);
+        creating.setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()));
+        Order order = orderWithShipments(creating, new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.error.creating");
+        verify(shipmentCreationService, never()).start(any(), any(), any(), any());
     }
 }

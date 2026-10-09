@@ -12,7 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.*;
 import pl.commercelink.shipping.AbstractShippingController;
-import pl.commercelink.shipping.ShipmentTrackingSubscriber;
+import pl.commercelink.shipping.ShipmentCreationCheckRequest;
+import pl.commercelink.shipping.ShipmentOwnerType;
 
 import java.time.LocalDate;
 import java.util.Collections;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.shipping.ShippingPageView;
-import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
@@ -32,14 +32,6 @@ public class OrdersShippingController extends AbstractShippingController {
     @Autowired
     private OrdersRepository ordersRepository;
 
-    @Autowired
-    private OrderLifecycle orderLifecycle;
-
-    @Autowired
-    private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
-
-    @Autowired
-    private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @GetMapping("")
     public String initiate(@PathVariable("orderId") String orderId, Model model,
@@ -75,8 +67,14 @@ public class OrdersShippingController extends AbstractShippingController {
         return refuseBooking(requireOrder(form.getShippingEntityId()));
     }
 
-    /** Every shipment already has its shipping data (a courier booked in another tab): nothing is left to book. */
+    /**
+     * A shipment is still being created (its number comes in a few seconds), or every shipment already has its shipping
+     * data (a courier booked in another tab): nothing is to be booked now.
+     */
     private static String refuseBooking(Order order) {
+        if (order.hasShipmentBeingCreated()) {
+            return "shipping.error.creating";
+        }
         return order.hasShipmentToBook() ? null : "shipping.error.all.defined";
     }
 
@@ -103,14 +101,11 @@ public class OrdersShippingController extends AbstractShippingController {
     }
 
     @Override
-    protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
-        Order order = requireOrder(form.getShippingEntityId());
-
-        order.replaceShipments(shipments);
-        shipmentTrackingSubscriber.subscribe(getStoreId(), order);
-
-        orderLifecycle.update(order);
-        orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
+    protected ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form) {
+        return ShipmentCreationCheckRequest.builder()
+                .ownerType(ShipmentOwnerType.ORDER)
+                .ownerId(form.getShippingEntityId())
+                .pickUpAddressId(form.getPickUpAddressId());
     }
 
     @Override

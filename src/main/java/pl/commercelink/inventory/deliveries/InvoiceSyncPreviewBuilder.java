@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.invoicing.InvoicePositionMatcher;
@@ -11,8 +12,11 @@ import pl.commercelink.invoicing.api.InvoicingProvider;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.orders.OrderFormats;
 
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -30,6 +34,9 @@ public class InvoiceSyncPreviewBuilder {
     public InvoiceSyncPreview build(String storeId, String deliveryId, String invoiceId) {
         Store store = storesRepository.findById(storeId);
         var delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (delivery == null) {
+            return null;
+        }
 
         InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
         if (invoicingProvider == null) {
@@ -48,7 +55,7 @@ public class InvoiceSyncPreviewBuilder {
         InvoicePositionMatcher matcher = new InvoicePositionMatcher(invoice.positions());
 
         List<InvoiceSyncPreview.Option> options = createOptions(invoice.positions(), invoice.currency());
-        List<InvoiceSyncPreview.Mapping> mappings = createMappings(delivery.getItems(), matcher);
+        List<InvoiceSyncPreview.Mapping> mappings = createMappings(inDeliveryOrder(delivery), matcher);
 
         InvoiceSyncPreview preview = new InvoiceSyncPreview();
         preview.setDeliveryId(delivery.getDeliveryId());
@@ -74,6 +81,19 @@ public class InvoiceSyncPreviewBuilder {
         preview.setInvoicePaymentToDate(invoice.paymentToDate() != null ? invoice.paymentToDate().toString() : null);
         preview.setDeliveryPaid(delivery.isPaid());
         preview.setDeliveryPaymentDueDate(delivery.getPaymentDueDate() != null ? delivery.getPaymentDueDate().toString() : null);
+        preview.setDeliveryShortId(delivery.getShortenedDeliveryId());
+        preview.setDeliverySupplier(delivery.getProvider());
+        preview.setDeliveryOrderedAt(OrderFormats.date(delivery.getOrderedAt()));
+        preview.setDeliveryAwaitingApproval(delivery.isAwaitingApproval());
+        preview.setDeliverySynced(delivery.isSynced());
+        preview.setDeliveryPayments(delivery.getPayments() == null ? List.of() : delivery.getPayments().stream()
+                .map(payment -> new InvoiceSyncPreview.PaymentLine(payment.getAmount(),
+                        StringUtils.firstNonBlank(payment.getReferenceNo(), payment.getName())))
+                .toList());
+        // the save stores the due date as days from the order date (InvoiceSyncService.updateDelivery)
+        if (invoice.paymentToDate() != null && delivery.getOrderedAt() != null) {
+            preview.setPaymentTermDays((int) ChronoUnit.DAYS.between(delivery.getOrderedAt().toLocalDate(), invoice.paymentToDate()));
+        }
 
         return preview;
     }
@@ -87,12 +107,20 @@ public class InvoiceSyncPreviewBuilder {
             option.setName(pos.name());
             option.setQty(pos.qty());
             option.setPriceNet(pos.price().netValue());
+            option.setTotalNet(pos.totalPrice().netValue());
             option.setCurrency(pos.price().currency() != null ? pos.price().currency() : currency);
-            option.setLabel(String.format("%d x %s (%.2f %s)", pos.qty(), pos.name(), pos.price().netValue(), option.getCurrency()));
             options.add(option);
         }
 
         return options;
+    }
+
+    // DeliveryItem.groupAndUnify lists the products in hash order; the rows follow the delivery, like its details page
+    private List<DeliveryItem> inDeliveryOrder(Delivery delivery) {
+        List<String> mfns = delivery.getAllocations().stream().map(Allocation::getMfn).distinct().toList();
+        return delivery.getItems().stream()
+                .sorted(Comparator.comparingInt(item -> mfns.indexOf(item.getMfn())))
+                .toList();
     }
 
     private List<InvoiceSyncPreview.Mapping> createMappings(List<DeliveryItem> deliveryItems, InvoicePositionMatcher matcher) {
@@ -105,7 +133,6 @@ public class InvoiceSyncPreviewBuilder {
             mapping.setUnitCost(item.getUnitCost());
 
             InvoicePositionMatcher.Match match = matcher.match(item.getUnitCost(), item.getOrderedQty());
-            mapping.setMatchQuality(match.quality());
             if (match.found()) {
                 mapping.setSelectedPositionId(match.positionId());
             }

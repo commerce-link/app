@@ -111,7 +111,7 @@ class ShippingTemplateTest {
         String html = render(variables);
 
         // then
-        assertThat(html).contains("<h1 class=\"cl-page-title\">Zamów kuriera</h1>")
+        assertThat(html).contains("<h1 class=\"cl-page-title\">Nadaj przesyłkę</h1>")
                 .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamówienie 3e373abc")
                 .contains("Przesyłka do klienta z zamówienia 3e373abc.")
                 .contains("class=\"cl-alert is-warn\"").contains("Klient poprosił o wysyłkę 2026-10-02.")
@@ -125,7 +125,7 @@ class ShippingTemplateTest {
                 .contains("Wybierz szablon paczek i kliknij „Wczytaj paczki”.")
                 .contains("Wyceń przesyłkę, żeby zobaczyć oferty przewoźników.")
                 .doesNotContain("id=\"shipping-parcels\"").doesNotContain("Wyceń przesyłkę</button>")
-                .doesNotContain("Zamów kuriera</button>").doesNotContain("data-cl-recipient-select")
+                .doesNotContain("Utwórz przesyłkę</button>").doesNotContain("Kuriera po paczkę zamówisz").doesNotContain("data-cl-recipient-select")
                 .doesNotContain("??");
     }
 
@@ -153,7 +153,8 @@ class ShippingTemplateTest {
                 .contains("value=\"dpd\" checked=\"checked\"").contains("23,5 PLN brutto")
                 .contains("value=\"ups\" disabled=\"disabled\"").contains("Niedostępna")
                 .contains("<span class=\"cl-choice-description is-warn\">Za ciężka paczka</span>")
-                .contains("class=\"cl-button is-primary\">Zamów kuriera</button>")
+                .contains("class=\"cl-button is-primary\">Utwórz przesyłkę</button>")
+                .contains("<p class=\"cl-help\">Kuriera po paczkę zamówisz potem przyciskiem „Zamów odbiór” na liście zamówień, razem z innymi paczkami tego przewoźnika.</p>")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/shipping/create\"")
                 .contains("<input type=\"hidden\" name=\"parcels[1].description\" value=\"\">")
                 .contains("<input type=\"hidden\" name=\"pickUpAddressId\" value=\"pickup-1\">")

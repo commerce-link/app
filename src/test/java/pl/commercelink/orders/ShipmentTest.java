@@ -131,4 +131,22 @@ class ShipmentTest {
         assertTrue(edited.getCancellation().hasCommand("cmd-1"));
         assertEquals(requested, edited.getCancellation().getRequestedAt());
     }
+
+    @Test
+    void aCreationPendingPastTheTimeoutCountsAsFailedButStillMatchesItsCommand() {
+        // given
+        Shipment fresh = new Shipment(ShipmentType.Courier);
+        fresh.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now().minusMinutes(9)));
+        Shipment stuck = new Shipment(ShipmentType.Courier);
+        stuck.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now().minusMinutes(11)));
+
+        // then
+        assertTrue(fresh.isCreating());
+        assertFalse(fresh.creationFailed());
+        assertTrue(fresh.awaitsProviderAnswer(LocalDateTime.now()));
+        assertFalse(stuck.isCreating());
+        assertTrue(stuck.creationFailed());
+        assertFalse(stuck.awaitsProviderAnswer(LocalDateTime.now()));
+        assertTrue(stuck.isCreationPendingFor("cmd-1"));
+    }
 }

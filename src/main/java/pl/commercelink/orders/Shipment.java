@@ -41,6 +41,17 @@ public class Shipment {
     /** The last cancel command of the courier order; null when none was sent. */
     @DynamoDBAttribute(attributeName = "cancellation")
     private CourierCancellation cancellation;
+    /** The shipping integration that created it (e.g. "furgonetka"); null for one typed by hand. */
+    @DynamoDBAttribute(attributeName = "provider")
+    private String provider;
+    /** The store's pickup address it leaves from; null for a customer return picked up at the customer. */
+    @DynamoDBAttribute(attributeName = "pickUpAddressId")
+    private String pickUpAddressId;
+    /** The creation command while the provider has not created the shipment; null once created. */
+    @DynamoDBAttribute(attributeName = "creation")
+    private ShipmentCreationState creation;
+    @DynamoDBAttribute(attributeName = "pickup")
+    private ShipmentPickup pickup;
 
     public Shipment() {
     }
@@ -200,6 +211,50 @@ public class Shipment {
         this.cancellation = cancellation;
     }
 
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getPickUpAddressId() { return pickUpAddressId; }
+    public void setPickUpAddressId(String pickUpAddressId) { this.pickUpAddressId = pickUpAddressId; }
+    public ShipmentCreationState getCreation() { return creation; }
+    public void setCreation(ShipmentCreationState creation) { this.creation = creation; }
+    public ShipmentPickup getPickup() { return pickup; }
+    public void setPickup(ShipmentPickup pickup) { this.pickup = pickup; }
+
+    /**
+     * The creation command still waits for its result. One PENDING past ProviderCommandTimeout.UNCONFIRMED_AFTER does
+     * not: nothing will settle it, so it counts as failed and the operator can remove it or book again.
+     */
+    @DynamoDBIgnore
+    public boolean isCreating() {
+        return creation != null && creation.isInProgress(LocalDateTime.now());
+    }
+
+    /** The creation failed, or was never confirmed (see isCreating). */
+    @DynamoDBIgnore
+    public boolean creationFailed() {
+        return creation != null && (creation.isFailed() || creation.isUnconfirmed(LocalDateTime.now()));
+    }
+
+    /**
+     * The placeholder of that very command, however old: a late result of a command nobody superseded still settles
+     * it, while a placeholder dropped by a new booking lets the late result go.
+     */
+    @DynamoDBIgnore
+    public boolean isCreationPendingFor(String commandId) {
+        return creation != null && creation.isPending() && creation.hasCommand(commandId);
+    }
+
+    @DynamoDBIgnore
+    public boolean awaitsPickup() {
+        // a delivered package was evidently collected, whoever brought it to the carrier
+        return creation == null && deliveredAt == null && pickup != null && pickup.isAwaiting();
+    }
+
+    @DynamoDBIgnore
+    public boolean isPickupPendingFor(String commandId) {
+        return pickup != null && pickup.isPendingFor(commandId);
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingSubscription() {
         return trackingSubscriptionStatus != null;
@@ -242,6 +297,16 @@ public class Shipment {
         return cancellation != null && cancellation.isUnresolved();
     }
 
+    /**
+     * A command of the provider (creation, pickup order, cancellation) has not been settled yet: its result will change
+     * the shipment within moments, so a page showing it asks again until it does.
+     */
+    @DynamoDBIgnore
+    public boolean awaitsProviderAnswer(LocalDateTime now) {
+        return isCancellationInProgress(now) || (creation != null && creation.isInProgress(now))
+                || (pickup != null && pickup.isInProgress(now));
+    }
+
     /** The shipment still waits for the result of that very cancel command. */
     @DynamoDBIgnore
     public boolean isCancellationPendingFor(String commandId) {
@@ -260,13 +325,16 @@ public class Shipment {
 
     /**
      * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
-     * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
+     * only "Cancel shipment" cancels it at the carrier, and a shipment that lost it could be removed and leave the
      * label orphaned. It keeps the state of its cancellation together with it.
      */
     public void inheritCourierOrderFrom(Shipment previous) {
         if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
             this.cancellation = previous.cancellation;
+            this.provider = previous.provider;
+            this.pickUpAddressId = previous.pickUpAddressId;
+            this.pickup = previous.pickup;
         }
     }
 
@@ -274,6 +342,6 @@ public class Shipment {
     @DynamoDBIgnore
     public boolean isPlaceholder() {
         return isEmpty(trackingNo) && isEmpty(trackingUrl) && isEmpty(externalId) && shippedAt == null
-                && deliveredAt == null;
+                && deliveredAt == null && creation == null;
     }
 }

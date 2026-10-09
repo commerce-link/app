@@ -58,6 +58,8 @@ public class RMAController {
 
     private final OpenRmaCoverage openRmaCoverage;
 
+    private final RmaShipmentsViewFactory rmaShipmentsViewFactory;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -171,7 +173,7 @@ public class RMAController {
     }
 
     @GetMapping("/dashboard/rma/{rmaId}")
-    public String showRmaDetail(@PathVariable String rmaId, Model model) {
+    public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
         RMAItemsForm rmaItemsForm = new RMAItemsForm(rmaItems);
@@ -189,6 +191,7 @@ public class RMAController {
         model.addAttribute("rmaItemsForm", rmaItemsForm);
         model.addAttribute("backofficeDomain", appDomain);
         model.addAttribute("isClosed", isClosed(rma));
+        model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
         model.addAttribute("refundDeliveryDefault",
@@ -568,6 +571,7 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShipments")
     public String updateShipments(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
+                                  @RequestParam(name = "shownPackages", required = false) List<String> shownPackages,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
@@ -575,18 +579,44 @@ public class RMAController {
             return blocked.get();
         }
         if (updatedRma.getShipments() != null) {
+            List<Shipment> previous = existingRma.getShipments();
+            // the form carries only what the operator edits and the package id: the courier order, its cancellation
+            // and pickup are taken from the shipment of that package, never from the form
+            Map<Shipment, String> packages = new IdentityHashMap<>();
+            updatedRma.getShipments().forEach(s -> {
+                packages.put(s, s.getExternalId());
+                s.setExternalId(null);
+            });
             List<Shipment> shipments = updatedRma.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
                     .collect(Collectors.toList());
+            shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            // a shipment being created has no data the form could show; dropping it would lose its label
+            List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
+            // nor could the form show a package created after it was opened: only packages it showed may be removed
+            Set<String> shown = new HashSet<>(packages.values().stream().filter(Objects::nonNull).toList());
+            if (shownPackages != null) {
+                shown.addAll(shownPackages);
+            }
+            List<Shipment> createdMeanwhile = previous.stream()
+                    .filter(s -> s.getCreation() == null && s.getExternalId() != null && !shown.contains(s.getExternalId()))
+                    .toList();
 
-            if (shipments.isEmpty()) {
+            if (shipments.isEmpty() && creations.isEmpty() && createdMeanwhile.isEmpty()) {
                 shipments.add(updatedRma.getShipments().get(0));
             }
+            shipments.addAll(createdMeanwhile);
+            shipments.addAll(creations);
 
             existingRma.setShipments(shipments);
         }
         rmaRepository.save(existingRma);
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private static Shipment shipmentOfPackage(List<Shipment> shipments, String externalId) {
+        return externalId == null ? null
+                : shipments.stream().filter(s -> externalId.equals(s.getExternalId())).findFirst().orElse(null);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/split")

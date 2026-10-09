@@ -13,6 +13,15 @@
                 <h1 class="cl-page-title" th:text="#{orders.list.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
+                    <!--/* "Zamów odbiór" for every package of the store waiting for a courier (orders and RMAs), with their
+                           number; back to this list as it is narrowed now, which list-page.js keeps up to date after an
+                           in-place change (data-cl-list-back) */-->
+                    <a th:if="${page.pickup() != null}" class="cl-button is-page-action" th:href="@{${page.pickup().href()}}" data-cl-list-back>
+                        <i class="fas fa-shipping-fast" aria-hidden="true"></i>
+                        <span th:text="#{shipping.pickup.title}"></span>
+                        <span th:if="${page.pickup().waiting() != null}" class="cl-button-count"><span class="cl-visually-hidden"
+                              th:text="#{orders.list.pickup.waiting}"></span><span th:text="${page.pickup().waiting()}"></span></span>
+                    </a>
                     <form method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-page-action-form">
                         <button type="submit" class="cl-button is-primary">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
