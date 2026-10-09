@@ -418,59 +418,6 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     }
 
 
-    public List<OrderIndexEntry> searchPastOrders(String storeId, PastOrderFilter filter) {
-        if (isNotBlank(filter.getOrderId())) {
-            Order order = findById(storeId, filter.getOrderId());
-            return order != null && (order.getStatus() == OrderStatus.Completed || order.getStatus() == OrderStatus.Cancelled)
-                    ? Collections.singletonList(OrderIndexEntry.fromOrder(order))
-                    : Collections.emptyList();
-        } else {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            Map<String, String> expressionAttributeNames = new HashMap<>();
-            StringBuilder filterExpression = new StringBuilder();
-
-            eav.put(":storeId", new AttributeValue().withS(storeId));
-            eav.put(":statusCompleted", new AttributeValue().withS(OrderStatus.Completed.name()));
-            eav.put(":statusCancelled", new AttributeValue().withS(OrderStatus.Cancelled.name()));
-            expressionAttributeNames.put("#status", "status");
-            appendFilter(filterExpression, "(#status = :statusCompleted OR #status = :statusCancelled)");
-
-            if (isNotBlank(filter.getEmail())) {
-                eav.put(":email", new AttributeValue().withS(filter.getEmail()));
-                appendFilter(filterExpression, "email = :email");
-            }
-
-            String keyCondition = "storeId = :storeId";
-            LocalDate orderedAtStart = filter.getOrderedAtStart();
-            LocalDate orderedAtEnd = filter.getOrderedAtEnd();
-            if (orderedAtStart != null && orderedAtEnd != null) {
-                keyCondition += " AND orderedAt BETWEEN :orderedAtStart AND :orderedAtEnd";
-                eav.put(":orderedAtStart", new AttributeValue().withS(orderedAtStart.toString()));
-                eav.put(":orderedAtEnd", new AttributeValue().withS(orderedAtEnd.toString()));
-            } else if (orderedAtStart != null) {
-                keyCondition += " AND orderedAt >= :orderedAtStart";
-                eav.put(":orderedAtStart", new AttributeValue().withS(orderedAtStart.toString()));
-            } else if (orderedAtEnd != null) {
-                keyCondition += " AND orderedAt <= :orderedAtEnd";
-                eav.put(":orderedAtEnd", new AttributeValue().withS(orderedAtEnd.toString()));
-            }
-
-            QueryRequest queryRequest = new QueryRequest()
-                    .withTableName("Orders")
-                    .withIndexName("StoreIdOrderedAtIndex")
-                    .withKeyConditionExpression(keyCondition)
-                    .withExpressionAttributeValues(eav)
-                    .withExpressionAttributeNames(expressionAttributeNames)
-                    .withFilterExpression(filterExpression.toString())
-                    .withScanIndexForward(false);
-
-            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
-            return queryResult.getItems().stream()
-                    .map(this::toOrderIndexEntry)
-                    .collect(Collectors.toList());
-        }
-    }
-
     public List<Order> findAllOrders(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));

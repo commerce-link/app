@@ -10500,3 +10500,24 @@ a.cl-link-button:hover {
 .cl-page .cl-effects > li.is-bad > :is(i, svg) {
     color: var(--cl-bad);
 }
+
+/* Orders archive (2026-10-09): shortcuts above the from–to fields of a date menu, and the line a batched text search
+   ends with when it stopped before the end of the history. */
+.cl-page .cl-date-presets {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+}
+.cl-page .cl-search-scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--cl-gap-related);
+    margin: 0;
+    padding: 12px 20px;
+    border-top: 1px solid var(--cl-line);
+    color: var(--cl-ink-2);
+    font-size: 13.5px;
+}
