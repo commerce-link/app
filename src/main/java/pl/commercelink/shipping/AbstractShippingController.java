@@ -47,6 +47,11 @@ public abstract class AbstractShippingController {
     @Autowired
     protected ShipmentCreationService shipmentCreationService;
 
+    /** The unpaid amount in whole grosze: the form must show 59.98, not the double's 59.980000000000004. */
+    protected static double roundedUnpaidAmount(Order order) {
+        return java.math.BigDecimal.valueOf(order.getUnpaidAmount()).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
+    }
+
     @PostMapping("/template")
     public String loadTemplates(@ModelAttribute ShippingForm form, Model model) {
         Store store = getStore();
@@ -62,7 +67,7 @@ public abstract class AbstractShippingController {
         double defaultCodAmount = 0;
         if (form.getShippingEntityType().equals("orders")) {
             Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
-            defaultCodAmount = order.getUnpaidAmount();
+            defaultCodAmount = roundedUnpaidAmount(order);
         }
         form.setCashOnDeliveryAmount(defaultCodAmount);
 

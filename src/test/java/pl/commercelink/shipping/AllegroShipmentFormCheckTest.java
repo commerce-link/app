@@ -23,7 +23,7 @@ class AllegroShipmentFormCheckTest {
 
     /** The store has a default bank account: only the form and the proposal decide. */
     static List<AllegroShipmentFormCheck.Problem> checkWithAccount(ShippingForm form, ShipmentProposal proposal) {
-        return AllegroShipmentFormCheck.check(form, proposal, true);
+        return AllegroShipmentFormCheck.check(form, proposal);
     }
 
     static ShippingForm form(int length, int width, int height, int weight, int insurance, Double cod) {
@@ -121,19 +121,14 @@ class AllegroShipmentFormCheckTest {
     }
 
     @Test
-    void cashOnDeliveryWithoutAStoreBankAccountIsRefused() {
-        // when
-        List<AllegroShipmentFormCheck.Problem> problems =
-                AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 920, 919.99), proposal(null, null), false);
-
-        // then
-        assertThat(problems).extracting(AllegroShipmentFormCheck.Problem::field, AllegroShipmentFormCheck.Problem::key)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("cashOnDeliveryAmount", "shipping.allegro.error.cod.noAccount"));
+    void cashOnDeliveryNeedsNoStoreBankAccount() {
+        // when / then
+        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 920, 919.99), proposal(null, null))).isEmpty();
     }
 
     @Test
-    void prepaidOrderNeedsNoBankAccount() {
+    void prepaidOrderIsNotRefused() {
         // when / then
-        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 100, null), proposal(null, null), false)).isEmpty();
+        assertThat(AllegroShipmentFormCheck.check(form(30, 20, 15, 2, 100, null), proposal(null, null))).isEmpty();
     }
 }

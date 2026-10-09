@@ -296,7 +296,7 @@ class OrdersShippingControllerTest {
         when(shippingIntegrationViews.allegro(any(), eq(order), any(), any())).thenReturn(new AllegroShippingView(
                 "Allegro One Box, One Kurier", "One by Allegro", "ALBOX-WAW-0231", "shipping.allegro.deliveryType.LOCKER",
                 "Katarzyna Wiśniewska", "limits", "cod", "insurance", "shipping.allegro.labelFormat.PDF_A6",
-                "/dashboard/store/shipping/allegro", null));
+                "/dashboard/store/shipping/allegro"));
     }
 
     @Test
@@ -398,38 +398,68 @@ class OrdersShippingControllerTest {
     }
 
     @Test
-    void createRefusesAllegroForOrderOutsideChoice() {
-        // given: a shop order; the post claims Wysyłam z Allegro anyway (a forged form)
+    void createForAnOrderOutsideTheAllegroChoiceReturnsToTheOrderWithTheUnavailableNotice() {
+        // given: a shop order; the post claims Wysyłam z Allegro anyway (a stale or forged form)
         Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
         when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
                 ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.allegroOnly", null),
                 ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(messageSource.getMessage(eq("shipping.integration.error.unavailable"), any(), any(Locale.class)))
+                .thenReturn("unavailable");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        // when / then
-        assertThatThrownBy(() -> controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
-                new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes())).containsEntry("errorMessage", "unavailable");
         verifyNoInteractions(shipmentCreationService);
         verify(shippingService, never()).buildAllegroRequest(any(), any(), any());
     }
 
     @Test
-    void createRefusesAllegroWhenItsProposalIsUnavailable() {
+    void createWhenTheAllegroProposalIsUnavailableReturnsToTheOrderWithTheUnavailableNotice() {
         // given: an Allegro order whose delivery method Allegro does not ship
         Order order = allegroOrder();
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
         when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
                 ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.proposal", "x"),
                 ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(messageSource.getMessage(eq("shipping.integration.error.unavailable"), any(), any(Locale.class)))
+                .thenReturn("unavailable");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        // when / then
-        assertThatThrownBy(() -> controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
-                new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes())).containsEntry("errorMessage", "unavailable");
         verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void theCashOnDeliveryAmountIsPrefilledRoundedToGrosze() {
+        // given: 79.98 - 20.0 is 59.980000000000004 in a double
+        Order order = allegroOrder();
+        order.setTotalPrice(79.98);
+        order.addPayment(new Payment("ref", "paid", PaymentSource.OnlinePayment, 20.0, 0));
+        assertThat(order.getUnpaidAmount()).isNotEqualTo(59.98);
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingForm form = (ShippingForm) model.get("shippingForm");
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(59.98);
     }
 
     @Test

@@ -24,8 +24,7 @@ public final class AllegroShipmentFormCheck {
     private AllegroShipmentFormCheck() {
     }
 
-    /** storeHasBankAccount: cash on delivery is paid out to the store's default bank account, so without one it is refused. */
-    public static List<Problem> check(ShippingForm form, ShipmentProposal proposal, boolean storeHasBankAccount) {
+    public static List<Problem> check(ShippingForm form, ShipmentProposal proposal) {
         List<Problem> problems = new ArrayList<>();
         List<ParcelForm> parcels = form.getCompleteParcels();
         if (parcels.isEmpty()) {
@@ -51,9 +50,6 @@ public final class AllegroShipmentFormCheck {
         if (proposal.maxCashOnDelivery() != null && cod.compareTo(proposal.maxCashOnDelivery()) > 0) {
             problems.add(new Problem("cashOnDeliveryAmount", "shipping.allegro.error.cod",
                     new Object[]{plain(proposal.maxCashOnDelivery())}));
-        }
-        if (form.isCashOnDelivery() && !storeHasBankAccount) {
-            problems.add(new Problem("cashOnDeliveryAmount", "shipping.allegro.error.cod.noAccount", new Object[0]));
         }
         BigDecimal insurance = BigDecimal.valueOf(parcel.getValue());
         // the insured value is whole zloty (ParcelForm#value): at least the cash on delivery rounded up

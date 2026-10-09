@@ -10,7 +10,6 @@ import org.springframework.context.MessageSource;
 import pl.commercelink.orders.Order;
 import pl.commercelink.shipping.api.DeliveryType;
 import pl.commercelink.shipping.api.ShipmentProposal;
-import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.Store;
 
 import java.util.List;
@@ -29,43 +28,6 @@ class ShippingIntegrationViewsTest {
     @Mock private ShippingProviderFactory shippingProviderFactory;
 
     private ShippingIntegrationViews views;
-
-    @Test
-    void codAccountIsTheDefaultBankAccountAsHolderAndIban() {
-        // given
-        views = new ShippingIntegrationViews(messageSource, shippingProviderFactory);
-        when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("text");
-        BankAccount account = new BankAccount();
-        account.setAccountHolder("Sklep Sp. z o.o.");
-        account.setIban("PL61109010140000071219812874");
-        Store store = new Store();
-        store.setStoreId("store-1");
-        store.addBankAccount(account, true);
-        ShipmentProposal proposal = ShipmentProposal.available("Method", null, null, DeliveryType.DOOR, List.of(), null, null);
-
-        // when
-        AllegroShippingView view = views.allegro(proposal, new Order("store-1"), store, Locale.ENGLISH);
-
-        // then
-        assertThat(view.codAccount()).isEqualTo("Sklep Sp. z o.o., PL61109010140000071219812874");
-    }
-
-    @Test
-    void storeWithoutABankAccountHasNoCodAccount() {
-        // given
-        views = new ShippingIntegrationViews(messageSource, shippingProviderFactory);
-        when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("text");
-        Store store = new Store();
-        store.setStoreId("store-1");
-        ShipmentProposal proposal = ShipmentProposal.available("Method", null, null, DeliveryType.DOOR, List.of(), null, null);
-
-        // when
-        AllegroShippingView view = views.allegro(proposal, new Order("store-1"), store, Locale.ENGLISH);
-
-        // then
-        assertThat(view.codAccount()).isNull();
-        assertThat(view.carrierName()).isNull();
-    }
 
     @Test
     void errorsOnOneFieldAreJoined() {

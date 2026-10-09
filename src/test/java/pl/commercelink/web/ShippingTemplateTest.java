@@ -330,7 +330,7 @@ class ShippingTemplateTest {
                 "Limity metody Allegro One Box, One Kurier: najwyżej 64 × 38 × 41 cm, najwyżej 25 kg. Jedna paczka w przesyłce.",
                 "Do zapłaty w zamówieniu: 919,99 PLN. Pobranie wypłaci Allegro. Najwyżej 5 000,00 PLN.",
                 "Co najmniej kwota pobrania, najwyżej 5 000,00 PLN.", "shipping.allegro.labelFormat.PDF_A6",
-                "/dashboard/store/shipping/allegro", "Sklep Sp. z o.o., PL61109010140000071219812874"));
+                "/dashboard/store/shipping/allegro"));
         variables.put("allegroErrors", Map.of());
         return variables;
     }
@@ -426,30 +426,13 @@ class ShippingTemplateTest {
     }
 
     @Test
-    void cashOnDeliveryShowsTheStoreBankAccountReadOnly() {
+    void cashOnDeliveryTellsThatAllegroPaysItOutToTheSellersAllegroFunds() {
         // when
         String html = render(allegroModel());
 
         // then
-        assertThat(html).contains("id=\"allegro-cod-account\"")
-                .contains("Pobranie wpłynie na konto sklepu: Sklep Sp. z o.o., PL61109010140000071219812874.")
-                .doesNotContain("allegro-cod-no-account");
-    }
-
-    @Test
-    void storeWithoutABankAccountGetsAWarningInTheCashOnDeliveryGroup() {
-        // given
-        Map<String, Object> variables = allegroModel();
-        AllegroShippingView view = (AllegroShippingView) variables.get("allegroShipping");
-        variables.put("allegroShipping", new AllegroShippingView(view.methodName(), view.carrierName(), view.pointCode(),
-                view.deliveryTypeKey(), view.recipient(), view.limits(), view.codHelp(), view.insuranceHelp(),
-                view.labelFormatKey(), view.settingsHref(), null));
-
-        // when
-        String html = render(variables);
-
-        // then
-        assertThat(html).contains("id=\"allegro-cod-no-account\"").contains("Sklep nie ma konta bankowego")
-                .doesNotContain("allegro-cod-account\"");
+        assertThat(html).contains("id=\"allegro-cod-payout\"")
+                .contains("Pobranie wypłaci Allegro na Twoje środki w Allegro.")
+                .doesNotContain("konto sklepu").doesNotContain("konta bankowego");
     }
 }

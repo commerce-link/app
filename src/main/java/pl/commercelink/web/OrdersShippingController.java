@@ -137,7 +137,7 @@ public class OrdersShippingController extends AbstractShippingController {
                 : shippingService.retrieveParcelsListBasedOnPackageTemplate(order.getTotalPrice(), templateId, store);
         ParcelForm parcel = parcels.isEmpty() ? ParcelForm.empty() : parcels.get(0);
         parcel.setType("package");
-        double unpaid = order.getUnpaidAmount();
+        double unpaid = roundedUnpaidAmount(order);
         if (unpaid > 0) {
             form.setCashOnDelivery(buyerChoseCashOnDelivery(order, proposal));
             form.setCashOnDeliveryAmount(unpaid);
@@ -176,7 +176,7 @@ public class OrdersShippingController extends AbstractShippingController {
     /**
      * "Utwórz przesyłkę" of Wysyłam z Allegro. The integration must be one the order can ship through right now (the
      * same choice the page showed: an order placed on Allegro whose method Allegro accepts); a post outside it is a
-     * forged or long-stale form and is answered with 400 before Allegro is asked for anything. Limits are checked
+     * long-stale or forged form and is sent back to the order with a notice before Allegro is asked for anything. Limits are checked
      * first; a refused field re-renders the form with its reason.
      */
     @PostMapping("/allegro/create")
@@ -194,12 +194,15 @@ public class OrdersShippingController extends AbstractShippingController {
         Store store = getStore();
         List<ShippingIntegrationOption> options = shippingIntegrationChoice.forOrder(store, order);
         model.addAttribute("integrationOptions", options);
+        // a post outside the page's own choice (a stale tab, a forged form) lands on the order with the same notice as a refused start
         ShipmentProposal proposal = ShippingIntegrationChoice.availableNamed(options, ShippingIntegrationChoice.ALLEGRO)
-                .map(ShippingIntegrationOption::proposal)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Order " + orderId + " cannot be shipped through Wysyłam z Allegro"));
-        List<AllegroShipmentFormCheck.Problem> problems =
-                AllegroShipmentFormCheck.check(form, proposal, store.getDefaultBankAccount() != null);
+                .map(ShippingIntegrationOption::proposal).orElse(null);
+        if (proposal == null) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("shipping.integration.error.unavailable", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+        List<AllegroShipmentFormCheck.Problem> problems = AllegroShipmentFormCheck.check(form, proposal);
         if (!problems.isEmpty()) {
             model.addAttribute("allegroErrors", shippingIntegrationViews.errors(problems, locale));
             return renderShippingForm(store, form, retrieveShippingDetailsList(form), model);

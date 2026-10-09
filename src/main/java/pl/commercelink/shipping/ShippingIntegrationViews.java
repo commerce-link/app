@@ -9,7 +9,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.api.PackageOption;
 import pl.commercelink.shipping.api.ShipmentProposal;
-import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
@@ -19,8 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** Builds what the shipping page shows about the integrations: the "Wyślij przez" card and the Allegro form. */
 @Slf4j
@@ -56,17 +53,7 @@ public class ShippingIntegrationViews {
         return new AllegroShippingView(proposal.methodName(), AllegroCarrierNames.displayName(proposal.carrierId()),
                 point, deliveryTypeKey, recipient(order.getShippingDetails()), limits(proposal, locale),
                 codHelp(order, proposal, locale), insuranceHelp(proposal, locale),
-                "shipping.allegro.labelFormat." + labelFormat(store), "/dashboard/store/shipping/allegro", codAccount(store));
-    }
-
-    /** The default bank account ShippingService sends with the cash on delivery, as "holder, IBAN"; null without one. */
-    private static String codAccount(Store store) {
-        BankAccount account = store.getDefaultBankAccount();
-        if (account == null) {
-            return null;
-        }
-        return Stream.of(account.getAccountHolder(), account.getIban()).filter(StringUtils::isNotBlank)
-                .collect(Collectors.joining(", "));
+                "shipping.allegro.labelFormat." + labelFormat(store), "/dashboard/store/shipping/allegro");
     }
 
     /** The reasons of the Allegro form, by field, in the operator's language; several on one field are joined. */
