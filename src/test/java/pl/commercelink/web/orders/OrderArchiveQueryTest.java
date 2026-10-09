@@ -137,4 +137,17 @@ class OrderArchiveQueryTest {
         assertThat(q.q()).hasSize(100);
         assertThat(q.statuses()).isEqualTo(Set.of(OrderStatus.Completed, OrderStatus.Cancelled));
     }
+
+    @Test
+    void searchCutAtTheLimitKeepsNoTrailingSpaceAndSurvivesARoundTrip() {
+        // given
+        String text = "a".repeat(99) + " " + "more";
+
+        // when
+        OrderArchiveQuery q = OrderArchiveQuery.parse(params("q", text));
+
+        // then
+        assertThat(q.q()).isEqualTo("a".repeat(99));
+        assertThat(OrderArchiveQuery.parse(params("q", q.q()))).isEqualTo(q);
+    }
 }

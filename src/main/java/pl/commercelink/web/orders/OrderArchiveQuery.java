@@ -56,7 +56,7 @@ public record OrderArchiveQuery(OrderStatus status, String q, Period period, Loc
         if (status != null && !CLOSED.contains(status)) {
             status = null;
         }
-        q = StringUtils.trimToNull(q) == null ? null : StringUtils.left(q.trim(), MAX_Q);
+        q = StringUtils.trimToNull(q) == null ? null : StringUtils.left(q.trim(), MAX_Q).trim();
         if (from != null && to != null && from.isAfter(to)) {
             LocalDate earlier = to;
             to = from;

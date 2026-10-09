@@ -34,7 +34,18 @@ class OrderBackLinkTest {
         // when / then
         assertThat(OrderBackLink.sanitize("/dashboard/warehouse")).isEqualTo(OrderBackLink.LIST);
         assertThat(OrderBackLink.sanitize("/dashboard/orders?q=a//b")).isEqualTo(OrderBackLink.LIST);
-        assertThat(OrderBackLink.sanitize("/dashboard/orders?q=" + "x".repeat(300))).isEqualTo(OrderBackLink.LIST);
+        assertThat(OrderBackLink.sanitize("/dashboard/orders?q=" + "x".repeat(1100))).isEqualTo(OrderBackLink.LIST);
         assertThat(OrderBackLink.sanitize("/dashboard/orders?status=New&page=2")).isEqualTo("/dashboard/orders?status=New&page=2");
+    }
+
+    @Test
+    void keepsALongArchiveAddressWithSearchAndCursor() {
+        // given
+        String href = "/dashboard/orders/archive?status=Completed&q=" + "%C5%82".repeat(95) + "&period=year&after=" + "x".repeat(120) + "&offset=50";
+
+        // when / then
+        assertThat(href.length()).isGreaterThan(500);
+        assertThat(OrderBackLink.sanitize(href)).isEqualTo(href);
+        assertThat(OrderBackLink.sanitize("/dashboard/orders/archive?q=" + "x".repeat(1000))).isEqualTo(OrderBackLink.LIST);
     }
 }

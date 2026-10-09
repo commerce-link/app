@@ -6,11 +6,14 @@ public final class OrderBackLink {
     public static final String LIST = "/dashboard/orders";
     public static final String ARCHIVE = OrderArchiveQuery.PATH;
 
+    // an archive address carries a search text of up to 100 characters (encoded) and a cursor
+    private static final int MAX_LENGTH = 1000;
+
     private OrderBackLink() {
     }
 
     public static String sanitize(String back) {
-        if (back == null || back.length() > 300 || back.contains("//")) {
+        if (back == null || back.length() > MAX_LENGTH || back.contains("//")) {
             return LIST;
         }
         return own(back, LIST) || own(back, ARCHIVE) ? back : LIST;
