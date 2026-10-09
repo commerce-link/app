@@ -10916,7 +10916,7 @@ a.cl-link-button:hover {
         background: var(--cl-chip-hover);
     }
 
-    .cl-page .cl-alt-fold-toggle:not([aria-disabled="true"]):hover {
+    .cl-page .cl-alt-fold-toggle:hover {
         text-decoration: underline;
     }
 }
@@ -11104,26 +11104,19 @@ a.cl-link-button:hover {
 
 .cl-page .cl-offer-toggle .cl-offer-toggle-off,
 .cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-on,
-.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-alt,
-.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) .cl-offer-toggle-kept {
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-alt {
     display: inline-flex;
 }
 
 .cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-off,
-.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-off,
-.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) :is(.cl-offer-toggle-on, .cl-offer-toggle-alt) {
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-off {
     display: none;
 }
 
-/* ticked but beaten: it orders nothing, so it must not look like the winner's filled button */
+/* covered cheaper: a smaller "Zamów tę" (a ticked offer is never covered: the script unticks it) */
 .cl-page tr.is-covered .cl-offer-toggle {
     min-height: 32px;
     font-size: 13px;
-}
-
-.cl-page tr.is-covered .cl-offer-toggle:has(input:checked) {
-    background: var(--cl-accent-soft);
-    color: var(--cl-accent-ink);
 }
 
 /* Covered cheaper: one compact line nested under its winner — a connector, the supplier, how much dearer (or why
@@ -11219,21 +11212,6 @@ a.cl-link-button:hover {
     font-weight: 600;
     color: var(--cl-accent-ink);
     cursor: pointer;
-}
-
-.cl-page .cl-alt-fold-toggle[aria-disabled="true"] {
-    color: var(--cl-ink-2);
-    cursor: default;
-}
-
-/* a lock instead of the chevron while a ticked offer under it keeps the fold open */
-.cl-page .cl-alt-fold-toggle .cl-fold-lock,
-.cl-page .cl-alt-fold-toggle[aria-disabled="true"] .cl-fold-open {
-    display: none;
-}
-
-.cl-page .cl-alt-fold-toggle[aria-disabled="true"] .cl-fold-lock {
-    display: inline-block;
 }
 
 .cl-page .cl-alt-fold-toggle:focus-visible {

@@ -41,7 +41,7 @@ class FulfilmentSelectScriptContractTest {
 
         // then
         assertThat(used).contains("dearer", "fold", "ratio", "money", "chipFilter", "chipFilterSplit", "categoryChosen",
-                "selectVisible", "clearAll", "clearMatching", "coveredOff", "foldPlain", "foldLocked", "swapOrders", "swapItems",
+                "selectVisible", "clearAll", "clearMatching", "coveredOff", "foldPlain", "swapOrders", "swapItems",
                 "liveItems", "liveCost", "liveProfit", "rangeCount", "rangeNoMin", "rangeNoMax");
         assertThat(used).allSatisfy(key -> assertThat(texts).as(key).contains(dataAttribute(key)));
         assertThat(texts).doesNotContain("data-category=");
@@ -58,6 +58,18 @@ class FulfilmentSelectScriptContractTest {
                 .contains("'cl-alt-fold'").contains("'cl-alt-fold-toggle'").contains("aria-controls")
                 .contains("aria-labelledby").doesNotContain("data-cl-select-all");
         assertThat(js).doesNotContain("innerHTML").doesNotContain("insertAdjacentHTML").doesNotContain("outerHTML");
+    }
+
+    @Test
+    void anOfferThatOrdersNothingIsUntickedAtEveryChange() throws Exception {
+        // when
+        String js = Files.readString(SCRIPT);
+
+        // then
+        String changed = js.substring(js.indexOf("function changed()"));
+        assertThat(changed.substring(0, changed.indexOf('}'))).contains("untickIdle();");
+        assertThat(js).doesNotContain("coveredOn").doesNotContain("foldLocked").doesNotContain("'kept'")
+                .doesNotContain("aria-disabled");
     }
 
     @Test

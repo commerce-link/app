@@ -319,7 +319,7 @@ class FulfilmentSelectRenderingTest {
         String dear = row(html, "AB-k2");
         String lastCell = dear.substring(dear.lastIndexOf("<td"));
         assertThat(lastCell).contains("<label class=\"cl-offer-toggle\">").contains("data-cl-offer-check")
-                .contains("Zamawiam").contains("Zamów").contains("Zamów tę").contains("Zaznaczona");
+                .contains("Zamawiam").contains("Zamów").contains("Zamów tę").doesNotContain("Zaznaczona");
         assertThat(lastCell.indexOf("<label")).isLessThan(lastCell.indexOf("data-cl-offer-check"));
         assertThat(lastCell.indexOf("data-cl-offer-check")).isLessThan(lastCell.indexOf("</label>"));
         assertThat(html).doesNotContain("cl-table-check").doesNotContain("data-cl-select-all");
@@ -337,7 +337,7 @@ class FulfilmentSelectRenderingTest {
         String cheap = row(html, "Elko-k1");
         assertThat(cheap).contains("aria-labelledby=\"offers-category-1-o0-on offers-category-1-o0-name\"")
                 .contains("id=\"offers-category-1-o0-on\"").contains("id=\"offers-category-1-o0-off\"")
-                .contains("id=\"offers-category-1-o0-alt\"").contains("id=\"offers-category-1-o0-kept\"")
+                .contains("id=\"offers-category-1-o0-alt\"").doesNotContain("offers-category-1-o0-kept")
                 .contains("<span class=\"cl-visually-hidden\" id=\"offers-category-1-o0-name\">")
                 .doesNotContain("aria-label=\"Zamów: ");
         assertThat(row(html, "AB-k2")).contains("aria-labelledby=\"offers-category-1-o1-off offers-category-1-o1-name\"");

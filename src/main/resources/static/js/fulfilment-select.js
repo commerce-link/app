@@ -120,7 +120,6 @@
     var partialState = null;
     // per winner (group id): whether its dearer offers are unfolded, and which of them were ticked at the last render
     var unfolded = {};
-    var tickedUnder = {};
     var foldRows = {};
 
     function beats(a, b) {
@@ -148,9 +147,8 @@
         return Math.round((offer.net - winner.net) * 100);
     }
 
-    // a ticked covered offer orders nothing and says who takes its items; an unticked one says how much dearer it is
-    // than the offer it sits under (net, per piece), the amount in the bad colour, or only who covers it when it is
-    // not dearer in net
+    // a covered offer says how much dearer it is than the offer it sits under (net, per piece), the amount in the bad
+    // colour, or only who covers it when it is not dearer in net
     function renderCovered(offer, winner, beaters) {
         var covered = offer.row.querySelector('[data-cl-covered]');
         var key = offer.row.querySelector('th.cl-table-key');
@@ -163,8 +161,8 @@
             return;
         }
         var cents = dearerCents(offer, winner[offer.allocations[0].key]);
-        if (offer.check.checked || cents <= 0) {
-            covered.textContent = format(offer.check.checked ? texts.coveredOn : texts.coveredOff, beaters.join(', '));
+        if (cents <= 0) {
+            covered.textContent = format(texts.coveredOff, beaters.join(', '));
             return;
         }
         var template = String(texts.dearer);
@@ -176,10 +174,10 @@
         covered.appendChild(amount);
     }
 
-    // WCAG 2.5.3: the checkbox is named by the toggle text on screen ("Zamawiam", "Zamów", "Zamów tę", "Zaznaczona")
-    // followed by the offer and the supplier; CSS picks the same text from the same two facts
+    // WCAG 2.5.3: the checkbox is named by the toggle text on screen ("Zamawiam", "Zamów", "Zamów tę") followed by the
+    // offer and the supplier; CSS picks the same text from the same two facts
     function renderToggleName(offer) {
-        var state = offer.covered ? (offer.check.checked ? 'kept' : 'alt') : (offer.check.checked ? 'on' : 'off');
+        var state = offer.check.checked ? 'on' : (offer.covered ? 'alt' : 'off');
         var text = offer.check.parentNode.querySelector('.cl-offer-toggle-' + state);
         offer.check.setAttribute('aria-labelledby', text.id + ' ' + offer.nameId);
     }
@@ -251,29 +249,14 @@
             button.type = 'button';
             button.className = 'cl-alt-fold-toggle';
             var icon = document.createElement('i');
-            icon.className = 'fas fa-chevron-down cl-fold-open';
+            icon.className = 'fas fa-chevron-down';
             icon.setAttribute('aria-hidden', 'true');
-            // a locked fold shows a lock instead of the chevron (CSS picks one by aria-disabled)
-            var lock = document.createElement('i');
-            lock.className = 'fas fa-lock cl-fold-lock';
-            lock.setAttribute('aria-hidden', 'true');
             var label = document.createElement('span');
             button.appendChild(icon);
-            button.appendChild(lock);
             button.appendChild(label);
-            // why a locked fold does not close, for screen readers (aria-describedby) and on hover (title)
-            var reasonText = document.createElement('span');
-            reasonText.className = 'cl-visually-hidden';
-            reasonText.id = parent.row.id + '-fold-locked';
-            reasonText.textContent = texts.foldLocked;
             cell.appendChild(button);
-            cell.appendChild(reasonText);
             row.appendChild(cell);
             button.addEventListener('click', function () {
-                // a group holding a ticked offer stays open (aria-disabled): folding it would hide part of the selection
-                if (button.getAttribute('aria-disabled') === 'true') {
-                    return;
-                }
                 unfolded[parent.id] = button.getAttribute('aria-expanded') !== 'true';
                 render();
             });
@@ -283,7 +266,7 @@
     }
 
     // a covered offer moves under the offer that wins its first item, as on the old page, behind one fold row that is
-    // closed until the operator opens it or ticks one of the offers under it
+    // closed until the operator opens it
     function reorder(winner) {
         var focused = document.activeElement;
         var used = {};
@@ -327,21 +310,8 @@
                 }
                 var fold = foldRow(primary);
                 used[primary.id] = true;
-                var ticked = children.filter(function (child) {
-                    return child.check.checked;
-                }).map(function (child) {
-                    return child.id;
-                });
-                var before = tickedUnder[primary.id] || [];
-                if (ticked.some(function (id) {
-                    return before.indexOf(id) < 0;
-                })) {
-                    unfolded[primary.id] = true;
-                }
-                tickedUnder[primary.id] = ticked;
-                // the focus never lands on a row that folds away, and a ticked offer is never folded out of sight
-                var locked = ticked.length > 0;
-                var open = locked || unfolded[primary.id] === true || children.some(function (child) {
+                // the focus never lands on a row that folds away
+                var open = unfolded[primary.id] === true || children.some(function (child) {
                     return child.row.contains(focused);
                 });
                 var dearer = children.map(function (child) {
@@ -354,15 +324,6 @@
                     ? format(texts.fold, children.length, money(Math.min.apply(null, dearer) / 100))
                     : format(texts.foldPlain, children.length);
                 fold.button.setAttribute('aria-expanded', String(open));
-                if (locked) {
-                    fold.button.setAttribute('aria-disabled', 'true');
-                    fold.button.setAttribute('aria-describedby', primary.row.id + '-fold-locked');
-                    fold.button.title = texts.foldLocked;
-                } else {
-                    fold.button.removeAttribute('aria-disabled');
-                    fold.button.removeAttribute('aria-describedby');
-                    fold.button.removeAttribute('title');
-                }
                 fold.button.setAttribute('aria-controls', children.map(function (child) {
                     return child.row.id;
                 }).join(' '));
@@ -381,7 +342,6 @@
             if (!used[id]) {
                 foldRows[id].row.remove();
                 delete foldRows[id];
-                delete tickedUnder[id];
             }
         });
     }
@@ -764,10 +724,13 @@
     // one button: it ticks the offers on screen while one of them is unticked; otherwise it clears every ticked offer
     // the filters let through, in a collapsed category or a closed fold too, like the old "Odznacz wszystkie", so
     // "clear, then pick by hand" never saves a suggestion left out of sight. Offers the filters hide are never changed.
+    // an unticked offer covered by a cheaper ticked one would be unticked again at once, so only the others count
+    function tickable(offer) {
+        return !offer.check.checked && !offer.covered;
+    }
+
     function selectVisibleMode() {
-        if (shownOffers().some(function (offer) {
-            return !offer.check.checked;
-        })) {
+        if (shownOffers().some(tickable)) {
             return 'tick';
         }
         return offers.some(function (offer) {
@@ -823,7 +786,22 @@
         applyFilters();
     }
 
+    // One ticked offer per item: an offer whose every item a cheaper ticked offer takes orders nothing, so it is
+    // unticked instead of staying ticked as a silent reserve (user's decision of 2026-10-09). An offer that still wins
+    // one of its items stays ticked.
+    function untickIdle() {
+        var winner = winners();
+        offers.forEach(function (offer) {
+            if (offer.check.checked && offer.allocations.length > 0 && !offer.allocations.some(function (allocation) {
+                return winner[allocation.key] === offer;
+            })) {
+                offer.check.checked = false;
+            }
+        });
+    }
+
     function changed() {
+        untickIdle();
         matchVariant();
         render();
     }
@@ -958,7 +936,7 @@
             var mode = selectVisibleMode();
             swapped = null;
             if (mode === 'tick') {
-                shownOffers().forEach(function (offer) {
+                shownOffers().filter(tickable).forEach(function (offer) {
                     offer.check.checked = true;
                 });
             } else if (mode === 'clear') {
