@@ -29,6 +29,24 @@ class FulfilmentSelectStylesContractTest {
     }
 
     @Test
+    void thePriceSliderTakesThePointerOnlyOnItsThumbsAndGrowsThemForTouch() throws Exception {
+        // given
+        String css = section();
+
+        // when
+        String input = ruleBody(css, ".cl-page .cl-range input[type=\"range\"]");
+        String thumb = ruleBody(css, ".cl-page .cl-range input[type=\"range\"]::-webkit-slider-thumb");
+        int touch = css.indexOf("@media screen and (max-width: 1023px) {\n    .cl-page .cl-range input[type=\"range\"]::-webkit-slider-thumb {");
+
+        // then
+        assertThat(input).contains("pointer-events: none;").contains("height: 44px;");
+        assertThat(thumb).contains("pointer-events: auto;").contains("var(--cl-accent)");
+        assertThat(ruleBody(css, ".cl-page .cl-filter-menu-dates.is-pair")).contains("repeat(2, minmax(0, 1fr))");
+        assertThat(touch).as("the touch thumb block").isNotNegative();
+        assertThat(ruleBody(css.substring(touch), ".cl-page .cl-range input[type=\"range\"]::-webkit-slider-thumb")).contains("width: 28px;");
+    }
+
+    @Test
     void thePaletteIsSolidTokensWithWhiteText() throws Exception {
         // given
         String css = section();

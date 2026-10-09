@@ -84,7 +84,8 @@
                           data-select-visible=#{fulfilment.select.list.selectVisible}, data-clear-all=#{fulfilment.select.list.clearAll},
                           data-clear-matching=#{fulfilment.select.list.clearMatching},
                           data-swap-orders=#{fulfilment.select.swap.orders}, data-swap-items=#{fulfilment.select.swap.items},
-                          data-live-items=#{fulfilment.select.live.items}, data-live-cost=#{fulfilment.select.live.cost}, data-live-profit=#{fulfilment.select.live.profit}"></div>
+                          data-range-count=#{fulfilment.select.filter.price.count}, data-range-no-min=#{fulfilment.select.filter.price.noMin},
+                          data-range-no-max=#{fulfilment.select.filter.price.noMax}, data-live-items=#{fulfilment.select.live.items}, data-live-cost=#{fulfilment.select.live.cost}, data-live-profit=#{fulfilment.select.live.profit}"></div>
 
             <div class="cl-layout-main">
                 <noscript>
@@ -120,7 +121,22 @@
                                     <span class="cl-filter-menu-value" data-cl-filter-value="price" th:text="#{fulfilment.select.filter.any}"></span>
                                 </summary>
                                 <div class="cl-filter-menu-panel">
-                                    <div class="cl-filter-menu-dates">
+                                    <!--/* a rough pick on the slider (log scale over the page's net prices, bars = offers per band),
+                                           an exact amount in the fields; both drive the same two fields. Shown by the script only
+                                           when the page has at least two different prices. */-->
+                                    <div class="cl-range-filter" data-cl-price-range hidden>
+                                        <div class="cl-range-hist" aria-hidden="true" data-cl-range-hist></div>
+                                        <div class="cl-range">
+                                            <span class="cl-range-track" aria-hidden="true"></span>
+                                            <span class="cl-range-fill" aria-hidden="true" data-cl-range-fill></span>
+                                            <input type="range" min="0" max="1000" step="1" value="0" data-cl-range-lo
+                                                   th:attr="aria-label=#{fulfilment.select.filter.price.sliderFrom}">
+                                            <input type="range" min="0" max="1000" step="1" value="1000" data-cl-range-hi
+                                                   th:attr="aria-label=#{fulfilment.select.filter.price.sliderTo}">
+                                        </div>
+                                        <div class="cl-range-ends" aria-hidden="true"><span data-cl-range-end-lo></span><span data-cl-range-end-hi></span></div>
+                                    </div>
+                                    <div class="cl-filter-menu-dates is-pair">
                                         <label>
                                             <span th:text="#{fulfilment.select.filter.price.from}"></span>
                                             <input class="cl-input is-price" type="number" inputmode="decimal" min="0" step="0.01" data-cl-filter-min>
@@ -129,6 +145,10 @@
                                             <span th:text="#{fulfilment.select.filter.price.to}"></span>
                                             <input class="cl-input is-price" type="number" inputmode="decimal" min="0" step="0.01" data-cl-filter-max>
                                         </label>
+                                    </div>
+                                    <div class="cl-range-foot">
+                                        <span class="cl-range-count" data-cl-range-count></span>
+                                        <button type="button" class="cl-link-button" data-cl-range-clear th:text="#{fulfilment.select.filter.price.clear}"></button>
                                     </div>
                                 </div>
                             </details>

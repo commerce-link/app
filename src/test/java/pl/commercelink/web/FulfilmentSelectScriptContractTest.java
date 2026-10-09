@@ -42,7 +42,7 @@ class FulfilmentSelectScriptContractTest {
         // then
         assertThat(used).contains("dearer", "fold", "ratio", "money", "chipFilter", "chipFilterSplit", "categoryChosen",
                 "selectVisible", "clearAll", "clearMatching", "coveredOff", "foldPlain", "foldLocked", "swapOrders", "swapItems",
-                "liveItems", "liveCost", "liveProfit");
+                "liveItems", "liveCost", "liveProfit", "rangeCount", "rangeNoMin", "rangeNoMax");
         assertThat(used).allSatisfy(key -> assertThat(texts).as(key).contains(dataAttribute(key)));
         assertThat(texts).doesNotContain("data-category=");
     }
@@ -58,5 +58,16 @@ class FulfilmentSelectScriptContractTest {
                 .contains("'cl-alt-fold'").contains("'cl-alt-fold-toggle'").contains("aria-controls")
                 .contains("aria-labelledby").doesNotContain("data-cl-select-all");
         assertThat(js).doesNotContain("innerHTML").doesNotContain("insertAdjacentHTML").doesNotContain("outerHTML");
+    }
+
+    @Test
+    void thePriceSliderDrivesTheSameFieldsTheFilterReads() throws Exception {
+        // when
+        String js = Files.readString(SCRIPT);
+
+        // then
+        assertThat(js).contains("input[data-cl-range-lo]").contains("input[data-cl-range-hi]")
+                .contains("button[data-cl-range-clear]").contains("[data-cl-range-hist]").contains("aria-valuetext")
+                .contains("Math.log(").contains("minInput.value =").contains("maxInput.value =");
     }
 }

@@ -197,6 +197,24 @@ class FulfilmentSelectRenderingTest {
     }
 
     @Test
+    void thePriceMenuHasAHiddenSliderAboveTheFieldsAndAClearButton() {
+        // given
+        FulfilmentForm form = warehouseGroup();
+
+        // when
+        String html = render(form, factory.forOrders(form, "store-1", false, labels, TODAY, PL));
+
+        // then
+        String menu = html.substring(html.indexOf("data-cl-filter-menu=\"price\""));
+        menu = menu.substring(0, menu.indexOf("</details>"));
+        assertThat(menu).contains("data-cl-price-range hidden").contains("data-cl-range-hist")
+                .contains("aria-label=\"Cena netto od (suwak)\"").contains("aria-label=\"Cena netto do (suwak)\"")
+                .contains("cl-filter-menu-dates is-pair").contains("data-cl-filter-min").contains("data-cl-filter-max")
+                .contains("Wyczyść cenę");
+        assertThat(menu.indexOf("data-cl-range-lo")).isLessThan(menu.indexOf("data-cl-filter-min"));
+    }
+
+    @Test
     void tooltipsAtTheRightEdgeGrowLeftSoTheyNeverWidenThePage() {
         // given
         FulfilmentForm form = new FulfilmentForm("warehouse", "redirect:/dashboard/warehouse?statuses=New",

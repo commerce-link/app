@@ -112,7 +112,10 @@ class FulfilmentSelectMessagesTest {
                 "fulfilment.select.category.chosen", "fulfilment.select.mfn", "fulfilment.select.offer.name",
                 "fulfilment.select.covered.off", "fulfilment.select.alt.fold.plain", "fulfilment.select.alt.fold.locked",
                 "fulfilment.select.swap.orders", "fulfilment.select.swap.items", "fulfilment.select.live.items",
-                "fulfilment.select.live.cost", "fulfilment.select.live.profit", "fulfilment.select.saved.none");
+                "fulfilment.select.live.cost", "fulfilment.select.live.profit", "fulfilment.select.saved.none",
+                "fulfilment.select.filter.price.sliderFrom", "fulfilment.select.filter.price.sliderTo",
+                "fulfilment.select.filter.price.noMin", "fulfilment.select.filter.price.noMax",
+                "fulfilment.select.filter.price.count", "fulfilment.select.filter.price.clear");
         for (String key : List.of("fulfilment.select.all", "fulfilment.select.column.price.short", "fulfilment.select.category.count",
                 "fulfilment.select.offer.label", "fulfilment.select.list.clearVisible")) {
             assertThat(pl.getProperty(key)).as("pl " + key).isNull();

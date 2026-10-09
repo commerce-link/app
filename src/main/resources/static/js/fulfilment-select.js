@@ -103,6 +103,10 @@
     var minInput = form.querySelector('input[data-cl-filter-min]');
     var maxInput = form.querySelector('input[data-cl-filter-max]');
     var hiddenNotice = form.querySelector('[data-cl-hidden-notice]');
+    var rangeBox = form.querySelector('[data-cl-price-range]');
+    var rangeLo = form.querySelector('input[data-cl-range-lo]');
+    var rangeHi = form.querySelector('input[data-cl-range-hi]');
+    var rangeClear = form.querySelector('button[data-cl-range-clear]');
     var reason = form.querySelector('[data-cl-select-reason]');
     var needsSelection = all(form, 'button[data-cl-needs-selection]');
     var liveRegion = form.querySelector('[data-cl-live]');
@@ -596,6 +600,96 @@
         return offer ? offer.label : provider;
     }
 
+    // Price slider: 0..1000 positions over the page's net prices, on a log scale when they spread wide (a 112 zł cooler
+    // and a 2 900 zł GPU each get room) and linear when they are close. The fields hold the filter; the slider writes
+    // rounded amounts into them and follows what is typed.
+    var rangeNets = offers.map(function (offer) {
+        return offer.net;
+    }).filter(function (net) {
+        return net > 0;
+    });
+    var rangeFloor = rangeNets.length ? Math.floor(Math.min.apply(null, rangeNets)) : 0;
+    var rangeCeil = rangeNets.length ? Math.ceil(Math.max.apply(null, rangeNets)) : 0;
+    var rangeLog = rangeFloor >= 1 && rangeCeil / rangeFloor >= 4;
+    var rangeOn = !!rangeBox && rangeCeil > rangeFloor;
+    var rangeBands = [];
+
+    function rangePrice(position) {
+        var t = position / 1000;
+        return rangeLog ? rangeFloor * Math.pow(rangeCeil / rangeFloor, t) : rangeFloor + (rangeCeil - rangeFloor) * t;
+    }
+
+    function rangePosition(price) {
+        var p = Math.min(rangeCeil, Math.max(rangeFloor, price));
+        var t = rangeLog ? Math.log(p / rangeFloor) / Math.log(rangeCeil / rangeFloor) : (p - rangeFloor) / (rangeCeil - rangeFloor);
+        return Math.round(t * 1000);
+    }
+
+    // amounts a dragged thumb writes into a field: whole złoty, then fives and tens as prices grow
+    function roundedPrice(price) {
+        if (price < 100) {
+            return Math.round(price);
+        }
+        return price < 1000 ? Math.round(price / 5) * 5 : Math.round(price / 10) * 10;
+    }
+
+    function buildRange() {
+        if (!rangeOn) {
+            return;
+        }
+        rangeBox.hidden = false;
+        var hist = rangeBox.querySelector('[data-cl-range-hist]');
+        var counts = [];
+        for (var i = 0; i < 20; i++) {
+            counts.push(0);
+            rangeBands.push(document.createElement('span'));
+            hist.appendChild(rangeBands[i]);
+        }
+        rangeNets.forEach(function (net) {
+            counts[Math.min(19, Math.floor(rangePosition(net) / 50))]++;
+        });
+        var most = Math.max.apply(null, counts);
+        rangeBands.forEach(function (band, i) {
+            band.style.height = (counts[i] ? 6 + Math.round(counts[i] / most * 26) : 2) + 'px';
+        });
+        rangeBox.querySelector('[data-cl-range-end-lo]').textContent = format(texts.money, money(rangeFloor));
+        rangeBox.querySelector('[data-cl-range-end-hi]').textContent = format(texts.money, money(rangeCeil));
+    }
+
+    // the thumbs follow the fields: an empty field puts its thumb at the end of the track
+    function syncRange() {
+        if (!rangeOn) {
+            return;
+        }
+        var min = bound(minInput);
+        var max = bound(maxInput);
+        rangeLo.value = String(min === null ? 0 : rangePosition(min));
+        rangeHi.value = String(max === null ? 1000 : rangePosition(max));
+    }
+
+    function paintRange(min, max) {
+        var inRange = offers.filter(function (offer) {
+            return (min === null || offer.net >= min) && (max === null || offer.net <= max);
+        }).length;
+        setText('[data-cl-range-count]', format(texts.rangeCount, inRange, offers.length));
+        if (rangeClear) {
+            rangeClear.disabled = min === null && max === null;
+        }
+        if (!rangeOn) {
+            return;
+        }
+        var lo = parseInt(rangeLo.value, 10);
+        var hi = parseInt(rangeHi.value, 10);
+        var fill = rangeBox.querySelector('[data-cl-range-fill]');
+        fill.style.left = (lo / 10) + '%';
+        fill.style.right = (100 - hi / 10) + '%';
+        rangeBands.forEach(function (band, i) {
+            band.classList.toggle('is-in', i * 50 + 50 > lo && i * 50 < hi);
+        });
+        rangeLo.setAttribute('aria-valuetext', min === null ? texts.rangeNoMin : format(texts.money, money(min)));
+        rangeHi.setAttribute('aria-valuetext', max === null ? texts.rangeNoMax : format(texts.money, money(max)));
+    }
+
     function applyFilters() {
         var providers = providerBoxes.filter(function (box) {
             return box.checked;
@@ -644,6 +738,7 @@
         });
         setText('[data-cl-filter-value="supplier"]', providers.length === 0 ? texts.all
             : (providers.length === 1 ? labelOf(providers[0]) : format(texts.many, providers.length)));
+        paintRange(min, max);
         setText('[data-cl-filter-value="price"]', min === null && max === null ? texts.any
             : (min === null ? format(texts.to, money(max))
                 : (max === null ? format(texts.from, money(min)) : format(texts.range, money(min), money(max)))));
@@ -895,9 +990,35 @@
     });
     [minInput, maxInput].forEach(function (input) {
         if (input) {
-            input.addEventListener('input', filtersChanged);
+            input.addEventListener('input', function () {
+                syncRange();
+                filtersChanged();
+            });
         }
     });
+    if (rangeOn) {
+        [rangeLo, rangeHi].forEach(function (thumb) {
+            thumb.addEventListener('input', function () {
+                // the thumbs never cross: the one being dragged pushes the other
+                if (parseInt(rangeLo.value, 10) > parseInt(rangeHi.value, 10)) {
+                    (thumb === rangeLo ? rangeHi : rangeLo).value = thumb.value;
+                }
+                var lo = parseInt(rangeLo.value, 10);
+                var hi = parseInt(rangeHi.value, 10);
+                minInput.value = lo <= 0 ? '' : String(roundedPrice(rangePrice(lo)));
+                maxInput.value = hi >= 1000 ? '' : String(roundedPrice(rangePrice(hi)));
+                filtersChanged();
+            });
+        });
+    }
+    if (rangeClear) {
+        rangeClear.addEventListener('click', function () {
+            minInput.value = '';
+            maxInput.value = '';
+            syncRange();
+            filtersChanged();
+        });
+    }
     // Enter on any field of the selection form would confirm it (implicit submission); buttons keep their Enter
     form.addEventListener('keydown', function (event) {
         var target = event.target;
@@ -917,8 +1038,10 @@
             maxInput.value = '';
         }
         filtersActive = false;
+        syncRange();
         applyFilters();
     });
+    buildRange();
     var filters = form.querySelector('[data-cl-select-filters]');
     if (filters) {
         filters.hidden = false;
@@ -973,6 +1096,9 @@
     });
 
     // back from the next page: the cache keeps the ticks the operator left, the numbers follow them
-    window.addEventListener('pageshow', changed);
+    window.addEventListener('pageshow', function () {
+        syncRange();
+        changed();
+    });
     changed();
 })();
