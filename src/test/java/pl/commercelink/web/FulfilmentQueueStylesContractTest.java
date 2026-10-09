@@ -88,6 +88,19 @@ class FulfilmentQueueStylesContractTest {
     }
 
     @Test
+    void theGroupDescriptionKeepsItsDistanceFromTheTable() throws Exception {
+        // given
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+
+        // when
+        int rule = css.indexOf(".cl-page .cl-card .cl-card-desc + .cl-table,");
+
+        // then
+        assertThat(rule).as("the description-then-table spacing").isNotNegative();
+        assertThat(css.substring(rule, css.indexOf('}', rule))).contains("margin-top: 12px;");
+    }
+
+    @Test
     void theRowLinkOverlayIsClippedToItsRowOutsideCardMode() throws Exception {
         // given
         String css = queueSection();

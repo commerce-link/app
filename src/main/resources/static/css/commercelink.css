@@ -1412,6 +1412,7 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 .cl-page .cl-card .cl-card-head + .cl-table,
+.cl-page .cl-card .cl-card-desc + .cl-table,
 .cl-page .cl-card .cl-card-head + .cl-list,
 .cl-page .cl-card .cl-card-desc + .cl-list,
 .cl-page .cl-card .cl-card-head + .cl-list-empty,
