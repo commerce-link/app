@@ -153,7 +153,7 @@ public class ShippingService {
 
     /**
      * A Wysyłam z Allegro shipment of an order: the store's pickup and sender addresses, one parcel, cash on delivery
-     * to the store's default account and the order's reference. The adapter takes the recipient and the delivery
+     * (paid out by Allegro, so the store's default account is optional) and the order's reference. The adapter takes the recipient and the delivery
      * method from Allegro's own proposal for the order (the buyer's masked e-mail), never from this request: the
      * receiver here is only what the order knows.
      */
@@ -162,9 +162,13 @@ public class ShippingService {
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
         ShipmentOptions.CashOnDelivery cod = null;
         if (form.isCashOnDelivery()) {
+            // Allegro pays the collected amount out to the seller's Allegro funds and the adapter sends no account,
+            // so a store without a bank account still ships cash on delivery
             BankAccount bankAccount = store.getDefaultBankAccount();
-            cod = new ShipmentOptions.CashOnDelivery(
-                    form.getCashOnDeliveryAmount(), bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
+            cod = bankAccount == null
+                    ? new ShipmentOptions.CashOnDelivery(form.getCashOnDeliveryAmount(), null, null, null)
+                    : new ShipmentOptions.CashOnDelivery(form.getCashOnDeliveryAmount(),
+                            bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
         }
         return ShipmentRequest.builder()
                 .pickup(toShipmentAddress(pickupAddress))

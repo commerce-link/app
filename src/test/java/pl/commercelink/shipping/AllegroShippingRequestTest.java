@@ -79,6 +79,26 @@ class AllegroShippingRequestTest {
     }
 
     @Test
+    void allegroCashOnDeliveryNeedsNoBankAccount() {
+        // given: Allegro pays the collected amount out to the seller's Allegro funds
+        Store store = store();
+        store.setBankAccounts(new ArrayList<>());
+        ShippingForm form = new ShippingForm("order-1", "orders");
+        form.setPickUpAddressId("addr-1");
+        form.setCashOnDelivery(true);
+        form.setCashOnDeliveryAmount(919.99);
+        form.setParcels(new ArrayList<>(List.of(new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"))));
+
+        // when
+        ShipmentRequest request = new ShippingService().buildAllegroRequest(form, store, allegroOrder());
+
+        // then
+        assertThat(request.options().cashOnDelivery().amount()).isEqualTo(919.99);
+        assertThat(request.options().cashOnDelivery().iban()).isNull();
+        assertThat(request.options().cashOnDelivery().accountHolder()).isNull();
+    }
+
+    @Test
     void orderReferenceIsOnlyForMarketplaceOrders() {
         // given
         Order shop = new Order("store-1");
