@@ -15,8 +15,8 @@
         return values.reduce(function (text, value, i) { return text.split('{' + i + '}').join(value); }, template || '');
     }
 
-    // Money.format (NBSP thousands, comma decimals, U+2212 minus) followed by the invoice's currency code: money.js
-    // renders the store's "PLN" pattern, while an invoice may be in another currency.
+    // Money.format (NBSP thousands, comma decimals, U+2212 minus) followed by the currency of the invoice lines
+    // (data-currency): the adapters convert the lines of an invoice in another currency, so they are in złoty.
     function money(value, currency) {
         var amount = Math.round(Number(value || 0) * 100) / 100;
         var parts = Math.abs(amount).toFixed(2).split('.');

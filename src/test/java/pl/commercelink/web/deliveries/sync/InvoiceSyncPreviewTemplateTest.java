@@ -121,7 +121,7 @@ class InvoiceSyncPreviewTemplateTest {
     }
 
     @Test
-    void anInvoiceInAnotherCurrencyWarnsThatTheSaveDoesNotConvertIt() {
+    void anInvoiceInAnotherCurrencyShowsItsTotalsInItAndTheConvertedLinesInZloty() {
         // given
         InvoiceSyncPreview preview = typical();
         preview.setCurrency("EUR");
@@ -131,9 +131,12 @@ class InvoiceSyncPreviewTemplateTest {
         String html = render(preview);
 
         // then
-        assertThat(html).contains("Faktura w EUR, kurs 4,2500")
-                .contains("Faktura jest w EUR. Zapis przepisze kwoty faktury bez przeliczenia na PLN");
-        assertThat(render(typical())).doesNotContain("bez przeliczenia na PLN");
+        assertThat(html).contains("Faktura w EUR, kurs 4,2500 — kwoty pozycji po przeliczeniu na PLN")
+                .contains("data-currency=\"PLN\"")
+                .contains("3\u00a0249,00 PLN · 2 × Laptop").contains("2,40 PLN netto")
+                .contains("9\u00a0000,00 EUR").contains("Netto faktury w PLN").contains("11\u00a0295,40 PLN")
+                .doesNotContain("bez przeliczenia").doesNotContain("EUR · 2 × Laptop");
+        assertThat(render(typical())).doesNotContain("kwoty pozycji po przeliczeniu").doesNotContain("Netto faktury w PLN");
     }
 
     @Test
