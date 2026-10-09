@@ -95,14 +95,14 @@ class FulfilmentSelectRenderingTest {
         // then
         assertThat(html).contains("<h1").contains("Dobór dostawców").contains("Kolejka realizacji")
                 .contains("href=\"/dashboard/fulfilment/queue?orderIds=s1&amp;skippedGroups=1\"")
-                .contains("Magazyn sklepu").contains("Sugestia").doesNotContain("Sugestia dokładna").contains("Tylko źródła z zyskiem")
+                .contains("Magazyn sklepu").contains("Sugestia").doesNotContain("Sugestia dokładna").contains("Tylko pozycje z zyskiem")
                 .contains("data-cl-select").contains("action=\"/dashboard/orders/fulfilment/commit\"")
                 .contains("formaction=\"/dashboard/orders/fulfilment/commitAndContinue\"")
                 .contains("Zatwierdź dobór").contains("Zatwierdź i dobierz resztę").doesNotContain("Pomiń to zamówienie")
                 .contains("data-cl-variant").contains("Wybiorę sam").contains("najtańsza")
                 .contains("data-cl-coverage").contains("data-order=\"w1-a\"")
                 .contains("data-provider=\"Elko-k1\"").contains("data-provider-label=\"Elko\"")
-                .contains("Bez oferty").contains("Logitech MX Keys").contains("brak oferty po zawężeniach")
+                .contains("Bez oferty po zawężeniach: 1 poz. — zostaną w kolejce.").doesNotContain("Logitech MX Keys")
                 .contains("fulfilment-select.js").contains("submit-once.js")
                 .doesNotContain("??");
         assertThat(content(html)).doesNotContain("style=\"").doesNotContain("redirectUrl")
@@ -267,7 +267,8 @@ class FulfilmentSelectRenderingTest {
 
         // then
         assertThat(html).contains("Żadna oferta nie pasuje do wybranych zawężeń")
-                .contains("przy jednym zamówieniu nic nie zostawia").contains("Mysz").contains("Zatwierdź dobór");
+                .contains("przy jednym zamówieniu nic nie zostawia").contains("Bez oferty po zawężeniach: 1 poz.")
+                .doesNotContain("Mysz").contains("Zatwierdź dobór");
     }
 
     @Test
@@ -354,12 +355,17 @@ class FulfilmentSelectRenderingTest {
         // then
         assertThat(html).contains("<thead class=\"cl-visually-hidden\">");
         String cheap = row(html, "Elko-k1");
-        assertThat(cheap).contains("szt.").contains("zł / szt.").contains("brutto 123,00").contains("100,00");
+        assertThat(cheap).contains("szt.").doesNotContain("zł / szt.");
+        String net = cheap.substring(cheap.indexOf("cl-cell-price is-net"), cheap.indexOf("cl-cell-price is-gross"));
+        String gross = cheap.substring(cheap.indexOf("cl-cell-price is-gross"), cheap.indexOf("cl-cell-profit"));
+        assertThat(net).contains("cl-price-main").contains("100,00").contains(">zł<").contains(">netto / szt.<");
+        assertThat(gross).contains("cl-price-main").contains("123,00").contains(">zł<").contains(">brutto / szt.<");
+        assertThat(html).contains("Cena zakupu netto / szt.").contains("Cena zakupu brutto / szt.");
         assertThat(cheap).doesNotContain("data-label=");
     }
 
     @Test
-    void onlyTheFirstCategoryStartsExpandedAndTheMissingGroupAlwaysShows() {
+    void onlyTheFirstCategoryStartsExpandedAndItemsWithoutOfferAreNamedInTheSummaryOnly() {
         // given
         FulfilmentForm form = warehouseGroup();
 
@@ -370,13 +376,15 @@ class FulfilmentSelectRenderingTest {
         String toggles = html.substring(html.indexOf("data-cl-offers"));
         assertThat(toggles.split("aria-expanded=", -1)).hasSize(3);
         assertThat(toggles.indexOf("aria-expanded=\"true\"")).isLessThan(toggles.indexOf("aria-expanded=\"false\""));
-        String missing = html.substring(html.indexOf("cl-offers-missing"));
-        assertThat(missing).contains("Bez oferty").contains("fa-exclamation-triangle")
-                .doesNotContain("aria-expanded").doesNotContain("cl-group-toggle");
+        assertThat(html).doesNotContain("cl-offers-missing").doesNotContain("is-missing");
+        String missing = html.substring(html.indexOf("data-cl-missing"), html.indexOf("data-cl-partial"));
+        assertThat(missing).contains("Bez oferty po zawężeniach: 1 poz.").contains("Zamówienia:")
+                .contains("href=\"/dashboard/orders/w2-b\"").contains("target=\"_blank\"");
+        assertThat(html.indexOf("data-cl-missing")).isGreaterThan(html.indexOf("data-cl-supplier-totals"));
     }
 
     @Test
-    void theListBarExpandsCollapsesAndTicksTheVisibleOffers() {
+    void theListBarExpandsCollapsesAndClearsTheTickedOffers() {
         // given
         FulfilmentForm form = warehouseGroup();
 
@@ -385,10 +393,10 @@ class FulfilmentSelectRenderingTest {
 
         // then
         String bar = html.substring(html.indexOf("class=\"cl-list-bar\""), html.indexOf("data-cl-offers"));
-        assertThat(bar).contains("data-cl-select-visible").contains("Zaznacz widoczne")
+        assertThat(bar).contains("data-cl-clear-ticked").contains("Odznacz wszystkie").doesNotContain("Zaznacz widoczne")
                 .contains("data-cl-expand-all").contains("Rozwiń wszystkie")
                 .contains("data-cl-collapse-all").contains("Zwiń wszystkie");
-        assertThat(html).contains("data-select-visible=\"Zaznacz widoczne\"").contains("data-clear-all=\"Odznacz wszystkie\"")
+        assertThat(html).doesNotContain("data-select-visible").contains("data-clear-all=\"Odznacz wszystkie\"")
                 .contains("data-clear-matching=\"Odznacz pasujące do filtra\"");
     }
 

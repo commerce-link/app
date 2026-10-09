@@ -37,7 +37,7 @@ public record FulfilmentSelectPage(Mode mode, Kind kind, String storeName, Strin
         return showCoverage();
     }
 
-    /** Items are waiting but no offer survived: the table holds only the "Bez oferty" group. */
+    /** Items are waiting but no offer survived: the list is empty and the summary names the orders. */
     public boolean noOfferMatched() {
         return categories.isEmpty() && !missing.isEmpty();
     }
@@ -134,8 +134,20 @@ public record FulfilmentSelectPage(Mode mode, Kind kind, String storeName, Strin
                                 String providers, boolean applied) {
     }
 
-    /** An item no offer covers (spec D7). */
-    public record Missing(String orderId, String number, String href, String name, int qty, double price, String reasonKey) {
+    public int missingItems() {
+        return missing.stream().mapToInt(Missing::items).sum();
+    }
+
+    public String missingKey() {
+        return missing.stream().anyMatch(Missing::narrowed)
+                ? "fulfilment.select.missing.summary.narrowed" : "fulfilment.select.missing.summary";
+    }
+
+    /**
+     * An order with items no offer covers (spec D7). The items are not listed among the offers (client, 2026-10-09);
+     * the summary names their orders, so a chip short of its total has a reason on the page.
+     */
+    public record Missing(String orderId, String number, String href, int items, boolean narrowed) {
     }
 
     public enum EmptyState {

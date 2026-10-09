@@ -135,8 +135,11 @@ class FulfilmentSelectPageFactoryTest {
         assertThat(page.orders()).extracting(FulfilmentSelectPage.OrderRef::href).containsExactly("/dashboard/orders/w1-a", "/dashboard/orders/w2-b");
         assertThat(page.context()).isEqualTo("Zamówienia magazynowe: 2 · pozycje do zamówienia: 4");
         assertThat(page.showCoverage()).isTrue();
-        assertThat(page.missing()).extracting(FulfilmentSelectPage.Missing::name, FulfilmentSelectPage.Missing::reasonKey)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("Klawiatura", "fulfilment.select.missing.reason.noOffer"));
+        assertThat(page.missing()).extracting(FulfilmentSelectPage.Missing::orderId, FulfilmentSelectPage.Missing::items,
+                        FulfilmentSelectPage.Missing::href)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("w2-b", 1, "/dashboard/orders/w2-b"));
+        assertThat(page.missingItems()).isEqualTo(1);
+        assertThat(page.missingKey()).isEqualTo("fulfilment.select.missing.summary");
         assertThat(page.emptyState()).isEqualTo(FulfilmentSelectPage.EmptyState.NONE);
     }
 
@@ -303,7 +306,7 @@ class FulfilmentSelectPageFactoryTest {
         assertThat(page.noOfferMatched()).isTrue();
         assertThat(page.multiOnSingleOrder()).isTrue();
         assertThat(page.noMatchKey()).isEqualTo("fulfilment.select.noMatch.narrowed");
-        assertThat(page.missing().get(0).reasonKey()).isEqualTo("fulfilment.select.missing.reason.narrowed");
+        assertThat(page.missingKey()).isEqualTo("fulfilment.select.missing.summary.narrowed");
     }
 
     @Test

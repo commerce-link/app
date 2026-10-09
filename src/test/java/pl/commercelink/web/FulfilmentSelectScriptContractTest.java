@@ -41,7 +41,7 @@ class FulfilmentSelectScriptContractTest {
 
         // then
         assertThat(used).contains("dearer", "fold", "ratio", "money", "chipFilter", "chipFilterSplit", "categoryChosen",
-                "selectVisible", "clearAll", "clearMatching", "coveredOff", "foldPlain", "swapOrders", "swapItems",
+                "clearAll", "clearMatching", "coveredOff", "foldPlain", "swapOrders", "swapItems",
                 "liveItems", "liveCost", "liveProfit", "rangeCount", "rangeNoMin", "rangeNoMax");
         assertThat(used).allSatisfy(key -> assertThat(texts).as(key).contains(dataAttribute(key)));
         assertThat(texts).doesNotContain("data-category=");
@@ -53,10 +53,10 @@ class FulfilmentSelectScriptContractTest {
         String js = Files.readString(SCRIPT);
 
         // then
-        assertThat(js).contains("button[data-cl-select-visible]").contains("button[data-cl-expand-all]")
+        assertThat(js).contains("button[data-cl-clear-ticked]").contains("button[data-cl-expand-all]")
                 .contains("button[data-cl-collapse-all]").contains("[data-cl-coverage-fill]").contains("style.width")
                 .contains("'cl-alt-fold'").contains("'cl-alt-fold-toggle'").contains("aria-controls")
-                .contains("aria-labelledby").doesNotContain("data-cl-select-all");
+                .contains("aria-labelledby").doesNotContain("data-cl-select-all").doesNotContain("data-cl-select-visible");
         assertThat(js).doesNotContain("innerHTML").doesNotContain("insertAdjacentHTML").doesNotContain("outerHTML");
     }
 

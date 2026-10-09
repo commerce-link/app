@@ -3955,7 +3955,7 @@ a.cl-link-button:hover {
 }
 
 /* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it; a disabled one
-   (nothing to act on, e.g. "Zaznacz widoczne" with every category collapsed) looks the same */
+   (nothing to act on, e.g. "Odznacz wszystkie" with nothing ticked) looks the same */
 .cl-page .cl-link-button[aria-disabled="true"],
 .cl-page .cl-link-button[aria-disabled="true"]:hover,
 .cl-page .cl-link-button:disabled,
@@ -10705,7 +10705,6 @@ a.cl-link-button:hover {
     --cl-offer-radius: 10px;
     --cl-alt-connector: #c3cfdf;
     --cl-warn-line: #ecc98f;
-    --cl-missing-line: #f1d9ad;
     --cl-chip-track: rgba(14, 23, 33, .12);
     --cl-chip-hover: rgba(14, 23, 33, .06);
     --cl-on-accent: #fff;
@@ -11007,6 +11006,7 @@ a.cl-link-button:hover {
 /* The offers table: rows as separated cards, no visible header row (units sit in the cells) */
 .cl-page .cl-offers-list {
     padding: 0 12px 8px;
+    container: cl-offers / inline-size;
 }
 
 .cl-page .cl-table.is-supplier-offers {
@@ -11020,7 +11020,7 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-price {
-    width: 120px;
+    width: 104px;
 }
 
 .cl-page .cl-table.is-supplier-offers col.cl-col-profit {
@@ -11031,7 +11031,7 @@ a.cl-link-button:hover {
     width: 128px;
 }
 
-.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > * {
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > * {
     padding: 12px 8px;
     border-top: 1px solid var(--cl-line);
     border-bottom: 1px solid var(--cl-line);
@@ -11039,13 +11039,13 @@ a.cl-link-button:hover {
     vertical-align: middle;
 }
 
-.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :first-child {
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :first-child {
     padding-left: 18px;
     border-left: 1px solid var(--cl-line);
     border-radius: var(--cl-offer-radius) 0 0 var(--cl-offer-radius);
 }
 
-.cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :last-child {
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :last-child {
     padding-right: 10px;
     border-right: 1px solid var(--cl-line);
     border-radius: 0 var(--cl-offer-radius) var(--cl-offer-radius) 0;
@@ -11317,7 +11317,7 @@ a.cl-link-button:hover {
     font-size: 13.5px;
 }
 
-.cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-cell-price .cl-table-sub, .cl-cell-qty > *, .cl-cell-profit > *),
+.cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-cell-qty > *, .cl-cell-profit > *),
 .cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes) {
     display: none;
 }
@@ -11447,22 +11447,6 @@ a.cl-link-button:hover {
     color: var(--cl-ink);
 }
 
-/* "Bez oferty": the warning icon and colour set it apart from the categories, whose rows can be ordered */
-.cl-page .cl-table.is-supplier-offers tr.cl-table-group.is-warn :is(i, svg) {
-    margin-right: 10px;
-    font-size: 15px;
-    color: var(--cl-warn);
-}
-
-.cl-page .cl-table.is-supplier-offers tr.cl-table-group.is-warn .cl-group-name {
-    color: var(--cl-warn);
-}
-
-.cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {
-    border-color: var(--cl-missing-line);
-    background: var(--cl-warn-soft);
-}
-
 /* Summary: amounts per supplier, earlier steps greyed */
 .cl-page .cl-by-supplier .cl-eyebrow {
     margin-bottom: 6px;
@@ -11555,28 +11539,15 @@ a.cl-link-button:hover {
     }
 }
 
-/* Phone: every offer is a card — the offer across, then the pieces, price and profit side by side, then the toggle
-   across the bottom. Every cell has an explicit place; nothing is reordered. */
-@media screen and (max-width: 719px) {
-    .cl-page .cl-offers-bar {
-        padding: 16px;
-    }
-
-    .cl-page .cl-bar-row {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 4px;
-    }
-
-    .cl-page .cl-bar-label {
-        padding-top: 0;
-    }
-
-    .cl-page .cl-list-bar {
-        padding: 6px 12px 0;
-    }
-
-    .cl-page .cl-offers-list {
-        padding: 0 12px 12px;
+/* A narrow offer list (beside the summary column at 1366–1600 px with the menu open, and on a phone) turns every
+   offer into a card: the offer across the top, then pieces, net, gross, profit and the toggle in one line. Six table
+   columns would leave the offer name under 100 px there. The phone block below rearranges the second line. */
+@container cl-offers (width < 800px) {
+    /* blocks, not table boxes: Chromium shrinks a grid row inside a table to its content instead of the list width */
+    .cl-page .cl-table.is-supplier-offers,
+    .cl-page .cl-table.is-supplier-offers > tbody,
+    .cl-page .cl-table.is-supplier-offers tbody tr:is(.cl-table-group, .cl-alt-fold) {
+        display: block;
     }
 
     .cl-page .cl-table.is-supplier-offers {
@@ -11593,9 +11564,10 @@ a.cl-link-button:hover {
         padding: 14px 4px 0;
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) {
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+        align-items: center;
         column-gap: 16px;
         row-gap: 10px;
         margin-top: 8px;
@@ -11605,8 +11577,8 @@ a.cl-link-button:hover {
         background: var(--cl-surface);
     }
 
-    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > *,
-    .cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > :is(:first-child, :last-child) {
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > *,
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :is(:first-child, :last-child) {
         display: block;
         padding: 0;
         border: 0;
@@ -11627,11 +11599,6 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table.is-supplier-offers tr.is-covered {
         background: var(--cl-surface-2);
-    }
-
-    .cl-page .cl-table.is-supplier-offers tr.is-missing {
-        border-color: var(--cl-missing-line);
-        background: var(--cl-warn-soft);
     }
 
     .cl-page .cl-table.is-supplier-offers th.cl-table-key {
@@ -11657,24 +11624,24 @@ a.cl-link-button:hover {
         white-space: normal;
     }
 
-    .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross {
         grid-column: 3;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
+        grid-column: 4;
         grid-row: 2;
         text-align: left;
         white-space: normal;
     }
 
     .cl-page .cl-table.is-supplier-offers td.cl-cell-toggle {
-        grid-column: 1 / -1;
-        grid-row: 3;
+        grid-column: 5;
+        grid-row: 2;
     }
 
     .cl-page .cl-table.is-supplier-offers tr.is-covered :is(td.cl-cell-qty, td.cl-cell-profit) {
         display: none;
-    }
-
-    .cl-page .cl-table.is-supplier-offers tr.is-covered td.cl-cell-price {
-        grid-column: 1 / -1;
     }
 
     .cl-page .cl-table.is-supplier-offers tbody tr.cl-alt-fold {
@@ -11685,6 +11652,80 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
         display: block;
         padding: 0;
+    }
+}
+
+/* the card's hover tints the card, not its cells */
+@media screen and (hover: hover) {
+    @container cl-offers (width < 800px) {
+        .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover {
+            background: var(--cl-surface-2);
+        }
+
+        .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover > * {
+            background: none;
+        }
+    }
+}
+
+/* Phone: on top of the card above, net | gross on the second line, pieces | profit on the third and the toggle across
+   the bottom. Every cell has an explicit place; nothing is reordered. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-offers-bar {
+        padding: 16px;
+    }
+
+    .cl-page .cl-bar-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .cl-page .cl-bar-label {
+        padding-top: 0;
+    }
+
+    .cl-page .cl-list-bar {
+        padding: 6px 12px 0;
+    }
+
+    .cl-page .cl-offers-list {
+        padding: 0 12px 12px;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: start;
+    }
+
+    /* four values side by side do not fit 390 px */
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-qty {
+        grid-column: 1;
+        grid-row: 3;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross {
+        grid-column: 2;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
+        grid-column: 2;
+        grid-row: 3;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-toggle {
+        grid-column: 1 / -1;
+        grid-row: 4;
     }
 }
 

@@ -75,11 +75,11 @@ class FulfilmentSelectStylesContractTest {
         assertThat(ruleBody(css, ".cl-page .cl-table.is-supplier-offers tbody tr.is-covered > *")).contains("var(--cl-surface-2)");
         assertThat(css).contains(".cl-page .cl-table.is-supplier-offers tr.is-off");
         // the states match the white card row's specificity, so they must come after it to win
-        int card = css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr:is([data-cl-offer], .is-missing) > * {");
+        int card = css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > * {");
         assertThat(card).isPositive();
         assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-on > * {")).isGreaterThan(card);
         assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-covered > * {")).isGreaterThan(card);
-        assertThat(css.indexOf(".cl-page .cl-table.is-supplier-offers tbody tr.is-missing > * {")).isGreaterThan(card);
+        assertThat(css).doesNotContain("is-missing").doesNotContain("--cl-missing-line");
     }
 
     @Test
@@ -94,19 +94,40 @@ class FulfilmentSelectStylesContractTest {
     }
 
     @Test
-    void theCardModePlacesEveryCellExplicitlyWithTheToggleAcrossTheBottom() throws Exception {
+    void aNarrowOfferListTurnsOffersIntoCardsWithTheValuesInOneLine() throws Exception {
         // given
         String css = section();
+        int query = css.indexOf("@container cl-offers (width < 800px) {");
+        assertThat(query).isPositive();
+        String block = css.substring(query, css.indexOf("\n}\n", query));
+
+        // when / then
+        assertThat(ruleBody(css, ".cl-page .cl-offers-list")).contains("container: cl-offers / inline-size;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]")).contains("display: grid;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers th.cl-table-key")).contains("grid-column: 1 / -1;").contains("grid-row: 1;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-qty")).contains("grid-column: 1;").contains("grid-row: 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price")).contains("grid-column: 2;").contains("grid-row: 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross")).contains("grid-column: 3;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-profit")).contains("grid-column: 4;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-toggle")).contains("grid-column: 5;");
+    }
+
+    @Test
+    void thePhoneCardPutsNetBesideGrossAndPiecesBesideProfitWithTheToggleAcrossTheBottom() throws Exception {
+        // given
+        String css = section();
+        int container = css.indexOf("@container cl-offers (width < 800px) {");
         int media = css.indexOf("@media screen and (max-width: 719px)");
-        assertThat(media).isPositive();
+        assertThat(media).as("the phone block comes after the card block, so its placements win").isGreaterThan(container);
         String block = css.substring(media);
 
         // when / then
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers th.cl-table-key")).contains("grid-column: 1 / -1;").contains("grid-row: 1;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-qty")).contains("grid-column: 1;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price")).contains("grid-column: 2;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-profit")).contains("grid-column: 3;");
-        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-toggle")).contains("grid-column: 1 / -1;").contains("grid-row: 3;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]")).contains("grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price")).contains("grid-column: 1;").contains("grid-row: 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross")).contains("grid-column: 2;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-qty")).contains("grid-column: 1;").contains("grid-row: 3;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-profit")).contains("grid-column: 2;").contains("grid-row: 3;");
+        assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers td.cl-cell-toggle")).contains("grid-column: 1 / -1;").contains("grid-row: 4;");
     }
 
     @Test
@@ -146,7 +167,7 @@ class FulfilmentSelectStylesContractTest {
     void theCardModeDropsTheBaseColumnLabels() throws Exception {
         // given
         String css = section();
-        String block = css.substring(css.indexOf("@media screen and (max-width: 719px)"));
+        String block = css.substring(css.indexOf("@container cl-offers (width < 800px) {"));
 
         // when / then
         assertThat(ruleBody(block, ".cl-page .cl-table.is-supplier-offers tbody tr > *::before")).contains("content: none;");

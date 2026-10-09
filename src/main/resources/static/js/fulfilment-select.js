@@ -96,7 +96,7 @@
     var chips = all(form, 'button[data-cl-coverage]');
     var variants = all(form, 'input[data-cl-variant]');
     var customVariant = form.querySelector('input[data-cl-variant-custom]');
-    var selectVisible = form.querySelector('button[data-cl-select-visible]');
+    var clearTicked = form.querySelector('button[data-cl-clear-ticked]');
     var expandAllButton = form.querySelector('button[data-cl-expand-all]');
     var collapseAllButton = form.querySelector('button[data-cl-collapse-all]');
     var providerBoxes = all(form, 'input[data-cl-filter-provider]');
@@ -244,7 +244,7 @@
             var row = document.createElement('tr');
             row.className = 'cl-alt-fold';
             var cell = document.createElement('td');
-            cell.colSpan = 5;
+            cell.colSpan = 6;
             var button = document.createElement('button');
             button.type = 'button';
             button.className = 'cl-alt-fold-toggle';
@@ -702,7 +702,7 @@
         setText('[data-cl-filter-value="price"]', min === null && max === null ? texts.any
             : (min === null ? format(texts.to, money(max))
                 : (max === null ? format(texts.from, money(min)) : format(texts.range, money(min), money(max)))));
-        renderSelectVisible();
+        renderClearTicked();
     }
 
     // on screen: passing the filters, in an expanded category and not folded under its winner. A winner the filters
@@ -721,31 +721,21 @@
         }) || bound(minInput) !== null || bound(maxInput) !== null;
     }
 
-    // one button: it ticks the offers on screen while one of them is unticked; otherwise it clears every ticked offer
-    // the filters let through, in a collapsed category or a closed fold too, like the old "Odznacz wszystkie", so
-    // "clear, then pick by hand" never saves a suggestion left out of sight. Offers the filters hide are never changed.
-    // an unticked offer covered by a cheaper ticked one would be unticked again at once, so only the others count
-    function tickable(offer) {
-        return !offer.check.checked && !offer.covered;
-    }
-
-    function selectVisibleMode() {
-        if (shownOffers().some(tickable)) {
-            return 'tick';
-        }
-        return offers.some(function (offer) {
+    // clears every ticked offer the filters let through, in a collapsed category or a closed fold too, so "clear, then
+    // pick by hand" never saves a suggestion left out of sight. Offers the filters hide are never changed. Ticking is
+    // left to the suggestion in the queue and to the toggles on the rows.
+    function clearableOffers() {
+        return offers.filter(function (offer) {
             return offer.visible && offer.check.checked;
-        }) ? 'clear' : null;
+        });
     }
 
-    function renderSelectVisible() {
-        if (!selectVisible) {
+    function renderClearTicked() {
+        if (!clearTicked) {
             return;
         }
-        var mode = selectVisibleMode();
-        selectVisible.textContent = mode !== 'clear' ? texts.selectVisible
-            : (narrowing() || focusedOrder ? texts.clearMatching : texts.clearAll);
-        selectVisible.disabled = mode === null;
+        clearTicked.textContent = narrowing() || focusedOrder ? texts.clearMatching : texts.clearAll;
+        clearTicked.disabled = clearableOffers().length === 0;
     }
 
     function renderSwap() {
@@ -931,21 +921,12 @@
         });
     });
 
-    if (selectVisible) {
-        selectVisible.addEventListener('click', function () {
-            var mode = selectVisibleMode();
+    if (clearTicked) {
+        clearTicked.addEventListener('click', function () {
             swapped = null;
-            if (mode === 'tick') {
-                shownOffers().filter(tickable).forEach(function (offer) {
-                    offer.check.checked = true;
-                });
-            } else if (mode === 'clear') {
-                offers.forEach(function (offer) {
-                    if (offer.visible) {
-                        offer.check.checked = false;
-                    }
-                });
-            }
+            clearableOffers().forEach(function (offer) {
+                offer.check.checked = false;
+            });
             changed();
         });
     }

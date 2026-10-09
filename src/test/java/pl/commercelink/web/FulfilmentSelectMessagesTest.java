@@ -60,7 +60,7 @@ class FulfilmentSelectMessagesTest {
 
         // then
         assertThat(used).contains("fulfilment.select.commit", "fulfilment.select.saved", "fulfilment.select.kind.warehouse",
-                "fulfilment.select.missing.reason.noOffer");
+                "fulfilment.select.missing.orders");
         assertThat(used).allSatisfy(key -> {
             assertThat(pl.getProperty(key)).as("pl " + key).isNotBlank();
             assertThat(en.getProperty(key)).as("en " + key).isNotBlank();
@@ -88,7 +88,7 @@ class FulfilmentSelectMessagesTest {
         Properties en = load("messages_en.properties");
 
         // then
-        for (String key : List.of("fulfilment.select.money", "fulfilment.select.unit.perPiece", "fulfilment.select.category.chosen",
+        for (String key : List.of("fulfilment.select.money", "fulfilment.select.unit.currency", "fulfilment.select.category.chosen",
                 "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold", "fulfilment.select.filter.range")) {
             assertThat(en.getProperty(key)).as("en " + key).contains("zł").doesNotContain("PLN");
         }
@@ -104,9 +104,9 @@ class FulfilmentSelectMessagesTest {
         Set<String> used = keysUsed();
 
         // then
-        assertThat(used).contains("fulfilment.select.unit.pieces", "fulfilment.select.unit.perPiece", "fulfilment.select.money",
+        assertThat(used).contains("fulfilment.select.unit.pieces", "fulfilment.select.unit.currency", "fulfilment.select.money",
                 "fulfilment.select.toggle.on", "fulfilment.select.toggle.off", "fulfilment.select.toggle.alt",
-                "fulfilment.select.list.expand", "fulfilment.select.list.collapse", "fulfilment.select.list.selectVisible",
+                "fulfilment.select.list.expand", "fulfilment.select.list.collapse",
                 "fulfilment.select.list.clearAll", "fulfilment.select.list.clearMatching", "fulfilment.select.alt.dearer", "fulfilment.select.alt.fold",
                 "fulfilment.select.orders.filter", "fulfilment.select.orders.filter.split", "fulfilment.select.ratio",
                 "fulfilment.select.category.chosen", "fulfilment.select.mfn", "fulfilment.select.offer.name",

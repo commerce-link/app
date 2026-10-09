@@ -45,7 +45,7 @@ class FulfilmentQueueRenderingTest {
                 .doesNotContain("Zasugeruj dokładnie")
                 .contains("name=\"onlyWithProfit\"").contains("name=\"onlyLocalSuppliers\"")
                 .contains("name=\"onlyMultiOrder\"").contains("name=\"orderByOrder\"")
-                .contains("<span>Pomiń</span>").contains("name=\"orderIds\" value=\"s1\"")
+                .contains("<span>Następna grupa</span>").contains("name=\"orderIds\" value=\"s1\"")
                 .contains("po terminie: 3 dni").contains("2 z 2").contains("fulfilment-queue.js")
                 .doesNotContain("??");
         String content = html.substring(html.indexOf("cl-page-body is-wide"));
@@ -66,10 +66,10 @@ class FulfilmentQueueRenderingTest {
         // then
         String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
         assertThat(actions).contains("href=\"/dashboard/fulfilment/queue?orderIds=s1&amp;skippedGroups=1\"")
-                .contains("<span>Wróć</span>").contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
-                .contains("name=\"skippedGroups\" value=\"1,1,2\"").contains("<span>Pomiń</span>");
-        assertThat(actions.indexOf("Wróć")).isLessThan(actions.indexOf("Zacznij od początku"));
-        assertThat(actions.indexOf("Zacznij od początku")).isLessThan(actions.indexOf("<span>Pomiń</span>"));
+                .contains("<span>Poprzednia grupa</span>").contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
+                .contains("name=\"skippedGroups\" value=\"1,1,2\"").contains("<span>Następna grupa</span>");
+        assertThat(actions.indexOf("Poprzednia grupa")).isLessThan(actions.indexOf("Zacznij od początku"));
+        assertThat(actions.indexOf("Zacznij od początku")).isLessThan(actions.indexOf("<span>Następna grupa</span>"));
         assertThat(html).doesNotContain("Pominięte zamówienia: 2");
     }
 
@@ -84,7 +84,7 @@ class FulfilmentQueueRenderingTest {
 
         // then
         String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
-        assertThat(actions).contains("<span>Wróć</span>").doesNotContain("Zacznij od początku").contains("<span>Pomiń</span>");
+        assertThat(actions).contains("<span>Poprzednia grupa</span>").doesNotContain("Zacznij od początku").contains("<span>Następna grupa</span>");
     }
 
     @Test
@@ -98,7 +98,7 @@ class FulfilmentQueueRenderingTest {
 
         // then
         String actions = html.substring(html.indexOf("cl-page-actions"), html.indexOf("cl-page-lead"));
-        assertThat(actions).contains("<span>Pomiń</span>").doesNotContain("Wróć").doesNotContain("Zacznij od początku");
+        assertThat(actions).contains("<span>Następna grupa</span>").doesNotContain("Poprzednia grupa").doesNotContain("Zacznij od początku");
         assertThat(html).doesNotContain("??");
     }
 
@@ -108,7 +108,7 @@ class FulfilmentQueueRenderingTest {
         String html = render(group(false));
 
         // then
-        assertThat(html).contains("Pomiń i wróć").contains("nic nie zmienia w zamówieniach");
+        assertThat(html).contains("Następna i poprzednia grupa").contains("Najpierw idą zamówienia magazynowe sklepu").contains("nic nie zmienia w zamówieniach");
     }
 
     @Test
@@ -145,7 +145,7 @@ class FulfilmentQueueRenderingTest {
 
         // then
         assertThat(html).contains("Pominięte zostały wszystkie czekające zamówienia").contains("Pominięte zamówienia: 7.")
-                .contains("<span>Wróć</span>").contains("href=\"/dashboard/fulfilment/queue?orderIds=a&amp;skippedGroups=6\"")
+                .contains("<span>Poprzednia grupa</span>").contains("href=\"/dashboard/fulfilment/queue?orderIds=a&amp;skippedGroups=6\"")
                 .contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
                 .doesNotContain("fa-forward").doesNotContain("??");
     }

@@ -271,14 +271,16 @@ public class FulfilmentSelectPageFactory {
 
     private static List<Missing> missing(FulfilmentForm form, List<OrderRef> refs, String storeId, boolean superAdmin) {
         Map<String, OrderRef> byId = refs.stream().collect(Collectors.toMap(OrderRef::orderId, r -> r, (a, b) -> a));
-        return form.getUnmatched().stream()
-                .map(item -> {
-                    OrderRef ref = byId.get(item.orderId());
-                    String number = ref != null ? ref.number() : ConversionUtil.getShortenedId(item.orderId());
-                    String href = ref != null ? ref.href() : orderHref(storeId, item.orderId(), superAdmin);
-                    String reason = item.reason() == UnmatchedItem.Reason.NARROWED
-                            ? "fulfilment.select.missing.reason.narrowed" : "fulfilment.select.missing.reason.noOffer";
-                    return new Missing(item.orderId(), number, href, item.name(), item.qty(), item.price(), reason);
+        Map<String, List<UnmatchedItem>> byOrder = form.getUnmatched().stream()
+                .collect(Collectors.groupingBy(UnmatchedItem::orderId, LinkedHashMap::new, Collectors.toList()));
+        return byOrder.entrySet().stream()
+                .map(entry -> {
+                    String orderId = entry.getKey();
+                    OrderRef ref = byId.get(orderId);
+                    String number = ref != null ? ref.number() : ConversionUtil.getShortenedId(orderId);
+                    String href = ref != null ? ref.href() : orderHref(storeId, orderId, superAdmin);
+                    boolean narrowed = entry.getValue().stream().anyMatch(item -> item.reason() == UnmatchedItem.Reason.NARROWED);
+                    return new Missing(orderId, number, href, entry.getValue().size(), narrowed);
                 })
                 .toList();
     }
