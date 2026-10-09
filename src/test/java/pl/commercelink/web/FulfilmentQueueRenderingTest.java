@@ -40,8 +40,9 @@ class FulfilmentQueueRenderingTest {
         assertThat(html).contains("<h1").contains("Kolejka realizacji").contains("Zamówienia magazynowe").contains("Magazyn sklepu")
                 .contains("action=\"/dashboard/orders/fulfilment\"")
                 .contains("name=\"selectedOrders\"").contains("value=\"o1\"").contains("data-items=\"4\"")
-                .contains("name=\"pathSelector\" value=\"default\"").contains("name=\"pathSelector\" value=\"suggest\"")
-                .contains("name=\"pathSelector\" value=\"suggest-exact\"")
+                .contains("name=\"pathSelector\" value=\"default\"").doesNotContain("name=\"pathSelector\" value=\"suggest\"")
+                .contains("name=\"pathSelector\" value=\"suggest-exact\"").contains("Zasugeruj dostawców")
+                .doesNotContain("Zasugeruj dokładnie")
                 .contains("name=\"onlyWithProfit\"").contains("name=\"onlyLocalSuppliers\"")
                 .contains("name=\"onlyMultiOrder\"").contains("name=\"orderByOrder\"")
                 .contains("<span>Pomiń</span>").contains("name=\"orderIds\" value=\"s1\"")
@@ -52,8 +53,9 @@ class FulfilmentQueueRenderingTest {
         assertThat(html.split("name=\"selectedOrders\"", -1)).hasSize(3);
         assertThat(html.split("checked", -1).length - 1).isGreaterThanOrEqualTo(2);
         assertThat(html).contains("value=\"default\" class=\"cl-button is-primary\"")
-                .contains("value=\"suggest\" class=\"cl-button\"").contains("value=\"suggest-exact\" class=\"cl-button\"");
-        assertThat(html.indexOf("value=\"default\"")).isLessThan(html.indexOf("value=\"suggest\""));
+                .contains("value=\"suggest-exact\" class=\"cl-button\"");
+        assertThat(html.split("name=\"pathSelector\"", -1)).hasSize(3);
+        assertThat(html.indexOf("value=\"default\"")).isLessThan(html.indexOf("value=\"suggest-exact\""));
     }
 
     @Test

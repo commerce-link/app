@@ -163,11 +163,8 @@ public class FulfilmentSelectPageFactory {
     }
 
     private static String strategyKey(String pathSelector) {
-        if ("suggest".equals(pathSelector)) {
+        if ("suggest".equals(pathSelector) || "suggest-exact".equals(pathSelector)) {
             return "fulfilment.select.strategy.suggest";
-        }
-        if ("suggest-exact".equals(pathSelector)) {
-            return "fulfilment.select.strategy.exact";
         }
         return "fulfilment.select.strategy.default";
     }

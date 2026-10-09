@@ -95,7 +95,7 @@ class FulfilmentSelectRenderingTest {
         // then
         assertThat(html).contains("<h1").contains("Dobór dostawców").contains("Kolejka realizacji")
                 .contains("href=\"/dashboard/fulfilment/queue?orderIds=s1&amp;skippedGroups=1\"")
-                .contains("Magazyn sklepu").contains("Sugestia dokładna").contains("Tylko źródła z zyskiem")
+                .contains("Magazyn sklepu").contains("Sugestia").doesNotContain("Sugestia dokładna").contains("Tylko źródła z zyskiem")
                 .contains("data-cl-select").contains("action=\"/dashboard/orders/fulfilment/commit\"")
                 .contains("formaction=\"/dashboard/orders/fulfilment/commitAndContinue\"")
                 .contains("Zatwierdź dobór").contains("Zatwierdź i dobierz resztę").doesNotContain("Pomiń to zamówienie")

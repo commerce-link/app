@@ -178,12 +178,12 @@
                         <button type="submit" name="pathSelector" value="default" class="cl-button is-primary"
                                 aria-describedby="queue-help-default" data-help="queue-help-default" th:text="#{fulfilment.queue.pick.default}"></button>
                         <p class="cl-help" id="queue-help-default" th:text="#{fulfilment.queue.pick.default.help}"></p>
-                        <button type="submit" name="pathSelector" value="suggest" class="cl-button"
+                        <!--/* the one suggestion is the exact finder (SupplierSubsetPathFinder): it is the cheapest split and,
+                               with the few suppliers a store has, faster than the pruned heuristic on a large group; the
+                               heuristic ("suggest") is no longer offered (user's decision of 2026-10-09) */-->
+                        <button type="submit" name="pathSelector" value="suggest-exact" class="cl-button"
                                 aria-describedby="queue-help-suggest" data-help="queue-help-suggest" th:text="#{fulfilment.queue.pick.suggest}"></button>
                         <p class="cl-help" id="queue-help-suggest" th:text="#{fulfilment.queue.pick.suggest.help}"></p>
-                        <button type="submit" name="pathSelector" value="suggest-exact" class="cl-button"
-                                aria-describedby="queue-help-exact" data-help="queue-help-exact" th:text="#{fulfilment.queue.pick.exact}"></button>
-                        <p class="cl-help" id="queue-help-exact" th:text="#{fulfilment.queue.pick.exact.help}"></p>
                     </div>
                 </section>
             </aside>
