@@ -142,13 +142,16 @@ public class OrderRowMapper {
         // "to issue"); a Cancelled one never owes a document
         boolean delivered = order.getStatus() == OrderStatus.Delivered
                 || (archive && order.getStatus() == OrderStatus.Completed);
+        // a closed order is past the point a missing document could hold it open, so its to-do says only what is missing
+        String todo = archive ? "orders.archive.mark.todo" : "orders.list.mark.todo";
+        String reviewTodo = archive ? "orders.archive.mark.review.todo" : "orders.list.mark.review.todo";
         List<DocMark> marks = new ArrayList<>();
 
         Optional<Document> goodsIssue = order.getDocumentByType(DocumentType.GoodsIssue);
         if (goodsIssue.isPresent()) {
             marks.add(mark("wz", "WZ", "is-done", text("orders.list.mark.done", "WZ", number(goodsIssue.get()))));
         } else if (delivered && warehouseDocuments && order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
-            marks.add(mark("wz", "WZ", "is-todo", text("orders.list.mark.todo", "WZ")));
+            marks.add(mark("wz", "WZ", "is-todo", text(todo, "WZ")));
         }
 
         Optional<Document> closing = order.getClosingDocument();
@@ -164,13 +167,13 @@ public class OrderRowMapper {
             marks.add(mark("invoice", code(type), "is-done", text("orders.list.mark.done", documentName(type), number(closing.get()))));
         } else if (delivered && !order.isInvoiced()) {
             DocumentType type = order.getReceiptType();
-            marks.add(mark("invoice", code(type), "is-todo", text("orders.list.mark.todo", documentName(type))));
+            marks.add(mark("invoice", code(type), "is-todo", text(todo, documentName(type))));
         }
 
         OrderReviewStatus review = order.getReview() == null ? null : order.getReview().getStatus();
         String reviewName = text("orders.list.mark.review");
         if (review == OrderReviewStatus.ToBeCollected && delivered) {
-            marks.add(mark("review", "", "is-todo", text("orders.list.mark.review.todo", reviewName)));
+            marks.add(mark("review", "", "is-todo", text(reviewTodo, reviewName)));
         } else if (review == OrderReviewStatus.Positive || review == OrderReviewStatus.Negative || review == OrderReviewStatus.NoResponse) {
             marks.add(mark("review", "", "is-done", text("orders.list.mark.review.done", reviewName, text("OrderReviewStatus." + review.name()))));
         }

@@ -408,4 +408,20 @@ class OrderRowMapperTest {
         // then
         assertThat(row.marks()).noneMatch(OrderRow.DocMark::todo);
     }
+
+    @Test
+    void archivedToDoDoesNotClaimItBlocksClosingAnOrderThatIsAlreadyClosed() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).filteredOn(OrderRow.DocMark::todo).extracting(OrderRow.DocMark::label)
+                .containsExactly("WZ: do wystawienia", "Paragon: do wystawienia", "Opinia: do zebrania");
+    }
 }
