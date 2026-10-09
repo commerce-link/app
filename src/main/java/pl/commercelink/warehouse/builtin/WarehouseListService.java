@@ -115,7 +115,7 @@ class WarehouseListService {
         List<WarehouseItem> counted = store.stream().filter(i -> statuses.contains(i.getStatus())).toList();
         boolean active = query.statuses().equals(statuses) && query.categories().isEmpty() && query.q() == null;
         String hint = hintKey != null ? text(locale, hintKey) : text(locale, "warehouse.tile.items", counted.size());
-        // an active tile clicked again switches its filter off, back to the default view (orders, deliveries, payments)
+        // an active tile clicked again switches its filter off and shows every status (orders, deliveries, payments)
         String href = active ? query.cleared().href() : query.withStatuses(statuses).href();
         return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
                 hint, href, active);
@@ -165,11 +165,8 @@ class WarehouseListService {
 
     private List<Chip> chips(WarehouseListQuery query, Locale locale) {
         List<Chip> chips = new ArrayList<>();
-        // the default status has no chip: the Status menu and the active tile already tell it, and with a chip "Wyczyść filtry"
-        // put back the very filter the chip's × had just removed (orders list rule)
-        if (query.isAllStatuses() && !query.isDefaultStatuses()) {
-            chip(chips, text(locale, "warehouse.list.chip.status", text(locale, "warehouse.list.menu.all")), query.withDefaultStatuses().href(), locale);
-        } else if (!query.isDefaultStatuses()) {
+        // every status narrowed to, the default one included, is a chip; its × shows the rest (every status once the last goes)
+        if (!query.isAllStatuses()) {
             query.statuses().forEach(s -> chip(chips, text(locale, "warehouse.list.chip.status", text(locale, WarehouseStatuses.labelKey(s))),
                     query.withoutStatus(s).href(), locale));
         }

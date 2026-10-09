@@ -81,7 +81,8 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
 
     public boolean isAllStatuses() { return statuses.equals(WarehouseStatuses.visible(wms)); }
 
-    public boolean isFiltered() { return !isDefaultStatuses() || !categories.isEmpty() || q != null; }
+    /** The default status narrows the list too: the page opens with it as a chip that can be cleared (user decision 2026-10-09). */
+    public boolean isFiltered() { return !isAllStatuses() || !categories.isEmpty() || q != null; }
 
     public Sort effectiveSort() { return sort != null ? sort : Sort.CATEGORY; }
 
@@ -102,11 +103,6 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
     /** A tile: exactly its statuses, every other narrowing dropped (orders list rule, app#238). */
     public WarehouseListQuery withStatuses(List<FulfilmentStatus> next) {
         return new WarehouseListQuery(wms, next, List.of(), null, sort, dir, 1);
-    }
-
-    /** The default status with every other narrowing kept: what removing the "all statuses" chip leads to. */
-    public WarehouseListQuery withDefaultStatuses() {
-        return new WarehouseListQuery(wms, null, categories, q, sort, dir, 1);
     }
 
     public WarehouseListQuery toggleCategory(String c) {
@@ -132,7 +128,8 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
 
     public WarehouseListQuery withPage(int n) { return new WarehouseListQuery(wms, statuses, categories, q, sort, dir, n); }
 
-    public WarehouseListQuery cleared() { return new WarehouseListQuery(wms, null, List.of(), null, sort, dir, 1); }
+    /** Nothing narrows the list: every status, which is the explicit statuses=all because a bare address opens the default. */
+    public WarehouseListQuery cleared() { return new WarehouseListQuery(wms, WarehouseStatuses.visible(wms), List.of(), null, sort, dir, 1); }
 
     public WarehouseListQuery toggleSort(Sort column) {
         Direction next = effectiveSort() == column ? effectiveDir().flipped() : Direction.ASC;

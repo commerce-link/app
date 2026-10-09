@@ -35,7 +35,8 @@ class WarehouseListQueryTest {
         assertThat(own.statuses()).containsExactly(Delivered);
         assertThat(external.statuses()).containsExactly(Ordered);
         assertThat(own.href()).isEqualTo("/dashboard/warehouse");
-        assertThat(own.isFiltered()).isFalse();
+        // the default status is a filter the operator sees as a chip and can clear (user decision 2026-10-09)
+        assertThat(own.isFiltered()).isTrue();
     }
 
     @Test
@@ -136,15 +137,19 @@ class WarehouseListQueryTest {
     }
 
     @Test
-    void clearedGoesBackToTheDefaultView() {
+    void clearedShowsEveryStatusWithNothingNarrowingTheList() {
         // given
-        WarehouseListQuery query = WarehouseListQuery.parse(params("statuses", "all", "categories", "none", "q", "x"), false);
+        WarehouseListQuery query = WarehouseListQuery.parse(params("categories", "none", "q", "x"), false);
+        WarehouseListQuery wms = WarehouseListQuery.parse(params("q", "x"), true);
 
         // when
         WarehouseListQuery q = query.cleared();
 
         // then
-        assertThat(q.href()).isEqualTo("/dashboard/warehouse");
+        // a bare address still opens on the default status, so "nothing narrows" is the explicit statuses=all
+        assertThat(q.href()).isEqualTo("/dashboard/warehouse?statuses=all");
+        assertThat(q.isFiltered()).isFalse();
+        assertThat(wms.cleared().isAllStatuses()).isTrue();
     }
 
     @Test

@@ -120,20 +120,51 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void activeTileLinksBackToTheDefaultViewSoASecondClickSwitchesItsFilterOff() {
+    void defaultStatusIsAChipWhoseRemovalShowsEveryStatus() {
+        // given
+        add("A", "GPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel opened = page();
+        WarehousePageModel byCategory = page("categories", "GPU");
+
+        // then
+        // the page opens on "Na stanie" as a filter the operator sees and can clear (user decision 2026-10-09)
+        assertThat(opened.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Status: Na stanie");
+        assertThat(opened.chips().get(0).clearHref()).isEqualTo("/dashboard/warehouse?statuses=all");
+        assertThat(opened.activeFilterCount()).isEqualTo(1);
+        assertThat(byCategory.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Status: Na stanie", "Kategoria: GPU");
+    }
+
+    @Test
+    void everyStatusHasNoChipBecauseNothingNarrowsTheList() {
+        // given
+        add("A", "GPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel all = page("statuses", "all", "q", "a");
+
+        // then
+        assertThat(all.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Szukasz: „a”");
+    }
+
+    @Test
+    void activeTileSwitchesItsFilterOffToEveryStatusAndThenNoTileIsActive() {
         // given
         add("A", "GPU", Reserved, 1, 1);
 
         // when
-        WarehousePageModel reserved = page("statuses", "Reserved", "sort", "name");
         WarehousePageModel opened = page("sort", "name");
+        WarehousePageModel reserved = page("statuses", "Reserved", "sort", "name");
+        WarehousePageModel all = page("statuses", "all", "sort", "name");
 
         // then
-        // like the orders, deliveries and payments tiles: an active tile clicked again removes its own filter
-        WarehousePageModel.Tile reservedTile = reserved.tiles().get(2);
-        assertThat(reservedTile.active()).isTrue();
-        assertThat(reservedTile.href()).isEqualTo("/dashboard/warehouse?sort=name");
-        assertThat(opened.tiles().get(2).href()).isEqualTo("/dashboard/warehouse?statuses=Reserved&sort=name");
+        // "Na stanie" is active on the default view and can be clicked off too, as every other tile
+        assertThat(opened.tiles().get(0).active()).isTrue();
+        assertThat(opened.tiles().get(0).href()).isEqualTo("/dashboard/warehouse?statuses=all&sort=name");
+        assertThat(reserved.tiles().get(2).href()).isEqualTo("/dashboard/warehouse?statuses=all&sort=name");
+        assertThat(all.tiles()).noneMatch(WarehousePageModel.Tile::active);
+        assertThat(all.tiles().get(2).href()).isEqualTo("/dashboard/warehouse?statuses=Reserved&sort=name");
     }
 
     @Test
@@ -300,36 +331,6 @@ class WarehouseListServiceTest {
         assertThat(filtered.chips()).extracting(WarehousePageModel.Chip::label)
                 .containsExactly("Status: Zarezerwowane", "Kategoria: GPU", "Szukasz: „a”");
         assertThat(filtered.activeFilterCount()).isEqualTo(3);
-    }
-
-    @Test
-    void defaultStatusIsNoChipSoClearingFiltersNeverAddsOne() {
-        // given
-        add("A", "GPU", Delivered, 1, 1);
-
-        // when
-        WarehousePageModel opened = page();
-        WarehousePageModel byCategory = page("categories", "GPU");
-
-        // then
-        // the Status menu ("Status: Na stanie") and the active tile already tell the default; a chip made "Wyczyść filtry" put back
-        // the very filter its × had just removed
-        assertThat(opened.chips()).isEmpty();
-        assertThat(opened.activeFilterCount()).isZero();
-        assertThat(byCategory.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Kategoria: GPU");
-    }
-
-    @Test
-    void allStatusesIsAChipWhoseRemovalLeadsBackToTheDefaultView() {
-        // given
-        add("A", "GPU", Delivered, 1, 1);
-
-        // when
-        WarehousePageModel all = page("statuses", "all", "q", "a");
-
-        // then
-        assertThat(all.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Status: wszystkie", "Szukasz: „a”");
-        assertThat(all.chips().get(0).clearHref()).isEqualTo("/dashboard/warehouse?q=a");
     }
 
     @Test
