@@ -301,4 +301,18 @@ class OrderArchiveServiceTest {
         assertThat(page.dates().presets()).extracting(OrderArchivePage.Preset::label)
                 .containsExactly("Cała historia", "Ostatnie 30 dni", "Ostatnie 90 dni", "Ten rok");
     }
+
+    @Test
+    void emptySegmentOffersAllStatusesInsteadOfANoOpClear() {
+        // given
+        indexReturns(List.of());
+
+        // when
+        OrderArchivePage page = service.page(STORE, query("status", "Cancelled"), TODAY, PL);
+
+        // then
+        assertThat(page.emptyState().text()).isEqualTo("Brak zamówień spełniających filtry.");
+        assertThat(page.emptyState().actions()).extracting(OrderArchivePage.Action::label, OrderArchivePage.Action::href)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Szukaj we wszystkich", "/dashboard/orders/archive"));
+    }
 }

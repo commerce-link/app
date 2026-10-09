@@ -219,6 +219,11 @@ public class OrderArchiveService {
             actions.add(new Action(text(locale, "orders.archive.search.clear"), q.withQ(null).href()));
             return new EmptyState(text(locale, "orders.archive.empty.search", q.q()), actions);
         }
+        if (!q.hasDates()) {
+            // clearing filters would keep the status segment, so the link would lead to this same page
+            return new EmptyState(text(locale, "orders.archive.empty.filtered"),
+                    List.of(new Action(text(locale, "orders.archive.empty.searchAll"), q.withStatus(null).href())));
+        }
         return new EmptyState(text(locale, "orders.archive.empty.filtered"),
                 List.of(new Action(text(locale, "general.clear.filters"), q.cleared().href())));
     }
