@@ -40,6 +40,29 @@ class OrdersListTemplateTest {
         return SettingsTemplateRenderer.render(markup, variables).replaceAll("\\s+", " ");
     }
 
+    /** The archive is one click away from the list, before the page's own actions (design system "Przycisk archiwum"). */
+    @Test
+    void theHeaderLeadsToTheArchiveFirst() throws Exception {
+        // when
+        String html = header(null);
+
+        // then
+        assertThat(html).contains("<a class=\"cl-button\" href=\"/dashboard/orders/archive\">"
+                + " <i class=\"fas fa-archive\" aria-hidden=\"true\"></i> <span>Archiwum</span> </a>");
+        assertThat(html.indexOf("fa-archive")).isLessThan(html.indexOf("Nowa sprzedaż POS"));
+    }
+
+    /** An empty search also offers the archive, next to clearing the search. */
+    @Test
+    void emptySearchLinksToTheArchive() throws Exception {
+        // given
+        String html = page();
+
+        // then
+        assertThat(html).contains("es.archiveHref()").contains("es.archiveLabel()");
+        assertThat(html.indexOf("es.archiveHref()")).isGreaterThan(html.indexOf("class=\"cl-list-empty\""));
+    }
+
     /** "Zamów odbiór" in the header, before "Nowa sprzedaż POS", with the number of packages waiting for a courier. */
     @Test
     void theHeaderOffersThePickupPageWithTheNumberOfWaitingPackages() throws Exception {

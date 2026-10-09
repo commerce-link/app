@@ -18,6 +18,18 @@ class OrderBackLinkTest {
     }
 
     @Test
+    void archiveIsAWayBackToo() {
+        // when / then
+        assertThat(OrderBackLink.sanitize("/dashboard/orders/archive")).isEqualTo("/dashboard/orders/archive");
+        assertThat(OrderBackLink.sanitize("/dashboard/orders/archive?q=kowalski&status=Completed"))
+                .isEqualTo("/dashboard/orders/archive?q=kowalski&status=Completed");
+        assertThat(OrderBackLink.sanitize("/dashboard/orders/archive//evil")).isEqualTo("/dashboard/orders");
+        assertThat(OrderBackLink.sanitize("/dashboard/orders/archivex")).isEqualTo("/dashboard/orders");
+        assertThat(OrderBackLink.isArchive("/dashboard/orders/archive?q=x")).isTrue();
+        assertThat(OrderBackLink.isArchive("/dashboard/orders?q=x")).isFalse();
+    }
+
+    @Test
     void rejectsForeignPathsDoubleSlashesAndOverlongValues() {
         // when / then
         assertThat(OrderBackLink.sanitize("/dashboard/warehouse")).isEqualTo(OrderBackLink.LIST);
