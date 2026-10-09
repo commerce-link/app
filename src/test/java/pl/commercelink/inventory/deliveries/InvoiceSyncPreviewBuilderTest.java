@@ -94,6 +94,32 @@ class InvoiceSyncPreviewBuilderTest {
     }
 
     @Test
+    void anInvoiceInEuroKeepsItsTotalsInEuroAndMatchesTheLinesTheAdapterConvertedToZloty() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        Delivery delivery = new Delivery("store-1", "W6XDAEXETN", "Wave");
+        delivery.setDeliveryId("delivery-1");
+        delivery.setItems(List.of(item("X870EAPROXICE", 1, 1311.66)));
+        when(deliveriesQueryService.fetchDeliveryWithAllocations("store-1", "delivery-1")).thenReturn(delivery);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        // as Fakturownia returns it: totals in EUR, every line converted with the invoice's rate (299.09 EUR x 4.3855)
+        Invoice invoice = new Invoice("inv-1", "1301004976944", null, new Price(299.09, 299.09, "EUR"), null, "EUR", 4.3855,
+                false, null, List.of(new InvoicePosition("pos-1", "GIGABYTE X870E AORUS PRO X3D ICE", 1, Price.fromNet(1311.66))),
+                BillingParty.company("seller-1", "Wave", null, null, null, null, null, "WAVE"), null);
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenReturn(invoice);
+
+        // when
+        InvoiceSyncPreview preview = builder.build("store-1", "delivery-1", "inv-1");
+
+        // then
+        assertThat(preview.getCurrency()).isEqualTo("EUR");
+        assertThat(preview.getPositionCurrency()).isEqualTo("PLN");
+        assertThat(preview.getInvoicePriceNetConverted()).isEqualTo(1311.66);
+        assertThat(preview.getMappings()).singleElement().satisfies(m -> assertThat(m.getSelectedPositionId()).isEqualTo("pos-1"));
+    }
+
+    @Test
     void unknownDeliveryGivesNoPreview() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(new Store());

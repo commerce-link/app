@@ -24,7 +24,7 @@
                         <span th:if="${p.supplierName != null}"><strong th:text="${p.supplierName}"></strong></span>
                         <span th:if="${!#strings.isEmpty(p.externalDeliveryId)}" th:text="#{invoiceSync.meta.number(${p.externalDeliveryId})}"></span>
                         <span th:if="${p.deliveryOrderedAt != null}" th:text="#{invoiceSync.meta.ordered(${p.deliveryOrderedAt})}"></span>
-                        <span th:if="${p.foreignCurrency}" th:text="#{invoiceSync.meta.currency(${p.currency}, ${#numbers.formatDecimal(p.exchangeRate, 1, 4)})}"></span>
+                        <span th:if="${p.foreignCurrency}" th:text="#{invoiceSync.meta.currency(${p.currency}, ${#numbers.formatDecimal(p.exchangeRate, 1, 4)}, ${p.positionCurrency})}"></span>
                     </p>
                 </th:block>
                 <th:block th:fragment="syncActions">
@@ -40,18 +40,13 @@
                 <p class="cl-alert-text" th:text="#{invoiceSync.locked}"></p>
             </div>
 
-            <div th:if="${p.foreignCurrency}" class="cl-alert is-warn">
-                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <p class="cl-alert-text" th:text="#{invoiceSync.foreignCurrency(${p.currency})}"></p>
-            </div>
-
             <form th:action="@{/dashboard/deliveries/sync/apply}" th:object="${preview}" method="post" class="cl-layout-aside"
                   data-cl-invoice-sync
                   th:attr="data-label-exact=#{invoiceSync.state.exact}, data-label-close=#{invoiceSync.state.close},
                            data-label-different=#{invoiceSync.state.different}, data-label-unassigned=#{invoiceSync.state.unassigned},
                            data-label-no-cost=#{invoiceSync.state.noCost}, data-template-diff=#{invoiceSync.diff('{0}')},
                            data-template-duplicate=#{invoiceSync.warn.duplicate('{0}')}, data-template-qty=#{invoiceSync.warn.qty('{0}', '{1}')},
-                           data-template-count=#{invoiceSync.state.count('{0}', '{1}')}, data-currency=${p.currency}">
+                           data-template-count=#{invoiceSync.state.count('{0}', '{1}')}, data-currency=${p.positionCurrency}">
                 <input type="hidden" th:field="*{deliveryId}"/>
                 <input type="hidden" th:field="*{externalDeliveryId}"/>
                 <input type="hidden" th:field="*{invoiceId}"/>
@@ -116,7 +111,7 @@
                                         <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
                                         <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
                                               th:with="o=${p.option(mapping.selectedPositionId)}"
-                                              th:text="#{invoiceSync.diff(${(o.priceNet > mapping.unitCost ? '+' : '') + p.invoiceMoney(o.priceNet - mapping.unitCost)})}"></span>
+                                              th:text="#{invoiceSync.diff(${(o.priceNet > mapping.unitCost ? '+' : '') + p.positionMoney(o.priceNet - mapping.unitCost)})}"></span>
                                     </td>
                                 </tr>
                                 </tbody>
@@ -156,7 +151,7 @@
                                 th:attr="data-position-id=${pos.id}">
                                 <div>
                                     <p class="cl-list-title" th:text="${pos.qty} + ' × ' + ${pos.name}"></p>
-                                    <p class="cl-list-desc" th:text="#{invoiceSync.unassigned.net(${p.invoiceMoney(pos.totalNet)})}"></p>
+                                    <p class="cl-list-desc" th:text="#{invoiceSync.unassigned.net(${p.positionMoney(pos.totalNet)})}"></p>
                                 </div>
                             </li>
                         </ul>
@@ -224,12 +219,14 @@
                         <dl class="cl-kv is-column">
                             <div><dt th:text="#{invoiceSync.compare.invoiceNet}"></dt><dd class="is-numeric" th:text="${p.invoiceMoney(p.invoicePriceNet)}"></dd></div>
                             <div><dt th:text="#{invoiceSync.compare.invoiceGross}"></dt><dd class="is-numeric" th:text="${p.invoiceMoney(p.invoicePriceGross)}"></dd></div>
+                            <div th:if="${p.foreignCurrency}"><dt th:text="#{invoiceSync.compare.invoiceNetConverted(${p.positionCurrency})}"></dt>
+                                <dd class="is-numeric" th:text="${p.positionMoney(p.invoicePriceNetConverted)}"></dd></div>
                             <div><dt th:text="#{invoiceSync.compare.deliveryNet}"></dt><dd class="is-numeric" th:text="${p.money(p.deliveryTotalCostNet)}"></dd></div>
                             <div class="cl-kv-total"><dt th:text="#{invoiceSync.compare.assigned}"></dt>
-                                <dd class="is-numeric"><output data-cl-sync-assigned aria-live="polite" th:text="${p.invoiceMoney(p.assignedNet)}"></output></dd></div>
+                                <dd class="is-numeric"><output data-cl-sync-assigned aria-live="polite" th:text="${p.positionMoney(p.assignedNet)}"></output></dd></div>
                             <div><dt th:text="#{invoiceSync.compare.unassigned}"></dt>
                                 <dd class="is-numeric" data-cl-sync-left th:classappend="${p.unassignedNet >= 0.005} ? 'is-bad'">
-                                    <output aria-live="polite" th:text="${p.invoiceMoney(p.unassignedNet)}"></output></dd></div>
+                                    <output aria-live="polite" th:text="${p.positionMoney(p.unassignedNet)}"></output></dd></div>
                         </dl>
                     </section>
                 </aside>
@@ -260,7 +257,7 @@
                 <span class="cl-status" th:classappend="${state.tone}" th:text="#{${state.labelKey}}"></span>
                 <span th:if="${state.name() == 'DIFFERENT'}" class="cl-diff"
                       th:with="o=${p.option(selected)}"
-                      th:text="#{invoiceSync.diff(${(o.totalNet > cost ? '+' : '') + p.invoiceMoney(o.totalNet - cost)})}"></span>
+                      th:text="#{invoiceSync.diff(${(o.totalNet > cost ? '+' : '') + p.positionMoney(o.totalNet - cost)})}"></span>
             </td>
         </tr>
 
@@ -269,7 +266,7 @@
                      data-now=#{invoiceSync.effect.now(${p.money(cost)})}, data-unchanged=#{invoiceSync.effect.unchanged}"
             th:hidden="${o == null}">
             <i class="fas" th:classappend="${icon}" aria-hidden="true"></i>
-            <span><strong data-cl-effect-text th:text="${o == null} ? '' : #{${key}(${p.invoiceMoney(o.totalNet)})}"></strong>
+            <span><strong data-cl-effect-text th:text="${o == null} ? '' : #{${key}(${p.positionMoney(o.totalNet)})}"></strong>
                 <span class="cl-effects-was" data-cl-effect-sub
                       th:text="${o != null and o.totalNet - cost < 0.005 and cost - o.totalNet < 0.005} ? #{invoiceSync.effect.unchanged} : #{invoiceSync.effect.now(${p.money(cost)})}"></span></span>
         </li>
