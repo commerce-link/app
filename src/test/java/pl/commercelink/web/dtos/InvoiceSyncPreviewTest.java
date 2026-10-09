@@ -140,13 +140,18 @@ class InvoiceSyncPreviewTest {
     }
 
     @Test
-    void invoiceAmountsCarryTheInvoiceCurrency() {
+    void invoiceTotalsCarryTheInvoiceCurrencyAndItsLinesTheirOwn() {
         // given
         InvoiceSyncPreview preview = preview();
         preview.setCurrency("EUR");
+        preview.setExchangeRate(4.3855);
 
         // when / then
-        assertThat(preview.invoiceMoney(1234.5)).isEqualTo("1 234,50 EUR");
+        assertThat(preview.invoiceMoney(1234.5)).isEqualTo("1\u00a0234,50 EUR");
+        assertThat(preview.positionMoney(1311.66)).isEqualTo("1\u00a0311,66 PLN");
+        assertThat(preview.optionLabel(preview.getOptions().get(0))).isEqualTo("100,00 PLN · 2 × Position p1");
+        assertThat(preview.getInvoicePriceNetConverted()).isEqualTo(510.0);
+        assertThat(preview.isForeignCurrency()).isTrue();
         assertThat(preview.money(1234.5)).isEqualTo("1\u00a0234,50 PLN");
         assertThat(preview.date("2026-10-22")).isEqualTo("22.10.2026");
     }

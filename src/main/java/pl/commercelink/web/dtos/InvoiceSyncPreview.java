@@ -1,6 +1,7 @@
 package pl.commercelink.web.dtos;
 
 import pl.commercelink.inventory.deliveries.InvoicePaymentSync;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderFormats;
 
@@ -332,8 +333,25 @@ public class InvoiceSyncPreview {
         return InvoicePaymentSync.of(invoicePaid, !deliveryPayments.isEmpty());
     }
 
+    /**
+     * The currency of the invoice lines. The invoicing adapters convert every line with the invoice's rate (Fakturownia,
+     * SaldeoSmart), so on an invoice in EUR the lines are already in złoty; only the invoice totals stay in EUR.
+     */
+    public String getPositionCurrency() {
+        return options.stream().map(Option::getCurrency).filter(c -> c != null && !c.isBlank()).findFirst()
+                .orElse(Price.DEFAULT_CURRENCY);
+    }
+
     public boolean isForeignCurrency() {
-        return currency != null && !"PLN".equalsIgnoreCase(currency);
+        return currency != null && !currency.equalsIgnoreCase(getPositionCurrency());
+    }
+
+    /**
+     * The invoice net in the lines' currency: the sum of the converted lines, not the total times the rate, which can
+     * differ by a grosz from the lines rounded one by one. So it always equals assigned plus unassigned.
+     */
+    public double getInvoicePriceNetConverted() {
+        return Math.round(options.stream().mapToDouble(Option::getTotalNet).sum() * 100.0) / 100.0;
     }
 
     /** An amount of the delivery, kept in złoty. */
@@ -341,7 +359,12 @@ public class InvoiceSyncPreview {
         return Money.format(amount) + " PLN";
     }
 
-    /** An amount of the invoice, in the invoice's currency. */
+    /** An amount from the invoice lines, in their currency. */
+    public String positionMoney(double amount) {
+        return Money.format(amount) + " " + getPositionCurrency();
+    }
+
+    /** A total of the invoice, in the invoice's currency. */
     public String invoiceMoney(double amount) {
         return Money.format(amount) + " " + (currency == null ? "PLN" : currency);
     }
@@ -353,7 +376,7 @@ public class InvoiceSyncPreview {
 
     /** The price leads: a long line name is cut in the closed select, and the price is what the row is compared by. */
     public String optionLabel(Option option) {
-        return invoiceMoney(option.getPriceNet()) + " \u00b7 " + option.getQty() + " \u00d7 " + option.getName();
+        return positionMoney(option.getPriceNet()) + " \u00b7 " + option.getQty() + " \u00d7 " + option.getName();
     }
 
     /** The state of a product row from its current choice; invoice-sync.js applies the same rule after every change. */
