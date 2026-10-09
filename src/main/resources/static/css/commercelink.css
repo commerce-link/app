@@ -8850,10 +8850,6 @@ a.cl-link-button:hover {
         margin-block: -12px;
     }
 }
-/* a lead link that would break mid-line on a phone (the warehouse archive link) takes its own line, as wide as its text */
-@media (max-width: 719px) {
-    .cl-page .cl-page-lead .cl-lead-link.is-stacked { display: table; }
-}
 
 .cl-page .cl-table.is-delivery td {
     vertical-align: top;

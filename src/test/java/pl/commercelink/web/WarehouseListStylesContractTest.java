@@ -166,18 +166,6 @@ class WarehouseListStylesContractTest {
     }
 
     @Test
-    void aStackedLeadLinkTakesItsOwnLineOnAPhone() throws Exception {
-        // given
-        String css = css();
-
-        // when / then
-        // after the lead text the link wrapped mid-line on a phone; display: table puts it on its own line, as wide as its text,
-        // and keeps the 44 px touch target of .cl-lead-link below 1024 px
-        String block = css.substring(css.indexOf("@media (max-width: 719px) {\n    .cl-page .cl-page-lead .cl-lead-link.is-stacked"));
-        assertThat(block.substring(0, block.indexOf("}\n}") + 3)).contains(".cl-page .cl-page-lead .cl-lead-link.is-stacked { display: table; }");
-    }
-
-    @Test
     void aCodeLongerThanThePhoneCardWrapsInsteadOfWideningThePage() throws Exception {
         // given
         String section = section();

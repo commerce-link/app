@@ -13,6 +13,11 @@
                 <h1 class="cl-page-title" th:text="#{warehouse.page.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
+                    <!--/* the archive of destroyed items, always there (also with 0): a secondary button before the two actions */-->
+                    <a class="cl-button" th:href="@{/dashboard/warehouse/items/destroyed}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-archive"></i></span>
+                        <span th:text="#{warehouse.action.destroyed(${page.destroyedCount()})}"></span>
+                    </a>
                     <a th:if="${page.admin() and restock != null}" class="cl-button" th:href="@{/dashboard/warehouse/restock}"
                        data-cl-dialog-open="warehouse-restock">
                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-sync-alt"></i></span>
@@ -24,9 +29,7 @@
                     </a>
                 </div>
             </div>
-            <!--/* the archive of destroyed items is a way to look things up, not an action: it follows the lead, always there */-->
-            <p class="cl-page-lead"><th:block th:text="#{warehouse.page.lead}"></th:block>
-                <a class="cl-lead-link is-stacked" th:href="@{/dashboard/warehouse/items/destroyed}" th:text="#{warehouse.action.destroyed(${page.destroyedCount()})}"></a></p>
+            <p class="cl-page-lead" th:text="#{warehouse.page.lead}"></p>
         </header>
 
         <div th:replace="~{fragments/screen-intro :: panel('warehouse', 'fas fa-warehouse')}"></div>
