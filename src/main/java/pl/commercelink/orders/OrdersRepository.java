@@ -326,6 +326,98 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return new QueryPageResult<>(orders, result.getLastEvaluatedKey());
     }
 
+    private static final String ORDERED_AT_INDEX = "StoreIdOrderedAtIndex";
+
+    /**
+     * The store's orders from StoreIdOrderedAtIndex in order-day order, read lazily: the next DynamoDB page is asked for
+     * only when the previous one is used up, so a caller that stops after 26 entries pays for one call. The days are
+     * compared as text: "from" as the bare date sorts before every time of that day (and equals a legacy date-only value),
+     * "to" is exclusive on the next day, so the last fraction of a second of the "to" day is still in.
+     */
+    public Iterator<ArchiveIndexEntry> archiveIndex(String storeId, ArchiveIndexRequest request) {
+        Map<String, AttributeValue> values = new HashMap<>();
+        Map<String, String> names = new HashMap<>();
+        values.put(":storeId", new AttributeValue().withS(storeId));
+        names.put("#status", "status");
+        String key = "storeId = :storeId";
+        if (request.from() != null || request.to() != null) {
+            // DynamoDB rejects a name placeholder that no expression uses
+            names.put("#orderedAt", "orderedAt");
+        }
+        if (request.from() != null && request.to() != null) {
+            key += " AND #orderedAt BETWEEN :from AND :toEnd";
+        } else if (request.from() != null) {
+            key += " AND #orderedAt >= :from";
+        } else if (request.to() != null) {
+            key += " AND #orderedAt < :toNext";
+        }
+        if (request.from() != null) {
+            values.put(":from", new AttributeValue().withS(request.from().toString()));
+        }
+        if (request.to() != null && request.from() != null) {
+            // a key condition takes one comparison of the range key, so with both days it is BETWEEN (inclusive): the
+            // upper bound is the highest text of the "to" day, above every "yyyy-MM-ddT…" of it and below the next day
+            values.put(":toEnd", new AttributeValue().withS(request.to() + "T￿"));
+        } else if (request.to() != null) {
+            values.put(":toNext", new AttributeValue().withS(request.to().plusDays(1).toString()));
+        }
+        List<String> statusPlaceholders = new ArrayList<>();
+        int i = 0;
+        for (OrderStatus status : request.statuses()) {
+            String placeholder = ":s" + i++;
+            statusPlaceholders.add(placeholder);
+            values.put(placeholder, new AttributeValue().withS(status.name()));
+        }
+        String filter = "#status IN (" + String.join(", ", statusPlaceholders) + ")";
+        String keyCondition = key;
+        Map<String, AttributeValue> firstStart = request.start() == null ? null : Map.of(
+                "storeId", new AttributeValue().withS(storeId),
+                "orderId", new AttributeValue().withS(request.start().orderId()),
+                "orderedAt", new AttributeValue().withS(request.start().orderedAt()));
+
+        return new Iterator<>() {
+            private final Deque<ArchiveIndexEntry> buffer = new ArrayDeque<>();
+            private Map<String, AttributeValue> startKey = firstStart;
+            private boolean exhausted;
+
+            @Override
+            public boolean hasNext() {
+                while (buffer.isEmpty() && !exhausted) {
+                    QueryRequest query = new QueryRequest()
+                            .withTableName("Orders")
+                            .withIndexName(ORDERED_AT_INDEX)
+                            .withKeyConditionExpression(keyCondition)
+                            .withFilterExpression(filter)
+                            .withExpressionAttributeValues(values)
+                            .withExpressionAttributeNames(names)
+                            .withScanIndexForward(!request.newestFirst())
+                            .withLimit(request.pageLimit());
+                    if (startKey != null) {
+                        query.withExclusiveStartKey(startKey);
+                    }
+                    QueryResult result = amazonDynamoDB.query(query);
+                    result.getItems().forEach(item -> buffer.add(new ArchiveIndexEntry(
+                            item.get("orderId").getS(),
+                            item.get("orderedAt").getS(),
+                            OrderStatus.valueOf(item.get("status").getS()),
+                            item.containsKey("email") ? item.get("email").getS() : null)));
+                    startKey = result.getLastEvaluatedKey();
+                    exhausted = startKey == null || startKey.isEmpty();
+                }
+                return !buffer.isEmpty();
+            }
+
+            @Override
+            public ArchiveIndexEntry next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return buffer.poll();
+            }
+        };
+    }
+
+
     public List<OrderIndexEntry> searchPastOrders(String storeId, PastOrderFilter filter) {
         if (isNotBlank(filter.getOrderId())) {
             Order order = findById(storeId, filter.getOrderId());
