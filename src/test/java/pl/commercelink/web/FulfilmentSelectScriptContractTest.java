@@ -73,6 +73,16 @@ class FulfilmentSelectScriptContractTest {
     }
 
     @Test
+    void filterMenusCloseOnAPressElsewhereOrEscapeAndOnlyOneStaysOpen() throws Exception {
+        // when
+        String js = Files.readString(SCRIPT);
+
+        // then
+        assertThat(js).contains("details[data-cl-filter-menu]").contains("addEventListener('pointerdown'")
+                .contains("event.key !== 'Escape'").contains("addEventListener('toggle'").contains("other.open = false;");
+    }
+
+    @Test
     void thePriceSliderDrivesTheSameFieldsTheFilterReads() throws Exception {
         // when
         String js = Files.readString(SCRIPT);

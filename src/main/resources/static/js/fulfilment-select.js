@@ -1019,6 +1019,39 @@
         syncRange();
         applyFilters();
     });
+    // The filter menus are <details>: one open at a time, closed by a press anywhere else or by Escape (which hands the
+    // focus back to its summary). A press, not a click: a slider thumb dragged past the panel ends its click outside.
+    var filterMenus = all(form, 'details[data-cl-filter-menu]');
+    filterMenus.forEach(function (menu) {
+        menu.addEventListener('toggle', function () {
+            if (menu.open) {
+                filterMenus.forEach(function (other) {
+                    if (other !== menu) {
+                        other.open = false;
+                    }
+                });
+            }
+        });
+    });
+    document.addEventListener('pointerdown', function (event) {
+        filterMenus.forEach(function (menu) {
+            if (menu.open && !menu.contains(event.target)) {
+                menu.open = false;
+            }
+        });
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') {
+            return;
+        }
+        filterMenus.forEach(function (menu) {
+            if (menu.open) {
+                menu.open = false;
+                menu.querySelector('summary').focus();
+            }
+        });
+    });
+
     buildRange();
     var filters = form.querySelector('[data-cl-select-filters]');
     if (filters) {
