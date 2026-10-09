@@ -105,7 +105,7 @@ class WarehouseListRenderingTest {
         assertThat(html).contains("value=\"a1\"").doesNotContain("value=\"b2\"");
         assertThat(html).contains("data-status=\"Delivered\"").contains("data-qty=\"3\"").contains("data-source=\"Acme\"");
         assertThat(html).contains("data-cl-action-path=\"/dashboard/warehouse/markAsReserved\"").contains("data-cl-action-for=\"Delivered\"");
-        assertThat(html).contains("Destroyed items: 7").contains("is-secondary-column");
+        assertThat(html).contains("is-secondary-column").doesNotContain("/dashboard/warehouse/items/destroyed");
         assertThat(html).contains("id=\"warehouse-bulk-form\"").contains("id=\"cl-quantity-dialog\"");
     }
 
@@ -156,6 +156,25 @@ class WarehouseListRenderingTest {
 
         // then
         assertThat(deliveryCell(html)).contains("class=\"cl-cell-delivery\"").contains("title=\"8c12485 / 0\"");
+    }
+
+    @Test
+    void destroyedArchiveLinkStandsInThePageHeaderEvenWithNoDestroyedItems() {
+        // given
+        WarehousePageModel base = model(List.of(row("a1", "Delivered", true)), false);
+        WarehousePageModel none = new WarehousePageModel(base.query(), true, false, base.tiles(), base.statusOptions(), "All",
+                base.categoryOptions(), "All", base.chips(), base.results(), base.sortHeaders(), base.rows(), base.pagination(), null,
+                false, base.activeFilterCount(), 0, base.menuActions(), base.destroyAction(), base.destroyReasons());
+        Context context = new Context();
+        context.setVariable("page", none);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("warehouse", context);
+
+        // then
+        String header = html.substring(html.indexOf("<header class=\"cl-page-header\">"), html.indexOf("</header>"));
+        assertThat(header).contains("href=\"/dashboard/warehouse/items/destroyed\"").contains("Destroyed items (0)");
+        assertThat(html).containsOnlyOnce("/dashboard/warehouse/items/destroyed");
     }
 
     @Test
@@ -383,7 +402,7 @@ class WarehouseListRenderingTest {
 
         // then
         assertThat(html).contains("data-template=\"· {m} pcs\"").contains("data-units-template=\"{m} pcs\"")
-                .contains("data-meta-template=\"{status} · {units}\"").contains("Destroyed items: 7 ›");
+                .contains("data-meta-template=\"{status} · {units}\"");
     }
 
     @Test

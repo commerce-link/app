@@ -104,6 +104,11 @@ public record WarehouseListQuery(boolean wms, List<FulfilmentStatus> statuses, L
         return new WarehouseListQuery(wms, next, List.of(), null, sort, dir, 1);
     }
 
+    /** The default status with every other narrowing kept: what removing the "all statuses" chip leads to. */
+    public WarehouseListQuery withDefaultStatuses() {
+        return new WarehouseListQuery(wms, null, categories, q, sort, dir, 1);
+    }
+
     public WarehouseListQuery toggleCategory(String c) {
         List<String> next = new ArrayList<>(categories);
         if (!next.remove(c)) {

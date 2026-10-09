@@ -282,8 +282,37 @@ class WarehouseListServiceTest {
         assertThat(empty.emptyState().actionHref()).isEqualTo("/dashboard/warehouse/items/new");
         assertThat(filtered.chips()).extracting(WarehousePageModel.Chip::label)
                 .containsExactly("Status: Zarezerwowane", "Kategoria: GPU", "Szukasz: „a”");
-        assertThat(page("statuses", "all").chips()).isEmpty();
         assertThat(filtered.activeFilterCount()).isEqualTo(3);
+    }
+
+    @Test
+    void defaultStatusIsNoChipSoClearingFiltersNeverAddsOne() {
+        // given
+        add("A", "GPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel opened = page();
+        WarehousePageModel byCategory = page("categories", "GPU");
+
+        // then
+        // the Status menu ("Status: Na stanie") and the active tile already tell the default; a chip made "Wyczyść filtry" put back
+        // the very filter its × had just removed
+        assertThat(opened.chips()).isEmpty();
+        assertThat(opened.activeFilterCount()).isZero();
+        assertThat(byCategory.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Kategoria: GPU");
+    }
+
+    @Test
+    void allStatusesIsAChipWhoseRemovalLeadsBackToTheDefaultView() {
+        // given
+        add("A", "GPU", Delivered, 1, 1);
+
+        // when
+        WarehousePageModel all = page("statuses", "all", "q", "a");
+
+        // then
+        assertThat(all.chips()).extracting(WarehousePageModel.Chip::label).containsExactly("Status: wszystkie", "Szukasz: „a”");
+        assertThat(all.chips().get(0).clearHref()).isEqualTo("/dashboard/warehouse?q=a");
     }
 
     @Test

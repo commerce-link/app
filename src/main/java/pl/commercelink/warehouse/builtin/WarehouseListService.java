@@ -163,13 +163,13 @@ class WarehouseListService {
 
     private List<Chip> chips(WarehouseListQuery query, Locale locale) {
         List<Chip> chips = new ArrayList<>();
-        if (!query.isAllStatuses() && !query.isDefaultStatuses()) {
+        // the default status has no chip: the Status menu and the active tile already tell it, and with a chip "Wyczyść filtry"
+        // put back the very filter the chip's × had just removed (orders list rule)
+        if (query.isAllStatuses() && !query.isDefaultStatuses()) {
+            chip(chips, text(locale, "warehouse.list.chip.status", text(locale, "warehouse.list.menu.all")), query.withDefaultStatuses().href(), locale);
+        } else if (!query.isDefaultStatuses()) {
             query.statuses().forEach(s -> chip(chips, text(locale, "warehouse.list.chip.status", text(locale, WarehouseStatuses.labelKey(s))),
                     query.withoutStatus(s).href(), locale));
-        } else if (query.isDefaultStatuses() && !query.isAllStatuses()) {
-            // the default status is a narrowing too: the operator sees why the reserved items are missing
-            FulfilmentStatus s = query.statuses().get(0);
-            chip(chips, text(locale, "warehouse.list.chip.status", text(locale, WarehouseStatuses.labelKey(s))), query.withoutStatus(s).href(), locale);
         }
         List<String> labels = categoryLabels(query, locale);
         for (int i = 0; i < labels.size(); i++) {
