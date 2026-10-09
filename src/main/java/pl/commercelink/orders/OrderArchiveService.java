@@ -40,7 +40,8 @@ public class OrderArchiveService {
     private final StoresRepository stores;
     private final MessageSource messages;
 
-    public OrderArchivePage page(String storeId, OrderArchiveQuery q, LocalDate today, Locale locale) {
+    public OrderArchivePage page(String storeId, OrderArchiveQuery requested, LocalDate today, Locale locale) {
+        OrderArchiveQuery q = withinRange(requested, today);
         Store store = stores.findById(storeId);
         OrderRowMapper mapper = new OrderRowMapper(messages, locale, store != null && store.hasDocumentsGenerationEnabled());
         Result result = switch (q.searchMode() == null ? SearchMode.TEXT : q.searchMode()) {
@@ -68,6 +69,20 @@ public class OrderArchiveService {
         }
     }
 
+    // DynamoDB rejects a start key outside the key condition (500), so such a cursor, e.g. a bookmarked "last 30 days"
+    // page reopened later, is ignored and the first page shown (spec §6); same text comparison as the key condition
+    private static OrderArchiveQuery withinRange(OrderArchiveQuery q, LocalDate today) {
+        ArchiveCursor cursor = q.after() != null ? q.after() : q.before();
+        if (cursor == null) {
+            return q;
+        }
+        LocalDate from = q.effectiveFrom(today);
+        LocalDate to = q.effectiveTo();
+        boolean tooOld = from != null && cursor.orderedAt().compareTo(from.toString()) < 0;
+        boolean tooNew = to != null && cursor.orderedAt().compareTo(to.plusDays(1).toString()) >= 0;
+        return tooOld || tooNew ? q.first() : q;
+    }
+
     private ArchiveIndexRequest request(OrderArchiveQuery q, LocalDate today, ArchiveCursor start, boolean newestFirst, int pageLimit) {
         return new ArchiveIndexRequest(q.statuses(), q.effectiveFrom(today), q.effectiveTo(), start, newestFirst, pageLimit);
     }
@@ -90,7 +105,8 @@ public class OrderArchiveService {
         List<ArchiveIndexEntry> page = take(orders.archiveIndex(storeId, request(q, today, q.after(), true, PAGE + 1)), PAGE + 1);
         boolean hasNext = page.size() > PAGE;
         List<ArchiveIndexEntry> shown = hasNext ? page.subList(0, PAGE) : page;
-        String previous = q.offset() > 0 && !shown.isEmpty() ? q.before(shown.get(0).cursor(), q.offset() - PAGE).href() : null;
+        String previous = q.offset() <= 0 || shown.isEmpty() ? null
+                : q.offset() - PAGE <= 0 ? q.first().href() : q.before(shown.get(0).cursor(), q.offset() - PAGE).href();
         String next = hasNext ? q.after(shown.get(PAGE - 1).cursor(), q.offset() + PAGE).href() : null;
         return Result.of(load(storeId, shown), q.offset(), previous, next);
     }

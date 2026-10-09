@@ -3,6 +3,9 @@ package pl.commercelink.orders;
 import org.apache.commons.lang3.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -30,8 +33,15 @@ public record ArchiveCursor(String orderedAt, String orderId) {
             if (at <= 0 || at == raw.length() - 1) {
                 return Optional.empty();
             }
-            return Optional.of(new ArchiveCursor(raw.substring(0, at), raw.substring(at + 1)));
-        } catch (IllegalArgumentException e) {
+            String orderedAt = raw.substring(0, at);
+            // the text is compared with the index key, so only what the index can hold is worth a query
+            if (orderedAt.length() < 12) {
+                LocalDate.parse(orderedAt);
+            } else {
+                LocalDateTime.parse(orderedAt);
+            }
+            return Optional.of(new ArchiveCursor(orderedAt, raw.substring(at + 1)));
+        } catch (IllegalArgumentException | DateTimeParseException e) {
             return Optional.empty();
         }
     }

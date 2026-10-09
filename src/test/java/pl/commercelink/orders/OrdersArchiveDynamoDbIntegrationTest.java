@@ -152,4 +152,17 @@ class OrdersArchiveDynamoDbIntegrationTest {
         // then
         assertThat(entries).hasSize(1).allMatch(e -> e.orderedAt().startsWith("2026-05-20"));
     }
+
+    @Test
+    void fromOnlyAndToOnlyBoundsEachCutOneSide() {
+        // when
+        List<ArchiveIndexEntry> since = all(orders.archiveIndex("store-a",
+                new ArchiveIndexRequest(CLOSED, LocalDate.of(2026, 5, 29), null, null, true, 100)));
+        List<ArchiveIndexEntry> until = all(orders.archiveIndex("store-a",
+                new ArchiveIndexRequest(CLOSED, null, LocalDate.of(2026, 5, 2), null, true, 100)));
+
+        // then
+        assertThat(since).extracting(ArchiveIndexEntry::orderedAt).allMatch(at -> at.compareTo("2026-05-29") >= 0).hasSize(3);
+        assertThat(until).extracting(ArchiveIndexEntry::orderedAt).allMatch(at -> at.compareTo("2026-05-03") < 0).hasSize(2);
+    }
 }

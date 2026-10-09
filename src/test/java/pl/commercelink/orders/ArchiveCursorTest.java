@@ -29,4 +29,11 @@ class ArchiveCursorTest {
         assertThat(ArchiveCursor.decode(java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("no-separator".getBytes()))).isEmpty();
     }
+
+    @Test
+    void cursorWithAnOrderedAtThatIsNoDateDecodesToNothing() {
+        // when / then
+        assertThat(ArchiveCursor.decode(new ArchiveCursor("yesterday", "8c1d02aa").encode())).isEmpty();
+        assertThat(ArchiveCursor.decode(new ArchiveCursor("2026-10-08", "8c1d02aa").encode())).isPresent();
+    }
 }

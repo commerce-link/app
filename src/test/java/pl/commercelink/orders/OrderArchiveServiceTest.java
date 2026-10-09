@@ -132,8 +132,80 @@ class OrderArchiveServiceTest {
         // then
         assertThat(page.rows()).hasSize(5);
         assertThat(page.pagination().nextHref()).isNull();
-        assertThat(page.pagination().previousHref()).contains("before=");
+        assertThat(page.pagination().previousHref()).isEqualTo(query().href());
         assertThat(page.resultsLine()).isEqualTo("Zamówienia: 26–30");
+    }
+
+    @Test
+    void previousFromADeeperPageStillUsesABeforeCursor() {
+        // given
+        List<ArchiveIndexEntry> entries = history(60);
+        indexReturns(entries);
+
+        // when
+        OrderArchivePage page = service.page(STORE, query().after(entries.get(49).cursor(), 50), TODAY, PL);
+
+        // then
+        assertThat(page.rows()).hasSize(10);
+        assertThat(page.pagination().previousHref()).contains("before=").contains("offset=25");
+    }
+
+    @Test
+    void cursorOlderThanThePeriodStartsFromTheNewest() {
+        // given
+        indexReturns(history(3));
+        ArchiveCursor stale = new ArchiveCursor("2026-08-01T10:00", "00000000-0000-4000-8000-000000000001");
+
+        // when
+        service.page(STORE, query("period", "30d").after(stale, 25), TODAY, PL);
+
+        // then
+        assertThat(lastRequest().start()).isNull();
+    }
+
+    @Test
+    void beforeCursorOutsideTheRangeStartsFromTheNewest() {
+        // given
+        indexReturns(history(3));
+        ArchiveCursor stale = new ArchiveCursor("2026-08-01T10:00", "00000000-0000-4000-8000-000000000001");
+
+        // when
+        service.page(STORE, query("period", "30d").before(stale, 25), TODAY, PL);
+
+        // then
+        assertThat(lastRequest().start()).isNull();
+    }
+
+    @Test
+    void cursorNewerThanTheUpperBoundStartsFromTheNewest() {
+        // given
+        indexReturns(history(3));
+        ArchiveCursor newer = new ArchiveCursor("2026-10-09T10:00", "00000000-0000-4000-8000-000000000001");
+
+        // when
+        service.page(STORE, query("to", "2026-10-01").after(newer, 25), TODAY, PL);
+
+        // then
+        assertThat(lastRequest().start()).isNull();
+    }
+
+    @Test
+    void cursorInsideTheRangeIsKept() {
+        // given
+        List<ArchiveIndexEntry> entries = history(30);
+        indexReturns(entries);
+
+        // when
+        service.page(STORE, query("period", "30d").after(entries.get(24).cursor(), 25), TODAY, PL);
+
+        // then
+        assertThat(lastRequest().start()).isEqualTo(entries.get(24).cursor());
+    }
+
+    private ArchiveIndexRequest lastRequest() {
+        ArgumentCaptor<ArchiveIndexRequest> captor = ArgumentCaptor.forClass(ArchiveIndexRequest.class);
+        verify(orders, org.mockito.Mockito.atLeastOnce()).archiveIndex(eq(STORE), captor.capture());
+        return captor.getAllValues().get(captor.getAllValues().size() - 1);
     }
 
     @Test
