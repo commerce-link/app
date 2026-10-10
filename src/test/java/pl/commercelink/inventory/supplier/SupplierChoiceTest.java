@@ -51,6 +51,16 @@ class SupplierChoiceTest {
     }
 
     @Test
+    void anEmptyChoiceAsksToChooseASupplier() {
+        // when
+        SupplierChoice.Resolution resolution = choice.resolve(store(), "", null);
+
+        // then
+        assertThat(resolution.accepted()).isFalse();
+        assertThat(resolution.errorCode()).isEqualTo("order.item.assign.supplier.required");
+    }
+
+    @Test
     void blankCustomNameIsRequired() {
         // when
         SupplierChoice.Resolution resolution = choice.resolve(store(), SupplierChoice.CUSTOM, "   ");

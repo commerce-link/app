@@ -3129,6 +3129,12 @@ a.cl-link-button:hover {
     margin-top: var(--cl-gap-fields);
 }
 
+/* A checkbox under a field (the restock page: price limit, then "only products not in stock") keeps the same distance;
+   without it the box touched the help line of the field above, while the restock dialog spaces them by its grid gap. */
+.cl-page .cl-fieldset > .cl-field + .cl-check-field {
+    margin-top: var(--cl-gap-fields);
+}
+
 /* The catalog form wraps the field in a Bulma .field under a label; it lost its mt-2 and touched the label. */
 .field > .schedule-field {
     margin-top: var(--cl-gap-related);
@@ -9161,6 +9167,97 @@ a.cl-link-button:hover {
     }
 }
 
+/* --- Warehouse list (spec docs/active/warehouse-list-redesign §14) --- */
+/* the results line carries the value of the list, so it keeps one place: the right edge, whether chips stand before it or not */
+.cl-page .cl-list-meta.is-warehouse .cl-table-results { margin-left: auto; text-align: right; }
+.cl-page .cl-muted { color: var(--cl-ink-3); }
+/* one grid item per cell in the phone card mode, like the orders cells */
+.cl-page .cl-table.is-warehouse .cl-cell-stack { display: flex; flex-direction: column; min-width: 0; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-end; }
+.cl-page .cl-table.is-warehouse :is(th, td) { white-space: normal; overflow-wrap: break-word; }
+.cl-page .cl-table.is-warehouse .cl-table-pills { max-width: 100%; }
+.cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { max-width: 100%; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; white-space: normal; }
+/* the phone card's own line ("3 szt. × 1 243,00 netto") stands in for the quantity and net cost columns there */
+.cl-page .cl-table.is-warehouse .cl-cards-only { display: none; }
+/* the comment shows two lines; the whole of it is on the item page (the name links there) and in the title */
+.cl-page .cl-table.is-warehouse .cl-table-note {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: none; white-space: normal;
+}
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-warehouse { table-layout: fixed; width: 100%; }
+    /* a code never breaks inside ("GV-/N406TWF2OC"): the line breaks between the EAN and the code; one longer than the
+       product column ends in an ellipsis, whole in its title */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+    /* a serial number is one token as well, cut at the cell's edge with the whole of it in its title */
+    .cl-page .cl-table.is-warehouse .cl-cell-serial { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    /* the delivery link stays on one line ("8c12485 / 0" broke after the id at 1024 px), cut at the cell's edge with the
+       whole of it in its title */
+    .cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 12%; }
+    .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
+    /* 17 %: "syst. 1 050,00" (116 px + padding) stays on one line at 1280 px; a longer amount breaks after "syst." (the
+       amount is grouped with no-break spaces), never out of the cell */
+    .cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }
+    /* 12 %: an 8-character delivery id (66 px) fits its cell at 1024 px; 11 % left 62 px */
+    .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }
+    /* 16 % of the table is narrower than the longest status pill ("Zarezerwowane", 114 px) below 1366 px; 9.5rem is that
+       pill plus the cell's 12 px padding on each side, with a little room (8.5rem cut the pill's text) */
+    .cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }
+}
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }
+    /* the hidden delivery column leaves room: 12 % was 78 px at 768 px and broke "Chłodzenie" inside the word */
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 18%; }
+}
+@media screen and (min-width: 1024px) and (max-width: 1279px) {
+    /* the sidebar narrows the table to 786 px at 1024 px: 12 % left 70 px of text, three short of "Chłodzenie" */
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 14%; }
+}
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
+    /* the card has no room for an ellipsis with its tooltip (no hover on touch): an overlong code wraps anywhere */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; overflow-wrap: anywhere; }
+    .cl-page .cl-table.is-warehouse .cl-table-pills .cl-status { white-space: normal; }
+
+    /* phone card (B3): like the orders card A, the cells give their parts to one grid of the row and drop their labels
+       (the labels stay in data-label): name, codes, condition and comment across the card; "3 szt. × 1 243,00 netto"
+       with the status pill on the right; the system cost; category and delivery with its supplier as one muted line.
+       The checkbox keeps its corner, the lines start level with the name; the right column (pill, delivery) takes at most
+       45 %, so a long delivery line wraps itself instead of the figures. */
+    .cl-page .cl-table.is-warehouse tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) fit-content(45%); column-gap: 10px; row-gap: 2px; align-items: center; padding: 12px 16px 12px 60px; }
+    .cl-page .cl-table.is-warehouse[data-cl-select-table] tbody :is(th.cl-table-key, td:not(.cl-table-check)) { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody :is(th, td)::before { content: none; }
+    .cl-page .cl-table.is-warehouse .cl-cards-hide { display: none; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > * { grid-column: 1 / -1; order: 1; margin-top: 0; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > a { font-weight: 600; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-card-figures { display: block; grid-column: 1; order: 2; font-variant-numeric: tabular-nums; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-status { grid-column: 2; justify-self: end; order: 2; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-cell-stack { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-table-pills { grid-column: 1 / -1; order: 3; justify-self: start; }
+    .cl-page .cl-table.is-warehouse tbody td.cl-cell-category > span { grid-column: 1; justify-self: start; order: 4; font-size: 12.5px; color: var(--cl-ink-2); }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack {
+        grid-column: 2; justify-self: end; order: 4; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; column-gap: 6px;
+        font-size: 12.5px; color: var(--cl-ink-2); text-align: right;
+    }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack > .cl-muted { display: none; }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-table-sub { margin: 0; }
+}
+/* the quantity dialog is narrow: its name / quantity table stays a two-column table on phones instead of the cards */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-dialog .cl-table.cl-quantity-table { display: table; }
+    .cl-page .cl-dialog .cl-quantity-table thead { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: table-header-group; }
+    .cl-page .cl-dialog .cl-quantity-table tbody { display: table-row-group; }
+    .cl-page .cl-dialog .cl-quantity-table tr { display: table-row; padding: 0; border-top: 0; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td) { display: table-cell; padding: 6px 10px; border-top: 1px solid var(--cl-line); vertical-align: top; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td)::before { content: none; }
+    .cl-page .cl-dialog .cl-quantity-table .is-numeric { text-align: right; }
+    .cl-page .cl-dialog .cl-quantity-table td.is-numeric { width: 108px; }
+}
+/* a checked row is tinted --cl-accent-soft, on which --cl-ink-3 is 4.04:1 ("Bez kategorii") */
+.cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }
+/* --cl-info-soft is --cl-accent-soft, the tint of a checked row: an info pill there gets the surface and a 1 px ring */
+.cl-page .cl-table.is-warehouse tr.is-selected .cl-status.is-info { background: var(--cl-surface); box-shadow: inset 0 0 0 1px var(--cl-accent); }
 /* Warehouse documents list (docs/active/warehouse-documents-redesign). A document number wraps after a "/" (the
    fragments/doc-number <wbr> break points), never inside the sequence digits; break-word only splits a segment that is
    longer than the whole column. The direction icon repeats the type name in colour (the name carries the meaning). */
@@ -9683,7 +9780,8 @@ a.cl-link-button:hover {
 }
 
 /* P2: below 720 px the selection row leaves the flow and is pinned to the bottom edge while something is checked and
-   the items card is on screen (.is-in-view, set by delivery-details.js); the form keeps room for it at its bottom. */
+   the items card is on screen (.is-in-view, set by delivery-details.js and by selection-actions.js on the warehouse
+   list); the host keeps room for it at its bottom. */
 @media screen and (max-width: 719px) {
     .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
         position: fixed;
@@ -9712,10 +9810,25 @@ a.cl-link-button:hover {
         margin-left: 0;
     }
 
+    /* pinned to the bottom edge, the row has nothing below it: its menus always open upwards and scroll within the
+       room between it and the top bar. menu.js turns a list up only when it fits there whole, so in a short window (a
+       phone held sideways, 1280×720 at 200 %) it stayed below the row, off the screen, with every action but "Zniszcz"
+       out of reach */
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) .cl-menu-list {
+        top: auto;
+        bottom: calc(100% + 4px);
+        max-height: calc(100vh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        max-height: calc(100dvh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
     .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
         padding-bottom: var(--cl-docked-bar, 112px);
     }
 }
+.cl-dialog .cl-quantity-table td.is-numeric { width: 120px; }
+.cl-dialog .cl-quantity-table .cl-input.is-qty { width: 96px; text-align: right; }
 
 /* P3: status card with the supplier's reason and the repair actions; a tone bar on the left. */
 .cl-page .cl-card.is-status .cl-card-title .is-bad {

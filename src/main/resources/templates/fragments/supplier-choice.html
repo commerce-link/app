@@ -2,60 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="field(id, options, withPlaceholder)" class="field" data-supplier-choice>
-    <label class="label" th:text="#{order.item.supplier}"></label>
-    <div class="control">
-        <div class="select is-fullwidth">
-            <select th:id="${id}" name="supplier" required
-                    onchange="toggleCustomSupplier(this)"
-                    data-custom="__custom__">
-                <option th:if="${withPlaceholder}" value="" th:text="#{general.select}"></option>
-                <option th:each="option : ${options}"
-                        th:value="${option.identity()}" th:text="${option.label()}"></option>
-                <option value="__custom__"
-                        th:text="#{order.item.supplier.custom}"></option>
-            </select>
-        </div>
-    </div>
-    <div class="control mt-2" style="display: none;" data-custom-supplier>
-        <input class="input" type="text" name="customSupplier"
-               autocomplete="off" pattern="[\p{L}\p{N}_\-]+"
-               th:placeholder="#{order.item.supplier.custom.placeholder}"
-               th:title="#{order.item.supplier.custom.format}"/>
-        <p class="help" th:text="#{order.item.supplier.custom.hint}"></p>
-    </div>
-
-    <script>
-        function toggleCustomSupplier(select) {
-            const custom = select.value === select.getAttribute('data-custom');
-            const control = select.closest('[data-supplier-choice]').querySelector('[data-custom-supplier]');
-            const input = control.querySelector('input');
-            control.style.display = custom ? '' : 'none';
-            input.required = custom;
-            if (custom) {
-                input.focus();
-            } else {
-                input.value = '';
-            }
-        }
-
-        function resetSupplierChoice(selectId) {
-            const select = document.getElementById(selectId);
-            select.selectedIndex = 0;
-            toggleCustomSupplier(select);
-        }
-    </script>
-</div>
-
 <!--/* The same choice in the cl-* forms: a select of the store's connections plus "Other supplier…", which reveals a
        text field (static/js/supplier-choice.js). current is the chosen identity, custom the typed name (or null).
        supplierOptional (th:with by the caller) makes the empty option mean "no supplier" instead of a placeholder; the
        assign-supplier dialog never sets it, so its choice stays required. supplierFieldName (th:with, optional) renames
-       the select for a form that posts the choice under another name (the item page posts it as deliveryId). */-->
-<div th:fragment="clField(id, options, current, custom)" class="cl-field">
+       the select for a form that posts the choice under another name (the item page posts it as deliveryId).
+       supplierErrorField (th:with, optional) is the id of the field the page's supplier error belongs to, id or
+       id + '-custom'; that field is marked invalid and described by the error the page renders as id + '-error'. */-->
+<div th:fragment="clField(id, options, current, custom)" class="cl-field"
+     th:with="selectInvalid=${supplierErrorField != null and supplierErrorField == id},
+              customInvalid=${supplierErrorField != null and supplierErrorField == id + '-custom'}">
     <label class="cl-label" th:for="${id}" th:text="#{order.item.supplier}"></label>
     <select class="cl-select" th:id="${id}" th:name="${supplierFieldName != null} ? ${supplierFieldName} : 'supplier'" th:required="${supplierOptional == null or !supplierOptional}"
-            data-cl-custom-option="__custom__">
+            data-cl-custom-option="__custom__" th:classappend="${selectInvalid} ? 'is-invalid'"
+            th:attr="aria-invalid=${selectInvalid ? 'true' : null}, aria-describedby=${selectInvalid ? id + '-error' : null}">
         <option value="" th:text="${supplierOptional != null and supplierOptional} ? #{order.item.supplier.none} : #{general.select}"></option>
         <option th:each="option : ${options}" th:value="${option.identity()}" th:selected="${option.identity() == current}"
                 th:text="${option.label()}"></option>
@@ -68,7 +28,8 @@
         <label class="cl-label" th:for="${id} + '-custom'" th:text="#{store.supplier.billing.shortcut}"></label>
         <input class="cl-input" th:id="${id} + '-custom'" type="text" name="customSupplier" autocomplete="off"
                pattern="[\p{L}\p{N}_\-]+" th:value="${custom}" th:title="#{order.item.supplier.custom.format}"
-               th:placeholder="#{order.item.supplier.custom.placeholder}">
+               th:placeholder="#{order.item.supplier.custom.placeholder}" th:classappend="${customInvalid} ? 'is-invalid'"
+               th:attr="aria-invalid=${customInvalid ? 'true' : null}, aria-describedby=${customInvalid ? id + '-error' : null}">
         <p class="cl-help" th:text="#{order.item.supplier.custom.hint}"></p>
     </div>
 </div>

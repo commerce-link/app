@@ -5,357 +5,307 @@
 <body>
 
 <div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
 
-    <div class="is-flex is-justify-content-flex-end mb-2">
-        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-    </div>
-
-    <div th:replace="~{fragments/screen-intro :: panel('warehouse', 'fas fa-archive')}"></div>
-
-    <div th:if="${hasExternalWarehouse}" class="notification is-info is-light">
-        <span th:text="#{warehouse.external.wms.info}"></span>
-    </div>
-
-    <div class="notification has-background-grey-lighter">
-        <strong th:text="#{warehouse.value.net} + ': '"></strong>
-        <span th:text="${#numbers.formatDecimal(warehouseNetValue, 1, 2)} + ' PLN'"></span>
-        <span class="mx-3">|</span>
-        <strong th:text="#{warehouse.value.gross} + ': '"></strong>
-        <span th:text="${#numbers.formatDecimal(warehouseGrossValue, 1, 2)} + ' PLN'"></span>
-    </div>
-
-    <div class="box">
-        <h4 class="title is-5">Filter by Category and Status</h4>
-        <div class="field is-grouped is-grouped-multiline" id="filterTags">
-            <div class="control">
-                <div class="tags has-addons">
-                    <span class="tag is-info">Categories:</span>
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{warehouse.page.title}"></h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                <div class="cl-page-actions">
+                    <!--/* the archive of destroyed items, always there (also with 0): a secondary button before the two actions */-->
+                    <a class="cl-button" th:href="@{/dashboard/warehouse/items/destroyed}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-archive"></i></span>
+                        <span th:text="#{warehouse.action.destroyed(${page.destroyedCount()})}"></span>
+                    </a>
+                    <a th:if="${page.admin() and restock != null}" class="cl-button" th:href="@{/dashboard/warehouse/restock}"
+                       data-cl-dialog-open="warehouse-restock">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-sync-alt"></i></span>
+                        <span th:text="#{warehouse.action.restock}"></span>
+                    </a>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/warehouse/items/new}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{warehouse.action.add.item}"></span>
+                    </a>
                 </div>
             </div>
-            <div class="control" th:each="category : ${categories}">
-                <div class="tags has-addons">
-                    <a class="tag category-tag"
-                       th:classappend="${#lists.contains(selectedCategories, category)} ? 'is-link' : 'is-link is-light'"
-                       th:text="${category}"
-                       th:data-category="${category}"
-                       href="javascript:void(0)"></a>
-                </div>
-            </div>
+            <p class="cl-page-lead" th:text="#{warehouse.page.lead}"></p>
+        </header>
 
-            <div class="control">
-                <div class="tags has-addons">
-                    <span class="tag is-info">Statuses:</span>
-                </div>
-            </div>
-            <div class="control" th:each="status : ${statuses}">
-                <div class="tags has-addons">
-                    <a class="tag status-tag"
-                       th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                       th:text="${enumI18n.localize(status)}"
-                       th:data-status="${status.name()}"
-                       href="javascript:void(0)"></a>
-                </div>
-            </div>
-
-            <div class="control">
-                <button class="button is-small is-danger is-light" id="clearFilters">
-                    <span class="icon is-small"><i class="fas fa-times"></i></span>
-                    <span>Clear Filters</span>
-                </button>
-            </div>
+        <div th:replace="~{fragments/screen-intro :: panel('warehouse', 'fas fa-warehouse')}"></div>
+        <th:block th:replace="~{fragments/settings-form :: savedAlert}"></th:block>
+        <div th:if="${page.wms()}" class="cl-alert is-info" role="status">
+            <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{warehouse.external.wms.info}"></p>
         </div>
-    </div>
 
-    <th:block th:if="${!#lists.isEmpty(deliveredItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.stock}, ${deliveredItems}, ${DeliveredStatus}, true)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(orderedItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.ordered}, ${orderedItems}, ${OrderedStatus}, false)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(allocationItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.ordering}, ${allocationItems}, ${AllocationStatus}, false)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(newItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.new}, ${newItems}, ${NewStatus}, true)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(reservedItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.reserved}, ${reservedItems}, ${ReservedStatus}, true)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(inRMAItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.rma}, ${inRMAItems}, ${InRMAStatus}, true)}"></div>
-    </th:block>
-    <th:block th:if="${!#lists.isEmpty(inExternalServiceItems)}">
-        <div th:replace="~{fragments/warehouseItemsListFragment :: box(#{warehouse.in.external.service}, ${inExternalServiceItems}, ${InExternalServiceStatus}, true)}"></div>
-    </th:block>
+        <div data-cl-list-results data-cl-list-path="/dashboard/warehouse" data-cl-list-fragment="/dashboard/warehouse/list"
+             th:fragment="results" th:with="q=${page.query()}">
 
-    <div class="box">
-        <form action="/dashboard/warehouse/restock" method="post">
-            <div class="field is-grouped is-grouped-centered is-grouped-multiline">
-                <div class="control">
-                    <div class="select is-small is-fullwidth">
-                        <select id="restockCatalog" name="catalogId" required>
-                            <option value="" th:text="#{warehouse.restock.catalog}">Katalog</option>
-                            <option th:each="catalog : ${restockCatalogs}"
-                                    th:value="${catalog.catalogId}"
-                                    th:text="${catalog.name}"></option>
-                        </select>
+            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{warehouse.tiles.label}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
+                       th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
+                    </a>
+                </li>
+            </ul>
+
+            <section class="cl-card cl-selection-host" aria-labelledby="warehouse-table-title">
+                <h2 class="cl-visually-hidden" id="warehouse-table-title" th:text="#{warehouse.list.table.title}"></h2>
+
+                <div class="cl-table-toolbar" th:unless="${page.storeEmpty()}">
+                    <div class="cl-toolbar-filters" id="warehouse-filters">
+                        <details class="cl-filter-menu" data-cl-filter-menu="statuses">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.list.status.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.statusSummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/warehouse}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/warehouse-list :: hidden('statuses')}"></th:block>
+                                <input type="hidden" th:name="${T(pl.commercelink.warehouse.builtin.WarehouseListQuery).STATUS_MENU}" value="1"/>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('statuses', null, ${page.statusOptions()})}"></th:block>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <details class="cl-filter-menu" data-cl-filter-menu="categories">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.list.category.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.categorySummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/warehouse}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/warehouse-list :: hidden('categories')}"></th:block>
+                                <div class="cl-filter-menu-scroll">
+                                    <th:block th:replace="~{fragments/deliveries-list :: checks('categories', null, ${page.categoryOptions()})}"></th:block>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <a th:if="${q.isFiltered()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                    </div>
+                    <div class="cl-toolbar-search">
+                        <form method="get" th:action="@{/dashboard/warehouse}" class="cl-search-form" role="search" data-cl-list-form>
+                            <th:block th:replace="~{fragments/warehouse-list :: hidden('search')}"></th:block>
+                            <label class="cl-visually-hidden" for="warehouse-search" th:text="#{warehouse.list.search.label}"></label>
+                            <div class="cl-search-field">
+                                <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <input class="cl-input cl-table-search" type="search" id="warehouse-search" name="q" autocomplete="off"
+                                       th:value="${q.q()}" th:attr="placeholder=#{warehouse.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                                <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                   th:attr="aria-label=#{warehouse.list.search.clear}" data-cl-list-nav>
+                                    <i class="fas fa-times" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                            <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                            </button>
+                        </form>
+                        <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="warehouse-filters" aria-expanded="true">
+                            <i class="fas fa-sliders-h" aria-hidden="true"></i><span class="cl-toolbar-toggle-label"><span th:text="#{warehouse.list.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}" th:text="|: ${page.activeFilterCount()}|"></th:block></span>
+                        </button>
                     </div>
                 </div>
-                <div class="control">
-                    <div class="select is-small is-fullwidth">
-                        <select id="restockCategory" name="categoryId">
-                            <option value="" th:text="#{warehouse.restock.all.categories}">Wszystkie kategorie</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="control">
-                    <div class="select is-small is-fullwidth">
-                        <select id="restockScope" name="scope" required>
-                            <option value="ExpectedStockQty" th:text="#{warehouse.restock.scope.expected}">Expected stock qty</option>
-                            <option value="WholeCatalog" th:text="#{warehouse.restock.scope.whole}">Cały katalog</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="control">
-                    <div class="select is-small is-fullwidth">
-                        <select id="restockOperation" name="restockPrice" required>
-                            <option value="HotDeal" th:text="#{warehouse.restock.hotdeal}">Hot deal</option>
-                            <option value="LowestPrice" th:text="#{warehouse.restock.lowest}">Najniższa cena</option>
-                            <option value="GoodDeal" th:text="#{warehouse.restock.promo}">Promocyjna</option>
-                            <option value="Standard" th:text="#{warehouse.restock.standard}">Standardowa</option>
-                            <option value="" th:text="#{warehouse.restock.current}">Aktualna</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="control">
-                    <label class="checkbox">
-                        <input type="checkbox" name="onlyMissingItems" value="true"/>
-                        <span th:text="#{warehouse.restock.only.missing}">Tylko brakujące przedmioty</span>
-                    </label>
-                </div>
-                <div class="control">
-                    <button type="submit" class="button is-primary is-small">
-                        <span class="icon is-small"><i class="fas fa-sync-alt"></i></span>
-                        <span th:text="#{general.execute}">Uzupełnij</span>
-                    </button>
-                </div>
-            </div>
-        </form>
-        <div class="buttons is-centered mt-2">
-            <button type="button" class="button is-link is-light is-small" onclick="openQuickAddModal()">
-                <span class="icon is-small"><i class="fas fa-plus"></i></span>
-                <span th:text="#{warehouse.add.item}">Dodaj przedmiot ręcznie</span>
-            </button>
-            <a href="/dashboard/warehouse/items/destroyed" class="button is-danger is-light is-small">
-                <span class="icon is-small"><i class="fas fa-trash"></i></span>
-                <span th:text="#{warehouse.view.destroyed.items}"></span>
-            </a>
-        </div>
-    </div>
 
-    <div id="quickAddModal" class="modal">
-        <div class="modal-background" onclick="toggleQuickAddModal(false)"></div>
-        <div class="modal-card" style="width: 480px; max-width: 90vw;">
-            <header class="modal-card-head">
-                <p class="modal-card-title" th:text="#{warehouse.add.item}"></p>
-                <button class="delete" type="button" onclick="toggleQuickAddModal(false)"></button>
-            </header>
+                <div class="cl-list-meta is-warehouse" th:unless="${page.storeEmpty()}">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status" th:with="r=${page.results()}">
+                        <span th:text="${r.count()}"></span>
+                        <th:block th:if="${r.net() != null}">
+                            <span class="cl-results-amount" th:text="${r.net()}"></span>
+                            <span th:text="${r.grossLabel()}"></span>
+                            <span class="cl-results-amount" th:text="${r.gross()}"></span>
+                        </th:block>
+                    </p>
+                </div>
 
-            <form id="quickAddForm" method="post" onsubmit="normalizeQuickAddPrice()"
-                  th:action="@{/dashboard/warehouse/items/quick-add}">
-                <section class="modal-card-body">
-                    <div class="field">
-                        <label class="label" th:text="#{general.manufacturer.code}"></label>
-                        <div class="control">
-                            <input class="input" type="text" id="quickAddMfn" name="manufacturerCode" required
-                                   th:placeholder="#{inventory.product.code.placeholder}"/>
+                <th:block th:unless="${page.rows().isEmpty()}">
+                    <form id="warehouse-bulk-form" method="post" th:action="@{/dashboard/warehouse}" hidden></form>
+                    <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                    <div class="cl-selection-row is-docked" data-cl-selection-bar hidden>
+                        <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                               th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label>
+                        <span class="cl-selection-count"><span data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span> <span data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span></span>
+                        <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}, data-reason-no-delivery=#{warehouse.bulk.reason.noDelivery}">
+                            <details class="cl-menu">
+                                <summary class="cl-button"><span th:text="#{warehouse.bulk.menu}"></span>
+                                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span></summary>
+                                <ul class="cl-menu-list">
+                                    <li th:each="a : ${page.menuActions()}">
+                                        <button type="button" class="cl-menu-item" th:replace="~{fragments/warehouse-list :: action(${a}, 'cl-menu-item')}"></button>
+                                    </li>
+                                </ul>
+                            </details>
+                            <span class="cl-help cl-selection-reason" id="warehouse-destroy-reason" hidden></span>
+                            <button th:replace="~{fragments/warehouse-list :: action(${page.destroyAction()}, 'cl-link-button is-danger cl-selection-remove')}"></button>
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.price.purchase}"></label>
-                        <div class="field has-addons mb-0">
-                            <div class="control is-expanded">
-                                <input class="input" type="text" id="quickAddPrice" name="cost" required
-                                       th:attr="data-tax=${defaultVatRate}"
-                                       oninput="updateQuickAddPriceHint()"/>
-                            </div>
-                            <div class="control">
-                                <button type="button" id="quickAddPriceTypeNet" class="button is-primary is-selected"
-                                        onclick="setQuickAddPriceType('net')"
-                                        th:text="#{order.item.price.type.net}"></button>
-                            </div>
-                            <div class="control">
-                                <button type="button" id="quickAddPriceTypeGross" class="button"
-                                        onclick="setQuickAddPriceType('gross')"
-                                        th:text="#{order.item.price.type.gross}"></button>
-                            </div>
-                        </div>
-                        <input type="hidden" id="quickAddPriceType" value="net"/>
-                        <p class="help" id="quickAddPriceHint" style="display: none;"
-                           th:attr="data-template=#{order.item.price.net.hint}"></p>
-                    </div>
+                    <nav class="cl-table-sortbar is-wrap" th:attr="aria-label=#{warehouse.list.sort.label}">
+                        <span class="cl-eyebrow" th:text="#{warehouse.list.sort.label}"></span>
+                        <a class="cl-tab" th:each="s : ${T(pl.commercelink.warehouse.builtin.WarehouseListQuery.Sort).values()}"
+                           th:with="h=${page.sortHeaders().get(s)}" th:href="@{${h.href()}}"
+                           th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
+                            <span th:text="#{|warehouse.list.sort.${s.param()}|}"></span>
+                            <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                        </a>
+                    </nav>
 
-                    <div class="field">
-                        <label class="label" th:text="#{warehouse.item.quantity}"></label>
-                        <div class="control">
-                            <input class="input" type="number" id="quickAddQty" name="qty" min="1" value="1" required/>
-                        </div>
-                    </div>
+                    <table class="cl-table is-warehouse" data-cl-select-table="true">
+                        <caption class="cl-visually-hidden" th:text="#{warehouse.list.caption}"></caption>
+                        <colgroup>
+                            <col class="cl-col-check"><col><col class="cl-col-category"><col class="cl-col-qty"><col class="cl-col-cost">
+                            <col class="cl-col-delivery is-secondary-column"><col class="cl-col-status">
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th scope="col" class="cl-table-check"><label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all hidden
+                                   th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-list :: sortHead('NAME', 'warehouse.list.column.product', '')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-list :: sortHead('CATEGORY', 'warehouse.list.column.category', '')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-list :: sortHead('QTY', 'warehouse.list.column.qty', 'is-numeric')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-list :: sortHead('COST', 'warehouse.list.column.cost', 'is-numeric')}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{warehouse.list.column.delivery}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-list :: sortHead('STATUS', 'warehouse.list.column.status', '')}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${page.rows()}">
+                            <td class="cl-table-check">
+                                <label class="cl-check-target" th:if="${row.selectable()}">
+                                    <input class="cl-check-input" type="checkbox" data-cl-select-row hidden th:value="${row.itemId()}"
+                                           th:attr="data-status=${row.status()}, data-qty=${row.qty()}, data-source=${row.source()}, data-has-delivery=${row.hasDelivery()},
+                                                    data-name=${row.name()}, data-status-label=${row.statusLabel()},
+                                                    aria-label=#{warehouse.row.select(${row.name()})}">
+                                </label>
+                            </td>
+                            <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.list.column.product}">
+                                <a th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                                <span class="cl-table-sub" th:if="${!row.codes().isEmpty()}"><th:block th:each="code, it : ${row.codes()}"><span class="cl-table-code" th:title="${code}" th:text="${it.last} ? ${code} : #{warehouse.row.code.beforeNext(${code})}"></span> </th:block></span>
+                                <span class="cl-table-pills" th:if="${row.conditionLabel() != null}"><span class="cl-status" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></span>
+                                <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
+                            </th>
+                            <td class="cl-cell-category" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}">
+                                <span class="cl-cards-hide" th:text="${row.qty()}"></span>
+                                <span class="cl-cards-only cl-card-figures" th:text="#{warehouse.row.card.figures(${row.qty()}, ${row.costNet()})}"></span>
+                            </td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.cost}">
+                                <span class="cl-cell-stack">
+                                    <span class="cl-cards-hide" th:text="${row.costNet()}"></span>
+                                    <span class="cl-table-sub cl-cards-hide" th:text="${row.costGross()}"></span>
+                                    <span class="cl-table-pills" th:if="${row.systemCost() != null}"><span class="cl-status is-info" th:title="${row.systemCostTitle()}" th:text="${row.systemCost()}"></span></span>
+                                </span>
+                            </td>
+                            <td class="is-secondary-column" th:attr="data-label=#{warehouse.list.column.delivery}">
+                                <span class="cl-cell-stack">
+                                    <a th:if="${row.deliveryHref() != null}" class="cl-cell-delivery" th:href="@{${row.deliveryHref()}}" th:title="${row.deliveryNumber()}" th:text="${row.deliveryNumber()}"></a>
+                                    <span th:if="${row.deliveryHref() == null and row.supplier() != null}" class="cl-cell-supplier" th:text="${row.supplier()}"></span>
+                                    <span th:if="${row.deliveryHref() == null and row.supplier() == null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
+                                    <span class="cl-table-sub" th:if="${row.deliveryHref() != null and row.supplier() != null}" th:text="${row.supplier()}"></span>
+                                    <span class="cl-table-sub cl-cell-serial" th:if="${row.serialNo() != null}" th:title="${row.serialNo()}" th:text="${row.serialNo()}"></span>
+                                </span>
+                            </td>
+                            <td th:attr="data-label=#{warehouse.list.column.status}"><span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </th:block>
 
-                    <div class="field">
-                        <label class="label" th:text="#{warehouse.item.status}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select id="quickAddStatus" name="status">
-                                    <option th:each="status : ${quickAddStatuses}" th:value="${status}"
-                                            th:text="${enumI18n.localize(status)}"></option>
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${es.actionHref() != null}" th:class="${page.storeEmpty()} ? 'cl-button is-primary' : 'cl-link-button'"
+                       th:href="@{${es.actionHref()}}" th:text="${es.actionLabel()}" th:attr="data-cl-list-nav=${page.storeEmpty()} ? null : ''"></a>
+                </div>
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
+
+            <dialog class="cl-dialog is-form" id="cl-quantity-dialog" aria-labelledby="cl-quantity-title" th:unless="${page.rows().isEmpty()}">
+                <form method="post" th:action="@{/dashboard/warehouse}" data-cl-quantity-form novalidate>
+                    <h2 class="cl-dialog-title" id="cl-quantity-title" data-cl-quantity-title></h2>
+                    <div class="cl-dialog-body">
+                        <table class="cl-table is-compact cl-quantity-table">
+                            <caption class="cl-visually-hidden" th:text="#{warehouse.bulk.dialog.qty}"></caption>
+                            <thead><tr><th scope="col" th:text="#{warehouse.bulk.dialog.item}"></th><th scope="col" class="is-numeric" th:text="#{warehouse.bulk.dialog.qty}"></th></tr></thead>
+                            <tbody data-cl-quantity-rows th:attr="data-meta-template=#{warehouse.bulk.dialog.meta('{status}', '{units}')}, data-units-template=#{warehouse.selection.units('{m}')}"></tbody>
+                        </table>
+                        <template data-cl-quantity-row>
+                            <tr>
+                                <th scope="row" class="cl-table-key"><span data-name></span><span class="cl-table-sub" data-meta></span></th>
+                                <td class="is-numeric">
+                                    <input type="hidden" name="selectedItemIds">
+                                    <input class="cl-input is-qty" type="text" inputmode="numeric" name="quantities" autocomplete="off" required>
+                                    <p class="cl-field-error" hidden></p>
+                                </td>
+                            </tr>
+                        </template>
+                        <div class="cl-form-grid" data-cl-quantity-destroy hidden>
+                            <div class="cl-span-6 cl-field">
+                                <label class="cl-label" for="destroy-reason" th:text="#{warehouse.bulk.destroy.reason}"></label>
+                                <select class="cl-select" id="destroy-reason" name="reason" required disabled>
+                                    <option value="" selected th:text="#{warehouse.bulk.destroy.reason.choose}"></option>
+                                    <option th:each="r : ${page.destroyReasons()}" th:value="${r.value()}" th:text="${r.label()}"></option>
                                 </select>
+                                <p class="cl-field-error" id="destroy-reason-error" hidden th:text="#{warehouse.bulk.destroy.reason.required}"></p>
+                            </div>
+                            <div class="cl-span-6 cl-field">
+                                <label class="cl-label" for="destroy-note" th:text="#{warehouse.bulk.destroy.note}"></label>
+                                <textarea class="cl-textarea" id="destroy-note" name="note" rows="3" required disabled></textarea>
+                                <p class="cl-field-error" id="destroy-note-error" hidden th:text="#{warehouse.bulk.destroy.note.required}"></p>
                             </div>
                         </div>
+                        <p class="cl-dialog-effect" data-cl-quantity-effect
+                           th:attr="data-effect-split=#{warehouse.bulk.dialog.effect.split}, data-effect-destroy=#{warehouse.bulk.dialog.effect.destroy},
+                                    data-error-max=#{warehouse.bulk.dialog.max('{0}')}, data-error-min=#{warehouse.bulk.dialog.min},
+                                    data-error-whole=#{warehouse.bulk.dialog.whole('{0}')}"></p>
                     </div>
-
-                    <div th:replace="~{fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)}"></div>
-                </section>
-
-                <footer class="modal-card-foot">
-                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
-                    <button class="button" type="button" onclick="toggleQuickAddModal(false)" th:text="#{general.cancel}"></button>
-                </footer>
-            </form>
+                    <div class="cl-dialog-actions">
+                        <button type="submit" class="cl-button is-primary" data-cl-quantity-submit></button>
+                        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                    </div>
+                </form>
+            </dialog>
         </div>
+
+        <noscript><p class="cl-help" th:text="#{warehouse.list.noscript}"></p></noscript>
+        <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
+        <dialog th:if="${restock != null}" class="cl-dialog is-form" id="warehouse-restock" aria-labelledby="restock-title">
+            <form method="post" th:action="@{/dashboard/warehouse/restock}">
+                <h2 class="cl-dialog-title" id="restock-title" th:text="#{warehouse.restock.title}"></h2>
+                <div class="cl-dialog-body">
+                    <p class="cl-help" th:text="#{warehouse.restock.lead}"></p>
+                    <th:block th:replace="~{fragments/warehouse-restock :: fields}"></th:block>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button type="submit" class="cl-button is-primary" th:text="#{warehouse.restock.submit}"></button>
+                    <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                </div>
+            </form>
+        </dialog>
     </div>
+</section>
 
-    <script th:inline="javascript">
-        // Initialize from server-side selected values (includes defaults)
-        const selectedCategories = new Set(/*[[${selectedCategories}]]*/ []);
-        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
-
-        function navigateWithFilters() {
-            const params = new URLSearchParams();
-
-            selectedCategories.forEach(cat => params.append('categories', cat));
-            selectedStatuses.forEach(status => params.append('statuses', status));
-
-            window.location.href = '/dashboard/warehouse?' + params.toString();
-        }
-
-        // Category tag click handler
-        document.querySelectorAll('.category-tag').forEach(tag => {
-            tag.addEventListener('click', function() {
-                const category = this.getAttribute('data-category');
-                if (selectedCategories.has(category)) {
-                    selectedCategories.delete(category);
-                } else {
-                    selectedCategories.add(category);
-                }
-                navigateWithFilters();
-            });
-        });
-
-        // Status tag click handler
-        document.querySelectorAll('.status-tag').forEach(tag => {
-            tag.addEventListener('click', function() {
-                const status = this.getAttribute('data-status');
-                if (selectedStatuses.has(status)) {
-                    selectedStatuses.delete(status);
-                } else {
-                    selectedStatuses.add(status);
-                }
-                navigateWithFilters();
-            });
-        });
-
-        // Clear filters button
-        document.getElementById('clearFilters').addEventListener('click', function() {
-            window.location.href = '/dashboard/warehouse?showAll=true';
-        });
-
-        const categoriesByCatalog = /*[[${restockCategoriesByCatalog}]]*/ {};
-        const catalogSelect = document.getElementById('restockCatalog');
-        const categorySelect = document.getElementById('restockCategory');
-        const allCategoriesLabel = categorySelect.options[0].textContent;
-
-        catalogSelect.addEventListener('change', function() {
-            const selected = this.value;
-            categorySelect.innerHTML = '';
-            const allOpt = document.createElement('option');
-            allOpt.value = '';
-            allOpt.textContent = allCategoriesLabel;
-            categorySelect.appendChild(allOpt);
-
-            const categories = categoriesByCatalog[selected] || [];
-            categories.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.textContent = c.name;
-                categorySelect.appendChild(opt);
-            });
-        });
-
-        function toggleQuickAddModal(show) {
-            document.getElementById('quickAddModal').classList.toggle('is-active', show);
-        }
-
-        function openQuickAddModal() {
-            document.getElementById('quickAddMfn').value = '';
-            document.getElementById('quickAddPrice').value = '';
-            document.getElementById('quickAddQty').value = '1';
-            resetSupplierChoice('quickAddSupplier');
-            setQuickAddPriceType('net');
-            toggleQuickAddModal(true);
-        }
-
-        function setQuickAddPriceType(type) {
-            document.getElementById('quickAddPriceType').value = type;
-            document.getElementById('quickAddPriceTypeNet').classList.toggle('is-primary', type === 'net');
-            document.getElementById('quickAddPriceTypeNet').classList.toggle('is-selected', type === 'net');
-            document.getElementById('quickAddPriceTypeGross').classList.toggle('is-primary', type === 'gross');
-            document.getElementById('quickAddPriceTypeGross').classList.toggle('is-selected', type === 'gross');
-            updateQuickAddPriceHint();
-        }
-
-        function normalizeQuickAddPrice() {
-            const priceInput = document.getElementById('quickAddPrice');
-            priceInput.value = priceInput.value.replace(',', '.').trim();
-
-            const net = calculateQuickAddNetPrice();
-            if (net !== null) {
-                priceInput.value = net.toFixed(2);
-            }
-        }
-
-        function calculateQuickAddNetPrice() {
-            const priceInput = document.getElementById('quickAddPrice');
-            const gross = parseFloat((priceInput.value || '').replace(',', '.'));
-            const tax = parseFloat(priceInput.getAttribute('data-tax'));
-            const isGross = document.getElementById('quickAddPriceType').value === 'gross';
-
-            if (!isGross || isNaN(gross) || isNaN(tax) || tax < 1) {
-                return null;
-            }
-            return gross / tax;
-        }
-
-        function updateQuickAddPriceHint() {
-            const hint = document.getElementById('quickAddPriceHint');
-            const net = calculateQuickAddNetPrice();
-
-            if (net === null) {
-                hint.style.display = 'none';
-                return;
-            }
-
-            const tax = parseFloat(document.getElementById('quickAddPrice').getAttribute('data-tax'));
-            const vatPercent = Math.round((tax - 1) * 10000) / 100;
-            hint.textContent = hint.getAttribute('data-template')
-                .replace('{0}', net.toFixed(2))
-                .replace('{1}', vatPercent);
-            hint.style.display = '';
-        }
-    </script>
-
+<script th:src="@{/js/list-page.js}" defer></script>
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/table-select.js}" defer></script>
+<script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/dependent-select.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/selection-actions.js}" defer></script>
 </div>
-
 </body>
 </html>

@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Pieces of the warehouse list (warehouse.html); here because a fragment inside the page's layout:fragment would
+       also render, with null parameters, as part of the page. */-->
+
+<!--/* The rest of the list query as hidden fields, so a menu's form never drops what the others set. */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <th:block th:if="${skip != 'statuses'}">
+        <input type="hidden" name="statuses" value="all" th:if="${q.isAllStatuses() and !q.isDefaultStatuses()}"/>
+        <th:block th:unless="${q.isAllStatuses() or q.isDefaultStatuses()}"><input type="hidden" name="statuses" th:each="s : ${q.statuses()}" th:value="${s.name()}"/></th:block>
+    </th:block>
+    <th:block th:if="${skip != 'categories'}"><input type="hidden" name="categories" th:each="c : ${q.categories()}" th:value="${c}"/></th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+    <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
+    <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
+</th:block>
+
+<!--/* A sortable header: name of the Sort constant, message key, extra class. */-->
+<th th:fragment="sortHead(sort, labelKey, extra)" scope="col" th:class="${extra}"
+    th:with="h=${page.sortHeaders().get(T(pl.commercelink.warehouse.builtin.WarehouseListQuery.Sort).valueOf(sort))}"
+    th:attr="aria-sort=${h.ariaSort()}">
+    <a class="cl-table-sort" th:href="@{${h.href()}}" th:text="#{${labelKey}}" data-cl-list-nav></a>
+</th>
+
+<!--/* One bulk action of the selection row; selection-actions.js greys it with its reason when the selection does not fit. */-->
+<button th:fragment="action(a, classes)" type="button" th:class="${classes}"
+        th:attr="data-cl-action-path=${a.path()}, data-cl-action-for=${a.forStatuses()}, data-cl-action-label=${a.label()},
+                 data-cl-action-quantity=${a.needsQuantity()} ? 'true' : null, data-cl-action-destroy=${a.danger()} ? 'true' : null,
+                 data-cl-action-same-source=${a.sameSource()} ? 'true' : null, data-reason-status=${a.statusReason()},
+                 data-cl-select-confirm-title=${a.confirmTitle()}, data-cl-select-confirm-message=${a.confirmMessage()},
+                 data-cl-select-confirm-action=${a.confirmAction()}, data-cl-action-dialog-title=${a.dialogTitle()},
+                 aria-describedby=${a.danger()} ? 'warehouse-destroy-reason' : null">
+    <span data-cl-action-text th:text="${a.label()}"></span>
+    <span class="cl-menu-reason" data-cl-action-reason hidden th:unless="${a.danger()}"></span>
+</button>
+
+</body>
+</html>

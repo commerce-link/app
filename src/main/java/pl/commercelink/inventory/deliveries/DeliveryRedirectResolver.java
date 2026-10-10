@@ -64,6 +64,15 @@ public class DeliveryRedirectResolver {
                 && !isAwaitingDelivery(item);
     }
 
+    /**
+     * Whether the item still waits for its supplier (New, unclaimed Allocation) with that supplier in deliveryId, so
+     * {@link #resolveFor(Item)} leads to the supplier's delivery planning page.
+     */
+    public boolean pointsToPlanning(Item item) {
+        return item.getDeliveryId() != null && !item.getDeliveryId().isBlank()
+                && !SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId()) && isAwaitingDelivery(item);
+    }
+
     private boolean isAwaitingDropshipDelivery(Order order, Item item) {
         return order.getFulfilmentType() == FulfilmentType.DirectToConsumer
                 && isAwaitingDelivery(item)

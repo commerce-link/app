@@ -18,6 +18,7 @@ public class SupplierChoice {
     private static final Pattern CUSTOM_NAME = Pattern.compile("^" + CUSTOM_NAME_PATTERN + "$");
 
     private static final String UNKNOWN = "order.item.assign.supplier.unknown";
+    private static final String CHOICE_REQUIRED = "order.item.assign.supplier.required";
     private static final String REQUIRED = "order.item.assign.supplier.custom.required";
     private static final String INVALID = "order.item.assign.supplier.custom.invalid";
     private static final String INTEGRATED = "order.item.assign.supplier.integrated";
@@ -42,7 +43,7 @@ public class SupplierChoice {
     public Resolution resolve(Store store, String choice, String customName) {
         String name = StringUtils.trimToNull(CUSTOM.equals(choice) ? customName : choice);
         if (name == null) {
-            return Resolution.rejected(REQUIRED);
+            return Resolution.rejected(CUSTOM.equals(choice) ? REQUIRED : CHOICE_REQUIRED);
         }
         StoreSupplierConnection connection = store.getSupplierConnections().stream()
                 .filter(candidate -> candidate.getSupplierName().equals(name))

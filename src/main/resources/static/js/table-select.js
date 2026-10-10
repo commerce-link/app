@@ -29,7 +29,8 @@
 // [data-cl-select-clear] unticks every row. [data-cl-selection-text][data-template] in the selection row follows the
 // count like the count itself ({k} checked, {n} visible). A set-up table gets .is-selectable (a page may hide its
 // checkbox column without the script) and is set up once; tables swapped in by list-page.js (cl-list:swapped) are set
-// up as they arrive.
+// up as they arrive. Every refresh ends with a bubbling cl:selection-changed on the table, for scripts that act on the
+// selection (selection-actions.js).
 (function () {
     'use strict';
 
@@ -94,6 +95,11 @@
     }
 
     function refresh(table) {
+        update(table);
+        table.dispatchEvent(new CustomEvent('cl:selection-changed', { bubbles: true }));
+    }
+
+    function update(table) {
         var bar = barOf(table);
         var selected = checked(table);
         rowsOf(table).forEach(function (box) {
