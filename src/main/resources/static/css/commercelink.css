@@ -4956,6 +4956,11 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
+/* a tile that is no link (the warehouse value tile) fills its cell like the links do */
+.cl-page .cl-stat-grid.is-orders > li > .cl-stat {
+    flex: 1 1 auto;
+}
+
 .cl-page .cl-stat.is-link {
     flex: 1 1 auto;
     color: inherit;
@@ -9214,6 +9219,9 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-warehouse .cl-col-category { width: 18%; }
 }
 @media screen and (min-width: 1024px) and (max-width: 1279px) {
+    /* four tiles in a row leave 154 px of text at 1024 px: a seven-digit value ("1 234 567,89", 165 px at 26 px) fits at
+       22 px; its "PLN" goes under it when the line is full */
+    .cl-page .cl-stat-grid.is-warehouse div.cl-stat .cl-stat-value { font-size: 22px; }
     /* the sidebar narrows the table to 786 px at 1024 px: 12 % left 70 px of text, three short of "Chłodzenie" */
     .cl-page .cl-table.is-warehouse .cl-col-category { width: 14%; }
 }

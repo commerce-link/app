@@ -23,7 +23,6 @@ import pl.commercelink.warehouse.builtin.WarehousePageModel.BulkActionView;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Chip;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.EmptyState;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Option;
-import pl.commercelink.warehouse.builtin.WarehousePageModel.Results;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.SortHeader;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
@@ -72,15 +71,15 @@ class WarehouseListRenderingTest {
         BulkActionView destroy = new BulkActionView("destroy", "/dashboard/warehouse/markAsDestroyed", "Destroy",
                 "Delivered InRMA InExternalService", true, false, false, true, "Only for: …", null, null, "Destroy", "Destroy {k} items?");
         return new WarehousePageModel(WarehouseListQuery.parse(new LinkedMultiValueMap<>(), false), true, false,
-                List.of(new Tile("In stock", "3 pcs", "in 1 items", "/dashboard/warehouse", true),
-                        new Tile("To receive", "2 pcs", "in allocation and ordered from suppliers", "/dashboard/warehouse?statuses=Allocation&statuses=Ordered", false),
-                        new Tile("Reserved", "1 pcs", "in 1 items", "/dashboard/warehouse?statuses=Reserved", false),
-                        new Tile("Needs attention", "0 pcs", "in claim and in service", "/dashboard/warehouse?statuses=InRMA&statuses=InExternalService", false)),
+                List.of(new Tile("In stock", "3 pcs", null, "in 1 items", "/dashboard/warehouse", true),
+                        new Tile("Net value", "11 994,00", "PLN", "gross 14 752,62 PLN", null, false),
+                        new Tile("Reserved", "1 pcs", null, "in 1 items", "/dashboard/warehouse?statuses=Reserved", false),
+                        new Tile("Needs attention", "0 pcs", null, "in claim and in service", "/dashboard/warehouse?statuses=InRMA&statuses=InExternalService", false)),
                 List.of(new Option("Delivered", "In stock", 1, true, "/dashboard/warehouse?statuses=all")), "In stock",
                 List.of(new Option("GPU", "GPU", 1, false, "/dashboard/warehouse?categories=GPU"),
                         new Option("none", "No category", 0, false, "/x")), "All",
                 List.of(new Chip("Status: In stock", "/dashboard/warehouse?statuses=all", "Remove filter: Status: In stock")),
-                new Results("Items: 2 · 6 pcs · Net value:", "1.00 PLN", "· gross:", "1.23 PLN"), headers, rows, Pagination.of(1, rows.size(), 50, n -> "/p" + n),
+                "Products: 2, units: 6", headers, rows, Pagination.of(1, rows.size(), 50, n -> "/p" + n),
                 rows.isEmpty() ? new EmptyState(storeEmpty ? "The warehouse is empty." : "Nothing matches the filters.",
                         "Clear filters", "/dashboard/warehouse") : null,
                 storeEmpty, 1, 7, List.of(reserve), destroy, List.of(new Option("Theft", "Theft", 0, false, null)));
@@ -105,7 +104,7 @@ class WarehouseListRenderingTest {
         assertThat(html).contains("data-cl-list-results").contains("data-cl-list-fragment=\"/dashboard/warehouse/list\"");
         assertThat(html).contains("class=\"cl-stat is-link\"").contains("aria-current=\"true\"");
         assertThat(html).contains("data-cl-filter-menu=\"statuses\"").contains("data-cl-filter-menu=\"categories\"").contains("No category");
-        assertThat(html).contains("Status: In stock").contains("Items: 2 · 6 pcs");
+        assertThat(html).contains("Status: In stock").contains("Products: 2, units: 6");
         assertThat(html).contains("cl-table is-warehouse").contains("data-cl-select-table=\"true\"");
         assertThat(html).contains("value=\"a1\"").doesNotContain("value=\"b2\"");
         assertThat(html).contains("data-status=\"Delivered\"").contains("data-qty=\"3\"").doesNotContain("data-source=");
@@ -115,7 +114,7 @@ class WarehouseListRenderingTest {
     }
 
     @Test
-    void everyTileIsALinkAndTheResultsLineIsVisibleWithoutChips() {
+    void statusTilesAreLinksTheValueTileIsNotAndTheResultsLineIsVisibleWithoutChips() {
         // given
         WarehousePageModel withChips = model(List.of(row("a1", "Delivered", true)), false);
         WarehousePageModel noChips = new WarehousePageModel(withChips.query(), true, false, withChips.tiles(), withChips.statusOptions(),
@@ -127,11 +126,12 @@ class WarehouseListRenderingTest {
         String html = render(noChips);
 
         // then
-        assertThat(html).containsOnlyOnce("To receive");
-        assertThat(Pattern.compile("<a class=\"cl-stat is-link\"").matcher(html).results().count()).isEqualTo(4);
+        assertThat(Pattern.compile("<a class=\"cl-stat is-link\"").matcher(html).results().count()).isEqualTo(3);
+        assertThat(html).containsPattern("<div class=\"cl-stat\">\\s*<span class=\"cl-eyebrow\">Net value</span>\\s*"
+                + "<span class=\"cl-stat-value\"><span class=\"cl-nowrap\">11 994,00</span> <span class=\"cl-stat-value-of\">PLN</span></span>\\s*"
+                + "<span class=\"cl-stat-hint\">gross 14 752,62 PLN</span>\\s*</div>");
         assertThat(html).doesNotContain("<li class=\"cl-stat\"");
-        assertThat(html).containsPattern("Items: 2 · 6 pcs · Net value:</span>\\s*<span class=\"cl-results-amount\">1.00 PLN</span>"
-                + "\\s*<span>· gross:</span>\\s*<span class=\"cl-results-amount\">1.23 PLN</span>");
+        assertThat(html).contains("<p class=\"cl-table-results\" role=\"status\">Products: 2, units: 6</p>").doesNotContain("cl-results-amount");
         assertThat(html).doesNotContain("cl-table-results cl-visually-hidden");
         assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\"");
         assertThat(html).contains("class=\"cl-list-meta is-warehouse\"");
@@ -425,7 +425,7 @@ class WarehouseListRenderingTest {
         // given
         WarehousePageModel base = model(List.of(), false);
         WarehousePageModel page = new WarehousePageModel(base.query(), true, false, base.tiles(), base.statusOptions(), "All",
-                base.categoryOptions(), "All", base.chips(), new Results("Items: 0", null, null, null), base.sortHeaders(),
+                base.categoryOptions(), "All", base.chips(), "Products: 0, units: 0", base.sortHeaders(),
                 base.rows(), base.pagination(), base.emptyState(), false, 1, 0, base.menuActions(), base.destroyAction(),
                 base.destroyReasons());
 
@@ -433,7 +433,7 @@ class WarehouseListRenderingTest {
         String html = render(page);
 
         // then
-        assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\">\\s*<span>Items: 0</span>\\s*</p>");
+        assertThat(html).contains("<p class=\"cl-table-results\" role=\"status\">Products: 0, units: 0</p>");
     }
 
     @Test

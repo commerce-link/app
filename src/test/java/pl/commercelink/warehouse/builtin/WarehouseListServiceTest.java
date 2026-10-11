@@ -80,13 +80,13 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::value)
-                .containsExactly("3 szt.", "0 szt.", "2 szt.", "2 szt.");
+                .containsExactly("3 szt.", "300,00", "2 szt.", "2 szt.");
         assertThat(model.tiles().get(0).active()).isFalse();
         assertThat(page().tiles().get(0).active()).isTrue();
     }
 
     @Test
-    void ownWarehouseTilesAreFourLinksWithToReceiveCountingAllocationAndOrdered() {
+    void ownWarehouseTilesAreThreeStatusLinksWithTheValueTileSecondAndNoLink() {
         // given
         add("A", "GPU", Delivered, 3, 100);
         add("B", "CPU", Allocation, 2, 50);
@@ -94,29 +94,35 @@ class WarehouseListServiceTest {
         add("D", "CPU", Reserved, 1, 10);
 
         // when
-        WarehousePageModel model = page();
+        WarehousePageModel model = page("statuses", "all");
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
-                .containsExactly("Na stanie", "Do przyjęcia", "Zarezerwowane", "Wymaga uwagi");
-        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
-        WarehousePageModel.Tile toReceive = model.tiles().get(1);
-        assertThat(toReceive.value()).isEqualTo("6 szt.");
-        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione");
-        assertThat(toReceive.href()).isEqualTo("/dashboard/warehouse?statuses=Allocation&statuses=Ordered");
-        assertThat(toReceive.active()).isFalse();
+                .containsExactly("Na stanie", "Wartość netto", "Zarezerwowane", "Wymaga uwagi");
+        WarehousePageModel.Tile value = model.tiles().get(1);
+        assertThat(value.link()).isFalse();
+        assertThat(value.active()).isFalse();
+        assertThat(value.value()).isEqualTo("450,00");
+        assertThat(value.unit()).isEqualTo("PLN");
+        assertThat(value.hint()).isEqualTo("brutto 553,50\u00a0PLN");
+        assertThat(List.of(model.tiles().get(0), model.tiles().get(2), model.tiles().get(3))).allMatch(WarehousePageModel.Tile::link);
     }
 
     @Test
-    void toReceiveTileIsActiveOnlyForExactlyItsStatusesWithoutOtherNarrowing() {
+    void valueTileFollowsTheFiltersWhileTheStatusTilesCountTheWholeWarehouse() {
         // given
-        add("A", "GPU", Allocation, 1, 1);
-        add("B", "CPU", Ordered, 1, 1);
+        add("A", "GPU", Delivered, 3, 100);
+        add("B", "CPU", Delivered, 1, 50);
+        add("C", "CPU", Reserved, 1, 10);
 
-        // when / then
-        assertThat(page("statuses", "Allocation", "statuses", "Ordered").tiles().get(1).active()).isTrue();
-        assertThat(page("statuses", "Allocation").tiles().get(1).active()).isFalse();
-        assertThat(page("statuses", "Allocation", "statuses", "Ordered", "categories", "GPU").tiles().get(1).active()).isFalse();
+        // when
+        WarehousePageModel gpu = page("categories", "GPU");
+
+        // then
+        assertThat(gpu.tiles().get(1).value()).isEqualTo("300,00");
+        assertThat(gpu.tiles().get(1).hint()).isEqualTo("brutto 369,00\u00a0PLN");
+        assertThat(gpu.tiles().get(0).value()).isEqualTo("4 szt.");
+        assertThat(page("q", "nothing-like-this").tiles().get(1).value()).isEqualTo("0,00");
     }
 
     @Test
@@ -168,7 +174,7 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void wmsTilesEndWithAllLinkingToEveryStatus() {
+    void wmsTilesAreThreeStatusLinksAndTheValueTileLast() {
         // given
         add("A", "GPU", Ordered, 3, 1);
         add("B", "GPU", Allocation, 2, 1);
@@ -182,18 +188,15 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
-                .containsExactly("Zamówione", "W alokacji", "Nowe", "Wszystkie");
-        WarehousePageModel.Tile everything = model.tiles().get(3);
-        assertThat(everything.value()).isEqualTo("6 szt.");
-        assertThat(everything.hint()).isEqualTo("nowe, w alokacji i zamówione");
-        assertThat(everything.href()).isEqualTo("/dashboard/warehouse?statuses=all");
-        assertThat(everything.active()).isFalse();
-        assertThat(all.tiles().get(3).active()).isTrue();
-        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
+                .containsExactly("Zamówione", "W alokacji", "Nowe", "Wartość netto");
+        assertThat(model.tiles().get(3).link()).isFalse();
+        assertThat(model.tiles().get(3).value()).isEqualTo("3,00");
+        assertThat(all.tiles().get(3).value()).isEqualTo("6,00");
+        assertThat(model.tiles().subList(0, 3)).allMatch(WarehousePageModel.Tile::link);
     }
 
     @Test
-    void resultsLineShowsNetAndGrossValueOfEveryFilteredItemAcrossPages() {
+    void resultsLineCountsProductsAndUnitsAndTheValueTileTheValueOfEveryFilteredItemAcrossPages() {
         // given
         for (int i = 0; i < 55; i++) add("P" + i, "GPU", Delivered, 2, 10);
         add("Other", "CPU", Delivered, 1, 100);
@@ -204,10 +207,11 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(first.rows()).hasSize(50);
-        assertThat(first.results()).isEqualTo(new WarehousePageModel.Results("Pozycje: 55 · 110 szt. · Wartość netto:",
-                "1\u00a0100,00\u00a0PLN", "· brutto:", "1\u00a0353,00\u00a0PLN"));
-        assertThat(everything.results().net()).isEqualTo("1\u00a0200,00\u00a0PLN");
-        assertThat(everything.results().gross()).isEqualTo("1\u00a0476,00\u00a0PLN");
+        assertThat(first.results()).isEqualTo("Ilość produktów: 55, Ilość sztuk: 110");
+        assertThat(first.tiles().get(1).value()).isEqualTo("1\u00a0100,00");
+        assertThat(first.tiles().get(1).hint()).isEqualTo("brutto 1\u00a0353,00\u00a0PLN");
+        assertThat(everything.tiles().get(1).value()).isEqualTo("1\u00a0200,00");
+        assertThat(everything.tiles().get(1).hint()).isEqualTo("brutto 1\u00a0476,00\u00a0PLN");
     }
 
     @Test
@@ -312,7 +316,7 @@ class WarehouseListServiceTest {
         // then
         assertThat(first.rows()).hasSize(50);
         assertThat(first.pagination().isNeeded()).isTrue();
-        assertThat(first.results().count()).startsWith("Pozycje: 55 · 110 szt.");
+        assertThat(first.results()).isEqualTo("Ilość produktów: 55, Ilość sztuk: 110");
         assertThat(page("page", "2").rows()).hasSize(5);
     }
 
@@ -387,18 +391,15 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void zeroResultsShowOnlyTheCount() {
+    void zeroResultsCountZeroProductsAndUnits() {
         // given
         add("A", "GPU", Delivered, 1, 1);
 
         // when
-        WarehousePageModel.Results results = page("q", "nothing-like-this").results();
+        String results = page("q", "nothing-like-this").results();
 
         // then
-        assertThat(results.count()).isEqualTo("Pozycje: 0");
-        assertThat(results.net()).isNull();
-        assertThat(results.grossLabel()).isNull();
-        assertThat(results.gross()).isNull();
+        assertThat(results).isEqualTo("Ilość produktów: 0, Ilość sztuk: 0");
     }
 
     @Test

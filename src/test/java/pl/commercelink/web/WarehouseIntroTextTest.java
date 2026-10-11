@@ -18,21 +18,21 @@ class WarehouseIntroTextTest {
     }
 
     @Test
-    void polishIntroPointsToTheResultsLineForValueAndMentionsNoValueTile() {
+    void polishIntroPointsToTheValueTileThatFollowsTheFilters() {
         // when
         String lead = lead("pl");
 
         // then
-        assertThat(lead).doesNotContain("wartość magazynu").contains("linii nad tabelą").contains("netto i brutto");
+        assertThat(lead).contains("netto i brutto").contains("w kafelku „Wartość netto” (zmienia się razem z filtrami)").doesNotContain("linii nad tabelą");
     }
 
     @Test
-    void englishIntroPointsToTheResultsLineForValueAndMentionsNoValueTile() {
+    void englishIntroPointsToTheValueTileThatFollowsTheFilters() {
         // when
         String lead = lead("en");
 
         // then
-        assertThat(lead).doesNotContain("warehouse value").contains("line above the table").contains("net and gross");
+        assertThat(lead).contains("net and gross").contains("\"Net value\" tile (it follows the filters)").doesNotContain("line above the table");
     }
 
     private static String text(String key, String language) {
@@ -67,7 +67,7 @@ class WarehouseIntroTextTest {
         assertThat(text("warehouse.page.lead", "en")).isEqualTo("Items in the store's warehouse and their status.");
         assertThat(text("warehouse.list.search.placeholder", "pl")).isEqualTo("Nazwa, EAN, kod, dostawa");
         assertThat(text("warehouse.list.search.placeholder", "en")).isEqualTo("Name, EAN, code, delivery");
-        assertThat(text("warehouse.tile.toReceive.hint", "en")).isEqualTo("in allocation and ordered");
+        assertThat(text("warehouse.list.results.count", "pl")).isEqualTo("Ilość produktów: {0}, Ilość sztuk: {1}");
     }
 
     @Test

@@ -63,7 +63,7 @@ class WarehouseListService {
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);
-        return new WarehousePageModel(query, admin, wms, tiles(query, store, wms, locale),
+        return new WarehousePageModel(query, admin, wms, tiles(query, store, shown, wms, locale),
                 statusOptions(query, forStatuses, locale), statusSummary(query, locale),
                 categoryOptions(query, forCategories, collator, locale), summary(query.categories().size(), categoryLabels(query, locale), locale),
                 chips, results(shown, locale),
@@ -74,27 +74,33 @@ class WarehouseListService {
                 DESTROY_REASONS.stream().map(r -> new Option(r.name(), text(locale, "DocumentReason." + r.name()), 0, false, null)).toList());
     }
 
-    private Results results(List<WarehouseItem> shown, Locale locale) {
-        if (shown.isEmpty()) {
-            return new Results(text(locale, "warehouse.list.results.empty"), null, null, null);
-        }
-        return new Results(text(locale, "warehouse.list.results.count", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum()),
-                text(locale, "warehouse.list.results.amount", Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum())),
-                text(locale, "warehouse.list.results.gross"),
-                text(locale, "warehouse.list.results.amount", Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())));
+    private String results(List<WarehouseItem> shown, Locale locale) {
+        return text(locale, "warehouse.list.results.count", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum());
     }
 
-    private List<Tile> tiles(WarehouseListQuery query, List<WarehouseItem> store, boolean wms, Locale locale) {
+    /**
+     * The value tile takes the second place ("Do przyjęcia", client 2026-10-11; with WMS the last, "Wszystkie", which
+     * "Wyczyść filtry" already gives): the value of what the list shows, so it follows the filters, unlike the status
+     * tiles that count the whole warehouse. The results line keeps only the counts.
+     */
+    private List<Tile> tiles(WarehouseListQuery query, List<WarehouseItem> store, List<WarehouseItem> shown, boolean wms, Locale locale) {
         if (wms) {
             return List.of(unitsTile(query, store, List.of(Ordered), "warehouse.tile.ordered", null, locale),
                     unitsTile(query, store, List.of(Allocation), "warehouse.tile.allocation", null, locale),
                     unitsTile(query, store, List.of(New), "warehouse.tile.new", null, locale),
-                    unitsTile(query, store, WarehouseStatuses.visible(true), "warehouse.tile.all", "warehouse.tile.all.hint", locale));
+                    valueTile(shown, locale));
         }
         return List.of(unitsTile(query, store, List.of(Delivered), "warehouse.tile.stock", null, locale),
-                unitsTile(query, store, List.of(Allocation, Ordered), "warehouse.tile.toReceive", "warehouse.tile.toReceive.hint", locale),
+                valueTile(shown, locale),
                 unitsTile(query, store, List.of(Reserved), "warehouse.tile.reserved", null, locale),
                 unitsTile(query, store, List.of(InRMA, InExternalService), "warehouse.tile.attention", "warehouse.tile.attention.hint", locale));
+    }
+
+    private Tile valueTile(List<WarehouseItem> shown, Locale locale) {
+        return new Tile(text(locale, "warehouse.tile.value"), Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum()),
+                text(locale, "warehouse.tile.value.unit"),
+                text(locale, "warehouse.tile.value.gross", Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())),
+                null, false);
     }
 
     private Tile unitsTile(WarehouseListQuery query, List<WarehouseItem> store, List<FulfilmentStatus> statuses, String key,
@@ -105,7 +111,7 @@ class WarehouseListService {
         // an active tile clicked again switches its filter off and shows every status (orders, deliveries, payments)
         String href = active ? query.cleared().href() : query.withStatuses(statuses).href();
         return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
-                hint, href, active);
+                null, hint, href, active);
     }
 
     private List<Option> statusOptions(WarehouseListQuery query, List<WarehouseItem> base, Locale locale) {

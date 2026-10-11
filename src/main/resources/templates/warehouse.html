@@ -42,15 +42,20 @@
         <div data-cl-list-results data-cl-list-path="/dashboard/warehouse" data-cl-list-fragment="/dashboard/warehouse/list"
              th:fragment="results" th:with="q=${page.query()}">
 
-            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{warehouse.tiles.label}">
+            <ul class="cl-stat-grid is-orders is-warehouse" th:attr="aria-label=#{warehouse.tiles.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
+                    <a class="cl-stat is-link" th:if="${tile.link()}" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.value()}"></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
                     </a>
+                    <div class="cl-stat" th:unless="${tile.link()}">
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value"><span class="cl-nowrap" th:text="${tile.value()}"></span> <span class="cl-stat-value-of" th:text="${tile.unit()}"></span></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                    </div>
                 </li>
             </ul>
 
@@ -123,14 +128,7 @@
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status" th:with="r=${page.results()}">
-                        <span th:text="${r.count()}"></span>
-                        <th:block th:if="${r.net() != null}">
-                            <span class="cl-results-amount" th:text="${r.net()}"></span>
-                            <span th:text="${r.grossLabel()}"></span>
-                            <span class="cl-results-amount" th:text="${r.gross()}"></span>
-                        </th:block>
-                    </p>
+                    <p class="cl-table-results" role="status" th:text="${page.results()}"></p>
                 </div>
 
                 <th:block th:unless="${page.rows().isEmpty()}">
