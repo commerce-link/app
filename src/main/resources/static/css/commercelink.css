@@ -24,6 +24,7 @@
     --cl-z-scrim: 20;
     --cl-z-topbar: 25;
     --cl-z-pop: 40;
+    --cl-z-toast: 50;
 }
 
 .cl-skip {
@@ -575,25 +576,70 @@ body.cl-drawer-open .cl-sidebar {
     visibility: visible;
 }
 
+/* Toast: a floating .cl-alert — the tone's soft background, its full colour on the left edge and the icon, ink text.
+   showToast (layout.html) sets the text and the is-* class; the icon is a CSS mask, so callers pass plain text. */
 .cl-toast {
+    --cl-toast-tone: var(--cl-ok);
+    --cl-toast-soft: var(--cl-ok-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E");
     display: none;
+    align-items: center;
+    gap: 10px;
     position: fixed;
-    top: 32px;
-    right: 32px;
-    z-index: 9999;
-    padding: 16px 32px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    font-size: 1.1em;
-    color: #fff;
-    background: #48c774;
+    top: calc(var(--cl-topbar-height) + 16px);
+    right: 24px;
+    z-index: var(--cl-z-toast);
+    max-width: 420px;
+    padding: 12px 18px 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--cl-toast-tone) 18%, var(--cl-toast-soft));
+    border-left: 4px solid var(--cl-toast-tone);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow), 0 2px 6px rgba(14, 23, 33, .08);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--cl-ink);
+    background: var(--cl-toast-soft);
     opacity: 0;
     transition: opacity 0.3s;
 }
 
-.cl-toast.is-danger { background: #f14668; }
-.cl-toast.is-info { background: #3e8ed0; }
-.cl-toast.is-warning { background: #ffdd57; color: rgba(0, 0, 0, 0.7); }
+.cl-toast::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    background-color: var(--cl-toast-tone);
+    -webkit-mask: var(--cl-toast-icon) center / contain no-repeat;
+    mask: var(--cl-toast-icon) center / contain no-repeat;
+}
+
+.cl-toast.is-danger {
+    --cl-toast-tone: var(--cl-bad);
+    --cl-toast-soft: var(--cl-bad-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 9l6 6M15 9l-6 6'/%3E%3C/svg%3E");
+}
+
+.cl-toast.is-info {
+    --cl-toast-tone: var(--cl-info);
+    --cl-toast-soft: var(--cl-info-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E");
+}
+
+.cl-toast.is-warning {
+    --cl-toast-tone: var(--cl-warn);
+    --cl-toast-soft: var(--cl-warn-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
+}
+
+@media screen and (max-width: 719px) {
+    .cl-toast {
+        top: calc(var(--cl-topbar-height) + 8px);
+        right: 16px;
+        left: 16px;
+        max-width: none;
+    }
+}
 
 /* Settings pages. Content sits inside Bulma's .content wrapper (layout.html), so rules that touch headings,
    lists and links are prefixed with .cl-page to outweigh .content h1/h2/ul/li. */
