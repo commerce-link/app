@@ -32,36 +32,6 @@
                                th:attr="aria-current=${s.active()} ? 'page' : null" data-cl-list-nav><span th:text="${s.label()}"></span></a>
                         </nav>
                         <div class="cl-toolbar-search">
-                            <!--/* the only menu sits right next to the search it narrows; on a phone it takes its own row above the field */-->
-                            <div class="cl-toolbar-filters">
-                            <details class="cl-filter-menu is-end" data-cl-filter-menu="dates">
-                                <summary class="cl-filter-menu-trigger">
-                                    <span class="cl-filter-menu-key" th:text="#{orders.archive.dates.menu}"></span>
-                                    <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
-                                </summary>
-                                <form method="get" th:action="@{/dashboard/orders/archive}" class="cl-filter-menu-panel" data-cl-list-form>
-                                    <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
-                                    <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
-                                    <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{orders.archive.dates.presets}">
-                                        <ul class="cl-date-presets">
-                                            <li th:each="p : ${page.dates().presets()}">
-                                                <a class="cl-filter-menu-item" th:href="@{${p.href()}}" th:attr="aria-current=${p.active()} ? 'true' : null"
-                                                   data-cl-list-nav><span class="cl-filter-menu-text" th:text="${p.label()}"></span></a>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="cl-filter-menu-dates">
-                                        <label><span th:text="#{orders.archive.dates.from}"></span>
-                                            <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/></label>
-                                        <label><span th:text="#{orders.archive.dates.to}"></span>
-                                            <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/></label>
-                                    </div>
-                                    <div class="cl-filter-menu-actions">
-                                        <button type="submit" class="cl-button is-primary" th:text="#{orders.archive.dates.apply}"></button>
-                                    </div>
-                                </form>
-                            </details>
-                            </div>
                             <form method="get" th:action="@{/dashboard/orders/archive}" class="cl-search-form" role="search" data-cl-list-form>
                                 <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
                                 <input type="hidden" name="period" th:if="${q.period() != null}" th:value="${q.period().param()}"/>
@@ -82,7 +52,44 @@
                                     <span class="cl-search-submit-text" th:text="#{general.search}"></span>
                                 </button>
                             </form>
+                            <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="archive-filters" aria-expanded="true">
+                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                <span class="cl-toolbar-toggle-label"><span th:text="#{orders.archive.filters}"></span><th:block th:if="${q.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${q.activeFilterCount()}"></span></th:block></span>
+                            </button>
                         </div>
+                    </div>
+
+                    <div class="cl-toolbar-filters" id="archive-filters">
+                        <details class="cl-filter-menu is-end" data-cl-filter-menu="dates">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{orders.archive.dates.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/orders/archive}" class="cl-filter-menu-panel" data-cl-list-form>
+                                <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
+                                <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{orders.archive.dates.presets}">
+                                    <ul class="cl-date-presets">
+                                        <li th:each="p : ${page.dates().presets()}">
+                                            <a class="cl-filter-menu-item" th:href="@{${p.href()}}" th:attr="aria-current=${p.active()} ? 'true' : null"
+                                               data-cl-list-nav><span class="cl-filter-menu-text" th:text="${p.label()}"></span></a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="cl-filter-menu-dates">
+                                    <label><span th:text="#{orders.archive.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/></label>
+                                    <label><span th:text="#{orders.archive.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/></label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" th:text="#{orders.archive.dates.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>
                 </div>
 
@@ -93,8 +100,6 @@
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
-                        <a class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
-                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>
                     <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
                        th:text="${page.resultsLine()}"></p>

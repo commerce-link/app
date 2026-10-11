@@ -60,22 +60,6 @@ class OrdersArchiveRenderingTest {
                 .contains("cl-date-presets").contains("Ostatnie 30 dni").contains("Złożone");
     }
 
-    /** The date menu stands right before the search field in the one toolbar row; nothing folds it away on a phone. */
-    @Test
-    void dateMenuSitsNextToTheSearchInOneRow() {
-        // when
-        String html = SettingsTemplateRenderer.render(RESULTS, Map.of("page", page(List.of(row()), null, null, null,
-                List.of(new Chip("Szukane: x", "/dashboard/orders/archive", "Wyczyść: Szukane: x")))));
-
-        // then
-        String search = html.substring(html.indexOf("class=\"cl-toolbar-search\""), html.indexOf("class=\"cl-list-meta"));
-        assertThat(search.indexOf("data-cl-filter-menu=\"dates\"")).isNotNegative()
-                .isLessThan(search.indexOf("role=\"search\""));
-        assertThat(html).doesNotContain("data-cl-toolbar-toggle").doesNotContain("cl-toolbar-row\">\n</div>");
-        String chips = html.substring(html.indexOf("class=\"cl-filter-chips\""), html.indexOf("class=\"cl-table-results"));
-        assertThat(chips).contains("cl-toolbar-clear").contains("Wyczyść filtry");
-    }
-
     @Test
     void exhaustedBatchOffersOlderOrders() {
         // when
