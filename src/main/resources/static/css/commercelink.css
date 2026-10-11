@@ -10623,6 +10623,35 @@ a.cl-link-button:hover {
     gap: 4px 8px;
 }
 
+/* Phone: "Poprzednia grupa" | "Następna grupa" share the first row ("Następna" always on the right, even alone) and
+   "Zacznij od początku" takes the second, so the step buttons never move when the restart appears */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-queue-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .cl-page .cl-queue-actions > .cl-queue-back {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-queue-actions > .cl-page-action-form {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-queue-actions > .cl-queue-restart {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .cl-page .cl-queue-actions > .cl-button {
+        justify-content: center;
+    }
+}
+
 /* Under a page title (the supplier selection's kind, step, store and strategy) it stays quieter than the lead */
 .cl-page .cl-page-header .cl-group-meta {
     margin-top: 8px;

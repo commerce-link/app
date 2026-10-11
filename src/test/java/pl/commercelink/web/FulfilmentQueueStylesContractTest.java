@@ -133,4 +133,19 @@ class FulfilmentQueueStylesContractTest {
         assertThat(ruleBody(narrow, ".cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub")).contains("display: block;");
         assertThat(ruleBody(narrow, ".cl-page .cl-table.is-queue .cl-queue-ordered-sub .cl-queue-label")).contains("display: inline;");
     }
+
+    @Test
+    void onAPhoneTheStepButtonsShareTheFirstRowAndTheRestartTakesTheSecond() throws Exception {
+        // given
+        String css = queueSection();
+        int media = css.indexOf("@media screen and (max-width: 719px) {\n    .cl-page .cl-queue-actions {");
+        assertThat(media).as("the phone block of the queue actions").isNotNegative();
+        String block = css.substring(media, css.indexOf("\n}\n", media));
+
+        // when / then
+        assertThat(ruleBody(block, ".cl-page .cl-queue-actions")).contains("display: grid;").contains("repeat(2, minmax(0, 1fr))");
+        assertThat(ruleBody(block, ".cl-page .cl-queue-actions > .cl-queue-back")).contains("grid-column: 1;").contains("grid-row: 1;");
+        assertThat(ruleBody(block, ".cl-page .cl-queue-actions > .cl-page-action-form")).contains("grid-column: 2;").contains("grid-row: 1;");
+        assertThat(ruleBody(block, ".cl-page .cl-queue-actions > .cl-queue-restart")).contains("grid-column: 1 / -1;").contains("grid-row: 2;");
+    }
 }

@@ -16,14 +16,17 @@
                        of each skipped group: FulfilmentQueue leaves them out and picks the next group. It skips the whole
                        group, ticked or not. The skipped orders live only in the address, so "Wróć" is the address before
                        the last skip and "Zacznij od początku" the page without any (SkippedGroups). */-->
-                <div class="cl-page-actions" th:if="${page.hasGroup()}">
-                    <a th:if="${page.backHref() != null}" class="cl-button" th:href="@{${page.backHref()}}">
-                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
-                        <span th:text="#{fulfilment.queue.back}"></span>
-                    </a>
-                    <a th:if="${page.canRestart()}" class="cl-button" th:href="@{/dashboard/fulfilment/queue}">
+                <div class="cl-page-actions cl-queue-actions" th:if="${page.hasGroup()}">
+                    <!--/* "Zacznij od początku" first: the actions sit at the right edge, so a button appearing on the left moves
+                           nothing, and "Poprzednia" / "Następna grupa" stay side by side in the same place (on a phone
+                           they share the first row and the restart takes the second, see .cl-queue-actions) */-->
+                    <a th:if="${page.canRestart()}" class="cl-button cl-queue-restart" th:href="@{/dashboard/fulfilment/queue}">
                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-undo-alt"></i></span>
                         <span th:text="#{fulfilment.queue.restart}"></span>
+                    </a>
+                    <a th:if="${page.backHref() != null}" class="cl-button cl-queue-back" th:href="@{${page.backHref()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-arrow-left"></i></span>
+                        <span th:text="#{fulfilment.queue.back}"></span>
                     </a>
                     <form method="get" th:action="@{/dashboard/fulfilment/queue}" class="cl-page-action-form">
                         <input type="hidden" name="orderIds" th:each="id : ${page.skipOrderIds()}" th:value="${id}">

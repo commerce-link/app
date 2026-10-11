@@ -68,8 +68,9 @@ class FulfilmentQueueRenderingTest {
         assertThat(actions).contains("href=\"/dashboard/fulfilment/queue?orderIds=s1&amp;skippedGroups=1\"")
                 .contains("<span>Poprzednia grupa</span>").contains("<span>Zacznij od początku</span>").contains("href=\"/dashboard/fulfilment/queue\"")
                 .contains("name=\"skippedGroups\" value=\"1,1,2\"").contains("<span>Następna grupa</span>");
-        assertThat(actions.indexOf("Poprzednia grupa")).isLessThan(actions.indexOf("Zacznij od początku"));
-        assertThat(actions.indexOf("Zacznij od początku")).isLessThan(actions.indexOf("<span>Następna grupa</span>"));
+        // the restart comes first, so the previous and next group stay side by side at the right edge
+        assertThat(actions.indexOf("Zacznij od początku")).isLessThan(actions.indexOf("<span>Poprzednia grupa</span>"));
+        assertThat(actions.indexOf("<span>Poprzednia grupa</span>")).isLessThan(actions.indexOf("<span>Następna grupa</span>"));
         assertThat(html).doesNotContain("Pominięte zamówienia: 2");
     }
 
