@@ -80,9 +80,7 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::value)
-                .containsExactly("300,00", "0,00", "100,00", "1 010,00");
-        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::counts)
-                .containsExactly("produkty: 1 · 3 szt.", "produkty: 0 · 0 szt.", "produkty: 1 · 2 szt.", "produkty: 2 · 2 szt.");
+                .containsExactly("3 szt.", "0 szt.", "2 szt.", "2 szt.");
         assertThat(model.tiles().get(0).active()).isFalse();
         assertThat(page().tiles().get(0).active()).isTrue();
     }
@@ -103,10 +101,8 @@ class WarehouseListServiceTest {
                 .containsExactly("Na stanie", "Do przyjęcia", "Zarezerwowane", "Wymaga uwagi");
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
         WarehousePageModel.Tile toReceive = model.tiles().get(1);
-        assertThat(toReceive.value()).isEqualTo("140,00");
-        assertThat(toReceive.gross()).isEqualTo("brutto 172,20 PLN");
-        assertThat(toReceive.counts()).isEqualTo("produkty: 2 · 6 szt.");
-        assertThat(toReceive.groups()).isEqualTo("w alokacji i zamówione");
+        assertThat(toReceive.value()).isEqualTo("6 szt.");
+        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione");
         assertThat(toReceive.href()).isEqualTo("/dashboard/warehouse?statuses=Allocation&statuses=Ordered");
         assertThat(toReceive.active()).isFalse();
     }
@@ -188,9 +184,8 @@ class WarehouseListServiceTest {
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
                 .containsExactly("Zamówione", "W alokacji", "Nowe", "Wszystkie");
         WarehousePageModel.Tile everything = model.tiles().get(3);
-        assertThat(everything.value()).isEqualTo("6,00");
-        assertThat(everything.counts()).isEqualTo("produkty: 3 · 6 szt.");
-        assertThat(everything.groups()).isEqualTo("nowe, w alokacji i zamówione");
+        assertThat(everything.value()).isEqualTo("6 szt.");
+        assertThat(everything.hint()).isEqualTo("nowe, w alokacji i zamówione");
         assertThat(everything.href()).isEqualTo("/dashboard/warehouse?statuses=all");
         assertThat(everything.active()).isFalse();
         assertThat(all.tiles().get(3).active()).isTrue();
@@ -407,7 +402,7 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void menuSummariesAndTileCountsReadAsLabelColonValue() {
+    void menuSummariesAndTileHintsReadAsLabelColonValue() {
         // given
         add("A", "GPU", Reserved, 1, 1);
         add("B", "CPU", Delivered, 1, 1);
@@ -421,6 +416,6 @@ class WarehouseListServiceTest {
         assertThat(all.categorySummary()).isEqualTo("wszystkie");
         assertThat(two.statusSummary()).isEqualTo("wybrane: 2");
         assertThat(two.categorySummary()).isEqualTo("wybrane: 2");
-        assertThat(all.tiles().get(0).counts()).isEqualTo("produkty: 1 · 1 szt.");
+        assertThat(all.tiles().get(0).hint()).isEqualTo("pozycje: 1");
     }
 }

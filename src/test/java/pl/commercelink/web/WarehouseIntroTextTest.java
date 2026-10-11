@@ -18,21 +18,21 @@ class WarehouseIntroTextTest {
     }
 
     @Test
-    void polishIntroSaysTilesShowTheWholeWarehouseValueAndTheResultsLineTheListsValue() {
+    void polishIntroPointsToTheResultsLineForValueAndMentionsNoValueTile() {
         // when
         String lead = lead("pl");
 
         // then
-        assertThat(lead).contains("wartość netto i brutto oraz liczbę produktów i sztuk, zawsze dla całego magazynu").contains("linii nad tabelą");
+        assertThat(lead).doesNotContain("wartość magazynu").contains("linii nad tabelą").contains("netto i brutto");
     }
 
     @Test
-    void englishIntroSaysTilesShowTheWholeWarehouseValueAndTheResultsLineTheListsValue() {
+    void englishIntroPointsToTheResultsLineForValueAndMentionsNoValueTile() {
         // when
         String lead = lead("en");
 
         // then
-        assertThat(lead).contains("net and gross value and the number of products and units, always for the whole warehouse").contains("line above the table");
+        assertThat(lead).doesNotContain("warehouse value").contains("line above the table").contains("net and gross");
     }
 
     private static String text(String key, String language) {
@@ -125,15 +125,6 @@ class WarehouseIntroTextTest {
         assertThat(text("warehouse.item.system.cost.tooltip", "en")).isEqualTo("System cost: {0} net / {1} gross");
         assertThat(text("warehouse.row.code.beforeNext", "pl")).isEqualTo("{0} ·");
         assertThat(text("warehouse.row.code.beforeNext", "en")).isEqualTo("{0} ·");
-    }
-
-    @Test
-    void tileSaysItsValueIsNetAndCountsProductsAndUnits() {
-        // when / then
-        assertThat(text("warehouse.tile.net", "pl")).isEqualTo("PLN\u00A0netto");
-        assertThat(text("warehouse.tile.gross", "pl")).isEqualTo("brutto {0}\u00A0PLN");
-        assertThat(text("warehouse.tile.counts", "pl")).isEqualTo("produkty: {0} · {1} szt.");
-        assertThat(text("warehouse.tile.counts", "en")).isEqualTo("products: {0} · {1} pcs");
     }
 
     @Test

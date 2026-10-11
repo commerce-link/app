@@ -72,12 +72,10 @@ class WarehouseListRenderingTest {
         BulkActionView destroy = new BulkActionView("destroy", "/dashboard/warehouse/markAsDestroyed", "Destroy",
                 "Delivered InRMA InExternalService", true, false, false, true, "Only for: …", null, null, "Destroy", "Destroy {k} items?");
         return new WarehousePageModel(WarehouseListQuery.parse(new LinkedMultiValueMap<>(), false), true, false,
-                List.of(new Tile("In stock", "9 224,25", "gross 11 345,82 PLN", "products: 86 · 1 974 pcs", null, "/dashboard/warehouse", true),
-                        new Tile("To receive", "140,00", "gross 172,20 PLN", "products: 2 · 6 pcs", "in allocation and ordered",
-                                "/dashboard/warehouse?statuses=Allocation&statuses=Ordered", false),
-                        new Tile("Reserved", "10,00", "gross 12,30 PLN", "products: 1 · 1 pcs", null, "/dashboard/warehouse?statuses=Reserved", false),
-                        new Tile("Needs attention", "0,00", "gross 0,00 PLN", "products: 0 · 0 pcs", "in claim and in service",
-                                "/dashboard/warehouse?statuses=InRMA&statuses=InExternalService", false)),
+                List.of(new Tile("In stock", "3 pcs", "in 1 items", "/dashboard/warehouse", true),
+                        new Tile("To receive", "2 pcs", "in allocation and ordered from suppliers", "/dashboard/warehouse?statuses=Allocation&statuses=Ordered", false),
+                        new Tile("Reserved", "1 pcs", "in 1 items", "/dashboard/warehouse?statuses=Reserved", false),
+                        new Tile("Needs attention", "0 pcs", "in claim and in service", "/dashboard/warehouse?statuses=InRMA&statuses=InExternalService", false)),
                 List.of(new Option("Delivered", "In stock", 1, true, "/dashboard/warehouse?statuses=all")), "In stock",
                 List.of(new Option("GPU", "GPU", 1, false, "/dashboard/warehouse?categories=GPU"),
                         new Option("none", "No category", 0, false, "/x")), "All",
@@ -307,21 +305,6 @@ class WarehouseListRenderingTest {
         assertThat(cell).contains("<a class=\"cl-cell-delivery\" href=\"/dashboard/deliveries/details?deliveryId=d1\" title=\"d1\">d1</a>");
         assertThat(cell.indexOf("S/N 1")).isGreaterThan(cell.indexOf(">d1</a>"));
         assertThat(cell).doesNotContain("cl-cell-supplier");
-    }
-
-    @Test
-    void tileLeadsWithTheNetValueThenGrossAndTheCountsWithItsStatusesInTheTitle() {
-        // given
-        WarehousePageModel page = model(List.of(row("a1", "Delivered", true)), false);
-
-        // when
-        String html = render(page);
-
-        // then
-        assertThat(html).containsPattern("<span class=\"cl-stat-value\"><span class=\"cl-nowrap\">9 224,25</span> <span class=\"cl-stat-value-of\">PLN\u00A0net</span></span>"
-                + "\\s*<span class=\"cl-stat-hint\">gross 11 345,82 PLN</span>\\s*<span class=\"cl-stat-hint\">products: 86 · 1 974 pcs</span>");
-        assertThat(html).contains("title=\"in allocation and ordered\"").contains("cl-stat-grid is-orders is-warehouse");
-        assertThat(html).containsPattern("<a class=\"cl-stat is-link\" href=\"/dashboard/warehouse\" data-cl-list-nav aria-current=\"true\">");
     }
 
     @Test

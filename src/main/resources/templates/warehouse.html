@@ -42,14 +42,13 @@
         <div data-cl-list-results data-cl-list-path="/dashboard/warehouse" data-cl-list-fragment="/dashboard/warehouse/list"
              th:fragment="results" th:with="q=${page.query()}">
 
-            <ul class="cl-stat-grid is-orders is-warehouse" th:attr="aria-label=#{warehouse.tiles.label}">
+            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{warehouse.tiles.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:title="${tile.groups()}"
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value"><span class="cl-nowrap" th:text="${tile.value()}"></span> <span class="cl-stat-value-of" th:text="#{warehouse.tile.net}"></span></span>
-                        <span class="cl-stat-hint" th:text="${tile.gross()}"></span>
-                        <span class="cl-stat-hint" th:text="${tile.counts()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
                     </a>
                 </li>

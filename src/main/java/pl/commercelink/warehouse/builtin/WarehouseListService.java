@@ -97,22 +97,15 @@ class WarehouseListService {
                 unitsTile(query, store, List.of(InRMA, InExternalService), "warehouse.tile.attention", "warehouse.tile.attention.hint", locale));
     }
 
-    /**
-     * The tile leads with the net value of its items, the figure the client reads the warehouse by (2026-10-11): money
-     * tied up in stock or on order. Gross and the counts of products and units come under it; the statuses a tile
-     * groups go to its title.
-     */
     private Tile unitsTile(WarehouseListQuery query, List<WarehouseItem> store, List<FulfilmentStatus> statuses, String key,
-                           String groupsKey, Locale locale) {
+                           String hintKey, Locale locale) {
         List<WarehouseItem> counted = store.stream().filter(i -> statuses.contains(i.getStatus())).toList();
         boolean active = query.statuses().equals(statuses) && query.categories().isEmpty() && query.q() == null;
+        String hint = hintKey != null ? text(locale, hintKey) : text(locale, "warehouse.tile.items", counted.size());
         // an active tile clicked again switches its filter off and shows every status (orders, deliveries, payments)
         String href = active ? query.cleared().href() : query.withStatuses(statuses).href();
-        return new Tile(text(locale, key),
-                Money.format(counted.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum()),
-                text(locale, "warehouse.tile.gross", Money.format(counted.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())),
-                text(locale, "warehouse.tile.counts", counted.size(), counted.stream().mapToInt(WarehouseItem::getQty).sum()),
-                groupsKey != null ? text(locale, groupsKey) : null, href, active);
+        return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
+                hint, href, active);
     }
 
     private List<Option> statusOptions(WarehouseListQuery query, List<WarehouseItem> base, Locale locale) {
