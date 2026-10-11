@@ -7,10 +7,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.util.LinkedMultiValueMap;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
-import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.orders.FulfilmentStatus;
 
@@ -20,6 +19,7 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
@@ -33,7 +33,7 @@ class WarehouseListServiceTest {
     @Mock
     private WarehouseRepository repository;
     @Mock
-    private DeliveriesRepository deliveries;
+    private SupplierRegistry suppliers;
     @Mock
     private StoresRepository stores;
 
@@ -46,7 +46,7 @@ class WarehouseListServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
-        service = new WarehouseListService(repository, deliveries, new DeliveryRedirectResolver(), messages, new SupplierLabels(stores));
+        service = new WarehouseListService(repository, new DeliveryRedirectResolver(), messages, new SupplierLabels(stores), suppliers);
         when(repository.findAllFiltered(eq("store-1"), isNull(), anyList())).thenAnswer(inv -> {
             List<FulfilmentStatus> statuses = inv.getArgument(2);
             return items.stream().filter(i -> statuses.contains(i.getStatus())).toList();
@@ -80,7 +80,9 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::value)
-                .containsExactly("3 szt.", "0 szt.", "2 szt.", "2 szt.");
+                .containsExactly("300,00", "0,00", "100,00", "1 010,00");
+        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::counts)
+                .containsExactly("produkty: 1 · 3 szt.", "produkty: 0 · 0 szt.", "produkty: 1 · 2 szt.", "produkty: 2 · 2 szt.");
         assertThat(model.tiles().get(0).active()).isFalse();
         assertThat(page().tiles().get(0).active()).isTrue();
     }
@@ -101,8 +103,10 @@ class WarehouseListServiceTest {
                 .containsExactly("Na stanie", "Do przyjęcia", "Zarezerwowane", "Wymaga uwagi");
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
         WarehousePageModel.Tile toReceive = model.tiles().get(1);
-        assertThat(toReceive.value()).isEqualTo("6 szt.");
-        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione");
+        assertThat(toReceive.value()).isEqualTo("140,00");
+        assertThat(toReceive.gross()).isEqualTo("brutto 172,20 PLN");
+        assertThat(toReceive.counts()).isEqualTo("produkty: 2 · 6 szt.");
+        assertThat(toReceive.groups()).isEqualTo("w alokacji i zamówione");
         assertThat(toReceive.href()).isEqualTo("/dashboard/warehouse?statuses=Allocation&statuses=Ordered");
         assertThat(toReceive.active()).isFalse();
     }
@@ -184,8 +188,9 @@ class WarehouseListServiceTest {
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
                 .containsExactly("Zamówione", "W alokacji", "Nowe", "Wszystkie");
         WarehousePageModel.Tile everything = model.tiles().get(3);
-        assertThat(everything.value()).isEqualTo("6 szt.");
-        assertThat(everything.hint()).isEqualTo("nowe, w alokacji i zamówione");
+        assertThat(everything.value()).isEqualTo("6,00");
+        assertThat(everything.counts()).isEqualTo("produkty: 3 · 6 szt.");
+        assertThat(everything.groups()).isEqualTo("nowe, w alokacji i zamówione");
         assertThat(everything.href()).isEqualTo("/dashboard/warehouse?statuses=all");
         assertThat(everything.active()).isFalse();
         assertThat(all.tiles().get(3).active()).isTrue();
@@ -367,25 +372,22 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void deliveryColumnLinksOnlyToDeliveriesThatExistAndNamesTheirSupplier() {
+    void deliveryColumnLinksEveryDeliveryIdWithoutReadingTheDeliveries() {
         // given
-        add("Known", "GPU", Delivered, 1, 1).setDeliveryId("7e7e1971-0000-0000-0000-000000000000");
+        add("Delivered", "GPU", Delivered, 1, 1).setDeliveryId("7e7e1971-0000-0000-0000-000000000000");
         add("Manual", "GPU", Delivered, 1, 1).setDeliveryId("Unknown");
-        add("Removed", "GPU", Delivered, 1, 1).setDeliveryId("8c124850-0000-0000-0000-000000000000");
-        Delivery delivery = new Delivery("store-1", null, "Acme");
-        delivery.setDeliveryId("7e7e1971-0000-0000-0000-000000000000");
-        when(deliveries.findById("store-1", "7e7e1971-0000-0000-0000-000000000000")).thenReturn(delivery);
+        add("Former supplier", "GPU", Ordered, 1, 1).setDeliveryId("Kosatec");
+        when(suppliers.exists(anyString())).thenAnswer(inv -> "Kosatec".equals(inv.getArgument(0)));
 
         // when
-        List<WarehouseItemRow> rows = page().rows();
+        List<WarehouseItemRow> rows = page("statuses", "all").rows();
 
         // then
-        assertThat(rows).extracting(WarehouseItemRow::name).containsExactly("Known", "Manual", "Removed");
+        assertThat(rows).extracting(WarehouseItemRow::name).containsExactly("Delivered", "Former supplier", "Manual");
         assertThat(rows.get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=7e7e1971-0000-0000-0000-000000000000");
         assertThat(rows.get(0).deliveryNumber()).isEqualTo("7e7e1971");
-        assertThat(rows.get(0).supplier()).isEqualTo("Acme");
+        assertThat(rows.get(0).supplier()).isNull();
         assertThat(rows.get(1).deliveryHref()).isNull();
-        assertThat(rows.get(1).deliveryNumber()).isNull();
         assertThat(rows.get(2).deliveryHref()).isNull();
     }
 
@@ -405,7 +407,7 @@ class WarehouseListServiceTest {
     }
 
     @Test
-    void menuSummariesAndTileHintsReadAsLabelColonValue() {
+    void menuSummariesAndTileCountsReadAsLabelColonValue() {
         // given
         add("A", "GPU", Reserved, 1, 1);
         add("B", "CPU", Delivered, 1, 1);
@@ -419,6 +421,6 @@ class WarehouseListServiceTest {
         assertThat(all.categorySummary()).isEqualTo("wszystkie");
         assertThat(two.statusSummary()).isEqualTo("wybrane: 2");
         assertThat(two.categorySummary()).isEqualTo("wybrane: 2");
-        assertThat(all.tiles().get(0).hint()).isEqualTo("pozycje: 1");
+        assertThat(all.tiles().get(0).counts()).isEqualTo("produkty: 1 · 1 szt.");
     }
 }

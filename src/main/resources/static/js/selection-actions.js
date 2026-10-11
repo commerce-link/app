@@ -1,6 +1,6 @@
 // Bulk actions on the rows checked in a cl-table (warehouse list). table-select.js keeps the checkboxes, the count and the
 // selection row; this script greys an action the selection does not fit (its reason as visible text: a status the action
-// is not for, or rows from different sources for an action that needs one), shows the checked units, and runs the action:
+// is not for, or a row without a delivery for goods out and shipping), shows the checked units, and runs the action:
 // a quantity dialog (#cl-quantity-dialog, full quantity by default, inline validation), the page's confirmation dialog
 // (window.CL_confirmBulk) or a plain post. Every post goes to the action's own address with selectedItemIds (and
 // quantities, reason, note) plus the list view from the address, so the server returns to the same search and
@@ -46,19 +46,14 @@
             return { fits: false, reason: button.getAttribute('data-reason-status') || '' };
         }
         if (button.hasAttribute('data-cl-action-same-source')) {
-            // goods out and shipping read the counterparty from the delivery the item came from (DeliveredPredicate)
+            // goods out and shipping read the counterparty from the delivery the item came from (DeliveredPredicate). The
+            // list does not read the deliveries (one read per row), so whether the rows share a supplier is checked by the
+            // server alone, which refuses a mixed selection with its reason and changes nothing.
             var withoutDelivery = boxes.some(function (box) {
                 return box.getAttribute('data-has-delivery') === 'false';
             });
             if (withoutDelivery) {
                 return { fits: false, reason: bar().getAttribute('data-reason-no-delivery') || '' };
-            }
-            var first = boxes.length ? boxes[0].getAttribute('data-source') : null;
-            var same = boxes.every(function (box) {
-                return box.getAttribute('data-source') === first;
-            });
-            if (!same) {
-                return { fits: false, reason: bar().getAttribute('data-reason-source') || '' };
             }
         }
         return { fits: true, reason: '' };

@@ -29,9 +29,9 @@ class WarehouseListStylesContractTest {
         String section = section();
 
         // when / then
-        // "Zarezerwowane" is a 114 px pill; 16 % of the table is narrower than that below 1366 px and the text ran out of it
-        // 9.5rem = the 114 px pill plus the cell's 2 × 12 px padding; 8.5rem (wave 2) left 112 px and cut "Zarezerwowane"
-        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 9.5rem; }")
+        // 16 % of the table is narrower than the longest pill below 1366 px and the text ran out of it; the longest is now the
+        // condition pill under the status, "Otwarte opakowanie" (151 px): 11.5rem = that pill plus the cell's 2 × 12 px padding
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse .cl-col-status { width: 11.5rem; }")
                 .doesNotContain(".cl-col-status { width: 16%; }");
     }
 
@@ -158,9 +158,9 @@ class WarehouseListStylesContractTest {
         String table = section.substring(section.indexOf("@media screen and (min-width: 720px) {"));
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap;")
                 .contains(".cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }");
-        // the pill may break after "syst." (the amount itself is grouped with no-break spaces), never out of its cell
+        // the condition pill under the status may break inside the status column ("Otwarte opakowanie"), never out of it
         assertThat(section).doesNotContain(".cl-table-pills .cl-status { white-space: nowrap; }")
-                .contains(".cl-page .cl-table.is-warehouse td.is-numeric .cl-table-pills .cl-status { text-align: right; white-space: normal; }");
+                .contains(".cl-page .cl-table.is-warehouse td.cl-cell-status .cl-status { white-space: normal; }");
         assertThat(section).contains("-webkit-line-clamp: 2;");
         assertThat(table.substring(0, table.indexOf("@media screen and (max-width: 719px)"))).doesNotContain(".cl-table-code { white-space: normal");
     }

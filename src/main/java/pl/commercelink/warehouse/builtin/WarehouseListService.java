@@ -6,11 +6,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
-import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.*;
@@ -37,10 +36,10 @@ class WarehouseListService {
             List.of(DocumentReason.StockAdjustment, DocumentReason.Destruction, DocumentReason.InternalUse, DocumentReason.Theft);
 
     private final WarehouseRepository repository;
-    private final DeliveriesRepository deliveries;
     private final DeliveryRedirectResolver redirects;
     private final MessageSource messages;
     private final SupplierLabels supplierLabels;
+    private final SupplierRegistry suppliers;
 
     WarehousePageModel page(String storeId, boolean wms, boolean admin, WarehouseListQuery query, Locale locale) {
         List<FulfilmentStatus> visible = WarehouseStatuses.visible(wms);
@@ -59,8 +58,8 @@ class WarehouseListService {
         Pagination pagination = Pagination.of(query.page(), shown.size(), WarehouseListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         List<WarehouseItem> pageItems = shown.subList(pagination.fromIndex(), pagination.toIndex());
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
-        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, deliveries(storeId, pageItems), labels::of,
-                labels::has, admin);
+        WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
+                id -> labels.has(id) || suppliers.exists(id), admin);
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);
@@ -73,18 +72,6 @@ class WarehouseListService {
                 chips.size(), destroyed,
                 WarehouseBulkAction.menu().stream().map(a -> view(a, locale)).toList(), view(WarehouseBulkAction.DESTROY, locale),
                 DESTROY_REASONS.stream().map(r -> new Option(r.name(), text(locale, "DocumentReason." + r.name()), 0, false, null)).toList());
-    }
-
-    /** The store's deliveries behind the page's items, one read per distinct id; an id with no record is left out. */
-    private Map<String, Delivery> deliveries(String storeId, List<WarehouseItem> items) {
-        Map<String, Delivery> byId = new HashMap<>();
-        items.stream().map(WarehouseItem::getDeliveryId).filter(StringUtils::isNotBlank).distinct().forEach(id -> {
-            Delivery delivery = deliveries.findById(storeId, id);
-            if (delivery != null) {
-                byId.put(id, delivery);
-            }
-        });
-        return byId;
     }
 
     private Results results(List<WarehouseItem> shown, Locale locale) {
@@ -110,15 +97,22 @@ class WarehouseListService {
                 unitsTile(query, store, List.of(InRMA, InExternalService), "warehouse.tile.attention", "warehouse.tile.attention.hint", locale));
     }
 
+    /**
+     * The tile leads with the net value of its items, the figure the client reads the warehouse by (2026-10-11): money
+     * tied up in stock or on order. Gross and the counts of products and units come under it; the statuses a tile
+     * groups go to its title.
+     */
     private Tile unitsTile(WarehouseListQuery query, List<WarehouseItem> store, List<FulfilmentStatus> statuses, String key,
-                           String hintKey, Locale locale) {
+                           String groupsKey, Locale locale) {
         List<WarehouseItem> counted = store.stream().filter(i -> statuses.contains(i.getStatus())).toList();
         boolean active = query.statuses().equals(statuses) && query.categories().isEmpty() && query.q() == null;
-        String hint = hintKey != null ? text(locale, hintKey) : text(locale, "warehouse.tile.items", counted.size());
         // an active tile clicked again switches its filter off and shows every status (orders, deliveries, payments)
         String href = active ? query.cleared().href() : query.withStatuses(statuses).href();
-        return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
-                hint, href, active);
+        return new Tile(text(locale, key),
+                Money.format(counted.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum()),
+                text(locale, "warehouse.tile.gross", Money.format(counted.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())),
+                text(locale, "warehouse.tile.counts", counted.size(), counted.stream().mapToInt(WarehouseItem::getQty).sum()),
+                groupsKey != null ? text(locale, groupsKey) : null, href, active);
     }
 
     private List<Option> statusOptions(WarehouseListQuery query, List<WarehouseItem> base, Locale locale) {

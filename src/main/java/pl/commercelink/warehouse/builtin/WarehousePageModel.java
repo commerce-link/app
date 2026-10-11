@@ -14,7 +14,9 @@ public record WarehousePageModel(WarehouseListQuery query, boolean admin, boolea
                                  long destroyedCount, List<BulkActionView> menuActions, BulkActionView destroyAction,
                                  List<Option> destroyReasons) {
 
-    public record Tile(String label, String value, String hint, String href, boolean active) { }
+    /** value is the net value of the tile's items, the bare amount (the template adds "PLN netto"); groups names the statuses a tile adds up, null for a single status. */
+    public record Tile(String label, String value, String gross, String counts, String groups, String href, boolean active) { }
+
     public record Option(String value, String label, long count, boolean selected, String toggleHref) { }
     /**
      * The results line in parts so the template can set the amounts as cl-results-amount (Payments): count is the text
