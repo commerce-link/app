@@ -61,9 +61,6 @@
                                     </div>
                                 </form>
                             </details>
-                            <!--/* after the menu, as on the other lists; in the chips line its 44 px target stretched the chips */-->
-                            <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
-                               th:text="#{general.clear.filters}" data-cl-list-nav></a>
                             </div>
                             <form method="get" th:action="@{/dashboard/orders/archive}" class="cl-search-form" role="search" data-cl-list-form>
                                 <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
@@ -96,6 +93,8 @@
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
+                        <a class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>
                     <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
                        th:text="${page.resultsLine()}"></p>
