@@ -60,7 +60,7 @@ class OrdersArchiveRenderingTest {
                 .contains("cl-date-presets").contains("Ostatnie 30 dni").contains("Złożone");
     }
 
-    /** The date menu stands right before the search field in the one toolbar row; nothing folds it away on a phone. */
+    /** The date menu and "Wyczyść filtry" stand right before the search field in the one toolbar row; nothing folds them away on a phone. */
     @Test
     void dateMenuSitsNextToTheSearchInOneRow() {
         // when
@@ -72,8 +72,11 @@ class OrdersArchiveRenderingTest {
         assertThat(search.indexOf("data-cl-filter-menu=\"dates\"")).isNotNegative()
                 .isLessThan(search.indexOf("role=\"search\""));
         assertThat(html).doesNotContain("data-cl-toolbar-toggle").doesNotContain("cl-toolbar-row\">\n</div>");
+        // "Wyczyść filtry" follows the menu as on the other lists, not inside the chips line (its 44 px target stretched the chips)
+        assertThat(search.indexOf("cl-toolbar-clear")).isGreaterThan(search.indexOf("data-cl-filter-menu=\"dates\""))
+                .isLessThan(search.indexOf("role=\"search\""));
         String chips = html.substring(html.indexOf("class=\"cl-filter-chips\""), html.indexOf("class=\"cl-table-results"));
-        assertThat(chips).contains("cl-toolbar-clear").contains("Wyczyść filtry");
+        assertThat(chips).doesNotContain("cl-toolbar-clear");
     }
 
     @Test
