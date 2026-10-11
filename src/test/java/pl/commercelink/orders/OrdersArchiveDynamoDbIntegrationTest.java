@@ -130,6 +130,18 @@ class OrdersArchiveDynamoDbIntegrationTest {
     }
 
     @Test
+    void countMatchesWhatTheIndexReadsAcrossPages() {
+        // when / then — the same key condition and filter as the read, summed over DynamoDB pages of 3 entries
+        assertThat(orders.countArchive("store-a", CLOSED, null, null, 3)).isEqualTo(31);
+        assertThat(orders.countArchive("store-a", CLOSED, null, null)).isEqualTo(31);
+        assertThat(orders.countArchive("store-a", Set.of(OrderStatus.Cancelled), null, null)).isEqualTo(10);
+        assertThat(orders.countArchive("store-a", CLOSED, LocalDate.of(2026, 5, 30), LocalDate.of(2026, 5, 31))).isEqualTo(2);
+        assertThat(orders.countArchive("store-a", CLOSED, LocalDate.of(2026, 5, 30), null)).isEqualTo(2);
+        assertThat(orders.countArchive("store-a", CLOSED, null, LocalDate.of(2026, 5, 2))).isEqualTo(2);
+        assertThat(orders.countArchive("store-b", CLOSED, null, null)).isEqualTo(1);
+    }
+
+    @Test
     void statusFilterKeepsOnlyTheAskedStatus() {
         // when
         List<ArchiveIndexEntry> cancelled = all(orders.archiveIndex("store-a",

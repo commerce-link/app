@@ -133,7 +133,50 @@ class OrderArchiveServiceTest {
         assertThat(page.rows()).hasSize(5);
         assertThat(page.pagination().nextHref()).isNull();
         assertThat(page.pagination().previousHref()).isEqualTo(query().href());
-        assertThat(page.resultsLine()).isEqualTo("Zamówienia: 26–30");
+        assertThat(page.resultsLine()).isEqualTo("Zamówienia: 30");
+    }
+
+    @Test
+    void browsingCountsTheWholeArchiveForTheResultsAndThePager() {
+        // given
+        indexReturns(history(30));
+        when(orders.countArchive(STORE, java.util.Set.of(OrderStatus.Cancelled), LocalDate.of(2026, 9, 9), null)).thenReturn(644L);
+
+        // when
+        OrderArchivePage page = service.page(STORE, query("status", "Cancelled", "period", "30d"), TODAY, PL);
+
+        // then
+        assertThat(page.resultsLine()).isEqualTo("Zamówienia: 644");
+        assertThat(page.pagination().openEnded()).isFalse();
+        assertThat(page.pagination().totalItems()).isEqualTo(644);
+    }
+
+    @Test
+    void textAndEmailSearchesCountNothing() {
+        // given
+        indexReturns(history(30));
+
+        // when
+        OrderArchivePage text = service.page(STORE, query("q", "kowalski"), TODAY, PL);
+        OrderArchivePage email = service.page(STORE, query("q", "klient1@example.com"), TODAY, PL);
+
+        // then
+        verify(orders, never()).countArchive(any(), any(), any(), any());
+        assertThat(text.pagination().openEnded()).isTrue();
+        assertThat(text.resultsLine()).isEqualTo("Zamówienia: 1–10");
+        assertThat(email.pagination().openEnded()).isTrue();
+    }
+
+    @Test
+    void emptyArchiveIsNotCounted() {
+        // given
+        indexReturns(List.of());
+
+        // when
+        service.page(STORE, query(), TODAY, PL);
+
+        // then
+        verify(orders, never()).countArchive(any(), any(), any(), any());
     }
 
     @Test
@@ -236,7 +279,10 @@ class OrderArchiveServiceTest {
 
         // then
         assertThat(page.rows()).extracting(r -> r.orderId()).containsExactly(closed.getOrderId());
+        assertThat(page.resultsLine()).isEqualTo("Zamówienia: 1");
+        assertThat(page.pagination().openEnded()).isFalse();
         verify(orders, never()).archiveIndex(any(), any());
+        verify(orders, never()).countArchive(any(), any(), any(), any());
     }
 
     @Test

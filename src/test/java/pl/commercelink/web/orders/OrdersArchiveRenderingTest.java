@@ -31,7 +31,7 @@ class OrdersArchiveRenderingTest {
                 new DateMenu("cała historia", List.of(new Preset("Cała historia", "/dashboard/orders/archive", true),
                         new Preset("Ostatnie 30 dni", "/dashboard/orders/archive?period=30d", false)), null, null),
                 chips, rows.isEmpty() ? "" : "Zamówienia: 1–1", rows,
-                new ArchivePager(0, rows.size(), null, rows.isEmpty() ? null : "/dashboard/orders/archive?after=x&offset=25"),
+                new ArchivePager(0, rows.size(), null, rows.isEmpty() ? null : "/dashboard/orders/archive?after=x&offset=25", rows.isEmpty() ? null : 644L),
                 empty, open, scope);
     }
 
@@ -45,7 +45,7 @@ class OrdersArchiveRenderingTest {
                 .contains("<a class=\"cl-row-link\" href=\"/dashboard/orders/o1?returnTo=%2Fdashboard%2Forders%2Farchive\">8C1D02</a>")
                 .contains("08.10.2026").contains("18:42").contains("cl-status is-ok").contains("cl-doc-mark is-done")
                 .contains("aria-sort=\"descending\"").contains("data-cl-list-fragment=\"/dashboard/orders/archive/list\"")
-                .contains("Następna")
+                .contains("Następna").contains("1–1 z 644")
                 .doesNotContain("cl-table-check").doesNotContain("??").doesNotContain("style=").doesNotContain("is-primary\" ");
     }
 

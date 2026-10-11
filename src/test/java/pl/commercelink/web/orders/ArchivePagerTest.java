@@ -9,7 +9,7 @@ class ArchivePagerTest {
     @Test
     void firstPageWithMoreHasOnlyNext() {
         // when
-        ArchivePager pager = new ArchivePager(0, 25, null, "/next");
+        ArchivePager pager = new ArchivePager(0, 25, null, "/next", null);
 
         // then
         assertThat(pager.isNeeded()).isTrue();
@@ -22,6 +22,25 @@ class ArchivePagerTest {
     @Test
     void singlePageNeedsNoPager() {
         // when / then
-        assertThat(new ArchivePager(0, 7, null, null).isNeeded()).isFalse();
+        assertThat(new ArchivePager(0, 7, null, null, null).isNeeded()).isFalse();
+    }
+
+    @Test
+    void knownTotalClosesTheRange() {
+        // when
+        ArchivePager pager = new ArchivePager(25, 50, "/prev", "/next", 644L);
+
+        // then
+        assertThat(pager.openEnded()).isFalse();
+        assertThat(pager.totalItems()).isEqualTo(644);
+    }
+
+    @Test
+    void totalNeverReadsBelowTheRowsShown() {
+        // when — an order reopened between the count and the read
+        ArchivePager pager = new ArchivePager(25, 50, "/prev", null, 40L);
+
+        // then
+        assertThat(pager.totalItems()).isEqualTo(50);
     }
 }

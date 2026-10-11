@@ -51,21 +51,43 @@ public class OrderArchiveService {
         };
         List<OrderRow> rows = result.orders().stream().map(o -> mapper.mapArchived(o, q.href())).toList();
         int from = result.offset();
-        ArchivePager pager = new ArchivePager(from, from + rows.size(), result.previousHref(), result.nextHref());
+        ArchivePager pager = new ArchivePager(from, from + rows.size(), result.previousHref(), result.nextHref(),
+                total(storeId, q, today, result, rows.isEmpty()));
         SearchScope scope = result.scannedUntil() == null ? null : new SearchScope(
                 text(locale, "orders.archive.scope", DAY.format(parse(result.scannedUntil()))),
                 text(locale, "orders.archive.scope.more"), result.moreHref());
         OpenNotice openNotice = result.openOrders().isEmpty() ? null : openNotice(result.openOrders(), q, locale);
         EmptyState empty = rows.isEmpty() && scope == null && openNotice == null ? emptyState(q, locale) : null;
-        String results = rows.isEmpty() ? "" : text(locale, "orders.archive.results", from + 1, from + rows.size());
+        String results = rows.isEmpty() ? ""
+                : pager.openEnded() ? text(locale, "orders.archive.results", from + 1, from + rows.size())
+                : text(locale, "orders.list.results", pager.totalItems());
         return new OrderArchivePage(q, segments(q, locale), dates(q, locale), chips(q, locale), results, rows, pager,
                 empty, openNotice, scope);
     }
 
+    /**
+     * Browsing, a segment and a date range are counted on the index (small entries, Select COUNT); a number is exact
+     * already; a text or e-mail search is not counted, since that would mean reading every whole order it skipped.
+     */
+    private Long total(String storeId, OrderArchiveQuery q, LocalDate today, Result result, boolean empty) {
+        if (empty) {
+            return null;
+        }
+        if (q.q() == null) {
+            return orders.countArchive(storeId, q.statuses(), q.effectiveFrom(today), q.effectiveTo());
+        }
+        return result.exactTotal();
+    }
+
     private record Result(List<Order> orders, int offset, String previousHref, String nextHref,
-                          String scannedUntil, String moreHref, List<Order> openOrders) {
+                          String scannedUntil, String moreHref, List<Order> openOrders, Long exactTotal) {
         static Result of(List<Order> orders, int offset, String previousHref, String nextHref) {
-            return new Result(orders, offset, previousHref, nextHref, null, null, List.of());
+            return new Result(orders, offset, previousHref, nextHref, null, null, List.of(), null);
+        }
+
+        /** Every match is on this one page (a number looked up by key), so their count is the total. */
+        static Result complete(List<Order> orders) {
+            return new Result(orders, 0, null, null, null, null, List.of(), (long) orders.size());
         }
     }
 
@@ -126,11 +148,11 @@ public class OrderArchiveService {
                 .limit(PAGE)
                 .toList();
         if (!closed.isEmpty()) {
-            return Optional.of(Result.of(closed, 0, null, null));
+            return Optional.of(Result.complete(closed));
         }
         List<Order> open = found.stream().filter(o -> !o.isClosed()).toList();
         if (!open.isEmpty()) {
-            return Optional.of(new Result(List.of(), 0, null, null, null, null, open));
+            return Optional.of(new Result(List.of(), 0, null, null, null, null, open, null));
         }
         return Optional.empty();
     }
@@ -185,7 +207,7 @@ public class OrderArchiveService {
         }
         if (scanned >= TEXT_BATCH && more) {
             return new Result(matched, q.offset(), previous, null, lastScanned.orderedAt(),
-                    q.after(lastScanned.cursor(), q.offset() + matched.size()).href(), List.of());
+                    q.after(lastScanned.cursor(), q.offset() + matched.size()).href(), List.of(), null);
         }
         return Result.of(matched, q.offset(), previous, null);
     }

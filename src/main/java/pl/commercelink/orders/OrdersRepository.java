@@ -5,6 +5,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.Select;
 import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import org.springframework.stereotype.Component;
@@ -329,47 +330,83 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     private static final String ORDERED_AT_INDEX = "StoreIdOrderedAtIndex";
 
     /**
-     * The store's orders from StoreIdOrderedAtIndex in order-day order, read lazily: the next DynamoDB page is asked for
-     * only when the previous one is used up, so a caller that stops after 26 entries pays for one call. The days are
-     * compared as text: "from" as the bare date sorts before every time of that day (and equals a legacy date-only value),
-     * "to" is exclusive on the next day, so the last fraction of a second of the "to" day is still in.
+     * How many orders {@link #archiveIndex} would read with these statuses and days: the same key condition and filter,
+     * counted by DynamoDB (Select COUNT), so only the small index entries are read and nothing comes back but the number.
      */
-    public Iterator<ArchiveIndexEntry> archiveIndex(String storeId, ArchiveIndexRequest request) {
+    public long countArchive(String storeId, Set<OrderStatus> statuses, LocalDate from, LocalDate to) {
+        return countArchive(storeId, statuses, from, to, null);
+    }
+
+    long countArchive(String storeId, Set<OrderStatus> statuses, LocalDate from, LocalDate to, Integer pageLimit) {
+        long total = 0;
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryRequest query = archiveQuery(storeId, statuses, from, to).withSelect(Select.COUNT);
+            if (pageLimit != null) {
+                query.withLimit(pageLimit);
+            }
+            if (startKey != null) {
+                query.withExclusiveStartKey(startKey);
+            }
+            QueryResult result = amazonDynamoDB.query(query);
+            total += result.getCount();
+            startKey = result.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return total;
+    }
+
+    /**
+     * The days are compared as text: "from" as the bare date sorts before every time of that day (and equals a legacy
+     * date-only value), "to" is exclusive on the next day, so the last fraction of a second of the "to" day is still in.
+     */
+    private static QueryRequest archiveQuery(String storeId, Set<OrderStatus> statuses, LocalDate from, LocalDate to) {
         Map<String, AttributeValue> values = new HashMap<>();
         Map<String, String> names = new HashMap<>();
         values.put(":storeId", new AttributeValue().withS(storeId));
         names.put("#status", "status");
         String key = "storeId = :storeId";
-        if (request.from() != null || request.to() != null) {
+        if (from != null || to != null) {
             // DynamoDB rejects a name placeholder that no expression uses
             names.put("#orderedAt", "orderedAt");
         }
-        if (request.from() != null && request.to() != null) {
+        if (from != null && to != null) {
             key += " AND #orderedAt BETWEEN :from AND :toEnd";
-        } else if (request.from() != null) {
+        } else if (from != null) {
             key += " AND #orderedAt >= :from";
-        } else if (request.to() != null) {
+        } else if (to != null) {
             key += " AND #orderedAt < :toNext";
         }
-        if (request.from() != null) {
-            values.put(":from", new AttributeValue().withS(request.from().toString()));
+        if (from != null) {
+            values.put(":from", new AttributeValue().withS(from.toString()));
         }
-        if (request.to() != null && request.from() != null) {
+        if (to != null && from != null) {
             // a key condition takes one comparison of the range key, so with both days it is BETWEEN (inclusive): the
             // upper bound is the highest text of the "to" day, above every "yyyy-MM-ddT…" of it and below the next day
-            values.put(":toEnd", new AttributeValue().withS(request.to() + "T￿"));
-        } else if (request.to() != null) {
-            values.put(":toNext", new AttributeValue().withS(request.to().plusDays(1).toString()));
+            values.put(":toEnd", new AttributeValue().withS(to + "T\uffff"));
+        } else if (to != null) {
+            values.put(":toNext", new AttributeValue().withS(to.plusDays(1).toString()));
         }
         List<String> statusPlaceholders = new ArrayList<>();
         int i = 0;
-        for (OrderStatus status : request.statuses()) {
+        for (OrderStatus status : statuses) {
             String placeholder = ":s" + i++;
             statusPlaceholders.add(placeholder);
             values.put(placeholder, new AttributeValue().withS(status.name()));
         }
-        String filter = "#status IN (" + String.join(", ", statusPlaceholders) + ")";
-        String keyCondition = key;
+        return new QueryRequest()
+                .withTableName("Orders")
+                .withIndexName(ORDERED_AT_INDEX)
+                .withKeyConditionExpression(key)
+                .withFilterExpression("#status IN (" + String.join(", ", statusPlaceholders) + ")")
+                .withExpressionAttributeValues(values)
+                .withExpressionAttributeNames(names);
+    }
+
+    /**
+     * The store's orders from StoreIdOrderedAtIndex in order-day order, read lazily: the next DynamoDB page is asked for
+     * only when the previous one is used up, so a caller that stops after 26 entries pays for one call.
+     */
+    public Iterator<ArchiveIndexEntry> archiveIndex(String storeId, ArchiveIndexRequest request) {
         Map<String, AttributeValue> firstStart = request.start() == null ? null : Map.of(
                 "storeId", new AttributeValue().withS(storeId),
                 "orderId", new AttributeValue().withS(request.start().orderId()),
@@ -383,13 +420,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
             @Override
             public boolean hasNext() {
                 while (buffer.isEmpty() && !exhausted) {
-                    QueryRequest query = new QueryRequest()
-                            .withTableName("Orders")
-                            .withIndexName(ORDERED_AT_INDEX)
-                            .withKeyConditionExpression(keyCondition)
-                            .withFilterExpression(filter)
-                            .withExpressionAttributeValues(values)
-                            .withExpressionAttributeNames(names)
+                    QueryRequest query = archiveQuery(storeId, request.statuses(), request.from(), request.to())
                             .withScanIndexForward(!request.newestFirst())
                             .withLimit(request.pageLimit());
                     if (startKey != null) {
