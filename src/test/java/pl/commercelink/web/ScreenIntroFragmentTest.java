@@ -105,4 +105,26 @@ class ScreenIntroFragmentTest {
         assertThat(script).contains("addEventListener('click'").doesNotContain("window.toggleScreenIntro")
                 .doesNotContain("window.dismissScreenIntro");
     }
+
+    @Test
+    void guideNeverOpensOnItsOwnAndClaimsNothingAboutAFirstVisit() throws Exception {
+        // when
+        String orders = panel("orders");
+        String script = Files.readString(Path.of("src/main/resources/static/js/screen-intro.js"));
+
+        // then
+        assertThat(orders).containsPattern("id=\"screen-intro-orders\"\\s+hidden").doesNotContain("Pierwszy raz");
+        assertThat(script).doesNotContain("panel.hidden = seen()").doesNotContain("panel.hidden = false;\n    }")
+                .contains("if (!seen()) {\n            markSeen();\n            pulseToggle(true);");
+    }
+
+    @Test
+    void firstPulseStaysUnderFiveSecondsAndStopsWithReducedMotion() throws Exception {
+        // when
+        String css = guideStyles();
+
+        // then — 5 × 0.95 s = 4.75 s; moving content that starts on its own and runs past 5 s must be stoppable (WCAG 2.2.2)
+        assertThat(css).contains(".screen-intro-toggle.is-pulsing.is-first {\n    animation: screen-intro-pulse .95s ease 5;")
+                .contains("    .screen-intro-toggle.is-pulsing,\n    .screen-intro-toggle.is-pulsing.is-first {\n        animation: none;");
+    }
 }

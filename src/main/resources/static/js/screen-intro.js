@@ -1,5 +1,7 @@
-// The screen guide: open on a screen until "Rozumiem" or × is used, then folded into the "?" next to the title.
-// Loaded right after the panel, not deferred, so a guide seen earlier stays hidden from the first paint.
+// The screen guide opens only from the "?" next to the title, never on its own. The first time this browser shows a
+// screen, the "?" pulses five times and never again there: a hint with no words, so it cannot be wrong for someone who knows
+// the screen from another browser.
+// Loaded right after the panel, not deferred, so the "?" pulses together with the first paint.
 (function () {
     const panel = document.querySelector('[data-intro-panel]');
     if (!panel || panel.dataset.introBound === '1') {
@@ -30,19 +32,23 @@
         }
     }
 
-    function dismiss() {
-        const hadFocus = panel.contains(document.activeElement);
-        markSeen();
-        setExpanded(false);
-        panel.classList.add('is-closing');
+    function pulseToggle(first) {
         if (toggle) {
             toggle.classList.remove('is-pulsing');
             void toggle.offsetWidth;
+            toggle.classList.toggle('is-first', first === true);
             toggle.classList.add('is-pulsing');
-            // The button that had focus disappears with the panel; the "?" is where the guide now lives
-            if (hadFocus) {
-                toggle.focus();
-            }
+        }
+    }
+
+    function dismiss() {
+        const hadFocus = panel.contains(document.activeElement);
+        setExpanded(false);
+        panel.classList.add('is-closing');
+        pulseToggle();
+        // The button that had focus disappears with the panel; the "?" is where the guide now lives
+        if (toggle && hadFocus) {
+            toggle.focus();
         }
         window.setTimeout(function () {
             panel.hidden = true;
@@ -51,6 +57,7 @@
     }
 
     function open() {
+        markSeen();
         panel.classList.add('is-closing');
         panel.hidden = false;
         setExpanded(true);
@@ -61,10 +68,13 @@
         });
     }
 
-    panel.hidden = seen();
     if (toggle) {
         toggle.setAttribute('aria-controls', panel.id);
-        setExpanded(!panel.hidden);
+        setExpanded(false);
+        if (!seen()) {
+            markSeen();
+            pulseToggle(true);
+        }
         toggle.addEventListener('click', function () {
             if (panel.hidden) {
                 open();
