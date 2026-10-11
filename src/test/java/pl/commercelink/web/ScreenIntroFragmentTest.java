@@ -79,7 +79,8 @@ class ScreenIntroFragmentTest {
         String html = toggle();
 
         // then
-        assertThat(html).doesNotContain("onclick=").contains("data-intro-toggle").contains("aria-label=\"Pokaż opis ekranu\"");
+        assertThat(html).doesNotContain("onclick=").doesNotContain("cl-tooltip").doesNotContain("data-tooltip")
+                .contains("data-intro-toggle").contains("aria-label=\"Pokaż opis ekranu\"");
     }
 
     @Test

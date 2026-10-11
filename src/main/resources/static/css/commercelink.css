@@ -673,8 +673,8 @@ body.cl-drawer-open .cl-sidebar {
     gap: 10px;
 }
 
-/* A title followed only by the "?" of the screen guide: the title wraps and the "?" stays right after it. Wrapped onto
-   a line of its own, the "?" stood at the left edge, where its end-anchored bubble had no room. */
+/* A title followed only by the "?" of the screen guide: the title wraps and the "?" stays right after it instead of
+   dropping to a line of its own at the left edge. */
 .cl-page .cl-page-header-row:has(> .screen-intro-toggle:last-child) {
     flex-wrap: nowrap;
 }
