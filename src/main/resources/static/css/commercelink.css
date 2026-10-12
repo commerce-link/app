@@ -12384,8 +12384,11 @@ a.cl-link-button:hover {
     font-weight: 650;
 }
 
+/* minmax(0, 1fr) everywhere below: an e-mail address has no break opportunity, and an auto track would grow to its
+   width and push the form off a phone screen. */
 .cl-signup-content {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 24px;
     margin-top: auto;
     margin-bottom: auto;
@@ -12393,6 +12396,7 @@ a.cl-link-button:hover {
 
 .cl-signup-head {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     justify-items: start;
 }
@@ -12423,10 +12427,12 @@ a.cl-link-button:hover {
     max-width: none;
     font-size: 16px;
     line-height: 1.55;
+    overflow-wrap: anywhere;
 }
 
 .cl-signup-content form {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
 }
 
@@ -12514,6 +12520,24 @@ a.cl-link-button:hover {
     .cl-page .cl-signup-link .cl-link-button {
         min-height: 44px;
     }
+
+    /* A 44 px touch area around an inline link: an invisible box over the line, so the text and the focus ring keep
+       their size. */
+    .cl-page .cl-signup-link a,
+    .cl-check.is-wrap a {
+        position: relative;
+    }
+
+    .cl-page .cl-signup-link a::after,
+    .cl-check.is-wrap a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 44px;
+        transform: translateY(-50%);
+    }
 }
 
 /* A checkbox whose label wraps keeps the box on the first line; a link in its label reads as a link. */
@@ -12526,7 +12550,7 @@ a.cl-link-button:hover {
     margin-top: 3px;
 }
 
-.cl-page .cl-check a {
+.cl-check.is-wrap a {
     color: var(--cl-accent-ink);
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -12569,6 +12593,7 @@ a.cl-link-button:hover {
     display: grid;
     gap: 18px;
     max-width: 560px;
+    padding-right: 16px;
 }
 
 .cl-page .cl-signup-panel-title {
@@ -12656,9 +12681,7 @@ a.cl-link-button:hover {
 
 .cl-showcase-tag {
     font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
+    font-weight: 500;
     color: var(--cl-ink-2);
 }
 
@@ -12785,6 +12808,7 @@ a.cl-link-button:hover {
 
 .cl-page.cl-auth-shell {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 20px;
     width: 100%;
     max-width: 440px;
@@ -12794,6 +12818,7 @@ a.cl-link-button:hover {
 
 .cl-auth-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     padding: 24px 24px 20px;
 }
@@ -12807,6 +12832,11 @@ a.cl-link-button:hover {
 .cl-page .cl-auth-head .cl-page-lead {
     margin: 0;
     max-width: none;
+}
+
+.cl-page .cl-auth-head .cl-page-lead,
+.cl-page .cl-auth-body .cl-alert-text {
+    overflow-wrap: anywhere;
 }
 
 .cl-page .cl-auth-body > .cl-alert {

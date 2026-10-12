@@ -3,7 +3,6 @@
       layout:decorate="~{signup-layout}">
 <head>
     <title th:text="#{registration.page-title}"></title>
-    <script th:if="${captchaSiteKey != null}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
 
@@ -28,9 +27,9 @@
         <div th:replace="~{fragments/settings-form :: textFieldWith('email', 'registration.email.label', ${email}, 'email',
                 'email', true, ${fieldErrors?.get('email')}, null, null, null, ${autofocus == 'email'})}"></div>
         <th:block th:unless="${demoMode}">
-            <div th:replace="~{fragments/settings-form :: textFieldWith('storeName', 'registration.store-name.label', ${storeName},
+            <div th:replace="~{fragments/settings-form :: textFieldLimited('storeName', 'registration.store-name.label', ${storeName},
                     'text', 'organization', true, ${fieldErrors?.get('storeName')}, #{registration.store-name.help}, null, null,
-                    ${autofocus == 'storeName'})}"></div>
+                    ${autofocus == 'storeName'}, ${storeNameMaxLength})}"></div>
         </th:block>
         <div class="cl-field" th:with="termsError=${fieldErrors?.get('termsConsent')}">
             <label class="cl-check is-wrap">
@@ -50,8 +49,13 @@
         </div>
         <input class="cl-honeypot" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
         <!--/* interaction-only: Cloudflare shows the widget only when it needs a click; otherwise the check is invisible. */-->
-        <div th:if="${captchaSiteKey != null}" class="cf-turnstile" data-appearance="interaction-only" data-size="flexible"
-             th:attr="data-sitekey=${captchaSiteKey}"></div>
+        <th:block th:if="${captchaSiteKey != null}">
+            <div class="cf-turnstile" data-appearance="interaction-only" data-size="flexible"
+                 th:attr="data-sitekey=${captchaSiteKey}"></div>
+            <!--/* Picks the widget size before Turnstile renders it, so api.js is loaded only after this script. */-->
+            <script th:src="@{/js/turnstile-size.js}"></script>
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        </th:block>
         <button type="submit" class="cl-button is-primary is-lg">
             <span th:text="${demoMode} ? #{registration.submit} : #{registration.submit.trial(${trialDays})}"></span>
             <i class="fas fa-arrow-right" aria-hidden="true"></i>

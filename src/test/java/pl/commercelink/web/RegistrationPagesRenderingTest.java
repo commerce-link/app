@@ -24,6 +24,7 @@ class RegistrationPagesRenderingTest {
         model.put("ttlDays", 7);
         model.put("trialDays", 14);
         model.put("trialRetentionDays", 14);
+        model.put("storeNameMaxLength", 60);
         model.put("termsUrl", "https://example.com/regulamin");
         model.put("termsConsent", false);
         model.put("fieldErrors", new HashMap<String, String>());
@@ -56,6 +57,7 @@ class RegistrationPagesRenderingTest {
                 .contains("class=\"cl-signup-panel\"").contains("Przykładowe dane").contains("W realizacji")
                 .doesNotContain("Krok 1").doesNotContain("cf-turnstile").doesNotContain("??");
         assertThat(html).containsPattern(Pattern.compile("id=\"email\"[^>]*autofocus"));
+        assertThat(html).containsPattern(Pattern.compile("id=\"storeName\"[^>]*maxlength=\"60\""));
     }
 
     @Test
@@ -126,6 +128,9 @@ class RegistrationPagesRenderingTest {
         assertThat(html).contains("cl-alert is-bad").contains("Potwierdź, że nie jesteś robotem")
                 .contains("data-sitekey=\"site-key\"").contains("data-appearance=\"interaction-only\"")
                 .contains("challenges.cloudflare.com/turnstile");
+        assertThat(html.indexOf("/js/turnstile-size.js")).isPositive()
+                .isGreaterThan(html.indexOf("class=\"cf-turnstile\""))
+                .isLessThan(html.indexOf("challenges.cloudflare.com/turnstile/v0/api.js"));
     }
 
     @Test
@@ -140,7 +145,7 @@ class RegistrationPagesRenderingTest {
 
         // then
         assertThat(html).contains("Krok 2 z 3").contains("Ustaw hasło").contains("<strong>anna@sklep.pl</strong>")
-                .contains("rozpocząć 14-dniowy okres próbny").contains("Utwórz konto")
+                .contains("rozpocząć 14\u2011dniowy okres próbny").contains("Utwórz konto")
                 .contains("Minimum 8 znaków").contains("Wróć i zmień adres e-mail").contains("Masz już konto?")
                 .doesNotContainPattern(Pattern.compile("id=\"password\"[^>]*value=\"[^\"]+\""))
                 .doesNotContain("??");

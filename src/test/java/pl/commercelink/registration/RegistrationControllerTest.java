@@ -356,4 +356,16 @@ class RegistrationControllerTest {
         assertEquals(14, model.getAttribute("trialDays"));
         assertEquals("site-key", model.getAttribute("captchaSiteKey"));
     }
+
+    @Test
+    void registerPageLimitsTheStoreNameToTheLengthTheServerAccepts() {
+        // given
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller(false).registerPage(model);
+
+        // then
+        assertEquals(RegistrationService.STORE_NAME_MAX, model.getAttribute("storeNameMaxLength"));
+    }
 }

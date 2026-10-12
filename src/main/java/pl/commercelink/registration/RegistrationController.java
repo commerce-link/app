@@ -198,6 +198,7 @@ public class RegistrationController {
     private void addFormAttributes(Model model) {
         model.addAttribute("demoMode", demoMode);
         model.addAttribute("stepTotal", demoMode ? 2 : 3);
+        model.addAttribute("storeNameMaxLength", RegistrationService.STORE_NAME_MAX);
         model.addAttribute("ttlDays", ttlDays);
         model.addAttribute("trialDays", trialDays);
         model.addAttribute("trialRetentionDays", trialRetentionDays);
