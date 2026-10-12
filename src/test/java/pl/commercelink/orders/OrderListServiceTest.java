@@ -373,6 +373,20 @@ class OrderListServiceTest {
     }
 
     @Test
+    void emptySearchOffersTheSameSearchInTheArchive() {
+        // given
+        add("old", OrderStatus.Completed, null, 10, 10, null);
+
+        // when
+        OrdersPageModel page = page(query("q", "kowalski"));
+
+        // then
+        assertThat(page.emptyState().archiveHref()).isEqualTo("/dashboard/orders/archive?q=kowalski");
+        assertThat(page.emptyState().archiveLabel()).isEqualTo("Szukaj „kowalski” w archiwum");
+        assertThat(page.emptyState().text()).isEqualTo("Brak otwartych zamówień dla „kowalski”. Zakończone i anulowane są w archiwum.");
+    }
+
+    @Test
     void sortsByAmountAndNumber() {
         add("b", OrderStatus.New, null, 300, 300, null);
         add("a", OrderStatus.New, null, 100, 100, null);
@@ -424,7 +438,7 @@ class OrderListServiceTest {
         assertThat(page(query()).emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
         assertThat(page(query()).emptyState().actionHref()).isNull();
         add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
-        assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak wyników dla „zzz”");
+        assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak otwartych zamówień dla „zzz”");
         assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query("status", "Blocked")).emptyState().text()).isEqualTo("Brak zamówień w statusie „Zablokowane”.");
         OrderFilter f = OrderFilter.of("Kurier", List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint")));

@@ -19,6 +19,7 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.web.orders.OrderRow.DocMark;
+import pl.commercelink.web.warehousedocuments.TestMessages;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -359,5 +360,100 @@ class OrderRowMapperTest {
 
         // then: the checkbox value is the id itself, never the link with its returnTo
         assertThat(row.orderId()).isEqualTo("ab58c563-9f1e-4d2a-b0c1-000000000000");
+    }
+
+    @Test
+    void archivedRowShowsTheOrderDayWithYearAndTime() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setOrderedAt(LocalDateTime.of(2026, 10, 8, 18, 42, 11));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), false);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, "/dashboard/orders/archive?q=x");
+
+        // then
+        assertThat(row.dueText()).isEqualTo("08.10.2026");
+        assertThat(row.dueNote()).isEqualTo("18:42");
+        assertThat(row.dueTone()).isEmpty();
+        assertThat(row.unpaidText()).isNull();
+        assertThat(row.href()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "?returnTo=%2Fdashboard%2Forders%2Farchive%3Fq%3Dx");
+    }
+
+    @Test
+    void completedOrderWithoutClosingDocumentShowsItAsToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), false);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).anyMatch(m -> m.kind().equals("invoice") && m.todo());
+    }
+
+    @Test
+    void completedWarehouseOrderWithoutWzShowsItAsToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).anyMatch(m -> m.kind().equals("wz") && m.todo());
+    }
+
+    @Test
+    void cancelledOrderNeverShowsAToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).noneMatch(OrderRow.DocMark::todo);
+    }
+
+    @Test
+    void archivedToDoDoesNotClaimItBlocksClosingAnOrderThatIsAlreadyClosed() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).filteredOn(OrderRow.DocMark::todo).extracting(OrderRow.DocMark::label)
+                .containsExactly("WZ: do wystawienia", "Paragon: do wystawienia");
+    }
+
+    @Test
+    void archivedOrderNeverShowsTheReviewToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).noneMatch(m -> m.kind().equals("review"));
     }
 }

@@ -17,8 +17,7 @@ public final class NavigationCatalog {
     private static final List<NavSection> SECTIONS = List.of(
             new NavSection("nav.group.sales", List.of(
                     new NavItem("offers", "nav.offer", "/dashboard/offers", "fa-tags", STORE_ROLES),
-                    new NavItem("orders", "nav.orders", "/dashboard/orders", "fa-shopping-cart", STORE_ROLES),
-                    new NavItem("clients", "nav.clients", "/dashboard/clients", "fa-users", STORE_ROLES))),
+                    new NavItem("orders", "nav.orders", "/dashboard/orders", "fa-shopping-cart", STORE_ROLES))),
             new NavSection("nav.group.fulfilment", List.of(
                     new NavItem("fulfilment", "nav.fulfilment", "/dashboard/fulfilment/queue", "fa-tasks",
                             Set.of(ADMIN)),
