@@ -1,6 +1,6 @@
 package pl.commercelink.financials;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -9,7 +9,8 @@ import pl.commercelink.orders.*;
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -25,17 +26,16 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class FinancialReportGenerator {
 
-    @Autowired
-    private OrdersRepository ordersRepository;
-    @Autowired
-    private OrderItemsRepository orderItemsRepository;
-    @Autowired
-    private DeliveriesRepository deliveriesRepository;
+    private final OrdersRepository ordersRepository;
+    private final OrderItemsRepository orderItemsRepository;
+    private final DeliveriesRepository deliveriesRepository;
 
     private static final int ITEMS_CHUNK_SIZE = 25;
     private static final int ITEMS_THREADS = 8;
+    private static final int CHUNKS_IN_FLIGHT_PER_REPORT = 4;
 
     private final ExecutorService itemsExecutor = Executors.newFixedThreadPool(ITEMS_THREADS, new ThreadFactory() {
         private final AtomicInteger counter = new AtomicInteger();
@@ -75,27 +75,30 @@ public class FinancialReportGenerator {
     }
 
     // the items table is queried once per order, so the chunks run in parallel; the pool is bounded to keep a
-    // long range from opening an unbounded number of concurrent queries on a table shared with the whole app
+    // long range from opening an unbounded number of concurrent queries on a table shared with the whole app, and
+    // one report keeps only a few chunks queued so that it cannot make another store's report wait behind all of them
     private Map<String, List<OrderItem>> loadItems(List<String> orderIds) {
-        List<CompletableFuture<Map<String, List<OrderItem>>>> chunks = new ArrayList<>();
-        for (int from = 0; from < orderIds.size(); from += ITEMS_CHUNK_SIZE) {
-            List<String> chunk = orderIds.subList(from, Math.min(from + ITEMS_CHUNK_SIZE, orderIds.size()));
-            chunks.add(CompletableFuture.supplyAsync(() -> orderItemsRepository.findByOrderIds(chunk), itemsExecutor));
-        }
+        Deque<CompletableFuture<Map<String, List<OrderItem>>>> window = new ArrayDeque<>();
         Map<String, List<OrderItem>> items = new HashMap<>();
-        for (CompletableFuture<Map<String, List<OrderItem>>> chunk : chunks) {
-            try {
-                items.putAll(chunk.join());
-            } catch (CompletionException e) {
-                chunks.forEach(c -> c.cancel(true));
-                if (e.getCause() instanceof RuntimeException cause) {
-                    throw cause;
+        int next = 0;
+        try {
+            while (next < orderIds.size() || !window.isEmpty()) {
+                while (next < orderIds.size() && window.size() < CHUNKS_IN_FLIGHT_PER_REPORT) {
+                    List<String> chunk = orderIds.subList(next, Math.min(next + ITEMS_CHUNK_SIZE, orderIds.size()));
+                    window.add(CompletableFuture.supplyAsync(() -> orderItemsRepository.findByOrderIds(chunk), itemsExecutor));
+                    next += ITEMS_CHUNK_SIZE;
                 }
-                if (e.getCause() instanceof Error cause) {
-                    throw cause;
-                }
-                throw e;
+                items.putAll(window.poll().join());
             }
+        } catch (CompletionException e) {
+            window.forEach(pending -> pending.cancel(true));
+            if (e.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            if (e.getCause() instanceof Error cause) {
+                throw cause;
+            }
+            throw e;
         }
         return items;
     }

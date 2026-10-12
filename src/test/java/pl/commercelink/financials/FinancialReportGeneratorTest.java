@@ -12,19 +12,25 @@ import pl.commercelink.orders.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -128,7 +134,7 @@ class FinancialReportGeneratorTest {
         // given
         List<OrderIndexEntry> index = new ArrayList<>();
         for (int i = 0; i < 60; i++) {
-            order("o" + i, LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
+            order("o" + i, LocalDateTime.of(2026, 9, 1, 10, 0), false, 123 * (i + 1), 80);
             index.add(index("o" + i));
         }
         when(ordersRepository.findAllPastOrders(FROM, TO, STORE)).thenReturn(index);
@@ -139,8 +145,42 @@ class FinancialReportGeneratorTest {
 
         // then
         assertThat(reports.ownSources().getTotalNumberOfOrders()).isEqualTo(60);
-        assertThat(reports.ownSources().getTotalPrice()).isCloseTo(6000, within(0.01));
+        assertThat(reports.ownSources().getTotalPrice()).isCloseTo(100.0 * 60 * 61 / 2, within(0.01));
         assertThat(reports.days().get(0).ownOrders()).isEqualTo(60);
+        verify(orderItemsRepository, times(3)).findByOrderIds(anyList());
+    }
+
+    @Test
+    void neverHasMoreThanFourItemChunksInFlightForOneReport() throws Exception {
+        // given
+        List<OrderIndexEntry> index = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            order("o" + i, LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
+            index.add(index("o" + i));
+        }
+        when(ordersRepository.findAllPastOrders(FROM, TO, STORE)).thenReturn(index);
+        when(deliveriesRepository.findAll(eq(STORE), any(), any())).thenReturn(List.of());
+        AtomicInteger inFlight = new AtomicInteger();
+        AtomicInteger maxInFlight = new AtomicInteger();
+        CountDownLatch fourInFlight = new CountDownLatch(4);
+        when(orderItemsRepository.findByOrderIds(anyList())).thenAnswer(call -> {
+            maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
+            fourInFlight.countDown();
+            // holds the first calls until four overlap, so an uncapped pool of eight would show up as more
+            fourInFlight.await(5, TimeUnit.SECONDS);
+            List<String> ids = call.getArgument(0);
+            Map<String, List<OrderItem>> chunk = new LinkedHashMap<>();
+            ids.forEach(id -> chunk.put(id, items.get(id)));
+            inFlight.decrementAndGet();
+            return chunk;
+        });
+
+        // when
+        FinancialReports reports = generator.generate(STORE, FROM, TO);
+
+        // then
+        assertThat(reports.ownSources().getTotalNumberOfOrders()).isEqualTo(1000);
+        assertThat(maxInFlight.get()).isEqualTo(4);
     }
 
     @Test
@@ -182,7 +222,7 @@ class FinancialReportGeneratorTest {
         generator.generate(STORE, FROM, TO);
 
         // then
-        verify(deliveriesRepository).findAll(STORE, FROM.atStartOfDay(), TO.atTime(java.time.LocalTime.MAX));
+        verify(deliveriesRepository).findAll(STORE, FROM.atStartOfDay(), TO.atTime(LocalTime.MAX));
     }
 
     private void order(String id, LocalDateTime orderedAt, boolean marketplace, double grossPrice, double netCost) {

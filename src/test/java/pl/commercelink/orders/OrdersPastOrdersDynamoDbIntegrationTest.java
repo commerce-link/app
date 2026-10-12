@@ -70,7 +70,6 @@ class OrdersPastOrdersDynamoDbIntegrationTest {
         BillingDetails billing = new BillingDetails();
         billing.setEmail("a@b.pl");
         order.setBillingDetails(billing);
-        order.setEmail("a@b.pl");
         order.setFulfilmentType(FulfilmentType.values()[0]);
         orders.save(order);
     }
