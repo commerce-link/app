@@ -4,26 +4,39 @@ import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
-/** The period closing section of the reports page: the range offered to close and the closed periods, newest first. */
-public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, List<ClosedPeriod> closedPeriods) {
+/**
+ * The stock ledger closing page: the range offered to close and the closed periods, newest first. Once a period is
+ * closed the next one must start the day after it, so the start is fixed and only the end is chosen; the server still
+ * checks the chain, so a hand-made request gets the same refusal as before.
+ */
+public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, boolean fromFixed, String fromLabel,
+                                     String previousLabel, List<ClosedPeriod> closedPeriods) {
 
-    public record ClosedPeriod(LocalDate from, LocalDate to, String label) {
+    private static final String CLOSE_PATH = "/dashboard/reports/stock-ledger/close";
+
+    public record ClosedPeriod(LocalDate from, LocalDate to, String label, String rangeText, String regenerateHref) {
     }
 
-    /** The range offered is the period after the last closed one; before any closing, the report's own range. */
-    public static StockLedgerClosingView of(List<StockLedgerPeriod> closed, LocalDate reportFrom, LocalDate reportTo) {
+    public static StockLedgerClosingView of(List<StockLedgerPeriod> closed, LocalDate fallbackFrom, LocalDate fallbackTo, Locale locale) {
         List<ClosedPeriod> periods = closed.stream()
                 .sorted(StockLedgerPeriod.BY_END.reversed())
-                .map(period -> new ClosedPeriod(period.from(), period.to(), period.label()))
+                .map(period -> new ClosedPeriod(period.from(), period.to(), StockLedgerPeriodLabel.of(period, locale),
+                        new ReportPeriod(period.from(), period.to()).rangeText(),
+                        CLOSE_PATH + "?dateFrom=" + period.from() + "&dateTo=" + period.to()))
                 .toList();
-        StockLedgerPeriod offered = closed.stream().max(StockLedgerPeriod.BY_END)
-                .map(StockLedgerPeriod::next)
-                .orElse(new StockLedgerPeriod(reportFrom, reportTo));
-        return new StockLedgerClosingView(offered.from(), offered.to(), periods);
+        StockLedgerPeriod last = closed.stream().max(StockLedgerPeriod.BY_END).orElse(null);
+        StockLedgerPeriod offered = last != null ? last.next() : new StockLedgerPeriod(fallbackFrom, fallbackTo);
+        return new StockLedgerClosingView(offered.from(), offered.to(), last != null, dayText(offered.from()),
+                last != null ? StockLedgerPeriodLabel.of(last, locale) : null, periods);
     }
 
     public StockLedgerClosingView withRange(LocalDate from, LocalDate to) {
-        return new StockLedgerClosingView(from, to, closedPeriods);
+        return new StockLedgerClosingView(from, to, fromFixed, dayText(from), previousLabel, closedPeriods);
+    }
+
+    private static String dayText(LocalDate day) {
+        return day.getDayOfMonth() + "." + (day.getMonthValue() < 10 ? "0" : "") + day.getMonthValue() + "." + day.getYear();
     }
 }

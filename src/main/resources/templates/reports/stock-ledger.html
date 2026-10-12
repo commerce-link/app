@@ -1,0 +1,138 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page" th:fragment="body" th:with="closing=${ledgerClosing}">
+        <div class="cl-page-body">
+            <header class="cl-page-header">
+                <a class="cl-back" th:href="@{/dashboard/reports}">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                    <span th:text="#{reports.title}"></span>
+                </a>
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{reports.stockLedger.closing.title}"></h1>
+                    <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                </div>
+                <p class="cl-page-lead" th:text="#{reports.stockLedger.lead}"></p>
+            </header>
+            <div th:replace="~{fragments/screen-intro :: panel('stockLedger', 'fas fa-lock')}"></div>
+
+            <div th:if="${ledgerSuccess != null}" class="cl-alert is-ok cl-ledger-notice" role="status" tabindex="-1" data-cl-error-summary>
+                <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${ledgerSuccess}"></p>
+            </div>
+            <div th:if="${ledgerError != null and ledgerWarning == null}" class="cl-alert is-bad cl-ledger-notice" role="status" tabindex="-1" data-cl-error-summary>
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${ledgerError}"></p>
+            </div>
+            <div th:if="${ledgerOutdated != null}" class="cl-alert is-warn cl-ledger-notice" role="status">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${ledgerOutdated}"></p>
+            </div>
+
+            <form class="cl-card" method="post" th:action="@{/dashboard/reports/stock-ledger/close}" aria-labelledby="close-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="close-title"
+                        th:text="${closing.fromFixed()} ? #{reports.stockLedger.next} : #{reports.stockLedger.first}"></h2>
+                </div>
+                <th:block th:if="${ledgerWarning != null}">
+                    <div class="cl-alert is-warn" role="status" tabindex="-1" data-cl-error-summary>
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div class="cl-alert-text"><p class="cl-alert-title" th:text="${ledgerError}"></p>
+                            <p th:text="#{reports.stockLedger.closing.blockers}"></p></div>
+                    </div>
+                    <table class="cl-table">
+                        <thead><tr>
+                            <th scope="col" th:text="#{reports.stockLedger.closing.delivery}"></th>
+                            <th scope="col" th:text="#{reports.stockLedger.closing.supplier}"></th>
+                            <th scope="col" th:text="#{reports.stockLedger.closing.supplierOrder}"></th>
+                            <th scope="col" th:text="#{reports.stockLedger.closing.received}"></th>
+                            <th scope="col" th:text="#{reports.stockLedger.closing.missing}"></th>
+                        </tr></thead>
+                        <tbody><tr th:each="blocker : ${ledgerWarning.deliveries()}">
+                            <th scope="row" class="cl-table-key"><a th:href="@{/dashboard/deliveries/details(deliveryId=${blocker.deliveryId()})}"
+                                                                    th:text="${blocker.number()}"></a></th>
+                            <td th:attr="data-label=#{reports.stockLedger.closing.supplier}" th:text="${blocker.supplier()}"></td>
+                            <td th:attr="data-label=#{reports.stockLedger.closing.supplierOrder}" th:text="${blocker.supplierOrder()}"></td>
+                            <td th:attr="data-label=#{reports.stockLedger.closing.received}" th:text="${blocker.receivedOn()}"></td>
+                            <td th:attr="data-label=#{reports.stockLedger.closing.missing}"><span class="cl-status is-warn" th:text="#{${blocker.missingKey()}}"></span></td>
+                        </tr></tbody>
+                    </table>
+                </th:block>
+                <div class="cl-card-body cl-ledger-fields">
+                    <th:block th:if="${closing.fromFixed()}">
+                        <input type="hidden" name="dateFrom" th:value="${closing.dateFrom()}">
+                        <dl class="cl-period-facts"><dt th:text="#{reports.from}"></dt>
+                            <dd><span th:text="${closing.fromLabel()}"></span>
+                                <span class="cl-help" th:text="#{reports.stockLedger.fromFixed(${closing.previousLabel()})}"></span></dd></dl>
+                    </th:block>
+                    <div class="cl-inline-fields">
+                        <div class="cl-field" th:unless="${closing.fromFixed()}">
+                            <label class="cl-label" for="ledger-from" th:text="#{reports.from}"></label>
+                            <input class="cl-input" id="ledger-from" type="date" name="dateFrom" th:value="${closing.dateFrom()}" required>
+                        </div>
+                        <div class="cl-field">
+                            <label class="cl-label" for="ledger-to" th:text="#{reports.to}"></label>
+                            <input class="cl-input" id="ledger-to" type="date" name="dateTo" th:value="${closing.dateTo()}" required>
+                        </div>
+                    </div>
+                    <p class="cl-help" th:text="${closing.fromFixed()} ? #{reports.stockLedger.help} : #{reports.stockLedger.help.first}"></p>
+                </div>
+                <div class="cl-card-footer">
+                    <button type="submit" class="cl-button is-primary"
+                            th:text="${ledgerWarning != null} ? #{reports.stockLedger.closeAgain} : #{reports.stockLedger.close}"></button>
+                </div>
+            </form>
+
+            <section class="cl-card cl-ledger-closed" aria-labelledby="closed-title">
+                <div class="cl-card-head"><h2 class="cl-card-title" id="closed-title" th:text="#{reports.stockLedger.closing.closedPeriods}"></h2></div>
+                <p class="cl-card-desc" th:text="#{reports.stockLedger.closed.desc}"></p>
+                <p th:if="${closing.closedPeriods().isEmpty()}" class="cl-list-empty" th:text="#{reports.stockLedger.closed.empty}"></p>
+                <table th:unless="${closing.closedPeriods().isEmpty()}" class="cl-table">
+                    <thead><tr><th scope="col" th:text="#{reports.stockLedger.period}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{reports.stockLedger.actions}"></span></th></tr></thead>
+                    <tbody><tr th:each="closed : ${closing.closedPeriods()}">
+                        <th scope="row" class="cl-table-key"><span th:text="${closed.label()}"></span>
+                            <span class="cl-table-sub" th:text="${closed.rangeText()}"></span></th>
+                        <td class="cl-table-actions">
+                            <a class="cl-link-button" th:href="@{/dashboard/reports/stock-ledger/closed(dateFrom=${closed.from()},dateTo=${closed.to()})}"
+                               th:attr="aria-label=#{reports.stockLedger.download.label(${closed.label()})}">
+                                <i class="fas fa-download" aria-hidden="true"></i><span th:text="#{reports.stockLedger.closing.download}"></span></a>
+                            <details class="cl-menu">
+                                <summary class="cl-button is-icon" th:attr="aria-label=#{reports.stockLedger.more(${closed.label()})}">
+                                    <span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+                                <ul class="cl-menu-list">
+                                    <li><a class="cl-menu-item" th:href="@{${closed.regenerateHref()}}" data-cl-confirm data-cl-confirm-tone="primary"
+                                           th:attr="data-cl-confirm-title=#{reports.stockLedger.regenerate.confirm.title(${closed.label()})},
+                                                    data-cl-confirm-message=#{reports.stockLedger.regenerate.confirm.message},
+                                                    data-cl-confirm-action=#{reports.stockLedger.closing.regenerate}"
+                                           th:text="#{reports.stockLedger.closing.regenerate}"></a></li>
+                                </ul>
+                            </details>
+                        </td>
+                    </tr></tbody>
+                </table>
+            </section>
+
+            <details class="cl-disclosure cl-ledger-how">
+                <summary th:text="#{reports.stockLedger.how}"></summary>
+                <div class="cl-disclosure-body">
+                    <ol class="cl-steps">
+                        <li th:text="#{reports.stockLedger.how.1}"></li>
+                        <li th:text="#{reports.stockLedger.how.2}"></li>
+                        <li th:text="#{reports.stockLedger.how.3}"></li>
+                        <li th:text="#{reports.stockLedger.how.4}"></li>
+                    </ol>
+                </div>
+            </details>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/menu.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+    <script th:src="@{/js/error-summary.js}" defer></script>
+</div>
+</body>
+</html>

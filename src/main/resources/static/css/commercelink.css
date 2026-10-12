@@ -12489,3 +12489,15 @@ a.cl-link-button:hover {
     .cl-page .cl-compare-mid { grid-column: 1 / -1; grid-row: 3; }
     .cl-page .cl-compare-row.is-plain .cl-compare-mid { display: none; }
 }
+
+/* Stock ledger closing subpage: fixed-start facts, inline date fields and the spacing between its cards.
+   Mockups: docs/active/reports-redesign/makiety/zamkniecie*.html */
+.cl-page .cl-period-facts { display: grid; gap: 4px 24px; grid-template-columns: max-content minmax(0, 1fr); margin: 0; font-size: 14px; }
+.cl-page .cl-period-facts dt { color: var(--cl-ink-2); }
+.cl-page .cl-period-facts dd { margin: 0; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+.cl-page .cl-period-facts dd .cl-help { display: inline; }
+.cl-page .cl-inline-fields { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; }
+.cl-page .cl-inline-fields .cl-field { min-width: 180px; }
+.cl-page .cl-ledger-notice { margin-bottom: 20px; }
+.cl-page .cl-ledger-closed, .cl-page .cl-ledger-how { margin-top: 28px; }
+.cl-page .cl-ledger-fields { display: grid; gap: 12px; }

@@ -22,7 +22,11 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
+import pl.commercelink.web.reports.ReportPeriod;
 import pl.commercelink.web.reports.ReportsPageFactory;
+import pl.commercelink.web.reports.StockLedgerClosingView;
+import pl.commercelink.web.reports.StockLedgerPeriodLabel;
+import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
@@ -38,7 +42,7 @@ import java.util.stream.Collectors;
 public class FinancialReportsController {
 
     private static final String REPORTS_PATH = "/dashboard/reports";
-    private static final String CLOSING_SECTION = REPORTS_PATH + "#stock-ledger-closing";
+    private static final String STOCK_LEDGER_PATH = REPORTS_PATH + "/stock-ledger";
 
     @Autowired
     private OrdersExport ordersExport;
@@ -111,27 +115,54 @@ public class FinancialReportsController {
         writeStockLedger(response, dateFrom.toString(), dateTo.toString(), csv);
     }
 
+    @GetMapping(STOCK_LEDGER_PATH)
+    public String stockLedger(Model model, Locale locale) {
+        ReportPeriod fallback = ReportPeriod.of(null, null, LocalDate.now());
+        StockLedgerClosingView closing = StockLedgerClosingView.of(
+                stockLedgerPeriodClosing.closedPeriods(getStoreId()), fallback.from(), fallback.to(), locale);
+        // after a held closing the form keeps the range that was held, so it can be closed once settled
+        StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
+        model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
+        return "reports/stock-ledger";
+    }
+
+    /** Without JavaScript "Generate again" opens this page; with it, confirm-dialog.js posts to the same address. */
+    @GetMapping(STOCK_LEDGER_PATH + "/close")
+    public String confirmStockLedgerRegeneration(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+                                                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                                 Model model, Locale locale) {
+        String label = StockLedgerPeriodLabel.of(new StockLedgerPeriod(dateFrom, dateTo), locale);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage("reports.stockLedger.regenerate.confirm.title", new Object[]{label}, locale),
+                messageSource.getMessage("reports.stockLedger.regenerate.confirm.message", null, locale),
+                messageSource.getMessage("reports.stockLedger.closing.regenerate", null, locale),
+                STOCK_LEDGER_PATH + "/close?dateFrom=" + dateFrom + "&dateTo=" + dateTo,
+                STOCK_LEDGER_PATH, false));
+        model.addAttribute("backLabel", messageSource.getMessage("reports.stockLedger.closing.title", null, locale));
+        return "settings-confirm";
+    }
+
     /** Closes the range, or generates it again when it is closed already. */
-    @PostMapping("/dashboard/reports/stock-ledger/close")
+    @PostMapping(STOCK_LEDGER_PATH + "/close")
     public String closeStockLedgerPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
                                          RedirectAttributes redirectAttributes, Locale locale) throws IOException {
         StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
-        Object[] label = {period.label()};
+        Object[] label = {StockLedgerPeriodLabel.of(period, locale)};
         switch (stockLedgerPeriodClosing.close(getStoreId(), period)) {
             case Closed closed -> {
-                redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
+                redirectAttributes.addFlashAttribute("ledgerSuccess", messageSource.getMessage(
                         closed.regenerated() ? "reports.stockLedger.closing.regenerated" : "reports.stockLedger.closing.closed",
                         label, locale));
                 if (!closed.outdatedLaterPeriods().isEmpty()) {
-                    String later = closed.outdatedLaterPeriods().stream().map(StockLedgerPeriod::label).collect(Collectors.joining(", "));
+                    String laterLabels = closed.outdatedLaterPeriods().stream().map(later -> StockLedgerPeriodLabel.of(later, locale)).collect(Collectors.joining(", "));
                     redirectAttributes.addFlashAttribute("ledgerOutdated", messageSource.getMessage(
-                            "reports.stockLedger.closing.outdated", new Object[]{period.label(), later}, locale));
+                            "reports.stockLedger.closing.outdated", new Object[]{label[0], laterLabels}, locale));
                 }
             }
             case Blocked blocked -> {
                 SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-                redirectAttributes.addFlashAttribute("errorMessage",
+                redirectAttributes.addFlashAttribute("ledgerError",
                         messageSource.getMessage("reports.stockLedger.closing.blocked", label, locale));
                 redirectAttributes.addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(dateFrom, dateTo,
                         blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList()));
@@ -139,11 +170,11 @@ public class FinancialReportsController {
             case NotAllowed notAllowed -> {
                 List<Object> arguments = new ArrayList<>(List.of(label));
                 arguments.addAll(notAllowed.arguments());
-                redirectAttributes.addFlashAttribute("errorMessage",
+                redirectAttributes.addFlashAttribute("ledgerError",
                         messageSource.getMessage(notAllowed.messageKey(), arguments.toArray(), locale));
             }
         }
-        return "redirect:" + CLOSING_SECTION;
+        return "redirect:" + STOCK_LEDGER_PATH;
     }
 
     @GetMapping("/dashboard/reports/productWeightOriginComplianceExport")
