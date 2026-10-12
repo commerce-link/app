@@ -12320,3 +12320,172 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
     font-size: 13.5px;
 }
+
+/* Reports (app#NNN): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
+   docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
+:root {
+    --cl-chart-1: var(--cl-supplier-1);
+    --cl-chart-2: var(--cl-supplier-2);
+}
+
+/* Period switcher in the toolbar: previous / [period menu] / next */
+.cl-page .cl-period { display: inline-flex; align-items: stretch; gap: 0; }
+.cl-page .cl-period > .cl-button.is-icon { width: 36px; padding: 0; justify-content: center; }
+.cl-page .cl-period > .cl-button.is-icon:first-child { border-radius: var(--cl-radius) 0 0 var(--cl-radius); }
+.cl-page .cl-period > .cl-button.is-icon:last-child { border-radius: 0 var(--cl-radius) var(--cl-radius) 0; }
+.cl-page .cl-period > .cl-filter-menu > .cl-filter-menu-trigger { border-radius: 0; margin: 0 -1px; height: 100%; }
+.cl-page .cl-period > [aria-disabled="true"] { color: var(--cl-ink-3); pointer-events: none; }
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-period > .cl-button.is-icon { width: 44px; }
+}
+.cl-page .cl-date-presets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.cl-page .cl-date-presets li { margin: 0; }
+
+/* Title line actions and the toolbar under the header */
+.cl-page .cl-report-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 4px; }
+.cl-page .cl-report-toolbar p { margin: 0; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-page .cl-page-actions .cl-menu-list.is-files { min-width: 320px; max-width: 360px; max-height: min(70vh, 560px); overflow-y: auto; }
+.cl-page .cl-menu-list .cl-menu-group { padding: 10px 14px 4px; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--cl-ink-2); }
+.cl-page .cl-menu-list .cl-menu-foot { padding: 8px 14px 4px; border-top: 1px solid var(--cl-line); margin-top: 6px; font-size: 12.5px; color: var(--cl-ink-2); }
+.cl-page .cl-menu-item .cl-menu-item-row { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.cl-page .cl-menu-item .cl-menu-item-row svg, .cl-page .cl-menu-item .cl-menu-item-row i { color: var(--cl-ink-3); }
+.cl-page .cl-button.is-closing { gap: 8px; }
+.cl-page .cl-button.is-closing .cl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cl-warn); flex: none; }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-page-actions.is-report { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .cl-page .cl-page-actions.is-report > * { width: 100%; }
+    .cl-page .cl-page-actions.is-report .cl-button { justify-content: center; width: 100%; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+    .cl-page .cl-page-actions.is-report > a.cl-button .icon { display: none; }
+    .cl-page .cl-page-actions .cl-menu-list.is-files { min-width: 0; width: calc(100vw - 32px); max-width: none; }
+    .cl-page .cl-report-toolbar .cl-period { width: 100%; }
+    .cl-page .cl-report-toolbar .cl-period > .cl-filter-menu { flex: 1; }
+    .cl-page .cl-report-toolbar .cl-period > .cl-filter-menu > .cl-filter-menu-trigger { width: 100%; justify-content: center; }
+}
+
+/* Chart cards grid */
+.cl-page .cl-chart-grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 16px; align-items: stretch; }
+@media screen and (min-width: 1216px) {
+    .cl-page .cl-chart-grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.cl-page .cl-chart-grid2 > .is-full { grid-column: 1 / -1; }
+.cl-page .cl-chart-grid2 > .cl-card { margin: 0; }
+.cl-page .cl-chart-figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 4px 0 0; }
+.cl-page .cl-chart-figure strong { font-size: 26px; font-weight: 650; color: var(--cl-ink); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.cl-page .cl-chart-figure span { font-size: 13.5px; color: var(--cl-ink-2); }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-chart-figure strong { font-size: 20px; }
+}
+
+/* HTML column chart: columns are days, segments are channels */
+.cl-page .cl-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-page .cl-chart-legend li { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.cl-page .cl-chart-key { width: 10px; height: 10px; border-radius: 3px; background: var(--cl-chart-1); }
+.cl-page .cl-chart-key.is-2 { background: var(--cl-chart-2); }
+.cl-page .cl-chart-legend strong { color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+.cl-page .cl-chart-plot { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); margin-top: 14px; }
+.cl-page .cl-chart-axis { position: relative; height: 220px; font-size: 12px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+.cl-page .cl-chart-axis span { position: absolute; right: 8px; transform: translateY(50%); }
+.cl-page .cl-chart-area { position: relative; height: 220px; border-bottom: 1px solid var(--cl-ink-3); }
+.cl-page .cl-chart-grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--cl-line); }
+.cl-page .cl-chart-cols { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; list-style: none; margin: 0; padding: 0 2px; }
+.cl-page .cl-chart-col { position: relative; flex: 1; height: 100%; display: flex; flex-direction: column-reverse; gap: 2px; margin: 0; outline: none; }
+.cl-page .cl-chart-col::before { content: ""; position: absolute; inset: 0 -1px; border-radius: 4px; }
+.cl-page .cl-chart-col:hover::before, .cl-page .cl-chart-col:focus-visible::before { background: var(--cl-accent-soft); }
+.cl-page .cl-chart-col:focus-visible { box-shadow: 0 0 0 2px var(--cl-accent); border-radius: 4px; }
+.cl-page .cl-chart-seg { position: relative; background: var(--cl-chart-1); }
+.cl-page .cl-chart-seg.is-2 { background: var(--cl-chart-2); border-radius: 4px 4px 0 0; }
+.cl-page .cl-chart-seg:only-child, .cl-page .cl-chart-seg.is-top { border-radius: 4px 4px 0 0; }
+.cl-page .cl-chart-tip { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: var(--cl-z-pop);
+    min-width: 190px; padding: 10px 12px; background: var(--cl-surface); border: 1px solid var(--cl-line); border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow); font-size: 13px; color: var(--cl-ink-2); white-space: nowrap; pointer-events: none; }
+.cl-page .cl-chart-col:hover .cl-chart-tip, .cl-page .cl-chart-col:focus-visible .cl-chart-tip { display: block; }
+.cl-page .cl-chart-col.is-first .cl-chart-tip { left: 0; transform: none; }
+.cl-page .cl-chart-col.is-last .cl-chart-tip { left: auto; right: 0; transform: none; }
+.cl-page .cl-chart-tip b { display: block; color: var(--cl-ink); margin-bottom: 4px; }
+.cl-page .cl-chart-tip span { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+.cl-page .cl-chart-tip span strong { color: var(--cl-ink); }
+.cl-page .cl-chart-x { display: flex; justify-content: space-between; margin: 6px 0 0 64px; font-size: 12px; color: var(--cl-ink-2); }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-chart-plot { grid-template-columns: 48px minmax(0, 1fr); }
+    .cl-page .cl-chart-axis, .cl-page .cl-chart-area { height: 180px; }
+    .cl-page .cl-chart-cols { gap: 1px; padding: 0; }
+    .cl-page .cl-chart-x { margin-left: 48px; }
+}
+
+/* The three daily panels: stacked without JavaScript, one at a time behind the switch with it */
+.cl-page .cl-chart-panel + .cl-chart-panel { margin-top: 20px; border-top: 1px solid var(--cl-line); padding-top: 16px; }
+.cl-page .cl-chart-panel-title { margin: 0 20px; font-size: 14px; font-weight: 600; color: var(--cl-ink-2); }
+.cl-page [data-cl-chart].is-switched .cl-chart-panel-title { display: none; }
+.cl-page .cl-chart-panel[hidden] { display: none; }
+
+/* Inner padding of chart cards (tables and footers run edge to edge) */
+.cl-page .cl-card.cl-chart > .cl-chart-legend, .cl-page .cl-card.cl-chart > .cl-chart-figure,
+.cl-page .cl-chart-panel > .cl-chart-legend, .cl-page .cl-chart-panel > .cl-chart-plot { padding-left: 20px; padding-right: 20px; }
+.cl-page .cl-chart-panel > .cl-chart-x { margin-left: 84px; margin-right: 20px; }
+.cl-page .cl-chart-panel > .cl-chart-legend { margin-top: 8px; }
+.cl-page .cl-chart-panel > .cl-disclosure { margin: 12px 20px 20px; }
+.cl-page .cl-card.cl-chart > .cl-list-empty { margin: 12px 20px 20px; }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-chart-panel > .cl-chart-x { margin-left: 64px; margin-right: 16px; }
+    .cl-page .cl-card.cl-chart > .cl-chart-legend, .cl-page .cl-card.cl-chart > .cl-chart-figure,
+    .cl-page .cl-chart-panel > .cl-chart-legend, .cl-page .cl-chart-panel > .cl-chart-plot { padding-left: 16px; padding-right: 16px; }
+    .cl-page .cl-chart-panel-title { margin: 0 16px; }
+    .cl-page .cl-chart-panel > .cl-disclosure { margin-left: 16px; margin-right: 16px; }
+}
+
+/* Value bar inside a table row (one series, one shade) */
+.cl-page .cl-meter { display: block; height: 8px; border-radius: 4px; background: var(--cl-surface-2); overflow: hidden; min-width: 80px; }
+.cl-page .cl-meter > span { display: block; height: 100%; border-radius: 4px; background: var(--cl-accent); }
+.cl-page .cl-table.is-bars td.is-bar { width: 45%; }
+.cl-page .cl-table.is-bars td.is-money { white-space: nowrap; }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-bars td.is-bar::before { content: none; }
+    .cl-page .cl-table.is-bars td.is-bar { width: auto; grid-column: 1 / -1; }
+}
+.cl-page .cl-table.is-channels td, .cl-page .cl-table.is-channels th { white-space: nowrap; }
+.cl-page .cl-table.is-channels tfoot td, .cl-page .cl-table.is-channels tfoot th { font-weight: 650; color: var(--cl-ink); }
+
+/* Channel share bar */
+.cl-page .cl-hbar-track { display: flex; gap: 2px; height: 28px; }
+.cl-page .cl-hbar-seg { position: relative; display: flex; align-items: center; min-width: 2px; padding: 0 8px; font-size: 12.5px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; outline: none; }
+.cl-page .cl-hbar-seg:first-child { border-radius: 4px 0 0 4px; }
+.cl-page .cl-hbar-seg:last-child { border-radius: 0 4px 4px 0; }
+.cl-page .cl-hbar-seg.is-c1 { background: var(--cl-chart-1); color: #fff; }
+.cl-page .cl-hbar-seg.is-c2 { background: var(--cl-chart-2); color: #fff; }
+.cl-page .cl-hbar-seg:hover, .cl-page .cl-hbar-seg:focus-visible { box-shadow: inset 0 0 0 2px rgba(14, 23, 33, .35); }
+
+/* Channel comparison card: a row is a measure, store value | share bar | marketplace value */
+.cl-page .cl-figures { display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 12px 0 0; padding: 0 20px; list-style: none; }
+.cl-page .cl-figures li { margin: 0; display: grid; gap: 2px; align-content: start; }
+.cl-page .cl-figures .cl-stat-value { font-size: 26px; }
+.cl-page .cl-figures .cl-stat-hint { font-size: 13px; color: var(--cl-ink-2); }
+.cl-page .cl-compare { margin: 16px 0 20px; padding: 0 20px; display: grid; gap: 0; }
+.cl-page .cl-compare-note { margin: 8px 20px 0; }
+.cl-page .cl-compare-head, .cl-page .cl-compare-row { display: grid; grid-template-columns: 150px minmax(110px, max-content) minmax(0, 1fr) minmax(110px, max-content); align-items: center; gap: 4px 14px; }
+.cl-page .cl-compare-head { padding-bottom: 8px; border-bottom: 1px solid var(--cl-line); font-size: 13px; color: var(--cl-ink-2); }
+.cl-page .cl-compare-head .is-own, .cl-page .cl-compare-head .is-mkt { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-compare-head .is-own { justify-content: flex-end; }
+.cl-page .cl-compare-row { padding: 12px 0; border-bottom: 1px solid var(--cl-line); }
+.cl-page .cl-compare-row:last-child { border-bottom: 0; }
+.cl-page .cl-compare-label { font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-page .cl-compare-val { font-size: 15px; font-weight: 600; color: var(--cl-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-compare-val.is-own { text-align: right; }
+.cl-page .cl-compare-row .cl-hbar-track { height: 24px; }
+.cl-page .cl-compare-row .cl-hbar-seg { font-size: 12px; }
+.cl-page .cl-compare-row.is-plain .cl-compare-mid { font-size: 12.5px; color: var(--cl-ink-2); text-align: center; }
+@media screen and (max-width: 719px) {
+    .cl-page .cl-figures { gap: 10px 24px; padding: 0 16px; }
+    .cl-page .cl-figures .cl-stat-value { font-size: 20px; }
+    .cl-page .cl-compare { padding: 0 16px; }
+    .cl-page .cl-compare-note { margin-left: 16px; margin-right: 16px; }
+    .cl-page .cl-compare-head, .cl-page .cl-compare-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .cl-page .cl-compare-head > :first-child, .cl-page .cl-compare-head > :nth-child(3) { display: none; }
+    .cl-page .cl-compare-head .is-own { justify-content: flex-start; }
+    .cl-page .cl-compare-head .is-mkt { justify-content: flex-end; }
+    .cl-page .cl-compare-label { grid-column: 1 / -1; }
+    .cl-page .cl-compare-val.is-own { text-align: left; grid-row: 2; grid-column: 1; }
+    .cl-page .cl-compare-val.is-mkt { text-align: right; grid-row: 2; grid-column: 2; }
+    .cl-page .cl-compare-mid { grid-column: 1 / -1; grid-row: 3; }
+    .cl-page .cl-compare-row.is-plain .cl-compare-mid { display: none; }
+}

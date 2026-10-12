@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.context.Context;
 import pl.commercelink.financials.FinancialReport;
@@ -32,6 +31,12 @@ class ReportsRenderingTest {
                 new SalesTimeline.Bucket(FROM.plusDays(1), FROM.plusDays(1), 0, 0, 0, 0, 0, 0));
         SupplierLabelMap labels = mock(SupplierLabelMap.class);
         when(labels.of("Action")).thenReturn("Action");
+        return page(pending, own, marketplace, buckets,
+                SupplierCosts.of(List.of(new SupplierDeliveries("Action", 21, 290.9, 46.9), new SupplierDeliveries(null, 1, 5, 0)), labels));
+    }
+
+    private static ReportsPage page(boolean pending, FinancialReport own, FinancialReport marketplace,
+                                    List<SalesTimeline.Bucket> buckets, SupplierCosts suppliers) {
         ReportPeriod period = new ReportPeriod(FROM, TO);
         return new ReportsPage("wrzesień 2026", "1–30.09.2026",
                 "/dashboard/reports?dateFrom=2026-08-01&dateTo=2026-08-31", "sierpień 2026", null, null,
@@ -44,7 +49,7 @@ class ReportsRenderingTest {
                 List.of(DailyChart.of(DailyChart.Metric.SALES, buckets, SalesTimeline.Granularity.DAY, Locale.ENGLISH),
                         DailyChart.of(DailyChart.Metric.PROFIT, buckets, SalesTimeline.Granularity.DAY, Locale.ENGLISH),
                         DailyChart.of(DailyChart.Metric.ORDERS, buckets, SalesTimeline.Granularity.DAY, Locale.ENGLISH)),
-                SupplierCosts.of(List.of(new SupplierDeliveries("Action", 21, 290.9, 46.9), new SupplierDeliveries(null, 1, 5, 0)), labels),
+                suppliers,
                 new StockLedgerClosingShortcut(pending, pending ? "September" : null, "August 2026"));
     }
 
@@ -100,12 +105,39 @@ class ReportsRenderingTest {
 
         // then
         assertThat(html).contains("No sales in the store in this period");
+        assertThat(html).contains("cl-compare-val is-own\">—<");
     }
 
-    @Disabled("Task 8")
+    @Test
+    void anEmptyPeriodSaysSoInsteadOfDrawingEmptyCharts() {
+        // given
+        FinancialReport none = new FinancialReport(FROM, TO, 0, 0, 0, 0, Map.of(), 0, 0, 0);
+        List<SalesTimeline.Bucket> zeros = List.of(
+                new SalesTimeline.Bucket(FROM, FROM, 0, 0, 0, 0, 0, 0),
+                new SalesTimeline.Bucket(FROM.plusDays(1), FROM.plusDays(1), 0, 0, 0, 0, 0, 0));
+        ReportsPage empty = page(false, none, none, zeros, SupplierCosts.of(List.of(), mock(SupplierLabelMap.class)));
+
+        // when
+        String html = render(empty);
+
+        // then
+        assertThat(html).contains("No orders in this period.").contains("No deliveries ordered in this period.");
+        assertThat(html).doesNotContain("??").doesNotContain("NaN");
+    }
+
     @Test
     void layoutNoLongerLoadsChartJs() throws Exception {
         // then
         assertThat(Files.readString(Path.of("src/main/resources/templates/layout.html"))).doesNotContain("chart.js");
+        try (var files = Files.walk(Path.of("src/main"))) {
+            assertThat(files.filter(p -> p.toString().endsWith(".html") || p.toString().endsWith(".js"))
+                    .anyMatch(p -> {
+                        try {
+                            return Files.readString(p).contains("new Chart(");
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    })).isFalse();
+        }
     }
 }
