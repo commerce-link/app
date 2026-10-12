@@ -20,17 +20,20 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
+import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 
 import java.util.Collections;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,6 +65,9 @@ class WarehouseControllerTest {
     @Mock
     private SupplierLabels supplierLabels;
 
+    @Mock
+    private FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
+
     @InjectMocks
     private WarehouseController warehouseController;
 
@@ -87,6 +93,24 @@ class WarehouseControllerTest {
             // then
             assertThat(view).isEqualTo("fulfilment");
             assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
+            verify(fulfilmentSelectPageFactory).forRestock(any(), eq(labels), eq(false), any());
+        }
+    }
+
+    @Test
+    void savingARestockAlwaysReturnsToTheWarehouseWhateverTheFormSays() {
+        // given
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            FulfilmentForm form = new FulfilmentForm();
+            form.setRedirectUrl("redirect:https://evil.example");
+
+            // when
+            String view = warehouseController.handleFulfilment(form);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=New");
+            verify(manualWarehouseFulfilment).accept(STORE_ID, form);
         }
     }
 }

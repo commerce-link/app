@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.ProductCatalog;
@@ -31,6 +32,7 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationItem;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -81,6 +83,9 @@ class WarehouseController {
 
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
+
+    @Autowired
+    private FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
 
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
@@ -331,8 +336,12 @@ class WarehouseController {
 
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 
+        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+
         model.addAttribute("form", fulfilmentForm);
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
+        model.addAttribute("supplierLabels", labels);
+        // without a budget every suggestion is priced at 100000 (getRestockPrice), so profit and margin would be fiction
+        model.addAttribute("page", fulfilmentSelectPageFactory.forRestock(fulfilmentForm, labels, restockPrice != null, locale));
 
         return "fulfilment";
     }
@@ -363,7 +372,8 @@ class WarehouseController {
     @PreAuthorize("hasRole('ADMIN')")
     String handleFulfilment(@ModelAttribute FulfilmentForm form) {
         manualWarehouseFulfilment.accept(getStoreId(), form);
-        return form.getRedirectUrl();
+        // fixed, not the form's redirectUrl: a posted value must not choose where the browser goes (spec B1)
+        return "redirect:/dashboard/warehouse?statuses=New";
     }
 
     @GetMapping("/dashboard/warehouse/items/destroyed")
