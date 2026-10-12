@@ -94,6 +94,30 @@ class WarehouseItemPageRenderingTest {
     }
 
     @Test
+    void commentIsAnOptionalFieldOfTheRecordsGroup() {
+        // when
+        String html = render(page(Mode.EDIT));
+
+        // then
+        String records = html.substring(html.indexOf(">Records</legend>"));
+        records = records.substring(0, records.indexOf("</fieldset>"));
+        assertThat(records).contains("name=\"comment\"");
+        String commentLabel = records.substring(records.indexOf("for=\"comment\""), records.indexOf("<textarea"));
+        assertThat(commentLabel).contains("cl-optional");
+    }
+
+    @Test
+    void destroyedCommentSitsInsideTheCardPadding() {
+        // when
+        String html = render(page(Mode.DESTROYED));
+
+        // then
+        String form = html.substring(html.indexOf("id=\"item-form-title\""), html.indexOf("name=\"comment\""));
+        assertThat(form).contains("<fieldset class=\"cl-fieldset\"");
+        assertThat(form).doesNotContain("<legend");
+    }
+
+    @Test
     void formWithoutAVersionPostsNone() {
         // given
         WarehouseItemPage page = page(Mode.EDIT);
