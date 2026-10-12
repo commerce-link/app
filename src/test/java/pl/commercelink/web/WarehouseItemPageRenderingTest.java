@@ -118,6 +118,18 @@ class WarehouseItemPageRenderingTest {
     }
 
     @Test
+    void itemNumberCopyButtonDrawsOneFocusRingAroundTheCodeAndItsIcon() {
+        // when
+        String html = render(page(Mode.EDIT));
+
+        // then
+        // the focus ring is drawn on each direct child, so the icon belongs inside the code (as on the order items)
+        String button = html.substring(html.indexOf("<button type=\"button\" class=\"cl-copy-inline\""));
+        button = button.substring(0, button.indexOf("</button>"));
+        assertThat(button).containsPattern("<span class=\"cl-copy-code\"><span>7c1e5a20</span><span class=\"cl-copy-icon\" aria-hidden=\"true\">");
+    }
+
+    @Test
     void formWithoutAVersionPostsNone() {
         // given
         WarehouseItemPage page = page(Mode.EDIT);

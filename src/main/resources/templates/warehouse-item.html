@@ -14,7 +14,7 @@
                     <span th:if="${p.ean() != null}" th:text="#{warehouse.item.meta.ean(${p.ean()})}"></span>
                     <span th:if="${p.mfn() != null}" th:text="#{warehouse.item.meta.mfn(${p.mfn()})}"></span>
                     <span><span th:text="#{warehouse.item.meta.id}"></span>&nbsp;<button type="button" class="cl-copy-inline"
-                            th:attr="data-cl-copy=${p.itemId()}, aria-label=#{warehouse.item.meta.copy}"><span class="cl-copy-code" th:text="${p.shortId()}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span></button></span>
+                            th:attr="data-cl-copy=${p.itemId()}, aria-label=#{warehouse.item.meta.copy}"><span class="cl-copy-code"><span th:text="${p.shortId()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button></span>
                 </p>
             </th:block>
             <th:block th:fragment="itemActions">
