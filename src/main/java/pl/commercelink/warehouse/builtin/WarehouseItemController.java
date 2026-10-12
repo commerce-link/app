@@ -211,10 +211,8 @@ class WarehouseItemController {
 
     private String conflict(String itemId, WarehouseItemEditForm form, Model model, Locale locale, HttpServletResponse response) {
         response.setStatus(HttpStatus.CONFLICT.value());
-        // the page shows the typed values over the newer stored item, whose version the operator now sees
-        WarehouseItem current = found(itemId);
-        form.setVersion(current.getVersion() == null ? null : String.valueOf(current.getVersion()));
-        model.addAttribute("page", warehouseItemPageFactory.page(current, form.getBack(), isAdmin(), form, Map.of(),
+        // the form keeps the stale version on purpose: every resubmit is refused until the page is reloaded
+        model.addAttribute("page", warehouseItemPageFactory.page(found(itemId), form.getBack(), isAdmin(), form, Map.of(),
                 text(locale, "warehouse.item.error.conflict"), locale));
         return "warehouse-item";
     }

@@ -132,6 +132,23 @@ class WarehouseItemPageFactoryTest {
     }
 
     @Test
+    void destroyedItemAfterAFailedSaveStillShowsTheStoredReadOnlyData() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Destroyed);
+        item.setSerialNo("S1, S2");
+        WarehouseItemEditForm posted = new WarehouseItemEditForm();
+        posted.setComment("x".repeat(2001));
+
+        // when
+        WarehouseItemPage page = factory.page(item, null, false, posted, Map.of("comment", "warehouse.item.error.comment"), null, PL);
+
+        // then
+        assertThat(page.form().getCategory()).isEqualTo("Dyski SSD");
+        assertThat(page.form().getSerialNo()).isEqualTo("S1, S2");
+        assertThat(page.form().getComment()).hasSize(2001);
+    }
+
+    @Test
     void destroyedWithoutDateNamesNoDate() {
         // when
         WarehouseItemPage page = factory.page(item(FulfilmentStatus.Destroyed), null, false, null, Map.of(), null, PL);

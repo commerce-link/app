@@ -48,7 +48,6 @@
                         <div><dt th:text="#{warehouse.item.new.category}"></dt><dd th:text="${f.category}"></dd></div>
                         <div><dt th:text="#{warehouse.item.field.condition}"></dt><dd><span class="cl-status" th:classappend="${p.readonlyCondition().tone()}" th:text="${p.readonlyCondition().label()}"></span></dd></div>
                         <div><dt th:text="#{warehouse.item.field.serialNo}"></dt><dd th:text="${f.serialNo != null and !#strings.isEmpty(f.serialNo)} ? ${f.serialNo} : '—'"></dd></div>
-                        <div><dt th:text="#{warehouse.item.fact.systemCost}"></dt><dd class="is-numeric" th:text="${!#strings.isEmpty(f.unitSystemCost)} ? ${f.unitSystemCost} : '—'"></dd></div>
                     </dl>
                 </section>
 

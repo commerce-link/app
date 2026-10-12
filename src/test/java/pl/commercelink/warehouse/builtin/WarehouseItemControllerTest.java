@@ -189,6 +189,33 @@ class WarehouseItemControllerTest {
     }
 
     @Test
+    void resubmittingTheConflictPageStaysRefusedUntilItIsReloaded() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setVersion(6L);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setVersion("5");
+
+        // when
+        asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+        WarehouseItemEditForm shown = captureShownForm();
+        MockHttpServletResponse second = new MockHttpServletResponse();
+        asStore(() -> controller.saveWarehouseItem(ID, shown, new ExtendedModelMap(), PL, second, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(shown.getVersion()).isEqualTo("5");
+        assertThat(second.getStatus()).isEqualTo(409);
+        verify(updates, never()).update(any(), any(), any());
+    }
+
+    private WarehouseItemEditForm captureShownForm() {
+        org.mockito.ArgumentCaptor<WarehouseItemEditForm> captor = org.mockito.ArgumentCaptor.forClass(WarehouseItemEditForm.class);
+        verify(pages).page(any(), any(), anyBoolean(), captor.capture(), any(), any(), any());
+        return captor.getValue();
+    }
+
+    @Test
     void matchingVersionSaves() throws Exception {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Delivered);

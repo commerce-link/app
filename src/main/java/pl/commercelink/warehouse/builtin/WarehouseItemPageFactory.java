@@ -40,6 +40,11 @@ class WarehouseItemPageFactory {
         ItemBack itemBack = ItemBack.resolve(back, status);
         WarehouseItemEditForm shown = form != null ? form : WarehouseItemEditForm.of(item);
         shown.setBack(ItemBack.safe(back));
+        if (mode == Mode.DESTROYED) {
+            // a destroyed page posts only the comment, so the read-only card must not read these from the form
+            shown.setCategory(item.getCategory());
+            shown.setSerialNo(item.getSerialNo());
+        }
         List<StoreCategories.Group> groups = storeCategories.groupsFor(item.getStoreId());
         boolean outside = StringUtils.isNotBlank(item.getCategory())
                 && groups.stream().noneMatch(g -> g.names().contains(item.getCategory()));
