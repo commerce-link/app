@@ -136,6 +136,25 @@ class WarehouseItemControllerTest {
     }
 
     @Test
+    void foreignBackNeverBecomesTheSaveRedirect() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+
+        for (String evil : new String[]{"https://evil.example", "//evil.example"}) {
+            WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+            form.setBack(evil);
+
+            // when
+            String view = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL,
+                    new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+            // then
+            assertThat(view).as(evil).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+        }
+    }
+
+    @Test
     void mergeLeadsToTheItemThatHoldsTheData() throws Exception {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Delivered);
