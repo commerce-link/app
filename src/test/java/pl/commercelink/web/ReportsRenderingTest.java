@@ -99,6 +99,16 @@ class ReportsRenderingTest {
     }
 
     @Test
+    void moneyRowsOfTheComparisonCarryTheCurrencyAndCountsDoNot() {
+        // when
+        String html = render(page(true, 141));
+
+        // then
+        assertThat(html).containsPattern("cl-compare-val is-own\">254[^<]162 PLN<");
+        assertThat(html).containsPattern("cl-compare-val is-own\">141<");
+    }
+
+    @Test
     void aMissingChannelIsSaid() {
         // when
         String html = render(page(true, 0));

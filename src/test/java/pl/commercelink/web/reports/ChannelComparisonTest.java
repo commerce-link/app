@@ -29,6 +29,8 @@ class ChannelComparisonTest {
         assertThat(orders.share().ownLabelled()).isTrue();
         assertThat(comparison.rows().get(3).share()).isNull();
         assertThat(comparison.missing()).isNull();
+        assertThat(comparison.rows()).extracting(ChannelComparison.Row::money)
+                .containsExactly(false, true, true, true, false, true);
     }
 
     @Test

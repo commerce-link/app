@@ -15,7 +15,7 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
     public record Totals(String salesNet, String profitNet, String margin, int orders, String averageOrder) {
     }
 
-    public record Row(String labelKey, String own, String marketplace, Share share) {
+    public record Row(String labelKey, boolean money, String own, String marketplace, Share share) {
     }
 
     public record Share(double own, double marketplace, String ownText, String marketplaceText,
@@ -44,18 +44,18 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
         boolean ownSold = own.getTotalNumberOfOrders() > 0;
         boolean marketplaceSold = marketplace.getTotalNumberOfOrders() > 0;
         List<Row> rows = List.of(
-                new Row("reports.channels.orders", String.valueOf(own.getTotalNumberOfOrders()),
+                new Row("reports.channels.orders", false, String.valueOf(own.getTotalNumberOfOrders()),
                         String.valueOf(marketplace.getTotalNumberOfOrders()),
                         Share.of(own.getTotalNumberOfOrders(), marketplace.getTotalNumberOfOrders())),
-                new Row("reports.channels.sales", ReportNumbers.wholeAmount(own.getTotalPrice()),
+                new Row("reports.channels.sales", true, ReportNumbers.wholeAmount(own.getTotalPrice()),
                         ReportNumbers.wholeAmount(marketplace.getTotalPrice()), Share.of(own.getTotalPrice(), marketplace.getTotalPrice())),
-                new Row("reports.channels.profit", ReportNumbers.wholeAmount(own.getTotalProfit()),
+                new Row("reports.channels.profit", true, ReportNumbers.wholeAmount(own.getTotalProfit()),
                         ReportNumbers.wholeAmount(marketplace.getTotalProfit()), Share.of(own.getTotalProfit(), marketplace.getTotalProfit())),
-                new Row("reports.channels.cost", ReportNumbers.wholeAmount(own.getTotalCost()),
+                new Row("reports.channels.cost", true, ReportNumbers.wholeAmount(own.getTotalCost()),
                         ReportNumbers.wholeAmount(marketplace.getTotalCost()), null),
-                new Row("reports.channels.margin", ownSold ? margin(own.getTotalProfit(), own.getTotalPrice()) : null,
+                new Row("reports.channels.margin", false, ownSold ? margin(own.getTotalProfit(), own.getTotalPrice()) : null,
                         marketplaceSold ? margin(marketplace.getTotalProfit(), marketplace.getTotalPrice()) : null, null),
-                new Row("reports.channels.averageOrder",
+                new Row("reports.channels.averageOrder", true,
                         ownSold ? ReportNumbers.wholeAmount(own.getTotalPrice() / own.getTotalNumberOfOrders()) : null,
                         marketplaceSold ? ReportNumbers.wholeAmount(marketplace.getTotalPrice() / marketplace.getTotalNumberOfOrders()) : null,
                         null));

@@ -110,7 +110,7 @@
             </div>
             <div th:each="row : ${channels.rows()}" class="cl-compare-row" th:classappend="${row.share() == null} ? 'is-plain'">
                 <span class="cl-compare-label" th:text="#{${row.labelKey()}}"></span>
-                <span class="cl-compare-val is-own" th:text="${row.own()} ?: '—'"></span>
+                <span class="cl-compare-val is-own" th:text="${row.own() == null} ? '—' : (${row.money()} ? #{general.currency.amount(${row.own()})} : ${row.own()})"></span>
                 <div class="cl-compare-mid">
                     <div th:if="${row.share() != null}" class="cl-hbar-track" role="img"
                          th:attr="aria-label=${#messages.msg('reports.channels.shareLabel', #messages.msg(row.labelKey()), row.share().ownText(), row.share().marketplaceText())}">
@@ -120,7 +120,7 @@
                               th:text="${row.share().marketplaceLabelled()} ? ${row.share().marketplaceText()} : ''"></span>
                     </div>
                 </div>
-                <span class="cl-compare-val is-mkt" th:text="${row.marketplace()} ?: '—'"></span>
+                <span class="cl-compare-val is-mkt" th:text="${row.marketplace() == null} ? '—' : (${row.money()} ? #{general.currency.amount(${row.marketplace()})} : ${row.marketplace()})"></span>
             </div>
         </div>
     </th:block>
