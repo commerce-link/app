@@ -31,7 +31,8 @@ public final class WarehouseStatuses {
         return switch (status) {
             case Delivered -> "is-ok";
             case InRMA, InExternalService -> "is-warn";
-            case New -> "is-neutral";
+            // Destroyed is final: a neutral pill, not the info tone of statuses still on the move
+            case New, Destroyed -> "is-neutral";
             default -> "is-info";
         };
     }
