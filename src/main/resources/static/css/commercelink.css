@@ -12325,7 +12325,9 @@ a.cl-link-button:hover {
    docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
 :root {
     --cl-chart-1: var(--cl-supplier-1);
-    --cl-chart-2: var(--cl-supplier-2);
+    /* marketplace series: violet instead of the supplier rust (client's choice, 2026-10-12); the pair with the store
+       blue passes the colour-blindness check and white percents inside the bar keep 5.7:1 */
+    --cl-chart-2: #7c3aed;
 }
 
 /* Period switcher in the toolbar: previous / [period menu] / next */

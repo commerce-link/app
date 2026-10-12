@@ -140,6 +140,16 @@ class ReportsRenderingTest {
     }
 
     @Test
+    void theMarketplaceSeriesIsVioletWhileTheSupplierPaletteKeepsItsColours() throws Exception {
+        // when
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
+
+        // then
+        assertThat(css).contains("--cl-chart-1: var(--cl-supplier-1);").contains("--cl-chart-2: #7c3aed;")
+                .contains("--cl-supplier-2: #9a3f0f;");
+    }
+
+    @Test
     void layoutNoLongerLoadsChartJs() throws Exception {
         // then
         assertThat(Files.readString(Path.of("src/main/resources/templates/layout.html"))).doesNotContain("chart.js");
