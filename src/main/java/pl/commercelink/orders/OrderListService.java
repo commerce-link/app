@@ -12,6 +12,7 @@ import pl.commercelink.shipping.PickupCandidates;
 import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.orders.OrderArchiveQuery;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrderListQuery.Direction;
 import pl.commercelink.web.orders.OrderListQuery.Sort;
@@ -27,6 +28,8 @@ import pl.commercelink.web.orders.OrdersPageModel.SortHeader;
 import pl.commercelink.web.orders.OrdersPageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -261,8 +264,11 @@ public class OrderListService {
 
     private EmptyState emptyState(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         if (query.q() != null) {
+            // closed orders are not read here; the archive searches them with the same text
             return new EmptyState(text("orders.list.empty.search", locale, query.q()),
-                    text("orders.list.empty.search.clear", locale), query.withQ(null).href());
+                    text("orders.list.empty.search.clear", locale), query.withQ(null).href(),
+                    text("orders.list.empty.archive", locale, query.q()),
+                    OrderArchiveQuery.PATH + "?q=" + URLEncoder.encode(query.q(), StandardCharsets.UTF_8));
         }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),

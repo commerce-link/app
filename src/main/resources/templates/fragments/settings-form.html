@@ -37,11 +37,16 @@
 <!--/* Error summary of a form whose messages are already translated (a message whose text carries a number the key
        cannot hold, e.g. the line of a broken brand line). Same markup as errorSummary; errors maps a field id to the
        text of its error. */-->
-<div th:fragment="errorSummaryText(id, errors)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
+<div th:fragment="errorSummaryText(id, errors)"
+     th:replace="~{fragments/settings-form :: errorSummaryTextTitled(${id}, ${errors}, 'form.errors.title')}"></div>
+
+<!--/* errorSummaryText with its own title key, for a form that saves nothing (form.errors.title says changes were not
+       saved). */-->
+<div th:fragment="errorSummaryTextTitled(id, errors, titleKey)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
      tabindex="-1" data-cl-error-summary>
     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
     <div>
-        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
         <ul class="cl-alert-list">
             <li th:each="error : ${errors}">
                 <a th:href="'#' + ${error.key}" th:text="${error.value}"></a>
@@ -51,16 +56,23 @@
 </div>
 
 <!--/* Labelled input with an optional help text (already resolved, or null) read out with the field. Not named "input":
-       a fragment name is also an element selector and would pull in every input of this file. */-->
-<div th:fragment="textField(name, labelKey, value, type, autocomplete, required, errorKey, help)" class="cl-field">
+       a fragment name is also an element selector and would pull in every input of this file. The one implementation is
+       textFieldWith; this shorthand passes no input mode, placeholder or autofocus. */-->
+<div th:fragment="textField(name, labelKey, value, type, autocomplete, required, errorKey, help)"
+     th:replace="~{fragments/settings-form :: textFieldWith(${name}, ${labelKey}, ${value}, ${type}, ${autocomplete}, ${required}, ${errorKey}, ${help}, null, null, false)}"></div>
+
+<!--/* textField with an input mode (or null: email and tel fields still get theirs from the type), a placeholder (an
+       example value, already resolved, or null) and autofocus (true only when the page has no error summary to focus). */-->
+<div th:fragment="textFieldWith(name, labelKey, value, type, autocomplete, required, errorKey, help, inputmode, placeholder, autofocus)" class="cl-field">
     <label class="cl-label" th:for="${name}">
         <span th:text="#{${labelKey}}"></span>
         <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
     </label>
     <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
            th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}" th:required="${required}"
+           th:placeholder="${placeholder}" th:autofocus="${autofocus}"
            th:attr="autocomplete=${autocomplete},
-                    inputmode=${type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null)},
+                    inputmode=${inputmode != null ? inputmode : (type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null))},
                     aria-invalid=${errorKey != null ? 'true' : null},
                     aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
     <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>

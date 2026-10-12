@@ -55,6 +55,11 @@ public record OrdersPageModel(
     public record SortHeader(String href, String ariaSort) {
     }
 
-    public record EmptyState(String text, String actionLabel, String actionHref) {
+    /** archiveHref: the same search in the orders archive, offered when an open-orders search finds nothing. */
+    public record EmptyState(String text, String actionLabel, String actionHref, String archiveLabel, String archiveHref) {
+
+        public EmptyState(String text, String actionLabel, String actionHref) {
+            this(text, actionLabel, actionHref, null, null);
+        }
     }
 }

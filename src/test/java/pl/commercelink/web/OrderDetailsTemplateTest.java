@@ -574,6 +574,21 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void orderOpenedFromTheArchiveLeadsBackToIt() {
+        // given
+        Order order = order(OrderStatus.Completed);
+        OrderPageModelFactory.Viewer fromArchive = new OrderPageModelFactory.Viewer(false, true, "/dashboard/orders/archive?q=x");
+
+        // when
+        String archive = page(render(order, fromArchive));
+        String list = page(render(order, ADMIN));
+
+        // then
+        assertThat(archive).contains("href=\"/dashboard/orders/archive?q=x\"").contains("Archiwum zamówień");
+        assertThat(list).doesNotContain("Archiwum zamówień");
+    }
+
+    @Test
     void superAdminPageCarriesNoFormDialogOrMenu() {
         // when
         String html = page(render(order(OrderStatus.Assembly), SUPER_ADMIN));

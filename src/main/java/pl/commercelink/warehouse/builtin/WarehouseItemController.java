@@ -1,14 +1,18 @@
 package pl.commercelink.warehouse.builtin;
 
-import org.apache.logging.log4j.util.Strings;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
@@ -19,11 +23,13 @@ import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.api.ItemCondition;
-import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Controller
@@ -35,8 +41,7 @@ class WarehouseItemController {
             FulfilmentStatus.Allocation
     );
 
-    @Autowired
-    private Warehouse warehouse;
+    static final String NEW_SUPPLIER_FIELD = "new-supplier";
 
     @Autowired
     private TaxonomyCache taxonomyCache;
@@ -65,10 +70,8 @@ class WarehouseItemController {
     @Autowired
     private SupplierChoice supplierChoice;
 
-    @GetMapping("/dashboard/warehouse/items/add")
-    String addWarehouseItem(Model model) {
-        return showWarehouseItemDetails(model, WarehouseItem.empty(getStoreId()));
-    }
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     @GetMapping("/dashboard/warehouse/items/available")
     @ResponseBody
@@ -108,45 +111,85 @@ class WarehouseItemController {
         return NEW_ITEM_STATUSES;
     }
 
-    @PostMapping("/dashboard/warehouse/items/quick-add")
-    String quickAddWarehouseItem(@RequestParam String manufacturerCode, @RequestParam double cost,
-                                 @RequestParam int qty, @RequestParam FulfilmentStatus status,
-                                 @RequestParam String supplier, @RequestParam(required = false) String customSupplier,
-                                 Model model, Locale locale, RedirectAttributes redirectAttributes) {
-        SupplierChoice.Resolution resolution = supplierChoice.resolve(
-                storesRepository.findById(getStoreId()), supplier, customSupplier);
-        if (!resolution.accepted()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage(resolution.errorCode(), resolution.errorArgs(), locale));
-            return "redirect:/dashboard/warehouse";
+    @GetMapping("/dashboard/warehouse/items/new")
+    String newItem(Model model) {
+        return newItemPage(model, new WarehouseItemAddForm(), Map.of(), Map.of(), false, null);
+    }
+
+    @PostMapping("/dashboard/warehouse/items/new")
+    String addItem(@ModelAttribute("form") WarehouseItemAddForm form, Model model, Locale locale,
+                   HttpServletResponse response, RedirectAttributes redirectAttributes) {
+        Taxonomy taxonomy = StringUtils.isBlank(form.getManufacturerCode()) ? null
+                : taxonomyCache.findByMfn(UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()));
+        boolean known = taxonomy != null && StringUtils.isNoneBlank(taxonomy.name(), taxonomy.ean());
+        boolean productDataNeeded = !known && StringUtils.isNotBlank(form.getManufacturerCode());
+        // the first submit of an unknown code only reveals the product data group, so it carries no name/ean errors yet
+        boolean productDataAsked = productDataNeeded && (form.isProductDataShown() || hasAnyProductData(form));
+        Map<String, String> errors = new LinkedHashMap<>(form.validate(productDataAsked));
+        Map<String, Object[]> errorArgs = new HashMap<>();
+        SupplierChoice.Resolution supplier = supplierChoice.resolve(
+                storesRepository.findById(getStoreId()), form.getSupplier(), form.getCustomSupplier());
+        if (!supplier.accepted()) {
+            String field = supplierField(form);
+            errors.put(field, supplier.errorCode());
+            if (supplier.errorArgs() != null) {
+                errorArgs.put(field, supplier.errorArgs());
+            }
         }
-        supplier = resolution.identity();
-        String mfn = UnifiedProductIdentifiers.unifyMfn(manufacturerCode);
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
-
-        String name = taxonomy != null ? taxonomy.name() : null;
-        String ean = taxonomy != null ? taxonomy.ean() : null;
-        String category = taxonomy != null && Strings.isNotBlank(taxonomy.category())
-                ? taxonomy.category()
-                : Categories.UNCATEGORIZED;
-
-        WarehouseItem item = new WarehouseItem(getStoreId(), supplier, category, name, ean, mfn, cost, qty);
-        item.setStatus(status);
-
-        if (Strings.isBlank(name) || Strings.isBlank(ean)) {
-            model.addAttribute("errorMessage", messageSource.getMessage("warehouse.item.mfn.not.found", null, locale));
-            return showWarehouseItemDetails(model, item);
+        if (!errors.isEmpty() || (productDataNeeded && !productDataAsked)) {
+            response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            return newItemPage(model, form, errors, errorArgs, productDataNeeded, null);
         }
+
+        String category = known ? StringUtils.defaultIfBlank(taxonomy.category(), Categories.UNCATEGORIZED)
+                : StringUtils.defaultIfBlank(form.getCategory(), Categories.UNCATEGORIZED);
+        WarehouseItem item = new WarehouseItem(getStoreId(), supplier.identity(), category,
+                known ? taxonomy.name() : form.getName().trim(), known ? taxonomy.ean() : form.getEan().trim(),
+                UnifiedProductIdentifiers.unifyMfn(form.getManufacturerCode()), form.netCost(), form.quantity());
+        item.setStatus(form.statusValue());
 
         OperationResult<?> result = warehouseInternalReceiptService.addItem(
-                getStoreId(), item, CustomSecurityContext.getLoggedInUserName()
-        );
+                getStoreId(), item, CustomSecurityContext.getLoggedInUserName());
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
-        } else {
-            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("warehouse.item.quick.add.success", null, locale));
+            response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            return newItemPage(model, form, errors, errorArgs, productDataNeeded, result.getMessage());
         }
-        return "redirect:/dashboard/warehouse";
+        redirectAttributes.addFlashAttribute("settingsSavedMessage",
+                messageSource.getMessage("warehouse.item.added", new Object[]{item.getName()}, locale));
+        return redirectToWarehouseFilteredBy(item.getStatus());
+    }
+
+    /** The id of the field a supplier error belongs to: as in {@link SupplierChoice#resolve}, the typed name only for "Other supplier…". */
+    private static String supplierField(WarehouseItemAddForm form) {
+        return SupplierChoice.CUSTOM.equals(form.getSupplier()) ? NEW_SUPPLIER_FIELD + "-custom" : NEW_SUPPLIER_FIELD;
+    }
+
+    /** "Uncategorized" is what the empty choice of the category list already means, so it is not offered twice. */
+    private static List<StoreCategories.Group> withoutUncategorized(List<StoreCategories.Group> groups) {
+        return groups.stream()
+                .map(group -> new StoreCategories.Group(group.catalog(), group.names().stream()
+                        .filter(name -> !Categories.UNCATEGORIZED.equals(name))
+                        .toList()))
+                .filter(group -> !group.names().isEmpty())
+                .toList();
+    }
+
+    private static boolean hasAnyProductData(WarehouseItemAddForm form) {
+        return StringUtils.isNotBlank(form.getName()) || StringUtils.isNotBlank(form.getEan());
+    }
+
+    private String newItemPage(Model model, WarehouseItemAddForm form, Map<String, String> errors,
+                               Map<String, Object[]> errorArgs, boolean mfnUnknown, String errorMessage) {
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("errorArgs", errorArgs);
+        model.addAttribute("mfnUnknown", mfnUnknown);
+        model.addAttribute("errorMessage", errorMessage);
+        model.addAttribute("vatRate", Price.DEFAULT_VAT_RATE);
+        model.addAttribute("statuses", NEW_ITEM_STATUSES);
+        model.addAttribute("suppliers", supplierLabels.forStoreId(getStoreId()).options());
+        model.addAttribute("categoryGroups", withoutUncategorized(storeCategories.groupsFor(getStoreId())));
+        return "warehouse-item-new";
     }
 
     @PostMapping("/dashboard/warehouse/items/{itemId}/save")

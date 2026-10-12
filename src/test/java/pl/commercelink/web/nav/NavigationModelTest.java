@@ -19,9 +19,18 @@ class NavigationModelTest {
         NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders");
 
         // then
-        assertThat(itemKeys(model)).contains("offers", "orders", "clients", "fulfilment", "deliveries", "rma",
+        assertThat(itemKeys(model)).contains("offers", "orders", "fulfilment", "deliveries", "rma",
                 "warehouse", "warehouseDocuments", "catalogs", "inventory", "inventoryPrices", "payments", "reports");
         assertThat(model.footer()).extracting(NavItem::key).containsExactly("settings");
+    }
+
+    @Test
+    void salesGroupHasNoClientsPage() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders");
+
+        // then
+        assertThat(itemKeys(model)).doesNotContain("clients");
     }
 
     @Test

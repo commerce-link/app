@@ -4,7 +4,7 @@
 <!--/* Record header: back to the list as left, h1 with the number, the status and its action, the meta
        lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
 <div th:fragment="header"
-     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
+     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{${page.backLabelKey()}},
              #{order.page.title(${page.shortId()})}, ~{::orderCopy}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
     <th:block th:fragment="orderCopy">
         <button type="button" class="cl-copy-inline is-icon"
