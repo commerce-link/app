@@ -57,6 +57,8 @@ class ItemHistoryRenderingTest {
         assertThat(page.moves().get(1).note()).isEqualTo("Zalany w magazynie B");
         assertThat(html).contains("· Zniszczenie").contains("Zalany w magazynie B");
         assertThat(html.split("· Zniszczenie", -1).length - 1).isEqualTo(1);
+        String visible = html.replaceAll("<[^>]+>", "").replaceAll("\\s+", " ");
+        assertThat(visible).contains(page.moves().get(1).typeName() + " · Zniszczenie");
     }
 
     @Test
