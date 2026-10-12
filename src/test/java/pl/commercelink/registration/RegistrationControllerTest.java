@@ -141,6 +141,7 @@ class RegistrationControllerTest {
         assertEquals(Map.of("email", "registration.error.email-exists"), model.getAttribute("fieldErrors"));
         assertEquals("email", model.getAttribute("autofocus"));
         assertEquals("user@example.com", model.getAttribute("email"));
+        assertEquals(true, model.getAttribute("termsConsent"));
         assertNull(model.getAttribute("errorMessage"));
         assertNull(sessionPending());
     }

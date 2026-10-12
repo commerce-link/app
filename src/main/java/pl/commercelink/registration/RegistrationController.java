@@ -80,6 +80,7 @@ public class RegistrationController {
         RegistrationErrors.prepare(model, "email");
         model.addAttribute("email", email);
         model.addAttribute("storeName", storeName);
+        model.addAttribute("termsConsent", termsConsent != null);
 
         if (!captchaVerifier.verify(captchaResponse, clientIp(request))) {
             rejectRegistration(model, "registration.error.captcha-failed", locale);
