@@ -181,7 +181,7 @@ class WarehouseListService {
         return categories.isEmpty() || categories.contains(WarehouseRowMapper.categoryValue(item.getCategory()));
     }
 
-    private static boolean matchesSearch(WarehouseItem item, String q) {
+    static boolean matchesSearch(WarehouseItem item, String q) {
         if (q == null) return true;
         // an EAN is stored without its leading zeros, so a scanned or typed EAN-13 is also tried in that form
         String asEan = UnifiedProductIdentifiers.unifyEan(q);
