@@ -66,7 +66,7 @@
                         <input type="hidden" name="dateFrom" th:value="${closing.dateFrom()}">
                         <dl class="cl-period-facts"><dt th:text="#{reports.from}"></dt>
                             <dd><span th:text="${closing.fromLabel()}"></span>
-                                <span class="cl-help" th:text="#{reports.stockLedger.fromFixed(${closing.previousLabel()})}"></span></dd></dl>
+                                <span class="cl-help" th:if="${closing.previousLabel() != null}" th:text="#{reports.stockLedger.fromFixed(${closing.previousLabel()})}"></span></dd></dl>
                     </th:block>
                     <div class="cl-inline-fields">
                         <div class="cl-field" th:unless="${closing.fromFixed()}">

@@ -97,4 +97,19 @@ class StockLedgerClosingViewTest {
         assertThat(view.previousLabel()).isEqualTo("wrzesień 2026");
         assertThat(september.previousLabel()).isEqualTo("sierpień 2026");
     }
+
+    @Test
+    void aRangeStartingAtTheOldestClosedPeriodNamesNoPeriodBeforeIt() {
+        // given
+        List<StockLedgerPeriod> closed = List.of(
+                new StockLedgerPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30)),
+                new StockLedgerPeriod(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)));
+        StockLedgerClosingView view = StockLedgerClosingView.of(closed, REPORT_FROM, REPORT_TO, PL);
+
+        // when
+        StockLedgerClosingView oldest = view.withRange(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
+
+        // then
+        assertThat(oldest.previousLabel()).isNull();
+    }
 }
