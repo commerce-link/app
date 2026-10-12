@@ -31,7 +31,8 @@ class ItemBackTest {
     void foreignOrTrickyBackFallsBackToTheDefault() {
         // when / then
         for (String evil : new String[]{"https://evil.example", "//evil.example", "/dashboard/orders",
-                "/dashboard/warehouse/../orders", "/dashboard/warehouse//x", "/dashboard/warehouse/items/abc", " /dashboard/warehouse"}) {
+                "/dashboard/warehouse/../orders", "/dashboard/warehouse//x", "/dashboard/warehouse/items/abc", " /dashboard/warehouse",
+                "/dashboard/warehouse?q={x}", "/dashboard/warehouse/items/destroyed?q=%7B{a}"}) {
             assertThat(ItemBack.resolve(evil, FulfilmentStatus.Delivered).href()).as(evil).isEqualTo("/dashboard/warehouse?statuses=Delivered");
             assertThat(ItemBack.safe(evil)).as(evil).isNull();
         }

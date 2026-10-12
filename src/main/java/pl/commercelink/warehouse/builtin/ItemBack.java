@@ -15,7 +15,8 @@ record ItemBack(String href, String labelKey) {
 
     static final String LIST = "/dashboard/warehouse";
     static final String ARCHIVE = "/dashboard/warehouse/items/destroyed";
-    private static final Pattern SAFE = Pattern.compile("^/dashboard/warehouse(/items/destroyed)?(\\?[^\\s]*)?$");
+    // braces never come from a link the server built (values are URL-encoded) and "redirect:" would expand them as URI variables
+    private static final Pattern SAFE = Pattern.compile("^/dashboard/warehouse(/items/destroyed)?(\\?[^\\s{}]*)?$");
 
     static ItemBack resolve(String back, FulfilmentStatus status) {
         String safe = safe(back);

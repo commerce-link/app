@@ -155,6 +155,26 @@ class WarehouseItemControllerTest {
     }
 
     @Test
+    void backWithATemplateVariableIsNotExpandedIntoTheRedirect() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        when(updates.update(any(), any(), any())).thenReturn("w-2");
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setBack("/dashboard/warehouse?q={x}");
+
+        // when
+        String merged = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+        when(repository.findById("store-1", ID)).thenReturn(item(FulfilmentStatus.New));
+        String deleted = asStore(() -> controller.deleteWarehouseItem(ID, "/dashboard/warehouse?q={x}", PL, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(merged).isEqualTo("redirect:/dashboard/warehouse/items/w-2");
+        assertThat(deleted).isEqualTo("redirect:/dashboard/warehouse?statuses=New");
+    }
+
+    @Test
     void mergeLeadsToTheItemThatHoldsTheData() throws Exception {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Delivered);
