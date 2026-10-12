@@ -42,15 +42,20 @@
         <div data-cl-list-results data-cl-list-path="/dashboard/warehouse" data-cl-list-fragment="/dashboard/warehouse/list"
              th:fragment="results" th:with="q=${page.query()}">
 
-            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{warehouse.tiles.label}">
+            <ul class="cl-stat-grid is-orders is-warehouse" th:attr="aria-label=#{warehouse.tiles.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
+                    <a class="cl-stat is-link" th:if="${tile.link()}" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.value()}"></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
                     </a>
+                    <div class="cl-stat" th:unless="${tile.link()}">
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value"><span class="cl-nowrap" th:text="${tile.value()}"></span> <span class="cl-stat-value-of" th:text="${tile.unit()}"></span></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                    </div>
                 </li>
             </ul>
 
@@ -123,14 +128,7 @@
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status" th:with="r=${page.results()}">
-                        <span th:text="${r.count()}"></span>
-                        <th:block th:if="${r.net() != null}">
-                            <span class="cl-results-amount" th:text="${r.net()}"></span>
-                            <span th:text="${r.grossLabel()}"></span>
-                            <span class="cl-results-amount" th:text="${r.gross()}"></span>
-                        </th:block>
-                    </p>
+                    <p class="cl-table-results" role="status" th:text="${page.results()}"></p>
                 </div>
 
                 <th:block th:unless="${page.rows().isEmpty()}">
@@ -140,7 +138,7 @@
                         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
                                th:attr="aria-label=#{warehouse.selection.selectAll}, data-cl-label-select=#{warehouse.selection.selectAll}, data-cl-label-clear=#{warehouse.selection.clearAll}"></label>
                         <span class="cl-selection-count"><span data-cl-selection-count th:attr="data-template=#{warehouse.selection.count('{k}', '{n}')}"></span> <span data-cl-selection-units th:attr="data-template=#{warehouse.selection.units.after('{m}')}"></span></span>
-                        <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-source=#{warehouse.bulk.reason.source}, data-reason-no-delivery=#{warehouse.bulk.reason.noDelivery}">
+                        <div class="cl-selection-actions" data-cl-selection-actions th:attr="data-reason-no-delivery=#{warehouse.bulk.reason.noDelivery}">
                             <details class="cl-menu">
                                 <summary class="cl-button"><span th:text="#{warehouse.bulk.menu}"></span>
                                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span></summary>
@@ -188,7 +186,7 @@
                             <td class="cl-table-check">
                                 <label class="cl-check-target" th:if="${row.selectable()}">
                                     <input class="cl-check-input" type="checkbox" data-cl-select-row hidden th:value="${row.itemId()}"
-                                           th:attr="data-status=${row.status()}, data-qty=${row.qty()}, data-source=${row.source()}, data-has-delivery=${row.hasDelivery()},
+                                           th:attr="data-status=${row.status()}, data-qty=${row.qty()}, data-has-delivery=${row.hasDelivery()},
                                                     data-name=${row.name()}, data-status-label=${row.statusLabel()},
                                                     aria-label=#{warehouse.row.select(${row.name()})}">
                                 </label>
@@ -196,7 +194,6 @@
                             <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.list.column.product}">
                                 <a th:href="@{${row.href()}}" th:text="${row.name()}"></a>
                                 <span class="cl-table-sub" th:if="${!row.codes().isEmpty()}"><th:block th:each="code, it : ${row.codes()}"><span class="cl-table-code" th:title="${code}" th:text="${it.last} ? ${code} : #{warehouse.row.code.beforeNext(${code})}"></span> </th:block></span>
-                                <span class="cl-table-pills" th:if="${row.conditionLabel() != null}"><span class="cl-status" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></span>
                                 <span class="cl-table-sub cl-table-note" th:if="${row.comment() != null}" th:title="${row.comment()}" th:text="${row.comment()}"></span>
                             </th>
                             <td class="cl-cell-category" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${row.uncategorized()} ? 'cl-muted' : ''" th:text="${row.categoryLabel()}"></span></td>
@@ -206,9 +203,9 @@
                             </td>
                             <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.cost}">
                                 <span class="cl-cell-stack">
-                                    <span class="cl-cards-hide" th:text="${row.costNet()}"></span>
+                                    <span class="cl-cards-hide"><span class="cl-tooltip is-end cl-cost-mark" th:if="${row.systemCost() != null}" tabindex="0" role="img" th:attr="data-tooltip=${row.systemCost()}, aria-label=${row.systemCost()}"><i class="fas fa-tag" aria-hidden="true"></i></span>[[${row.costNet()}]]</span>
                                     <span class="cl-table-sub cl-cards-hide" th:text="${row.costGross()}"></span>
-                                    <span class="cl-table-pills" th:if="${row.systemCost() != null}"><span class="cl-status is-info" th:title="${row.systemCostTitle()}" th:text="${row.systemCost()}"></span></span>
+                                    <span class="cl-table-sub cl-cards-only cl-cost-note" th:if="${row.systemCost() != null}" th:text="${row.systemCost()}"></span>
                                 </span>
                             </td>
                             <td class="is-secondary-column" th:attr="data-label=#{warehouse.list.column.delivery}">
@@ -216,11 +213,10 @@
                                     <a th:if="${row.deliveryHref() != null}" class="cl-cell-delivery" th:href="@{${row.deliveryHref()}}" th:title="${row.deliveryNumber()}" th:text="${row.deliveryNumber()}"></a>
                                     <span th:if="${row.deliveryHref() == null and row.supplier() != null}" class="cl-cell-supplier" th:text="${row.supplier()}"></span>
                                     <span th:if="${row.deliveryHref() == null and row.supplier() == null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
-                                    <span class="cl-table-sub" th:if="${row.deliveryHref() != null and row.supplier() != null}" th:text="${row.supplier()}"></span>
                                     <span class="cl-table-sub cl-cell-serial" th:if="${row.serialNo() != null}" th:title="${row.serialNo()}" th:text="${row.serialNo()}"></span>
                                 </span>
                             </td>
-                            <td th:attr="data-label=#{warehouse.list.column.status}"><span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span></td>
+                            <td class="cl-cell-status" th:attr="data-label=#{warehouse.list.column.status}"><span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span><span class="cl-status" th:if="${row.conditionLabel() != null}" th:classappend="${row.conditionTone()}" th:text="${row.conditionLabel()}"></span></td>
                         </tr>
                         </tbody>
                     </table>
