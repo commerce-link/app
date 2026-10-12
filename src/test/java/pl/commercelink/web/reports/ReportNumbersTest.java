@@ -13,6 +13,7 @@ class ReportNumbersTest {
         assertThat(ReportNumbers.wholeAmount(-38.6)).isEqualTo("−39");
         assertThat(ReportNumbers.wholeAmount(0)).isEqualTo("0");
         assertThat(ReportNumbers.percent(30.345)).isEqualTo("30,3%");
+        assertThat(ReportNumbers.percent(-5.5)).isEqualTo("−5,5%");
         assertThat(ReportNumbers.axis(15_000)).isEqualTo(new ReportNumbers.Axis("15", "reports.axis.thousands"));
         assertThat(ReportNumbers.axis(1_000_000)).isEqualTo(new ReportNumbers.Axis("1", "reports.axis.millions"));
         assertThat(ReportNumbers.axis(2_500_000)).isEqualTo(new ReportNumbers.Axis("2,5", "reports.axis.millions"));

@@ -24,7 +24,7 @@ public final class ReportNumbers {
     }
 
     public static String percent(double value) {
-        return BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).toPlainString().replace('.', ',') + "%";
+        return BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).toPlainString().replace('.', ',').replace('-', '\u2212') + "%";
     }
 
     public static Axis axis(double value) {
