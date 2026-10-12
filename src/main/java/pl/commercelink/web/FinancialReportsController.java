@@ -32,6 +32,7 @@ import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -116,14 +117,29 @@ public class FinancialReportsController {
     }
 
     @GetMapping(STOCK_LEDGER_PATH)
-    public String stockLedger(Model model, Locale locale) {
+    public String stockLedger(Model model, Locale locale,
+                              @RequestParam(value = "from", required = false) String from,
+                              @RequestParam(value = "to", required = false) String to) {
         ReportPeriod fallback = ReportPeriod.of(null, null, LocalDate.now());
         StockLedgerClosingView closing = StockLedgerClosingView.of(
                 stockLedgerPeriodClosing.closedPeriods(getStoreId()), fallback.from(), fallback.to(), locale);
         // after a held closing the form keeps the range that was held, so it can be closed once settled
         StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
+        model.addAttribute("backHref", backToReport(from, to));
         model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
         return "reports/stock-ledger";
+    }
+
+    /** The report the page was opened from keeps its period; a missing or unreadable one opens the report's default. */
+    private static String backToReport(String from, String to) {
+        if (from == null || to == null) {
+            return REPORTS_PATH;
+        }
+        try {
+            return REPORTS_PATH + "?" + new ReportPeriod(LocalDate.parse(from), LocalDate.parse(to)).query();
+        } catch (DateTimeParseException e) {
+            return REPORTS_PATH;
+        }
     }
 
     /** Without JavaScript "Generate again" opens this page; with it, confirm-dialog.js posts to the same address. */

@@ -7,7 +7,7 @@
     <section class="cl-page" th:fragment="body" th:with="closing=${ledgerClosing}">
         <div class="cl-page-body">
             <header class="cl-page-header">
-                <a class="cl-back" th:href="@{/dashboard/reports}">
+                <a class="cl-back" th:href="@{${backHref ?: '/dashboard/reports'}}">
                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
                     <span th:text="#{reports.title}"></span>
                 </a>
@@ -35,7 +35,7 @@
             <form class="cl-card" method="post" th:action="@{/dashboard/reports/stock-ledger/close}" aria-labelledby="close-title">
                 <div class="cl-card-head">
                     <h2 class="cl-card-title" id="close-title"
-                        th:text="${closing.fromFixed()} ? #{reports.stockLedger.next} : #{reports.stockLedger.first}"></h2>
+                        th:text="${ledgerWarning != null} ? #{reports.stockLedger.held} : (${closing.fromFixed()} ? #{reports.stockLedger.next} : #{reports.stockLedger.first})"></h2>
                 </div>
                 <th:block th:if="${ledgerWarning != null}">
                     <div class="cl-alert is-warn" role="status" tabindex="-1" data-cl-error-summary>

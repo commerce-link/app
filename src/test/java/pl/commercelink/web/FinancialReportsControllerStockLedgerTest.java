@@ -88,6 +88,33 @@ class FinancialReportsControllerStockLedgerTest {
     }
 
     @Test
+    void theBackLinkOfTheClosingPageReturnsToTheReportWithItsPeriod() {
+        // given
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.stockLedger(model, PL, "2026-03-01", "2026-03-31");
+
+        // then
+        assertThat(model.getAttribute("backHref")).isEqualTo("/dashboard/reports?dateFrom=2026-03-01&dateTo=2026-03-31");
+    }
+
+    @Test
+    void theBackLinkFallsBackToTheReportWhenThePeriodIsMissingOrUnreadable() {
+        // given
+        Model withoutParams = new ExtendedModelMap();
+        Model unreadable = new ExtendedModelMap();
+
+        // when
+        controller.stockLedger(withoutParams, PL, null, null);
+        controller.stockLedger(unreadable, PL, "yesterday", "2026-03-31");
+
+        // then
+        assertThat(withoutParams.getAttribute("backHref")).isEqualTo("/dashboard/reports");
+        assertThat(unreadable.getAttribute("backHref")).isEqualTo("/dashboard/reports");
+    }
+
+    @Test
     void closedPeriodIsConfirmedOnTheClosingPage() throws Exception {
         // given
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Closed(MARCH, false, List.of()));

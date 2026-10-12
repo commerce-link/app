@@ -9,7 +9,7 @@
         <h1 class="cl-page-title" th:text="#{reports.title}"></h1>
         <button th:replace="~{fragments/screen-intro :: toggle}"></button>
         <div class="cl-page-actions is-report">
-            <a class="cl-button is-closing" th:href="@{/dashboard/reports/stock-ledger}"
+            <a class="cl-button is-closing" th:href="@{${page.closingHref()}}"
                th:title="${page.closing().lastClosed() != null} ? #{reports.closing.lastClosed(${page.closing().lastClosed()})} : null">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-lock"></i></span>
                 <span th:text="${page.closing().pending()} ? #{reports.closing.pending(${page.closing().month()})} : #{reports.closing.open}"></span>
@@ -114,9 +114,11 @@
                 <div class="cl-compare-mid">
                     <div th:if="${row.share() != null}" class="cl-hbar-track" role="img"
                          th:attr="aria-label=${#messages.msg('reports.channels.shareLabel', #messages.msg(row.labelKey()), row.share().ownText(), row.share().marketplaceText())}">
-                        <span class="cl-hbar-seg is-c1" th:style="'flex:' + ${row.share().own()}" th:title="${row.share().ownText()}"
+                        <span th:if="${row.share().own() > 0}" class="cl-hbar-seg is-c1" th:classappend="${row.share().ownLabelled()} ? 'is-labelled'"
+                              th:style="'flex:' + ${row.share().own()}" th:title="${row.share().ownText()}"
                               th:text="${row.share().ownLabelled()} ? ${row.share().ownText()} : ''"></span>
-                        <span class="cl-hbar-seg is-c2" th:style="'flex:' + ${row.share().marketplace()}" th:title="${row.share().marketplaceText()}"
+                        <span th:if="${row.share().marketplace() > 0}" class="cl-hbar-seg is-c2" th:classappend="${row.share().marketplaceLabelled()} ? 'is-labelled'"
+                              th:style="'flex:' + ${row.share().marketplace()}" th:title="${row.share().marketplaceText()}"
                               th:text="${row.share().marketplaceLabelled()} ? ${row.share().marketplaceText()} : ''"></span>
                     </div>
                 </div>
@@ -128,7 +130,7 @@
 
 <!--/* All three panels are rendered: without JavaScript they stand one under another; report-charts.js keeps one and
        turns the segmented buttons into a switch. */-->
-<section th:fragment="daily(charts)" class="cl-card cl-chart is-full" aria-labelledby="daily-title" data-cl-chart>
+<section th:fragment="daily(charts, empty)" class="cl-card cl-chart is-full" aria-labelledby="daily-title" data-cl-chart>
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="daily-title" th:text="#{${charts[0].metric().titleKey()}}" data-cl-chart-heading></h2>
         <div class="cl-segmented" role="group" th:attr="aria-label=#{reports.chart.switch}" hidden data-cl-chart-switch>
@@ -137,8 +139,8 @@
                     th:text="#{${chart.metric().segmentKey()}}"></button>
         </div>
     </div>
-    <p th:if="${charts[0].empty()}" class="cl-list-empty" th:text="#{reports.empty.orders}"></p>
-    <div th:unless="${charts[0].empty()}" th:each="chart : ${charts}" class="cl-chart-panel"
+    <p th:if="${empty}" class="cl-list-empty" th:text="#{reports.empty.orders}"></p>
+    <div th:unless="${empty}" th:each="chart : ${charts}" class="cl-chart-panel"
          th:attr="data-cl-chart-panel=${chart.metric().key()}">
         <h3 class="cl-chart-panel-title" th:text="#{${chart.metric().titleKey()}}"></h3>
         <ul class="cl-chart-legend">
@@ -157,14 +159,17 @@
                       th:style="'bottom:' + ${tick.bottom()} + '%'"></span>
                 <ol class="cl-chart-cols" th:attr="aria-label=#{${chart.metric().titleKey()}}">
                     <li th:each="col : ${chart.columns()}" class="cl-chart-col" th:classappend="${col.edge()}" tabindex="0"
-                        th:attr="aria-label=#{reports.chart.columnLabel(${col.label()}, ${col.own()}, ${col.marketplace()})}">
+                        th:with="own=${chart.metric().money()} ? #{general.currency.amount(${col.own()})} : ${col.own()},
+                                 marketplace=${chart.metric().money()} ? #{general.currency.amount(${col.marketplace()})} : ${col.marketplace()},
+                                 total=${chart.metric().money()} ? #{general.currency.amount(${col.total()})} : ${col.total()}"
+                        th:attr="aria-label=#{reports.chart.columnLabel(${col.label()}, ${own}, ${marketplace})}">
                         <span class="cl-chart-seg" th:style="'height:' + ${col.ownHeight()} + '%'"></span>
                         <span class="cl-chart-seg is-2" th:style="'height:' + ${col.marketplaceHeight()} + '%'"></span>
                         <span class="cl-chart-tip" role="tooltip">
                             <b th:text="${col.label()}"></b>
-                            <span><th:block th:text="#{reports.channel.own}"></th:block> <strong th:text="${col.own()}"></strong></span>
-                            <span><th:block th:text="#{reports.channel.marketplace}"></th:block> <strong th:text="${col.marketplace()}"></strong></span>
-                            <span><th:block th:text="#{reports.chart.total}"></th:block> <strong th:text="${col.total()}"></strong></span>
+                            <span><th:block th:text="#{reports.channel.own}"></th:block> <strong th:text="${own}"></strong></span>
+                            <span><th:block th:text="#{reports.channel.marketplace}"></th:block> <strong th:text="${marketplace}"></strong></span>
+                            <span><th:block th:text="#{reports.chart.total}"></th:block> <strong th:text="${total}"></strong></span>
                         </span>
                     </li>
                 </ol>
@@ -181,11 +186,14 @@
                         <th scope="col" class="is-numeric" th:text="#{reports.channel.marketplace}"></th>
                         <th scope="col" class="is-numeric" th:text="#{reports.chart.total}"></th>
                     </tr></thead>
-                    <tbody><tr th:each="col : ${chart.columns()}">
+                    <tbody><tr th:each="col : ${chart.columns()}"
+                        th:with="own=${chart.metric().money()} ? #{general.currency.amount(${col.own()})} : ${col.own()},
+                                 marketplace=${chart.metric().money()} ? #{general.currency.amount(${col.marketplace()})} : ${col.marketplace()},
+                                 total=${chart.metric().money()} ? #{general.currency.amount(${col.total()})} : ${col.total()}">
                         <th scope="row" class="cl-table-key" th:text="${col.label()}"></th>
-                        <td class="is-numeric" th:attr="data-label=#{reports.channel.own}" th:text="${col.own()}"></td>
-                        <td class="is-numeric" th:attr="data-label=#{reports.channel.marketplace}" th:text="${col.marketplace()}"></td>
-                        <td class="is-numeric" th:attr="data-label=#{reports.chart.total}" th:text="${col.total()}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{reports.channel.own}" th:text="${own}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{reports.channel.marketplace}" th:text="${marketplace}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{reports.chart.total}" th:text="${total}"></td>
                     </tr></tbody>
                 </table>
             </div>
@@ -218,9 +226,9 @@
             <tfoot><tr>
                 <th scope="row" class="cl-table-key" th:text="#{reports.chart.total}"></th>
                 <td class="is-bar"></td>
-                <td class="is-numeric" th:text="${suppliers.deliveries()}"></td>
-                <td class="is-numeric is-money" th:text="#{general.currency.amount(${suppliers.shipping()})}"></td>
-                <td class="is-numeric is-money" th:text="#{general.currency.amount(${suppliers.payment()})}"></td>
+                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${suppliers.deliveries()}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.shipping}" th:text="#{general.currency.amount(${suppliers.shipping()})}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.payment}" th:text="#{general.currency.amount(${suppliers.payment()})}"></td>
             </tr></tfoot>
         </table>
     </th:block>

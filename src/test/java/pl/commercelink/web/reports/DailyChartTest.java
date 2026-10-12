@@ -37,6 +37,19 @@ class DailyChartTest {
     }
 
     @Test
+    void monthlyColumnsAreLabelledWithTheShortMonthAndTheYear() {
+        // given
+        List<SalesTimeline.Bucket> buckets = List.of(
+                new SalesTimeline.Bucket(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), 100, 0, 10, 0, 1, 0));
+
+        // when
+        DailyChart chart = DailyChart.of(DailyChart.Metric.SALES, buckets, SalesTimeline.Granularity.MONTH, PL);
+
+        // then
+        assertThat(chart.columns().get(0).label()).isEqualTo("wrz 2026");
+    }
+
+    @Test
     void ordersAreCountsAndANegativeProfitHasNoHeight() {
         // given
         List<SalesTimeline.Bucket> buckets = List.of(

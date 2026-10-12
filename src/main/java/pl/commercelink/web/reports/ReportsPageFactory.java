@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class ReportsPageFactory {
 
     private static final String PATH = "/dashboard/reports";
+    private static final String CLOSING_PATH = PATH + "/stock-ledger";
 
     private final FinancialReportGenerator generator;
     private final SupplierLabels supplierLabels;
@@ -43,7 +44,7 @@ public class ReportsPageFactory {
                         .map(preset -> new ReportsPage.PresetLink(preset.messageKey(), href(preset.period(today)),
                                 preset.period(today).equals(period)))
                         .toList(),
-                period.from().toString(), period.to().toString(),
+                period.from().toString(), period.to().toString(), CLOSING_PATH + "?from=" + period.from() + "&to=" + period.to(),
                 files(period),
                 ChannelComparison.of(reports.ownSources(), reports.marketplace()),
                 Arrays.stream(DailyChart.Metric.values())

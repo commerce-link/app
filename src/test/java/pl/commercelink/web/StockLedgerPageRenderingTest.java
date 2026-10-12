@@ -67,11 +67,12 @@ class StockLedgerPageRenderingTest {
                         "reports.stockLedger.closing.missing.sync")));
 
         // when
-        String html = render(closing, warning, "Closing held");
+        String html = render(closing, warning, "Closing March held by deliveries");
 
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html.split("<h1", -1)).hasSize(2);
+        assertThat(html).containsPattern("id=\"close-title\">\\s*Closing held\\s*<").doesNotContain("Next period to close");
         assertThat(html).contains("cl-alert is-warn").contains("/dashboard/deliveries/details?deliveryId=delivery-1")
                 .contains("Close the period again");
     }

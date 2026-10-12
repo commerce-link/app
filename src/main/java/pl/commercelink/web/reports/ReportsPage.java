@@ -4,7 +4,7 @@ import java.util.List;
 
 /** Everything the reports page shows, worked out on the server; the template only prints it. */
 public record ReportsPage(String periodLabel, String rangeText, String previousHref, String previousLabel,
-                          String nextHref, String nextLabel, List<PresetLink> presets, String dateFrom, String dateTo,
+                          String nextHref, String nextLabel, List<PresetLink> presets, String dateFrom, String dateTo, String closingHref,
                           List<FileGroup> files, ChannelComparison channels, List<DailyChart> charts,
                           SupplierCosts suppliers, StockLedgerClosingShortcut closing) {
 

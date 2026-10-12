@@ -11,7 +11,7 @@
             <div th:replace="~{reports/parts :: toolbar(${page})}"></div>
             <div class="cl-chart-grid2">
                 <section th:replace="~{reports/parts :: channels(${page.channels()})}"></section>
-                <section th:replace="~{reports/parts :: daily(${page.charts()})}"></section>
+                <section th:replace="~{reports/parts :: daily(${page.charts()}, ${page.channels().empty()})}"></section>
                 <section th:replace="~{reports/parts :: suppliers(${page.suppliers()})}"></section>
             </div>
         </div>

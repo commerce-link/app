@@ -65,6 +65,12 @@ class ReportPeriodTest {
     }
 
     @Test
+    void aSingleDayIsPrintedOnce() {
+        // then
+        assertThat(new ReportPeriod(LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 5)).rangeText()).isEqualTo("5.09.2026");
+    }
+
+    @Test
     void rangeTextDropsWhatBothEndsShare() {
         // then
         assertThat(new ReportPeriod(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).rangeText()).isEqualTo("1–30.09.2026");

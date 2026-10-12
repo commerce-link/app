@@ -41,7 +41,7 @@ class ReportsRenderingTest {
         return new ReportsPage("wrzesień 2026", "1–30.09.2026",
                 "/dashboard/reports?dateFrom=2026-08-01&dateTo=2026-08-31", "sierpień 2026", null, null,
                 List.of(new ReportsPage.PresetLink("reports.period.preset.previousMonth", "/dashboard/reports?" + period.query(), true)),
-                "2026-09-01", "2026-09-30",
+                "2026-09-01", "2026-09-30", "/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30",
                 List.of(new ReportsPage.FileGroup("reports.files.group.sales", List.of(
                         new ReportsPage.FileLink("reports.files.orders", "reports.files.orders.desc",
                                 ReportFile.ORDERS.href(period))))),
@@ -54,9 +54,13 @@ class ReportsRenderingTest {
     }
 
     private static String render(ReportsPage page) {
-        Context context = new Context(Locale.ENGLISH);
+        return render(page, Locale.ENGLISH);
+    }
+
+    private static String render(ReportsPage page, Locale locale) {
+        Context context = new Context(locale);
         context.setVariable("page", page);
-        return EnglishFragmentTemplateEngine.create().process("<div th:replace=\"~{reports :: body}\"></div>", context);
+        return EnglishFragmentTemplateEngine.create(locale).process("<div th:replace=\"~{reports :: body}\"></div>", context);
     }
 
     @Test
@@ -70,7 +74,7 @@ class ReportsRenderingTest {
         assertThat(html).contains("href=\"/dashboard/reports/ordersExport?dateFrom=2026-09-01&amp;dateTo=2026-09-30\"")
                 .containsPattern("<a[^>]*class=\"cl-menu-item\"[^>]*download");
         assertThat(html).contains("Close September").contains("cl-dot is-warn");
-        assertThat(html).contains("href=\"/dashboard/reports/stock-ledger\"");
+        assertThat(html).contains("href=\"/dashboard/reports/stock-ledger?from=2026-09-01&amp;to=2026-09-30\"");
     }
 
     @Test
@@ -149,5 +153,55 @@ class ReportsRenderingTest {
                         }
                     })).isFalse();
         }
+    }
+
+    @Test
+    void anEmptyChannelHasNoSegmentInTheShareBars() {
+        // given
+        FinancialReport none = new FinancialReport(FROM, TO, 0, 0, 0, 0, Map.of(), 0, 0, 0);
+        FinancialReport marketplace = new FinancialReport(FROM, TO, 324, 554_680.10, 467_641.91, 87_038.44, Map.of(), 0, 0, 0);
+        List<SalesTimeline.Bucket> buckets = List.of(new SalesTimeline.Bucket(FROM, FROM, 0, 2000, 0, 200, 0, 2));
+
+        // when
+        String html = render(page(false, none, marketplace, buckets, SupplierCosts.of(List.of(), mock(SupplierLabelMap.class))));
+
+        // then
+        assertThat(html).contains("cl-hbar-seg is-c2").doesNotContain("cl-hbar-seg is-c1");
+    }
+
+    @Test
+    void moneyInTheChartTooltipLabelAndTableCarriesTheCurrencyAndOrdersDoNot() {
+        // when
+        String html = render(page(true, 141));
+
+        // then
+        assertThat(html).containsPattern("<strong>1[^<]000,00 PLN</strong>");
+        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1[^\"]000,00 PLN, marketplace 2[^\"]000,00 PLN\"");
+        assertThat(html).containsPattern("data-label=\"Store\">1[^<]000,00 PLN<");
+        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1, marketplace 2\"");
+    }
+
+    @Test
+    void aPeriodWithOrdersButZeroNetValueStillDrawsTheChartPanels() {
+        // given
+        FinancialReport own = new FinancialReport(FROM, TO, 3, 0, 0, 0, Map.of(), 0, 0, 0);
+        FinancialReport marketplace = new FinancialReport(FROM, TO, 0, 0, 0, 0, Map.of(), 0, 0, 0);
+        List<SalesTimeline.Bucket> buckets = List.of(new SalesTimeline.Bucket(FROM, FROM, 0, 0, 0, 0, 3, 0));
+
+        // when
+        String html = render(page(false, own, marketplace, buckets, SupplierCosts.of(List.of(), mock(SupplierLabelMap.class))));
+
+        // then
+        assertThat(html).contains("data-cl-chart-panel=\"sales\"").contains("data-cl-chart-panel=\"orders\"");
+        assertThat(html).doesNotContain("No orders in this period.");
+    }
+
+    @Test
+    void thePolishPageResolvesEveryMessage() {
+        // when
+        String html = render(page(true, 141), Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(html).doesNotContain("??").contains("Raporty");
     }
 }

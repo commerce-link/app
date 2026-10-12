@@ -71,9 +71,12 @@ public record ReportPeriod(LocalDate from, LocalDate to) {
         return from.isAfter(day);
     }
 
-    /** "1–30.09.2026", "28.09–5.10.2026", "30.12.2025–2.01.2026": what both ends share is written once. */
+    /** "5.09.2026", "1–30.09.2026", "28.09–5.10.2026", "30.12.2025–2.01.2026": what both ends share is written once. */
     public String rangeText() {
         String end = to.getDayOfMonth() + "." + twoDigits(to.getMonthValue()) + "." + to.getYear();
+        if (from.equals(to)) {
+            return end;
+        }
         if (from.getYear() != to.getYear()) {
             return from.getDayOfMonth() + "." + twoDigits(from.getMonthValue()) + "." + from.getYear() + "–" + end;
         }
