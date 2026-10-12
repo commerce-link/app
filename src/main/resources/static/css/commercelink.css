@@ -12501,3 +12501,12 @@ a.cl-link-button:hover {
 .cl-page .cl-ledger-notice { margin-bottom: 20px; }
 .cl-page .cl-ledger-closed, .cl-page .cl-ledger-how { margin-top: 28px; }
 .cl-page .cl-ledger-fields { display: grid; gap: 12px; }
+/* The closed-periods table has no column labels to repeat on a phone, so the generic stacked row would leave an empty
+   84 px label column: the period and its actions share one line instead. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-ledger-closed .cl-table tbody tr { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .cl-page .cl-ledger-closed .cl-table tbody th,
+    .cl-page .cl-ledger-closed .cl-table tbody td { display: block; }
+    .cl-page .cl-ledger-closed .cl-table tbody :is(th, td)::before { content: none; }
+    .cl-page .cl-ledger-closed .cl-table td.cl-table-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+}
