@@ -68,7 +68,7 @@
                                 <div class="cl-span-3 cl-field">
                                     <label class="cl-label" for="category" th:text="#{warehouse.item.new.category}"></label>
                                     <select class="cl-select" id="category" name="category">
-                                        <option th:if="${p.categoryOutsideCatalog()}" th:value="${f.category}" th:text="${f.category}" selected></option>
+                                        <option th:if="${p.categoryOutsideCatalog() != null}" th:value="${p.categoryOutsideCatalog()}" th:text="${p.categoryOutsideCatalog()}" th:selected="${p.categoryOutsideCatalog() == f.category}"></option>
                                         <optgroup th:each="g : ${p.categoryGroups()}" th:label="${g.catalog()}">
                                             <option th:each="c : ${g.names()}" th:value="${c}" th:text="${c}" th:selected="${c == f.category}"></option>
                                         </optgroup>

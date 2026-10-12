@@ -183,6 +183,23 @@ class WarehouseItemPageFactoryTest {
         WarehouseItemPage page = factory.page(item, null, false, null, Map.of(), null, PL);
 
         // then
-        assertThat(page.categoryOutsideCatalog()).isTrue();
+        assertThat(page.categoryOutsideCatalog()).isEqualTo("Stara kategoria");
+    }
+
+    @Test
+    void categoryOutsideTheCatalogIsTheStoredOneAfterAFailedSave() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Delivered);
+        item.setCategory("Stara kategoria");
+        WarehouseItemEditForm posted = WarehouseItemEditForm.of(item);
+        posted.setCategory("Dyski SSD");
+        posted.setName("");
+
+        // when
+        WarehouseItemPage page = factory.page(item, null, false, posted, Map.of("name", "warehouse.item.error.name"), null, PL);
+
+        // then
+        assertThat(page.categoryOutsideCatalog()).isEqualTo("Stara kategoria");
+        assertThat(page.form().getCategory()).isEqualTo("Dyski SSD");
     }
 }

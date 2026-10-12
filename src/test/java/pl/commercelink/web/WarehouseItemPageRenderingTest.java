@@ -39,7 +39,7 @@ class WarehouseItemPageRenderingTest {
                 new Origin("/dashboard/deliveries/details?deliveryId=d-1", "3F2A9C1E", null,
                         mode == Mode.NEW ? null : "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=d-1&mfn=MZ&from=item&itemId=7c1e5a20-1111",
                         List.of(new Link("S1", "/dashboard/item/history?serialNo=S1"), new Link("S2", "/dashboard/item/history?serialNo=S2"))),
-                form(status), Map.of(), null, List.of(new StoreCategories.Group("Computers", List.of("SSD drives"))), false,
+                form(status), Map.of(), null, List.of(new StoreCategories.Group("Computers", List.of("SSD drives"))), null,
                 List.of(new Choice("Sealed", "Sealed", null, "is-ok"), new Choice("Damaged", "Damaged", null, "is-bad")),
                 mode == Mode.NEW ? List.of(new Choice("New", "New", "Waits", null), new Choice("Allocation", "In allocation", "Pool", null)) : List.of(),
                 mode == Mode.DESTROYED ? new Choice("Damaged", "Damaged", null, "is-bad") : null,
@@ -158,6 +158,41 @@ class WarehouseItemPageRenderingTest {
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("id=\"warehouse-item-errors\"").contains("href=\"#name\"").contains("href=\"#status\"");
         assertThat(html).contains("id=\"name-error\"").contains("aria-invalid=\"true\"").contains("Changed meanwhile");
+    }
+
+    @Test
+    void storedCategoryOutsideTheCatalogStaysAnOptionWhileTheTypedChoiceIsSelected() {
+        // given
+        WarehouseItemPage page = page(Mode.EDIT);
+        WarehouseItemPage outside = new WarehouseItemPage(page.itemId(), page.name(), page.statusLabel(), page.statusTone(), page.ean(), page.mfn(),
+                page.shortId(), page.backHref(), page.backLabel(), page.mode(), page.destroyedTitle(), page.facts(), page.totalNet(), page.origin(),
+                page.form(), Map.of("name", "warehouse.item.error.name"), null,
+                page.categoryGroups(), "Old category", page.conditions(), page.statuses(), page.readonlyCondition(), page.delete());
+
+        // when
+        String html = render(outside);
+
+        // then
+        assertThat(html).contains("<option value=\"Old category\">Old category</option>");
+        assertThat(html).contains("<option value=\"SSD drives\" selected=\"selected\">SSD drives</option>");
+    }
+
+    @Test
+    void storedCategoryOutsideTheCatalogIsSelectedWhileItIsTheChoice() {
+        // given
+        WarehouseItemPage page = page(Mode.EDIT);
+        page.form().setCategory("Old category");
+        WarehouseItemPage outside = new WarehouseItemPage(page.itemId(), page.name(), page.statusLabel(), page.statusTone(), page.ean(), page.mfn(),
+                page.shortId(), page.backHref(), page.backLabel(), page.mode(), page.destroyedTitle(), page.facts(), page.totalNet(), page.origin(),
+                page.form(), Map.of(), null,
+                page.categoryGroups(), "Old category", page.conditions(), page.statuses(), page.readonlyCondition(), page.delete());
+
+        // when
+        String html = render(outside);
+
+        // then
+        assertThat(html).contains("<option value=\"Old category\" selected=\"selected\">Old category</option>");
+        assertThat(html).contains("<option value=\"SSD drives\">SSD drives</option>");
     }
 
     @Test

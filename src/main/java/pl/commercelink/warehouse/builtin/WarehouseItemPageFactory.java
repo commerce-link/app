@@ -46,8 +46,8 @@ class WarehouseItemPageFactory {
             shown.setSerialNo(item.getSerialNo());
         }
         List<StoreCategories.Group> groups = storeCategories.groupsFor(item.getStoreId());
-        boolean outside = StringUtils.isNotBlank(item.getCategory())
-                && groups.stream().noneMatch(g -> g.names().contains(item.getCategory()));
+        String outside = StringUtils.isNotBlank(item.getCategory())
+                && groups.stream().noneMatch(g -> g.names().contains(item.getCategory())) ? item.getCategory() : null;
         return new WarehouseItemPage(item.getItemId(), item.getName(), text(locale, WarehouseStatuses.labelKey(status)),
                 WarehouseStatuses.tone(status), StringUtils.trimToNull(item.getEan()), StringUtils.trimToNull(item.getManufacturerCode()),
                 StringUtils.left(item.getItemId(), 8), itemBack.href(), text(locale, itemBack.labelKey()), mode,
