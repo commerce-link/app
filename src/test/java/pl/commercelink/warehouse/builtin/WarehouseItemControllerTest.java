@@ -263,6 +263,32 @@ class WarehouseItemControllerTest {
     }
 
     @Test
+    void deletingANewItemWithoutBackGoesToTheListOfNewItems() throws Exception {
+        // given
+        when(repository.findById("store-1", ID)).thenReturn(item(FulfilmentStatus.New));
+
+        // when
+        String view = asStore(() -> controller.deleteWarehouseItem(ID, null, PL, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=New");
+    }
+
+    @Test
+    void savingWithoutBackGoesToTheListOfTheStoredStatus() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+
+        // when
+        String view = asStore(() -> controller.saveWarehouseItem(ID, WarehouseItemEditForm.of(stored), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=Delivered");
+    }
+
+    @Test
     void deleteConfirmPageWithoutJavaScript() throws Exception {
         // given
         when(repository.findById("store-1", ID)).thenReturn(item(FulfilmentStatus.New));

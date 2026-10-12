@@ -32,7 +32,7 @@ class ItemBackTest {
         // when / then
         for (String evil : new String[]{"https://evil.example", "//evil.example", "/dashboard/orders",
                 "/dashboard/warehouse/../orders", "/dashboard/warehouse//x", "/dashboard/warehouse/items/abc", " /dashboard/warehouse"}) {
-            assertThat(ItemBack.resolve(evil, FulfilmentStatus.Delivered).href()).as(evil).isEqualTo("/dashboard/warehouse");
+            assertThat(ItemBack.resolve(evil, FulfilmentStatus.Delivered).href()).as(evil).isEqualTo("/dashboard/warehouse?statuses=Delivered");
             assertThat(ItemBack.safe(evil)).as(evil).isNull();
         }
     }
@@ -43,7 +43,10 @@ class ItemBackTest {
         assertThat(ItemBack.resolve(null, FulfilmentStatus.Destroyed))
                 .isEqualTo(new ItemBack("/dashboard/warehouse/items/destroyed", "warehouse.destroyed.title"));
         assertThat(ItemBack.resolve(null, FulfilmentStatus.New))
-                .isEqualTo(new ItemBack("/dashboard/warehouse", "nav.warehouse"));
+                .isEqualTo(new ItemBack("/dashboard/warehouse?statuses=New", "nav.warehouse"));
+        assertThat(ItemBack.resolve(null, FulfilmentStatus.Delivered))
+                .isEqualTo(new ItemBack("/dashboard/warehouse?statuses=Delivered", "nav.warehouse"));
+        assertThat(ItemBack.safe("/dashboard/warehouse?statuses=Delivered")).isEqualTo("/dashboard/warehouse?statuses=Delivered");
     }
 
     @Test

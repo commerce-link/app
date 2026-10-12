@@ -110,6 +110,8 @@ class WarehouseItemPageFactoryTest {
         assertThat(page.origin().documentsHref()).isNull();
         assertThat(page.delete().href()).isEqualTo("/dashboard/warehouse/items/7c1e5a20-1111-2222-3333-444444444444/delete");
         assertThat(page.delete().title()).contains("Samsung 990 PRO 2TB");
+        assertThat(page.backHref()).isEqualTo("/dashboard/warehouse?statuses=New");
+        assertThat(page.backLabel()).isEqualTo("Magazyn");
     }
 
     @Test

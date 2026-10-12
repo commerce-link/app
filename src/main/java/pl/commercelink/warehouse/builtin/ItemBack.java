@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 /**
  * Where the item page leads back to: the warehouse list or the destroyed archive exactly as the operator left it
  * (filters, page, sort), carried in "back". The address comes from the request, so only those two lists are accepted;
- * anything else falls back to the list the item belongs on.
+ * anything else falls back to the list of the item's status.
  */
 record ItemBack(String href, String labelKey) {
 
@@ -22,9 +22,10 @@ record ItemBack(String href, String labelKey) {
         if (safe != null) {
             return new ItemBack(safe, safe.startsWith(ARCHIVE) ? "warehouse.destroyed.title" : "nav.warehouse");
         }
+        // without a list to return to, the item goes back to the list of its status, as before the redesign
         return status == FulfilmentStatus.Destroyed
                 ? new ItemBack(ARCHIVE, "warehouse.destroyed.title")
-                : new ItemBack(LIST, "nav.warehouse");
+                : new ItemBack(LIST + "?statuses=" + status.name(), "nav.warehouse");
     }
 
     static String safe(String back) {
