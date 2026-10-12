@@ -39,6 +39,8 @@ public class WarehouseItemEditForm {
     private String deliveryId;
     private String status;
     private String back;
+    // the optimistic-lock version the page was rendered with; null for a page from before the redesign
+    private String version;
 
     public static WarehouseItemEditForm of(WarehouseItem item) {
         WarehouseItemEditForm form = new WarehouseItemEditForm();
@@ -55,6 +57,7 @@ public class WarehouseItemEditForm {
         form.manufacturerCode = item.getManufacturerCode();
         form.deliveryId = item.getDeliveryId();
         form.status = item.getStatus().name();
+        form.version = item.getVersion() == null ? null : String.valueOf(item.getVersion());
         return form;
     }
 

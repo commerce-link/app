@@ -169,6 +169,43 @@ class WarehouseItemControllerTest {
     }
 
     @Test
+    void stalePageVersionAnswers409AndSavesNothing() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setVersion(5L);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setVersion("4");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, response, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).isEqualTo("warehouse-item");
+        assertThat(response.getStatus()).isEqualTo(409);
+        verify(updates, never()).update(any(), any(), any());
+        verify(pages).page(any(), any(), anyBoolean(), same(form), eq(Map.of()), argThat(m -> m.contains("zmieniono")), eq(PL));
+    }
+
+    @Test
+    void matchingVersionSaves() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setVersion(5L);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setVersion("5");
+
+        // when
+        String view = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).startsWith("redirect:");
+        verify(updates).update(any(), any(), any());
+    }
+
+    @Test
     void deletingAnItemOutsideNewIsRefused() throws Exception {
         // given
         when(repository.findById("store-1", ID)).thenReturn(item(FulfilmentStatus.Delivered));

@@ -35,6 +35,17 @@ class WarehouseItemEditFormTest {
     }
 
     @Test
+    void ofCopiesTheOptimisticLockVersion() {
+        // given
+        WarehouseItem versioned = item(FulfilmentStatus.Delivered);
+        versioned.setVersion(5L);
+
+        // when / then
+        assertThat(WarehouseItemEditForm.of(versioned).getVersion()).isEqualTo("5");
+        assertThat(WarehouseItemEditForm.of(item(FulfilmentStatus.Delivered)).getVersion()).isNull();
+    }
+
+    @Test
     void destroyedItemAcceptsOnlyTheComment() {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Destroyed);

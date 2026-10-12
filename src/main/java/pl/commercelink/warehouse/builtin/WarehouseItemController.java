@@ -185,6 +185,10 @@ class WarehouseItemController {
     String saveWarehouseItem(@PathVariable("itemId") String itemId, @ModelAttribute("form") WarehouseItemEditForm form, Model model,
                              Locale locale, HttpServletResponse response, RedirectAttributes redirectAttributes) {
         WarehouseItem stored = found(itemId);
+        // a page left open while someone else saved must not overwrite their change
+        if (form.getVersion() != null && !form.getVersion().equals(String.valueOf(stored.getVersion()))) {
+            return conflict(itemId, form, model, locale, response);
+        }
         Map<String, String> errors = form.validate(stored.getStatus());
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -195,10 +199,7 @@ class WarehouseItemController {
         try {
             holder = warehouseItemUpdateService.update(getStoreId(), stored, form.toUpdate(stored));
         } catch (ConditionalCheckFailedException e) {
-            response.setStatus(HttpStatus.CONFLICT.value());
-            model.addAttribute("page", warehouseItemPageFactory.page(found(itemId), form.getBack(), isAdmin(), form, Map.of(),
-                    text(locale, "warehouse.item.error.conflict"), locale));
-            return "warehouse-item";
+            return conflict(itemId, form, model, locale, response);
         }
         if (!holder.equals(itemId)) {
             SettingsFlash.onRedirect(redirectAttributes, text(locale, "warehouse.item.saved.merged", stored.getName()));
@@ -206,6 +207,16 @@ class WarehouseItemController {
         }
         SettingsFlash.onRedirect(redirectAttributes, text(locale, "warehouse.item.saved", stored.getName()));
         return "redirect:" + ItemBack.resolve(form.getBack(), stored.getStatus()).href();
+    }
+
+    private String conflict(String itemId, WarehouseItemEditForm form, Model model, Locale locale, HttpServletResponse response) {
+        response.setStatus(HttpStatus.CONFLICT.value());
+        // the page shows the typed values over the newer stored item, whose version the operator now sees
+        WarehouseItem current = found(itemId);
+        form.setVersion(current.getVersion() == null ? null : String.valueOf(current.getVersion()));
+        model.addAttribute("page", warehouseItemPageFactory.page(current, form.getBack(), isAdmin(), form, Map.of(),
+                text(locale, "warehouse.item.error.conflict"), locale));
+        return "warehouse-item";
     }
 
     /** Without JavaScript the delete button opens this page; with it, confirm-dialog.js posts to the same address. */
