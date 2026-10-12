@@ -10,6 +10,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.builtin.DestroyedListQuery.Period;
 import pl.commercelink.warehouse.builtin.WarehousePageModel.*;
 import pl.commercelink.web.orders.Money;
@@ -21,6 +22,7 @@ import java.text.Collator;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -42,13 +44,14 @@ class DestroyedListService {
 
     DestroyedPageModel page(String storeId, boolean admin, DestroyedListQuery query, LocalDate today, Locale locale) {
         List<WarehouseItem> all = repository.findAll(storeId, FulfilmentStatus.Destroyed);
-        List<WarehouseItem> forCategories = all.stream()
+        List<WarehouseItem> base = all.stream()
                 .filter(i -> query.includes(i.getDestroyedAt(), today))
                 .filter(i -> WarehouseListService.matchesSearch(i, query.q())).toList();
+        Predicate<WarehouseItem> inCategories = i -> query.categories().isEmpty()
+                || query.categories().contains(WarehouseRowMapper.categoryValue(i.getCategory()));
+        Predicate<WarehouseItem> inConditions = i -> query.includesCondition(i.getCondition());
         Collator collator = Collator.getInstance(locale);
-        List<WarehouseItem> shown = forCategories.stream()
-                .filter(i -> query.categories().isEmpty() || query.categories().contains(WarehouseRowMapper.categoryValue(i.getCategory())))
-                .sorted(comparator(query, collator)).toList();
+        List<WarehouseItem> shown = base.stream().filter(inCategories).filter(inConditions).sorted(comparator(query, collator)).toList();
 
         Pagination pagination = Pagination.of(query.page(), shown.size(), DestroyedListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
@@ -60,7 +63,8 @@ class DestroyedListService {
         List<Chip> chips = chips(query, locale);
         return new DestroyedPageModel(query, tiles(query, all, today, locale), dateSummary(query, locale),
                 query.from() == null ? null : query.from().toString(), query.to() == null ? null : query.to().toString(),
-                categoryOptions(query, forCategories, collator, locale), categorySummary(query, locale), chips,
+                categoryOptions(query, base.stream().filter(inConditions).toList(), collator, locale), categorySummary(query, locale),
+                conditionOptions(query, base.stream().filter(inCategories).toList(), locale), conditionSummary(query, locale), chips,
                 text(locale, "warehouse.list.results.count", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum()),
                 sortHeaders(query), rows, pagination,
                 rows.isEmpty() ? emptyState(query, all.isEmpty(), locale) : null, all.isEmpty(), chips.size());
@@ -107,6 +111,23 @@ class DestroyedListService {
         return options;
     }
 
+    /** Every condition, counted on the items the other filters leave, so a menu never empties itself. */
+    private List<Option> conditionOptions(DestroyedListQuery query, List<WarehouseItem> base, Locale locale) {
+        return Arrays.stream(ItemCondition.values()).map(c -> new Option(c.name(), conditionLabel(c, locale),
+                base.stream().filter(i -> (i.getCondition() == null ? ItemCondition.Sealed : i.getCondition()) == c).count(),
+                query.conditions().contains(c), query.toggleCondition(c).href())).toList();
+    }
+
+    private String conditionSummary(DestroyedListQuery query, Locale locale) {
+        if (query.conditions().isEmpty()) return text(locale, "warehouse.list.menu.all");
+        return query.conditions().size() == 1 ? conditionLabel(query.conditions().get(0), locale)
+                : text(locale, "warehouse.list.menu.selected", query.conditions().size());
+    }
+
+    private String conditionLabel(ItemCondition c, Locale locale) {
+        return text(locale, "ItemCondition." + c.name());
+    }
+
     private String categorySummary(DestroyedListQuery query, Locale locale) {
         if (query.categories().isEmpty()) return text(locale, "warehouse.list.menu.all");
         return query.categories().size() == 1 ? categoryLabel(query.categories().get(0), locale)
@@ -128,6 +149,8 @@ class DestroyedListService {
         }
         query.categories().forEach(c -> chip(chips, text(locale, "warehouse.list.chip.category", categoryLabel(c, locale)),
                 query.withoutCategory(c).href(), locale));
+        query.conditions().forEach(c -> chip(chips, text(locale, "warehouse.destroyed.chip.condition", conditionLabel(c, locale)),
+                query.withoutCondition(c).href(), locale));
         if (query.q() != null) {
             chip(chips, text(locale, "warehouse.list.chip.search", query.q()), query.withQ(null).href(), locale);
         }

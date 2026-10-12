@@ -292,4 +292,17 @@ class WarehouseItemPageRenderingTest {
         String commentLabel = html.substring(html.indexOf("for=\"comment\""), html.indexOf("<textarea"));
         assertThat(commentLabel).doesNotContain("cl-visually-hidden").contains("cl-optional");
     }
+
+    @Test
+    void documentsLinkUsesTheNameTheDeliveryDetailsUse() {
+        // when
+        String edit = render(page(Mode.EDIT));
+        String destroyed = render(page(Mode.DESTROYED));
+
+        // then
+        // one name for the delivery-mfn-history page across the dashboard: "Item document history" on the delivery details
+        assertThat(edit).contains(">Item document history ›</a>");
+        assertThat(destroyed).contains("<span>Item document history</span>").contains("are in the item document history.");
+        assertThat(edit + destroyed).doesNotContain(">Document history");
+    }
 }

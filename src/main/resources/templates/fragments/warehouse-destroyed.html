@@ -12,6 +12,7 @@
         <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
     </th:block>
     <th:block th:if="${skip != 'categories'}"><input type="hidden" name="categories" th:each="c : ${q.categories()}" th:value="${c}"/></th:block>
+    <th:block th:if="${skip != 'conditions'}"><input type="hidden" name="conditions" th:each="c : ${q.conditions()}" th:value="${c.name()}"/></th:block>
     <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
     <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
     <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>

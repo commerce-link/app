@@ -11,7 +11,8 @@ import java.util.Map;
  */
 public record DestroyedPageModel(DestroyedListQuery query, List<WarehousePageModel.Tile> tiles, String dateSummary,
                                  String fromValue, String toValue, List<WarehousePageModel.Option> categoryOptions,
-                                 String categorySummary, List<WarehousePageModel.Chip> chips, String results,
+                                 String categorySummary, List<WarehousePageModel.Option> conditionOptions, String conditionSummary,
+                                 List<WarehousePageModel.Chip> chips, String results,
                                  Map<DestroyedListQuery.Sort, WarehousePageModel.SortHeader> sortHeaders, List<Row> rows,
                                  Pagination pagination, WarehousePageModel.EmptyState emptyState, boolean storeEmpty,
                                  int activeFilterCount) {

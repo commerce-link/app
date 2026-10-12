@@ -76,6 +76,19 @@
                                 </div>
                             </form>
                         </details>
+                        <details class="cl-filter-menu" data-cl-filter-menu="conditions">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.destroyed.menu.condition}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.conditionSummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/warehouse/items/destroyed}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/warehouse-destroyed :: hidden('conditions')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('conditions', null, ${page.conditionOptions()})}"></th:block>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
                         <a th:if="${q.isFiltered()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
                            th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>

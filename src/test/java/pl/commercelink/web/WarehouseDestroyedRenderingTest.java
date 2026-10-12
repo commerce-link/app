@@ -43,6 +43,8 @@ class WarehouseDestroyedRenderingTest {
                         new Tile("All", "12 954,00", "PLN", "17 pcs · net", "/dashboard/warehouse/items/destroyed?period=all", false)),
                 "Last 12 months", null, null,
                 List.of(new Option("SSD", "SSD", 1, false, "/dashboard/warehouse/items/destroyed?categories=SSD")), "All",
+                List.of(new Option("Sealed", "Sealed", 1, false, "#"), new Option("OpenBox", "Open box", 0, false, "#"),
+                        new Option("Damaged", "Damaged", 1, true, "#")), "Damaged",
                 List.of(new Chip("Destroyed: Last 12 months", "/dashboard/warehouse/items/destroyed?period=all", "Remove filter")),
                 "Products: 2, Units: 2 · Net value: 1 378,00 PLN", headers, rows, Pagination.of(1, 2, 50, n -> "?page=" + n),
                 emptyState, storeEmpty, 1);
@@ -119,5 +121,30 @@ class WarehouseDestroyedRenderingTest {
         // when / then
         assertThat(Files.exists(Path.of("src/main/resources/templates/destroyedWarehouseItems.html"))).isFalse();
         assertThat(Files.exists(Path.of("src/main/resources/templates/fragments/warehouseItemsListFragment.html"))).isFalse();
+    }
+
+    @Test
+    void conditionMenuOffersEveryCondition() {
+        // given
+        DestroyedPageModel page = pageWithRows();
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("data-cl-filter-menu=\"conditions\"").contains(">Condition</span>")
+                .contains("name=\"conditions\" value=\"Damaged\" checked=\"checked\"").contains("name=\"conditions\" value=\"Sealed\"");
+        assertThat(html).contains("<span class=\"cl-filter-menu-value\">Damaged</span>");
+    }
+
+    @Test
+    void rowMenuAndSearchUseShortClearTexts() {
+        // when
+        String html = render(pageWithRows());
+
+        // then
+        assertThat(html).contains("<span>Item document history</span>");
+        // a placeholder as short as the warehouse list's, so it is not cut off in the search field
+        assertThat(html).contains("placeholder=\"Name, EAN, code, serial no.\"");
     }
 }

@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import pl.commercelink.warehouse.api.ItemCondition;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -119,5 +120,45 @@ class DestroyedListQueryTest {
         assertThat(query.toggleSort(DestroyedListQuery.Sort.NAME).effectiveDir()).isEqualTo(WarehouseListQuery.Direction.ASC);
         assertThat(query.toggleSort(DestroyedListQuery.Sort.NAME).toggleSort(DestroyedListQuery.Sort.DATE).effectiveDir())
                 .isEqualTo(WarehouseListQuery.Direction.DESC);
+    }
+
+    @Test
+    void conditionsComeFromTheAddressInTheirOwnOrderAndUnknownOnesAreIgnored() {
+        // when
+        DestroyedListQuery query = DestroyedListQuery.parse(params("conditions", "Damaged", "conditions", "Broken", "conditions", "OpenBox",
+                "conditions", "Damaged", "categories", "SSD"));
+
+        // then
+        assertThat(query.conditions()).containsExactly(ItemCondition.OpenBox, ItemCondition.Damaged);
+        assertThat(query.isFiltered()).isTrue();
+        assertThat(query.href()).isEqualTo("/dashboard/warehouse/items/destroyed?categories=SSD&conditions=OpenBox&conditions=Damaged");
+    }
+
+    @Test
+    void conditionsAreToggledRemovedClearedAndKeptByOtherChanges() {
+        // given
+        DestroyedListQuery query = DestroyedListQuery.parse(params("conditions", "Damaged", "page", "3"));
+
+        // when / then
+        assertThat(query.toggleCondition(ItemCondition.Sealed).conditions()).containsExactly(ItemCondition.Sealed, ItemCondition.Damaged);
+        assertThat(query.toggleCondition(ItemCondition.Damaged).conditions()).isEmpty();
+        assertThat(query.withoutCondition(ItemCondition.Damaged).href()).isEqualTo("/dashboard/warehouse/items/destroyed");
+        assertThat(query.toggleCondition(ItemCondition.Sealed).page()).isEqualTo(1);
+        assertThat(query.withPeriod(DestroyedListQuery.Period.MONTH).conditions()).containsExactly(ItemCondition.Damaged);
+        assertThat(query.withQ("x").conditions()).containsExactly(ItemCondition.Damaged);
+        assertThat(query.toggleSort(DestroyedListQuery.Sort.NAME).conditions()).containsExactly(ItemCondition.Damaged);
+        assertThat(query.cleared().conditions()).isEmpty();
+    }
+
+    @Test
+    void anItemWithoutAConditionCountsAsSealed() {
+        // given
+        DestroyedListQuery sealed = DestroyedListQuery.parse(params("conditions", "Sealed"));
+
+        // when / then
+        assertThat(sealed.includesCondition(null)).isTrue();
+        assertThat(sealed.includesCondition(ItemCondition.Sealed)).isTrue();
+        assertThat(sealed.includesCondition(ItemCondition.Damaged)).isFalse();
+        assertThat(DestroyedListQuery.parse(params()).includesCondition(ItemCondition.Damaged)).isTrue();
     }
 }

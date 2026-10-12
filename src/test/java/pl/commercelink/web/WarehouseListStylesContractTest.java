@@ -263,4 +263,14 @@ class WarehouseListStylesContractTest {
         assertThat(css).contains(".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-hint,\n"
                 + ".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-value-of {\n    color: var(--cl-ink-2);\n}");
     }
+
+    @Test
+    void searchFieldEndsAPlaceholderThatDoesNotFitWithAnEllipsis() throws Exception {
+        // given
+        String css = css();
+
+        // when / then
+        // on a phone the field shares its row with "Szukaj" and "Filtry": a hard cut ("Nazwa, EAN, l") read as a defect
+        assertThat(css).contains(".cl-page .cl-search-field .cl-table-search {\n    width: 100%;\n    padding-left: 36px;\n    padding-right: 40px;\n    text-overflow: ellipsis;\n}");
+    }
 }

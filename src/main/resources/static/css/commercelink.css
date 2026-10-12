@@ -5584,10 +5584,12 @@ a.cl-link-button:hover {
     }
 }
 
+/* on a phone the field shares its row with "Szukaj" and "Filtry": a placeholder that does not fit ends with "…", not mid-word */
 .cl-page .cl-search-field .cl-table-search {
     width: 100%;
     padding-left: 36px;
     padding-right: 40px;
+    text-overflow: ellipsis;
 }
 
 .cl-page .cl-search-field .cl-table-search::-webkit-search-cancel-button {

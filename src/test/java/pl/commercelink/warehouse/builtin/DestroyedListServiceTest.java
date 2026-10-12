@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import pl.commercelink.warehouse.api.ItemCondition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -227,5 +228,47 @@ class DestroyedListServiceTest {
         assertThat(page().rows()).hasSize(50);
         assertThat(page("page", "2").rows()).hasSize(1);
         assertThat(page().pagination().nextHref()).isEqualTo("/dashboard/warehouse/items/destroyed?page=2");
+    }
+
+    @Test
+    void conditionFilterNarrowsTheListAndCountsWithTheOtherFilters() {
+        // given
+        destroyed("A", "SSD", TODAY, 10, 1).setCondition(ItemCondition.Sealed);
+        destroyed("B", "SSD", TODAY, 10, 1).setCondition(ItemCondition.Damaged);
+        destroyed("C", "RAM", TODAY, 10, 1).setCondition(ItemCondition.Damaged);
+        destroyed("D", "SSD", TODAY, 10, 1).setCondition(null);
+        destroyed("E", "SSD", TODAY, 10, 1).setCondition(ItemCondition.OpenBox);
+
+        // when
+        DestroyedPageModel page = page("categories", "SSD", "conditions", "Damaged");
+
+        // then
+        assertThat(page.rows()).extracting(r -> r.item().name()).containsExactly("B");
+        // counts of the condition menu follow the category filter, not the condition filter itself
+        assertThat(page.conditionOptions()).extracting(WarehousePageModel.Option::label).containsExactly("Fabrycznie nowy", "Otwarte opakowanie", "Uszkodzony");
+        assertThat(page.conditionOptions()).extracting(WarehousePageModel.Option::count).containsExactly(2L, 1L, 1L);
+        assertThat(page.conditionOptions()).extracting(WarehousePageModel.Option::selected).containsExactly(false, false, true);
+        // and the category menu follows the condition filter
+        assertThat(page.categoryOptions()).extracting(WarehousePageModel.Option::count).containsExactly(1L, 1L);
+        assertThat(page.conditionSummary()).isEqualTo("Uszkodzony");
+        assertThat(page.chips()).extracting(WarehousePageModel.Chip::label).contains("Stan: Uszkodzony");
+        assertThat(page.chips()).filteredOn(c -> c.label().equals("Stan: Uszkodzony")).extracting(WarehousePageModel.Chip::clearHref)
+                .containsExactly("/dashboard/warehouse/items/destroyed?categories=SSD");
+    }
+
+    @Test
+    void sealedTakesItemsWithoutAConditionAndTilesIgnoreTheConditionFilter() {
+        // given
+        destroyed("A", "SSD", TODAY, 10, 1).setCondition(null);
+        destroyed("B", "SSD", TODAY, 20, 1).setCondition(ItemCondition.Damaged);
+
+        // when
+        DestroyedPageModel page = page("conditions", "Sealed");
+
+        // then
+        assertThat(page.rows()).extracting(r -> r.item().name()).containsExactly("A");
+        assertThat(page.tiles().get(3).value()).isEqualTo("30,00");
+        assertThat(page(("conditions"), "Sealed", "conditions", "OpenBox").conditionSummary()).isEqualTo("wybrane: 2");
+        assertThat(page().conditionSummary()).isEqualTo("wszystkie");
     }
 }
