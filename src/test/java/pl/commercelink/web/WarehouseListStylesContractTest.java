@@ -252,4 +252,15 @@ class WarehouseListStylesContractTest {
                 .contains(".cl-page .cl-table.is-warehouse.is-destroyed td.cl-table-actions { padding-left: 8px; }")
                 .doesNotContain(".cl-col-menu { width: 3.5rem; }");
     }
+
+    @Test
+    void activeTileUnitIsReadableOnTheAccentFill() throws Exception {
+        // given
+        String css = css();
+
+        // when / then
+        // the destroyed archive's loss tiles put "PLN" in an active tile: --cl-ink-3 there is 4.04:1, like the hint was
+        assertThat(css).contains(".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-hint,\n"
+                + ".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-value-of {\n    color: var(--cl-ink-2);\n}");
+    }
 }
