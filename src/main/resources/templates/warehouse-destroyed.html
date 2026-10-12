@@ -1,0 +1,209 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{/dashboard/warehouse}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{nav.warehouse}"></span>
+            </a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{warehouse.destroyed.title}"></h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+            </div>
+            <p class="cl-page-lead" th:text="#{warehouse.destroyed.lead}"></p>
+        </header>
+
+        <div th:replace="~{fragments/screen-intro :: panel('warehouse-destroyed', 'fas fa-archive')}"></div>
+
+        <div data-cl-list-results data-cl-list-path="/dashboard/warehouse/items/destroyed"
+             data-cl-list-fragment="/dashboard/warehouse/items/destroyed/list"
+             th:fragment="results" th:with="q=${page.query()}">
+
+            <ul class="cl-stat-grid is-orders is-warehouse" th:attr="aria-label=#{warehouse.destroyed.tiles.label}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value"><span class="cl-nowrap" th:text="${tile.value()}"></span> <span class="cl-stat-value-of" th:text="${tile.unit()}"></span></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
+                    </a>
+                </li>
+            </ul>
+
+            <section class="cl-card" aria-labelledby="destroyed-table-title">
+                <h2 class="cl-visually-hidden" id="destroyed-table-title" th:text="#{warehouse.destroyed.caption}"></h2>
+
+                <div class="cl-table-toolbar" th:unless="${page.storeEmpty()}">
+                    <div class="cl-toolbar-filters" id="destroyed-filters">
+                        <details class="cl-filter-menu" data-cl-filter-menu="dates">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.destroyed.menu.dates}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.dateSummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/warehouse/items/destroyed}" class="cl-filter-menu-panel" data-cl-list-form>
+                                <th:block th:replace="~{fragments/warehouse-destroyed :: hidden('dates')}"></th:block>
+                                <div class="cl-filter-menu-dates">
+                                    <label><span th:text="#{warehouse.documents.list.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.fromValue()}"/></label>
+                                    <label><span th:text="#{warehouse.documents.list.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.toValue()}"/></label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" th:text="#{warehouse.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <details class="cl-filter-menu" data-cl-filter-menu="categories">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{warehouse.list.category.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.categorySummary()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/warehouse/items/destroyed}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/warehouse-destroyed :: hidden('categories')}"></th:block>
+                                <div class="cl-filter-menu-scroll">
+                                    <th:block th:replace="~{fragments/deliveries-list :: checks('categories', null, ${page.categoryOptions()})}"></th:block>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{warehouse.list.menu.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <a th:if="${q.isFiltered()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                    </div>
+                    <div class="cl-toolbar-search">
+                        <form method="get" th:action="@{/dashboard/warehouse/items/destroyed}" class="cl-search-form" role="search" data-cl-list-form>
+                            <th:block th:replace="~{fragments/warehouse-destroyed :: hidden('search')}"></th:block>
+                            <label class="cl-visually-hidden" for="destroyed-search" th:text="#{warehouse.destroyed.search.label}"></label>
+                            <div class="cl-search-field">
+                                <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <input class="cl-input cl-table-search" type="search" id="destroyed-search" name="q" autocomplete="off"
+                                       th:value="${q.q()}" th:attr="placeholder=#{warehouse.destroyed.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                                <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                   th:attr="aria-label=#{warehouse.list.search.clear}" data-cl-list-nav>
+                                    <i class="fas fa-times" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                            <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                            </button>
+                        </form>
+                        <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="destroyed-filters" aria-expanded="true">
+                            <i class="fas fa-sliders-h" aria-hidden="true"></i><span class="cl-toolbar-toggle-label"><span th:text="#{warehouse.list.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}" th:text="|: ${page.activeFilterCount()}|"></th:block></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cl-list-meta is-warehouse" th:unless="${page.storeEmpty()}">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status" th:text="${page.results()}"></p>
+                </div>
+
+                <th:block th:unless="${page.rows().isEmpty()}">
+                    <nav class="cl-table-sortbar is-wrap" th:attr="aria-label=#{warehouse.list.sort.label}">
+                        <span class="cl-eyebrow" th:text="#{warehouse.list.sort.label}"></span>
+                        <a class="cl-tab" th:each="s : ${T(pl.commercelink.warehouse.builtin.DestroyedListQuery.Sort).values()}"
+                           th:with="h=${page.sortHeaders().get(s)}" th:href="@{${h.href()}}"
+                           th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
+                            <span th:text="#{|warehouse.destroyed.sort.${s.param()}|}"></span>
+                            <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                        </a>
+                    </nav>
+
+                    <table class="cl-table is-warehouse is-destroyed">
+                        <caption class="cl-visually-hidden" th:text="#{warehouse.destroyed.caption}"></caption>
+                        <colgroup>
+                            <col><col class="cl-col-category"><col class="cl-col-qty"><col class="cl-col-cost">
+                            <col class="cl-col-delivery is-secondary-column"><col class="cl-col-date"><col class="cl-col-menu">
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th scope="col" th:replace="~{fragments/warehouse-destroyed :: sortHead('NAME', 'warehouse.list.column.product', '')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-destroyed :: sortHead('CATEGORY', 'warehouse.list.column.category', '')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-destroyed :: sortHead('QTY', 'warehouse.list.column.qty', 'is-numeric')}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-destroyed :: sortHead('COST', 'warehouse.list.column.cost', 'is-numeric')}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{warehouse.list.column.delivery}"></th>
+                            <th scope="col" th:replace="~{fragments/warehouse-destroyed :: sortHead('DATE', 'warehouse.destroyed.column.date', '')}"></th>
+                            <th scope="col" class="cl-table-actions"><span class="cl-visually-hidden" th:text="#{warehouse.destroyed.column.actions}"></span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row, it : ${page.rows()}" th:with="item=${row.item()}">
+                            <th scope="row" class="cl-table-key" th:attr="data-label=#{warehouse.list.column.product}">
+                                <a th:href="@{${item.href()}}" th:text="${item.name()}"></a>
+                                <span class="cl-table-sub" th:if="${!item.codes().isEmpty()}"><th:block th:each="code, c : ${item.codes()}"><span class="cl-table-code" th:title="${code}" th:text="${c.last} ? ${code} : #{warehouse.row.code.beforeNext(${code})}"></span> </th:block></span>
+                                <span class="cl-table-pills" th:if="${item.conditionLabel() != null}"><span class="cl-status" th:classappend="${item.conditionTone()}" th:text="${item.conditionLabel()}"></span></span>
+                                <span class="cl-table-sub cl-table-note" th:if="${item.comment() != null}" th:title="${item.comment()}" th:text="${item.comment()}"></span>
+                            </th>
+                            <td class="cl-cell-category" th:attr="data-label=#{warehouse.list.column.category}"><span th:classappend="${item.uncategorized()} ? 'cl-muted' : ''" th:text="${item.categoryLabel()}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.qty}">
+                                <span class="cl-cards-hide" th:text="${item.qty()}"></span>
+                                <span class="cl-cards-only cl-card-figures" th:text="#{warehouse.row.card.figures(${item.qty()}, ${item.costNet()})}"></span>
+                            </td>
+                            <td class="is-numeric" th:attr="data-label=#{warehouse.list.column.cost}">
+                                <span class="cl-cell-stack">
+                                    <span class="cl-cards-hide"><span class="cl-tooltip is-end cl-cost-mark" th:if="${item.systemCost() != null}" tabindex="0" role="img" th:attr="data-tooltip=${item.systemCost()}, aria-label=${item.systemCost()}"><i class="fas fa-tag" aria-hidden="true"></i></span>[[${item.costNet()}]]</span>
+                                    <span class="cl-table-sub cl-cards-hide" th:text="${item.costGross()}"></span>
+                                    <span class="cl-table-sub cl-cards-only cl-cost-note" th:if="${item.systemCost() != null}" th:text="${item.systemCost()}"></span>
+                                </span>
+                            </td>
+                            <td class="is-secondary-column" th:attr="data-label=#{warehouse.list.column.delivery}">
+                                <span class="cl-cell-stack">
+                                    <a th:if="${item.deliveryHref() != null}" class="cl-cell-delivery" th:href="@{${item.deliveryHref()}}" th:title="${item.deliveryNumber()}" th:text="${item.deliveryNumber()}"></a>
+                                    <span th:if="${item.deliveryHref() == null and item.supplier() != null}" class="cl-cell-supplier" th:text="${item.supplier()}"></span>
+                                    <span th:if="${item.deliveryHref() == null and item.supplier() == null}" class="cl-muted" th:text="#{warehouse.row.delivery.none}"></span>
+                                    <span class="cl-table-sub cl-cell-serial" th:if="${item.serialNo() != null}" th:title="${item.serialNo()}" th:text="${item.serialNo()}"></span>
+                                </span>
+                            </td>
+                            <td class="cl-cell-date" th:attr="data-label=#{warehouse.destroyed.column.date}"><span th:text="${row.destroyedOn()}"></span></td>
+                            <td class="cl-table-actions">
+                                <details class="cl-menu">
+                                    <summary class="cl-button is-icon" th:attr="aria-label=${row.menuLabel()}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+                                    <ul class="cl-menu-list" th:id="|destroyed-menu-${it.index}|">
+                                        <li th:if="${row.documentsHref() != null}">
+                                            <a class="cl-menu-item" th:href="@{${row.documentsHref()}}"><span th:text="#{warehouse.item.documents}"></span><span class="cl-menu-desc" th:text="#{warehouse.destroyed.row.documents.desc}"></span></a>
+                                        </li>
+                                        <li th:if="${row.documentsHref() == null}">
+                                            <button type="button" class="cl-menu-item" aria-disabled="true"><span th:text="#{warehouse.item.documents}"></span><span class="cl-menu-reason" th:text="#{warehouse.destroyed.row.documents.none}"></span></button>
+                                        </li>
+                                        <li th:if="${row.historyHref() != null}">
+                                            <a class="cl-menu-item" th:href="@{${row.historyHref()}}" th:text="#{warehouse.item.origin.history}"></a>
+                                        </li>
+                                    </ul>
+                                </details>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </th:block>
+
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}" th:text="${es.actionLabel()}" data-cl-list-nav></a>
+                </div>
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
+        </div>
+
+    </div>
+</section>
+
+<script th:src="@{/js/list-page.js}" defer></script>
+<script th:src="@{/js/menu.js}" defer></script>
+</div>
+</body>
+</html>

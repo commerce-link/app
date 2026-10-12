@@ -227,4 +227,17 @@ class WarehouseListStylesContractTest {
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }");
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }");
     }
+
+    @Test
+    void destroyedArchiveCardKeepsTheRowMenuInTheCornerInsteadOfTheCheckbox() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // the archive table has no checkbox: the phone card drops its left gutter and pins the ⋯ menu top right
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed .cl-col-date { width: 8rem; }");
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody tr { padding: 12px 76px 12px 16px; position: relative; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody :is(th.cl-table-key, td:not(.cl-table-actions)) { display: contents; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody td.cl-table-actions { display: block; position: absolute; top: 8px; right: 8px; padding: 0; }");
+    }
 }
