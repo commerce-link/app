@@ -95,7 +95,7 @@
                         <th scope="col"><span class="cl-visually-hidden" th:text="#{reports.stockLedger.actions}"></span></th></tr></thead>
                     <tbody><tr th:each="closed : ${closing.closedPeriods()}">
                         <th scope="row" class="cl-table-key"><span th:text="${closed.label()}"></span>
-                            <span class="cl-table-sub" th:text="${closed.rangeText()}"></span></th>
+                            <span class="cl-table-sub" th:unless="${closed.rangeText() == closed.label()}" th:text="${closed.rangeText()}"></span></th>
                         <td class="cl-table-actions">
                             <a class="cl-link-button" th:href="@{/dashboard/reports/stock-ledger/closed(dateFrom=${closed.from()},dateTo=${closed.to()})}"
                                th:attr="aria-label=#{reports.stockLedger.download.label(${closed.label()})}">

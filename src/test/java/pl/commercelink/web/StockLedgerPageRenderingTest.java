@@ -75,4 +75,21 @@ class StockLedgerPageRenderingTest {
         assertThat(html).contains("cl-alert is-warn").contains("/dashboard/deliveries/details?deliveryId=delivery-1")
                 .contains("Close the period again");
     }
+
+    @Test
+    void theRangeUnderAClosedPeriodIsPrintedOnlyWhenItDiffersFromTheLabel() {
+        // given
+        StockLedgerPeriod firstHalf = new StockLedgerPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
+        StockLedgerClosingView closing = StockLedgerClosingView.of(List.of(AUGUST, firstHalf), FROM, TO, Locale.ENGLISH);
+        String halfLabel = closing.closedPeriods().get(1).label();
+        String augustLabel = closing.closedPeriods().get(0).label();
+
+        // when
+        String html = render(closing, null, null);
+
+        // then
+        assertThat(closing.closedPeriods().get(1).rangeText()).isEqualTo(halfLabel);
+        assertThat(closing.closedPeriods().get(0).rangeText()).isNotEqualTo(augustLabel);
+        assertThat(html.split("cl-table-sub", -1)).hasSize(2);
+    }
 }
