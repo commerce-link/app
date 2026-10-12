@@ -26,13 +26,13 @@
 
     <form method="post" th:action="@{/register}" novalidate>
         <div th:replace="~{fragments/settings-form :: textFieldWith('email', 'registration.email.label', ${email}, 'email',
-                'email', true, ${fieldErrors['email']}, null, null, null, ${autofocus == 'email'})}"></div>
+                'email', true, ${fieldErrors?.get('email')}, null, null, null, ${autofocus == 'email'})}"></div>
         <th:block th:unless="${demoMode}">
             <div th:replace="~{fragments/settings-form :: textFieldWith('storeName', 'registration.store-name.label', ${storeName},
-                    'text', 'organization', true, ${fieldErrors['storeName']}, #{registration.store-name.help}, null, null,
+                    'text', 'organization', true, ${fieldErrors?.get('storeName')}, #{registration.store-name.help}, null, null,
                     ${autofocus == 'storeName'})}"></div>
         </th:block>
-        <div class="cl-field" th:with="termsError=${fieldErrors['termsConsent']}">
+        <div class="cl-field" th:with="termsError=${fieldErrors?.get('termsConsent')}">
             <label class="cl-check is-wrap">
                 <input type="checkbox" id="termsConsent" name="termsConsent" required th:checked="${termsConsent}"
                        th:autofocus="${autofocus == 'termsConsent'}"

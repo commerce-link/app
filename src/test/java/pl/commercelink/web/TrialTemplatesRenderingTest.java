@@ -162,9 +162,9 @@ class TrialTemplatesRenderingTest {
         String html = engine.process("register", registration(false));
 
         // then
-        assertThat(html).contains("You get a 14-day trial.");
-        assertThat(html).contains("14 days later the data of the store is deleted for good.");
-        assertThat(html).contains("Start your 14-day trial");
+        assertThat(html).contains("14 days free");
+        assertThat(html).contains("stays open for browsing only for 14 days, then we delete the store data.");
+        assertThat(html).contains("Start 14 days free");
         assertThat(html).doesNotContain("This is a demo instance");
     }
 
@@ -176,7 +176,7 @@ class TrialTemplatesRenderingTest {
         // then
         assertThat(html).contains("This is a demo instance");
         assertThat(html).contains(">Create account<");
-        assertThat(html).doesNotContain("14-day trial");
+        assertThat(html).doesNotContain("14 days free");
     }
 
     @Test
@@ -185,8 +185,8 @@ class TrialTemplatesRenderingTest {
         String html = engine.process("register-password", registration(false));
 
         // then
-        assertThat(html).contains("Set a password to start your trial.");
-        assertThat(html).contains("Set password and create account");
+        assertThat(html).contains("Set a password to start your 14-day trial.");
+        assertThat(html).contains("Create account");
         assertThat(html).doesNotContain("go straight to the panel");
     }
 
