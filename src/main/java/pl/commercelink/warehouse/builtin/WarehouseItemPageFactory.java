@@ -81,7 +81,7 @@ class WarehouseItemPageFactory {
     private Origin origin(WarehouseItem item, boolean admin, Mode mode, Locale locale) {
         SupplierLabelMap labels = supplierLabels.forStoreId(item.getStoreId());
         WarehouseItemRow row = new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
-                id -> labels.has(id) || suppliers.exists(id), admin).map(item);
+                id -> labels.has(id) || suppliers.exists(id), admin, null).map(item);
         String documents = mode != Mode.NEW && row.hasDelivery() && StringUtils.isNotBlank(item.getManufacturerCode())
                 ? "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + encode(item.getDeliveryId())
                   + "&mfn=" + encode(item.getManufacturerCode()) + "&from=item&itemId=" + encode(item.getItemId())

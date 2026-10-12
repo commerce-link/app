@@ -46,6 +46,9 @@ class WarehouseDocumentsController {
     private StoresRepository storesRepository;
 
     @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
     private MessageSource messageSource;
 
     @Autowired
@@ -144,6 +147,7 @@ class WarehouseDocumentsController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn,
                               @RequestParam(required = false) String from, @RequestParam(required = false) String documentId,
+                              @RequestParam(required = false) String itemId,
                               Locale locale, Model model) {
         String storeId = getStoreId();
         String backHref = DeliveryLinks.of(false, storeId, deliveryId).details();
@@ -155,6 +159,14 @@ class WarehouseDocumentsController {
             if (source != null) {
                 backHref = DocumentRowMapper.detailsHref("/dashboard", documentId);
                 backLabel = source.getDocumentNo();
+            }
+        }
+        // back to the item only when it is one of this store's items (the parameter comes from the address)
+        if ("item".equals(from) && itemId != null) {
+            WarehouseItem item = warehouseRepository.findById(storeId, itemId);
+            if (item != null) {
+                backHref = "/dashboard/warehouse/items/" + itemId;
+                backLabel = item.getName();
             }
         }
         model.addAttribute("page", ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),

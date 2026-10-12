@@ -53,6 +53,8 @@ class WarehouseDocumentsControllerTest {
     private WarehouseDocumentItemRepository warehouseDocumentItemRepository;
     @Mock
     private WarehouseDocumentMfnHistoryService historyService;
+    @Mock
+    private WarehouseRepository warehouseRepository;
     @Spy
     private MessageSource messageSource = TestMessages.polish();
     @InjectMocks
@@ -218,6 +220,43 @@ class WarehouseDocumentsControllerTest {
         // when
         var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
                 .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "document").param("documentId", "foreign"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del-1");
+    }
+
+    @Test
+    void itemHistoryOpenedFromAnItemLeadsBackToIt() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
+        item.setItemId("w-1");
+        when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-1"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/warehouse/items/w-1");
+        assertThat(page.backLabel()).isEqualTo("Samsung 990");
+    }
+
+    @Test
+    void itemHistoryFromAForeignItemFallsBackToTheDelivery() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        when(warehouseRepository.findById("s1", "w-x")).thenReturn(null);
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-x"))
                 .andReturn();
 
         // then

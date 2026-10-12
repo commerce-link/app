@@ -59,7 +59,7 @@ class WarehouseListService {
         List<WarehouseItem> pageItems = shown.subList(pagination.fromIndex(), pagination.toIndex());
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
         WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
-                id -> labels.has(id) || suppliers.exists(id), admin);
+                id -> labels.has(id) || suppliers.exists(id), admin, query.href());
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);
