@@ -22,8 +22,8 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
+import pl.commercelink.web.reports.ReportsPageFactory;
 import pl.commercelink.web.reports.StockLedgerClosingBlocker;
-import pl.commercelink.web.reports.StockLedgerClosingView;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
 import java.io.IOException;
@@ -31,7 +31,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Controller
@@ -60,7 +59,7 @@ public class FinancialReportsController {
     private PaymentsExport paymentsExport;
 
     @Autowired
-    private FinancialReportGenerator financialReportGenerator;
+    private ReportsPageFactory reportsPageFactory;
 
     @Autowired
     private SupplierLabels supplierLabels;
@@ -73,32 +72,9 @@ public class FinancialReportsController {
 
     @GetMapping(REPORTS_PATH)
     public String reports(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-                                  Model model, Locale locale) {
-        if (dateFrom == null || dateTo == null) {
-            LocalDate now = LocalDate.now();
-            dateFrom = now.minusMonths(1).withDayOfMonth(1);
-            dateTo = dateFrom.withDayOfMonth(dateFrom.lengthOfMonth());
-        }
-
-        FinancialReports reports = financialReportGenerator.generate(getStoreId(), dateFrom, dateTo);
-
-        Map<String, Integer> salesVolumeByProvider = reports.ownSources().getSalesVolumeByProvider();
-        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-        List<String> providerNames = salesVolumeByProvider.keySet().stream().map(labels::of).toList();
-        List<Integer> providerSales = new ArrayList<>(salesVolumeByProvider.values());
-
-        model.addAttribute("reportOwn", reports.ownSources());
-        model.addAttribute("reportMarketplace", reports.marketplace());
-        model.addAttribute("providerNames", providerNames);
-        model.addAttribute("providerSales", providerSales);
-        model.addAttribute("dateFrom", dateFrom);
-        model.addAttribute("dateTo", dateTo);
-        // after a held closing the range picker keeps the range that was held, so it can be closed once settled
-        StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
-        StockLedgerClosingView closing = StockLedgerClosingView.of(stockLedgerPeriodClosing.closedPeriods(getStoreId()), dateFrom, dateTo);
-        model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
-
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                          Model model, Locale locale) {
+        model.addAttribute("page", reportsPageFactory.create(getStoreId(), dateFrom, dateTo, LocalDate.now(), locale));
         return "reports";
     }
 
