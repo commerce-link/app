@@ -193,10 +193,10 @@ class WarehouseItemController {
                              Locale locale, HttpServletResponse response, RedirectAttributes redirectAttributes) {
         WarehouseItem stored = found(itemId);
         // a page left open while someone else saved must not overwrite their change
-        if (form.getVersion() != null && !form.getVersion().equals(String.valueOf(stored.getVersion()))) {
+        if (form.getVersion() != null && !form.getVersion().equals(WarehouseItemEditForm.versionOf(stored))) {
             return conflict(itemId, form, model, locale, response);
         }
-        Map<String, String> errors = form.validate(stored.getStatus());
+        Map<String, String> errors = form.validate(stored.getStatus(), stored.getComment());
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
             model.addAttribute("page", warehouseItemPageFactory.page(stored, form.getBack(), isAdmin(), form, errors, null, locale));

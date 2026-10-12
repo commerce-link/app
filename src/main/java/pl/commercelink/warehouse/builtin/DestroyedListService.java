@@ -61,7 +61,7 @@ class DestroyedListService {
         return new DestroyedPageModel(query, tiles(query, all, today, locale), dateSummary(query, locale),
                 query.from() == null ? null : query.from().toString(), query.to() == null ? null : query.to().toString(),
                 categoryOptions(query, forCategories, collator, locale), categorySummary(query, locale), chips,
-                text(locale, "warehouse.destroyed.results", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum(), net(shown)),
+                text(locale, "warehouse.list.results.count", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum()),
                 sortHeaders(query), rows, pagination,
                 rows.isEmpty() ? emptyState(query, all.isEmpty(), locale) : null, all.isEmpty(), chips.size());
     }
@@ -70,14 +70,18 @@ class DestroyedListService {
         return TILES.stream().map(p -> {
             DestroyedListQuery periodQuery = query.cleared().withPeriod(p);
             List<WarehouseItem> counted = all.stream().filter(i -> periodQuery.includes(i.getDestroyedAt(), today)).toList();
+            boolean active = query.period() == p && !query.hasCustomRange();
+            // an active tile clicked again switches its period off, as the status tiles of the warehouse list
+            String href = (active ? query.withPeriod(Period.ALL) : query.withPeriod(p)).href();
             return new Tile(text(locale, "warehouse.destroyed.period." + key(p)), net(counted), text(locale, "warehouse.tile.value.unit"),
-                    text(locale, "warehouse.destroyed.tile.hint", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
-                    query.withPeriod(p).href(), query.period() == p && !query.hasCustomRange());
+                    text(locale, "warehouse.destroyed.tile.hint", counted.stream().mapToInt(WarehouseItem::getQty).sum(), gross(counted)),
+                    href, active);
         }).toList();
     }
 
     private DestroyedPageModel.Row row(WarehouseItem item, WarehouseItemRow row, Locale locale) {
-        String documents = row.hasDelivery() && StringUtils.isNotBlank(item.getManufacturerCode())
+        // an item added by hand or bought from a supplier without a delivery still has its documents under that id
+        String documents = StringUtils.isNotBlank(item.getDeliveryId()) && StringUtils.isNotBlank(item.getManufacturerCode())
                 ? "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + encode(item.getDeliveryId())
                   + "&mfn=" + encode(item.getManufacturerCode()) + "&from=item&itemId=" + encode(item.getItemId())
                 : null;
@@ -172,6 +176,10 @@ class DestroyedListService {
 
     private static String net(List<WarehouseItem> items) {
         return Money.format(items.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum());
+    }
+
+    private static String gross(List<WarehouseItem> items) {
+        return Money.format(items.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum());
     }
 
     private static String key(Period p) {

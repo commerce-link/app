@@ -8,6 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
@@ -36,6 +38,7 @@ class WarehouseItemPageFactoryTest {
     @Mock private SupplierLabelMap labelMap;
     @Mock private SupplierRegistry suppliers;
     @Mock private DeliveryRedirectResolver redirects;
+    @Mock private DeliveriesRepository deliveries;
 
     private WarehouseItemPageFactory factory;
 
@@ -45,7 +48,7 @@ class WarehouseItemPageFactoryTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
-        factory = new WarehouseItemPageFactory(messages, storeCategories, supplierLabels, suppliers, redirects);
+        factory = new WarehouseItemPageFactory(messages, storeCategories, supplierLabels, suppliers, redirects, deliveries);
         when(supplierLabels.forStoreId("store-1")).thenReturn(labelMap);
         when(storeCategories.groupsFor("store-1")).thenReturn(List.of(new StoreCategories.Group("Komputery", List.of("Dyski SSD"))));
         when(redirects.pointsToDelivery(any())).thenReturn(true);
@@ -160,7 +163,7 @@ class WarehouseItemPageFactoryTest {
     }
 
     @Test
-    void itemAddedByHandHasNoDocumentsLink() {
+    void itemAddedByHandLinksItsDocumentsButNoDelivery() {
         // given
         WarehouseItem item = item(FulfilmentStatus.Delivered);
         item.setDeliveryId("Unknown");
@@ -169,8 +172,88 @@ class WarehouseItemPageFactoryTest {
         WarehouseItemPage page = factory.page(item, null, false, null, Map.of(), null, PL);
 
         // then
-        assertThat(page.origin().documentsHref()).isNull();
+        assertThat(page.origin().documentsHref()).isEqualTo(
+                "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=Unknown&mfn=MZ-V9P2T0BW&from=item&itemId=7c1e5a20-1111-2222-3333-444444444444");
         assertThat(page.origin().deliveryHref()).isNull();
+    }
+
+    @Test
+    void itemFromASupplierWithoutADeliveryLinksItsDocuments() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Destroyed);
+        item.setDeliveryId("Acme");
+        when(labelMap.has("Acme")).thenReturn(true);
+        when(labelMap.of("Acme")).thenReturn("Acme");
+
+        // when
+        WarehouseItemPage page = factory.page(item, null, false, null, Map.of(), null, PL);
+
+        // then
+        assertThat(page.origin().documentsHref()).startsWith("/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=Acme&mfn=MZ-V9P2T0BW");
+        assertThat(page.origin().deliveryHref()).isNull();
+    }
+
+    @Test
+    void itemWithoutDeliveryIdHasNoDocumentsLink() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Delivered);
+        item.setDeliveryId(null);
+
+        // when / then
+        assertThat(factory.page(item, null, false, null, Map.of(), null, PL).origin().documentsHref()).isNull();
+    }
+
+    @Test
+    void originNamesTheSupplierOfTheDeliveryNextToItsNumber() {
+        // given
+        Delivery delivery = new Delivery();
+        delivery.setProvider("Action");
+        when(deliveries.findById("store-1", "3f2a9c1e-0000")).thenReturn(delivery);
+        when(labelMap.of("Action")).thenReturn("Action S.A.");
+
+        // when
+        WarehouseItemPage page = factory.page(item(FulfilmentStatus.Delivered), null, false, null, Map.of(), null, PL);
+
+        // then
+        assertThat(page.origin().deliveryHref()).isNotNull();
+        assertThat(page.origin().supplier()).isEqualTo("Action S.A.");
+    }
+
+    @Test
+    void uncategorizedIsTheEmptyChoiceNotACategoryOutsideTheCatalog() {
+        // given
+        when(storeCategories.groupsFor("store-1")).thenReturn(List.of(new StoreCategories.Group("Komputery", List.of("Uncategorized", "Dyski SSD"))));
+        WarehouseItem item = item(FulfilmentStatus.Delivered);
+        item.setCategory("Uncategorized");
+
+        // when
+        WarehouseItemPage page = factory.page(item, null, false, null, Map.of(), null, PL);
+
+        // then
+        assertThat(page.categoryOutsideCatalog()).isNull();
+        assertThat(page.categoryGroups()).flatExtracting(StoreCategories.Group::names).containsExactly("Dyski SSD");
+        assertThat(page.form().getCategory()).isEmpty();
+    }
+
+    @Test
+    void destroyedItemWithoutCategorySaysSo() {
+        // given
+        WarehouseItem item = item(FulfilmentStatus.Destroyed);
+        item.setCategory("");
+
+        // when / then
+        assertThat(factory.page(item, null, false, null, Map.of(), null, PL).form().getCategory()).isEqualTo("Bez kategorii");
+    }
+
+    @Test
+    void deliveryLinkForTheDocumentsHistoryIsTheOneTheItemPageShows() {
+        // given
+        WarehouseItem byHand = item(FulfilmentStatus.Destroyed);
+        byHand.setDeliveryId("Unknown");
+
+        // when / then
+        assertThat(factory.deliveryHref(item(FulfilmentStatus.Destroyed), false, PL)).isEqualTo("/dashboard/deliveries/details?deliveryId=3f2a9c1e-0000");
+        assertThat(factory.deliveryHref(byHand, false, PL)).isNull();
     }
 
     @Test

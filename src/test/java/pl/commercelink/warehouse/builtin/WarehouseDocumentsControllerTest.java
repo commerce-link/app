@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,8 @@ class WarehouseDocumentsControllerTest {
     private WarehouseDocumentMfnHistoryService historyService;
     @Mock
     private WarehouseRepository warehouseRepository;
+    @Mock
+    private WarehouseItemPageFactory itemPages;
     @Spy
     private MessageSource messageSource = TestMessages.polish();
     @InjectMocks
@@ -245,6 +248,47 @@ class WarehouseDocumentsControllerTest {
         var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
         assertThat(page.backHref()).isEqualTo("/dashboard/warehouse/items/w-1");
         assertThat(page.backLabel()).isEqualTo("Samsung 990");
+    }
+
+    @Test
+    void itemHistoryOpenedFromAnItemWithoutADeliveryLinksNoDelivery() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "Acme", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        WarehouseItem item = new WarehouseItem("s1", "Acme", "SSD", "Kabel", "880", "MZ-1", 1.0, 1);
+        item.setItemId("w-2");
+        when(warehouseRepository.findById("s1", "w-2")).thenReturn(item);
+        when(itemPages.deliveryHref(eq(item), anyBoolean(), any())).thenReturn(null);
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "Acme").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-2"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.backHref()).isEqualTo("/dashboard/warehouse/items/w-2");
+        assertThat(page.deliveryHref()).isNull();
+    }
+
+    @Test
+    void itemHistoryOpenedFromAnItemWithADeliveryLinksIt() throws Exception {
+        // given
+        securityContext.when(CustomSecurityContext::getStoreId).thenReturn("s1");
+        when(historyService.history("s1", "del-1", "MZ-1")).thenReturn(new MfnHistory(null, List.of()));
+        WarehouseItem item = new WarehouseItem("s1", "del-1", "SSD", "Samsung 990", "880", "MZ-1", 1.0, 1);
+        item.setItemId("w-1");
+        when(warehouseRepository.findById("s1", "w-1")).thenReturn(item);
+        when(itemPages.deliveryHref(eq(item), anyBoolean(), any())).thenReturn("/dashboard/deliveries/details?deliveryId=del-1");
+
+        // when
+        var result = mockMvc.perform(get("/dashboard/warehouse-documents/delivery-mfn-history")
+                .param("deliveryId", "del-1").param("mfn", "MZ-1").param("from", "item").param("itemId", "w-1"))
+                .andReturn();
+
+        // then
+        var page = (pl.commercelink.web.warehousedocuments.ItemHistoryPage) result.getModelAndView().getModel().get("page");
+        assertThat(page.deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del-1");
     }
 
     @Test

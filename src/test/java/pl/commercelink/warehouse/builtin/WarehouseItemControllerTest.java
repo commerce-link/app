@@ -83,13 +83,15 @@ class WarehouseItemControllerTest {
     }
 
     @Test
-    void savingADestroyedItemStoresOnlyTheCommentAndGoesBackToTheArchive() throws Exception {
+    void savingADestroyedItemStoresOnlyTheNameAndCommentAndGoesBackToTheArchive() throws Exception {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Destroyed);
         when(repository.findById("store-1", ID)).thenReturn(stored);
         WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
         form.setComment("Flooded");
-        form.setName("Forged");
+        form.setName("Samsung 990 (damaged)");
+        form.setStatus("New");
+        form.setQty("99");
         RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
         // when
@@ -97,8 +99,8 @@ class WarehouseItemControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/warehouse/items/destroyed");
-        verify(updates).update(eq("store-1"), same(stored), argThat(u -> "Flooded".equals(u.getComment()) && "Samsung 990".equals(u.getName())));
-        assertThat(ra.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Zapisano pozycję Samsung 990.");
+        verify(updates).update(eq("store-1"), same(stored), argThat(u -> "Flooded".equals(u.getComment()) && "Samsung 990 (damaged)".equals(u.getName())
+                && u.getStatus() == FulfilmentStatus.Destroyed && u.getQty() == 3));
     }
 
     @Test
@@ -269,6 +271,55 @@ class WarehouseItemControllerTest {
         // then
         assertThat(view).startsWith("redirect:");
         verify(updates).update(any(), any(), any());
+    }
+
+    @Test
+    void pageOfAnItemStoredWithoutVersionSaves() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+
+        // when
+        String view = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).startsWith("redirect:");
+        verify(updates).update(any(), any(), any());
+    }
+
+    @Test
+    void pageOfAnItemStoredWithoutVersionIsRefusedOnceSomeoneElseSavedIt() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        stored.setVersion(1L);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, response, new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(409);
+        verify(updates, never()).update(any(), any(), any());
+    }
+
+    @Test
+    void storedCommentOverTheLimitDoesNotBlockSavingOtherFields() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setComment("A; B; ".repeat(400));
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setSerialNo("S9");
+
+        // when
+        String view = asStore(() -> controller.saveWarehouseItem(ID, form, new ExtendedModelMap(), PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        assertThat(view).startsWith("redirect:");
+        verify(updates).update(any(), any(), argThat(u -> "S9".equals(u.getSerialNo())));
     }
 
     @Test

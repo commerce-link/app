@@ -15,7 +15,7 @@
             <p class="cl-record-meta">
                 <span th:if="${p.productName() != null}"><strong th:text="${p.productName()}"></strong></span>
                 <span th:text="#{warehouse.documents.history.mfn(${p.mfn()})}"></span>
-                <span><span th:text="#{warehouse.documents.history.delivery}"></span> <a th:href="@{${p.deliveryHref()}}" th:text="${p.deliveryShortId()}"></a></span>
+                <span><span th:text="#{warehouse.documents.history.delivery}"></span> <a th:if="${p.deliveryHref() != null}" th:href="@{${p.deliveryHref()}}" th:text="${p.deliveryShortId()}"></a><span th:unless="${p.deliveryHref() != null}" th:text="${p.deliveryShortId()}"></span></span>
             </p>
         </header>
 

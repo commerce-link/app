@@ -49,6 +49,9 @@ class WarehouseDocumentsController {
     private WarehouseRepository warehouseRepository;
 
     @Autowired
+    private WarehouseItemPageFactory warehouseItemPageFactory;
+
+    @Autowired
     private MessageSource messageSource;
 
     @Autowired
@@ -162,15 +165,16 @@ class WarehouseDocumentsController {
             }
         }
         // back to the item only when it is one of this store's items (the parameter comes from the address)
-        if ("item".equals(from) && itemId != null) {
-            WarehouseItem item = warehouseRepository.findById(storeId, itemId);
-            if (item != null) {
-                backHref = "/dashboard/warehouse/items/" + itemId;
-                backLabel = item.getName();
-            }
+        WarehouseItem item = "item".equals(from) && itemId != null ? warehouseRepository.findById(storeId, itemId) : null;
+        if (item != null) {
+            backHref = "/dashboard/warehouse/items/" + itemId;
+            backLabel = item.getName();
         }
-        model.addAttribute("page", ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
-                deliveryId, mfn, backHref, backLabel, messageSource, locale));
+        ItemHistoryPage page = ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
+                deliveryId, mfn, backHref, backLabel, messageSource, locale);
+        // an item added by hand or bought without a delivery keeps its documents under its supplier or "Unknown": no delivery to open
+        model.addAttribute("page", item == null ? page
+                : page.withDeliveryHref(warehouseItemPageFactory.deliveryHref(item, CustomSecurityContext.hasRole("ADMIN"), locale)));
         return "warehouse-document-mfn-history";
     }
 

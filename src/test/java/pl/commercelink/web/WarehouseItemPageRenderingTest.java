@@ -82,13 +82,15 @@ class WarehouseItemPageRenderingTest {
     }
 
     @Test
-    void destroyedItemOffersOnlyTheComment() {
+    void destroyedItemOffersOnlyTheNameAndComment() {
         // when
         String html = render(page(Mode.DESTROYED));
 
         // then
-        assertThat(html).contains("cl-card is-status").contains("Destroyed on 06.10.2026");
-        assertThat(html).contains("name=\"comment\"").doesNotContain("name=\"name\"").doesNotContain("name=\"condition\"")
+        assertThat(html).contains("cl-card is-status").contains("Destroyed on 06.10.2026").contains("you can change its name and comment");
+        assertThat(html).contains(">Name and comment</h2>");
+        assertThat(html).contains("name=\"comment\"").contains("name=\"name\"").doesNotContain("name=\"condition\"")
+                .doesNotContain("name=\"category\"").doesNotContain("name=\"unitSystemCost\"")
                 .doesNotContain("name=\"serialNo\"").doesNotContain("data-cl-confirm");
         assertThat(html).contains("cl-status is-bad");
     }
@@ -200,5 +202,94 @@ class WarehouseItemPageRenderingTest {
         // when / then
         assertThat(Files.exists(Path.of("src/main/resources/templates/warehouseItem.html"))).isFalse();
         assertThat(Files.exists(Path.of("src/main/resources/templates/warehouse-item.html"))).isTrue();
+    }
+
+    private static WarehouseItemPage with(WarehouseItemPage p, Origin origin, Map<String, String> errors) {
+        return new WarehouseItemPage(p.itemId(), p.name(), p.statusLabel(), p.statusTone(), p.ean(), p.mfn(), p.shortId(), p.backHref(),
+                p.backLabel(), p.mode(), p.destroyedTitle(), p.facts(), p.totalNet(), origin, p.form(), errors, p.errorMessage(),
+                p.categoryGroups(), p.categoryOutsideCatalog(), p.conditions(), p.statuses(), p.readonlyCondition(), p.delete());
+    }
+
+    @Test
+    void itemWithoutCategoryHasTheEmptyChoiceSelected() {
+        // given
+        WarehouseItemPage page = page(Mode.EDIT);
+        page.form().setCategory("");
+
+        // when
+        String html = render(page);
+
+        // then
+        String select = html.substring(html.indexOf("<select class=\"cl-select\" id=\"category\""));
+        select = select.substring(0, select.indexOf("</select>"));
+        assertThat(select).contains("<option value=\"\" selected=\"selected\">No category</option>");
+        assertThat(select).doesNotContain("value=\"SSD drives\" selected");
+    }
+
+    @Test
+    void itemWithACategoryKeepsItSelectedNextToTheEmptyChoice() {
+        // when
+        String html = render(page(Mode.EDIT));
+
+        // then
+        assertThat(html).contains("<option value=\"\">No category</option>").contains("<option value=\"SSD drives\" selected=\"selected\">SSD drives</option>");
+    }
+
+    @Test
+    void deliveryNumberIsFollowedByItsSupplier() {
+        // given
+        WarehouseItemPage page = with(page(Mode.EDIT), new Origin("/dashboard/deliveries/details?deliveryId=d-1", "3F2A9C1E", "Action S.A.", null, List.of()), Map.of());
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).containsPattern("<a href=\"/dashboard/deliveries/details\\?deliveryId=d-1\">3F2A9C1E</a>\\s*<span[^>]*>· Action S.A.</span>");
+    }
+
+    @Test
+    void commentErrorIsTiedToTheField() {
+        // given
+        WarehouseItemPage page = with(page(Mode.EDIT), page(Mode.EDIT).origin(), Map.of("comment", "warehouse.item.error.comment"));
+
+        // when
+        String html = render(page);
+
+        // then
+        String textarea = html.substring(html.indexOf("<textarea"), html.indexOf("</textarea>"));
+        assertThat(textarea).contains("aria-invalid=\"true\"").contains("aria-describedby=\"comment-error\"");
+        assertThat(html).contains("class=\"cl-field-error\" id=\"comment-error\"");
+    }
+
+    @Test
+    void statusErrorIsTiedToTheChoiceGroup() {
+        // given
+        WarehouseItemPage page = with(page(Mode.NEW), page(Mode.NEW).origin(), Map.of("status", "warehouse.item.error.status"));
+
+        // when
+        String html = render(page);
+
+        // then
+        assertThat(html).contains("<fieldset class=\"cl-choice-group\" id=\"status\" aria-describedby=\"status-error\" aria-invalid=\"true\">");
+        assertThat(html).contains("class=\"cl-field-error\" id=\"status-error\"");
+    }
+
+    @Test
+    void fieldsWithoutErrorsCarryNoErrorAttributes() {
+        // when
+        String html = render(page(Mode.NEW));
+
+        // then
+        assertThat(html).doesNotContain("aria-describedby=\"comment-error\"").doesNotContain("status-error");
+    }
+
+    @Test
+    void destroyedCommentHasAVisibleOptionalLabel() {
+        // when
+        String html = render(page(Mode.DESTROYED));
+
+        // then
+        String commentLabel = html.substring(html.indexOf("for=\"comment\""), html.indexOf("<textarea"));
+        assertThat(commentLabel).doesNotContain("cl-visually-hidden").contains("cl-optional");
     }
 }

@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
 
 import java.util.Arrays;
@@ -14,7 +15,8 @@ import java.util.regex.Pattern;
 
 /**
  * The item page's form, every field as typed. The server decides which fields it takes from the status the item has in
- * the store, never from the form (spec §4.3): a destroyed item is an archive record and takes only the comment; a New
+ * the store, never from the form (spec §4.3): a destroyed item is an archive record and takes only its name and comment
+ * (the client asked for the name, 2026-10-12); a New
  * item has no document yet, so everything stays correctable; any other item keeps its quantity, cost and status, which
  * only documents change.
  */
@@ -23,6 +25,8 @@ import java.util.regex.Pattern;
 public class WarehouseItemEditForm {
 
     static final int MAX_COMMENT = 2000;
+    // DynamoDB versions start at 1: "0" is the page of an item stored without a version, still checked on save
+    static final String NO_VERSION = "0";
     private static final Pattern PLAIN_DECIMAL = Pattern.compile("\\d+(\\.\\d+)?");
 
     private String name;
@@ -39,13 +43,15 @@ public class WarehouseItemEditForm {
     private String deliveryId;
     private String status;
     private String back;
-    // the optimistic-lock version the page was rendered with; null for a page from before the redesign
+    // the optimistic-lock version the page was rendered with (NO_VERSION when the item has none); null only for a page
+    // from before the redesign
     private String version;
 
     public static WarehouseItemEditForm of(WarehouseItem item) {
         WarehouseItemEditForm form = new WarehouseItemEditForm();
         form.name = item.getName();
-        form.category = item.getCategory();
+        // the empty choice is "no category", whichever way the item stores it
+        form.category = WarehouseRowMapper.uncategorized(item.getCategory()) ? "" : item.getCategory();
         form.condition = item.getCondition() == null ? ItemCondition.Sealed.name() : item.getCondition().name();
         form.serialNo = item.getSerialNo();
         form.unitSystemCost = item.hasUnitSystemCost() ? decimal(item.getUnitSystemCost()) : "";
@@ -57,7 +63,7 @@ public class WarehouseItemEditForm {
         form.manufacturerCode = item.getManufacturerCode();
         form.deliveryId = item.getDeliveryId();
         form.status = item.getStatus().name();
-        form.version = item.getVersion() == null ? null : String.valueOf(item.getVersion());
+        form.version = versionOf(item);
         return form;
     }
 
@@ -70,13 +76,24 @@ public class WarehouseItemEditForm {
         return String.valueOf(Math.round((multiplier - 1) * 100));
     }
 
+    static String versionOf(WarehouseItem item) {
+        return item.getVersion() == null ? NO_VERSION : String.valueOf(item.getVersion());
+    }
+
     public Map<String, String> validate(FulfilmentStatus stored) {
+        return validate(stored, null);
+    }
+
+    /** storedComment: a comment longer than the limit saved before it existed (or joined on a merge) may stay as it is. */
+    public Map<String, String> validate(FulfilmentStatus stored, String storedComment) {
         Map<String, String> errors = new LinkedHashMap<>();
-        if (StringUtils.length(comment) > MAX_COMMENT) errors.put("comment", "warehouse.item.error.comment");
+        if (StringUtils.length(comment) > MAX_COMMENT && !sameText(comment, storedComment)) {
+            errors.put("comment", "warehouse.item.error.comment");
+        }
+        if (StringUtils.isBlank(name)) errors.put("name", "warehouse.item.error.name");
         if (stored == FulfilmentStatus.Destroyed) {
             return errors;
         }
-        if (StringUtils.isBlank(name)) errors.put("name", "warehouse.item.error.name");
         if (conditionValue() == null) errors.put("condition", "warehouse.item.error.condition");
         if (StringUtils.isNotBlank(unitSystemCost) && amount(unitSystemCost) == null) errors.put("unitSystemCost", "warehouse.item.error.systemCost");
         if (stored == FulfilmentStatus.New) {
@@ -95,11 +112,12 @@ public class WarehouseItemEditForm {
     public WarehouseItem toUpdate(WarehouseItem stored) {
         WarehouseItem updated = copyOf(stored);
         updated.setComment(StringUtils.trimToNull(comment));
+        updated.setName(name.trim());
         if (stored.getStatus() == FulfilmentStatus.Destroyed) {
             return updated;
         }
-        updated.setName(name.trim());
-        updated.setCategory(StringUtils.defaultIfBlank(category, stored.getCategory()));
+        updated.setCategory(StringUtils.isNotBlank(category) ? category
+                : WarehouseRowMapper.uncategorized(stored.getCategory()) ? stored.getCategory() : Categories.UNCATEGORIZED);
         updated.setCondition(conditionValue());
         updated.setSerialNo(StringUtils.trimToNull(serialNo));
         // "no system cost" is stored as 0 (hasUnitSystemCost() is unitSystemCost > 0)
@@ -136,6 +154,11 @@ public class WarehouseItemEditForm {
         copy.setDestroyedAt(stored.getDestroyedAt());
         copy.setUnitSystemCost(stored.getUnitSystemCost());
         return copy;
+    }
+
+    // a textarea posts its line breaks as CRLF
+    private static boolean sameText(String posted, String stored) {
+        return stored != null && StringUtils.trim(posted.replace("\r\n", "\n")).equals(StringUtils.trim(stored.replace("\r\n", "\n")));
     }
 
     int quantity() {

@@ -42,11 +42,11 @@ class WarehouseItemEditFormTest {
 
         // when / then
         assertThat(WarehouseItemEditForm.of(versioned).getVersion()).isEqualTo("5");
-        assertThat(WarehouseItemEditForm.of(item(FulfilmentStatus.Delivered)).getVersion()).isNull();
+        assertThat(WarehouseItemEditForm.of(item(FulfilmentStatus.Delivered)).getVersion()).isEqualTo(WarehouseItemEditForm.NO_VERSION);
     }
 
     @Test
-    void destroyedItemAcceptsOnlyTheComment() {
+    void destroyedItemAcceptsOnlyTheNameAndComment() {
         // given
         WarehouseItem stored = item(FulfilmentStatus.Destroyed);
         WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
@@ -63,7 +63,7 @@ class WarehouseItemEditFormTest {
         // then
         assertThat(errors).isEmpty();
         assertThat(updated.getComment()).isEqualTo("Flooded in hall B");
-        assertThat(updated.getName()).isEqualTo("Samsung 990 PRO 2TB");
+        assertThat(updated.getName()).isEqualTo("Forged");
         assertThat(updated.getStatus()).isEqualTo(FulfilmentStatus.Destroyed);
         assertThat(updated.getQty()).isEqualTo(3);
         assertThat(updated.getCondition()).isEqualTo(ItemCondition.Sealed);
@@ -170,5 +170,88 @@ class WarehouseItemEditFormTest {
         assertThat(WarehouseItemEditForm.percentFromMultiplier("23")).isEqualTo("23");
         assertThat(WarehouseItemEditForm.percentFromMultiplier("abc")).isEqualTo("abc");
         assertThat(WarehouseItemEditForm.percentFromMultiplier(null)).isNull();
+    }
+
+    @Test
+    void storedCommentOverTheLimitLeftAsItWasDoesNotBlockTheSave() {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setComment(("A; B\n").repeat(500));
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        // a textarea posts its line breaks as CRLF
+        form.setComment(stored.getComment().replace("\n", "\r\n"));
+        form.setSerialNo("S9");
+
+        // when
+        Map<String, String> errors = form.validate(FulfilmentStatus.Delivered, stored.getComment());
+
+        // then
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void changedCommentOverTheLimitIsRefused() {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setComment("x".repeat(2001));
+
+        // when / then
+        assertThat(form.validate(FulfilmentStatus.Delivered, stored.getComment())).containsOnlyKeys("comment");
+    }
+
+    @Test
+    void itemWithoutCategoryIsShownAsTheEmptyChoice() {
+        // given
+        WarehouseItem missing = item(FulfilmentStatus.Delivered);
+        missing.setCategory(null);
+        WarehouseItem empty = item(FulfilmentStatus.Delivered);
+        empty.setCategory("");
+        WarehouseItem uncategorized = item(FulfilmentStatus.Delivered);
+        uncategorized.setCategory("Uncategorized");
+
+        // when / then
+        assertThat(WarehouseItemEditForm.of(missing).getCategory()).isEmpty();
+        assertThat(WarehouseItemEditForm.of(empty).getCategory()).isEmpty();
+        assertThat(WarehouseItemEditForm.of(uncategorized).getCategory()).isEmpty();
+    }
+
+    @Test
+    void emptyCategoryChoiceRemovesTheCategory() {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setCategory("");
+
+        // when
+        WarehouseItem updated = form.toUpdate(stored);
+
+        // then
+        assertThat(updated.getCategory()).isEqualTo("Uncategorized");
+    }
+
+    @Test
+    void itemWithoutCategoryKeepsItsStoredValueWhenTheChoiceStaysEmpty() {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setCategory("");
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(stored);
+        form.setComment("only the comment");
+
+        // when
+        WarehouseItem updated = form.toUpdate(stored);
+
+        // then
+        assertThat(updated.getCategory()).isEmpty();
+    }
+
+    @Test
+    void destroyedItemNeedsAName() {
+        // given
+        WarehouseItemEditForm form = WarehouseItemEditForm.of(item(FulfilmentStatus.Destroyed));
+        form.setName(" ");
+
+        // when / then
+        assertThat(form.validate(FulfilmentStatus.Destroyed)).containsOnlyKeys("name");
     }
 }

@@ -21,6 +21,11 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm");
 
+    /** The same page with another delivery link; null names the delivery id without a link (an item without a delivery). */
+    public ItemHistoryPage withDeliveryHref(String href) {
+        return new ItemHistoryPage(backHref, backLabel, productName, mfn, deliveryShortId, href, movesTitle, moves, summary, emptyText);
+    }
+
     public static ItemHistoryPage of(MfnHistory history, String deliveryId, String mfn, String backHref, String backLabel,
                                      MessageSource messages, Locale locale) {
         int in = 0, out = 0, after = 0;

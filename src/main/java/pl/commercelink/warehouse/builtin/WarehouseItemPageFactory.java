@@ -5,12 +5,15 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
+import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.builtin.WarehouseItemPage.*;
 import pl.commercelink.web.orders.Money;
@@ -32,6 +35,7 @@ class WarehouseItemPageFactory {
     private final SupplierLabels supplierLabels;
     private final SupplierRegistry suppliers;
     private final DeliveryRedirectResolver redirects;
+    private final DeliveriesRepository deliveries;
 
     WarehouseItemPage page(WarehouseItem item, String back, boolean admin, WarehouseItemEditForm form,
                            Map<String, String> errors, String errorMessage, Locale locale) {
@@ -42,11 +46,11 @@ class WarehouseItemPageFactory {
         shown.setBack(ItemBack.safe(back));
         if (mode == Mode.DESTROYED) {
             // a destroyed page posts only the comment, so the read-only card must not read these from the form
-            shown.setCategory(item.getCategory());
+            shown.setCategory(WarehouseRowMapper.uncategorized(item.getCategory()) ? text(locale, "warehouse.category.none") : item.getCategory());
             shown.setSerialNo(item.getSerialNo());
         }
-        List<StoreCategories.Group> groups = storeCategories.groupsFor(item.getStoreId());
-        String outside = StringUtils.isNotBlank(item.getCategory())
+        List<StoreCategories.Group> groups = withoutUncategorized(storeCategories.groupsFor(item.getStoreId()));
+        String outside = !WarehouseRowMapper.uncategorized(item.getCategory())
                 && groups.stream().noneMatch(g -> g.names().contains(item.getCategory())) ? item.getCategory() : null;
         return new WarehouseItemPage(item.getItemId(), item.getName(), text(locale, WarehouseStatuses.labelKey(status)),
                 WarehouseStatuses.tone(status), StringUtils.trimToNull(item.getEan()), StringUtils.trimToNull(item.getManufacturerCode()),
@@ -58,6 +62,26 @@ class WarehouseItemPageFactory {
                 conditions(locale), mode == Mode.NEW ? statuses(locale) : List.of(),
                 mode == Mode.DESTROYED ? condition(item.getCondition(), locale) : null,
                 mode == Mode.NEW ? delete(item, back, locale) : null);
+    }
+
+    /** The delivery link the item page shows, for the documents history opened from the item; null without a delivery. */
+    String deliveryHref(WarehouseItem item, boolean admin, Locale locale) {
+        return row(item, admin, locale).deliveryHref();
+    }
+
+    private WarehouseItemRow row(WarehouseItem item, boolean admin, Locale locale) {
+        SupplierLabelMap labels = supplierLabels.forStoreId(item.getStoreId());
+        return new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
+                id -> labels.has(id) || suppliers.exists(id), admin, null).map(item);
+    }
+
+    /** "Uncategorized" is what the empty choice of the category list already means, so it is not offered twice. */
+    private static List<StoreCategories.Group> withoutUncategorized(List<StoreCategories.Group> groups) {
+        return groups.stream()
+                .map(group -> new StoreCategories.Group(group.catalog(), group.names().stream()
+                        .filter(name -> !Categories.UNCATEGORIZED.equals(name)).toList()))
+                .filter(group -> !group.names().isEmpty())
+                .toList();
     }
 
     private String destroyedTitle(WarehouseItem item, Locale locale) {
@@ -79,17 +103,23 @@ class WarehouseItemPageFactory {
     }
 
     private Origin origin(WarehouseItem item, boolean admin, Mode mode, Locale locale) {
-        SupplierLabelMap labels = supplierLabels.forStoreId(item.getStoreId());
-        WarehouseItemRow row = new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
-                id -> labels.has(id) || suppliers.exists(id), admin, null).map(item);
-        String documents = mode != Mode.NEW && row.hasDelivery() && StringUtils.isNotBlank(item.getManufacturerCode())
+        WarehouseItemRow row = row(item, admin, locale);
+        // an item added by hand or bought from a supplier without a delivery still has its documents under that id
+        String documents = mode != Mode.NEW && StringUtils.isNotBlank(item.getDeliveryId()) && StringUtils.isNotBlank(item.getManufacturerCode())
                 ? "/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=" + encode(item.getDeliveryId())
                   + "&mfn=" + encode(item.getManufacturerCode()) + "&from=item&itemId=" + encode(item.getItemId())
                 : null;
         List<Link> serials = Arrays.stream(StringUtils.defaultString(item.getSerialNo()).split(","))
                 .map(String::trim).filter(StringUtils::isNotEmpty)
                 .map(s -> new Link(s, "/dashboard/item/history?serialNo=" + encode(s))).toList();
-        return new Origin(row.deliveryHref(), row.deliveryNumber(), row.supplier(), documents, serials);
+        return new Origin(row.deliveryHref(), row.deliveryNumber(), row.hasDelivery() ? deliverySupplier(item) : row.supplier(), documents, serials);
+    }
+
+    /** One delivery read on the item page (the list rows never read deliveries): the supplier next to the delivery number. */
+    private String deliverySupplier(WarehouseItem item) {
+        Delivery delivery = deliveries.findById(item.getStoreId(), item.getDeliveryId());
+        return delivery == null || StringUtils.isBlank(delivery.getProvider()) ? null
+                : supplierLabels.forStoreId(item.getStoreId()).of(delivery.getProvider());
     }
 
     private List<Choice> conditions(Locale locale) {

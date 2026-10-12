@@ -115,6 +115,19 @@ class ItemHistoryRenderingTest {
         assertThat(page.deliveryHref()).isEqualTo("/dashboard/deliveries/details?deliveryId=del+1%26x%3D2");
     }
 
+    @Test
+    void anItemWithoutADeliveryNamesItsIdWithoutALink() {
+        // given
+        ItemHistoryPage page = ItemHistoryPage.of(new MfnHistory("X", List.of()), "Acme", "M", "/dashboard/warehouse/items/w-1", "X",
+                TestMessages.polish(), java.util.Locale.forLanguageTag("pl")).withDeliveryHref(null);
+
+        // when
+        String html = SettingsTemplateRenderer.render(BODY, Map.of("page", page));
+
+        // then
+        assertThat(html).doesNotContain("/dashboard/deliveries/details").contains(">Acme</span>");
+    }
+
     private static ItemHistoryPage page(MfnHistory history) {
         return ItemHistoryPage.of(history, "del-1", "MZ-V9P2T0BW", "/dashboard/deliveries/details?deliveryId=del-1",
                 "Dostawa del-1", TestMessages.polish(), java.util.Locale.forLanguageTag("pl"));

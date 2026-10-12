@@ -80,6 +80,39 @@ class DestroyedListServiceTest {
         // then
         assertThat(page.tiles()).extracting(WarehousePageModel.Tile::value).containsExactly("100,00", "400,00", "500,00", "1\u00a0500,00");
         assertThat(page.tiles()).extracting(WarehousePageModel.Tile::active).containsExactly(false, false, false, true);
+        // net is the loss; gross next to it, as under the net value tile of the warehouse list
+        assertThat(page.tiles()).extracting(WarehousePageModel.Tile::hint).containsExactly(
+                "1 szt. \u00b7 brutto\u00a0123,00 PLN", "2 szt. \u00b7 brutto\u00a0492,00 PLN", "3 szt. \u00b7 brutto\u00a0615,00 PLN",
+                "4 szt. \u00b7 brutto\u00a01\u00a0845,00 PLN");
+        // "brutto" stays with its amount on a phone tile; "PLN" may wrap, as under the main value
+    }
+
+    @Test
+    void activeTileClickedAgainSwitchesItsPeriodOffAndKeepsTheOtherFilters() {
+        // given
+        destroyed("A", "SSD", TODAY, 100, 1);
+
+        // when
+        DestroyedPageModel page = page("period", "month", "categories", "SSD", "q", "A");
+
+        // then
+        // as the status tiles of the warehouse list: a second click on the active tile shows every period again
+        assertThat(page.tiles().get(0).active()).isTrue();
+        assertThat(page.tiles().get(0).href()).isEqualTo("/dashboard/warehouse/items/destroyed?categories=SSD&q=A");
+        assertThat(page.tiles().get(1).href()).isEqualTo("/dashboard/warehouse/items/destroyed?period=previous&categories=SSD&q=A");
+    }
+
+    @Test
+    void customRangeLeavesEveryTileInactiveAndEachOneSetsItsPeriod() {
+        // given
+        destroyed("A", "SSD", TODAY, 100, 1);
+
+        // when
+        DestroyedPageModel page = page("from", "2026-10-01", "to", "2026-10-12");
+
+        // then
+        assertThat(page.tiles()).extracting(WarehousePageModel.Tile::active).containsOnly(false);
+        assertThat(page.tiles().get(0).href()).isEqualTo("/dashboard/warehouse/items/destroyed?period=month");
     }
 
     @Test
@@ -135,7 +168,8 @@ class DestroyedListServiceTest {
         DestroyedPageModel page = page("categories", "SSD");
 
         // then
-        assertThat(page.results()).isEqualTo("Ilo\u015b\u0107 produkt\u00f3w: 1, Ilo\u015b\u0107 sztuk: 2 \u00b7 Warto\u015b\u0107 netto: 200,00 PLN");
+        // counts only, as on the warehouse list: the amounts are in the tiles and in the cost column
+        assertThat(page.results()).isEqualTo("Ilo\u015b\u0107 produkt\u00f3w: 1, Ilo\u015b\u0107 sztuk: 2");
         assertThat(page.categoryOptions()).extracting(WarehousePageModel.Option::value).containsExactly("RAM", "SSD");
     }
 
@@ -151,6 +185,23 @@ class DestroyedListServiceTest {
         assertThat(row.documentsHref()).contains("/dashboard/warehouse-documents/delivery-mfn-history?deliveryId=d-A&mfn=MFN-A&from=item&itemId=");
         assertThat(row.historyHref()).isEqualTo("/dashboard/item/history?serialNo=S1");
         assertThat(row.item().href()).contains("?back=%2Fdashboard%2Fwarehouse%2Fitems%2Fdestroyed%3Fperiod%3Dmonth");
+    }
+
+    @Test
+    void itemsAddedByHandOrFromASupplierLinkTheirDocumentsToo() {
+        // given
+        destroyed("A", "SSD", TODAY, 1, 1).setDeliveryId("Unknown");
+        destroyed("B", "SSD", TODAY, 1, 1).setDeliveryId("Acme");
+        destroyed("C", "SSD", TODAY, 1, 1).setDeliveryId(null);
+        when(labelMap.has("Acme")).thenReturn(true);
+
+        // when
+        List<DestroyedPageModel.Row> rows = page("sort", "name").rows();
+
+        // then
+        assertThat(rows.get(0).documentsHref()).contains("delivery-mfn-history?deliveryId=Unknown&mfn=MFN-A");
+        assertThat(rows.get(1).documentsHref()).contains("delivery-mfn-history?deliveryId=Acme&mfn=MFN-B");
+        assertThat(rows.get(2).documentsHref()).isNull();
     }
 
     @Test
