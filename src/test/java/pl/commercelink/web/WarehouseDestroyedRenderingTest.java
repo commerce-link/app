@@ -100,6 +100,21 @@ class WarehouseDestroyedRenderingTest {
     }
 
     @Test
+    void savedMessageOfAnItemOpenedFromTheArchiveIsShownOnReturn() {
+        // given
+        Context context = new Context();
+        context.setVariable("page", pageWithRows());
+        context.setVariable("settingsSavedMessage", "Item SSD a1 saved.");
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("warehouse-destroyed", context);
+
+        // then
+        assertThat(html).contains("data-cl-saved-alert").contains("Item SSD a1 saved.");
+        assertThat(html.indexOf("data-cl-saved-alert")).isLessThan(html.indexOf("data-cl-list-results"));
+    }
+
+    @Test
     void oldTemplatesAreGone() {
         // when / then
         assertThat(Files.exists(Path.of("src/main/resources/templates/destroyedWarehouseItems.html"))).isFalse();

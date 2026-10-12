@@ -21,6 +21,7 @@
         </header>
 
         <div th:replace="~{fragments/screen-intro :: panel('warehouse-destroyed', 'fas fa-archive')}"></div>
+        <th:block th:replace="~{fragments/settings-form :: savedAlert}"></th:block>
 
         <div data-cl-list-results data-cl-list-path="/dashboard/warehouse/items/destroyed"
              data-cl-list-fragment="/dashboard/warehouse/items/destroyed/list"
