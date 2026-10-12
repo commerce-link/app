@@ -33,7 +33,13 @@ public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, boole
     }
 
     public StockLedgerClosingView withRange(LocalDate from, LocalDate to) {
-        return new StockLedgerClosingView(from, to, fromFixed, dayText(from), previousLabel, closedPeriods);
+        // a held regeneration of an older period starts after the one before it, not after the newest closed period
+        String labelBefore = closedPeriods.stream()
+                .filter(closed -> closed.to().plusDays(1).equals(from))
+                .map(ClosedPeriod::label)
+                .findFirst()
+                .orElse(previousLabel);
+        return new StockLedgerClosingView(from, to, fromFixed, dayText(from), labelBefore, closedPeriods);
     }
 
     private static String dayText(LocalDate day) {
