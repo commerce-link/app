@@ -42,16 +42,18 @@ abstract class OrderFulfilment {
         return Optional.empty();
     }
 
-    void commit(String storeId, List<OrderItem> acceptedOrderItems) {
+    List<OrderItem> commit(String storeId, List<OrderItem> acceptedOrderItems) {
         Map<String, List<OrderItem>> groupedByOrderId = acceptedOrderItems.stream()
                 .collect(Collectors.groupingBy(OrderItem::getOrderId));
 
+        List<OrderItem> saved = new LinkedList<>();
         for (Map.Entry<String, List<OrderItem>> entry : groupedByOrderId.entrySet()) {
-            commit(storeId, entry.getKey(), entry.getValue());
+            saved.addAll(commit(storeId, entry.getKey(), entry.getValue()));
         }
+        return saved;
     }
 
-    private void commit(String storeId, String orderId, List<OrderItem> orderItems) {
+    private List<OrderItem> commit(String storeId, String orderId, List<OrderItem> orderItems) {
         Order order = ordersRepository.findById(storeId, orderId);
 
         List<OrderItem> acceptedProducts = orderItems.stream()
@@ -81,6 +83,7 @@ abstract class OrderFulfilment {
         if (fulfilledProducts.stream().allMatch(i -> i.isDelivered() || i.isOrdered())) {
             orderLifecycle.update(order);
         }
+        return fulfilledProducts;
     }
 
     private List<OrderItem> runServicesFulfilment(List<OrderItem> acceptedServices) {

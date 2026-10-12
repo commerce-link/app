@@ -24,6 +24,7 @@
     --cl-z-scrim: 20;
     --cl-z-topbar: 25;
     --cl-z-pop: 40;
+    --cl-z-toast: 50;
 }
 
 .cl-skip {
@@ -575,25 +576,70 @@ body.cl-drawer-open .cl-sidebar {
     visibility: visible;
 }
 
+/* Toast: a floating .cl-alert — the tone's soft background, its full colour on the left edge and the icon, ink text.
+   showToast (layout.html) sets the text and the is-* class; the icon is a CSS mask, so callers pass plain text. */
 .cl-toast {
+    --cl-toast-tone: var(--cl-ok);
+    --cl-toast-soft: var(--cl-ok-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.5 2.5L16 9.5'/%3E%3C/svg%3E");
     display: none;
+    align-items: center;
+    gap: 10px;
     position: fixed;
-    top: 32px;
-    right: 32px;
-    z-index: 9999;
-    padding: 16px 32px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    font-size: 1.1em;
-    color: #fff;
-    background: #48c774;
+    top: calc(var(--cl-topbar-height) + 16px);
+    right: 24px;
+    z-index: var(--cl-z-toast);
+    max-width: 420px;
+    padding: 12px 18px 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--cl-toast-tone) 18%, var(--cl-toast-soft));
+    border-left: 4px solid var(--cl-toast-tone);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow), 0 2px 6px rgba(14, 23, 33, .08);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--cl-ink);
+    background: var(--cl-toast-soft);
     opacity: 0;
     transition: opacity 0.3s;
 }
 
-.cl-toast.is-danger { background: #f14668; }
-.cl-toast.is-info { background: #3e8ed0; }
-.cl-toast.is-warning { background: #ffdd57; color: rgba(0, 0, 0, 0.7); }
+.cl-toast::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    background-color: var(--cl-toast-tone);
+    -webkit-mask: var(--cl-toast-icon) center / contain no-repeat;
+    mask: var(--cl-toast-icon) center / contain no-repeat;
+}
+
+.cl-toast.is-danger {
+    --cl-toast-tone: var(--cl-bad);
+    --cl-toast-soft: var(--cl-bad-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 9l6 6M15 9l-6 6'/%3E%3C/svg%3E");
+}
+
+.cl-toast.is-info {
+    --cl-toast-tone: var(--cl-info);
+    --cl-toast-soft: var(--cl-info-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E");
+}
+
+.cl-toast.is-warning {
+    --cl-toast-tone: var(--cl-warn);
+    --cl-toast-soft: var(--cl-warn-soft);
+    --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
+}
+
+@media screen and (max-width: 719px) {
+    .cl-toast {
+        top: calc(var(--cl-topbar-height) + 8px);
+        right: 16px;
+        left: 16px;
+        max-width: none;
+    }
+}
 
 /* Settings pages. Content sits inside Bulma's .content wrapper (layout.html), so rules that touch headings,
    lists and links are prefixed with .cl-page to outweigh .content h1/h2/ul/li. */
@@ -627,8 +673,8 @@ body.cl-drawer-open .cl-sidebar {
     gap: 10px;
 }
 
-/* A title followed only by the "?" of the screen guide: the title wraps and the "?" stays right after it. Wrapped onto
-   a line of its own, the "?" stood at the left edge, where its end-anchored bubble had no room. */
+/* A title followed only by the "?" of the screen guide: the title wraps and the "?" stays right after it instead of
+   dropping to a line of its own at the left edge. */
 .cl-page .cl-page-header-row:has(> .screen-intro-toggle:last-child) {
     flex-wrap: nowrap;
 }
@@ -636,6 +682,233 @@ body.cl-drawer-open .cl-sidebar {
 .cl-page .cl-page-header-row:has(> .screen-intro-toggle:last-child) > .cl-page-title {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+/* Screen guide (fragments/screen-intro). Not under .cl-page: three Bulma screens (fulfilment queue, reports, RMA) still
+   embed it, so text rules carry three classes to outweigh Bulma's .content p:not(:last-child) and h2:not(:first-child).
+   It collapses by animating the row track to 0fr: a fixed max-height cut the footer off whenever the copy wrapped
+   past it, which it does on a phone. */
+.screen-intro {
+    position: relative;
+    display: grid;
+    grid-template-rows: 1fr;
+    margin-bottom: 20px;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow-card);
+    overflow: hidden;
+    transition: grid-template-rows .35s ease, opacity .3s ease, margin-bottom .35s ease;
+}
+
+/* display: grid above outranks the UA rule for the attribute */
+.screen-intro[hidden] {
+    display: none;
+}
+
+.screen-intro.is-closing {
+    grid-template-rows: 0fr;
+    margin-bottom: 0;
+    border-width: 0;
+    opacity: 0;
+}
+
+.screen-intro::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--cl-accent);
+}
+
+.screen-intro-inner {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.screen-intro-body {
+    display: flex;
+    gap: 16px;
+    padding: 20px 56px 0 24px;
+}
+
+.screen-intro-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--cl-radius);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent);
+    font-size: 18px;
+}
+
+.screen-intro-text {
+    min-width: 0;
+}
+
+.screen-intro .screen-intro-text .screen-intro-eyebrow {
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.screen-intro .screen-intro-text .screen-intro-title {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.screen-intro .screen-intro-text .screen-intro-lead {
+    margin: 0;
+    max-width: 72ch;
+    font-size: .95rem;
+    color: var(--cl-ink-2);
+}
+
+.screen-intro .screen-intro-text .screen-intro-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.screen-intro .screen-intro-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 78ch;
+    margin: 0;
+    font-size: .9rem;
+    color: var(--cl-ink-2);
+}
+
+.screen-intro .screen-intro-list strong {
+    color: var(--cl-ink);
+}
+
+.screen-intro-check {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    border-radius: 50%;
+    background: var(--cl-ok-soft);
+    color: var(--cl-ok);
+    font-size: 10px;
+}
+
+/* Starts under the text column: body padding + icon + gap */
+.screen-intro-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px 20px 84px;
+}
+
+.screen-intro-hint {
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.screen-intro-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.screen-intro-toggle {
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--cl-line);
+    border-radius: 50%;
+    background: var(--cl-surface);
+    color: var(--cl-accent);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.screen-intro-toggle:hover,
+.screen-intro-toggle[aria-expanded="true"] {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+}
+
+.screen-intro-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.screen-intro-toggle.is-pulsing {
+    animation: screen-intro-pulse 1.2s ease 2;
+}
+
+/* The first time a screen is shown: five pulses, 4.75 s in all, under the 5 s after which moving content has to be
+   possible to stop (WCAG 2.2.2) */
+.screen-intro-toggle.is-pulsing.is-first {
+    animation: screen-intro-pulse .95s ease 5;
+}
+
+@keyframes screen-intro-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(27, 77, 177, .45); }
+    70% { box-shadow: 0 0 0 9px rgba(27, 77, 177, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(27, 77, 177, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .screen-intro {
+        transition: none;
+    }
+
+    .screen-intro-toggle.is-pulsing,
+    .screen-intro-toggle.is-pulsing.is-first {
+        animation: none;
+    }
+}
+
+@media screen and (max-width: 1023px) {
+    .screen-intro-toggle,
+    .screen-intro-close {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 640px) {
+    .screen-intro-body {
+        padding-right: 20px;
+    }
+
+    /* Only the lines beside the 44 px × in the corner make room for it */
+    .screen-intro .screen-intro-text .screen-intro-eyebrow,
+    .screen-intro .screen-intro-text .screen-intro-title {
+        padding-right: 44px;
+    }
+
+    .screen-intro-footer {
+        padding-left: 24px;
+    }
+
+    .screen-intro-icon {
+        display: none;
+    }
 }
 
 .cl-page .cl-page-title {
@@ -1429,6 +1702,7 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 .cl-page .cl-card .cl-card-head + .cl-table,
+.cl-page .cl-card .cl-card-desc + .cl-table,
 .cl-page .cl-card .cl-card-head + .cl-list,
 .cl-page .cl-card .cl-card-desc + .cl-list,
 .cl-page .cl-card .cl-card-head + .cl-list-empty,
@@ -3136,6 +3410,12 @@ a.cl-link-button:hover {
     margin-top: var(--cl-gap-fields);
 }
 
+/* A checkbox under a field (the restock page: price limit, then "only products not in stock") keeps the same distance;
+   without it the box touched the help line of the field above, while the restock dialog spaces them by its grid gap. */
+.cl-page .cl-fieldset > .cl-field + .cl-check-field {
+    margin-top: var(--cl-gap-fields);
+}
+
 /* The catalog form wraps the field in a Bulma .field under a label; it lost its mt-2 and touched the label. */
 .field > .schedule-field {
     margin-top: var(--cl-gap-related);
@@ -3960,9 +4240,12 @@ a.cl-link-button:hover {
     cursor: not-allowed;
 }
 
-/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
+/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it; a disabled one
+   (nothing to act on, e.g. "Odznacz wszystkie" with nothing ticked) looks the same */
 .cl-page .cl-link-button[aria-disabled="true"],
-.cl-page .cl-link-button[aria-disabled="true"]:hover {
+.cl-page .cl-link-button[aria-disabled="true"]:hover,
+.cl-page .cl-link-button:disabled,
+.cl-page .cl-link-button:disabled:hover {
     color: var(--cl-ink-3);
     text-decoration: none;
     cursor: not-allowed;
@@ -4955,6 +5238,11 @@ a.cl-link-button:hover {
 .cl-page .cl-stat-grid.is-orders > li {
     display: flex;
     margin: 0;
+}
+
+/* a tile that is no link (the warehouse value tile) fills its cell like the links do */
+.cl-page .cl-stat-grid.is-orders > li > .cl-stat {
+    flex: 1 1 auto;
 }
 
 .cl-page .cl-stat.is-link {
@@ -9177,6 +9465,104 @@ a.cl-link-button:hover {
     }
 }
 
+/* --- Warehouse list (spec docs/active/warehouse-list-redesign §14) --- */
+/* the results line carries the value of the list, so it keeps one place: the right edge, whether chips stand before it or not */
+.cl-page .cl-list-meta.is-warehouse .cl-table-results { margin-left: auto; text-align: right; }
+.cl-page .cl-muted { color: var(--cl-ink-3); }
+/* one grid item per cell in the phone card mode, like the orders cells */
+.cl-page .cl-table.is-warehouse .cl-cell-stack { display: flex; flex-direction: column; min-width: 0; }
+.cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-end; }
+.cl-page .cl-table.is-warehouse :is(th, td) { white-space: normal; overflow-wrap: break-word; }
+/* the system cost is a quiet mark before the net cost, the whole of it (net and gross) in its tooltip (2026-10-11: a pill
+   under the gross amount read as a gross figure) */
+.cl-page .cl-table.is-warehouse .cl-cost-mark { margin-right: 6px; font-size: 11px; color: var(--cl-info); }
+/* the item's condition (open box, damaged) sits under its status pill, where the eye looks for an item's state */
+.cl-page .cl-table.is-warehouse td.cl-cell-status .cl-status { white-space: normal; }
+.cl-page .cl-table.is-warehouse td.cl-cell-status .cl-status + .cl-status { display: flex; width: fit-content; margin: 4px 0 0; }
+/* the phone card's own line ("3 szt. × 1 243,00 netto") stands in for the quantity and net cost columns there */
+.cl-page .cl-table.is-warehouse .cl-cards-only { display: none; }
+/* the comment shows two lines; the whole of it is on the item page (the name links there) and in the title */
+.cl-page .cl-table.is-warehouse .cl-table-note {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: none; white-space: normal;
+}
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-warehouse { table-layout: fixed; width: 100%; }
+    /* a code never breaks inside ("GV-/N406TWF2OC"): the line breaks between the EAN and the code; one longer than the
+       product column ends in an ellipsis, whole in its title */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: nowrap; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+    /* a serial number is one token as well, cut at the cell's edge with the whole of it in its title */
+    .cl-page .cl-table.is-warehouse .cl-cell-serial { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    /* the delivery link stays on one line ("8c12485 / 0" broke after the id at 1024 px), cut at the cell's edge with the
+       whole of it in its title */
+    .cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 12%; }
+    .cl-page .cl-table.is-warehouse .cl-col-qty { width: 7%; }
+    /* 17 %: the gross line ("brutto 11 345,82") and the system-cost mark before the net cost stay on one line at 1024 px */
+    .cl-page .cl-table.is-warehouse .cl-col-cost { width: 17%; }
+    /* 12 %: an 8-character delivery id (66 px) fits its cell at 1024 px; 11 % left 62 px */
+    .cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }
+    /* 16 % of the table is narrower than the longest status pill below 1366 px. Since the condition pill sits under the
+       status (2026-10-11) the longest pill is "Otwarte opakowanie" (151 px); 11.5rem is that pill plus the cell's 12 px
+       padding on each side, with a little room, so it stays on one line (9.5rem, sized for "Zarezerwowane", broke it) */
+    .cl-page .cl-table.is-warehouse .cl-col-status { width: 11.5rem; }
+}
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-warehouse .is-secondary-column { display: none; }
+    /* the hidden delivery column leaves room: 12 % was 78 px at 768 px and broke "Chłodzenie" inside the word */
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 18%; }
+}
+@media screen and (min-width: 1024px) and (max-width: 1279px) {
+    /* four tiles in a row leave 154 px of text at 1024 px: a seven-digit value ("1 234 567,89", 165 px at 26 px) fits at
+       22 px; its "PLN" goes under it when the line is full */
+    .cl-page .cl-stat-grid.is-warehouse div.cl-stat .cl-stat-value { font-size: 22px; }
+    /* the sidebar narrows the table to 786 px at 1024 px: 12 % left 70 px of text, three short of "Chłodzenie" */
+    .cl-page .cl-table.is-warehouse .cl-col-category { width: 14%; }
+}
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-warehouse td.is-numeric .cl-cell-stack { align-items: flex-start; }
+    /* the card has no room for an ellipsis with its tooltip (no hover on touch): an overlong code wraps anywhere */
+    .cl-page .cl-table.is-warehouse .cl-table-code { white-space: normal; overflow-wrap: anywhere; }
+
+    /* phone card (B3): like the orders card A, the cells give their parts to one grid of the row and drop their labels
+       (the labels stay in data-label): name, codes and comment across the card; "3 szt. × 1 243,00 netto" with the
+       status pill on the right and the condition pill under it; the system cost as text (no hover on touch for the
+       mark's tooltip); category and delivery as one muted line.
+       The checkbox keeps its corner, the lines start level with the name; the right column (pill, delivery) takes at most
+       45 %, so a long delivery line wraps itself instead of the figures. */
+    .cl-page .cl-table.is-warehouse tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) fit-content(45%); column-gap: 10px; row-gap: 2px; align-items: center; padding: 12px 16px 12px 60px; }
+    .cl-page .cl-table.is-warehouse[data-cl-select-table] tbody :is(th.cl-table-key, td:not(.cl-table-check)) { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody :is(th, td)::before { content: none; }
+    .cl-page .cl-table.is-warehouse .cl-cards-hide { display: none; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > * { grid-column: 1 / -1; order: 1; margin-top: 0; }
+    .cl-page .cl-table.is-warehouse tbody .cl-table-key > a { font-weight: 600; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-card-figures { display: block; grid-column: 1; order: 2; font-variant-numeric: tabular-nums; }
+    .cl-page .cl-table.is-warehouse tbody td > .cl-status { grid-column: 2; justify-self: end; order: 2; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-cell-stack { display: contents; }
+    .cl-page .cl-table.is-warehouse tbody td.is-numeric .cl-cost-note { display: block; grid-column: 1 / -1; order: 3; justify-self: start; margin: 0; }
+    .cl-page .cl-table.is-warehouse tbody td.cl-cell-status .cl-status + .cl-status { grid-column: 2; justify-self: end; order: 2; margin: 0; }
+    .cl-page .cl-table.is-warehouse tbody td.cl-cell-category > span { grid-column: 1; justify-self: start; order: 4; font-size: 12.5px; color: var(--cl-ink-2); }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack {
+        grid-column: 2; justify-self: end; order: 4; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; column-gap: 6px;
+        font-size: 12.5px; color: var(--cl-ink-2); text-align: right;
+    }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-cell-stack > .cl-muted { display: none; }
+    .cl-page .cl-table.is-warehouse tbody td.is-secondary-column .cl-table-sub { margin: 0; }
+}
+/* the quantity dialog is narrow: its name / quantity table stays a two-column table on phones instead of the cards */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-dialog .cl-table.cl-quantity-table { display: table; }
+    .cl-page .cl-dialog .cl-quantity-table thead { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: table-header-group; }
+    .cl-page .cl-dialog .cl-quantity-table tbody { display: table-row-group; }
+    .cl-page .cl-dialog .cl-quantity-table tr { display: table-row; padding: 0; border-top: 0; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td) { display: table-cell; padding: 6px 10px; border-top: 1px solid var(--cl-line); vertical-align: top; }
+    .cl-page .cl-dialog .cl-quantity-table :is(tbody th, td)::before { content: none; }
+    .cl-page .cl-dialog .cl-quantity-table .is-numeric { text-align: right; }
+    .cl-page .cl-dialog .cl-quantity-table td.is-numeric { width: 108px; }
+}
+/* a checked row is tinted --cl-accent-soft, on which --cl-ink-3 is 4.04:1 ("Bez kategorii") */
+.cl-page .cl-table.is-warehouse tr.is-selected .cl-muted { color: var(--cl-ink-2); }
+/* --cl-info-soft is --cl-accent-soft, the tint of a checked row: an info pill there gets the surface and a 1 px ring */
+.cl-page .cl-table.is-warehouse tr.is-selected .cl-status.is-info { background: var(--cl-surface); box-shadow: inset 0 0 0 1px var(--cl-accent); }
 /* Warehouse documents list (docs/active/warehouse-documents-redesign). A document number wraps after a "/" (the
    fragments/doc-number <wbr> break points), never inside the sequence digits; break-word only splits a segment that is
    longer than the whole column. The direction icon repeats the type name in colour (the name carries the meaning). */
@@ -9699,7 +10085,8 @@ a.cl-link-button:hover {
 }
 
 /* P2: below 720 px the selection row leaves the flow and is pinned to the bottom edge while something is checked and
-   the items card is on screen (.is-in-view, set by delivery-details.js); the form keeps room for it at its bottom. */
+   the items card is on screen (.is-in-view, set by delivery-details.js and by selection-actions.js on the warehouse
+   list); the host keeps room for it at its bottom. */
 @media screen and (max-width: 719px) {
     .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
         position: fixed;
@@ -9728,10 +10115,25 @@ a.cl-link-button:hover {
         margin-left: 0;
     }
 
+    /* pinned to the bottom edge, the row has nothing below it: its menus always open upwards and scroll within the
+       room between it and the top bar. menu.js turns a list up only when it fits there whole, so in a short window (a
+       phone held sideways, 1280×720 at 200 %) it stayed below the row, off the screen, with every action but "Zniszcz"
+       out of reach */
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) .cl-menu-list {
+        top: auto;
+        bottom: calc(100% + 4px);
+        max-height: calc(100vh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        max-height: calc(100dvh - var(--cl-docked-bar, 112px) - var(--cl-topbar-height) - 8px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
     .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
         padding-bottom: var(--cl-docked-bar, 112px);
     }
 }
+.cl-dialog .cl-quantity-table td.is-numeric { width: 120px; }
+.cl-dialog .cl-quantity-table .cl-input.is-qty { width: 96px; text-align: right; }
 
 /* P3: status card with the supplier's reason and the repair actions; a tone bar on the left. */
 .cl-page .cl-card.is-status .cl-card-title .is-bad {
@@ -10515,4 +10917,1422 @@ a.cl-link-button:hover {
 .cl-page .cl-effects > li.is-bad,
 .cl-page .cl-effects > li.is-bad > :is(i, svg) {
     color: var(--cl-bad);
+}
+
+/* Fulfilment queue (/dashboard/fulfilment/queue, spec docs/active/fulfilment-queue-redesign). The table is the orders
+   table with is-selectable set by the template: its checkbox column is the form's selectedOrders, not a bulk selection,
+   so it is drawn without JavaScript and kept in card mode (no data-cl-select-table, whose card rule hides it). An
+   unticked row greys its client and dates; ticked rows get no tint, since the whole group starts ticked. */
+.cl-page .cl-table.is-queue tr:has(.cl-check-input:not(:checked)) :is(.cl-cell-client, .cl-cell-ordered, .cl-queue-ordered-sub, .cl-cell-due-date) {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-table.is-queue :is(.cl-cell-ordered, .cl-cell-due-date) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-queue .cl-cell-count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Beside the side column (1366 px and up) the table has about 600 px: a one-line "Do zamówienia" header would make the
+   column as wide as the header for a 1-3 digit value and squeeze the customer cell onto three lines. The header wraps
+   between its words instead; the value cell stays on one line. */
+.cl-page .cl-table.is-queue thead th.is-numeric {
+    white-space: normal;
+}
+
+/* the column headers name the values on a wide screen; the labels speak only in card mode */
+.cl-page .cl-table.is-queue .cl-queue-label {
+    display: none;
+}
+
+/* Kolumna zwijana pod klucz, following the card like the Metoda column of Payments: beside the side column the card is
+   604 px at 1366 px and 678 px at 1440 px, while the full table needs about 651 px (an other-year date, the overdue note
+   and the number with its source do not wrap). Below 660 px of card the "Złożone" column goes and its date moves under
+   the order number, labelled. The sub-line exists only for that: the card mode (< 720 px) keeps the date in its own row. */
+.cl-page .cl-queue-card {
+    container-type: inline-size;
+}
+
+.cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub {
+    display: none;
+}
+
+@media screen and (min-width: 720px) {
+    @container (width < 660px) {
+        .cl-page .cl-table.is-queue .is-secondary-column {
+            display: none;
+        }
+
+        .cl-page .cl-table.is-queue .cl-table-key .cl-table-sub.cl-queue-ordered-sub {
+            display: block;
+        }
+
+        .cl-page .cl-table.is-queue .cl-queue-ordered-sub .cl-queue-label {
+            display: inline;
+        }
+
+        .cl-page .cl-table.is-queue .cl-queue-ordered-date {
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+    }
+}
+
+/* WebKit ignores position: relative on a table row, so the row link's stretched ::after covered the whole page there
+   and every click on "Pomiń", the narrowing options or the selection buttons opened an order. A clip-path keeps the
+   overlay (and its hit area) inside its own row; the card mode below 720 px is a positioned block already. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-queue tbody tr {
+        clip-path: inset(0);
+    }
+}
+
+/* "Wróć" and "Zacznij od początku" side by side when every waiting order was skipped. */
+.cl-page .cl-queue-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+/* A list of checkboxes with an optional line under the name (the queue's narrowing). */
+.cl-page .cl-check-stack {
+    display: grid;
+    gap: var(--cl-gap-related);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-check-stack .cl-check {
+    align-items: flex-start;
+}
+
+/* .cl-check keeps a 36 px minimum for its target, which gives a one-line option more height than its text while
+   two-line ones fit, so the gaps in the stack look uneven. From 1024 px the options take their own height; below it the
+   44 px touch target of .cl-check stays (every option gets the same minimum). */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-check-stack .cl-check {
+        min-height: 0;
+    }
+}
+
+.cl-page .cl-check-desc {
+    display: block;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* One fact about the record shown in a card, under its description (the store of a super admin's group). */
+.cl-page .cl-group-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+}
+
+/* Phone: "Poprzednia grupa" | "Następna grupa" share the first row ("Następna" always on the right, even alone) and
+   "Zacznij od początku" takes the second, so the step buttons never move when the restart appears */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-queue-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .cl-page .cl-queue-actions > .cl-queue-back {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-queue-actions > .cl-page-action-form {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-queue-actions > .cl-queue-restart {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .cl-page .cl-queue-actions > .cl-button {
+        justify-content: center;
+    }
+}
+
+/* Under a page title (the supplier selection's kind, step, store and strategy) it stays quieter than the lead */
+.cl-page .cl-page-header .cl-group-meta {
+    margin-top: 8px;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+@media screen and (max-width: 719px) {
+    /* card: the checkbox down the left edge, number and count on the first line, then source, customer, dates */
+    .cl-page .cl-table.is-queue tr {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+    }
+
+    .cl-page .cl-table.is-queue td.cl-table-check {
+        display: block;
+        grid-column: 1;
+        grid-row: 1 / span 6;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-queue .cl-row-link {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-count {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    /* explicit rows: the orders card rules give some of these parts an order, which would otherwise shuffle them */
+    .cl-page .cl-table.is-queue .cl-table-key .cl-table-sub {
+        grid-column: 2 / -1;
+        grid-row: 2;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-client {
+        grid-column: 2 / -1;
+        grid-row: 3;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-ordered {
+        grid-column: 2 / -1;
+        grid-row: 4;
+    }
+
+    .cl-page .cl-table.is-queue .cl-cell-due-date {
+        grid-column: 2 / -1;
+        grid-row: 5;
+    }
+
+    .cl-page .cl-table.is-queue .cl-due-note {
+        grid-column: 2 / -1;
+        grid-row: 6;
+    }
+
+    .cl-page .cl-table.is-queue .cl-queue-label {
+        display: inline;
+    }
+}
+
+/* Supplier selection (POST /dashboard/orders/fulfilment and the warehouse restock; spec
+   docs/active/fulfilment-queue-redesign/2026-10-08-fulfilment-select-design.md, variant A4 of the readability rework,
+   plan 2026-10-08-fulfilment-select-a4-plan.md). Offers are separated card rows grouped by item category beside the
+   sticky summary. A ticked offer that wins items is tinted with a thick accent edge (is-on), an unticked one is white
+   (is-off), and an offer whose every item a cheaper ticked one takes folds into one line under its winner
+   (is-covered) — fulfilment-select.js sets the three. Supplier colours come from the server (FulfilmentSelectPageFactory,
+   by label) as solid pills with white text. */
+:root {
+    --cl-supplier-0: #47566a;
+    --cl-supplier-1: #1b4db1;
+    --cl-supplier-2: #9a3f0f;
+    --cl-supplier-3: #1d6b45;
+    --cl-supplier-4: #6a2fa0;
+    --cl-supplier-5: #0b6170;
+    --cl-supplier-6: #8f1659;
+    --cl-offer-on: #eef4ff;
+    --cl-offer-on-line: #b9cdf3;
+    --cl-offer-radius: 10px;
+    --cl-alt-connector: #c3cfdf;
+    --cl-warn-line: #ecc98f;
+    --cl-chip-track: rgba(14, 23, 33, .12);
+    --cl-chip-hover: rgba(14, 23, 33, .06);
+    --cl-on-accent: #fff;
+}
+
+.cl-page .cl-supplier-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--cl-supplier-1);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+    color: var(--cl-on-accent);
+    white-space: nowrap;
+}
+
+.cl-page .cl-supplier-pill i {
+    font-size: 11px;
+}
+
+.cl-page .cl-supplier-pill.is-c0 {
+    background: var(--cl-supplier-0);
+}
+
+.cl-page .cl-supplier-pill.is-c1 {
+    background: var(--cl-supplier-1);
+}
+
+.cl-page .cl-supplier-pill.is-c2 {
+    background: var(--cl-supplier-2);
+}
+
+.cl-page .cl-supplier-pill.is-c3 {
+    background: var(--cl-supplier-3);
+}
+
+.cl-page .cl-supplier-pill.is-c4 {
+    background: var(--cl-supplier-4);
+}
+
+.cl-page .cl-supplier-pill.is-c5 {
+    background: var(--cl-supplier-5);
+}
+
+.cl-page .cl-supplier-pill.is-c6 {
+    background: var(--cl-supplier-6);
+}
+
+.cl-page .cl-muted {
+    color: var(--cl-ink-3);
+    font-weight: 400;
+}
+
+.cl-page .cl-num {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Card head: the title with the two filter menus on its right, a line under it */
+.cl-page .cl-offers-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-card-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* The bar: a 110 px label column and its content (proposals, order chips), closed by a line */
+.cl-page .cl-offers-bar {
+    display: grid;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-bar-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px 10px;
+}
+
+.cl-page .cl-bar-label {
+    padding-top: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-bar-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+}
+
+.cl-page .cl-variant-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cl-page .cl-variant-option {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 5px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+/* the radio stays in the label for keyboard and screen readers; the label's frame shows the choice */
+.cl-page .cl-variant-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cl-page .cl-variant-option:has(input:checked) {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    box-shadow: inset 0 0 0 1px var(--cl-accent);
+}
+
+.cl-page .cl-variant-option:has(input:focus-visible) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-variant-option strong {
+    font-weight: 650;
+}
+
+.cl-page .cl-variant-sub {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-variant-option:has(input:checked) .cl-variant-sub {
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-variant-tag {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-bar-info {
+    padding: 4px;
+    color: var(--cl-ink-3);
+    cursor: help;
+}
+
+/* Order chips (as on the old page): tinted by the state the script keeps on the filter button (none yet = nothing
+   covered), the number opens the order, the bar part filters the table. The tint, the icon and the bar's colour all
+   follow the state, so it never rests on colour alone. */
+.cl-page .cl-order-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding-left: 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-ok) {
+    background: var(--cl-ok-soft);
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-warn) {
+    border-color: var(--cl-warn-line);
+    background: var(--cl-warn-soft);
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter[aria-pressed="true"]) {
+    box-shadow: 0 0 0 2px var(--cl-accent);
+}
+
+.cl-page .cl-coverage-icon {
+    display: none;
+}
+
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-ok) .cl-coverage-icon.is-ok,
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-warn) .cl-coverage-icon.is-warn,
+.cl-page .cl-order-chip:has(> .cl-order-chip-filter.is-bad) .cl-coverage-icon.is-bad {
+    display: inline-flex;
+}
+
+.cl-page .cl-order-chip-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: var(--cl-ink);
+}
+
+/* only a number with an address is a link; without one it is plain text */
+.cl-page a.cl-order-chip-link {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+
+.cl-page a.cl-order-chip-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-order-chip-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 12px 0 6px;
+    border: 0;
+    border-radius: 0 999px 999px 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.cl-page .cl-order-chip-filter:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-order-chip-bar {
+    width: 52px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--cl-chip-track);
+    overflow: hidden;
+}
+
+/* the script sets the fill's width (done / total) */
+.cl-page .cl-order-chip-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 3px;
+    background: currentColor;
+}
+
+.cl-page .cl-coverage-split {
+    font-size: 12px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-offers-notice {
+    margin: 12px 20px 0;
+}
+
+/* Above the list: tick or clear the visible offers, expand and collapse all */
+.cl-page .cl-list-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 18px;
+    padding: 6px 16px 0;
+}
+
+.cl-page .cl-list-bar-end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    margin-left: auto;
+}
+
+/* The offers table: rows as separated cards, no visible header row (units sit in the cells) */
+.cl-page .cl-offers-list {
+    padding: 0 12px 8px;
+    container: cl-offers / inline-size;
+}
+
+.cl-page .cl-table.is-supplier-offers {
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+}
+
+.cl-page .cl-table.is-supplier-offers col.cl-col-qty-s {
+    width: 60px;
+}
+
+.cl-page .cl-table.is-supplier-offers col.cl-col-price {
+    width: 104px;
+}
+
+.cl-page .cl-table.is-supplier-offers col.cl-col-profit {
+    width: 108px;
+}
+
+.cl-page .cl-table.is-supplier-offers col.cl-col-toggle {
+    width: 128px;
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > * {
+    padding: 12px 8px;
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    background: var(--cl-surface);
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :first-child {
+    padding-left: 18px;
+    border-left: 1px solid var(--cl-line);
+    border-radius: var(--cl-offer-radius) 0 0 var(--cl-offer-radius);
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :last-child {
+    padding-right: 10px;
+    border-right: 1px solid var(--cl-line);
+    border-radius: 0 var(--cl-offer-radius) var(--cl-offer-radius) 0;
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
+    cursor: pointer;
+}
+
+/* Hover only on devices that hover (touch keeps it stuck) and never over a selected or covered row, whose own state wins. */
+@media screen and (hover: hover) {
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover > * {
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-offer-toggle:not(:has(input:checked)):hover {
+        background: var(--cl-accent-soft);
+    }
+
+    .cl-page .cl-order-chip-filter:hover {
+        background: var(--cl-chip-hover);
+    }
+
+    .cl-page .cl-alt-fold-toggle:hover {
+        text-decoration: underline;
+    }
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr.is-on > * {
+    border-color: var(--cl-offer-on-line);
+    background: var(--cl-offer-on);
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr.is-on > :first-child {
+    box-shadow: inset 5px 0 0 var(--cl-accent);
+}
+
+.cl-page .cl-table.is-supplier-offers th.cl-table-key {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-offer-name {
+    display: block;
+    font-size: 15px;
+    font-weight: 650;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-offer-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin-top: 6px;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* the secondary texts sit on white and on the tinted rows: --cl-ink-3 falls under 4.5:1 on the tint, --cl-ink-2 does not */
+.cl-page .cl-offer-stock,
+.cl-page .cl-offer-codes {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-order-refs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-order-ref {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+/* one class more than the quiet link of the key cell (.cl-table .cl-table-key a): order numbers are accent links */
+.cl-page .cl-table .cl-table-key .cl-order-ref a {
+    font-weight: 600;
+    color: var(--cl-accent);
+}
+
+/* an item a cheaper ticked offer takes: the reference stays, dashed, its price struck through */
+.cl-page .cl-order-ref.is-lost {
+    padding: 0 6px;
+    border: 1px dashed var(--cl-ink-3);
+    border-radius: 999px;
+}
+
+.cl-page .cl-order-ref.is-lost .cl-order-ref-price {
+    text-decoration: line-through;
+}
+
+.cl-page .cl-table.is-supplier-offers td.is-numeric {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.cl-page .cl-table.is-supplier-offers .cl-price-main {
+    display: block;
+}
+
+.cl-page .cl-unit {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-supplier-offers .cl-table-sub {
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-profit {
+    display: inline-block;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+/* profit as a tinted pill, in the table and the summary; the loss carries an icon too, not only the colour */
+.cl-page .cl-profit:is(.is-ok, .is-bad) {
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.cl-page .cl-profit.is-ok {
+    background: var(--cl-ok-soft);
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-profit.is-bad {
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-profit.is-unknown {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-loss-icon {
+    display: none;
+    margin-right: 4px;
+}
+
+.cl-page .cl-profit.is-bad .cl-loss-icon {
+    display: inline;
+}
+
+/* unticked: the numbers step back, the name and the solid pill stay readable */
+.cl-page .cl-table.is-supplier-offers tr.is-off td.is-numeric {
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+/* The toggle: a label around the offer's checkbox. The checkbox stays focusable and keeps the state; the label shows
+   one of four texts — "Zamów" / "✓ Zamawiam" and, for an offer covered cheaper, "Zamów tę" / "✓ Zaznaczona". */
+.cl-page .cl-offer-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 8px;
+    border: 1px solid var(--cl-accent);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--cl-accent-ink);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cl-page .cl-offer-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cl-page .cl-offer-toggle:has(input:checked) {
+    background: var(--cl-accent);
+    color: var(--cl-on-accent);
+}
+
+.cl-page .cl-offer-toggle:has(input:focus-visible) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-offer-toggle > span {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.cl-page .cl-offer-toggle .cl-offer-toggle-off,
+.cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-on,
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-alt {
+    display: inline-flex;
+}
+
+.cl-page .cl-offer-toggle:has(input:checked) .cl-offer-toggle-off,
+.cl-page tr.is-covered .cl-offer-toggle .cl-offer-toggle-off {
+    display: none;
+}
+
+/* covered cheaper: a smaller "Zamów tę" (a ticked offer is never covered: the script unticks it) */
+.cl-page tr.is-covered .cl-offer-toggle {
+    min-height: 32px;
+    font-size: 13px;
+}
+
+/* Covered cheaper: one compact line nested under its winner — a connector, the supplier, how much dearer (or why
+   nothing is ordered), the net price and the toggle; name, codes, orders and the other numbers fold away. The name,
+   codes and orders fold away only while the winner is on screen right above (is-nested, set by the script); a covered
+   offer whose winner a filter hides or that sits in another category keeps them, or nothing would say what it is. */
+.cl-page .cl-table.is-supplier-offers tbody tr.is-covered > * {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-table.is-supplier-offers tbody tr.is-covered.is-nested th.cl-table-key {
+    position: relative;
+    padding-left: 46px;
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested th.cl-table-key::before {
+    content: "";
+    position: absolute;
+    left: 22px;
+    top: -10px;
+    width: 12px;
+    height: calc(50% + 10px);
+    border-left: 2px solid var(--cl-alt-connector);
+    border-bottom: 2px solid var(--cl-alt-connector);
+    border-bottom-left-radius: 6px;
+}
+
+/* the winner row above carries the name; here it stays for screen readers only (same technique as .cl-visually-hidden) */
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested .cl-offer-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested .cl-offer-line {
+    margin: 0;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-covered :is(.cl-cell-qty > *, .cl-cell-profit > *),
+.cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested :is(.cl-offer-stock, .cl-order-refs, .cl-offer-codes) {
+    display: none;
+}
+
+.cl-page .cl-table.is-supplier-offers tr.is-covered td.is-numeric {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-offer-covered {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-offer-dearer {
+    font-weight: 600;
+    color: var(--cl-bad);
+}
+
+/* After "Zamów tę": which supplier was unticked and which orders' items it left without one */
+.cl-page .cl-offer-swap {
+    flex-basis: 100%;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--cl-warn);
+}
+
+/* The fold under a winner with dearer offers ("▸ Droższe oferty: n · od +x zł/szt."), written by the script */
+.cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
+    padding: 0 10px 0 46px;
+    border: 0;
+    background: none;
+}
+
+.cl-page .cl-alt-fold-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+.cl-page .cl-alt-fold-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-alt-fold-toggle :is(i, svg) {
+    font-size: 11px;
+    transition: transform .15s ease;
+}
+
+.cl-page .cl-alt-fold-toggle[aria-expanded="false"] :is(i, svg) {
+    transform: rotate(-90deg);
+}
+
+/* Category headings: larger than the rows, with the chevron toggle and "ofert: n · zamawiane: k" */
+.cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
+    padding: 14px 4px 0;
+    border: 0;
+    background: none;
+}
+
+.cl-page .cl-group-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--cl-ink);
+    cursor: pointer;
+}
+
+.cl-page .cl-group-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table.is-supplier-offers .cl-group-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-group-toggle i,
+.cl-page .cl-group-toggle svg {
+    width: 14px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    transition: transform .15s ease;
+}
+
+.cl-page .cl-group-toggle[aria-expanded="false"] :is(i, svg) {
+    transform: rotate(-90deg);
+}
+
+.cl-page .cl-group-count {
+    margin-left: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-group-count strong {
+    font-weight: 600;
+    color: inherit;
+}
+
+.cl-page .cl-group-count strong.is-ok {
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-group-chosen {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+/* Summary: amounts per supplier, earlier steps greyed */
+.cl-page .cl-by-supplier .cl-eyebrow {
+    margin-bottom: 6px;
+}
+
+.cl-page .cl-supplier-totals {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+}
+
+.cl-page .cl-supplier-totals li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.cl-page .cl-supplier-totals li[hidden] {
+    display: none;
+}
+
+.cl-page .cl-supplier-totals li.is-earlier {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-supplier-line {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.cl-page .cl-summary-alert {
+    margin: 0 20px 12px;
+}
+
+.cl-page .cl-kv-total .cl-help {
+    display: block;
+    font-weight: 400;
+}
+
+/* Below 1366 px the summary is under the table: the totals and a jump to it stay at the bottom of the screen */
+.cl-page .cl-summary-peek {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 16px;
+    padding: 10px 16px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius) var(--cl-radius) 0 0;
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
+    font-size: 14px;
+}
+
+
+.cl-page .cl-summary-peek .cl-button {
+    margin-left: auto;
+}
+
+@media screen and (min-width: 1366px) {
+    .cl-page .cl-summary-peek {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page :is(.cl-group-toggle, .cl-alt-fold-toggle) :is(i, svg) {
+        transition: none;
+    }
+}
+
+/* Below 1024 px every control is a 44 px touch target */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-offer-toggle,
+    .cl-page tr.is-covered .cl-offer-toggle,
+    .cl-page .cl-order-chip-link,
+    .cl-page .cl-order-chip-filter,
+    .cl-page .cl-group-toggle,
+    .cl-page .cl-alt-fold-toggle {
+        min-height: 44px;
+    }
+}
+
+/* A narrow offer list (beside the summary column at 1366–1600 px with the menu open, and on a phone) turns every
+   offer into a card: the offer across the top, then pieces, net, gross, profit and the toggle in one line. Six table
+   columns would leave the offer name under 100 px there. The phone block below rearranges the second line. */
+@container cl-offers (width < 800px) {
+    /* blocks, not table boxes: Chromium shrinks a grid row inside a table to its content instead of the list width */
+    .cl-page .cl-table.is-supplier-offers,
+    .cl-page .cl-table.is-supplier-offers > tbody,
+    .cl-page .cl-table.is-supplier-offers tbody tr:is(.cl-table-group, .cl-alt-fold) {
+        display: block;
+    }
+
+    .cl-page .cl-table.is-supplier-offers {
+        table-layout: auto;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr.cl-table-group {
+        padding: 0;
+        border-top: 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.cl-table-group > th {
+        display: block;
+        padding: 14px 4px 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+        align-items: center;
+        column-gap: 16px;
+        row-gap: 10px;
+        margin-top: 8px;
+        padding: 12px 14px;
+        border: 1px solid var(--cl-line);
+        border-radius: var(--cl-offer-radius);
+        background: var(--cl-surface);
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > *,
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] > :is(:first-child, :last-child) {
+        display: block;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr > *::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.is-on {
+        border-color: var(--cl-offer-on-line);
+        background: var(--cl-offer-on);
+        box-shadow: inset 5px 0 0 var(--cl-accent);
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.is-covered {
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-supplier-offers th.cl-table-key {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.is-covered.is-nested th.cl-table-key {
+        padding-left: 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-qty {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price {
+        grid-column: 2;
+        grid-row: 2;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross {
+        grid-column: 3;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
+        grid-column: 4;
+        grid-row: 2;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-toggle {
+        grid-column: 5;
+        grid-row: 2;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.is-covered :is(td.cl-cell-qty, td.cl-cell-profit) {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr.cl-alt-fold {
+        padding: 4px 4px 0;
+        border-top: 0;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tr.cl-alt-fold > td {
+        display: block;
+        padding: 0;
+    }
+}
+
+/* the card's hover tints the card, not its cells */
+@media screen and (hover: hover) {
+    @container cl-offers (width < 800px) {
+        .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover {
+            background: var(--cl-surface-2);
+        }
+
+        .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer]:not(.is-on):not(.is-covered):hover > * {
+            background: none;
+        }
+    }
+}
+
+/* Phone: on top of the card above, net | gross on the second line, pieces | profit on the third and the toggle across
+   the bottom. Every cell has an explicit place; nothing is reordered. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-offers-bar {
+        padding: 16px;
+    }
+
+    .cl-page .cl-bar-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .cl-page .cl-bar-label {
+        padding-top: 0;
+    }
+
+    .cl-page .cl-list-bar {
+        padding: 6px 12px 0;
+    }
+
+    .cl-page .cl-offers-list {
+        padding: 0 12px 12px;
+    }
+
+    .cl-page .cl-table.is-supplier-offers tbody tr[data-cl-offer] {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: start;
+    }
+
+    /* four values side by side do not fit 390 px */
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-qty {
+        grid-column: 1;
+        grid-row: 3;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price {
+        grid-column: 1;
+        grid-row: 2;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-price.is-gross {
+        grid-column: 2;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-profit {
+        grid-column: 2;
+        grid-row: 3;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.is-supplier-offers td.cl-cell-toggle {
+        grid-column: 1 / -1;
+        grid-row: 4;
+    }
+}
+
+/* Price filter of the supplier selection: a dual range slider (cl-range) under a bar chart of the offers per price
+   band, then both fields side by side, the count and "Wyczyść cenę". Two native range inputs share one track and only
+   their thumbs take the pointer, so each thumb can be grabbed over the other input; the keyboard and the accessible
+   value (aria-valuetext in złoty) come with the native inputs. */
+.cl-page .cl-range-filter {
+    padding: 8px 16px 0;
+}
+
+.cl-page .cl-range-hist {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 32px;
+}
+
+.cl-page .cl-range-hist span {
+    flex: 1;
+    min-height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--cl-chip-track);
+}
+
+.cl-page .cl-range-hist span.is-in {
+    background: var(--cl-accent);
+    opacity: .55;
+}
+
+.cl-page .cl-range {
+    position: relative;
+    height: 44px;
+}
+
+.cl-page :is(.cl-range-track, .cl-range-fill) {
+    position: absolute;
+    top: 20px;
+    height: 4px;
+    border-radius: 2px;
+}
+
+.cl-page .cl-range-track {
+    left: 0;
+    right: 0;
+    background: var(--cl-chip-track);
+}
+
+.cl-page .cl-range-fill {
+    background: var(--cl-accent);
+}
+
+.cl-page .cl-range input[type="range"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 44px;
+    margin: 0;
+    background: none;
+    pointer-events: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.cl-page .cl-range input[type="range"]:focus {
+    outline: none;
+}
+
+.cl-page .cl-range input[type="range"]::-webkit-slider-runnable-track {
+    height: 44px;
+    background: none;
+}
+
+.cl-page .cl-range input[type="range"]::-moz-range-track {
+    background: none;
+}
+
+.cl-page .cl-range input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: 11px;
+    border: 2px solid var(--cl-accent);
+    border-radius: 50%;
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
+    cursor: grab;
+    pointer-events: auto;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.cl-page .cl-range input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--cl-accent);
+    border-radius: 50%;
+    background: var(--cl-surface);
+    cursor: grab;
+    pointer-events: auto;
+}
+
+.cl-page .cl-range input[type="range"]:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-range input[type="range"]:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-range-ends {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-filter-menu-dates.is-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cl-page .cl-range-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding: 8px 16px 4px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* touch: a larger thumb inside the 44 px tall input */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-range input[type="range"]::-webkit-slider-thumb {
+        width: 28px;
+        height: 28px;
+        margin-top: 8px;
+    }
+
+    .cl-page .cl-range input[type="range"]::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+/* Orders archive (2026-10-09): shortcuts above the from–to fields of a date menu, and the line a batched text search
+   ends with when it stopped before the end of the history. */
+.cl-page .cl-date-presets {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+}
+.cl-page .cl-search-scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--cl-gap-related);
+    margin: 0;
+    padding: 12px 20px;
+    border-top: 1px solid var(--cl-line);
+    color: var(--cl-ink-2);
+    font-size: 13.5px;
 }

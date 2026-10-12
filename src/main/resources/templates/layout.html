@@ -201,7 +201,7 @@
         const toast = document.getElementById('clToast');
         toast.textContent = message;
         toast.className = 'cl-toast' + (type ? ' is-' + type : '');
-        toast.style.display = 'block';
+        toast.style.display = 'flex';
         requestAnimationFrame(() => { toast.style.opacity = '1'; });
         clearTimeout(clToastTimer);
         clToastTimer = setTimeout(() => {

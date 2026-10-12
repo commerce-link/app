@@ -26,6 +26,11 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                              CustomerView customer, OrderSettingsView settings, FinancesView finances,
                              HistoryCard history, OrderStatusOptions statusOptions) {
 
+    /** The back link names the list the operator came from: the archive or the open orders. */
+    public String backLabelKey() {
+        return OrderBackLink.isArchive(backHref) ? "orders.archive.title" : "orders.list.title";
+    }
+
     /**
      * cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an e-receipt
      * being issued), null for the general reason; cancelUnavailableKey: that general reason, which names what the

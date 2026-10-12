@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ public class OrderRowMapper {
 
     private static final DateTimeFormatter SAME_YEAR = DateTimeFormatter.ofPattern("dd.MM");
     private static final DateTimeFormatter OTHER_YEAR = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final DateTimeFormatter FULL_DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private final MessageSource messages;
     private final Locale locale;
@@ -90,7 +93,35 @@ public class OrderRowMapper {
                 statusTone(order.getStatus()),
                 money(order.getTotalPrice()),
                 unpaid > 0 ? text("orders.list.unpaid", money(unpaid)) : null,
-                marks(order));
+                marks(order, false));
+    }
+
+    /** A row of the orders archive (spec §5.4): the order day with year and time instead of the shipping due date. */
+    public OrderRow mapArchived(Order order, String returnTo) {
+        ShippingDetails shipping = order.getShippingDetails();
+        BillingDetails billing = order.getBillingDetails();
+        String email = billing == null ? null : billing.getEmail();
+        String name = firstNonBlank(personOrCompany(shipping), personOrCompany(billing));
+        LocalDateTime orderedAt = order.getOrderedAt();
+        return new OrderRow(
+                order.getOrderId(),
+                OrderListQuery.PATH + "/" + order.getOrderId()
+                        + (returnTo == null ? "" : "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8)),
+                order.getShortenedOrderId(),
+                sourceText(order),
+                order.getExternalOrderId() == null || order.getExternalOrderId().isBlank() ? null
+                        : text("orders.list.source.external", order.getExternalOrderId()),
+                name != null ? name : (email != null ? email : text("orders.list.client.unknown")),
+                shipping == null ? null : blankToNull(shipping.getCity()),
+                name != null ? email : null,
+                orderedAt == null ? text("orders.list.due.none") : FULL_DATE.format(orderedAt),
+                orderedAt == null ? null : TIME.format(orderedAt),
+                "",
+                order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
+                statusTone(order.getStatus()),
+                money(order.getTotalPrice()),
+                null,
+                marks(order, true));
     }
 
     /**
@@ -103,14 +134,23 @@ public class OrderRowMapper {
      * counts as a warehouse one (OrderLifecycle decides from the items).
      */
     List<DocMark> marks(Order order) {
-        boolean delivered = order.getStatus() == OrderStatus.Delivered;
+        return marks(order, false);
+    }
+
+    List<DocMark> marks(Order order, boolean archive) {
+        // in the archive a Completed order still missing its WZ or invoice is a real gap (the old page listed it as
+        // "to issue"); a Cancelled one never owes a document
+        boolean delivered = order.getStatus() == OrderStatus.Delivered
+                || (archive && order.getStatus() == OrderStatus.Completed);
+        // a closed order is past the point a missing document could hold it open, so its to-do says only what is missing
+        String todo = archive ? "orders.archive.mark.todo" : "orders.list.mark.todo";
         List<DocMark> marks = new ArrayList<>();
 
         Optional<Document> goodsIssue = order.getDocumentByType(DocumentType.GoodsIssue);
         if (goodsIssue.isPresent()) {
             marks.add(mark("wz", "WZ", "is-done", text("orders.list.mark.done", "WZ", number(goodsIssue.get()))));
         } else if (delivered && warehouseDocuments && order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
-            marks.add(mark("wz", "WZ", "is-todo", text("orders.list.mark.todo", "WZ")));
+            marks.add(mark("wz", "WZ", "is-todo", text(todo, "WZ")));
         }
 
         Optional<Document> closing = order.getClosingDocument();
@@ -126,12 +166,13 @@ public class OrderRowMapper {
             marks.add(mark("invoice", code(type), "is-done", text("orders.list.mark.done", documentName(type), number(closing.get()))));
         } else if (delivered && !order.isInvoiced()) {
             DocumentType type = order.getReceiptType();
-            marks.add(mark("invoice", code(type), "is-todo", text("orders.list.mark.todo", documentName(type))));
+            marks.add(mark("invoice", code(type), "is-todo", text(todo, documentName(type))));
         }
 
         OrderReviewStatus review = order.getReview() == null ? null : order.getReview().getStatus();
         String reviewName = text("orders.list.mark.review");
-        if (review == OrderReviewStatus.ToBeCollected && delivered) {
+        // a closed order is past collecting the review (ruling 5), so the archive never shows it as a to-do
+        if (review == OrderReviewStatus.ToBeCollected && delivered && !archive) {
             marks.add(mark("review", "", "is-todo", text("orders.list.mark.review.todo", reviewName)));
         } else if (review == OrderReviewStatus.Positive || review == OrderReviewStatus.Negative || review == OrderReviewStatus.NoResponse) {
             marks.add(mark("review", "", "is-done", text("orders.list.mark.review.done", reviewName, text("OrderReviewStatus." + review.name()))));
