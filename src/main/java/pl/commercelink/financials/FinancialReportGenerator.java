@@ -6,10 +6,20 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.*;
 
+import jakarta.annotation.PreDestroy;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -24,17 +34,26 @@ public class FinancialReportGenerator {
     @Autowired
     private DeliveriesRepository deliveriesRepository;
 
-    public FinancialReports generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
-        List<OrderIndexEntry> pastOrders = ordersRepository.findAllPastOrders(dateFrom, dateTo, storeId);
-        List<Entry> entries = pastOrders.stream()
-                .map(o -> {
-                    Order order = ordersRepository.findById(storeId, o.getOrderId());
-                    List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+    private static final int ITEMS_CHUNK_SIZE = 25;
+    private static final int ITEMS_THREADS = 8;
 
-                    return new Entry(order, orderItems);
-                })
+    private final ExecutorService itemsExecutor = Executors.newFixedThreadPool(ITEMS_THREADS, new ThreadFactory() {
+        private final AtomicInteger counter = new AtomicInteger();
+
+        @Override
+        public Thread newThread(Runnable task) {
+            Thread thread = new Thread(task, "report-items-" + counter.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
+
+    public FinancialReports generate(String storeId, LocalDate dateFrom, LocalDate dateTo) {
+        List<String> orderIds = ordersRepository.findAllPastOrders(dateFrom, dateTo, storeId).stream()
+                .map(OrderIndexEntry::getOrderId)
                 .toList();
-        var deliveries = deliveriesRepository.findAll(storeId, dateFrom.atStartOfDay(), dateTo.atTime(23, 59, 59));
+        List<Entry> entries = loadEntries(storeId, orderIds);
+        var deliveries = deliveriesRepository.findAll(storeId, dateFrom.atStartOfDay(), dateTo.atTime(LocalTime.MAX));
 
         List<Entry> ownEntries = entries.stream().filter(e -> !e.getOrder().isMarketplaceOrder()).toList();
         List<Entry> marketplaceEntries = entries.stream().filter(e -> e.getOrder().isMarketplaceOrder()).toList();
@@ -44,6 +63,46 @@ public class FinancialReportGenerator {
 
         return new FinancialReports(ownReport, marketplaceReport,
                 dailySales(dateFrom, dateTo, entries), supplierDeliveries(deliveries));
+    }
+
+    // an index entry whose order was deleted since the index was read has nothing to report, so it is skipped
+    private List<Entry> loadEntries(String storeId, List<String> orderIds) {
+        List<Order> orders = ordersRepository.findByIds(storeId, orderIds);
+        Map<String, List<OrderItem>> itemsByOrder = loadItems(orders.stream().map(Order::getOrderId).toList());
+        return orders.stream()
+                .map(order -> new Entry(order, itemsByOrder.getOrDefault(order.getOrderId(), List.of())))
+                .toList();
+    }
+
+    // the items table is queried once per order, so the chunks run in parallel; the pool is bounded to keep a
+    // long range from opening an unbounded number of concurrent queries on a table shared with the whole app
+    private Map<String, List<OrderItem>> loadItems(List<String> orderIds) {
+        List<CompletableFuture<Map<String, List<OrderItem>>>> chunks = new ArrayList<>();
+        for (int from = 0; from < orderIds.size(); from += ITEMS_CHUNK_SIZE) {
+            List<String> chunk = orderIds.subList(from, Math.min(from + ITEMS_CHUNK_SIZE, orderIds.size()));
+            chunks.add(CompletableFuture.supplyAsync(() -> orderItemsRepository.findByOrderIds(chunk), itemsExecutor));
+        }
+        Map<String, List<OrderItem>> items = new HashMap<>();
+        for (CompletableFuture<Map<String, List<OrderItem>>> chunk : chunks) {
+            try {
+                items.putAll(chunk.join());
+            } catch (CompletionException e) {
+                chunks.forEach(c -> c.cancel(true));
+                if (e.getCause() instanceof RuntimeException cause) {
+                    throw cause;
+                }
+                if (e.getCause() instanceof Error cause) {
+                    throw cause;
+                }
+                throw e;
+            }
+        }
+        return items;
+    }
+
+    @PreDestroy
+    void shutdown() {
+        itemsExecutor.shutdown();
     }
 
     // every day of the range gets an entry, so the daily chart shows a day without orders as a gap rather than skipping it
