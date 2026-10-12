@@ -1,6 +1,7 @@
 package pl.commercelink.web.warehousedocuments;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.warehouse.builtin.MfnHistory;
 import pl.commercelink.warehouse.builtin.MfnHistoryRow;
@@ -20,8 +21,8 @@ class ItemHistoryRenderingTest {
     void movesShowSignedChangesSummaryAndBackToTheDelivery() {
         // given
         MfnHistory history = new MfnHistory("Samsung 990 PRO", List.of(
-                new MfnHistoryRow("d1", "PZ/MAG1/2026/000210", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5),
-                new MfnHistoryRow("d2", "WZ/MAG1/2026/001179", DocumentType.GoodsIssue, LocalDateTime.of(2026, 10, 3, 11, 0), 2, -2, 3)));
+                new MfnHistoryRow("d1", "PZ/MAG1/2026/000210", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
+                new MfnHistoryRow("d2", "WZ/MAG1/2026/001179", DocumentType.GoodsIssue, LocalDateTime.of(2026, 10, 3, 11, 0), 2, -2, 3, null, null)));
         ItemHistoryPage page = page(history);
 
         // when
@@ -35,6 +36,27 @@ class ItemHistoryRenderingTest {
                 .contains(">PZ/<wbr>MAG1/<wbr>2026/<wbr>000210</a>")
                 .doesNotContain("has-text-danger").doesNotContain("style=").doesNotContain("??");
         assertThat(html.split("<h1", -1).length - 1).isEqualTo(1);
+    }
+
+    @Test
+    void aDocumentsReasonAndNoteAreShownAndAbsentOnesLeaveNothingBehind() {
+        // given
+        MfnHistory history = new MfnHistory("X", List.of(
+                new MfnHistoryRow("d1", "PZ/1", DocumentType.GoodsReceipt, LocalDateTime.of(2026, 10, 2, 8, 0), 5, 5, 5, null, null),
+                new MfnHistoryRow("d2", "RW/1", DocumentType.InternalIssue, LocalDateTime.of(2026, 10, 3, 8, 0), 1, -1, 4,
+                        DocumentReason.Destruction, "  Zalany w magazynie B ")));
+
+        // when
+        ItemHistoryPage page = page(history);
+        String html = SettingsTemplateRenderer.render(BODY, Map.of("page", page));
+
+        // then
+        assertThat(page.moves().get(0).reason()).isNull();
+        assertThat(page.moves().get(0).note()).isNull();
+        assertThat(page.moves().get(1).reason()).isEqualTo("Zniszczenie");
+        assertThat(page.moves().get(1).note()).isEqualTo("Zalany w magazynie B");
+        assertThat(html).contains("· Zniszczenie").contains("Zalany w magazynie B");
+        assertThat(html.split("· Zniszczenie", -1).length - 1).isEqualTo(1);
     }
 
     @Test
@@ -67,7 +89,7 @@ class ItemHistoryRenderingTest {
     void anItemWithoutADocumentTypeRendersADash() {
         // given
         MfnHistory history = new MfnHistory("X", List.of(
-                new MfnHistoryRow("d1", "X/1", null, null, 1, 0, 0)));
+                new MfnHistoryRow("d1", "X/1", null, null, 1, 0, 0, null, null)));
 
         // when
         ItemHistoryPage page = page(history);

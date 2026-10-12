@@ -17,7 +17,7 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
                               String deliveryHref, String movesTitle, List<Move> moves, String summary, String emptyText) {
 
     public record Move(String documentNo, String documentHref, String typeName, boolean incoming, String date,
-                       String change, String changeTone, String after) {}
+                       String change, String changeTone, String after, String reason, String note) {}
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm");
 
@@ -34,7 +34,9 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
             moves.add(new Move(r.documentNo(), DocumentRowMapper.detailsHref("/dashboard", r.documentId()),
                     typeName(r, kind, messages, locale), kind != null && kind.incoming(),
                     r.createdAt() == null ? "—" : r.createdAt().format(WHEN), change, tone,
-                    messages.getMessage("warehouse.documents.history.after", new Object[]{r.stockAfter()}, locale)));
+                    messages.getMessage("warehouse.documents.history.after", new Object[]{r.stockAfter()}, locale),
+                    r.reason() == null ? null : messages.getMessage("DocumentReason." + r.reason().name(), null, locale),
+                    r.note() == null || r.note().isBlank() ? null : r.note().trim()));
         }
         return new ItemHistoryPage(backHref, backLabel, history.productName(), mfn, DocumentRowMapper.shortId(deliveryId),
                 DeliveryLinks.of(false, null, URLEncoder.encode(deliveryId, StandardCharsets.UTF_8)).details(),
