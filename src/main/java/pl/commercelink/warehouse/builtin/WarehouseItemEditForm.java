@@ -61,6 +61,15 @@ public class WarehouseItemEditForm {
         return form;
     }
 
+    /** The page before the redesign posted the stored multiplier (1.23); anything else is left for validate() to judge. */
+    static String percentFromMultiplier(String tax) {
+        Double multiplier = amount(tax);
+        if (multiplier == null || multiplier < 1 || multiplier > 2) {
+            return tax;
+        }
+        return String.valueOf(Math.round((multiplier - 1) * 100));
+    }
+
     public Map<String, String> validate(FulfilmentStatus stored) {
         Map<String, String> errors = new LinkedHashMap<>();
         if (StringUtils.length(comment) > MAX_COMMENT) errors.put("comment", "warehouse.item.error.comment");

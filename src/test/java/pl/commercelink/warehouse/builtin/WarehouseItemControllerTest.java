@@ -278,14 +278,78 @@ class WarehouseItemControllerTest {
     }
 
     @Test
-    void oldSaveAddressIsTheSameHandler() throws Exception {
-        // given: the alias is mapped on the same method, so the mapping annotation carries both paths
-        var mapping = WarehouseItemController.class.getDeclaredMethod("saveWarehouseItem", String.class, WarehouseItemEditForm.class,
-                org.springframework.ui.Model.class, Locale.class, jakarta.servlet.http.HttpServletResponse.class,
-                org.springframework.web.servlet.mvc.support.RedirectAttributes.class)
+    void bothSaveAddressesAreMapped() throws Exception {
+        // given
+        Class<?>[] params = {String.class, WarehouseItemEditForm.class, org.springframework.ui.Model.class, Locale.class,
+                jakarta.servlet.http.HttpServletResponse.class, org.springframework.web.servlet.mvc.support.RedirectAttributes.class};
+
+        // when
+        var current = WarehouseItemController.class.getDeclaredMethod("saveWarehouseItem", params)
+                .getAnnotation(org.springframework.web.bind.annotation.PostMapping.class);
+        var old = WarehouseItemController.class.getDeclaredMethod("saveFromPageBeforeRedesign", params)
                 .getAnnotation(org.springframework.web.bind.annotation.PostMapping.class);
 
-        // when / then
-        assertThat(mapping.value()).containsExactlyInAnyOrder("/dashboard/warehouse/items/{itemId}", "/dashboard/warehouse/items/{itemId}/save");
+        // then
+        assertThat(current.value()).containsExactly("/dashboard/warehouse/items/{itemId}");
+        assertThat(old.value()).containsExactly("/dashboard/warehouse/items/{itemId}/save");
+    }
+
+    /** Exactly the fields the page before the redesign posts: tax as the multiplier, no version, no back. */
+    private static WarehouseItemEditForm oldPageForm(String status, String comment) {
+        WarehouseItemEditForm form = new WarehouseItemEditForm();
+        form.setCategory("Dyski SSD");
+        form.setName("Samsung 990 Pro");
+        form.setQty("3");
+        form.setCost("689.0");
+        form.setUnitSystemCost("0.0");
+        form.setTax("1.23");
+        form.setEan("880");
+        form.setManufacturerCode("MZ-1");
+        form.setDeliveryId("d-1");
+        form.setSerialNo("");
+        form.setStatus(status);
+        form.setCondition("Sealed");
+        form.setComment(comment);
+        return form;
+    }
+
+    @Test
+    void oldPageSavingANewItemKeepsItsVatRate() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.New);
+        stored.setTax(1.23);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        org.mockito.ArgumentCaptor<WarehouseItem> saved = org.mockito.ArgumentCaptor.forClass(WarehouseItem.class);
+
+        // when
+        String view = asStore(() -> controller.saveFromPageBeforeRedesign(ID, oldPageForm("New", "Old page"), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        verify(updates).update(eq("store-1"), same(stored), saved.capture());
+        assertThat(saved.getValue().getTax()).isCloseTo(1.23, org.assertj.core.data.Offset.offset(1e-4));
+        assertThat(saved.getValue().getCost()).isEqualTo(689.0);
+        assertThat(saved.getValue().getName()).isEqualTo("Samsung 990 Pro");
+        assertThat(view).startsWith("redirect:");
+    }
+
+    @Test
+    void oldPageSavingADeliveredItemStoresTheAllowedFields() throws Exception {
+        // given
+        WarehouseItem stored = item(FulfilmentStatus.Delivered);
+        stored.setTax(1.23);
+        when(repository.findById("store-1", ID)).thenReturn(stored);
+        org.mockito.ArgumentCaptor<WarehouseItem> saved = org.mockito.ArgumentCaptor.forClass(WarehouseItem.class);
+
+        // when
+        asStore(() -> controller.saveFromPageBeforeRedesign(ID, oldPageForm("Delivered", "Old page"), new ExtendedModelMap(), PL,
+                new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then
+        verify(updates).update(eq("store-1"), same(stored), saved.capture());
+        assertThat(saved.getValue().getName()).isEqualTo("Samsung 990 Pro");
+        assertThat(saved.getValue().getComment()).isEqualTo("Old page");
+        assertThat(saved.getValue().getTax()).isEqualTo(1.23);
+        assertThat(saved.getValue().getCost()).isEqualTo(689.0);
     }
 }

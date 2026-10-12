@@ -180,8 +180,15 @@ class WarehouseItemController {
         return "redirect:/dashboard/warehouse?statuses=" + status.name();
     }
 
-    // "/save" is the address of the page before the redesign: a page still open in a browser during a rolling deploy posts there
-    @PostMapping({"/dashboard/warehouse/items/{itemId}", "/dashboard/warehouse/items/{itemId}/save"})
+    // only the page before the redesign posts here (a page still open during a rolling deploy); it sends the VAT as the multiplier
+    @PostMapping("/dashboard/warehouse/items/{itemId}/save")
+    String saveFromPageBeforeRedesign(@PathVariable("itemId") String itemId, @ModelAttribute("form") WarehouseItemEditForm form, Model model,
+                                      Locale locale, HttpServletResponse response, RedirectAttributes redirectAttributes) {
+        form.setTax(WarehouseItemEditForm.percentFromMultiplier(form.getTax()));
+        return saveWarehouseItem(itemId, form, model, locale, response, redirectAttributes);
+    }
+
+    @PostMapping("/dashboard/warehouse/items/{itemId}")
     String saveWarehouseItem(@PathVariable("itemId") String itemId, @ModelAttribute("form") WarehouseItemEditForm form, Model model,
                              Locale locale, HttpServletResponse response, RedirectAttributes redirectAttributes) {
         WarehouseItem stored = found(itemId);

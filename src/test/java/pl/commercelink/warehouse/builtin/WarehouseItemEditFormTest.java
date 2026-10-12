@@ -160,4 +160,15 @@ class WarehouseItemEditFormTest {
         // then
         assertThat(updated.hasUnitSystemCost()).isFalse();
     }
+
+    @Test
+    void multiplierOfThePageBeforeTheRedesignBecomesPercent() {
+        // when / then
+        assertThat(WarehouseItemEditForm.percentFromMultiplier("1.23")).isEqualTo("23");
+        assertThat(WarehouseItemEditForm.percentFromMultiplier("1.08")).isEqualTo("8");
+        assertThat(WarehouseItemEditForm.percentFromMultiplier("1")).isEqualTo("0");
+        assertThat(WarehouseItemEditForm.percentFromMultiplier("23")).isEqualTo("23");
+        assertThat(WarehouseItemEditForm.percentFromMultiplier("abc")).isEqualTo("abc");
+        assertThat(WarehouseItemEditForm.percentFromMultiplier(null)).isNull();
+    }
 }
