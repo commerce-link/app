@@ -9549,7 +9549,9 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-warehouse tr.is-selected .cl-status.is-info { background: var(--cl-surface); box-shadow: inset 0 0 0 1px var(--cl-accent); }
 /* Destroyed archive (spec §6.2): the warehouse table without the checkbox column, with the destruction day and a ⋯ menu */
 .cl-page .cl-table.is-warehouse.is-destroyed .cl-col-date { width: 8rem; }
-.cl-page .cl-table.is-warehouse.is-destroyed .cl-col-menu { width: 3.5rem; }
+/* 8 px + the 44 px target (36 px from 1024 px) + the card's 20 px right edge; at 3.5rem the button reached the card border */
+.cl-page .cl-table.is-warehouse.is-destroyed .cl-col-menu { width: 4.5rem; }
+.cl-page .cl-table.is-warehouse.is-destroyed td.cl-table-actions { padding-left: 8px; }
 .cl-page .cl-table.is-warehouse.is-destroyed td.cl-cell-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 719px) {
     /* no checkbox to make room for: the menu sits in the top-right corner of the card instead */

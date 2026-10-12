@@ -240,4 +240,16 @@ class WarehouseListStylesContractTest {
                 .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody :is(th.cl-table-key, td:not(.cl-table-actions)) { display: contents; }")
                 .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody td.cl-table-actions { display: block; position: absolute; top: 8px; right: 8px; padding: 0; }");
     }
+
+    @Test
+    void destroyedArchiveMenuColumnFitsTheTouchTargetInsideTheCardEdge() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // 8 px + the 44 px target (36 px from 1024 px) + the card's 20 px right edge: at 3.5rem the button reached the card border
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed .cl-col-menu { width: 4.5rem; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed td.cl-table-actions { padding-left: 8px; }")
+                .doesNotContain(".cl-col-menu { width: 3.5rem; }");
+    }
 }
