@@ -1,5 +1,6 @@
 package pl.commercelink.warehouse.builtin;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,11 +10,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
@@ -22,9 +26,9 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
-import pl.commercelink.warehouse.api.ItemCondition;
 
-import java.util.Arrays;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,6 +77,9 @@ class WarehouseItemController {
     @Autowired
     private SupplierLabels supplierLabels;
 
+    @Autowired
+    private WarehouseItemPageFactory warehouseItemPageFactory;
+
     @GetMapping("/dashboard/warehouse/items/available")
     @ResponseBody
     List<AvailableWarehouseItemDto> availableWarehouseItems(@RequestParam(defaultValue = "") String category) {
@@ -84,33 +91,10 @@ class WarehouseItemController {
     }
 
     @GetMapping("/dashboard/warehouse/items/{itemId}")
-    String showWarehouseItem(@PathVariable("itemId") String itemId, Model model) {
-        return showWarehouseItemDetails(model, warehouseRepository.findById(getStoreId(), itemId));
+    String showWarehouseItem(@PathVariable("itemId") String itemId, @RequestParam(required = false) String back, Model model, Locale locale) {
+        model.addAttribute("page", warehouseItemPageFactory.page(found(itemId), back, isAdmin(), null, Map.of(), null, locale));
+        return "warehouse-item";
     }
-
-    private String showWarehouseItemDetails(Model model, WarehouseItem item) {
-        boolean isEdit = !item.isNew();
-
-        model.addAttribute("productCategories", storeCategories.namesFor(getStoreId()));
-        model.addAttribute("productCategoryGroups", storeCategories.groupsFor(getStoreId()));
-        model.addAttribute("fulfilmentStatuses", getAvailableStatuses(isEdit));
-        model.addAttribute("itemConditions", ItemCondition.values());
-        model.addAttribute("warehouseItem", item);
-        model.addAttribute("isEdit", isEdit);
-
-        return "warehouseItem";
-    }
-
-    private List<FulfilmentStatus> getAvailableStatuses(boolean isEdit) {
-        if (isEdit) {
-            return Arrays.stream(FulfilmentStatus.values())
-                    .filter(s -> s != FulfilmentStatus.Returned)
-                    .filter(s -> s != FulfilmentStatus.Replaced)
-                    .collect(Collectors.toList());
-        }
-        return NEW_ITEM_STATUSES;
-    }
-
     @GetMapping("/dashboard/warehouse/items/new")
     String newItem(Model model) {
         return newItemPage(model, new WarehouseItemAddForm(), Map.of(), Map.of(), false, null);
@@ -192,41 +176,85 @@ class WarehouseItemController {
         return "warehouse-item-new";
     }
 
-    @PostMapping("/dashboard/warehouse/items/{itemId}/save")
-    String saveWarehouseItem(@PathVariable("itemId") String itemId,
-                             @ModelAttribute WarehouseItem updatedItem,
-                             Model model) {
-        WarehouseItem existingItem = warehouseRepository.findById(getStoreId(), itemId);
-        boolean isNewItem = existingItem == null;
-
-        if (isNewItem) {
-            if (updatedItem.getStatus() == FulfilmentStatus.Delivered) {
-                updatedItem.setDeliveryId("Unknown");
-            }
-            OperationResult<?> result = warehouseInternalReceiptService.addItem(
-                    getStoreId(),
-                    updatedItem,
-                    CustomSecurityContext.getLoggedInUserName()
-            );
-            if (!result.isSuccess()) {
-                model.addAttribute("errorMessage", result.getMessage());
-                return showWarehouseItemDetails(model, updatedItem);
-            }
-            return redirectToWarehouseFilteredBy(updatedItem.getStatus());
-        }
-
-        warehouseItemUpdateService.update(getStoreId(), existingItem, updatedItem);
-        return redirectToWarehouseFilteredBy(existingItem.getStatus());
-    }
-
     private static String redirectToWarehouseFilteredBy(FulfilmentStatus status) {
         return "redirect:/dashboard/warehouse?statuses=" + status.name();
     }
 
+    // "/save" is the address of the page before the redesign: a page still open in a browser during a rolling deploy posts there
+    @PostMapping({"/dashboard/warehouse/items/{itemId}", "/dashboard/warehouse/items/{itemId}/save"})
+    String saveWarehouseItem(@PathVariable("itemId") String itemId, @ModelAttribute("form") WarehouseItemEditForm form, Model model,
+                             Locale locale, HttpServletResponse response, RedirectAttributes redirectAttributes) {
+        WarehouseItem stored = found(itemId);
+        Map<String, String> errors = form.validate(stored.getStatus());
+        if (!errors.isEmpty()) {
+            response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            model.addAttribute("page", warehouseItemPageFactory.page(stored, form.getBack(), isAdmin(), form, errors, null, locale));
+            return "warehouse-item";
+        }
+        String holder;
+        try {
+            holder = warehouseItemUpdateService.update(getStoreId(), stored, form.toUpdate(stored));
+        } catch (ConditionalCheckFailedException e) {
+            response.setStatus(HttpStatus.CONFLICT.value());
+            model.addAttribute("page", warehouseItemPageFactory.page(found(itemId), form.getBack(), isAdmin(), form, Map.of(),
+                    text(locale, "warehouse.item.error.conflict"), locale));
+            return "warehouse-item";
+        }
+        if (!holder.equals(itemId)) {
+            SettingsFlash.onRedirect(redirectAttributes, text(locale, "warehouse.item.saved.merged", stored.getName()));
+            return "redirect:" + ItemBack.itemHref(holder, form.getBack());
+        }
+        SettingsFlash.onRedirect(redirectAttributes, text(locale, "warehouse.item.saved", stored.getName()));
+        return "redirect:" + ItemBack.resolve(form.getBack(), stored.getStatus()).href();
+    }
+
+    /** Without JavaScript the delete button opens this page; with it, confirm-dialog.js posts to the same address. */
+    @GetMapping("/dashboard/warehouse/items/{itemId}/delete")
+    String confirmDeleteWarehouseItem(@PathVariable("itemId") String itemId, @RequestParam(required = false) String back, Model model,
+                                      Locale locale, RedirectAttributes redirectAttributes) {
+        WarehouseItem item = found(itemId);
+        if (!item.canBeDeleted()) {
+            SettingsFlash.errorOnRedirect(redirectAttributes, text(locale, "warehouse.item.delete.refused"));
+            return "redirect:" + ItemBack.itemHref(itemId, back);
+        }
+        String self = ItemBack.itemHref(itemId, back);
+        String safe = ItemBack.safe(back);
+        model.addAttribute("confirm", new ConfirmAction(text(locale, "warehouse.item.delete.title", item.getName()),
+                text(locale, "warehouse.item.delete.message"), text(locale, "warehouse.item.delete.action"),
+                "/dashboard/warehouse/items/" + itemId + "/delete" + (safe == null ? "" : "?back=" + URLEncoder.encode(safe, StandardCharsets.UTF_8)),
+                self));
+        model.addAttribute("backLabel", item.getName());
+        return "settings-confirm";
+    }
+
     @PostMapping("/dashboard/warehouse/items/{itemId}/delete")
-    String deleteWarehouseItem(@PathVariable("itemId") String itemId) {
+    String deleteWarehouseItem(@PathVariable("itemId") String itemId, @RequestParam(required = false) String back, Locale locale,
+                               RedirectAttributes redirectAttributes) {
+        WarehouseItem item = found(itemId);
+        // the button shows only for New, but a posted form can come from anywhere
+        if (!item.canBeDeleted()) {
+            SettingsFlash.errorOnRedirect(redirectAttributes, text(locale, "warehouse.item.delete.refused"));
+            return "redirect:" + ItemBack.itemHref(itemId, back);
+        }
         warehouseAllocationsManager.remove(getStoreId(), itemId);
-        return "redirect:/dashboard/warehouse";
+        SettingsFlash.onRedirect(redirectAttributes, text(locale, "warehouse.item.deleted", item.getName()));
+        return "redirect:" + ItemBack.resolve(back, FulfilmentStatus.New).href();
+    }
+
+    private WarehouseItem found(String itemId) {
+        WarehouseItem item = warehouseRepository.findById(getStoreId(), itemId);
+        if (item == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return item;
+    }
+
+    private boolean isAdmin() {
+        return CustomSecurityContext.hasRole("ADMIN");
+    }
+
+    private String text(Locale locale, String key, Object... args) {
+        return messageSource.getMessage(key, args, locale);
     }
 
     private String getStoreId() {
