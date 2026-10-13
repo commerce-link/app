@@ -188,4 +188,37 @@ class RmaNewPageFactoryTest {
         assertThat(page.items().get(0).selected()).isFalse();
         assertThat(page.items().get(0).qty()).isEqualTo("1");
     }
+
+    @Test
+    void theOrderNamesTheClientWithTheCityAndAnItemItsSerialNumber() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.getBillingDetails().setName("Anna");
+        order.getBillingDetails().setSurname("Nowak");
+        order.getBillingDetails().setCity("Kraków");
+        when(orderItems.findByOrderIdAndStatuses(ORDER_ID, RmaCreateService.REPORTABLE)).thenReturn(List.of(item("i1", "602-V531", 1)));
+        when(coverage.claims(STORE, List.of("i1"))).thenReturn(Map.of());
+
+        // when
+        RmaNewPage page = factory.build(STORE, new RmaOrderSearch.Result(RmaOrderSearch.Kind.ORDER, ORDER_ID, false, order, null, List.of(), false), null, PL);
+
+        // then
+        assertThat(page.order().client()).isEqualTo("Anna Nowak · Kraków");
+        assertThat(page.items().get(0).sub()).isEqualTo("SN 602-V531");
+    }
+
+    @Test
+    void aClientWithoutANameIsTheirEmail() {
+        // when
+        String client = RmaNewPageFactory.client(order(OrderStatus.Delivered));
+
+        // then
+        assertThat(client).isEqualTo("anna@x.pl");
+    }
+
+    @Test
+    void theResolutionsAreOfferedAsRepairReplacementReturn() {
+        // when / then
+        assertThat(RmaNewPage.RESOLUTIONS).containsExactly(RMAResolutionType.Repair, RMAResolutionType.Replacement, RMAResolutionType.Return);
+    }
 }

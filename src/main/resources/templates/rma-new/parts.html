@@ -17,7 +17,7 @@
         <a class="cl-lead-link" th:href="@{${p.order().href()}}" th:text="${p.order().shortId()}"
            th:title="${p.order().orderId()}"></a>
         <th:block th:if="${p.order().client() != null}"> · <span th:text="${p.order().client()}"></span></th:block>
-        · <span th:text="${p.order().ordered()}"></span>
+        · <span th:text="#{rma.new.lead.ordered(${p.order().ordered()})}"></span>
     </p>
     <p class="cl-page-lead" th:if="${p.state().name() == 'START' or p.state().name() == 'CHOICE'}" th:text="${p.leadText()}"></p>
 </div>
@@ -159,7 +159,7 @@
                             <fieldset class="cl-choice-group is-row" tabindex="-1" th:id="${resId}"
                                       th:attr="aria-invalid=${resErr != null ? 'true' : null}, aria-describedby=${resErr != null ? resId + '-error' : null}">
                                 <legend class="cl-label" th:text="#{rma.new.resolution.legend}"></legend>
-                                <label class="cl-choice" th:each="res : ${T(pl.commercelink.orders.rma.RMAResolutionType).values()}">
+                                <label class="cl-choice" th:each="res : ${T(pl.commercelink.web.rma.RmaNewPage).RESOLUTIONS}">
                                     <input type="radio" th:id="|${resId}-${res.name()}|" th:name="|items[${i}].resolution|"
                                            th:value="${res.name()}" th:checked="${res.name() == r.resolution()}"/>
                                     <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{|RMAResolutionType.${res.name()}|}"></span></span>

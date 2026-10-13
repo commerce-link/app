@@ -1,6 +1,7 @@
 package pl.commercelink.web.rma;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -13,6 +14,7 @@ import pl.commercelink.orders.rma.RmaCreateService;
 import pl.commercelink.orders.rma.RmaOrderSearch;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.dtos.RmaCreateForm;
+import pl.commercelink.web.orders.AddressBlock;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderFormats;
 import pl.commercelink.web.orders.OrderLabels;
@@ -23,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -148,7 +151,20 @@ public class RmaNewPageFactory {
         return new RmaNewPage.Header(order.getOrderId(), ConversionUtil.getShortenedId(order.getOrderId()),
                 "/dashboard/orders/" + order.getOrderId(), OrderLabels.status(order.getStatus()),
                 OrderLabels.tone(order.getStatus()), OrderFormats.date(order.getOrderedAt()),
-                OrderPageModelFactory.clientName(order), source);
+                client(order), source);
+    }
+
+    // "name or company · city"; without either, the e-mail the order page falls back to
+    static String client(Order order) {
+        String person = Stream.of(AddressBlock.of(order.getShippingDetails(), Locale.ROOT).companyOrPerson(),
+                AddressBlock.of(order.getBillingDetails(), Locale.ROOT).companyOrPerson()).filter(Objects::nonNull).findFirst().orElse(null);
+        if (person == null) {
+            return OrderPageModelFactory.clientName(order);
+        }
+        String city = Stream.of(order.getShippingDetails() == null ? null : order.getShippingDetails().getCity(),
+                        order.getBillingDetails() == null ? null : order.getBillingDetails().getCity())
+                .filter(StringUtils::isNotBlank).map(String::trim).findFirst().orElse(null);
+        return city == null ? person : person + " · " + city;
     }
 
     private String sub(OrderItem item, Locale locale) {
@@ -156,7 +172,7 @@ public class RmaNewPageFactory {
             return msg("rma.new.items.service", locale);
         }
         return Stream.of(item.getEan() == null || item.getEan().isBlank() ? null : msg("rma.new.items.ean", locale, item.getEan()),
-                        item.getSerialNo() == null || item.getSerialNo().isBlank() ? null : item.getSerialNo())
+                        item.getSerialNo() == null || item.getSerialNo().isBlank() ? null : msg("rma.new.items.serial", locale, item.getSerialNo()))
                 .filter(s -> s != null).collect(Collectors.joining(" · "));
     }
 

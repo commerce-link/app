@@ -1,5 +1,7 @@
 package pl.commercelink.web.rma;
 
+import pl.commercelink.orders.rma.RMAResolutionType;
+
 import java.util.List;
 import java.util.Map;
 
@@ -8,6 +10,10 @@ public record RmaNewPage(State state, String query, String backHref, String back
                          String leadText, Header order, Choice choice, String notFoundDesc, Ineligible ineligible,
                          List<ItemRow> items, String itemsEmptyText, Summary summary,
                          String pageError, Map<String, String> errorSummary, Map<String, String> fieldErrors) {
+
+    /** The order the operator reads them in (the enum's own order is Repair, Return, Replacement). */
+    public static final List<RMAResolutionType> RESOLUTIONS =
+            List.of(RMAResolutionType.Repair, RMAResolutionType.Replacement, RMAResolutionType.Return);
 
     public enum State { START, CHOICE, NOT_FOUND, INELIGIBLE, ORDER }
 
