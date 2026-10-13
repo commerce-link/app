@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,7 +32,7 @@ class OrdersArchiveDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static OrdersRepository orders;
     static final Set<OrderStatus> CLOSED = Set.of(OrderStatus.Completed, OrderStatus.Cancelled);
