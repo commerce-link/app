@@ -119,7 +119,23 @@ class ReportsRenderingTest {
 
         // then
         assertThat(html).contains("No sales in the store in this period");
-        assertThat(html).contains("cl-compare-val is-own\">—<");
+        assertThat(html).containsPattern("aria-labelledby=\"channel-profile-own\"[\\s\\S]*?<dd class=\"is-numeric\">—</dd>");
+    }
+
+    @Test
+    void theShareRowsAddUpAndEachChannelGetsAProfileOfTheRest() {
+        // when
+        String html = render(page(true, 141));
+
+        // then
+        assertThat(html.split("class=\"cl-compare-row", -1)).hasSize(4);
+        assertThat(html).containsPattern("<h3 class=\"cl-compare-profile-title\" id=\"channel-profile-own\">\\s*"
+                        + "<span class=\"cl-chart-key\" aria-hidden=\"true\"></span>\\s*<span>Store</span></h3>")
+                .containsPattern("<h3 class=\"cl-compare-profile-title\" id=\"channel-profile-marketplace\">\\s*"
+                        + "<span class=\"cl-chart-key is-2\" aria-hidden=\"true\"></span>\\s*<span>Marketplace</span></h3>")
+                .containsPattern("<dt>Net cost</dt>\\s*<dd class=\"is-numeric\">215[^<]439 PLN</dd>")
+                .containsPattern("<dt>Margin</dt>\\s*<dd class=\"is-numeric\">15,7%</dd>")
+                .containsPattern("<dt>Average order</dt>\\s*<dd class=\"is-numeric\">1[^<]712 PLN</dd>");
     }
 
     @Test

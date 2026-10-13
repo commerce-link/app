@@ -1903,6 +1903,8 @@ body.cl-drawer-open .cl-sidebar {
     border-top: 1px solid var(--cl-line);
     font-size: 14px;
     color: var(--cl-ink-2);
+    /* the empty state quotes the search phrase, which may be one long word */
+    overflow-wrap: anywhere;
 }
 
 /* Status tones next to the warning tone defined with the tiles (is-bad: Zablokowane on the orders list, FAILED/BLOCKED
@@ -9605,9 +9607,9 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-documents .cl-icon-text .fa-sign-out-alt { color: var(--cl-ink-2); }
 
 /* Offers list (spec docs/active/offers-redesign). The row link's ::after covers the whole row, so the actions cell rises
-   above it or its menu and buttons could not be clicked. Scoped to is-offers: payments.html also has td.cl-table-actions
-   inside an is-orders table and must keep its own layout. */
-.cl-page .cl-table.is-offers .cl-table-actions {
+   above it or its menu and buttons could not be clicked. Scoped to the offers and stores lists: payments.html also has
+   td.cl-table-actions inside an is-orders table and must keep its own layout. */
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions {
     position: relative;
     z-index: 1;
     width: 1%;
@@ -9616,24 +9618,24 @@ a.cl-link-button:hover {
 }
 
 /* Every actions cell is its own layer; without this the next row's cell paints over the open menu and takes its clicks. */
-.cl-page .cl-table.is-offers .cl-table-actions:has(.cl-menu[open]) {
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions:has(.cl-menu[open]) {
     z-index: 2;
 }
 
-.cl-page .cl-table.is-offers .cl-table-actions > * + * {
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions > * + * {
     margin-left: 4px;
 }
 
 /* Row actions without a frame at rest (S1, audit 2026-10-03): two framed 36 px buttons per row were the loudest thing in
    the table. The frame comes back under the pointer, on an open menu, and the focus ring stays; the size (36 px,
    44 px below 1024 px) does not change. */
-.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon {
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions .cl-button.is-icon {
     border-color: transparent;
     background: transparent;
 }
 
-.cl-page .cl-table.is-offers .cl-table-actions .cl-button.is-icon:hover,
-.cl-page .cl-table.is-offers .cl-table-actions .cl-menu[open] > summary.cl-button.is-icon {
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions .cl-button.is-icon:hover,
+.cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions .cl-menu[open] > summary.cl-button.is-icon {
     border-color: var(--cl-accent);
     background: var(--cl-surface);
 }
@@ -12354,6 +12356,84 @@ a.cl-link-button:hover {
     font-size: 13.5px;
 }
 
+/* RMA list (spec 2026-10-13): the return shipment and the marketplace state each get their own line under the status
+   pill; the order column gives way to the customer below 1216 px and is hidden on the phone card (cl-cards-hide).
+   The age warning (.cl-due-note.is-warn) is already styled by the orders table, which is-rma extends. */
+.cl-page .cl-table.is-rma .cl-rma-track {
+    display: block;
+}
+
+.cl-page .cl-table.is-rma .cl-cell-date {
+    white-space: nowrap;
+}
+
+/* A long word in a company or surname (Konstantynopolitańczykiewiczówna) breaks instead of widening the table past the
+   card (design system §1.4). */
+.cl-page .cl-table.is-rma .cl-cell-client {
+    overflow-wrap: anywhere;
+}
+
+/* A pill whose label wraps keeps its dot on the first line instead of centring it between the lines; on one line the
+   dot sits where it always does (6 px into an 18 px line). It wraps between words only: breaking anywhere would let the
+   status column shrink to one letter ("Zatwi / erdzo / ny") beside a long client. */
+.cl-page .cl-table.is-rma .cl-status {
+    align-items: flex-start;
+    overflow-wrap: normal;
+}
+
+.cl-page .cl-table.is-rma .cl-status::before {
+    margin-top: 6px;
+}
+
+/* The orders table tones every age note, so its hover rule leaves .cl-due-note alone; an untoned RMA age ("3 dni") in
+   --cl-ink-3 would be 4.48:1 on the hover tint. */
+.cl-page .cl-table.is-rma tbody tr:hover .cl-due-note:not(.is-warn) {
+    color: var(--cl-ink-2);
+}
+
+/* The Allegro return reference is longer than the 14ch the orders table allows a code; it wraps instead of ending in an
+   ellipsis, since the list is the only place to read it without opening the RMA (the full text is also the title). */
+.cl-page .cl-table.is-rma .cl-table-key .cl-table-sub .cl-table-code {
+    display: inline;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Phone card: the number is the row's name and is always shown whole, so its column is as wide as the number and the
+   status pill takes the rest and wraps when its text is long; the pill sits at the card's edge, its text starts at the
+   dot. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-rma tr {
+        grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-rma .cl-table-key .cl-row-link {
+        flex-shrink: 0;
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .cl-page .cl-table.is-rma .cl-status {
+        white-space: normal;
+    }
+}
+
+/* Beside the sidebar the status column would otherwise be as wide as "Oczekiwanie na przedmioty" and push the table
+   past the card at 720-789 px; the pill wraps like on the phone card. */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-rma .is-secondary-column {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-rma .cl-status {
+        white-space: normal;
+    }
+}
+
 /* Reports (app#290): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
    docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
 :root {
@@ -12542,6 +12622,13 @@ a.cl-link-button:hover {
 .cl-page .cl-compare-row .cl-hbar-track { height: 24px; }
 .cl-page .cl-compare-row .cl-hbar-seg { font-size: 12px; }
 .cl-page .cl-compare-row.is-plain .cl-compare-mid { font-size: 12.5px; color: var(--cl-ink-2); text-align: center; }
+/* figures of each channel that do not add up into a share (net cost, margin, average order): one panel per channel
+   under the share rows, a key dot in the title as in the head, values as dl.cl-kv.is-column (label left, number right,
+   one line also on a phone); the panels stack below 720 px */
+.cl-page .cl-compare-profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 20px 20px; }
+.cl-page .cl-compare-profile { border: 1px solid var(--cl-line); border-radius: var(--cl-radius); padding: 12px 16px 14px; }
+.cl-page .cl-compare-profile-title { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-compare-profile dl.cl-kv { gap: 8px; padding: 0; }
 /* 720–1023 px: the share bar is narrow, so the measure column gives it room and a segment keeps its percent whole */
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-compare-head, .cl-page .cl-compare-row { grid-template-columns: 120px minmax(100px, max-content) minmax(0, 1fr) minmax(100px, max-content); gap: 4px 10px; }
@@ -12561,6 +12648,7 @@ a.cl-link-button:hover {
     .cl-page .cl-compare-val.is-mkt { text-align: right; grid-row: 2; grid-column: 2; }
     .cl-page .cl-compare-mid { grid-column: 1 / -1; grid-row: 3; }
     .cl-page .cl-compare-row.is-plain .cl-compare-mid { display: none; }
+    .cl-page .cl-compare-profiles { grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0 16px 16px; }
 }
 
 /* Stock ledger closing subpage: fixed-start facts, inline date fields and the spacing between its cards.
@@ -13142,4 +13230,166 @@ a.cl-link-button:hover {
     .cl-auth .cl-card-footer {
         padding: 14px 16px;
     }
+}
+
+/* --- Stores list (super admin, /dashboard/stores; spec docs/active/stores-list-redesign/2026-10-13-stores-list-design.md).
+   The orders row (is-orders) with the offers' action column; one pill per row, its date under it. */
+.cl-page .cl-table.is-stores .cl-col-status { width: 13rem; }
+.cl-page .cl-table.is-stores .cl-col-date { width: 8rem; }
+.cl-page .cl-table.is-stores .cl-col-menu { width: 3.5rem; }
+
+.cl-page .cl-table.is-stores .cl-cell-name {
+    font-weight: 600;
+}
+
+.cl-page .cl-table.is-stores .cl-status {
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-stores .cl-due-note:not(.is-warn) {
+    font-weight: 400;
+}
+
+/* on the tinted hover row --cl-ink-3 drops under AA; muted text on a toned background uses --cl-ink-2 (§9) */
+.cl-page .cl-table.is-stores tbody tr:hover .cl-due-note:not(.is-warn),
+.cl-page .cl-table.is-stores tbody tr:hover .cl-table-empty {
+    color: var(--cl-ink-2);
+}
+
+/* the registration date sits under the ID only on the phone card, where its column is hidden */
+.cl-page .cl-table.is-stores .cl-narrow-date {
+    display: none;
+}
+
+/* 720-1215 px: the store and owner names are one line each with an ellipsis (full text in title), the owner's e-mail goes */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-stores :is(.cl-cell-name, .cl-cell-client) {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 0;
+        min-width: 100%;
+    }
+
+    .cl-page .cl-table.is-stores .cl-cell-email {
+        display: none;
+    }
+}
+
+/* Phone card: name with ⋯ in the corner / ID · date / owner / pill and its note on one wrapping line. The lines are
+   placed on explicit grid rows: DeliveryDetailsStylesContractTest forbids reordering after its marker. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-stores tr {
+        position: relative;
+        grid-template-columns: minmax(0, 1fr);
+        padding-right: 60px;
+    }
+
+    .cl-page .cl-table.is-stores tr > *,
+    .cl-page .cl-table.is-stores .cl-row-link,
+    .cl-page .cl-table.is-stores .cl-table-key .cl-table-sub {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-stores .cl-table-key .cl-table-sub {
+        grid-row: 2;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-owner {
+        display: block;
+        grid-row: 3;
+        font-size: 12.5px;
+        color: var(--cl-ink-2);
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-owner > * {
+        display: block;
+        grid-column: auto;
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-state {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px 8px;
+        grid-row: 4;
+        margin-top: 4px;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-state .cl-status {
+        grid-column: auto;
+        grid-row: auto;
+        justify-self: auto;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-state .cl-due-note {
+        margin: 0;
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-cell-created {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-stores .cl-narrow-date {
+        display: inline;
+    }
+
+    .cl-page .cl-table.is-stores td.cl-table-actions {
+        position: absolute;
+        top: 4px;
+        right: 8px;
+        display: flex;
+        width: auto;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-stores .cl-table-actions .cl-button.is-icon {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Search chip line: "Clear filters" sits next to the chip (no filter menus in this toolbar), and a long phrase without
+   spaces wraps inside the chip instead of widening the page. */
+.cl-page .cl-list-meta.is-stores .cl-filter-chips {
+    align-items: center;
+    min-width: 0;
+}
+
+.cl-page .cl-list-meta.is-stores .cl-filter-chip {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Typed confirmation dialog (store delete): what goes with the record, and the identifier to type. */
+.cl-page .cl-dialog .cl-dialog-effects {
+    margin: 0 0 12px 18px;
+    padding: 0;
+    list-style: disc;
+    color: var(--cl-ink-2);
+    font-size: 13.5px;
+}
+
+.cl-page .cl-dialog .cl-dialog-effects li + li {
+    margin-top: 2px;
+}
+
+.cl-page .cl-dialog .cl-confirm-id {
+    display: inline-block;
+    justify-self: start;
+    padding: 2px 8px;
+    border: 1px solid var(--cl-line);
+    border-radius: 6px;
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-dialog [hidden] {
+    display: none;
 }
