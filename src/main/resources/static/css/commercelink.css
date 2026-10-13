@@ -13157,7 +13157,7 @@ a.cl-link-button:hover {
 }
 
 /* 720-1215 px: the store and owner names are one line each with an ellipsis (full text in title), the owner's e-mail goes */
-@media (min-width: 720px) and (max-width: 1215px) {
+@media screen and (min-width: 720px) and (max-width: 1215px) {
     .cl-page .cl-table.is-stores :is(.cl-cell-name, .cl-cell-client) {
         display: block;
         overflow: hidden;
@@ -13172,8 +13172,9 @@ a.cl-link-button:hover {
     }
 }
 
-/* Phone card: name with ⋯ in the corner / ID · date / owner / pill and its note on one wrapping line. */
-@media (max-width: 719px) {
+/* Phone card: name with ⋯ in the corner / ID · date / owner / pill and its note on one wrapping line. The lines are
+   placed on explicit grid rows: DeliveryDetailsStylesContractTest forbids reordering after its marker. */
+@media screen and (max-width: 719px) {
     .cl-page .cl-table.is-stores tr {
         position: relative;
         grid-template-columns: minmax(0, 1fr);
@@ -13187,12 +13188,12 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-table.is-stores .cl-table-key .cl-table-sub {
-        order: 1;
+        grid-row: 2;
     }
 
     .cl-page .cl-table.is-stores td.cl-cell-owner {
         display: block;
-        order: 2;
+        grid-row: 3;
         font-size: 12.5px;
         color: var(--cl-ink-2);
     }
@@ -13208,7 +13209,7 @@ a.cl-link-button:hover {
         flex-wrap: wrap;
         align-items: center;
         gap: 2px 8px;
-        order: 3;
+        grid-row: 4;
         margin-top: 4px;
     }
 

@@ -28,7 +28,7 @@ class OffersListStylesContractTest {
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
 
         // then
-        assertThat(css).contains(".cl-page .cl-table.is-offers .cl-table-actions:has(.cl-menu[open])");
+        assertThat(css).contains(".cl-page .cl-table:is(.is-offers, .is-stores) .cl-table-actions:has(.cl-menu[open])");
     }
 
     @Test
