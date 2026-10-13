@@ -21,16 +21,32 @@ class ChannelComparisonTest {
         assertThat(comparison.totals().margin()).isEqualTo("15,5%");
         assertThat(comparison.totals().orders()).isEqualTo(465);
         assertThat(comparison.rows()).extracting(ChannelComparison.Row::labelKey).containsExactly(
-                "reports.channels.orders", "reports.channels.sales", "reports.channels.profit",
-                "reports.channels.cost", "reports.channels.margin", "reports.channels.averageOrder");
+                "reports.channels.orders", "reports.channels.sales", "reports.channels.profit");
         ChannelComparison.Row orders = comparison.rows().get(0);
         assertThat(orders.own()).isEqualTo("141");
         assertThat(orders.share().ownText()).isEqualTo("30,3%");
         assertThat(orders.share().ownLabelled()).isTrue();
-        assertThat(comparison.rows().get(3).share()).isNull();
         assertThat(comparison.missing()).isNull();
-        assertThat(comparison.rows()).extracting(ChannelComparison.Row::money)
-                .containsExactly(false, true, true, true, false, true);
+        assertThat(comparison.rows()).extracting(ChannelComparison.Row::money).containsExactly(false, true, true);
+    }
+
+    @Test
+    void figuresThatDoNotAddUpAreAProfileOfEachChannel() {
+        // when
+        ChannelComparison comparison = ChannelComparison.of(report(141, 254_162.49, 215_438.97, 38_723.66),
+                report(324, 554_680.10, 467_641.91, 87_038.44));
+
+        // then
+        assertThat(comparison.profiles()).extracting(ChannelComparison.Profile::channel)
+                .containsExactly(ChannelComparison.Channel.OWN, ChannelComparison.Channel.MARKETPLACE);
+        ChannelComparison.Profile own = comparison.profiles().get(0);
+        assertThat(own.costNet()).isEqualTo("215 439");
+        assertThat(own.margin()).isEqualTo("15,2%");
+        assertThat(own.averageOrder()).isEqualTo("1 803");
+        ChannelComparison.Profile marketplace = comparison.profiles().get(1);
+        assertThat(marketplace.costNet()).isEqualTo("467 642");
+        assertThat(marketplace.margin()).isEqualTo("15,7%");
+        assertThat(marketplace.averageOrder()).isEqualTo("1 712");
     }
 
     @Test
@@ -51,8 +67,10 @@ class ChannelComparisonTest {
 
         // then
         assertThat(comparison.missing()).isEqualTo(ChannelComparison.Channel.MARKETPLACE);
-        assertThat(comparison.rows().get(4).marketplace()).isNull();
-        assertThat(comparison.rows().get(5).marketplace()).isNull();
+        ChannelComparison.Profile marketplace = comparison.profiles().get(1);
+        assertThat(marketplace.costNet()).isEqualTo("0");
+        assertThat(marketplace.margin()).isNull();
+        assertThat(marketplace.averageOrder()).isNull();
         assertThat(comparison.rows().get(0).share().own()).isEqualTo(100);
     }
 
