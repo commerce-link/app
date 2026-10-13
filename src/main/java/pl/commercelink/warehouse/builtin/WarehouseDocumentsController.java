@@ -46,6 +46,12 @@ class WarehouseDocumentsController {
     private StoresRepository storesRepository;
 
     @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
+    private WarehouseItemPageFactory warehouseItemPageFactory;
+
+    @Autowired
     private MessageSource messageSource;
 
     @Autowired
@@ -144,6 +150,7 @@ class WarehouseDocumentsController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     String deliveryMfnHistory(@RequestParam String deliveryId, @RequestParam String mfn,
                               @RequestParam(required = false) String from, @RequestParam(required = false) String documentId,
+                              @RequestParam(required = false) String itemId,
                               Locale locale, Model model) {
         String storeId = getStoreId();
         String backHref = DeliveryLinks.of(false, storeId, deliveryId).details();
@@ -157,8 +164,17 @@ class WarehouseDocumentsController {
                 backLabel = source.getDocumentNo();
             }
         }
-        model.addAttribute("page", ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
-                deliveryId, mfn, backHref, backLabel, messageSource, locale));
+        // back to the item only when it is one of this store's items (the parameter comes from the address)
+        WarehouseItem item = "item".equals(from) && itemId != null ? warehouseRepository.findById(storeId, itemId) : null;
+        if (item != null) {
+            backHref = "/dashboard/warehouse/items/" + itemId;
+            backLabel = item.getName();
+        }
+        ItemHistoryPage page = ItemHistoryPage.of(warehouseDocumentMfnHistoryService.history(storeId, deliveryId, mfn),
+                deliveryId, mfn, backHref, backLabel, messageSource, locale);
+        // an item added by hand or bought without a delivery keeps its documents under its supplier or "Unknown": no delivery to open
+        model.addAttribute("page", item == null ? page
+                : page.withDeliveryHref(warehouseItemPageFactory.deliveryHref(item, CustomSecurityContext.hasRole("ADMIN"), locale)));
         return "warehouse-document-mfn-history";
     }
 

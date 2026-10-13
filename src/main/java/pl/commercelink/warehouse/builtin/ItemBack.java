@@ -1,0 +1,41 @@
+package pl.commercelink.warehouse.builtin;
+
+import pl.commercelink.orders.FulfilmentStatus;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
+
+/**
+ * Where the item page leads back to: the warehouse list or the destroyed archive exactly as the operator left it
+ * (filters, page, sort), carried in "back". The address comes from the request, so only those two lists are accepted;
+ * anything else falls back to the list of the item's status.
+ */
+record ItemBack(String href, String labelKey) {
+
+    static final String LIST = "/dashboard/warehouse";
+    static final String ARCHIVE = "/dashboard/warehouse/items/destroyed";
+    // braces never come from a link the server built (values are URL-encoded) and "redirect:" would expand them as URI variables
+    private static final Pattern SAFE = Pattern.compile("^/dashboard/warehouse(/items/destroyed)?(\\?[^\\s{}]*)?$");
+
+    static ItemBack resolve(String back, FulfilmentStatus status) {
+        String safe = safe(back);
+        if (safe != null) {
+            return new ItemBack(safe, safe.startsWith(ARCHIVE) ? "warehouse.destroyed.title" : "nav.warehouse");
+        }
+        // without a list to return to, the item goes back to the list of its status, as before the redesign
+        return status == FulfilmentStatus.Destroyed
+                ? new ItemBack(ARCHIVE, "warehouse.destroyed.title")
+                : new ItemBack(LIST + "?statuses=" + status.name(), "nav.warehouse");
+    }
+
+    static String safe(String back) {
+        return back != null && SAFE.matcher(back).matches() && !back.contains("//") && !back.contains("..") ? back : null;
+    }
+
+    static String itemHref(String itemId, String back) {
+        String path = "/dashboard/warehouse/items/" + itemId;
+        String safe = safe(back);
+        return safe == null ? path : path + "?back=" + URLEncoder.encode(safe, StandardCharsets.UTF_8);
+    }
+}

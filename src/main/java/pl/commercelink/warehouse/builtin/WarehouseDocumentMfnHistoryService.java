@@ -42,7 +42,7 @@ class WarehouseDocumentMfnHistoryService {
                 productName = item.getName();
             }
             rows.add(new MfnHistoryRow(item.getDocumentId(), document.getDocumentNo(), item.getDocumentType(),
-                    item.getCreatedAt(), item.getQty(), stockChange, runningStock));
+                    item.getCreatedAt(), item.getQty(), stockChange, runningStock, document.getReason(), document.getNote()));
         }
         return new MfnHistory(productName, rows);
     }

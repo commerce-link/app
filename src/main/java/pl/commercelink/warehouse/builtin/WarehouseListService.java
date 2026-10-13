@@ -59,7 +59,7 @@ class WarehouseListService {
         List<WarehouseItem> pageItems = shown.subList(pagination.fromIndex(), pagination.toIndex());
         SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
         WarehouseRowMapper mapper = new WarehouseRowMapper(messages, locale, redirects, labels::of, labels::has,
-                id -> labels.has(id) || suppliers.exists(id), admin);
+                id -> labels.has(id) || suppliers.exists(id), admin, query.href());
         List<WarehouseItemRow> rows = pageItems.stream().map(mapper::map).toList();
 
         List<Chip> chips = chips(query, locale);
@@ -181,7 +181,7 @@ class WarehouseListService {
         return categories.isEmpty() || categories.contains(WarehouseRowMapper.categoryValue(item.getCategory()));
     }
 
-    private static boolean matchesSearch(WarehouseItem item, String q) {
+    static boolean matchesSearch(WarehouseItem item, String q) {
         if (q == null) return true;
         // an EAN is stored without its leading zeros, so a scanned or typed EAN-13 is also tried in that form
         String asEan = UnifiedProductIdentifiers.unifyEan(q);
