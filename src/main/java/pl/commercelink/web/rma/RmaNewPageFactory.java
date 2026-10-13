@@ -111,7 +111,7 @@ public class RmaNewPageFactory {
             String claimedBy = claims.get(item.getItemId());
             boolean selected = claimedBy == null && (posted != null ? posted.isSelected() : item.getItemId().equals(serialItemId));
             rows.add(new RmaNewPage.ItemRow(i, item.getItemId(), item.getName(), sub(item, locale), item.isService(),
-                    item.getQty(), posted != null ? posted.getQty() : "1", selected,
+                    item.getQty(), postedQty(posted), selected,
                     posted != null && posted.getResolution() != null ? posted.getResolution().name() : null,
                     posted != null ? posted.getReason() : null, Money.format(item.getPrice()), item.getPrice(),
                     claimedBy == null ? null : ConversionUtil.getShortenedId(claimedBy),
@@ -162,6 +162,12 @@ public class RmaNewPageFactory {
 
     private static RmaCreateForm.Item postedFor(RmaCreateForm form, String itemId) {
         return form.getItems().stream().filter(i -> itemId.equals(i.getItemId())).findFirst().orElse(null);
+    }
+
+    // the script disables the quantity of an unticked item, so it is not posted; ticking it again after a rejected
+    // submit must not start from an empty field
+    private static String postedQty(RmaCreateForm.Item posted) {
+        return posted == null || posted.getQty() == null ? "1" : posted.getQty();
     }
 
     private static int parse(String qty) {

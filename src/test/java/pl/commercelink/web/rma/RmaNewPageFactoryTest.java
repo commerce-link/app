@@ -167,4 +167,25 @@ class RmaNewPageFactoryTest {
                 Map.entry("email", "E-mail klienta: wpisz poprawny adres"));
         assertThat(page.fieldErrors()).containsEntry("items0.qty", "ilość: od 1 do 2 szt.");
     }
+
+    @Test
+    void anItemLeftUntickedInARejectedSubmitKeepsQuantityOne() {
+        // given
+        when(orderItems.findByOrderIdAndStatuses(ORDER_ID, RmaCreateService.REPORTABLE)).thenReturn(List.of(item("i1", null, 2)));
+        when(coverage.claims(STORE, List.of("i1"))).thenReturn(Map.of());
+        RmaCreateForm.Item posted = new RmaCreateForm.Item();
+        posted.setItemId("i1");
+        RmaCreateForm form = new RmaCreateForm();
+        form.setOrderId(ORDER_ID);
+        form.setEmail("anna@x.pl");
+        form.setItems(new ArrayList<>(List.of(posted)));
+        RmaCreateService.Outcome outcome = new RmaCreateService.Outcome(null, "rma.new.error.noItems", List.of());
+
+        // when
+        RmaNewPage page = factory.rebuild(STORE, order(OrderStatus.Delivered), form, outcome, PL);
+
+        // then
+        assertThat(page.items().get(0).selected()).isFalse();
+        assertThat(page.items().get(0).qty()).isEqualTo("1");
+    }
 }
