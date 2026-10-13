@@ -156,6 +156,21 @@ class StoresTemplateRenderingTest {
     }
 
     @Test
+    void searchShowsResultCountOnlyWhenThereIsAPhrase() {
+        // given
+        StoreRow row = row(StoreState.FULL, null, false, false, false, true, false, false);
+        StoresListPage searched = new StoresListPage(StoresListQuery.of(null, "toys", null, null, null), List.of(row), segments(), null, null);
+
+        // when
+        String withPhrase = render(searched, null);
+        String withoutPhrase = render(page(row), null);
+
+        // then
+        assertThat(withPhrase).contains("role=\"status\"").contains("Results: 1");
+        assertThat(withoutPhrase).doesNotContain("cl-table-results");
+    }
+
+    @Test
     void templateUsesNoLegacyMarkup() {
         // when
         String html = render(page(row(StoreState.FULL, null, false, false, false, true, false, false)), null);

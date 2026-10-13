@@ -72,6 +72,10 @@
                 </div>
             </div>
 
+            <div class="cl-list-meta is-count-only" th:if="${query.q() != null}">
+                <p class="cl-table-results" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
+            </div>
+
             <!--/* The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
             <table class="cl-table is-orders is-stores" th:unless="${page.rows().isEmpty()}">
                 <colgroup><col><col><col class="cl-col-status"><col class="cl-col-date"><col class="cl-col-menu"></colgroup>
