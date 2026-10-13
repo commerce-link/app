@@ -12526,6 +12526,13 @@ a.cl-link-button:hover {
 .cl-page .cl-compare-row .cl-hbar-track { height: 24px; }
 .cl-page .cl-compare-row .cl-hbar-seg { font-size: 12px; }
 .cl-page .cl-compare-row.is-plain .cl-compare-mid { font-size: 12.5px; color: var(--cl-ink-2); text-align: center; }
+/* figures of each channel that do not add up into a share (net cost, margin, average order): one panel per channel
+   under the share rows, a key dot in the title as in the head, values as dl.cl-kv.is-column (label left, number right,
+   one line also on a phone); the panels stack below 720 px */
+.cl-page .cl-compare-profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 20px 20px; }
+.cl-page .cl-compare-profile { border: 1px solid var(--cl-line); border-radius: var(--cl-radius); padding: 12px 16px 14px; }
+.cl-page .cl-compare-profile-title { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-compare-profile dl.cl-kv { gap: 8px; padding: 0; }
 /* 720–1023 px: the share bar is narrow, so the measure column gives it room and a segment keeps its percent whole */
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-compare-head, .cl-page .cl-compare-row { grid-template-columns: 120px minmax(100px, max-content) minmax(0, 1fr) minmax(100px, max-content); gap: 4px 10px; }
@@ -12545,6 +12552,7 @@ a.cl-link-button:hover {
     .cl-page .cl-compare-val.is-mkt { text-align: right; grid-row: 2; grid-column: 2; }
     .cl-page .cl-compare-mid { grid-column: 1 / -1; grid-row: 3; }
     .cl-page .cl-compare-row.is-plain .cl-compare-mid { display: none; }
+    .cl-page .cl-compare-profiles { grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0 16px 16px; }
 }
 
 /* Stock ledger closing subpage: fixed-start facts, inline date fields and the spacing between its cards.
