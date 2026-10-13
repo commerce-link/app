@@ -473,29 +473,42 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     }
 
     public List<OrderIndexEntry> findAllPastOrders(LocalDate dateFrom, LocalDate dateTo, String storeId) {
+        return findAllPastOrders(dateFrom, dateTo, storeId, null);
+    }
+
+    // pageSize is null in production (DynamoDB's own 1 MB page); tests set it to force several pages on a small data set
+    List<OrderIndexEntry> findAllPastOrders(LocalDate dateFrom, LocalDate dateTo, String storeId, Integer pageSize) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
         eav.put(":dateFrom", new AttributeValue().withS(dateFrom.atStartOfDay().toString()));
-        eav.put(":dateTo", new AttributeValue().withS(dateTo.atTime(23, 59, 59).toString()));
+        // a key condition allows one condition on the sort key, so the end is the last instant of the day;
+        // "23:59:59" as a string would drop an order at 23:59:59.5
+        eav.put(":dateTo", new AttributeValue().withS(dateTo.atTime(LocalTime.MAX).toString()));
         eav.put(":statusNew", new AttributeValue().withS(OrderStatus.New.name()));
 
         Map<String, String> expressionAttributeNames = new HashMap<>();
         expressionAttributeNames.put("#status", "status");
         expressionAttributeNames.put("#orderedAt", "orderedAt");
 
-        QueryRequest queryRequest = new QueryRequest()
-            .withTableName("Orders")
-            .withIndexName("StoreIdOrderedAtIndex")
-            .withKeyConditionExpression("storeId = :storeId AND #orderedAt BETWEEN :dateFrom AND :dateTo")
-            .withFilterExpression("#status <> :statusNew")
-            .withExpressionAttributeValues(eav)
-            .withExpressionAttributeNames(expressionAttributeNames);
-
-        QueryResult queryResult = amazonDynamoDB.query(queryRequest);
-
-        return queryResult.getItems().stream()
-                .map(this::toOrderIndexEntry)
-                .collect(Collectors.toList());
+        List<OrderIndexEntry> entries = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                .withTableName("Orders")
+                .withIndexName("StoreIdOrderedAtIndex")
+                .withKeyConditionExpression("storeId = :storeId AND #orderedAt BETWEEN :dateFrom AND :dateTo")
+                .withFilterExpression("#status <> :statusNew")
+                .withExpressionAttributeValues(eav)
+                .withExpressionAttributeNames(expressionAttributeNames)
+                .withLimit(pageSize);
+            if (startKey != null && !startKey.isEmpty()) {
+                queryRequest.withExclusiveStartKey(startKey);
+            }
+            QueryResult result = amazonDynamoDB.query(queryRequest);
+            result.getItems().stream().map(this::toOrderIndexEntry).forEach(entries::add);
+            startKey = result.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return entries;
     }
 
     public List<Order> findByEmail(String storeId, String email) {

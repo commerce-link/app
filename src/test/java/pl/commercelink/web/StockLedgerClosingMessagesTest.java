@@ -33,6 +33,7 @@ class StockLedgerClosingMessagesTest {
         Set<String> keys = new TreeSet<>();
         for (Path file : List.of(
                 Path.of("src/main/resources/templates/reports.html"),
+                Path.of("src/main/resources/templates/reports/stock-ledger.html"),
                 Path.of("src/main/java/pl/commercelink/web/FinancialReportsController.java"),
                 Path.of("src/main/java/pl/commercelink/web/reports/StockLedgerClosingBlocker.java"),
                 Path.of("src/main/java/pl/commercelink/warehouse/builtin/StockLedgerPeriodClosing.java"))) {
