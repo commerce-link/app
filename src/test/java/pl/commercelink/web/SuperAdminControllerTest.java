@@ -6,30 +6,32 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ConcurrentModel;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.stores.CreateStoreRequest;
-import pl.commercelink.stores.DeactivationReason;
-import pl.commercelink.stores.DeactivationStatus;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivationService;
-import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoreCopyService;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.TrialPeriod;
-import pl.commercelink.stores.TrialStatus;
+import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.stores.StoresListPage;
+import pl.commercelink.web.stores.StoresListPageFactory;
+import pl.commercelink.web.stores.StoresListQuery;
+import pl.commercelink.web.stores.StoresNotice;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.AdditionalMatchers.aryEq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +46,7 @@ class SuperAdminControllerTest {
     @Mock private StoreDeletionService storeDeletionService;
     @Mock private StoreCreationService storeCreationService;
     @Mock private StoreTrialService storeTrialService;
-    @Mock private StoreActivity storeActivity;
+    @Mock private StoresListPageFactory storesListPageFactory;
     @Mock private StoreActivationService storeActivationService;
     @InjectMocks private SuperAdminController controller;
 
@@ -62,12 +64,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Błąd usuwania", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.bad("Błąd usuwania"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -83,11 +84,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Błąd usuwania", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.bad("Błąd usuwania"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -100,12 +101,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, "wrong-id", locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, "wrong-id", null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Nie pasuje", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.bad("Nie pasuje"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verifyNoInteractions(storeDeletionService);
     }
 
@@ -114,17 +114,18 @@ class SuperAdminControllerTest {
         // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
-        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        when(messageSource.getMessage(eq("store.delete.success"), aryEq(new Object[]{"Sklep A"}), eq(locale))).thenReturn("Usunięto");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, STORE_ID, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.ok("Usunięto"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
     }
 
@@ -133,17 +134,18 @@ class SuperAdminControllerTest {
         // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
-        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        when(messageSource.getMessage(eq("store.delete.success"), aryEq(new Object[]{"Sklep A"}), eq(locale))).thenReturn("Usunięto");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, " " + STORE_ID + "\n", locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, " " + STORE_ID + "\n", null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.ok("Usunięto"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
     }
 
@@ -155,12 +157,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Nie istnieje", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.bad("Nie istnieje"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verifyNoInteractions(storeDeletionService);
     }
 
@@ -169,18 +170,19 @@ class SuperAdminControllerTest {
         // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
         store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
-        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
+        when(messageSource.getMessage(eq("store.delete.success"), aryEq(new Object[]{"Sklep A"}), eq(locale))).thenReturn("Usunięto");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+        String view = controller.deleteStore(STORE_ID, null, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.ok("Usunięto"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
     }
 
@@ -215,85 +217,6 @@ class SuperAdminControllerTest {
         // then
         assertEquals("redirect:/dashboard/store/create", view);
         assertEquals("Błąd tworzenia", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
-    }
-
-    private static Store storeWithCreatedAt(String storeId, String createdAt) {
-        Store store = new Store();
-        store.setStoreId(storeId);
-        store.setCreatedAt(createdAt);
-        return store;
-    }
-
-    @Test
-    void sortsStoresNewestFirstByDefaultWithNullsLast() {
-        // given
-        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
-        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
-        Store legacy = storeWithCreatedAt("legacy-st-1", null);
-        when(storesRepository.findAll()).thenReturn(List.of(oldest, legacy, newest));
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        String view = controller.store("desc", model);
-
-        // then
-        assertEquals("stores", view);
-        assertEquals(List.of(newest, oldest, legacy), model.getAttribute("stores"));
-        assertEquals("desc", model.getAttribute("dir"));
-    }
-
-    @Test
-    void sortsStoresOldestFirstWhenAscendingRequested() {
-        // given
-        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
-        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
-        Store legacy = storeWithCreatedAt("legacy-st-1", null);
-        when(storesRepository.findAll()).thenReturn(List.of(newest, legacy, oldest));
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        String view = controller.store("asc", model);
-
-        // then
-        assertEquals("stores", view);
-        assertEquals(List.of(oldest, newest, legacy), model.getAttribute("stores"));
-        assertEquals("asc", model.getAttribute("dir"));
-    }
-
-    @Test
-    void normalizesUnknownSortDirectionToDescending() {
-        // given
-        Store oldest = storeWithCreatedAt("old-store-1", "2026-01-01T10:00:00Z");
-        Store newest = storeWithCreatedAt("new-store-1", "2026-07-01T10:00:00Z");
-        when(storesRepository.findAll()).thenReturn(List.of(oldest, newest));
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        controller.store("bogus", model);
-
-        // then
-        assertEquals(List.of(newest, oldest), model.getAttribute("stores"));
-        assertEquals("desc", model.getAttribute("dir"));
-    }
-
-    @Test
-    void exposesTrialStatusesOfListedStores() {
-        // given
-        Store trialStore = storeWithCreatedAt("trial-st-1", "2026-09-28T10:00:00Z");
-        trialStore.setTrial(new TrialPeriod("owner@example.com", "2026-09-28T10:00:00Z", "2026-10-12T10:00:00Z"));
-        Store fullStore = storeWithCreatedAt("full-st-01", "2026-01-01T10:00:00Z");
-        TrialStatus status = new TrialStatus(LocalDate.parse("2026-10-12"), 14, false);
-        when(storesRepository.findAll()).thenReturn(List.of(trialStore, fullStore));
-        when(storeTrialService.status(trialStore)).thenReturn(Optional.of(status));
-        when(storeTrialService.status(fullStore)).thenReturn(Optional.empty());
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        controller.store("desc", model);
-
-        // then
-        assertEquals(Map.of("trial-st-1", status), model.getAttribute("trials"));
     }
 
     @Test
@@ -304,12 +227,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.convertTrial(STORE_ID, locale, redirectAttributes);
+        String view = controller.convertTrial(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Pełne konto", redirectAttributes.getFlashAttributes().get("successMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.ok("Pełne konto"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -320,12 +242,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.convertTrial(STORE_ID, locale, redirectAttributes);
+        String view = controller.convertTrial(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Brak okresu próbnego", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.bad("Brak okresu próbnego"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -336,11 +257,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.convertTrial(STORE_ID, locale, redirectAttributes);
+        String view = controller.convertTrial(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Błąd", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.bad("Błąd"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -354,30 +275,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
+        controller.deleteStore(STORE_ID, null, null, locale, redirectAttributes);
 
         // then
-        assertEquals("Nie pasuje", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.bad("Nie pasuje"), redirectAttributes.getFlashAttributes().get("storesNotice"));
         verifyNoInteractions(storeDeletionService);
-    }
-
-    @Test
-    void exposesDeactivationsOfListedStores() {
-        // given
-        Store inactive = storeWithCreatedAt("inactive-01", "2026-09-28T10:00:00Z");
-        Store active = storeWithCreatedAt("active-0001", "2026-01-01T10:00:00Z");
-        DeactivationStatus status = new DeactivationStatus(DeactivationReason.TRIAL_ENDED,
-                LocalDate.parse("2026-10-12"), LocalDate.parse("2026-10-26"), 6);
-        when(storesRepository.findAll()).thenReturn(List.of(inactive, active));
-        when(storeActivity.status(inactive)).thenReturn(Optional.of(status));
-        when(storeActivity.status(active)).thenReturn(Optional.empty());
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        controller.store("desc", model);
-
-        // then
-        assertEquals(Map.of("inactive-01", status), model.getAttribute("deactivations"));
     }
 
     @Test
@@ -388,11 +290,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deactivateStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deactivateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Dezaktywowany", redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.ok("Dezaktywowany"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -403,11 +305,10 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.deactivateStore(STORE_ID, locale, redirectAttributes);
+        controller.deactivateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
-        assertEquals("Bez zmian", redirectAttributes.getFlashAttributes().get("warningMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.warn("Bez zmian"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -418,10 +319,10 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.deactivateStore(STORE_ID, locale, redirectAttributes);
+        controller.deactivateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
-        assertEquals("Brak sklepu", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.bad("Brak sklepu"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -432,11 +333,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.deactivateStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.deactivateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Błąd", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals(StoresNotice.bad("Błąd"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -447,11 +348,11 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.activateStore(STORE_ID, locale, redirectAttributes);
+        String view = controller.activateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Aktywny", redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.ok("Aktywny"), redirectAttributes.getFlashAttributes().get("storesNotice"));
     }
 
     @Test
@@ -462,10 +363,148 @@ class SuperAdminControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        controller.activateStore(STORE_ID, locale, redirectAttributes);
+        controller.activateStore(STORE_ID, null, locale, redirectAttributes);
 
         // then
-        assertEquals("Przenieś na pełne konto", redirectAttributes.getFlashAttributes().get("errorMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+        assertEquals(StoresNotice.bad("Przenieś na pełne konto"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+    }
+
+    @Test
+    void listDelegatesToFactoryWithParsedQuery() {
+        // given
+        List<Store> stores = List.of(new Store());
+        StoresListQuery query = StoresListQuery.of("trial", "max", "name", "desc", null);
+        StoresListPage page = new StoresListPage(query, List.of(), List.of(), null, null);
+        when(storesRepository.findAll()).thenReturn(stores);
+        when(storesListPageFactory.build(stores, query)).thenReturn(page);
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.store("trial", "max", "name", "desc", null, model);
+
+        // then
+        assertEquals("stores", view);
+        assertSame(page, model.getAttribute("page"));
+        verify(storesRepository, times(1)).findAll();
+        verifyNoMoreInteractions(storesRepository);
+    }
+
+    @Test
+    void convertConfirmationPageCarriesBackAddress() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage(eq("stores.list.convert.title"), aryEq(new Object[]{"Sklep A"}), eq(locale))).thenReturn("Przenieść?");
+        when(messageSource.getMessage("store.trial.convert.confirm", null, locale)).thenReturn("Treść");
+        when(messageSource.getMessage("store.trial.convert.button", null, locale)).thenReturn("Przenieś");
+        when(messageSource.getMessage("nav.stores", null, locale)).thenReturn("Sklepy");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.confirmConvertTrial(STORE_ID, "/dashboard/stores?status=trial", model, locale);
+
+        // then
+        assertEquals("settings-confirm", view);
+        assertEquals(new ConfirmAction("Przenieść?", "Treść", "Przenieś",
+                "/dashboard/store/" + STORE_ID + "/trial/convert?back=%2Fdashboard%2Fstores%3Fstatus%3Dtrial",
+                "/dashboard/stores?status=trial", false), model.getAttribute("confirm"));
+        assertEquals("Sklepy", model.getAttribute("backLabel"));
+    }
+
+    @Test
+    void confirmationPageOfUnknownStoreIsNotFound() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+
+        // when / then
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> controller.confirmDeactivate(STORE_ID, null, new ConcurrentModel(), locale));
+        assertEquals(HttpStatus.NOT_FOUND, e.getStatusCode());
+    }
+
+    @Test
+    void deleteLinkOfRegularStoreOpensTheTypedConfirmationOnTheList() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        String view = controller.confirmDelete(STORE_ID, "/dashboard/stores?status=full", new ConcurrentModel(), locale);
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=full&delete=" + STORE_ID, view);
+    }
+
+    @Test
+    void deleteLinkOfDemoStoreShowsDangerConfirmation() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName("Demo");
+        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage(eq("stores.list.delete.title"), aryEq(new Object[]{"Demo"}), eq(locale))).thenReturn("Usunąć?");
+        when(messageSource.getMessage("store.delete.confirm", null, locale)).thenReturn("Nieodwracalne");
+        when(messageSource.getMessage("stores.list.delete.action", null, locale)).thenReturn("Usuń sklep");
+        when(messageSource.getMessage("nav.stores", null, locale)).thenReturn("Sklepy");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.confirmDelete(STORE_ID, null, model, locale);
+
+        // then
+        assertEquals("settings-confirm", view);
+        ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+        assertTrue(confirm.destructive());
+        assertEquals("/dashboard/store/" + STORE_ID + "/delete?back=%2Fdashboard%2Fstores", confirm.actionPath());
+    }
+
+    @Test
+    void cleanupConfirmationPageIsDestructive() {
+        // given
+        when(messageSource.getMessage("stores.list.cleanup.title", null, locale)).thenReturn("Usunąć osierocone?");
+        when(messageSource.getMessage("stores.list.cleanup.message", null, locale)).thenReturn("Treść");
+        when(messageSource.getMessage("store.cleanup.button", null, locale)).thenReturn("Usuń osierocone produkty");
+        when(messageSource.getMessage("nav.stores", null, locale)).thenReturn("Sklepy");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.confirmCleanupProducts(null, model, locale);
+
+        // then
+        assertEquals("settings-confirm", view);
+        assertTrue(((ConfirmAction) model.getAttribute("confirm")).destructive());
+        verifyNoInteractions(orphanedProductCleanupService);
+    }
+
+    @Test
+    void actionsReturnToTheListStateTheyCameFrom() {
+        // given
+        when(storeActivationService.deactivate(STORE_ID)).thenReturn(StoreActivationService.Outcome.CHANGED);
+        when(messageSource.getMessage("store.activity.deactivate.success", null, locale)).thenReturn("Dezaktywowany");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deactivateStore(STORE_ID, "/dashboard/stores?status=trial&q=max", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=trial&q=max", view);
+        assertEquals(StoresNotice.ok("Dezaktywowany"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+    }
+
+    @Test
+    void actionsIgnoreForeignBackAddress() {
+        // given
+        when(storeActivationService.activate(STORE_ID)).thenReturn(StoreActivationService.Outcome.CHANGED);
+        when(messageSource.getMessage("store.activity.activate.success", null, locale)).thenReturn("Aktywny");
+
+        // when
+        String view = controller.activateStore(STORE_ID, "https://evil.example", locale, new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
     }
 }
