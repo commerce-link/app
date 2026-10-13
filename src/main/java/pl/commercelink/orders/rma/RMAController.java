@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -66,8 +65,6 @@ public class RMAController {
     @Value("${s3.bucket.stores}")
     private String bucketName;
 
-    private final int RMA_PAGE_SIZE = 25;
-
     /**
      * RMA is bound straight from the form. The marketplace-decision fields (externalReturnId,
      * marketplaceDecisions, ...) feed a real refund through the resend path and must never come from the
@@ -79,46 +76,6 @@ public class RMAController {
             binder.setAllowedFields("rmaId", "orderId", "email", "status", "rejectionReason",
                     "emailNotificationsEnabled", "shippingInsurance", "draftRmaItems*", "shippingDetails*", "shipments*");
         }
-    }
-
-    @GetMapping("/dashboard/rma")
-    public String rma(@RequestParam(required = false) String rmaId,
-                      @RequestParam(required = false) String orderId,
-                      @RequestParam(required = false) String email,
-                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtStart,
-                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtEnd,
-                      @RequestParam(required = false) List<RMAStatus> statuses,
-                      @RequestParam(required = false, defaultValue = "1") int page,
-                      Model model) {
-        RMAFilter filter = new RMAFilter(rmaId, orderId, email, createdAtStart, createdAtEnd, statuses);
-        List<RMA> paginatedRmaEntries = rmaRepository.searchRMAEntries(getStoreId(), filter, page, RMA_PAGE_SIZE);
-
-        HashMap<String, Object> searchParams = new HashMap<>();
-        searchParams.put("rmaId", rmaId);
-        searchParams.put("orderId", orderId);
-        searchParams.put("email", email);
-        searchParams.put("createdAtStart", createdAtStart);
-        searchParams.put("createdAtEnd", createdAtEnd);
-        if (filter.hasStatuses()) {
-            searchParams.put("statuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.joining(",")));
-        }
-
-        model.addAttribute("rmaEntries", paginatedRmaEntries.subList(0, Math.min(paginatedRmaEntries.size(), RMA_PAGE_SIZE)));
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", paginatedRmaEntries.size() > RMA_PAGE_SIZE);
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("activeStatuses", Arrays.stream(RMAStatus.values())
-                .filter(status -> !status.isClosed())
-                .collect(Collectors.toList()));
-        model.addAttribute("closedStatusNames", Arrays.stream(RMAStatus.values())
-                .filter(RMAStatus::isClosed)
-                .map(Enum::name)
-                .collect(Collectors.toList()));
-        model.addAttribute("selectedStatuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()));
-        model.addAttribute("closedSelected", filter.getStatuses().stream().anyMatch(RMAStatus::isClosed));
-        model.addAttribute("countsByStatus", rmaRepository.countActiveByStatus(getStoreId()));
-
-        return "rma";
     }
 
     @GetMapping("/dashboard/rma/new")
