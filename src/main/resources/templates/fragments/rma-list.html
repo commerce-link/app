@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The rest of the RMA list query as hidden fields, so a menu's form never drops what the others set; "skip" names
+       the parameter the form itself submits (status, dates = from/to/period, search = q). */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <input type="hidden" name="scope" th:if="${q.scope() != null}" th:value="${q.scope().param()}"/>
+    <th:block th:if="${skip != 'status'}"><input type="hidden" name="status" th:each="s : ${q.statusParams()}" th:value="${s}"/></th:block>
+    <th:block th:if="${skip != 'dates'}">
+        <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>
+        <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
+        <input type="hidden" name="period" th:if="${q.period() != null}" th:value="${q.period().param()}"/>
+    </th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+</th:block>
+
+</body>
+</html>

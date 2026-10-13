@@ -12338,6 +12338,23 @@ a.cl-link-button:hover {
     font-size: 13.5px;
 }
 
+/* RMA list (spec 2026-10-13): the return shipment and the marketplace state each get their own line under the status
+   pill; the order column gives way to the customer below 1216 px and is hidden on the phone card (cl-cards-hide).
+   The age warning (.cl-due-note.is-warn) is already styled by the orders table, which is-rma extends. */
+.cl-page .cl-table.is-rma .cl-rma-track {
+    display: block;
+}
+
+.cl-page .cl-table.is-rma .cl-cell-date {
+    white-space: nowrap;
+}
+
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-rma .is-secondary-column {
+        display: none;
+    }
+}
+
 /* Reports (app#290): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
    docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
 :root {
