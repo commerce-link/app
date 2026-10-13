@@ -111,9 +111,14 @@ public record StoresListQuery(Segment segment, String q, Sort sort, boolean asce
 
     /** Back to the list the action came from, never to another address (no open redirect, no header injection). */
     public static String safeBack(String back) {
-        if (back == null || back.contains("\r") || back.contains("\n")
+        if (back == null
                 // RedirectView expands {…} as URI templates, which would fail after the action already happened
-                || back.contains("{") || back.contains("}")) {
+                || back.contains("{") || back.contains("}")
+                // a fragment would swallow the delete parameter appended after it
+                || back.contains("#")
+                // CR/LF would split the header; any other raw control, space or non-ASCII character makes Tomcat drop the
+                // Location header, leaving a blank page after the action has run. The list's own links are always encoded.
+                || back.chars().anyMatch(c -> c < 0x21 || c > 0x7E)) {
             return PATH;
         }
         return back.equals(PATH) || back.startsWith(PATH + "?") ? back : PATH;

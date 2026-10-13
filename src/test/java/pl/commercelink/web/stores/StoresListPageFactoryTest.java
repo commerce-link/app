@@ -158,7 +158,9 @@ class StoresListPageFactoryTest {
 
         // then
         assertThat(page.rows()).hasSize(1);
-        assertThat(page.rows().get(0).state()).isEqualTo(StoreState.SWITCHED_OFF);
+        assertThat(page.rows().get(0).state()).isEqualTo(StoreState.DEMO_SWITCHED_OFF);
+        assertThat(page.rows().get(0).state().labelKey()).isEqualTo("stores.list.state.switchedOff");
+        assertThat(page.rows().get(0).state().noteKey()).isEqualTo("stores.list.note.demoSince");
         assertThat(page.rows().get(0).noteDate()).isNull();
     }
 
@@ -277,11 +279,12 @@ class StoresListPageFactoryTest {
     }
 
     @Test
-    void deleteDialogUsesTheRowOwnerEmailChainAndShortIdForNamelessStore() {
+    void deleteDialogPromisesOnlyTheTrialOwnerAccountAndUsesShortIdForNamelessStore() {
         // given
         Store nameless = store("nameless001", " ", "2026-10-01T10:00:00Z");
         nameless.setTrial(new TrialPeriod(" ", "2026-10-01T10:00:00Z", "2026-10-15T10:00:00Z"));
         BillingDetails billing = new BillingDetails();
+        billing.setCompanyName("Firma");
         billing.setEmail("faktury@firma.pl");
         nameless.setBillingDetails(billing);
 
@@ -289,13 +292,34 @@ class StoresListPageFactoryTest {
         StoresListPage page = factory.build(List.of(nameless), StoresListQuery.of(null, null, null, null, "nameless001"));
 
         // then
-        assertThat(page.deleteDialog().ownerEmail()).isEqualTo("faktury@firma.pl");
+        assertThat(page.deleteDialog().trialOwnerEmail()).isNull();
+        assertThat(page.rows().get(0).trialOwnerEmail()).isNull();
+        assertThat(page.rows().get(0).ownerEmail()).isEqualTo("faktury@firma.pl");
         assertThat(page.deleteDialog().name()).isEqualTo("nameless");
         assertThat(StoresListPageFactory.displayName(nameless)).isEqualTo("nameless");
     }
 
     @Test
-    void deleteDialogOfFullStoreWithoutAnyEmailHasNoOwnerEmail() {
+    void trialOwnerEmailIsTheTrialAccountEvenWhenTheRowShowsTheCompanyEmail() {
+        // given
+        Store trial = onTrial("trial00001", "Trial shop", 9);
+        BillingDetails billing = new BillingDetails();
+        billing.setCompanyName("Firma");
+        billing.setEmail("faktury@firma.pl");
+        trial.setBillingDetails(billing);
+        Store full = store("full000001", "Full", null);
+        full.setBillingDetails(billing);
+
+        // when
+        StoresListPage page = factory.build(List.of(trial, full), StoresListQuery.defaults());
+
+        // then
+        assertThat(row(page.rows(), "trial00001").trialOwnerEmail()).isEqualTo("owner@trial00001.pl");
+        assertThat(row(page.rows(), "full000001").trialOwnerEmail()).isNull();
+    }
+
+    @Test
+    void deleteDialogOfFullStoreHasNoOwnerAccount() {
         // given
         Store full = store("full0000001", "Full", null);
 
@@ -303,7 +327,7 @@ class StoresListPageFactoryTest {
         StoresListPage page = factory.build(List.of(full), StoresListQuery.of(null, null, null, null, "full0000001"));
 
         // then
-        assertThat(page.deleteDialog().ownerEmail()).isNull();
+        assertThat(page.deleteDialog().trialOwnerEmail()).isNull();
     }
 
     @Test
@@ -334,6 +358,7 @@ class StoresListPageFactoryTest {
 
         // when
         StoresListPage noMatch = factory.build(List.of(full), StoresListQuery.of("trial", "zabawki", null, null, null));
+        StoresListPage matchElsewhere = factory.build(List.of(full), StoresListQuery.of("trial", "alfa", "name", null, null));
         StoresListPage emptySegment = factory.build(List.of(full), StoresListQuery.of("trial", null, null, null, null));
         StoresListPage demoAsked = factory.build(List.of(full), StoresListQuery.of("demo", null, null, null, null));
         StoresListPage none = factory.build(List.of(), StoresListQuery.defaults());
@@ -341,7 +366,9 @@ class StoresListPageFactoryTest {
 
         // then
         assertThat(noMatch.emptyState()).isEqualTo(new StoresListPage.EmptyState("stores.list.empty.search", "zabawki",
-                "stores.list.empty.showAll", "/dashboard/stores"));
+                "stores.list.search.clear", "/dashboard/stores?status=trial"));
+        assertThat(matchElsewhere.emptyState()).isEqualTo(new StoresListPage.EmptyState("stores.list.empty.searchSegment", "alfa",
+                "stores.list.empty.allSegments", "/dashboard/stores?q=alfa&sort=name"));
         assertThat(emptySegment.emptyState()).isEqualTo(new StoresListPage.EmptyState("stores.list.empty.segment", null,
                 "stores.list.empty.showAll", "/dashboard/stores"));
         assertThat(none.emptyState()).isEqualTo(new StoresListPage.EmptyState("stores.list.empty.none", null,

@@ -34,8 +34,10 @@
         dialog.querySelectorAll('[data-store-delete-kind]').forEach(function (line) {
             line.hidden = (line.getAttribute('data-store-delete-kind') === 'trial') !== trial;
         });
-        owner.hidden = !trial;
-        owner.textContent = trial ? fill(owner.getAttribute('data-pattern'), trigger.getAttribute('data-owner-email') || '') : '';
+        // only the account the server deletes with a trial store (its trial owner e-mail), and only when it is known
+        var ownerEmail = trial ? trigger.getAttribute('data-owner-email') : null;
+        owner.hidden = !ownerEmail;
+        owner.textContent = ownerEmail ? fill(owner.getAttribute('data-pattern'), ownerEmail) : '';
         idBox.textContent = trigger.getAttribute('data-store-id');
         form.setAttribute('action', trigger.getAttribute('data-action'));
         input.value = '';

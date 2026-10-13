@@ -7,6 +7,8 @@ public enum StoreState {
     TRIAL_ENDING("is-warn", "stores.list.state.trial", "stores.list.note.trial", true, StoresListQuery.Segment.TRIAL),
     TRIAL_ENDED("is-bad", "stores.list.state.trialEnded", "stores.list.note.deletion", true, StoresListQuery.Segment.INACTIVE),
     SWITCHED_OFF("is-bad", "stores.list.state.switchedOff", "stores.list.note.since", false, StoresListQuery.Segment.INACTIVE),
+    // an inactive demo store is listed with the inactive ones, so its note keeps saying it is a demo store
+    DEMO_SWITCHED_OFF("is-bad", "stores.list.state.switchedOff", "stores.list.note.demoSince", false, StoresListQuery.Segment.INACTIVE),
     DEMO("is-neutral", "stores.list.state.demo", "stores.list.note.expires", false, StoresListQuery.Segment.DEMO);
 
     private final String tone;

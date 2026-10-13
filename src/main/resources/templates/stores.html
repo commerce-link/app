@@ -72,9 +72,19 @@
                 </div>
             </div>
 
-            <div class="cl-list-meta is-count-only" th:if="${query.q() != null}">
-                <!--/* For screen readers only, like the offers list without chips: the segment counts already show the number. */-->
-                <p class="cl-table-results cl-visually-hidden" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
+            <!--/* A phrase is shown as a chip with the count, like on the other lists. There are no filter menus to stand next to,
+                   so "Clear filters" follows the chip; it drops the phrase and keeps the segment and the sort. */-->
+            <div class="cl-list-meta is-stores" th:if="${query.q() != null}"
+                 th:with="chipLabel=#{stores.list.chip.search(${query.q()})}, clearHref=${query.withQ(null).href()}">
+                <div class="cl-filter-chips">
+                    <span class="cl-filter-chip">
+                        <span th:text="${chipLabel}"></span>
+                        <a class="cl-filter-chip-clear" th:href="@{${clearHref}}" th:attr="aria-label=#{stores.list.chip.clear(${chipLabel})}"><span
+                                aria-hidden="true">×</span></a>
+                    </span>
+                    <a class="cl-link-button cl-toolbar-clear" th:href="@{${clearHref}}" th:text="#{general.clear.filters}"></a>
+                </div>
+                <p class="cl-table-results" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
             </div>
 
             <!--/* The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
@@ -155,7 +165,7 @@
                                 <li th:unless="${row.demo()}"><a class="cl-menu-item is-danger" data-cl-dialog-open="store-delete-dialog"
                                        th:href="@{${row.deleteDialogHref()}}"
                                        th:attr="data-store-id=${row.storeId()}, data-store-name=${row.name()}, data-store-trial=${row.trial()},
-                                                data-owner-email=${row.ownerEmail() != null ? row.ownerEmail() : row.ownerName()},
+                                                data-owner-email=${row.trialOwnerEmail()},
                                                 data-action=@{/dashboard/store/{id}/delete(id=${row.storeId()}, back=${back})}"
                                        th:text="#{stores.list.menu.delete}"></a></li>
                             </ul>
@@ -188,9 +198,9 @@
                         <li th:text="#{stores.list.delete.effect.orders}"></li>
                         <li th:text="#{stores.list.delete.effect.catalogs}"></li>
                         <li th:text="#{stores.list.delete.effect.settings}"></li>
-                        <li data-store-delete-owner th:hidden="${d == null or !d.trial() or d.ownerEmail() == null}"
+                        <li data-store-delete-owner th:hidden="${d == null or !d.trial() or d.trialOwnerEmail() == null}"
                             th:attr="data-pattern=#{stores.list.delete.effect.owner('{0}')}"
-                            th:text="${d != null and d.trial() and d.ownerEmail() != null} ? #{stores.list.delete.effect.owner(${d.ownerEmail()})} : ''"></li>
+                            th:text="${d != null and d.trial() and d.trialOwnerEmail() != null} ? #{stores.list.delete.effect.owner(${d.trialOwnerEmail()})} : ''"></li>
                     </ul>
                     <div class="cl-field">
                         <label class="cl-label" for="confirm-store-id" th:text="#{stores.list.delete.confirm.label}"></label>

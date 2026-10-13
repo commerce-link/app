@@ -22,7 +22,8 @@ class StoresTemplateRenderingTest {
 
     private static StoreRow row(StoreState state, String noteDate, boolean demo, boolean trial, boolean canConvert,
                                 boolean canDeactivate, boolean canActivate, boolean blocked) {
-        return new StoreRow(STORE_ID, "abc123de", "My store", "Firma sp. z o.o.", "owner@example.com", state, noteDate, 9,
+        return new StoreRow(STORE_ID, "abc123de", "My store", "Firma sp. z o.o.", "owner@example.com", trial ? "trial@example.com" : null,
+                state, noteDate, 9,
                 "28.09.2026", demo, trial, canConvert, canDeactivate, canActivate, blocked, "/dashboard/stores?delete=" + STORE_ID);
     }
 
@@ -52,7 +53,7 @@ class StoresTemplateRenderingTest {
         assertThat(html).contains("href=\"/dashboard/store/" + STORE_ID + "/trial/convert?back=");
         assertThat(html).contains("href=\"/dashboard/store/" + STORE_ID + "/deactivate?back=");
         assertThat(html).doesNotContain("/activate?");
-        assertThat(html).contains("data-owner-email=\"owner@example.com\"").contains("data-store-trial=\"true\"");
+        assertThat(html).contains("data-owner-email=\"trial@example.com\"").contains("data-store-trial=\"true\"");
     }
 
     @Test
@@ -132,6 +133,54 @@ class StoresTemplateRenderingTest {
     }
 
     @Test
+    void deleteLinkCarriesOnlyTheTrialOwnerAccount() {
+        // when
+        String trial = render(page(row(StoreState.TRIAL, "12.10.2026", false, true, true, true, false, false)), null);
+        String full = render(page(row(StoreState.FULL, null, false, false, false, true, false, false)), null);
+
+        // then
+        assertThat(trial).contains("data-owner-email=\"trial@example.com\"");
+        assertThat(full).doesNotContain("data-owner-email=\"owner@example.com\"").doesNotContain("data-owner-email=\"Firma");
+    }
+
+    @Test
+    void serverDialogOfTrialWithoutOwnerAccountHasNoOwnerLine() {
+        // given
+        StoresListPage page = new StoresListPage(StoresListQuery.of(null, null, null, null, STORE_ID),
+                List.of(row(StoreState.TRIAL, "12.10.2026", false, true, true, true, false, false)), segments(),
+                new StoresListPage.DeleteDialog(STORE_ID, "My store", true, null, "/dashboard/store/" + STORE_ID + "/delete"), null);
+
+        // when
+        String html = render(page, null);
+
+        // then
+        assertThat(html).containsPattern("<li data-store-delete-owner[^>]*hidden=\"hidden\"></li>");
+        assertThat(html).doesNotContain("(panel sign-in)</li>");
+    }
+
+    @Test
+    void switchedOffDemoStoreSaysItIsADemoStore() {
+        // when
+        String html = render(page(row(StoreState.DEMO_SWITCHED_OFF, "11.10.2026", true, false, false, false, true, false)), null);
+
+        // then
+        assertThat(html).contains(">Switched off<").contains("Demo · since: 11.10.2026");
+    }
+
+    @Test
+    void emptySearchInOneSegmentOffersAllSegments() {
+        // given
+        StoresListPage page = new StoresListPage(StoresListQuery.of("trial", "ogr", null, null, null), List.of(), segments(), null,
+                new StoresListPage.EmptyState("stores.list.empty.searchSegment", "ogr", "stores.list.empty.allSegments", "/dashboard/stores?q=ogr"));
+
+        // when
+        String html = render(page, null);
+
+        // then
+        assertThat(html).contains("No store in this segment matches “ogr”.").contains("href=\"/dashboard/stores?q=ogr\">Search all segments<");
+    }
+
+    @Test
     void deleteDialogClosedByDefault() {
         // when
         String html = render(page(row(StoreState.FULL, null, false, false, false, true, false, false)), null);
@@ -144,31 +193,34 @@ class StoresTemplateRenderingTest {
     void noticeAndEmptyState() {
         // given
         StoresListPage empty = new StoresListPage(StoresListQuery.of(null, "toys", null, null, null), List.of(), segments(), null,
-                new StoresListPage.EmptyState("stores.list.empty.search", "toys", "stores.list.empty.showAll", "/dashboard/stores"));
+                new StoresListPage.EmptyState("stores.list.empty.search", "toys", "stores.list.search.clear", "/dashboard/stores"));
 
         // when
         String html = render(empty, StoresNotice.warn("Already in that state"));
 
         // then
         assertThat(html).contains("cl-alert is-warn").contains("Already in that state");
-        assertThat(html).contains("No store matches “toys”.").contains("Show all stores");
+        assertThat(html).contains("No store matches “toys”.").contains(">Clear search<");
         assertThat(html).doesNotContain("<table");
     }
 
     @Test
-    void searchShowsResultCountOnlyWhenThereIsAPhrase() {
+    void searchPhraseShowsChipCountAndClearFiltersKeepingSegmentAndSort() {
         // given
         StoreRow row = row(StoreState.FULL, null, false, false, false, true, false, false);
-        StoresListPage searched = new StoresListPage(StoresListQuery.of(null, "toys", null, null, null), List.of(row), segments(), null, null);
+        StoresListPage searched = new StoresListPage(StoresListQuery.of("full", "toys", "name", null, null), List.of(row), segments(), null, null);
 
         // when
         String withPhrase = render(searched, null);
         String withoutPhrase = render(page(row), null);
 
         // then
-        assertThat(withPhrase).contains("role=\"status\"").contains("Results: 1")
-                .contains("<p class=\"cl-table-results cl-visually-hidden\" role=\"status\">");
-        assertThat(withoutPhrase).doesNotContain("cl-table-results");
+        assertThat(withPhrase).contains("<span>Searching: “toys”</span>")
+                .contains("aria-label=\"Clear: Searching: “toys”\"")
+                .contains("<a class=\"cl-link-button cl-toolbar-clear\" href=\"/dashboard/stores?status=full&amp;sort=name\">Clear filters</a>")
+                .contains("<p class=\"cl-table-results\" role=\"status\">Stores: 1</p>")
+                .doesNotContain("cl-visually-hidden\" role=\"status\"");
+        assertThat(withoutPhrase).doesNotContain("cl-table-results").doesNotContain("cl-filter-chip").doesNotContain("cl-toolbar-clear");
     }
 
     @Test

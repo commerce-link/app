@@ -1896,6 +1896,8 @@ body.cl-drawer-open .cl-sidebar {
     border-top: 1px solid var(--cl-line);
     font-size: 14px;
     color: var(--cl-ink-2);
+    /* the empty state quotes the search phrase, which may be one long word */
+    overflow-wrap: anywhere;
 }
 
 /* Status tones next to the warning tone defined with the tiles (is-bad: Zablokowane on the orders list, FAILED/BLOCKED
@@ -13147,7 +13149,8 @@ a.cl-link-button:hover {
 }
 
 /* on the tinted hover row --cl-ink-3 drops under AA; muted text on a toned background uses --cl-ink-2 (§9) */
-.cl-page .cl-table.is-stores tbody tr:hover .cl-due-note:not(.is-warn) {
+.cl-page .cl-table.is-stores tbody tr:hover .cl-due-note:not(.is-warn),
+.cl-page .cl-table.is-stores tbody tr:hover .cl-table-empty {
     color: var(--cl-ink-2);
 }
 
@@ -13245,6 +13248,18 @@ a.cl-link-button:hover {
         min-width: 44px;
         min-height: 44px;
     }
+}
+
+/* Search chip line: "Clear filters" sits next to the chip (no filter menus in this toolbar), and a long phrase without
+   spaces wraps inside the chip instead of widening the page. */
+.cl-page .cl-list-meta.is-stores .cl-filter-chips {
+    align-items: center;
+    min-width: 0;
+}
+
+.cl-page .cl-list-meta.is-stores .cl-filter-chip {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 /* Typed confirmation dialog (store delete): what goes with the record, and the identifier to type. */

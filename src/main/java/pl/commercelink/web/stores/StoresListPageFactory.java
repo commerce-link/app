@@ -59,7 +59,7 @@ public class StoresListPageFactory {
                 .toList();
 
         return new StoresListPage(query, rows, segments(query, counts, matching.size()), deleteDialog(stores, query),
-                emptyState(query, rows.isEmpty(), stores.isEmpty()));
+                emptyState(query, rows.isEmpty(), stores.isEmpty(), !matching.isEmpty()));
     }
 
     private StoreRow row(Store store, StoresListQuery query) {
@@ -69,7 +69,7 @@ public class StoresListPageFactory {
         String noteDate = switch (state) {
             case TRIAL, TRIAL_ENDING -> trial.map(t -> format(t.endsOn())).orElse(null);
             case TRIAL_ENDED -> deactivation.map(d -> format(d.deletionOn())).orElse(null);
-            case SWITCHED_OFF -> deactivation.map(d -> format(d.deactivatedOn())).orElse(null);
+            case SWITCHED_OFF, DEMO_SWITCHED_OFF -> deactivation.map(d -> format(d.deactivatedOn())).orElse(null);
             case DEMO -> format(day(store.getDemo().getExpiresAt()));
             case FULL -> null;
         };
@@ -83,6 +83,7 @@ public class StoresListPageFactory {
                 displayName(store),
                 company != null ? company : email,
                 company != null ? email : null,
+                trialOwnerEmail(store),
                 state, noteDate, noteDays, format(day(store.getCreatedAt())),
                 store.getDemo() != null, store.getTrial() != null,
                 store.getTrial() != null, !inactive, inactive && !trialEnded, trialEnded,
@@ -91,7 +92,10 @@ public class StoresListPageFactory {
 
     private static StoreState state(Store store, Optional<DeactivationStatus> deactivation, Optional<TrialStatus> trial) {
         if (deactivation.isPresent()) {
-            return deactivation.get().reason() == DeactivationReason.TRIAL_ENDED ? StoreState.TRIAL_ENDED : StoreState.SWITCHED_OFF;
+            if (deactivation.get().reason() == DeactivationReason.TRIAL_ENDED) {
+                return StoreState.TRIAL_ENDED;
+            }
+            return store.getDemo() != null ? StoreState.DEMO_SWITCHED_OFF : StoreState.SWITCHED_OFF;
         }
         if (store.getDemo() != null) {
             return StoreState.DEMO;
@@ -117,6 +121,10 @@ public class StoresListPageFactory {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static String trialOwnerEmail(Store store) {
+        return store.getTrial() == null ? null : trimmed(store.getTrial().getOwnerEmail());
     }
 
     private static boolean matches(Listed listed, String q) {
@@ -173,12 +181,13 @@ public class StoresListPageFactory {
                 .map(store -> new StoresListPage.DeleteDialog(store.getStoreId(),
                         displayName(store),
                         store.getTrial() != null,
-                        ownerEmail(store),
+                        trialOwnerEmail(store),
                         "/dashboard/store/" + store.getStoreId() + "/delete"))
                 .orElse(null);
     }
 
-    private static StoresListPage.EmptyState emptyState(StoresListQuery query, boolean noRows, boolean noStores) {
+    private static StoresListPage.EmptyState emptyState(StoresListQuery query, boolean noRows, boolean noStores,
+                                                        boolean matchesInOtherSegments) {
         if (!noRows) {
             return null;
         }
@@ -186,8 +195,14 @@ public class StoresListPageFactory {
             return new StoresListPage.EmptyState("stores.list.empty.none", null, "stores.list.create", "/dashboard/store/create");
         }
         String showAll = query.cleared().href();
+        // e.g. right after converting a trial from the "Trial" segment: the store now matches only in another segment
+        if (query.q() != null && matchesInOtherSegments) {
+            return new StoresListPage.EmptyState("stores.list.empty.searchSegment", query.q(), "stores.list.empty.allSegments",
+                    query.withSegment(StoresListQuery.Segment.ALL).href());
+        }
+        // as on the offers list: the action drops only the phrase, the segment and the sort stay
         if (query.q() != null) {
-            return new StoresListPage.EmptyState("stores.list.empty.search", query.q(), "stores.list.empty.showAll", showAll);
+            return new StoresListPage.EmptyState("stores.list.empty.search", query.q(), "stores.list.search.clear", query.withQ(null).href());
         }
         return new StoresListPage.EmptyState("stores.list.empty.segment", null, "stores.list.empty.showAll", showAll);
     }

@@ -103,6 +103,18 @@ class StoresListQueryTest {
     }
 
     @Test
+    void safeBackRejectsCharactersTheListNeverSendsUnencoded() {
+        // then
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=a b")).isEqualTo("/dashboard/stores");
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=a\tb")).isEqualTo("/dashboard/stores");
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=Łódź")).isEqualTo("/dashboard/stores");
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=a\u202Eb")).isEqualTo("/dashboard/stores");
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=a#frag")).isEqualTo("/dashboard/stores");
+        assertThat(StoresListQuery.safeBack("/dashboard/stores?q=%C5%81%C3%B3d%C5%BA+b")).isEqualTo("/dashboard/stores?q=%C5%81%C3%B3d%C5%BA+b");
+        assertThat(StoresListQuery.withDeleteParam("/dashboard/stores?q=a#frag", "id1")).isEqualTo("/dashboard/stores?delete=id1");
+    }
+
+    @Test
     void withDeleteParamAppendsToTheBackAddress() {
         // then
         assertThat(StoresListQuery.withDeleteParam("/dashboard/stores", "a b")).isEqualTo("/dashboard/stores?delete=a+b");
