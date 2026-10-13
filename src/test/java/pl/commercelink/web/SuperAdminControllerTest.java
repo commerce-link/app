@@ -21,6 +21,7 @@ import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.TrialPeriod;
+import pl.commercelink.web.dtos.StoreCopyForm;
 import pl.commercelink.web.dtos.StoreCreateForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -755,5 +756,170 @@ class SuperAdminControllerTest {
 
         // then
         verify(storeTrialService, never()).convertToFullAccount(any());
+    }
+
+    private static StoreCopyForm copyForm(String id, String name) {
+        return StoreCopyForm.of(name, id);
+    }
+
+    @Test
+    void copyPageSuggestsANameAndAFreeId() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storeCreationService.freeStoreId()).thenReturn(NEW_ID);
+        when(messageSource.getMessage(eq("store.copy.name.suggested"), aryEq(new Object[]{"Madman Gaming"}), eq(locale)))
+                .thenReturn("Madman Gaming (kopia)");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.copyStorePage(STORE_ID, null, model, locale);
+
+        // then
+        assertEquals("store-copy", view);
+        StoreCopyForm form = (StoreCopyForm) model.getAttribute("form");
+        assertEquals("Madman Gaming (kopia)", form.getNewStoreName());
+        assertEquals(NEW_ID, form.getNewStoreId());
+    }
+
+    @Test
+    void copyPageBackLeadsToTheSourceSettingsWithoutBack() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(messageSource.getMessage("store.title", null, locale)).thenReturn("Ustawienia sklepu");
+        // the page also asks for the suggested name, which these tests do not assert on
+        lenient().when(messageSource.getMessage(eq("store.copy.name.suggested"), any(), eq(locale))).thenReturn("suggested");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.copyStorePage(STORE_ID, null, model, locale);
+
+        // then
+        assertEquals("/dashboard/store/" + STORE_ID, model.getAttribute("backHref"));
+        assertEquals("Ustawienia sklepu", model.getAttribute("backLabel"));
+        assertNull(model.getAttribute("back"));
+    }
+
+    @Test
+    void copyPageBackKeepsTheListState() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(messageSource.getMessage("nav.stores", null, locale)).thenReturn("Sklepy");
+        // the page also asks for the suggested name, which these tests do not assert on
+        lenient().when(messageSource.getMessage(eq("store.copy.name.suggested"), any(), eq(locale))).thenReturn("suggested");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.copyStorePage(STORE_ID, "/dashboard/stores?status=trial", model, locale);
+
+        // then
+        assertEquals("/dashboard/stores?status=trial", model.getAttribute("backHref"));
+        assertEquals("/dashboard/stores?status=trial", model.getAttribute("back"));
+        assertEquals("Sklepy", model.getAttribute("backLabel"));
+    }
+
+    @Test
+    void copyPageIgnoresForeignBack() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.copyStorePage(STORE_ID, "https://evil.example", model, locale);
+
+        // then
+        assertEquals("/dashboard/stores", model.getAttribute("backHref"));
+    }
+
+    @Test
+    void copyPageOfUnknownStoreIsNotFound() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+
+        // when / then
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> controller.copyStorePage(STORE_ID, null, new ConcurrentModel(), locale));
+        assertEquals(HttpStatus.NOT_FOUND, e.getStatusCode());
+    }
+
+    @Test
+    void copiesUnderTheFormIdAndShowsTheOutcomeInTheSettings() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        when(storeCopyService.copyStore(STORE_ID, NEW_ID, "Kopia")).thenReturn(store(NEW_ID, "Kopia"));
+        when(messageSource.getMessage(eq("store.copy.success"), aryEq(new Object[]{"Kopia", "Madman Gaming"}), eq(locale)))
+                .thenReturn("Skopiowano");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, " Kopia "), null, new ConcurrentModel(), locale,
+                redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        assertEquals("Skopiowano", redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE));
+    }
+
+    @Test
+    void copyWithoutIdGetsAFreshOne() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storeCreationService.freeStoreId()).thenReturn(NEW_ID);
+        when(storeCopyService.copyStore(STORE_ID, NEW_ID, "Kopia")).thenReturn(store(NEW_ID, "Kopia"));
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(null, "Kopia"), null, new ConcurrentModel(), locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+    }
+
+    @Test
+    void blankCopyNameRendersTheFormWithoutCopying() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, " "), null, model, locale, new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-copy", view);
+        assertEquals(Map.of("newStoreName", "store.copy.error.name.required"), model.getAttribute("errors"));
+        verifyNoInteractions(storeCopyService);
+    }
+
+    @Test
+    void resentCopyFormLandsOnTheCopyItMade() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(store(NEW_ID, "Kopia"));
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, "Kopia"), null, new ConcurrentModel(), locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        verifyNoInteractions(storeCopyService);
+    }
+
+    @Test
+    void failedCopyRendersTheFormWithTheError() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        when(storeCopyService.copyStore(STORE_ID, NEW_ID, "Kopia")).thenThrow(new IllegalStateException("timeout"));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, "Kopia"), "/dashboard/stores", model, locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-copy", view);
+        assertEquals("store.copy.error", model.getAttribute("formError"));
+        assertEquals("/dashboard/stores", model.getAttribute("back"));
     }
 }
