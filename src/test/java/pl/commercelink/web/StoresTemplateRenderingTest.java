@@ -179,4 +179,17 @@ class StoresTemplateRenderingTest {
         assertThat(html).doesNotContainPattern("class=\"(button|tag|table|title)[ \"]")
                 .doesNotContain("style=").doesNotContain("onsubmit").doesNotContain("prompt(").doesNotContain("confirm(");
     }
+
+    @Test
+    void scriptAndStylesheetCoverTheDialogMarkup() throws Exception {
+        // given
+        String js = new String(getClass().getResourceAsStream("/static/js/stores.js").readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        String css = new String(getClass().getResourceAsStream("/static/css/commercelink.css").readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+
+        // then
+        assertThat(js).contains("store-delete-dialog").contains("cl:dialog-open").contains("data-store-delete-submit")
+                .contains("data-store-id").contains("data-action");
+        assertThat(css).contains(".cl-table.is-stores").contains(".cl-dialog-effects").contains(".cl-confirm-id")
+                .contains(":is(.is-offers, .is-stores) .cl-table-actions");
+    }
 }
