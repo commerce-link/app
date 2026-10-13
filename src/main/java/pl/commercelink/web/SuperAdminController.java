@@ -1,7 +1,9 @@
 package pl.commercelink.web;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +23,9 @@ import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.dtos.StoreCreateForm;
 import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.web.stores.StoresListPageFactory;
 import pl.commercelink.web.stores.StoresListQuery;
@@ -30,6 +34,8 @@ import pl.commercelink.web.stores.StoresNotice;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -143,26 +149,65 @@ public class SuperAdminController {
     }
 
     @GetMapping("/dashboard/store/create")
-    public String createStorePage(Model model) {
-        model.addAttribute("store", new Store());
-        return "store-create";
+    public String createStorePage(@RequestParam(required = false) String back, Model model) {
+        return renderCreate(StoreCreateForm.withId(storeCreationService.freeStoreId()), Map.of(), null, back, model);
     }
 
     @PostMapping("/dashboard/store/create")
-    public String createStore(@RequestParam String name,
-                              @RequestParam(required = false) String apiKey,
-                              Locale locale,
-                              RedirectAttributes redirectAttributes) {
-        try {
-            Store store = storeCreationService.createStore(CreateStoreRequest.bare(null, name, apiKey));
-            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
-            return String.format("redirect:/dashboard/store/%s", store.getStoreId());
-        } catch (Exception e) {
-            log.error("Failed to create store '{}'", name, e);
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("store.create.error", null, locale));
-            return "redirect:/dashboard/store/create";
+    public String createStore(@ModelAttribute("form") StoreCreateForm form, @RequestParam(required = false) String back,
+                              Model model, Locale locale, RedirectAttributes redirectAttributes) {
+        // a form opened before this page handed out ids (or a tampered one) simply gets a fresh id
+        if (!form.hasWellFormedId()) {
+            form.setNewStoreId(storeCreationService.freeStoreId());
         }
+        Map<String, String> errors = form.validate();
+        if (!errors.isEmpty()) {
+            return renderCreate(form, errors, null, back, model);
+        }
+        Store taken = storesRepository.findById(form.getNewStoreId());
+        if (taken != null) {
+            return alreadyCreated(taken, form, back, model, locale, redirectAttributes);
+        }
+        try {
+            Store store = storeCreationService.createStore(
+                    CreateStoreRequest.bare(form.getNewStoreId(), form.trimmedName(), form.apiKeySuffix()));
+            SettingsFlash.onRedirect(redirectAttributes, message("store.create.success", locale, store.getName()));
+            return "redirect:/dashboard/store/" + store.getStoreId();
+        } catch (ConditionalCheckFailedException e) {
+            // the same form sent twice at once: the other request saved the store first (Store is versioned)
+            Store raced = storesRepository.findById(form.getNewStoreId());
+            if (raced != null) {
+                return alreadyCreated(raced, form, back, model, locale, redirectAttributes);
+            }
+            log.error("Store id {} refused as taken but not readable", form.getNewStoreId(), e);
+            return renderCreate(form, Map.of(), "store.create.error", back, model);
+        } catch (RuntimeException e) {
+            log.error("Failed to create store '{}'", form.trimmedName(), e);
+            return renderCreate(form, Map.of(), "store.create.error", back, model);
+        }
+    }
+
+    private String alreadyCreated(Store taken, StoreCreateForm form, String back, Model model, Locale locale,
+                                  RedirectAttributes redirectAttributes) {
+        if (sameName(taken, form.trimmedName())) {
+            SettingsFlash.onRedirect(redirectAttributes, message("store.create.duplicate", locale, taken.getName()));
+            return "redirect:/dashboard/store/" + taken.getStoreId();
+        }
+        form.setNewStoreId(storeCreationService.freeStoreId());
+        return renderCreate(form, Map.of(), "store.create.error.stale", back, model);
+    }
+
+    private String renderCreate(StoreCreateForm form, Map<String, String> errors, String formError, String back, Model model) {
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("formError", formError);
+        model.addAttribute("back", back == null ? null : StoresListQuery.safeBack(back));
+        model.addAttribute("backHref", StoresListQuery.safeBack(back));
+        return "store-create";
+    }
+
+    private static boolean sameName(Store store, String name) {
+        return Objects.equals(StringUtils.strip(store.getName()), name);
     }
 
     @GetMapping("/dashboard/store/{storeId}/copy")

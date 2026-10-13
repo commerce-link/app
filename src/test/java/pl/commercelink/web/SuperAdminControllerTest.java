@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,13 +21,16 @@ import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.TrialPeriod;
+import pl.commercelink.web.dtos.StoreCreateForm;
 import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.stores.StoresListPage;
 import pl.commercelink.web.stores.StoresListPageFactory;
 import pl.commercelink.web.stores.StoresListQuery;
 import pl.commercelink.web.stores.StoresNotice;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -187,38 +191,155 @@ class SuperAdminControllerTest {
         verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
     }
 
-    @Test
-    void createStoreDelegatesToCreationServiceAndIgnoresClientStoreId() {
-        // given
-        Store created = new Store();
-        created.setStoreId("srv-gen-001");
-        when(storeCreationService.createStore(CreateStoreRequest.bare(null, "Nowy sklep", "key-9"))).thenReturn(created);
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+    private static final String NEW_ID = "newid00001";
 
-        // when
-        String view = controller.createStore("Nowy sklep", "key-9", locale, redirectAttributes);
+    private static StoreCreateForm createForm(String id, String name, String apiKey) {
+        StoreCreateForm form = StoreCreateForm.withId(id);
+        form.setName(name);
+        form.setApiKey(apiKey);
+        return form;
+    }
 
-        // then
-        assertEquals("redirect:/dashboard/store/srv-gen-001", view);
-        verify(storeCreationService).createStore(CreateStoreRequest.bare(null, "Nowy sklep", "key-9"));
-        verifyNoMoreInteractions(storeCreationService);
+    private static Store store(String id, String name) {
+        Store store = new Store();
+        store.setStoreId(id);
+        store.setName(name);
+        return store;
     }
 
     @Test
-    void createStoreShowsErrorFlashWhenCreationFails() {
+    void createPageHandsOutAFreeIdAndGoesBackToTheList() {
         // given
-        when(storeCreationService.createStore(CreateStoreRequest.bare(null, "Nowy sklep", null)))
-                .thenThrow(new IllegalStateException("Could not generate a unique store id"));
-        when(messageSource.getMessage("store.create.error", null, locale)).thenReturn("Błąd tworzenia");
+        when(storeCreationService.freeStoreId()).thenReturn(NEW_ID);
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.createStorePage("/dashboard/stores?status=trial", model);
+
+        // then
+        assertEquals("store-create", view);
+        assertEquals(NEW_ID, ((StoreCreateForm) model.getAttribute("form")).getNewStoreId());
+        assertEquals("/dashboard/stores?status=trial", model.getAttribute("backHref"));
+        assertEquals(Map.of(), model.getAttribute("errors"));
+    }
+
+    @Test
+    void createsStoreUnderTheFormIdWithTheKeySuffixAndShowsTheOutcomeInTheSettings() {
+        // given
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        when(storeCreationService.createStore(CreateStoreRequest.bare(NEW_ID, "Elektro-Max", "yz1234")))
+                .thenReturn(store(NEW_ID, "Elektro-Max"));
+        when(messageSource.getMessage(eq("store.create.success"), aryEq(new Object[]{"Elektro-Max"}), eq(locale)))
+                .thenReturn("Utworzono");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.createStore("Nowy sklep", null, locale, redirectAttributes);
+        String view = controller.createStore(createForm(NEW_ID, " Elektro-Max ", "full-key-wxyz1234"), null,
+                new ConcurrentModel(), locale, redirectAttributes);
 
         // then
-        assertEquals("redirect:/dashboard/store/create", view);
-        assertEquals("Błąd tworzenia", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        assertEquals("Utworzono", redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE));
         assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
+    }
+
+    @Test
+    void createWithoutIdGetsAFreshOne() {
+        // given — a form opened before the deploy has no newStoreId field
+        when(storeCreationService.freeStoreId()).thenReturn(NEW_ID);
+        when(storeCreationService.createStore(CreateStoreRequest.bare(NEW_ID, "Sklep", null))).thenReturn(store(NEW_ID, "Sklep"));
+
+        // when
+        String view = controller.createStore(createForm(null, "Sklep", null), null, new ConcurrentModel(), locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+    }
+
+    @Test
+    void blankNameRendersTheFormWithoutCreating() {
+        // given
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.createStore(createForm(NEW_ID, "  ", "abc"), "/dashboard/stores", model, locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-create", view);
+        assertEquals(Map.of("name", "store.create.error.name.required", "apiKey", "store.create.error.apiKey.short"),
+                model.getAttribute("errors"));
+        assertEquals("abc", ((StoreCreateForm) model.getAttribute("form")).getApiKey());
+        assertEquals("/dashboard/stores", model.getAttribute("back"));
+        verifyNoInteractions(storeCreationService);
+    }
+
+    @Test
+    void resentFormLandsOnTheStoreItCreated() {
+        // given
+        when(storesRepository.findById(NEW_ID)).thenReturn(store(NEW_ID, "Elektro-Max"));
+        when(messageSource.getMessage(eq("store.create.duplicate"), aryEq(new Object[]{"Elektro-Max"}), eq(locale)))
+                .thenReturn("Już był");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createStore(createForm(NEW_ID, "Elektro-Max", null), null, new ConcurrentModel(), locale,
+                redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        assertEquals("Już był", redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE));
+        verify(storeCreationService, never()).createStore(any());
+    }
+
+    @Test
+    void idOfAnotherStoreRendersTheFormWithAFreshId() {
+        // given
+        when(storesRepository.findById(NEW_ID)).thenReturn(store(NEW_ID, "Inny sklep"));
+        when(storeCreationService.freeStoreId()).thenReturn("fresh00001");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.createStore(createForm(NEW_ID, "Elektro-Max", null), null, model, locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-create", view);
+        assertEquals("store.create.error.stale", model.getAttribute("formError"));
+        assertEquals("fresh00001", ((StoreCreateForm) model.getAttribute("form")).getNewStoreId());
+        verify(storeCreationService, never()).createStore(any());
+    }
+
+    @Test
+    void lostRaceLandsOnTheStoreTheOtherRequestCreated() {
+        // given
+        when(storesRepository.findById(NEW_ID)).thenReturn(null).thenReturn(store(NEW_ID, "Elektro-Max"));
+        when(storeCreationService.createStore(any())).thenThrow(new ConditionalCheckFailedException("taken"));
+
+        // when
+        String view = controller.createStore(createForm(NEW_ID, "Elektro-Max", null), null, new ConcurrentModel(), locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+    }
+
+    @Test
+    void failedCreationRendersTheFormWithTheTypedValues() {
+        // given
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        when(storeCreationService.createStore(any())).thenThrow(new IllegalStateException("boom"));
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.createStore(createForm(NEW_ID, "Elektro-Max", "ab12cd"), null, model, locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-create", view);
+        assertEquals("store.create.error", model.getAttribute("formError"));
+        assertEquals("Elektro-Max", ((StoreCreateForm) model.getAttribute("form")).getName());
     }
 
     @Test
