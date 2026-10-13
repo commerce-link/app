@@ -30,7 +30,8 @@
         <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
         <input class="cl-input cl-table-search" type="search" id="rma-search" name="q" autocomplete="off" spellcheck="false"
                th:value="${p.query()}" th:attr="placeholder=#{rma.new.search.label}" th:autofocus="${autofocus}">
-        <a th:if="${p.query() != null}" class="cl-search-clear" th:href="@{/dashboard/rma/new}"
+        <a th:if="${p.query() != null}" class="cl-search-clear"
+           th:href="${p.from() != null} ? @{/dashboard/rma/new(from=${p.from()})} : @{/dashboard/rma/new}"
            th:attr="aria-label=#{rma.new.search.clear}"><i class="fas fa-times" aria-hidden="true"></i></a>
     </div>
     <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">

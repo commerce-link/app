@@ -81,6 +81,15 @@ class RmaNewTemplateTest {
     }
 
     @Test
+    void clearingTheSearchKeepsTheWayBackToTheOrder() {
+        // when
+        String html = content(render(order(Map.of(), Map.of(), null)));
+
+        // then
+        assertThat(html).contains("class=\"cl-search-clear\"").contains("href=\"/dashboard/rma/new?from=order\"");
+    }
+
+    @Test
     void errorsAreSummarisedAndShownUnderTheirFields() {
         // given
         Map<String, String> summary = new LinkedHashMap<>();
