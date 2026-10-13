@@ -13166,10 +13166,12 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* .cl-row-detail-inner is a bordered box without padding (it usually holds a .cl-subtable with its own cell padding) */
 .cl-page .cl-rma-item-fields {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--cl-gap-fields);
+    padding: 12px 16px 16px;
 }
 
 .cl-page .cl-rma-item-fields .cl-field {
@@ -13198,6 +13200,15 @@ a.cl-link-button:hover {
         grid-template-columns: 44px minmax(0, 1fr);
         column-gap: 8px;
         align-items: start;
+    }
+
+    /* the row is a grid with gaps between its cells: the ticked tint goes on the row, not on each cell */
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main.is-open {
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main.is-open > * {
+        background: none;
     }
 
     .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check {
