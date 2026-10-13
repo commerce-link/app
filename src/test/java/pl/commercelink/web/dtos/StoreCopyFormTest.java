@@ -24,8 +24,11 @@ class StoreCopyFormTest {
         // given
         StoreCopyForm form = StoreCopyForm.of(" \t", "abcde12345");
 
-        // expect
-        assertThat(form.validate()).containsExactly(Map.entry("newStoreName", "store.copy.error.name.required"));
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsExactly(Map.entry("newStoreName", "store.copy.error.name.required"));
     }
 
     @Test
@@ -33,8 +36,12 @@ class StoreCopyFormTest {
         // given
         StoreCopyForm form = StoreCopyForm.of("  Kopia  ", "ABC");
 
-        // expect
-        assertThat(form.trimmedName()).isEqualTo("Kopia");
-        assertThat(form.hasWellFormedId()).isFalse();
+        // when
+        String name = form.trimmedName();
+        boolean wellFormed = form.hasWellFormedId();
+
+        // then
+        assertThat(name).isEqualTo("Kopia");
+        assertThat(wellFormed).isFalse();
     }
 }

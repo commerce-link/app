@@ -37,6 +37,7 @@ import java.util.Locale;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -317,13 +318,17 @@ class SuperAdminControllerTest {
         // given
         when(storesRepository.findById(NEW_ID)).thenReturn(null).thenReturn(store(NEW_ID, "Elektro-Max"));
         when(storeCreationService.createStore(any())).thenThrow(new ConditionalCheckFailedException("taken"));
+        when(messageSource.getMessage(eq("store.create.duplicate"), aryEq(new Object[]{"Elektro-Max"}), eq(locale)))
+                .thenReturn("Już był");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
         String view = controller.createStore(createForm(NEW_ID, "Elektro-Max", null), null, new ConcurrentModel(), locale,
-                new RedirectAttributesModelMap());
+                redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        assertEquals("Już był", redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE));
     }
 
     @Test
@@ -921,5 +926,57 @@ class SuperAdminControllerTest {
         assertEquals("store-copy", view);
         assertEquals("store.copy.error", model.getAttribute("formError"));
         assertEquals("/dashboard/stores", model.getAttribute("back"));
+    }
+
+    @Test
+    void copyIdOfAnotherStoreRendersTheFormWithAFreshId() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(store(NEW_ID, "Inny sklep"));
+        when(storeCreationService.freeStoreId()).thenReturn("fresh00001");
+        lenient().when(messageSource.getMessage(anyString(), any(), eq(locale))).thenReturn("text");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, "Kopia"), null, model, locale,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("store-copy", view);
+        assertEquals("store.copy.error.stale", model.getAttribute("formError"));
+        assertEquals("fresh00001", ((StoreCopyForm) model.getAttribute("form")).getNewStoreId());
+        verifyNoInteractions(storeCopyService);
+    }
+
+    @Test
+    void lostCopyRaceLandsOnTheCopyTheOtherRequestMade() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(null).thenReturn(store(NEW_ID, "Kopia"));
+        when(storeCopyService.copyStore(STORE_ID, NEW_ID, "Kopia")).thenThrow(new ConditionalCheckFailedException("taken"));
+        when(messageSource.getMessage(eq("store.copy.duplicate"), aryEq(new Object[]{"Kopia"}), eq(locale)))
+                .thenReturn("Już była");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.copyStore(STORE_ID, copyForm(NEW_ID, "Kopia"), null, new ConcurrentModel(), locale,
+                redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/store/" + NEW_ID, view);
+        assertEquals("Już była", redirectAttributes.getFlashAttributes().get(SettingsFlash.SAVED_MESSAGE));
+    }
+
+    @Test
+    void copyPostOfUnknownSourceIsNotFound() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+
+        // when / then
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> controller.copyStore(STORE_ID, copyForm(NEW_ID, "Kopia"), null, new ConcurrentModel(), locale,
+                        new RedirectAttributesModelMap()));
+        assertEquals(HttpStatus.NOT_FOUND, e.getStatusCode());
+        verifyNoInteractions(storeCopyService);
     }
 }

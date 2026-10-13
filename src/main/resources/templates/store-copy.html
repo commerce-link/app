@@ -14,7 +14,7 @@
                 <!--/* A failed or stale copy is no field's fault; errors is empty then, so the two alerts never show together. */-->
                 <div th:if="${formError != null}" id="store-copy-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                    <p class="cl-alert-text" th:text="#{${formError}(${form.newStoreName})}"></p>
+                    <p class="cl-alert-text" th:text="#{${formError}(${form.trimmedName()})}"></p>
                 </div>
                 <input type="hidden" name="newStoreId" th:value="*{newStoreId}"/>
                 <input type="hidden" name="back" th:if="${back != null}" th:value="${back}"/>

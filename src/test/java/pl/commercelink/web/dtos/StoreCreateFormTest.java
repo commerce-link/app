@@ -26,7 +26,7 @@ class StoreCreateFormTest {
 
     @Test
     void nameIsStripped() {
-        // expect
+        // when / then
         assertThat(form("  Elektro-Max \n", null).trimmedName()).isEqualTo("Elektro-Max");
     }
 
@@ -35,20 +35,23 @@ class StoreCreateFormTest {
         // given
         StoreCreateForm form = form("Sklep", "  ");
 
-        // expect
-        assertThat(form.validate()).isEmpty();
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).isEmpty();
         assertThat(form.apiKeySuffix()).isNull();
     }
 
     @Test
     void apiKeyShorterThanTheSuffixIsRefused() {
-        // expect
+        // when / then
         assertThat(form("Sklep", "ab12c").validate()).containsExactly(Map.entry("apiKey", "store.create.error.apiKey.short"));
     }
 
     @Test
     void apiKeyOfExactlySixCharactersIsKept() {
-        // expect
+        // when / then
         assertThat(form("Sklep", "ab12cd").apiKeySuffix()).isEqualTo("ab12cd");
     }
 
@@ -57,14 +60,17 @@ class StoreCreateFormTest {
         // given — a whole API Gateway key pasted with stray whitespace
         StoreCreateForm form = form("Sklep", "  Q2xhdWRlQ29kZUFwaUdhdGV3YXlLZXk0MHh5ejEyMw \n");
 
-        // expect
-        assertThat(form.validate()).isEmpty();
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).isEmpty();
         assertThat(form.apiKeySuffix()).isEqualTo("ejEyMw");
     }
 
     @Test
     void errorsKeepTheFieldOrder() {
-        // expect
+        // when / then
         assertThat(form("", "abc").validate().keySet()).containsExactly("name", "apiKey");
     }
 
@@ -74,8 +80,11 @@ class StoreCreateFormTest {
         StoreCreateForm missing = StoreCreateForm.withId(null);
         StoreCreateForm forged = StoreCreateForm.withId("../other");
 
-        // expect
-        assertThat(StoreCreateForm.withId("abcde12345").hasWellFormedId()).isTrue();
+        // when
+        StoreCreateForm valid = StoreCreateForm.withId("abcde12345");
+
+        // then
+        assertThat(valid.hasWellFormedId()).isTrue();
         assertThat(missing.hasWellFormedId()).isFalse();
         assertThat(forged.hasWellFormedId()).isFalse();
     }
