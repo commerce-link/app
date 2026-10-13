@@ -5059,6 +5059,24 @@ a.cl-link-button:hover {
     margin-top: 4px;
 }
 
+/* Scope of an operation: what it does and what it leaves out, two lists side by side (store copy, 2026-10-13). */
+.cl-page .cl-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.cl-page .cl-scope-title { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-scope-list { margin: 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.4; color: var(--cl-ink-2); }
+.cl-page .cl-scope-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; margin: 0; }
+.cl-page .cl-scope-list li + li { margin-top: 4px; }
+.cl-page .cl-scope-list .icon { width: 16px; height: 1.4em; }
+.cl-page .cl-scope-list.is-yes .icon { color: var(--cl-ok); }
+.cl-page .cl-scope-list.is-no .icon { color: var(--cl-ink-3); }
+@media (max-width: 719px) {
+    .cl-page .cl-scope { grid-template-columns: minmax(0, 1fr); }
+}
+/* A short note under a page's form (a hint to another way of doing the same). */
+.cl-page .cl-form + .cl-help { margin-top: 12px; }
+/* Busy state of a submit-once button with data-cl-busy-label. */
+.cl-page .cl-button > .cl-spinner.is-compact { margin-right: 6px; }
+.cl-page .cl-card-footer > [data-cl-busy-note] { flex-basis: 100%; margin: 0; }
+
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
     /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the select-all box and
