@@ -13,6 +13,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 
 import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Controller
@@ -38,6 +39,7 @@ public class EmailVerificationController {
             return "redirect:" + homeUrl;
         }
         addEmail(model);
+        RegistrationErrors.prepare(model, "code");
         if (!emailVerificationService.sendCodeOnce(request)) {
             model.addAttribute("errorMessage",
                     messageSource.getMessage("registration.verify.resend-failed", null, locale));
@@ -55,7 +57,8 @@ public class EmailVerificationController {
             return "redirect:" + homeUrl;
         } catch (RegistrationException e) {
             addEmail(model);
-            model.addAttribute("errorMessage", messageSource.getMessage(e.messageKey(), null, locale));
+            RegistrationErrors.prepare(model, "code");
+            RegistrationErrors.reject(model, e.messageKey(), Set.of("code"), messageSource, locale);
             return "register-verify-email";
         }
     }
@@ -66,6 +69,7 @@ public class EmailVerificationController {
             return "redirect:" + homeUrl;
         }
         addEmail(model);
+        RegistrationErrors.prepare(model, "code");
         try {
             emailVerificationService.sendCode(request);
             model.addAttribute("infoMessage",

@@ -1,89 +1,45 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{signup-layout}">
 <head>
-    <meta charset="UTF-8">
-    <title>CommerceLink</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            font-family: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #e0f0ff, #fceeff, #ffffe0);
-            background-repeat: no-repeat;
-            background-size: cover;
-        }
-
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .demo-card {
-            background: #ffffffff;
-            border-radius: 10px;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-            padding: 24px;
-            max-width: 420px;
-            width: 100%;
-            text-align: center;
-            border: 1px solid #c6c6cdff;
-        }
-
-        .demo-card h1 {
-            font-size: 24px;
-            font-weight: 700;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-            color: #000716ff;
-        }
-
-        .demo-card p {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 1.5rem;
-        }
-
-        .demo-card .button {
-            width: 100%;
-            font-weight: 600;
-            font-size: 14px;
-            border-radius: 10px;
-            background-color: #0972d3ff;
-            border-color: #0972d3ff;
-        }
-
-        .demo-card .button:hover {
-            background-color: #005bb5;
-            border-color: #005bb5;
-        }
-
-        .demo-card .honeypot {
-            position: absolute;
-            left: -9999px;
-        }
-    </style>
+    <title th:text="#{registration.verify.title}"></title>
 </head>
 <body>
 
-<div class="demo-card">
-    <h1 th:text="#{registration.verify.title}"></h1>
-    <p th:text="#{registration.verify.lead(${email})}"></p>
-    <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
-    <div th:if="${infoMessage}" class="notification is-info is-light" th:text="${infoMessage}"></div>
-    <form method="post" action="/register/verify-email">
-        <div class="field">
-            <div class="control">
-                <input class="input" type="text" name="code" required autofocus inputmode="numeric"
-                       autocomplete="one-time-code" th:placeholder="#{registration.verify.placeholder}">
-            </div>
-        </div>
-        <button type="submit" class="button is-primary" th:text="#{registration.verify.submit}"></button>
+<!--/* No "Masz już konto?" here: this step comes after the automatic sign-in. */-->
+<div layout:fragment="content">
+    <header class="cl-signup-head">
+        <span class="cl-status is-info is-lg" th:text="#{registration.step(3, 3)}"></span>
+        <h1 class="cl-hero-title" th:text="#{registration.verify.title}"></h1>
+        <p class="cl-page-lead"><th:block th:text="#{registration.verify.lead.before}"></th:block>
+            <strong th:text="${email}"></strong>
+            <th:block th:text="#{registration.verify.lead.after}"></th:block></p>
+    </header>
+
+    <div th:if="${errorMessage}" class="cl-alert is-bad">
+        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+        <p class="cl-alert-text" th:text="${errorMessage}"></p>
+    </div>
+    <div th:if="${infoMessage}" class="cl-alert is-ok">
+        <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+        <p class="cl-alert-text" th:text="${infoMessage}"></p>
+    </div>
+
+    <form method="post" th:action="@{/register/verify-email}" novalidate>
+        <div th:replace="~{fragments/settings-form :: textFieldWith('code', 'registration.verify.label', null, 'text',
+                'one-time-code', true, ${fieldErrors?.get('code')}, null, 'numeric', null, ${autofocus == 'code'})}"></div>
+        <button type="submit" class="cl-button is-primary is-lg">
+            <span th:text="#{registration.verify.submit}"></span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </button>
     </form>
-    <form method="post" action="/register/verify-email/resend" class="mt-4">
-        <button type="submit" class="button is-text" th:text="#{registration.verify.resend}"></button>
-    </form>
+
+    <div class="cl-signup-link">
+        <span th:text="#{registration.verify.resend.prompt}"></span>
+        <form method="post" th:action="@{/register/verify-email/resend}">
+            <button type="submit" class="cl-link-button" th:text="#{registration.verify.resend}"></button>
+        </form>
+    </div>
 </div>
 
 </body>

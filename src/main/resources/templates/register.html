@@ -1,110 +1,74 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{signup-layout}">
 <head>
-    <meta charset="UTF-8">
-    <title>CommerceLink</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
-    <script th:if="${captchaSiteKey != null}" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            font-family: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #e0f0ff, #fceeff, #ffffe0);
-            background-repeat: no-repeat;
-            background-size: cover;
-        }
-
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .demo-card {
-            background: #ffffffff;
-            border-radius: 10px;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-            padding: 24px;
-            max-width: 420px;
-            width: 100%;
-            text-align: center;
-            border: 1px solid #c6c6cdff;
-        }
-
-        .demo-card h1 {
-            font-size: 24px;
-            font-weight: 700;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-            color: #000716ff;
-        }
-
-        .demo-card p {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 1.5rem;
-        }
-
-        .demo-card .button {
-            width: 100%;
-            font-weight: 600;
-            font-size: 14px;
-            border-radius: 10px;
-            background-color: #0972d3ff;
-            border-color: #0972d3ff;
-        }
-
-        .demo-card .button:hover {
-            background-color: #005bb5;
-            border-color: #005bb5;
-        }
-
-        .demo-card .honeypot {
-            position: absolute;
-            left: -9999px;
-        }
-    </style>
+    <title th:text="#{registration.page-title}"></title>
 </head>
 <body>
 
-<div class="demo-card">
-    <h1 th:text="#{registration.title}"></h1>
-    <p th:text="#{registration.lead}"></p>
-    <div th:if="${demoMode}" class="notification is-info is-light" th:text="#{registration.demo-notice(${ttlDays})}"></div>
-    <div th:unless="${demoMode}" class="notification is-info is-light" th:text="#{registration.trial-notice(${trialDays}, ${trialRetentionDays})}"></div>
-    <div th:if="${errorMessage}" class="notification is-danger is-light" th:text="${errorMessage}"></div>
-    <form method="post" action="/register">
-        <div class="field">
-            <div class="control">
-                <input class="input" type="email" name="email" required
-                       th:placeholder="#{registration.email.placeholder}" th:value="${email}">
-            </div>
-        </div>
-        <div class="field" th:unless="${demoMode}">
-            <label class="label" th:text="#{registration.store-name.label}"></label>
-            <div class="control">
-                <input class="input" type="text" name="storeName" required minlength="2" maxlength="60"
-                       th:placeholder="#{registration.store-name.placeholder}" th:value="${storeName}">
-            </div>
-        </div>
-        <input class="honeypot" type="text" name="company" tabindex="-1" autocomplete="off">
-        <div class="field">
-            <label class="checkbox">
-                <input type="checkbox" name="termsConsent" required>
-                <span th:text="#{registration.terms-consent}"></span>
-                <a th:if="${termsUrl != null}" th:href="${termsUrl}" target="_blank" rel="noopener"
-                   th:text="#{registration.terms-consent.link}"></a>
-                <span th:unless="${termsUrl != null}" th:text="#{registration.terms-consent.link}"></span>
-                <span th:text="#{registration.terms-consent.suffix}"></span>
+<th:block layout:fragment="top">
+    <p th:replace="~{fragments/signup :: signIn}"></p>
+</th:block>
+
+<div layout:fragment="content">
+    <header class="cl-signup-head">
+        <span class="cl-status is-info is-lg"
+              th:text="${demoMode} ? #{registration.pill.demo} : #{registration.pill.trial(${trialDays})}"></span>
+        <h1 class="cl-hero-title"><span th:text="#{registration.hero.line1}"></span><br><span th:text="#{registration.hero.line2}"></span></h1>
+        <p class="cl-page-lead" th:text="${demoMode} ? #{registration.lead.demo} : #{registration.lead}"></p>
+    </header>
+
+    <div th:if="${errorMessage}" class="cl-alert is-bad">
+        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+        <p class="cl-alert-text" th:text="${errorMessage}"></p>
+    </div>
+
+    <form method="post" th:action="@{/register}" novalidate>
+        <div th:replace="~{fragments/settings-form :: textFieldWith('email', 'registration.email.label', ${email}, 'email',
+                'email', true, ${fieldErrors?.get('email')}, null, null, null, ${autofocus == 'email'})}"></div>
+        <th:block th:unless="${demoMode}">
+            <div th:replace="~{fragments/settings-form :: textFieldLimited('storeName', 'registration.store-name.label', ${storeName},
+                    'text', 'organization', true, ${fieldErrors?.get('storeName')}, #{registration.store-name.help}, null, null,
+                    ${autofocus == 'storeName'}, ${storeNameMaxLength})}"></div>
+        </th:block>
+        <div class="cl-field" th:with="termsError=${fieldErrors?.get('termsConsent')}">
+            <label class="cl-check is-wrap">
+                <input type="checkbox" id="termsConsent" name="termsConsent" required th:checked="${termsConsent}"
+                       th:autofocus="${autofocus == 'termsConsent'}"
+                       th:attr="aria-invalid=${termsError != null ? 'true' : null},
+                                aria-describedby=${termsError != null ? 'termsConsent-error' : null}">
+                <span><th:block th:text="#{registration.terms.accept}"></th:block>
+                    <a th:if="${termsUrl != null}" th:href="${termsUrl}" target="_blank" rel="noopener"
+                       th:text="#{registration.terms.link}"></a><th:block th:unless="${termsUrl != null}"
+                       th:text="#{registration.terms.link}"></th:block>.</span>
             </label>
+            <p th:if="${termsError != null}" class="cl-field-error" id="termsConsent-error">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="#{${termsError}}"></span>
+            </p>
         </div>
-        <div class="field is-flex is-justify-content-center" th:if="${captchaSiteKey != null}">
-            <div class="cf-turnstile" th:attr="data-sitekey=${captchaSiteKey}"></div>
-        </div>
-        <button type="submit" class="button is-primary"
-                th:text="${demoMode} ? #{registration.submit} : #{registration.submit.trial(${trialDays})}"></button>
+        <input class="cl-honeypot" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <!--/* interaction-only: Cloudflare shows the widget only when it needs a click; otherwise the check is invisible. */-->
+        <th:block th:if="${captchaSiteKey != null}">
+            <div class="cf-turnstile" data-appearance="interaction-only" data-size="flexible"
+                 th:attr="data-sitekey=${captchaSiteKey}"></div>
+            <!--/* Picks the widget size before Turnstile renders it, so api.js is loaded only after this script. */-->
+            <script th:src="@{/js/turnstile-size.js}"></script>
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        </th:block>
+        <button type="submit" class="cl-button is-primary is-lg">
+            <span th:text="${demoMode} ? #{registration.submit} : #{registration.submit.trial(${trialDays})}"></span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </button>
     </form>
+
+    <ul th:unless="${demoMode}" class="cl-inline-checks">
+        <li><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{registration.check.no-card}"></span></li>
+        <li><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{registration.check.no-commitment}"></span></li>
+        <li><i class="fas fa-check" aria-hidden="true"></i><span th:text="#{registration.check.all-modules}"></span></li>
+    </ul>
+    <p class="cl-signup-note"
+       th:text="${demoMode} ? #{registration.demo-notice(${ttlDays})} : #{registration.trial-note(${trialRetentionDays})}"></p>
 </div>
 
 </body>

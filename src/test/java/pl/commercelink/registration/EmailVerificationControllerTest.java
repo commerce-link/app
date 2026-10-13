@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.ui.ExtendedModelMap;
 
 import java.util.Locale;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,5 +75,39 @@ class EmailVerificationControllerTest {
         // then
         assertEquals("redirect:/dashboard", view);
         verify(emailVerificationService, never()).sendCodeOnce(any());
+    }
+
+    @Test
+    void showsWrongCodeUnderTheCodeField() {
+        // given
+        doThrow(new RegistrationException(RegistrationException.Reason.INVALID_CODE))
+                .when(emailVerificationService).verify("000000", request);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.verify("000000", request, model, LOCALE);
+
+        // then
+        assertEquals("register-verify-email", view);
+        assertEquals(Map.of("code", "registration.error.invalid-code"), model.getAttribute("fieldErrors"));
+        assertEquals("code", model.getAttribute("autofocus"));
+        assertNull(model.getAttribute("errorMessage"));
+    }
+
+    @Test
+    void showsVerificationFailureAsAlert() {
+        // given
+        doThrow(new RegistrationException(RegistrationException.Reason.VERIFICATION_FAILED))
+                .when(emailVerificationService).verify("123456", request);
+        when(messageSource.getMessage("registration.error.verification-failed", null, LOCALE))
+                .thenReturn("Nie udało się potwierdzić adresu.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.verify("123456", request, model, LOCALE);
+
+        // then
+        assertEquals("Nie udało się potwierdzić adresu.", model.getAttribute("errorMessage"));
+        assertEquals(Map.of(), model.getAttribute("fieldErrors"));
     }
 }
