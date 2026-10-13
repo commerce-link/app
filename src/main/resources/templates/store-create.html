@@ -4,32 +4,49 @@
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <h1 class="title" th:text="#{store.create}"></h1>
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, #{nav.stores}, #{store.create.title}, #{store.create.lead}, null)}"></div>
 
-            <form th:action="@{/dashboard/store/create}" th:object="${store}" method="post">
-                <div class="field">
-                    <label class="label" for="storeName" th:text="#{store.name}"></label>
-                    <div class="control">
-                        <input class="input" type="text" id="storeName" th:field="*{name}" required />
-                    </div>
+            <form id="store-create-form" class="cl-form" th:action="@{/dashboard/store/create}" th:object="${form}" method="post"
+                  novalidate data-cl-submit-once>
+                <div th:replace="~{fragments/settings-form :: errorSummary('store-create-errors', ${errors}, null)}"></div>
+                <!--/* A refused save is no field's fault; errors is empty then, so the two alerts never show together. */-->
+                <div th:if="${formError != null}" id="store-create-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{${formError}}"></p>
                 </div>
-                <div class="field">
-                    <label class="label" for="storeApiKey" th:text="#{store.api.key}"></label>
-                    <div class="control">
-                        <input class="input" type="text" id="storeApiKey" th:field="*{apiKey}" />
-                    </div>
-                </div>
-
-                <div class="field">
-                    <div class="control">
-                        <button type="submit" class="button is-success" th:text="#{general.create}"></button>
+                <input type="hidden" name="newStoreId" th:value="*{newStoreId}"/>
+                <input type="hidden" name="back" th:if="${back != null}" th:value="${back}"/>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.create.section.store}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-4" th:insert="~{fragments/settings-form :: textFieldWith('name', 'store.create.name', *{name}, 'text', 'off', true, ${errors['name']}, null, null, null, ${errors.isEmpty() and formError == null})}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.create.section.api}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('apiKey', 'store.create.apiKey', *{apiKey}, 'text', 'off', false, ${errors['apiKey']}, #{store.create.apiKey.help})}"></div>
+                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.create.submit}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
                     </div>
                 </div>
             </form>
+            <p class="cl-help">
+                <span th:text="#{store.create.copyHint}"></span>
+                <a th:href="@{${backHref}}" th:text="#{store.create.copyHint.link}"></a>
+            </p>
         </div>
     </section>
+    <script th:if="${!errors.isEmpty() or formError != null}">
+        document.getElementById('store-create-errors').focus();
+    </script>
+    <script th:src="@{/js/submit-once.js}" defer></script>
 </div>
 </body>
 </html>
