@@ -16,8 +16,8 @@
     // leave 4-digit amounts ungrouped in Polish.
     function formatMoney(amount) {
         // toPrecision(15) drops the binary noise (1.005 * 100 = 100.49999999999999) so half cents round up like HALF_UP
-        const cents = Math.round(Number((amount * 100).toPrecision(15)));
-        const fixed = (cents / 100).toFixed(2);
+        const totalCents = Math.round(Number((amount * 100).toPrecision(15)));
+        const fixed = (totalCents / 100).toFixed(2);
         const [whole, cents] = fixed.split('.');
         return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + cents;
     }
