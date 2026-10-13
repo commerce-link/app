@@ -177,4 +177,37 @@ class RMARepositoryListRangeDynamoDbIntegrationTest {
         assertThat(active).containsExactly("a2", "a1", "a3");
         assertThat(window).containsExactly("c0", "c1", "c2");
     }
+
+    @Test
+    void anIdPrefixFindsOnlyThisStoresRmasAndFollowsEveryPage() {
+        // given
+        save("store-1", "abc12345-0001", RMAStatus.Completed, LocalDateTime.of(2020, 1, 1, 12, 0));
+        save("store-1", "abc12345-0002", RMAStatus.New, LocalDateTime.of(2026, 10, 1, 12, 0));
+        save("store-1", "abd00000-0003", RMAStatus.New, LocalDateTime.of(2026, 10, 1, 12, 0));
+        save("store-2", "abc12345-0009", RMAStatus.New, LocalDateTime.of(2026, 10, 1, 12, 0));
+
+        // when
+        List<String> found = rmas.findByIdPrefix("store-1", "abc123").stream().map(RMA::getRmaId).toList();
+        List<String> everyC = rmas.findByIdPrefix("store-1", "c").stream().map(RMA::getRmaId).toList();
+
+        // then
+        assertThat(found).containsExactlyInAnyOrder("abc12345-0001", "abc12345-0002");
+        assertThat(everyC).hasSize(150);
+    }
+
+    @Test
+    void anyInRangeAsksForOneEntryOnTheIndexAndOnThePartition() {
+        // given
+        Runnable check = () -> {
+            assertThat(rmas.hasAnyInRange("store-1", CLOSED, upperBound(CLOSED, null))).isTrue();
+            assertThat(rmas.hasAnyInRange("store-1", lowerBound(CLOSED, LocalDate.of(2027, 1, 1)), upperBound(CLOSED, null))).isFalse();
+            assertThat(rmas.hasAnyInRange("store-3", CLOSED, upperBound(CLOSED, null))).isFalse();
+        };
+
+        // when / then
+        check.run();
+        buildIndex();
+        rmas = new RMARepository(client, () -> Long.MAX_VALUE / 2);
+        check.run();
+    }
 }

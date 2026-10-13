@@ -33,7 +33,11 @@ class RmaListRenderingTest {
     }
 
     private static RmaListPage page(List<RmaRow> rows, EmptyState empty, SearchScope scope, List<Chip> chips, List<Tile> tiles) {
-        return new RmaListPage(Q, tiles,
+        return page(Q, rows, empty, scope, chips, tiles);
+    }
+
+    private static RmaListPage page(RmaListQuery query, List<RmaRow> rows, EmptyState empty, SearchScope scope, List<Chip> chips, List<Tile> tiles) {
+        return new RmaListPage(query, tiles,
                 List.of(new SegmentLink("Aktywne", 8L, "/dashboard/rma", true),
                         new SegmentLink("Zakończone", null, "/dashboard/rma?scope=closed", false)),
                 new StatusMenu("wszystkie", List.of(new StatusOption("New", "Nowy", 1L, false),
@@ -75,6 +79,20 @@ class RmaListRenderingTest {
                 .contains("cl-segment-count").contains("data-cl-filter-menu=\"status\"").contains("data-cl-filter-menu=\"dates\"")
                 .contains("placeholder=\"Numer, e-mail, nazwisko, firma\"").contains("cl-date-presets")
                 .containsPattern("value=\"ItemsReceived\"[^>]*checked");
+    }
+
+    @Test
+    void theSearchFormDoesNotCarryTheScopeButTheOtherMenusDo() {
+        // given
+        RmaListQuery closed = RmaListQuery.parse(new LinkedMultiValueMap<>(Map.of("scope", List.of("closed"))));
+
+        // when
+        String html = SettingsTemplateRenderer.render(RESULTS, Map.of("page", page(closed, List.of(row()), null, null, List.of(), tiles())));
+
+        // then
+        String search = html.substring(html.lastIndexOf("<form", html.indexOf("name=\"q\"")), html.indexOf("</form>", html.indexOf("name=\"q\"")));
+        assertThat(search).doesNotContain("name=\"scope\"");
+        assertThat(html.split("name=\"scope\"", -1).length - 1).isGreaterThanOrEqualTo(2);
     }
 
     @Test

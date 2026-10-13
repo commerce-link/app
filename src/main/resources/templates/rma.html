@@ -149,7 +149,7 @@
                     <tr th:each="row : ${page.rows()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.list.column.rma}">
                             <a class="cl-row-link cl-table-code" th:href="@{${row.href()}}" th:title="${row.rmaId()}" th:text="${row.number()}"></a>
-                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.reference() != null}"> · <span class="cl-table-code" th:text="${row.reference()}"></span></th:block></span>
+                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.reference() != null}"> · <span class="cl-table-code" th:title="${row.reference()}" th:text="${row.reference()}"></span></th:block></span>
                         </th>
                         <td th:attr="data-label=#{rma.list.column.client}" th:classappend="${row.clientName() == null} ? 'is-empty' : ''">
                             <span class="cl-cell-client" th:if="${row.clientName() != null}"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>

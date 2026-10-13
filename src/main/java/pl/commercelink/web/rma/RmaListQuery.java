@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -27,6 +28,8 @@ public record RmaListQuery(Scope scope, Set<RMAStatus> statuses, String q, Perio
     public static final int MAX_Q = 100;
     public static final List<RMAStatus> ACTIVE_STATUSES = Arrays.stream(RMAStatus.values()).filter(s -> !s.isClosed()).toList();
     public static final List<RMAStatus> CLOSED_STATUSES = Arrays.stream(RMAStatus.values()).filter(RMAStatus::isClosed).toList();
+
+    private static final Pattern ID_LIKE = Pattern.compile("[0-9a-fA-F-]{4,36}");
 
     public enum Scope {
         ACTIVE("active"), CLOSED("closed");
@@ -108,6 +111,11 @@ public record RmaListQuery(Scope scope, Set<RMAStatus> statuses, String q, Perio
     /** The scope shown: null while a search covers both. */
     public Scope effectiveScope() {
         return q == null && scope == null ? Scope.ACTIVE : scope;
+    }
+
+    /** The lower-cased search when it looks like (the start of) an RMA id, as in OrderArchiveQuery.searchMode; else null. */
+    public String idPrefix() {
+        return q != null && ID_LIKE.matcher(q).matches() && q.chars().anyMatch(Character::isDigit) ? q.toLowerCase(Locale.ROOT) : null;
     }
 
     public boolean searchesActive() {

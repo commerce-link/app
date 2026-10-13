@@ -171,4 +171,26 @@ class V021AddRmaListSortKeyIndexDynamoDbIntegrationTest {
         assertThat(item("u1").get("rmaListSortKey").getS()).startsWith("ACTIVE#");
         assertThat(item("u1")).doesNotContainKey("version");
     }
+
+    @Test
+    void aMalformedItemIsSkippedAndTheOthersStillGetTheirKeys() {
+        // given
+        savedWithoutKey("a1", RMAStatus.New, LocalDateTime.of(2026, 10, 1, 10, 0));
+        client.putItem("RMA", Map.of("storeId", new AttributeValue("store-1"), "rmaId", new AttributeValue("bad"),
+                "status", new AttributeValue("Bogus"),
+                "createdAt", new AttributeValue("2026-10-01T10:00:00")));
+        client.putItem("RMA", Map.of("storeId", new AttributeValue("store-1"), "rmaId", new AttributeValue("badDate"),
+                "status", new AttributeValue(RMAStatus.New.name()),
+                "createdAt", new AttributeValue("not-a-date")));
+        savedWithoutKey("c1", RMAStatus.Completed, LocalDateTime.of(2026, 9, 1, 10, 0));
+
+        // when
+        migration().execute();
+
+        // then
+        assertThat(item("a1").get("rmaListSortKey").getS()).startsWith("ACTIVE#");
+        assertThat(item("c1").get("rmaListSortKey").getS()).startsWith("CLOSED#");
+        assertThat(item("bad")).doesNotContainKey("rmaListSortKey");
+        assertThat(item("badDate")).doesNotContainKey("rmaListSortKey");
+    }
 }

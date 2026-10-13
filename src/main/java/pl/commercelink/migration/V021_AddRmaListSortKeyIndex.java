@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.model.*;
 import io.mongock.api.annotations.ChangeUnit;
+import lombok.extern.slf4j.Slf4j;
 import io.mongock.api.annotations.ChangeUnitConstructor;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
@@ -33,6 +34,7 @@ import java.util.function.Predicate;
  * <p>
  * Waits are bounded; Mongock is an ApplicationRunner, so a timeout fails start-up and the next start resumes.
  */
+@Slf4j
 @ChangeUnit(id = "V021-add-rma-list-sort-key-index", order = "021", author = "commercelink", runAlways = true)
 public class V021_AddRmaListSortKeyIndex {
 
@@ -105,12 +107,18 @@ public class V021_AddRmaListSortKeyIndex {
                     .withExpressionAttributeNames(Map.of("#s", "status", "#v", "version"))
                     .withExclusiveStartKey(startKey));
             for (Map<String, AttributeValue> item : page.getItems()) {
-                RMA scanned = mapper.marshallIntoObject(RMA.class, item);
-                AttributeValue stored = item.get(ATTRIBUTE);
-                if (stored != null && RmaListSortKey.of(scanned).equals(stored.getS())) {
-                    continue;
+                try {
+                    RMA scanned = mapper.marshallIntoObject(RMA.class, item);
+                    AttributeValue stored = item.get(ATTRIBUTE);
+                    if (stored != null && RmaListSortKey.of(scanned).equals(stored.getS())) {
+                        continue;
+                    }
+                    backfillRmaListSortKey(scanned, item.containsKey("version"));
+                } catch (RuntimeException e) {
+                    // one malformed record (e.g. a status that is no enum value) must not fail the start-up of the application
+                    log.error("V021: skipping RMA {} of store {}, its list key was not written: {}",
+                            idOf(item, "rmaId"), idOf(item, "storeId"), e.getMessage());
                 }
-                backfillRmaListSortKey(scanned, item.containsKey("version"));
             }
             startKey = page.getLastEvaluatedKey();
         } while (startKey != null && !startKey.isEmpty());
@@ -140,6 +148,11 @@ public class V021_AddRmaListSortKeyIndex {
         } catch (ConditionalCheckFailedException changedMeanwhile) {
             // deleted or saved between the scan and the update: a save already wrote the current key
         }
+    }
+
+    private static String idOf(Map<String, AttributeValue> item, String name) {
+        AttributeValue value = item.get(name);
+        return value == null ? null : value.getS();
     }
 
     private TableDescription describe() {

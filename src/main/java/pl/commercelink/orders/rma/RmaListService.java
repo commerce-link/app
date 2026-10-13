@@ -57,17 +57,20 @@ public class RmaListService {
 
     public RmaListPage page(String storeId, RmaListQuery q, LocalDate today, Locale locale) {
         List<RMA> allActive = drain(rmas.listRange(storeId, ACTIVE, upperBound(ACTIVE, null), true));
-        Result result = q.q() != null ? search(storeId, q, allActive, today)
+        Result result = q.q() != null ? byId(storeId, q, today).orElseGet(() -> search(storeId, q, allActive, today))
                 : q.effectiveScope() == Scope.CLOSED ? browseClosed(storeId, q, today)
                 : browseActive(q, allActive, today);
         RmaRowMapper mapper = new RmaRowMapper(messages, locale);
         var rows = result.rmas().stream().map(rma -> mapper.map(rma, today)).toList();
         ArchivePager pager = new ArchivePager(result.offset(), result.offset() + rows.size(),
                 result.previousHref(), result.nextHref(), result.total());
+        // nothing matched in the batch that was spent: say so, otherwise the page would show only the offer to search further
         SearchScope scope = result.scannedUntil() == null ? null : new SearchScope(
-                text(locale, "rma.list.scope", DAY.format(result.scannedUntil())), text(locale, "rma.list.scope.more"), result.moreHref());
+                rows.isEmpty() ? text(locale, "rma.list.scope.none", q.q(), DAY.format(result.scannedUntil()))
+                        : text(locale, "rma.list.scope", DAY.format(result.scannedUntil())),
+                text(locale, "rma.list.scope.more"), result.moreHref());
         boolean storeEmpty = allActive.isEmpty() && !q.isFiltered() && rows.isEmpty() && q.offset() == 0
-                && !rmas.listRange(storeId, CLOSED, upperBound(CLOSED, null), true).hasNext();
+                && !rmas.hasAnyInRange(storeId, lowerBound(CLOSED, null), upperBound(CLOSED, null));
         EmptyState empty = rows.isEmpty() && scope == null ? emptyState(q, storeEmpty, locale) : null;
         String results = rows.isEmpty() ? ""
                 : pager.openEnded() ? text(locale, "rma.list.results.range", pager.fromIndex() + 1, pager.toIndex())
@@ -112,6 +115,25 @@ public class RmaListService {
                 : q.offset() - PAGE <= 0 ? q.first().href() : q.before(RmaCursor.of(page.get(0)), q.offset() - PAGE).href();
         String next = hasNext ? q.after(RmaCursor.of(page.get(PAGE - 1)), q.offset() + PAGE).href() : null;
         return Result.of(page, q.offset(), previous, next, null);
+    }
+
+    /**
+     * A search that looks like an RMA id is first a key query on the table, so an RMA is found whatever its age and not
+     * only within the SEARCH_BATCH window (same idea as OrderArchiveService.byNumber). Nothing found falls back to the
+     * text search, which still finds an order number or a reference.
+     */
+    private Optional<Result> byId(String storeId, RmaListQuery q, LocalDate today) {
+        String prefix = q.idPrefix();
+        if (prefix == null || q.offset() > 0 || q.after() != null) {
+            return Optional.empty();
+        }
+        // q.accepts also applies the scope: an active search never lists a closed RMA and the other way round
+        List<RMA> found = rmas.findByIdPrefix(storeId, prefix).stream()
+                .filter(r -> q.accepts(r.getStatus()) && withinDates(r, q, today))
+                .sorted(Comparator.comparing(RmaListService::position).reversed())
+                .limit(PAGE)
+                .toList();
+        return found.isEmpty() ? Optional.empty() : Optional.of(Result.of(found, 0, null, null, (long) found.size()));
     }
 
     /**

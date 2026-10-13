@@ -36,6 +36,12 @@ class RmaListServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         service = new RmaListService(repository, messages);
+        lenient().when(repository.hasAnyInRange(eq("s1"), anyString(), anyString())).thenAnswer(call -> {
+            String lo = call.getArgument(1);
+            String hi = call.getArgument(2);
+            return store.stream().anyMatch(r -> RmaListSortKey.of(r).compareTo(lo) >= 0 && RmaListSortKey.of(r).compareTo(hi) <= 0);
+        });
+        idStubs();
         lenient().when(repository.listRange(eq("s1"), anyString(), anyString(), anyBoolean())).thenAnswer(call -> {
             String lo = call.getArgument(1);
             String hi = call.getArgument(2);
@@ -43,6 +49,13 @@ class RmaListServiceTest {
             Comparator<RMA> byKey = Comparator.comparing(RmaListSortKey::of);
             return store.stream().filter(r -> RmaListSortKey.of(r).compareTo(lo) >= 0 && RmaListSortKey.of(r).compareTo(hi) <= 0)
                     .sorted(newestFirst ? byKey.reversed() : byKey).iterator();
+        });
+    }
+
+    private void idStubs() {
+        lenient().when(repository.findByIdPrefix(eq("s1"), anyString())).thenAnswer(call -> {
+            String prefix = call.getArgument(1);
+            return store.stream().filter(r -> r.getRmaId().startsWith(prefix)).toList();
         });
     }
 
@@ -165,7 +178,7 @@ class RmaListServiceTest {
 
         // then
         assertThat(page.rows()).isEmpty();
-        assertThat(page.scope().text()).startsWith("Przeszukano zakończone zgłoszenia utworzone od");
+        assertThat(page.scope().text()).startsWith("Brak RMA dla „needle” wśród zgłoszeń utworzonych od");
         assertThat(page.emptyState()).isNull();
         assertThat(ids(more)).containsExactly("c550");
     }
@@ -333,6 +346,97 @@ class RmaListServiceTest {
         // then
         assertThat(ids(first)).containsExactly("aNewest", "aInside");
         assertThat(ids(more)).containsExactly("aAfterBoundary", "c550");
+    }
+
+    @Test
+    void anOldClosedRmaIsFoundByItsFullIdOnTheFirstRequestWhateverTheBatch() {
+        // given
+        for (int i = 0; i < 600; i++) {
+            add(String.format("%08x-aaaa-bbbb-cccc-000000000000", 0x1000 + i), RMAStatus.Completed,
+                    LocalDateTime.of(2026, 10, 9, 12, 0).minusHours(i), "c@x.pl");
+        }
+        String oldest = String.format("%08x-aaaa-bbbb-cccc-000000000000", 0x1000 + 599);
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of(oldest)));
+
+        // then
+        assertThat(ids(page)).containsExactly(oldest);
+        assertThat(page.scope()).isNull();
+        assertThat(page.pagination().totalItems()).isEqualTo(1);
+    }
+
+    @Test
+    void anOldClosedRmaIsFoundByAnEightCharacterPrefix() {
+        // given
+        for (int i = 0; i < 600; i++) {
+            add(String.format("%08x-aaaa-bbbb-cccc-000000000000", 0x1000 + i), RMAStatus.Completed,
+                    LocalDateTime.of(2026, 10, 9, 12, 0).minusHours(i), "c@x.pl");
+        }
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of("00001257")));
+
+        // then
+        assertThat(ids(page)).containsExactly("00001257-aaaa-bbbb-cccc-000000000000");
+        assertThat(page.scope()).isNull();
+    }
+
+    @Test
+    void anIdSearchHonoursTheChosenScopeAndTheDateRange() {
+        // given
+        add("abc12345-1", RMAStatus.New, LocalDateTime.of(2026, 10, 12, 9, 0), "a@x.pl");
+        add("abc12345-2", RMAStatus.Completed, LocalDateTime.of(2026, 9, 1, 9, 0), "b@x.pl");
+        add("abc12345-3", RMAStatus.Completed, LocalDateTime.of(2026, 10, 1, 9, 0), "c@x.pl");
+
+        // when
+        RmaListPage both = page(Map.of("q", List.of("abc12345")));
+        RmaListPage closedSince = page(Map.of("q", List.of("abc12345"), "scope", List.of("closed"), "from", List.of("2026-09-15")));
+
+        // then
+        assertThat(ids(both)).containsExactly("abc12345-1", "abc12345-3", "abc12345-2");
+        assertThat(ids(closedSince)).containsExactly("abc12345-3");
+    }
+
+    @Test
+    void anIdLikeSearchThatMatchesNoIdFallsBackToTheTextSearch() {
+        // given
+        add("n1", RMAStatus.New, LocalDateTime.of(2026, 10, 13, 9, 0), "anna@x.pl").setOrderId("ord-20261013-7");
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of("20261013")));
+
+        // then
+        assertThat(ids(page)).containsExactly("n1");
+    }
+
+    @Test
+    void aSearchWithoutAMatchAfterTheBatchSaysNothingWasFoundSince() {
+        // given
+        for (int i = 0; i < 600; i++) {
+            add("c" + i, RMAStatus.Completed, LocalDateTime.of(2026, 10, 9, 12, 0).minusHours(i), "c@x.pl");
+        }
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of("nobody")));
+
+        // then
+        assertThat(page.rows()).isEmpty();
+        assertThat(page.scope().text()).startsWith("Brak RMA dla „nobody” wśród zgłoszeń utworzonych od ");
+        assertThat(page.scope().moreHref()).isNotNull();
+    }
+
+    @Test
+    void theEmptyStoreCheckAsksForOneClosedEntryNotAPage() {
+        // given
+        store.clear();
+
+        // when
+        RmaListPage page = page(Map.of());
+
+        // then
+        assertThat(page.tiles()).isEmpty();
+        org.mockito.Mockito.verify(repository).hasAnyInRange(eq("s1"), startsWith("CLOSED#"), anyString());
     }
 
     private static Map<String, List<String>> params(String href) {

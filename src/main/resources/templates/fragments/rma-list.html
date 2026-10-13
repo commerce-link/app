@@ -3,9 +3,10 @@
 <body>
 
 <!--/* The rest of the RMA list query as hidden fields, so a menu's form never drops what the others set; "skip" names
-       the parameter the form itself submits (status, dates = from/to/period, search = q). */-->
+       the parameter the form itself submits (status, dates = from/to/period, search = q). The search form also drops the
+       scope: a search covers both scopes until one is chosen. */-->
 <th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
-    <input type="hidden" name="scope" th:if="${q.scope() != null}" th:value="${q.scope().param()}"/>
+    <input type="hidden" name="scope" th:if="${skip != 'search' and q.scope() != null}" th:value="${q.scope().param()}"/>
     <th:block th:if="${skip != 'status'}"><input type="hidden" name="status" th:each="s : ${q.statusParams()}" th:value="${s}"/></th:block>
     <th:block th:if="${skip != 'dates'}">
         <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>

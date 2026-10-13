@@ -139,6 +139,44 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
                 .iterator();
     }
 
+    /** Whether the store has any RMA with a list key in [lo, hi]: one index entry is read, not a page. */
+    public boolean hasAnyInRange(String storeId, String lo, String hi) {
+        if (lo.compareTo(hi) > 0) {
+            return false;
+        }
+        if (!isListIndexActive()) {
+            return partitionRange(storeId, lo, hi, true).hasNext();
+        }
+        QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                .withTableName("RMA")
+                .withIndexName(LIST_INDEX)
+                .withKeyConditionExpression("storeId = :storeId AND rmaListSortKey BETWEEN :lo AND :hi")
+                .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue(storeId),
+                        ":lo", new AttributeValue(lo), ":hi", new AttributeValue(hi)))
+                .withLimit(1));
+        return !page.getItems().isEmpty();
+    }
+
+    /**
+     * The store's RMAs whose id starts with this prefix: a key query on the table (not the list index), so an RMA is
+     * found whatever its age. Every page is followed, a raw QueryRequest stops at 1 MB.
+     */
+    public List<RMA> findByIdPrefix(String storeId, String prefix) {
+        Map<String, AttributeValue> values = Map.of(":storeId", new AttributeValue(storeId), ":prefix", new AttributeValue(prefix));
+        List<RMA> found = new java.util.ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("RMA")
+                    .withKeyConditionExpression("storeId = :storeId AND begins_with(rmaId, :prefix)")
+                    .withExpressionAttributeValues(values)
+                    .withExclusiveStartKey(startKey));
+            page.getItems().forEach(item -> found.add(dynamoDBMapper.marshallIntoObject(RMA.class, item)));
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return found;
+    }
+
     public RMA findById(String storeId, String rmaId) {
         return dynamoDBMapper.load(RMA.class, storeId, rmaId);
     }

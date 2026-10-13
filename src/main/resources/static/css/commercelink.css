@@ -12353,6 +12353,36 @@ a.cl-link-button:hover {
     font-weight: 600;
 }
 
+/* The Allegro return reference is longer than the 14ch the orders table allows a code; it wraps instead of ending in an
+   ellipsis, since the list is the only place to read it without opening the RMA (the full text is also the title). */
+.cl-page .cl-table.is-rma .cl-table-key .cl-table-sub .cl-table-code {
+    display: inline;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+
+/* Phone card: the number is the row's name and is always shown whole, so its column is as wide as the number and the
+   status pill takes the rest and wraps when its text is long. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-rma tr {
+        grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-rma .cl-table-key .cl-row-link {
+        flex-shrink: 0;
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .cl-page .cl-table.is-rma .cl-status {
+        white-space: normal;
+        text-align: right;
+    }
+}
+
 @media screen and (min-width: 720px) and (max-width: 1215px) {
     .cl-page .cl-table.is-rma .is-secondary-column {
         display: none;
