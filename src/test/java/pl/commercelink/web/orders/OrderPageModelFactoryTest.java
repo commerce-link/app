@@ -2295,4 +2295,31 @@ class OrderPageModelFactoryTest {
         assertThat(card.rows().get(0).stateArgs()).containsExactly("APP/CRIN/13023761");
         assertThat(card.rows().get(0).stateTone()).isEqualTo("is-ok");
     }
+
+    @Test
+    void aDeliveredOrOneCompletedOrderOffersAnRmaToTheStore() {
+        // given
+        Order delivered = order(OrderStatus.Delivered);
+        Order completed = order(OrderStatus.Completed);
+
+        // when
+        OrderPageModel.Header deliveredHeader = factory.build(delivered, List.of(), ADMIN, PL).header();
+        OrderPageModel.Header completedHeader = factory.build(completed, List.of(), ADMIN, PL).header();
+
+        // then
+        assertThat(deliveredHeader.rmaHref()).isEqualTo("/dashboard/rma/new?q=" + delivered.getOrderId() + "&from=order");
+        assertThat(completedHeader.rmaHref()).isEqualTo("/dashboard/rma/new?q=" + completed.getOrderId() + "&from=order");
+    }
+
+    @Test
+    void anOrderOnItsWayOrSeenByASuperAdminOffersNoRma() {
+        // when
+        OrderPageModel.Header shipping = factory.build(order(OrderStatus.Shipping), List.of(), ADMIN, PL).header();
+        OrderPageModel.Header superAdmin = factory.build(order(OrderStatus.Delivered), List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).header();
+
+        // then
+        assertThat(shipping.rmaHref()).isNull();
+        assertThat(superAdmin.rmaHref()).isNull();
+    }
 }

@@ -411,6 +411,21 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theMoreMenuLeadsADeliveredOrderToTheRmaPageWithItsId() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+
+        // when
+        String html = page(render(order, items(order), ADMIN, Set.of()));
+        String more = html.substring(html.indexOf("id=\"order-more-menu\""));
+        more = more.substring(0, more.indexOf("</ul>"));
+
+        // then
+        assertThat(more).contains("href=\"/dashboard/rma/new?q=" + order.getOrderId() + "&amp;from=order\"")
+                .contains("Zgłoś RMA");
+    }
+
+    @Test
     void theMoreMenuNoLongerNamesTheItemHistory() {
         // given
         Order order = order(OrderStatus.Delivered);

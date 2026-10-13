@@ -43,7 +43,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, boolean canCancel,
                          String cancelLockedKey, String cancelUnavailableKey, String cancelMessage, boolean canDelete,
-                         String deleteMessage) {
+                         String deleteMessage, String rmaHref) {
     }
 
     public record PrimaryAction(String labelKey, String href, String icon) {
