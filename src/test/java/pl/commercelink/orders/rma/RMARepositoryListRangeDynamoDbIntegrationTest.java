@@ -11,12 +11,14 @@ import com.amazonaws.services.dynamodbv2.model.BillingMode;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.migration.V021_AddRmaListSortKeyIndex;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,7 +35,7 @@ class RMARepositoryListRangeDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     AmazonDynamoDB client;
     DynamoDBMapper mapper;
@@ -79,6 +81,7 @@ class RMARepositoryListRangeDynamoDbIntegrationTest {
 
     private void buildIndex() {
         new V021_AddRmaListSortKeyIndex(client).execute();
+        awaitIndexesActive();
     }
 
     @Test
@@ -209,5 +212,30 @@ class RMARepositoryListRangeDynamoDbIntegrationTest {
         buildIndex();
         rmas = new RMARepository(client, () -> Long.MAX_VALUE / 2);
         check.run();
+    }
+
+    // V021 creates the list index without waiting for it; until dynamodb-local has built it a query can read nothing and
+    // deleting the table under it can fail with InternalFailure
+    private void awaitIndexesActive() {
+        long deadline = System.currentTimeMillis() + Duration.ofMinutes(1).toMillis();
+        while (!indexesActive()) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new IllegalStateException("RMA indexes still building: "
+                        + client.describeTable("RMA").getTable().getGlobalSecondaryIndexes());
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    // dynamodb-local reports no status at all for an index that is ready
+    private boolean indexesActive() {
+        List<GlobalSecondaryIndexDescription> indexes = client.describeTable("RMA").getTable().getGlobalSecondaryIndexes();
+        return indexes == null || indexes.stream()
+                .allMatch(index -> index.getIndexStatus() == null || "ACTIVE".equals(index.getIndexStatus()));
     }
 }

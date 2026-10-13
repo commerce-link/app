@@ -7,17 +7,20 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.model.*;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.orders.rma.RmaListSortKey;
 
 import java.time.Duration;
+import java.util.List;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -29,7 +32,7 @@ class V021AddRmaListSortKeyIndexDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     AmazonDynamoDB client;
     DynamoDBMapper mapper;
@@ -46,6 +49,11 @@ class V021AddRmaListSortKeyIndexDynamoDbIntegrationTest {
             client.deleteTable("RMA");
         }
         client.createTable(mapper.generateCreateTableRequest(RMA.class).withBillingMode(BillingMode.PAY_PER_REQUEST));
+    }
+
+    @AfterEach
+    void letTheIndexBuildBeforeTheNextTestDropsTheTable() {
+        awaitIndexesActive();
     }
 
     private RMA savedWithoutKey(String rmaId, RMAStatus status, LocalDateTime createdAt) {
@@ -192,5 +200,30 @@ class V021AddRmaListSortKeyIndexDynamoDbIntegrationTest {
         assertThat(item("c1").get("rmaListSortKey").getS()).startsWith("CLOSED#");
         assertThat(item("bad")).doesNotContainKey("rmaListSortKey");
         assertThat(item("badDate")).doesNotContainKey("rmaListSortKey");
+    }
+
+    // V021 creates the list index without waiting for it; until dynamodb-local has built it a query can read nothing and
+    // deleting the table under it can fail with InternalFailure
+    private void awaitIndexesActive() {
+        long deadline = System.currentTimeMillis() + Duration.ofMinutes(1).toMillis();
+        while (!indexesActive()) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new IllegalStateException("RMA indexes still building: "
+                        + client.describeTable("RMA").getTable().getGlobalSecondaryIndexes());
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    // dynamodb-local reports no status at all for an index that is ready
+    private boolean indexesActive() {
+        List<GlobalSecondaryIndexDescription> indexes = client.describeTable("RMA").getTable().getGlobalSecondaryIndexes();
+        return indexes == null || indexes.stream()
+                .allMatch(index -> index.getIndexStatus() == null || "ACTIVE".equals(index.getIndexStatus()));
     }
 }
