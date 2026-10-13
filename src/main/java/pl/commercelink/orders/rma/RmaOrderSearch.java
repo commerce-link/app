@@ -5,8 +5,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.history.SerialNumberLookup;
+import pl.commercelink.orders.SerialNumbers;
 
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -25,10 +26,12 @@ public class RmaOrderSearch {
 
     public static final int CHOICE_LIMIT = 50;
     public static final int MIN_PREFIX = 8;
+    // far above any e-mail, order id or serial number; a longer key would break DynamoDB's 1024-byte sort-key limit
+    public static final int MAX_QUERY = 200;
     private static final Pattern PREFIX = Pattern.compile("[0-9a-f-]{" + MIN_PREFIX + ",}");
 
     private final OrdersRepository orders;
-    private final SerialNumberLookup serials;
+    private final OrderItemsRepository orderItems;
 
     public enum Kind { EMPTY, ORDER, CHOICE, NOT_FOUND }
 
@@ -53,6 +56,9 @@ public class RmaOrderSearch {
         if (q == null) {
             return Result.empty();
         }
+        if (q.length() > MAX_QUERY) {
+            return Result.notFound(q, q.contains("@"));
+        }
         if (q.contains("@")) {
             List<String> ids = orders.findOrderIdsByEmail(storeId, q, CHOICE_LIMIT + 1);
             boolean truncated = ids.size() > CHOICE_LIMIT;
@@ -70,7 +76,10 @@ public class RmaOrderSearch {
                 return choose(q, false, byPrefix, null, false);
             }
         }
-        List<OrderItem> items = serials.find(storeId, q).orderItems();
+        // only order items: an RMA item or a warehouse unit with that number would add nothing to open on this page
+        List<OrderItem> items = orderItems.findBySerialNo(q).stream()
+                .filter(i -> SerialNumbers.contains(i.getSerialNo(), q))
+                .toList();
         if (items.isEmpty()) {
             return Result.notFound(q, false);
         }
@@ -83,7 +92,8 @@ public class RmaOrderSearch {
             return Result.notFound(q, byEmail);
         }
         List<Order> eligible = found.stream().filter(Order::isEligibleForRMACreation).toList();
-        Order only = found.size() == 1 ? found.get(0) : eligible.size() == 1 ? eligible.get(0) : null;
+        // a truncated list holds only the newest orders, so its one eligible order may not be the only one
+        Order only = found.size() == 1 ? found.get(0) : eligible.size() == 1 && !truncated ? eligible.get(0) : null;
         if (only != null) {
             return Result.order(q, byEmail, only, serialItemOf(only, serialItems));
         }
