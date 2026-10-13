@@ -66,4 +66,13 @@ class StoreCreateTemplateRenderingTest {
         assertThat(html).contains("id=\"store-create-errors\"").contains("The store could not be created. Try again.");
         assertThat(html).doesNotContain("cl-alert-list");
     }
+
+    @Test
+    void storeSettingsPageShowsTheOutcomeOfCreateAndCopy() throws Exception {
+        // when
+        String store = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/resources/templates/store.html"));
+
+        // then
+        assertThat(store).contains("fragments/settings-form :: savedAlert");
+    }
 }

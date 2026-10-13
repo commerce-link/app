@@ -25,7 +25,7 @@
                                 <span class="cl-menu-desc" th:text="#{stores.list.cleanup.desc}"></span></a></li>
                         </ul>
                     </details>
-                    <a class="cl-button is-primary" th:href="@{/dashboard/store/create}">
+                    <a class="cl-button is-primary" th:href="@{/dashboard/store/create(back=${back})}">
                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                         <span th:text="#{stores.list.create}"></span>
                     </a>
@@ -136,7 +136,7 @@
                             </summary>
                             <ul class="cl-menu-list">
                                 <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}(id=${row.storeId()})}" th:text="#{stores.list.menu.open}"></a></li>
-                                <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}/copy(id=${row.storeId()})}" th:text="#{stores.list.menu.copy}"></a></li>
+                                <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}/copy(id=${row.storeId()}, back=${back})}" th:text="#{stores.list.menu.copy}"></a></li>
                                 <li class="cl-menu-sep" aria-hidden="true"></li>
                                 <li th:if="${row.canConvert()}"><a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
                                        th:href="@{/dashboard/store/{id}/trial/convert(id=${row.storeId()}, back=${back})}"
