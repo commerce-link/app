@@ -26,9 +26,14 @@ import java.util.function.Predicate;
  * <p>
  * DynamoDB runs one index create or delete per table at a time, so the unit first waits for the table to be idle.
  * It does not wait for the new index to become ACTIVE: until then RMARepository reads the store's partition.
+ * Runs on every start (runAlways): production deploys rolling, so an old instance keeps writing RMAs without the key
+ * (or leaving a stale prefix after a status change) while the first new instance runs this unit, and a rollback does
+ * the same; the next start repairs them. Cost: one narrow-projection scan per start, writes only for stale or missing
+ * keys, and index creation is skipped when it exists.
+ * <p>
  * Waits are bounded; Mongock is an ApplicationRunner, so a timeout fails start-up and the next start resumes.
  */
-@ChangeUnit(id = "V021-add-rma-list-sort-key-index", order = "021", author = "commercelink")
+@ChangeUnit(id = "V021-add-rma-list-sort-key-index", order = "021", author = "commercelink", runAlways = true)
 public class V021_AddRmaListSortKeyIndex {
 
     public static final String INDEX = "StoreIdRmaListSortKeyIndex";
@@ -165,7 +170,10 @@ public class V021_AddRmaListSortKeyIndex {
         long waitedMillis = 0;
         while (!done.test(describe())) {
             if (waitedMillis >= timeout.toMillis()) {
-                throw new IllegalStateException("V021: timed out after " + timeout + " waiting for " + what);
+                TableDescription table = describe();
+                throw new IllegalStateException("V021: timed out after " + timeout + " waiting for " + what
+                        + " on RMA; table status " + table.getTableStatus() + ", busy indexes " + busyIndexes(table)
+                        + ". Restart the application to resume V021.");
             }
             pause.accept(POLL_INTERVAL.toMillis());
             waitedMillis += POLL_INTERVAL.toMillis();
@@ -183,10 +191,6 @@ public class V021_AddRmaListSortKeyIndex {
 
     @RollbackExecution
     public void rollback() {
-        if (hasIndex(describe())) {
-            dynamoDB.updateTable(new UpdateTableRequest().withTableName(TABLE)
-                    .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
-                            .withDelete(new DeleteGlobalSecondaryIndexAction().withIndexName(INDEX))));
-        }
+        // No-op: after a client-side timeout the index may still be CREATING, and deleting it would lose the build.
     }
 }

@@ -132,4 +132,43 @@ class V021AddRmaListSortKeyIndexDynamoDbIntegrationTest {
         assertThat(capacity.getReadCapacityUnits()).isEqualTo(3L);
         assertThat(capacity.getWriteCapacityUnits()).isEqualTo(2L);
     }
+
+    @Test
+    void aSecondRunRepairsWhatAnOldInstanceWroteAfterTheFirst() {
+        // given: V021 already ran; an old instance then completed an RMA (stale ACTIVE# key) and created one without a key
+        savedWithoutKey("a1", RMAStatus.New, LocalDateTime.of(2026, 10, 1, 10, 0));
+        migration().execute();
+        String versionBefore = item("a1").get("version").getN();
+        client.updateItem(new UpdateItemRequest().withTableName("RMA")
+                .withKey(Map.of("storeId", new AttributeValue("store-1"), "rmaId", new AttributeValue("a1")))
+                .withUpdateExpression("SET #s = :s")
+                .withExpressionAttributeNames(Map.of("#s", "status"))
+                .withExpressionAttributeValues(Map.of(":s", new AttributeValue(RMAStatus.Completed.name()))));
+        RMA fresh = savedWithoutKey("n1", RMAStatus.New, LocalDateTime.of(2026, 10, 2, 10, 0));
+        String freshVersion = item("n1").get("version").getN();
+
+        // when
+        migration().execute();
+
+        // then
+        assertThat(item("a1").get("rmaListSortKey").getS()).startsWith("CLOSED#");
+        assertThat(item("a1").get("version").getN()).isEqualTo(versionBefore);
+        assertThat(item("n1").get("rmaListSortKey").getS()).isEqualTo(RmaListSortKey.of(fresh));
+        assertThat(item("n1").get("version").getN()).isEqualTo(freshVersion);
+    }
+
+    @Test
+    void anItemWithoutAVersionGetsItsKey() {
+        // given
+        client.putItem("RMA", Map.of("storeId", new AttributeValue("store-1"), "rmaId", new AttributeValue("u1"),
+                "status", new AttributeValue(RMAStatus.New.name()),
+                "createdAt", new AttributeValue("2026-10-01T10:00:00")));
+
+        // when
+        migration().execute();
+
+        // then
+        assertThat(item("u1").get("rmaListSortKey").getS()).startsWith("ACTIVE#");
+        assertThat(item("u1")).doesNotContainKey("version");
+    }
 }
