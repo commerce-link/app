@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -65,7 +66,7 @@ class ShipmentCancelServiceTest {
     @Mock
     private OrderEventsRepository orderEventsRepository;
     @Mock
-    private ShippingProviderFactory shippingProviderFactory;
+    private ShippingProviders shippingProviders;
     @Mock
     private ShipmentCancellationEventPublisher publisher;
     @Mock
@@ -84,8 +85,8 @@ class ShipmentCancelServiceTest {
         // the real settler: an immediate provider result is written by the same rules as the checker's
         ShipmentCancellationSettler settler =
                 new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                        new OrderRealizationStepBack(orderEventsRepository));
-        shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, shippingProviderFactory,
+                        new OrderRealizationStepBack(orderEventsRepository), mock(ShipmentTrackingsRepository.class));
+        shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, shippingProviders,
                 publisher, optimisticLockingExecutor, settler);
     }
 
@@ -102,7 +103,7 @@ class ShipmentCancelServiceTest {
                 .isInstanceOf(ShippingException.class)
                 .hasMessageContaining("No courier order to cancel");
 
-        verify(shippingProviderFactory, never()).get(any());
+        verify(shippingProviders, never()).forShipment(any(), any());
         verify(ordersRepository, never()).save(any());
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
     }
@@ -131,7 +132,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         List<Boolean> pendingWhenSent = new ArrayList<>();
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenAnswer(invocation -> {
             pendingWhenSent.add(order.getShipments().get(0).getCancellation().hasCommand(invocation.getArgument(1)));
@@ -167,7 +168,7 @@ class ShipmentCancelServiceTest {
         Order fresh = orderWithShipments(marked);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -188,7 +189,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -205,7 +206,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -221,7 +222,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         ShippingException refused = new ShippingException("already in transit");
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenThrow(refused);
 
@@ -244,7 +245,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         ShippingException refused = new ShippingException("already in transit");
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenThrow(refused);
 
@@ -265,7 +266,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         ShippingException refused = new ShippingException("already in transit");
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenThrow(refused);
         doAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave())
@@ -287,7 +288,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when
         ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
@@ -312,7 +313,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when
         ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
@@ -336,7 +337,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenAnswer(invocation -> ShipmentCancellation.pending(invocation.getArgument(1)));
 
@@ -361,7 +362,7 @@ class ShipmentCancelServiceTest {
         Order fresh = orderWithShipments(new Shipment(ShipmentType.Courier));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when
         ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
@@ -381,7 +382,7 @@ class ShipmentCancelServiceTest {
         Order secondAttempt = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, firstAttempt, secondAttempt);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         doAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3))
                 .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
         doThrow(new ConditionalCheckFailedException("version conflict")).doNothing().when(ordersRepository).save(any());
@@ -407,7 +408,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenAnswer(invocation -> ShipmentCancellation.succeeded(invocation.getArgument(1), List.of()));
 
@@ -433,7 +434,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenAnswer(invocation ->
                 ShipmentCancellation.failed(invocation.getArgument(1), "Przesyłka została już odebrana", List.of()));
 
@@ -467,7 +468,7 @@ class ShipmentCancelServiceTest {
         Order fresh = orderWithShipments(unconfirmed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -491,7 +492,7 @@ class ShipmentCancelServiceTest {
         Order fresh = orderWithShipments(failed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -515,7 +516,7 @@ class ShipmentCancelServiceTest {
         Order fresh = orderWithShipments(other);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -531,7 +532,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, (Order) null);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         doAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3))
                 .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
 
@@ -551,7 +552,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         HttpClientException http = new HttpClientException(502, "Bad Gateway");
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenThrow(new ShippingException(http.getMessage(), http));
@@ -577,7 +578,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenThrow(new IllegalStateException(new java.net.SocketTimeoutException("Read timed out")));
 
@@ -600,7 +601,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         HttpClientException http = new HttpClientException(400, "{\"errors\":[{\"message\":\"Nieprawidłowa paczka\"}]}");
         ShippingException refused = new ShippingException(http.getMessage(), http);
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenThrow(refused);
@@ -625,7 +626,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Shipping);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         succeedsRightAway();
 
         // when
@@ -651,7 +652,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Assembled);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         succeedsRightAway();
 
         // when
@@ -671,7 +672,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Shipping);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenAnswer(invocation -> ShipmentCancellation.pending(invocation.getArgument(1)));
 
@@ -695,7 +696,7 @@ class ShipmentCancelServiceTest {
         Order order = orderWithShipments(typed, booked);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
                 .thenAnswer(invocation -> ShipmentCancellation.pending(invocation.getArgument(1)));
 
@@ -717,7 +718,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Shipping);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         succeedsRightAway();
 
         // when
@@ -743,7 +744,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Shipping);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.of(shippingProvider));
         succeedsRightAway();
 
         // when
@@ -765,7 +766,7 @@ class ShipmentCancelServiceTest {
         order.setStatus(OrderStatus.Shipping);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(shippingProviders.forShipment(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
@@ -792,5 +793,44 @@ class ShipmentCancelServiceTest {
         shipment.setShippedAt(LocalDateTime.now().minusHours(1));
         shipment.setExternalId(externalId);
         return shipment;
+    }
+
+    @Test
+    void aShipmentTheIntegrationCannotCancelIsRefusedBeforeAnythingIsSent() {
+        // given
+        Shipment oneByAllegro = courierShipment(EXTERNAL_ID);
+        oneByAllegro.setProvider("allegro");
+        oneByAllegro.setCancellable(false);
+        Order order = orderWithShipments(oneByAllegro);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when / then
+        assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                .isInstanceOf(ShippingException.class)
+                .hasMessage(ShipmentCancelService.NOT_CANCELLABLE);
+        verifyNoInteractions(shippingProviders, publisher);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    void theCancellationGoesToTheIntegrationOfTheShipmentAndIsCheckedThere() {
+        // given
+        Shipment allegroShipment = courierShipment(EXTERNAL_ID);
+        allegroShipment.setProvider("allegro");
+        Order order = orderWithShipments(allegroShipment);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviders.forShipment(store, allegroShipment)).thenReturn(java.util.Optional.of(shippingProvider));
+        when(shippingProviders.nameFor(store, allegroShipment)).thenReturn("allegro");
+        when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
+                .thenAnswer(inv -> ShipmentCancellation.pending(inv.getArgument(1)));
+
+        // when
+        shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        verify(publisher).publish(org.mockito.ArgumentMatchers.argThat(
+                (ShipmentCancellationCheckRequest r) -> "allegro".equals(r.getProvider())));
     }
 }

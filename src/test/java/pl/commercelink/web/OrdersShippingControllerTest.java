@@ -16,12 +16,41 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.shipping.AllegroShippingView;
+import pl.commercelink.shipping.ParcelForm;
+import pl.commercelink.shipping.ShipmentCreationReconciler;
 import pl.commercelink.shipping.ShipmentCreationService;
+import pl.commercelink.shipping.ShipmentCreationSettler;
+import pl.commercelink.shipping.ShipmentOwner;
+import pl.commercelink.shipping.ShipmentOwners;
+import pl.commercelink.shipping.ShippingIntegrationNames;
+import pl.commercelink.shipping.ShippingProviders;
+import pl.commercelink.shipping.api.ShipmentCreation;
+import pl.commercelink.shipping.api.ShipmentResult;
+import pl.commercelink.shipping.api.ShippingProvider;
+import org.springframework.test.util.ReflectionTestUtils;
+import pl.commercelink.shipping.ShipmentCreationStart;
+import pl.commercelink.shipping.ShipmentOwnerType;
+import pl.commercelink.shipping.api.ShipmentRequest;
+import pl.commercelink.shipping.ShippingIntegrationChoice;
+import pl.commercelink.shipping.ShippingIntegrationChoiceView;
+import pl.commercelink.shipping.ShippingIntegrationOption;
+import pl.commercelink.shipping.ShippingIntegrationViews;
+import pl.commercelink.shipping.api.DeliveryPoint;
+import pl.commercelink.shipping.api.DeliveryType;
+import pl.commercelink.shipping.api.PackageOption;
+import pl.commercelink.shipping.api.ShipmentProposal;
+import pl.commercelink.stores.PackageTemplate;
+import java.math.BigDecimal;
 import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.shipping.ShippingUnavailableException;
@@ -33,11 +62,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,6 +87,14 @@ class OrdersShippingControllerTest {
     @Mock private MessageSource messageSource;
     @Mock private ShippingService shippingService;
     @Mock private ShipmentCreationService shipmentCreationService;
+    @Mock private ShippingIntegrationChoice shippingIntegrationChoice;
+    @Mock private ShippingIntegrationViews shippingIntegrationViews;
+    @Mock private ShippingIntegrationNames shippingIntegrationNames;
+    @Mock private ShippingProviders shippingProviders;
+    @Mock private ShipmentCreationSettler settler;
+    @Mock private ShippingProvider allegroProvider;
+    @Mock private ShipmentOwners owners;
+    @Mock private ShipmentOwner orderOwner;
 
     @InjectMocks
     private OrdersShippingController controller;
@@ -68,6 +109,17 @@ class OrdersShippingControllerTest {
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(shippingService.isAvailable(any())).thenReturn(true);
+        when(shippingService.isAvailableFor(any(), any())).thenReturn(true);
+        when(shippingIntegrationChoice.forOrder(any(), any())).thenReturn(List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(shippingIntegrationViews.choice(any(), any(), any())).thenAnswer(invocation ->
+                new ShippingIntegrationChoiceView(invocation.getArgument(0), invocation.getArgument(1), null, null));
+        // the real reconciler, so these tests see what the provider's answer does to the booking
+        ReflectionTestUtils.setField(controller, "shipmentCreationReconciler",
+                new ShipmentCreationReconciler(shippingProviders, settler, owners));
+        when(shippingProviders.forShipment(any(), any())).thenReturn(java.util.Optional.of(allegroProvider));
+        when(shippingIntegrationNames.of(eq("allegro"), any(), any())).thenReturn("Wysyłam z Allegro");
+        when(owners.get(ShipmentOwnerType.ORDER)).thenReturn(orderOwner);
     }
 
     @AfterEach
@@ -90,7 +142,7 @@ class OrdersShippingControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("shipping");
@@ -108,7 +160,7 @@ class OrdersShippingControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), model, redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, model, redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("shipping");
@@ -127,7 +179,7 @@ class OrdersShippingControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
@@ -141,7 +193,7 @@ class OrdersShippingControllerTest {
         ShippingForm form = new ShippingForm("foreign", "orders");
 
         // when / then
-        assertThatThrownBy(() -> controller.initiate("foreign", new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
+        assertThatThrownBy(() -> controller.initiate("foreign", null, null, new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> controller.createShipping(form, new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOf(ResponseStatusException.class);
@@ -155,11 +207,11 @@ class OrdersShippingControllerTest {
         // given
         Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
         when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
-        when(shippingService.isAvailable(any())).thenReturn(false);
+        when(shippingService.isAvailableFor(any(), eq(order))).thenReturn(false);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.initiate(order.getOrderId(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
@@ -243,5 +295,597 @@ class OrdersShippingControllerTest {
         assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
                 .containsEntry("errorMessage", "shipping.error.creating");
         verify(shipmentCreationService, never()).start(any(), any(), any(), any());
+    }
+
+    static Order allegroOrder() {
+        Order order = orderWithShipments(new Shipment(ShipmentType.PickupPoint));
+        order.setExternalOrderId("29a9b8c0-a87a-11f1-8456-8d3ada2e8e1c");
+        order.setSource(new OrderSource("Allegro", OrderSourceType.Marketplace));
+        order.setTotalPrice(919.99);
+        return order;
+    }
+
+    static ShipmentProposal proposal() {
+        return ShipmentProposal.available("Allegro One Box, One Kurier", "ALLEGRO", new DeliveryPoint("ALBOX-WAW-0231"),
+                DeliveryType.LOCKER, List.of(new PackageOption("PACKAGE", new BigDecimal("64"), new BigDecimal("38"),
+                        new BigDecimal("41"), new BigDecimal("25"))), new BigDecimal("5000"), new BigDecimal("5000"));
+    }
+
+    private void allegroSuggested(Order order) {
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null),
+                ShippingIntegrationOption.available("allegro", "Wysyłam z Allegro", proposal()).suggestedCopy()));
+        when(shippingIntegrationViews.allegro(any(), eq(order), any(), any())).thenReturn(new AllegroShippingView(
+                "Allegro One Box, One Kurier", "One by Allegro", "ALBOX-WAW-0231", "shipping.allegro.deliveryType.LOCKER",
+                "Katarzyna Wiśniewska", "limits", "cod", "insurance", "shipping.allegro.labelFormat.PDF_A6",
+                "/dashboard/store/shipping/allegro"));
+    }
+
+    @Test
+    void allegroOrderOpensTheAllegroFormSuggestedByTheChoice() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("shipping");
+        assertThat(model.get("allegroShipping")).isNotNull();
+        assertThat(((ShippingForm) model.get("shippingForm")).getProvider()).isEqualTo("allegro");
+        assertThat(((ShippingIntegrationChoiceView) model.get("integrationChoice")).selected()).isEqualTo("allegro");
+    }
+
+    @Test
+    void aStoreWithOnlyAnUnavailableAllegroShowsTheReasonAndOffersNoSteps() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(ShippingIntegrationOption.unavailable(
+                "allegro", "Wysyłam z Allegro", "shipping.integration.reason.consent", null)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingIntegrationChoiceView choice = (ShippingIntegrationChoiceView) model.get("integrationChoice");
+        assertThat(view).isEqualTo("shipping");
+        assertThat(choice.shown()).isTrue();
+        assertThat(choice.nothingAvailable()).isTrue();
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(model.get("shippingUnavailable")).isEqualTo("shipping.integration.none");
+    }
+
+    @Test
+    void aStoreWhoseDefaultAndAllegroAreBothUnavailableOffersNoSteps() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("furgonetka", "Furgonetka", "shipping.integration.reason.notConnected", null),
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.authLost", null)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(((ShippingIntegrationChoiceView) model.get("integrationChoice")).nothingAvailable()).isTrue();
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(model.get("shippingUnavailable")).isEqualTo("shipping.integration.none");
+    }
+
+    @Test
+    void theOperatorCanSwitchAnAllegroOrderToTheDefaultIntegration() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), "furgonetka", null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(model.get("allegroShipping")).isNull();
+        assertThat(((ShippingForm) model.get("shippingForm")).getProvider()).isEqualTo("furgonetka");
+    }
+
+    @Test
+    void anOnlinePaidAllegroOrderThatLooksUnpaidKeepsCashOnDeliveryUnchecked() {
+        ShippingForm form = allegroFormFor(PaymentSource.OnlinePayment);
+
+        assertThat(form.isCashOnDelivery()).isFalse();
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(919.99);
+    }
+
+    @Test
+    void aCashOnDeliveryAllegroOrderStartsWithCashOnDeliveryCheckedForTheUnpaidAmount() {
+        ShippingForm form = allegroFormFor(PaymentSource.CashOnDelivery);
+
+        assertThat(form.isCashOnDelivery()).isTrue();
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(919.99);
+    }
+
+    private ShippingForm allegroFormFor(PaymentSource source) {
+        Order order = allegroOrder();
+        order.getPayments().clear();
+        order.addPayment(new Payment(source));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        ExtendedModelMap model = new ExtendedModelMap();
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+        return (ShippingForm) model.get("shippingForm");
+    }
+
+    @Test
+    void theAllegroFormStartsWithOneParcelOfTheDefaultTemplateAndTheUnpaidAmount() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        Store store = new Store();
+        PackageTemplate template = new PackageTemplate("Karton M", List.of());
+        template.setId("t-m");
+        template.setDefault(true);
+        store.setShippingConfiguration(new pl.commercelink.stores.ShippingConfiguration());
+        store.getShippingConfiguration().getPackageTemplates().add(template);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(shippingService.retrieveParcelsListBasedOnPackageTemplate(919.99, "t-m", store)).thenReturn(new ArrayList<>(List.of(
+                new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"),
+                new ParcelForm(10, 10, 10, 1, 920, "Drugi", "package"))));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingForm form = (ShippingForm) model.get("shippingForm");
+        assertThat(form.getParcels()).hasSize(1);
+        assertThat(form.getPackageTemplateId()).isEqualTo("t-m");
+    }
+
+    static ShippingForm allegroForm(String orderId) {
+        ShippingForm form = new ShippingForm(orderId, "orders");
+        form.setProvider("allegro");
+        form.setPickUpAddressId("addr-1");
+        form.setParcels(new ArrayList<>(List.of(new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"))));
+        return form;
+    }
+
+    @Test
+    void createForAnOrderOutsideTheAllegroChoiceReturnsToTheOrderWithTheUnavailableNotice() {
+        // given: a shop order; the post claims Wysyłam z Allegro anyway (a stale or forged form)
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.allegroOnly", null),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(messageSource.getMessage(eq("shipping.integration.error.unavailable"), any(), any(Locale.class)))
+                .thenReturn("unavailable");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes())).containsEntry("errorMessage", "unavailable");
+        verifyNoInteractions(shipmentCreationService);
+        verify(shippingService, never()).buildAllegroRequest(any(), any(), any());
+    }
+
+    @Test
+    void createWhenTheAllegroProposalIsUnavailableReturnsToTheOrderWithTheUnavailableNotice() {
+        // given: an Allegro order whose delivery method Allegro does not ship
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingIntegrationChoice.forOrder(any(), eq(order))).thenReturn(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.proposal", "x"),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()));
+        when(messageSource.getMessage(eq("shipping.integration.error.unavailable"), any(), any(Locale.class)))
+                .thenReturn("unavailable");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes())).containsEntry("errorMessage", "unavailable");
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void theCashOnDeliveryAmountIsPrefilledRoundedToGrosze() {
+        // given: 79.98 - 20.0 is 59.980000000000004 in a double
+        Order order = allegroOrder();
+        order.setTotalPrice(79.98);
+        order.addPayment(new Payment("ref", "paid", PaymentSource.OnlinePayment, 20.0, 0));
+        assertThat(order.getUnpaidAmount()).isNotEqualTo(59.98);
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.initiate(order.getOrderId(), null, null, model, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ShippingForm form = (ShippingForm) model.get("shippingForm");
+        assertThat(form.getCashOnDeliveryAmount()).isEqualTo(59.98);
+    }
+
+    @Test
+    void forgedAllegroProviderOnTheDefaultStepsIsRefused() {
+        // given
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        Store store = new Store();
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.createShipping(allegroForm(order.getOrderId()), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.integration.error.unavailable");
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void allegroCreateStartsTheCommandWithThePlaceholderOfTheBuyersMethod() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        ShipmentRequest request = ShipmentRequest.builder().build();
+        when(shippingService.buildAllegroRequest(any(), any(), eq(order))).thenReturn(request);
+        when(shipmentCreationService.start(any(), eq(request), any(), any(), eq("allegro")))
+                .thenReturn(ShipmentCreationStart.startedForTest());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        verify(shipmentCreationService).start(argThat(seed -> seed.getOwnerType() == ShipmentOwnerType.ORDER
+                        && order.getOrderId().equals(seed.getOwnerId()) && "addr-1".equals(seed.getPickUpAddressId())),
+                eq(request), any(), argThat(placeholder -> "Allegro One Box, One Kurier".equals(placeholder.getCarrier())
+                        && "ALBOX-WAW-0231".equals(placeholder.getCollectionPointCode())
+                        && placeholder.getType() == ShipmentType.PickupPoint), eq("allegro"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void allegroCreateWithParcelOverTheLimitRendersTheFormWithTheReason() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        allegroSuggested(order);
+        when(shippingIntegrationViews.errors(any(), any())).thenReturn(Map.of("parcel", "Paczka przekracza wagę metody: najwyżej 25 kg."));
+        ShippingForm form = allegroForm(order.getOrderId());
+        form.getParcels().get(0).setWeight(30);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), form, model, new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("shipping");
+        assertThat(((Map<String, String>) model.get("allegroErrors"))).containsKey("parcel");
+        verifyNoInteractions(shipmentCreationService);
+        // the choice is asked once in the request: the page reuses it
+        verify(shippingIntegrationChoice, times(1)).forOrder(any(), eq(order));
+    }
+
+    @Test
+    void defaultStepsOfAMarketplaceOrderCarryItsReference() {
+        // given
+        Order order = allegroOrder();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        Store store = new Store();
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ShipmentRequest built = ShipmentRequest.builder().carrierId("svc-1").build();
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(built);
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+        ShippingForm form = new ShippingForm(order.getOrderId(), "orders");
+        form.setProvider("furgonetka");
+
+        // when
+        controller.createShipping(form, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        verify(shipmentCreationService).start(any(), argThat(r -> r.orderReference() != null
+                && order.getExternalOrderId().equals(r.orderReference().externalOrderId())), any(), any());
+    }
+
+    /** An Allegro order whose earlier creation command never got a result (the app died during the POST). */
+    private Order allegroOrderWithUnconfirmedCreation() {
+        Shipment stuck = new Shipment(ShipmentType.PickupPoint);
+        stuck.setProvider("allegro");
+        stuck.setCreation(ShipmentCreationState.pending("cmd-0", java.time.LocalDateTime.now().minusMinutes(11)));
+        Order order = allegroOrder();
+        order.setShipments(new ArrayList<>(List.of(stuck)));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        return order;
+    }
+
+    private static ShipmentCreation createdAfterAll() {
+        return ShipmentCreation.succeeded("cmd-0", new ShipmentResult("shp-9", List.of(
+                new ShipmentResult.ShipmentParcelResult("AD058PZBBXLXNJ5TZ", "DPD", null, true, null, false)), null));
+    }
+
+    @Test
+    void theFormOfAnOrderWhoseShipmentWasCreatedAfterAllReturnsToTheOrder() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(createdAfterAll());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then: the number is saved on the order and the operator is told no new shipment is needed
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdAfterAll");
+        verify(messageSource).getMessage(eq("shipping.creation.createdAfterAll"),
+                argThat(args -> args.length == 1 && "Wysyłam z Allegro".equals(args[0])), eq(Locale.ENGLISH));
+        verify(settler).succeeded(argThat(r -> "cmd-0".equals(r.getCommandId()) && "shp-9".equals(r.getExternalId())),
+                eq(createdAfterAll().result()));
+        verify(shippingIntegrationChoice, never()).forOrder(any(), any());
+    }
+
+    @Test
+    void allegroCreateDoesNotBookAgainWhenTheEarlierCommandCreatedTheShipment() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(createdAfterAll());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdAfterAll");
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateDoesNotBookAgainWhenTheEarlierCommandCreatedTheShipment() {
+        // given: the row was already settled as never confirmed ("Spróbuj ponownie" leads here)
+        Order order = allegroOrderWithUnconfirmedCreation();
+        Shipment stuck = order.getShipments().get(0);
+        stuck.setCreation(stuck.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(createdAfterAll());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdAfterAll");
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void allegroCreateBooksAfterTheEarlierCommandIsFoundRefused() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        when(allegroProvider.checkShipmentCreation("cmd-0", null))
+                .thenReturn(ShipmentCreation.failed("cmd-0", null, "Nieprawidłowy kod pocztowy"));
+        when(shippingService.buildAllegroRequest(any(), any(), eq(order))).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any(), eq("allegro")))
+                .thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()), new ExtendedModelMap(),
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        verify(settler).failed(argThat(r -> "cmd-0".equals(r.getCommandId())), eq("Nieprawidłowy kod pocztowy"));
+        verify(shipmentCreationService).start(any(), any(), any(), any(), eq("allegro"));
+    }
+
+    @Test
+    void allegroCreateBooksAsBeforeWhenTheEarlierCommandIsPendingWithoutAPackage() {
+        // given: nothing says the command reached Allegro; the row already warned the operator to check the panel
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", null));
+        when(shippingService.buildAllegroRequest(any(), any(), eq(order))).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any(), eq("allegro")))
+                .thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()), new ExtendedModelMap(),
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        verifyNoInteractions(settler);
+        verify(shipmentCreationService).start(any(), any(), any(), any(), eq("allegro"));
+    }
+
+    private void pendingWithAPackage(Order order) {
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", "shp-9"));
+    }
+
+    @Test
+    void theFormOfAnOrderWhosePackageAwaitsItsNumberReturnsToTheOrder() {
+        // given: Allegro answered SUCCESS without the waybill
+        Order order = allegroOrderWithUnconfirmedCreation();
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then: the package id is kept on the row, the row stays, nothing is booked
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(messageSource).getMessage(eq("shipping.creation.createdWithoutNumber"),
+                argThat(args -> args.length == 1 && "Wysyłam z Allegro".equals(args[0])), eq(Locale.ENGLISH));
+        verify(orderOwner).recordExternalId(argThat(r -> "shp-9".equals(r.getExternalId())));
+        verifyNoInteractions(settler);
+        verify(shippingIntegrationChoice, never()).forOrder(any(), any());
+    }
+
+    @Test
+    void allegroCreateDoesNotBookAgainWhileThePackageAwaitsItsNumber() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateDoesNotBookAgainWhileThePackageAwaitsItsNumber() {
+        // given: the row was already settled as never confirmed ("Spróbuj ponownie" leads here)
+        Order order = allegroOrderWithUnconfirmedCreation();
+        Shipment stuck = order.getShipments().get(0);
+        stuck.setCreation(stuck.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        pendingWithAPackage(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateBooksWhenTheEarlierCommandIsPendingWithoutAPackage() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(allegroProvider.checkShipmentCreation("cmd-0", null)).thenReturn(ShipmentCreation.pending("cmd-0", null));
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        verifyNoInteractions(settler, orderOwner);
+        verify(shipmentCreationService).start(any(), any(), any(), any());
+    }
+
+    @Test
+    void allegroCreateDoesNotBookAgainWhenTheCheckOfAHeldPackageFails() {
+        // given: the row names the package Allegro holds, the check of its command fails
+        Order order = allegroOrderWithUnconfirmedCreation();
+        allegroSuggested(order);
+        order.getShipments().get(0).setExternalId("shp-9");
+        when(allegroProvider.checkShipmentCreation("cmd-0", "shp-9"))
+                .thenThrow(new pl.commercelink.shipping.api.ShippingException("HTTP 502"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createAllegroShipping(order.getOrderId(), allegroForm(order.getOrderId()),
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(shippingService, never()).buildAllegroRequest(any(), any(), any());
+        verify(allegroProvider, never()).createShipment(any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void defaultCreateDoesNotBookAgainWhenTheIntegrationOfAHeldPackageCannotBeBuilt() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        Shipment stuck = order.getShipments().get(0);
+        stuck.setCreation(stuck.getCreation().failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        stuck.setExternalId("shp-9");
+        when(shippingProviders.forShipment(any(), any())).thenThrow(new IllegalStateException("missing secret"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("warningMessage", "shipping.creation.createdWithoutNumber");
+        verify(shippingService, never()).buildRequest(any(), any(), any());
+        verifyNoInteractions(shipmentCreationService);
+    }
+
+    @Test
+    void theFormOpensWhenTheIntegrationOfAnUnconfirmedCommandCannotBeBuilt() {
+        // given: no package named, so nothing says the command reached the provider
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(shippingProviders.forShipment(any(), any())).thenThrow(new IllegalStateException("missing secret"));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), null, null, new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isNotEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("warningMessage");
+        verifyNoInteractions(settler, orderOwner);
+    }
+
+    @Test
+    void defaultCreateBooksWhenTheCheckFailsAndNoPackageIsNamed() {
+        // given
+        Order order = allegroOrderWithUnconfirmedCreation();
+        when(allegroProvider.checkShipmentCreation("cmd-0", null))
+                .thenThrow(new pl.commercelink.shipping.api.ShippingException("HTTP 502"));
+        when(shippingService.buildRequest(any(), any(), any())).thenReturn(ShipmentRequest.builder().build());
+        when(shipmentCreationService.start(any(), any(), any(), any())).thenReturn(ShipmentCreationStart.startedForTest());
+
+        // when
+        controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), new RedirectAttributesModelMap(),
+                Locale.ENGLISH);
+
+        // then
+        verifyNoInteractions(settler, orderOwner);
+        verify(shipmentCreationService).start(any(), any(), any(), any());
     }
 }

@@ -1,5 +1,6 @@
 package pl.commercelink.shipping;
 
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShipmentPickup;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Shipment;
@@ -52,5 +53,38 @@ class ShipmentResultsTest {
         assertThat(pickup.getPickupId()).isEqualTo("APP/CRIN/13023761");
         assertThat(pickup.getWindow()).isNull();
         assertThat(created.get(0).awaitsPickup()).isFalse();
+    }
+
+    @Test
+    void aParcelTheIntegrationCannotCancelIsMarkedSo() {
+        // given
+        ShipmentResult result = new ShipmentResult("shp-1", List.of(
+                new ShipmentResult.ShipmentParcelResult("A1", "ALLEGRO", null, true, null, false),
+                new ShipmentResult.ShipmentParcelResult("D1", "DPD", null, true, null)), null);
+
+        // when
+        List<Shipment> shipments = ShipmentResults.toShipments(result, "allegro", "addr-1");
+
+        // then
+        assertThat(shipments.get(0).getCancellable()).isFalse();
+        assertThat(shipments.get(0).allowsCancellation()).isFalse();
+        assertThat(shipments.get(1).getCancellable()).isNull();
+        assertThat(shipments.get(1).allowsCancellation()).isTrue();
+    }
+
+    @Test
+    void aNewRowOfTheSameCourierOrderKeepsTheCancellationRule() {
+        // given
+        Shipment previous = new Shipment(ShipmentType.Courier);
+        previous.setExternalId("shp-1");
+        previous.setProvider("allegro");
+        previous.setCancellable(false);
+        Shipment edited = new Shipment(ShipmentType.Courier);
+
+        // when
+        edited.inheritCourierOrderFrom(previous);
+
+        // then
+        assertThat(edited.allowsCancellation()).isFalse();
     }
 }

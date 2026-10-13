@@ -3,6 +3,8 @@ package pl.commercelink.shipping;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -13,6 +15,8 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShipmentPickup;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemStatus;
@@ -31,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -100,6 +106,26 @@ class RmaShipmentOwnerTest {
         Shipment s = new Shipment(ShipmentType.Courier);
         s.setCreation(ShipmentCreationState.pending(commandId, LocalDateTime.now()));
         return s;
+    }
+
+    @Test
+    void trackingEventAddedWhileSubscribingIsSavedByTheLifecycleUpdateThatFollows() {
+        // given: the subscriber only adds the event in memory; the RMA must be saved after it ran
+        doAnswer(invocation -> {
+            ((RMA) invocation.getArgument(1)).addEvent(new Event(EventType.action, "SHIPMENT_TRACKING_UNAVAILABLE", LocalDateTime.now()));
+            return null;
+        }).when(trackingSubscriber).subscribe(eq("store-1"), any(RMA.class));
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of());
+        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
+
+        // when
+        operatorOwner().afterCreated(settled(true));
+
+        // then
+        InOrder order = inOrder(trackingSubscriber, rmaLifecycle);
+        order.verify(trackingSubscriber).subscribe("store-1", rma);
+        order.verify(rmaLifecycle).update(saved.capture(), any());
+        assertThat(saved.getValue().getEvents()).extracting(Event::getName).contains("SHIPMENT_TRACKING_UNAVAILABLE");
     }
 
     @Test

@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -56,6 +57,8 @@ class ShipmentCancellationSettlerTest {
     private OrderEventsRepository orderEventsRepository;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private ShipmentTrackingsRepository shipmentTrackingsRepository;
 
     private ShipmentCancellationSettler settler;
 
@@ -66,7 +69,7 @@ class ShipmentCancellationSettlerTest {
                 .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
         // the step back is a rule of the settlement, so it runs for real over the mocked events
         settler = new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
-                new OrderRealizationStepBack(orderEventsRepository));
+                new OrderRealizationStepBack(orderEventsRepository), shipmentTrackingsRepository);
     }
 
     private static Shipment pendingShipment(String commandId) {
@@ -120,9 +123,10 @@ class ShipmentCancellationSettlerTest {
             warnings = logs.warnings();
         }
 
-        // then: the reason is not stored on the shipment, the log keeps it with what identifies the command
+        // then: the provider's words are stored on the cancellation and the log keeps them with what identifies the command
         assertThat(saved).isTrue();
         Shipment shipment = order.getShipments().get(0);
+        assertThat(shipment.getCancellation().getError()).isEqualTo("Przesyłka została już odebrana");
         assertThat(shipment.getExternalId()).isEqualTo(EXTERNAL_ID);
         assertThat(shipment.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
         assertThat(shipment.getCancellation().hasCommand(COMMAND_ID)).isTrue();
@@ -131,6 +135,52 @@ class ShipmentCancellationSettlerTest {
                         "commandId=" + COMMAND_ID, "Przesyłka została już odebrana"));
         verify(ordersRepository).save(order);
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
+    }
+
+    @Test
+    void succeedClosesTheTrackingOfEveryCancelledParcelAndOnlyThose() {
+        // given
+        Shipment cancelled = pendingShipment(COMMAND_ID);
+        Shipment other = new Shipment(ShipmentType.Courier);
+        other.setTrackingNo("TRK-OTHER");
+        other.setExternalId("999");
+        Order order = orderWith(cancelled, other);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        settler.succeed(REQUEST);
+
+        // then
+        verify(shipmentTrackingsRepository).expireSilently(STORE_ID, "TRK-1");
+        verify(shipmentTrackingsRepository, never()).expireSilently(STORE_ID, "TRK-OTHER");
+    }
+
+    @Test
+    void succeedStillSettlesTheOrderWhenTheTrackingCannotBeClosed() {
+        // given
+        Order order = orderWith(pendingShipment(COMMAND_ID));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        doThrow(new IllegalStateException("dynamo down")).when(shipmentTrackingsRepository).expireSilently(any(), any());
+
+        // when
+        boolean cleared = settler.succeed(REQUEST).cleared();
+
+        // then
+        assertThat(cleared).isTrue();
+        assertThat(order.getShipments().get(0).getTrackingNo()).isNull();
+    }
+
+    @Test
+    void failedCancellationOfAShipmentNoLongerWaitingClosesNoTracking() {
+        // given
+        Order order = orderWith(pendingShipment("cmd-2"));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        settler.succeed(REQUEST);
+
+        // then
+        verify(shipmentTrackingsRepository, never()).expireSilently(any(), any());
     }
 
     @Test

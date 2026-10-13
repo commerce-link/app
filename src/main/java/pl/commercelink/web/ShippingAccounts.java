@@ -7,6 +7,7 @@ import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.web.dtos.IntegrationSettingsForm;
 import pl.commercelink.provider.api.ProviderField.FieldType;
 import pl.commercelink.shipping.ShippingProviderFactory;
+import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
@@ -42,8 +43,10 @@ class ShippingAccounts {
         this.apiDomain = apiDomain;
     }
 
+    /** The couriers an account can be connected to; integrations without an account of their own are set up elsewhere. */
     List<ShippingProviderDescriptor> installed() {
         return shippingProviderFactory.availableProviders().stream()
+                .filter(descriptor -> !ShippingProviders.ADDITIONAL_ONLY.contains(descriptor.name()))
                 .sorted(Comparator.comparing(ShippingProviderDescriptor::displayName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }

@@ -13,8 +13,8 @@ import java.util.Objects;
 
 /**
  * The last cancel command sent for a shipment's courier order and where it stands. A shipment without one has none;
- * a confirmed cancellation clears the shipment, so there is no "succeeded" state. The failure reason is not kept: it
- * is logged where the failure is written.
+ * a confirmed cancellation clears the shipment, so there is no "succeeded" state. A refused one keeps the provider's
+ * words (error, absent on rows written before it was stored).
  * <p>Treat it as immutable: transitions return new objects; the setters exist only for the DynamoDB mapper.
  */
 @DynamoDBDocument
@@ -36,24 +36,35 @@ public class CourierCancellation {
     public CourierCancellation() {
     }
 
-    private CourierCancellation(ShipmentCancellationStatus status, String commandId, LocalDateTime requestedAt) {
+    /** The provider's own words for refusing the command, shown as they are; null when unknown. */
+    @DynamoDBAttribute(attributeName = "error")
+    private String error;
+
+    private CourierCancellation(ShipmentCancellationStatus status, String commandId, LocalDateTime requestedAt,
+                                String error) {
         this.status = status;
         this.commandId = commandId;
         this.requestedAt = requestedAt;
+        this.error = error;
     }
 
     public static CourierCancellation pending(String commandId, LocalDateTime now) {
-        return new CourierCancellation(ShipmentCancellationStatus.PENDING, commandId, now);
+        return new CourierCancellation(ShipmentCancellationStatus.PENDING, commandId, now, null);
     }
 
     /** The same command, refused by the provider. A copy, so a remembered earlier state stays as it was. */
     public CourierCancellation failed() {
-        return new CourierCancellation(ShipmentCancellationStatus.FAILED, commandId, requestedAt);
+        return failed(null);
+    }
+
+    /** The same command, refused in the provider's words. */
+    public CourierCancellation failed(String error) {
+        return new CourierCancellation(ShipmentCancellationStatus.FAILED, commandId, requestedAt, error);
     }
 
     /** The same command, its result unknown after the checks ran out. A copy, like failed(). */
     public CourierCancellation unconfirmed() {
-        return new CourierCancellation(ShipmentCancellationStatus.UNCONFIRMED, commandId, requestedAt);
+        return new CourierCancellation(ShipmentCancellationStatus.UNCONFIRMED, commandId, requestedAt, null);
     }
 
     public ShipmentCancellationStatus getStatus() {
@@ -78,6 +89,14 @@ public class CourierCancellation {
 
     public void setRequestedAt(LocalDateTime requestedAt) {
         this.requestedAt = requestedAt;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
     @DynamoDBIgnore
@@ -124,12 +143,13 @@ public class CourierCancellation {
             return false;
         }
         return status == other.status && Objects.equals(commandId, other.commandId)
-                && Objects.equals(requestedAt, other.requestedAt);
+                && Objects.equals(requestedAt, other.requestedAt)
+                && Objects.equals(error, other.error);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(status, commandId, requestedAt);
+        return Objects.hash(status, commandId, requestedAt, error);
     }
 
     @Override

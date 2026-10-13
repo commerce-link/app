@@ -50,11 +50,11 @@ public class ShipmentPickupRetryController {
                 .filter(s -> externalId.equals(s.getExternalId())).toList();
         Store store = storesRepository.findById(storeId());
         String provider = parcels.isEmpty() ? null : parcels.get(0).getProvider();
-        // only a return still waiting for its pickup, of the store's own integration (whose account created it); a
-        // package of the store's pickup list goes through the pickup page, which groups it with the others
+        // only a return still waiting for its pickup, of an integration the store still has (whose account created
+        // it); a package of the store's pickup list goes through the pickup page, which groups it with the others
         boolean retryable = !parcels.isEmpty() && (rma.getStatus() == null || !rma.getStatus().isClosed())
                 && parcels.stream().allMatch(s -> s.awaitsPickup() && s.getPickUpAddressId() == null)
-                && provider != null && provider.equals(shippingService.providerName(store));
+                && provider != null && shippingService.providerNamed(store, provider).isPresent();
         if (!retryable) {
             redirectAttributes.addFlashAttribute("errorMessage", message("shipping.pickup.gone", locale));
             return back;

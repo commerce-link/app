@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.shipping.api.PickupOrder;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.shipping.api.ShippingProvider;
@@ -21,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +30,7 @@ import static org.mockito.Mockito.when;
 class ShipmentPickupCheckerTest {
 
     @Mock private StoresRepository storesRepository;
-    @Mock private ShippingProviderFactory shippingProviderFactory;
+    @Mock private ShippingProviders shippingProviders;
     @Mock private ShipmentPickupEventPublisher publisher;
     @Mock private ShipmentPickupSettler settler;
     @Mock private Store store;
@@ -39,8 +41,8 @@ class ShipmentPickupCheckerTest {
     @BeforeEach
     void setUp() {
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(shippingProviderFactory.get(store)).thenReturn(provider);
-        checker = new ShipmentPickupChecker(storesRepository, shippingProviderFactory, publisher, settler);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.of(provider));
+        checker = new ShipmentPickupChecker(storesRepository, shippingProviders, publisher, settler);
     }
 
     private static ShipmentPickupCheckRequest request(int attempt) {
@@ -127,27 +129,75 @@ class ShipmentPickupCheckerTest {
     }
 
     @Test
-    void missingProviderFailsThePickup() {
+    void missingProviderIsAskedAgainWhileAttemptsRemain() {
         // given
-        when(shippingProviderFactory.get(store)).thenReturn(null);
+        when(shippingProviders.forCommand(eq(store), any())).thenReturn(java.util.Optional.empty());
 
         // when
         checker.check(request(1));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.pickup.no.provider"));
-        verify(publisher, never()).publish(any());
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2));
+        verifyNoInteractions(settler);
     }
 
     @Test
-    void aDeletedStoreFailsThePickup() {
+    void checkerWithDisconnectedIntegrationSettlesThePickupAsUnconfirmedOnTheLastAttempt() {
+        // given
+        ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").provider("allegro")
+                .commandId("pick-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00")
+                .attempt(ShipmentPickupChecker.MAX_ATTEMPTS).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.empty());
+
+        // when
+        checker.check(request);
+
+        // then: the command was sent, the courier may still come: unconfirmed, nothing re-queued
+        verify(settler).failedWithKey(request, ShipmentPickup.UNCONFIRMED_DISCONNECTED_KEY);
+        verifyNoInteractions(publisher, provider);
+    }
+
+    @Test
+    void aDeletedStoreFailsThePickupOnTheLastAttempt() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(null);
 
         // when
-        checker.check(request(1));
+        checker.check(request(ShipmentPickupChecker.MAX_ATTEMPTS));
 
         // then
-        verify(settler).failedWithKey(any(), eq("shipping.pickup.no.provider"));
+        verify(settler).failedWithKey(any(), eq("shipping.pickup.unconfirmed.disconnected"));
+    }
+
+    @Test
+    void aPickupCheckWithoutProviderUsesDefaultIntegration() {
+        // given
+        ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").commandId("cmd-1")
+                .targets(List.of()).date("2026-10-09").from("09:00").to("12:00").attempt(1).build();
+        when(provider.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1"));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(shippingProviders).forCommand(store, null);
+        verify(publisher).publish(argThat(r -> r.getAttempt() == 2));
+    }
+
+    @Test
+    void aPickupCheckGoesToTheIntegrationNamedInTheMessage() {
+        // given
+        ShippingProvider allegro = mock(ShippingProvider.class);
+        ShipmentPickupCheckRequest request = ShipmentPickupCheckRequest.builder().storeId("store-1").provider("allegro")
+                .commandId("cmd-1").targets(List.of()).date("2026-10-09").from("09:00").to("12:00").attempt(1).build();
+        when(shippingProviders.forCommand(store, "allegro")).thenReturn(java.util.Optional.of(allegro));
+        when(allegro.checkPickupOrder("cmd-1")).thenReturn(PickupOrder.pending("cmd-1"));
+
+        // when
+        checker.check(request);
+
+        // then
+        verify(allegro).checkPickupOrder("cmd-1");
+        verifyNoInteractions(provider);
     }
 }
