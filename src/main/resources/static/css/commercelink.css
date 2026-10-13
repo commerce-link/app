@@ -13127,3 +13127,114 @@ a.cl-link-button:hover {
         padding: 14px 16px;
     }
 }
+
+/* New RMA page (/dashboard/rma/new): items table with the selection as a form field and the resolution/reason row
+   under a ticked item (pattern of the new-delivery table), and the list of orders to choose from. */
+.cl-page .cl-table.is-rma-items tr.cl-row-main.is-open > * {
+    background: var(--cl-surface-2);
+    border-bottom-color: transparent;
+}
+
+/* --cl-ink-3 falls under 4.5:1 on --cl-surface-2 */
+.cl-page .cl-table.is-rma-items tr.cl-row-main.is-open .cl-table-sub {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.cl-row-detail > td {
+    padding: 0 20px 16px 64px;
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.cl-row-detail[hidden] {
+    display: none;
+}
+
+.cl-page .cl-table.is-rma-items .cl-min {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-rma-items .cl-input:disabled {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.is-unavailable > * {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-rma-item-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+}
+
+.cl-page .cl-rma-item-fields .cl-field {
+    margin: 0;
+}
+
+.cl-page .cl-rma-item-fields .cl-textarea {
+    min-height: 72px;
+}
+
+.cl-page .cl-table.is-rma-orders tr.is-unavailable > * {
+    color: var(--cl-ink-2);
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-rma-item-fields .cl-choice-group.is-row {
+        grid-template-columns: repeat(3, max-content);
+        column-gap: 24px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    /* checkbox beside the item name, the quantity and price rows below it */
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main {
+        grid-template-columns: 44px minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check {
+        display: block;
+        grid-column: 1;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > th.cl-table-key {
+        display: block;
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td:not(.cl-table-check) {
+        grid-column: 1 / -1;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody th.cl-table-key::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail {
+        padding: 0 16px 12px;
+        border-top: 0;
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail > td {
+        display: block;
+        padding: 0;
+        background: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail > td::before {
+        content: none;
+    }
+}
