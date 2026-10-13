@@ -80,7 +80,7 @@ public class StoresListPageFactory {
         boolean inactive = deactivation.isPresent();
         boolean trialEnded = state == StoreState.TRIAL_ENDED;
         return new StoreRow(store.getStoreId(), shortId,
-                StringUtils.isBlank(store.getName()) ? shortId : store.getName(),
+                displayName(store),
                 company != null ? company : email,
                 company != null ? email : null,
                 state, noteDate, noteDays, format(day(store.getCreatedAt())),
@@ -101,6 +101,11 @@ public class StoresListPageFactory {
                     ? StoreState.TRIAL_ENDING : StoreState.TRIAL;
         }
         return StoreState.FULL;
+    }
+
+    /** The one name rule for every screen: a store without a name is shown by the first characters of its ID. */
+    public static String displayName(Store store) {
+        return StringUtils.isBlank(store.getName()) ? StringUtils.left(store.getStoreId(), SHORT_ID) : store.getName();
     }
 
     private static String ownerEmail(Store store) {
@@ -166,9 +171,9 @@ public class StoresListPageFactory {
                 .filter(store -> store != null && query.delete().equals(store.getStoreId()) && store.getDemo() == null)
                 .findFirst()
                 .map(store -> new StoresListPage.DeleteDialog(store.getStoreId(),
-                        StringUtils.isBlank(store.getName()) ? StringUtils.left(store.getStoreId(), SHORT_ID) : store.getName(),
+                        displayName(store),
                         store.getTrial() != null,
-                        store.getTrial() == null ? null : store.getTrial().getOwnerEmail(),
+                        ownerEmail(store),
                         "/dashboard/store/" + store.getStoreId() + "/delete"))
                 .orElse(null);
     }

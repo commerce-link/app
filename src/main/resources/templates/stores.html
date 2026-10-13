@@ -188,9 +188,9 @@
                         <li th:text="#{stores.list.delete.effect.orders}"></li>
                         <li th:text="#{stores.list.delete.effect.catalogs}"></li>
                         <li th:text="#{stores.list.delete.effect.settings}"></li>
-                        <li data-store-delete-owner th:hidden="${d == null or !d.trial()}"
+                        <li data-store-delete-owner th:hidden="${d == null or !d.trial() or d.ownerEmail() == null}"
                             th:attr="data-pattern=#{stores.list.delete.effect.owner('{0}')}"
-                            th:text="${d != null and d.trial()} ? #{stores.list.delete.effect.owner(${d.ownerEmail()})} : ''"></li>
+                            th:text="${d != null and d.trial() and d.ownerEmail() != null} ? #{stores.list.delete.effect.owner(${d.ownerEmail()})} : ''"></li>
                     </ul>
                     <div class="cl-field">
                         <label class="cl-label" for="confirm-store-id" th:text="#{stores.list.delete.confirm.label}"></label>

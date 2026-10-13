@@ -31,6 +31,7 @@ import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalMatchers.aryEq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -217,6 +218,7 @@ class SuperAdminControllerTest {
         // then
         assertEquals("redirect:/dashboard/store/create", view);
         assertEquals("Błąd tworzenia", redirectAttributes.getFlashAttributes().get("errorMessage"));
+        assertNull(redirectAttributes.getFlashAttributes().get("successMessage"));
     }
 
     @Test
@@ -506,5 +508,131 @@ class SuperAdminControllerTest {
 
         // then
         assertEquals("redirect:/dashboard/stores", view);
+    }
+
+    @Test
+    void cleanupReportsDeletedCountAndReturnsToSafeBack() {
+        // given
+        when(orphanedProductCleanupService.cleanupOrphanedProducts()).thenReturn(7);
+        when(messageSource.getMessage(eq("store.cleanup.success"), aryEq(new Object[]{7}), eq(locale))).thenReturn("Usunięto 7");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.cleanupProducts("/dashboard/stores?status=trial", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=trial", view);
+        assertEquals(StoresNotice.ok("Usunięto 7"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+    }
+
+    @Test
+    void cleanupFailureShowsErrorAndReturnsToTheListWithoutBack() {
+        // given
+        when(orphanedProductCleanupService.cleanupOrphanedProducts()).thenThrow(new RuntimeException("dynamo down"));
+        when(messageSource.getMessage("store.cleanup.error", null, locale)).thenReturn("Błąd czyszczenia");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.cleanupProducts(null, locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores", view);
+        assertEquals(StoresNotice.bad("Błąd czyszczenia"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+    }
+
+    @Test
+    void deleteReturnsToSafeBackAfterSuccess() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
+        when(messageSource.getMessage(eq("store.delete.success"), aryEq(new Object[]{"Sklep A"}), eq(locale))).thenReturn("Usunięto");
+
+        // when
+        String view = controller.deleteStore(STORE_ID, STORE_ID, "/dashboard/stores?status=trial", locale, new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=trial", view);
+    }
+
+    @Test
+    void deleteReturnsToSafeBackAfterConfirmationMismatch() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage("store.delete.confirm.mismatch", null, locale)).thenReturn("Nie pasuje");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteStore(STORE_ID, "wrong-id", "/dashboard/stores?status=trial", locale, redirectAttributes);
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=trial", view);
+        assertEquals(StoresNotice.bad("Nie pasuje"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+        verifyNoInteractions(storeDeletionService);
+    }
+
+    @Test
+    void deleteSuccessNoticeNamesNamelessStoreByShortId() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName(" ");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
+        when(messageSource.getMessage(eq("store.delete.success"), aryEq(new Object[]{"abc123de"}), eq(locale))).thenReturn("Usunięto abc123de");
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        controller.deleteStore(STORE_ID, STORE_ID, null, locale, redirectAttributes);
+
+        // then
+        assertEquals(StoresNotice.ok("Usunięto abc123de"), redirectAttributes.getFlashAttributes().get("storesNotice"));
+    }
+
+    @Test
+    void convertTrialReturnsToSafeBack() {
+        // given
+        when(storeTrialService.convertToFullAccount(STORE_ID)).thenReturn(true);
+        when(messageSource.getMessage("store.trial.convert.success", null, locale)).thenReturn("Pełne konto");
+
+        // when
+        String view = controller.convertTrial(STORE_ID, "/dashboard/stores?status=trial", locale, new RedirectAttributesModelMap());
+
+        // then
+        assertEquals("redirect:/dashboard/stores?status=trial", view);
+    }
+
+    @Test
+    void deactivateConfirmationPageDoesNotDeactivate() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        controller.confirmDeactivate(STORE_ID, null, new ConcurrentModel(), locale);
+
+        // then
+        verifyNoInteractions(storeActivationService);
+    }
+
+    @Test
+    void convertConfirmationPageDoesNotConvert() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setName("Sklep A");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        controller.confirmConvertTrial(STORE_ID, null, new ConcurrentModel(), locale);
+
+        // then
+        verify(storeTrialService, never()).convertToFullAccount(any());
     }
 }

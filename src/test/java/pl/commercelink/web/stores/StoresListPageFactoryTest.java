@@ -277,6 +277,36 @@ class StoresListPageFactoryTest {
     }
 
     @Test
+    void deleteDialogUsesTheRowOwnerEmailChainAndShortIdForNamelessStore() {
+        // given
+        Store nameless = store("nameless001", " ", "2026-10-01T10:00:00Z");
+        nameless.setTrial(new TrialPeriod(" ", "2026-10-01T10:00:00Z", "2026-10-15T10:00:00Z"));
+        BillingDetails billing = new BillingDetails();
+        billing.setEmail("faktury@firma.pl");
+        nameless.setBillingDetails(billing);
+
+        // when
+        StoresListPage page = factory.build(List.of(nameless), StoresListQuery.of(null, null, null, null, "nameless001"));
+
+        // then
+        assertThat(page.deleteDialog().ownerEmail()).isEqualTo("faktury@firma.pl");
+        assertThat(page.deleteDialog().name()).isEqualTo("nameless");
+        assertThat(StoresListPageFactory.displayName(nameless)).isEqualTo("nameless");
+    }
+
+    @Test
+    void deleteDialogOfFullStoreWithoutAnyEmailHasNoOwnerEmail() {
+        // given
+        Store full = store("full0000001", "Full", null);
+
+        // when
+        StoresListPage page = factory.build(List.of(full), StoresListQuery.of(null, null, null, null, "full0000001"));
+
+        // then
+        assertThat(page.deleteDialog().ownerEmail()).isNull();
+    }
+
+    @Test
     void deleteDialogOnlyForExistingNonDemoStore() {
         // given
         Store trial = onTrial("trial00001", "Trial shop", 9);

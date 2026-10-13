@@ -62,7 +62,7 @@ public class SuperAdminController {
     public String confirmConvertTrial(@PathVariable String storeId, @RequestParam(required = false) String back,
                                       Model model, Locale locale) {
         Store store = existing(storeId);
-        return confirmPage(model, locale, message("stores.list.convert.title", locale, displayName(store)),
+        return confirmPage(model, locale, message("stores.list.convert.title", locale, StoresListPageFactory.displayName(store)),
                 message("store.trial.convert.confirm", locale), message("store.trial.convert.button", locale),
                 "/dashboard/store/" + storeId + "/trial/convert", back, false);
     }
@@ -71,7 +71,7 @@ public class SuperAdminController {
     public String confirmDeactivate(@PathVariable String storeId, @RequestParam(required = false) String back,
                                     Model model, Locale locale) {
         Store store = existing(storeId);
-        return confirmPage(model, locale, message("stores.list.deactivate.title", locale, displayName(store)),
+        return confirmPage(model, locale, message("stores.list.deactivate.title", locale, StoresListPageFactory.displayName(store)),
                 message("store.activity.deactivate.confirm", locale), message("store.activity.deactivate.button", locale),
                 "/dashboard/store/" + storeId + "/deactivate", back, false);
     }
@@ -80,7 +80,7 @@ public class SuperAdminController {
     public String confirmActivate(@PathVariable String storeId, @RequestParam(required = false) String back,
                                   Model model, Locale locale) {
         Store store = existing(storeId);
-        return confirmPage(model, locale, message("stores.list.activate.title", locale, displayName(store)),
+        return confirmPage(model, locale, message("stores.list.activate.title", locale, StoresListPageFactory.displayName(store)),
                 message("store.activity.activate.confirm", locale), message("store.activity.activate.button", locale),
                 "/dashboard/store/" + storeId + "/activate", back, false);
     }
@@ -93,7 +93,7 @@ public class SuperAdminController {
         if (store.getDemo() == null) {
             return "redirect:" + StoresListQuery.withDeleteParam(back, storeId);
         }
-        return confirmPage(model, locale, message("stores.list.delete.title", locale, displayName(store)),
+        return confirmPage(model, locale, message("stores.list.delete.title", locale, StoresListPageFactory.displayName(store)),
                 message("store.delete.confirm", locale), message("stores.list.delete.action", locale),
                 "/dashboard/store/" + storeId + "/delete", back, true);
     }
@@ -120,10 +120,6 @@ public class SuperAdminController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         return store;
-    }
-
-    private static String displayName(Store store) {
-        return store.getName() == null || store.getName().isBlank() ? store.getStoreId() : store.getName();
     }
 
     private String message(String key, Locale locale, Object... args) {
@@ -219,7 +215,7 @@ public class SuperAdminController {
         try {
             if (storeDeletionService.deleteStore(storeId, StoreDeletionService.Guard.ANY)) {
                 redirectAttributes.addFlashAttribute("storesNotice",
-                        StoresNotice.ok(messageSource.getMessage("store.delete.success", new Object[]{displayName(store)}, locale)));
+                        StoresNotice.ok(messageSource.getMessage("store.delete.success", new Object[]{StoresListPageFactory.displayName(store)}, locale)));
             } else {
                 redirectAttributes.addFlashAttribute("storesNotice",
                         StoresNotice.bad(messageSource.getMessage("store.delete.error", null, locale)));
