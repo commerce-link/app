@@ -5,199 +5,192 @@
 <body>
 
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
-                <h1 class="title is-3 mb-0" th:text="#{rma.title}"></h1>
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header" th:fragment="header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{rma.list.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-            </div>
-
-            <div th:replace="~{fragments/screen-intro :: panel('rma', 'fas fa-undo')}"></div>
-
-            <div class="box">
-                <div class="field is-grouped is-grouped-multiline is-align-items-center" id="filterTags">
-                    <div class="control">
-                        <span class="tag is-info" th:text="#{rma.filter.statuses}"></span>
-                    </div>
-                    <div class="control" th:each="status : ${activeStatuses}">
-                        <button type="button"
-                                class="button is-small status-tag"
-                                th:classappend="${#lists.contains(selectedStatuses, status.name())} ? 'is-primary' : 'is-primary is-light'"
-                                th:data-status="${status.name()}">
-                            <span th:text="${enumI18n.localize(status)}"></span>
-                            <span th:text="'(' + ${countsByStatus.get(status) ?: 0} + ')'"></span>
-                        </button>
-                    </div>
-                    <div class="control">
-                        <button type="button" id="closedToggle"
-                                class="button is-small"
-                                th:classappend="${closedSelected} ? 'is-dark' : 'is-light'">
-                            <span class="icon is-small"><i class="fas fa-archive"></i></span>
-                            <span th:text="#{rma.filter.closed}"></span>
-                        </button>
-                    </div>
-                    <div class="control">
-                        <button type="button" class="button is-small is-danger is-light" id="clearFilters">
-                            <span class="icon is-small"><i class="fas fa-times"></i></span>
-                            <span th:text="#{general.clear.filters}"></span>
-                        </button>
-                    </div>
-                    <div class="control ml-auto">
-                        <a href="/dashboard/rma/new" class="button is-small is-link">
-                            <span class="icon is-small"><i class="fas fa-plus"></i></span>
-                            <span th:text="#{create.new.rma}"></span>
-                        </a>
-                    </div>
+                <div class="cl-page-actions">
+                    <a class="cl-button" th:href="@{/dashboard/item/history}"><i class="fas fa-history" aria-hidden="true"></i><span th:text="#{rma.list.history}"></span></a>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/rma/new}"><i class="fas fa-plus" aria-hidden="true"></i><span th:text="#{rma.list.create}"></span></a>
                 </div>
             </div>
+            <p class="cl-page-lead" th:text="#{rma.list.lead}"></p>
+        </header>
 
-            <div class="box">
-                <form method="get" action="/dashboard/rma">
-                    <div class="columns is-multiline mb-0">
-                        <div class="column is-half py-2">
-                            <div class="field">
-                                <label class="label" th:text="#{rma.id}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="rmaId" th:value="${searchParams.rmaId}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-half py-2">
-                            <div class="field">
-                                <label class="label" th:text="#{rma.order.id}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="orderId" th:value="${searchParams.orderId}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-half py-2">
-                            <div class="field">
-                                <label class="label" th:text="#{rma.email}"></label>
-                                <div class="control">
-                                    <input class="input" type="text" name="email" th:value="${searchParams.email}">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-half py-2">
-                            <div class="field is-grouped">
-                                <div class="control is-expanded">
-                                    <label class="label" th:text="#{rma.created.at.start}"></label>
-                                    <input class="input" type="date" name="createdAtStart"
-                                           th:value="${searchParams.createdAtStart}">
-                                </div>
-                                <div class="control is-expanded">
-                                    <label class="label" th:text="#{rma.created.at.end}"></label>
-                                    <input class="input" type="date" name="createdAtEnd"
-                                           th:value="${searchParams.createdAtEnd}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        <div th:replace="~{fragments/screen-intro :: panel('rma', 'fas fa-undo')}"></div>
 
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-link" type="submit" th:text="#{general.search}"></button>
-                        </div>
-                        <div class="control">
-                            <a href="/dashboard/item/history" class="button is-light">
-                                <span class="icon"><i class="fas fa-history"></i></span>
-                                <span th:text="#{item.history}"></span>
+        <div data-cl-list-results th:fragment="results" th:with="q=${page.query()}"
+             th:attr="data-cl-list-path=@{/dashboard/rma},data-cl-list-fragment=${page.fragmentPath()}">
+
+            <!--/* The tiles count the RMAs being handled across the whole store and each narrows the list to its statuses
+                   (same tile as on the orders and deliveries lists). */-->
+            <ul class="cl-stat-grid is-orders" th:unless="${page.tiles().isEmpty()}" th:attr="aria-label=#{rma.list.attention.label}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.count()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{rma.list.attention.active}"></span>
+                    </a>
+                </li>
+            </ul>
+
+            <section class="cl-card" aria-labelledby="rma-table-title">
+                <h2 class="cl-visually-hidden" id="rma-table-title" th:text="#{rma.list.table.title}"></h2>
+
+                <div class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{rma.list.segments.label}">
+                            <a class="cl-segment" th:each="s : ${page.segments()}" th:href="@{${s.href()}}"
+                               th:attr="aria-current=${s.active()} ? 'page' : null" data-cl-list-nav>
+                                <span th:text="${s.label()}"></span><th:block th:if="${s.count() != null}"><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${s.count()}"></span></th:block>
                             </a>
+                        </nav>
+                        <div class="cl-toolbar-search">
+                            <form method="get" th:action="@{/dashboard/rma}" class="cl-search-form" role="search" data-cl-list-form>
+                                <th:block th:replace="~{fragments/rma-list :: hidden('search')}"></th:block>
+                                <label class="cl-visually-hidden" for="rma-search" th:text="#{rma.list.search.label}"></label>
+                                <div class="cl-search-field is-wide">
+                                    <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <input class="cl-input cl-table-search" type="search" id="rma-search" name="q" autocomplete="off"
+                                           th:value="${q.q()}" th:placeholder="#{rma.list.search.placeholder}"/>
+                                    <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                       th:attr="aria-label=#{rma.list.search.clear}" data-cl-list-nav>
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                                <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                    <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                                </button>
+                            </form>
+                            <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="rma-filters" aria-expanded="true">
+                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                <span class="cl-toolbar-toggle-label"><span th:text="#{rma.list.filters}"></span><th:block th:if="${q.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${q.activeFilterCount()}"></span></th:block></span>
+                            </button>
                         </div>
                     </div>
-                </form>
-
-                <div class="mt-5">
-                    <div class="table-container">
-                        <table class="table is-fullwidth is-striped is-hoverable">
-                            <thead>
-                            <tr>
-                                <th th:text="#{rma.id}"></th>
-                                <th th:text="#{rma.order.id}"></th>
-                                <th th:text="#{rma.email}"></th>
-                                <th th:text="#{rma.status}"></th>
-                                <th th:text="#{rma.created.at}"></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="rmaEntry : ${rmaEntries}">
-                                <td>
-                                    <a th:href="@{/dashboard/rma/{id}(id=${rmaEntry.rmaId})}">
-                                        <span th:text="${rmaEntry.rmaId}"></span>
-                                    </a>
-                                </td>
-                                <td>
-                                    <a th:href="@{/dashboard/orders/{id}(id=${rmaEntry.orderId})}">
-                                        <span th:text="${rmaEntry.orderId}"></span>
-                                    </a>
-                                </td>
-                                <td th:text="${rmaEntry.email}"></td>
-                                <td>
-                                    <span th:if="${rmaEntry.status != null}"
-                                          class="tag"
-                                          th:classappend="${rmaEntry.status.tagClass()}"
-                                          th:text="${enumI18n.localize(rmaEntry.status)}"></span>
-                                    <span th:if="${rmaEntry.marketplaceReturn}" class="tag is-info is-light ml-1">
-                                        <span th:text="${rmaEntry.marketplace}"></span>
-                                        <span th:if="${rmaEntry.externalReturnStatus != null}"
-                                              th:text="' · ' + ${enumI18n.localize(rmaEntry.externalReturnStatus)}"></span>
-                                    </span>
-                                </td>
-                                <td th:text="${#temporals.format(rmaEntry.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
-                            </tr>
-                            <tr th:if="${#lists.isEmpty(rmaEntries)}">
-                                <td colspan="5" class="has-text-centered" th:text="#{rma.list.empty}"></td>
-                            </tr>
-                            </tbody>
-                        </table>
+                    <div class="cl-toolbar-filters" id="rma-filters">
+                        <details class="cl-filter-menu" data-cl-filter-menu="status">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{rma.list.status.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.statusMenu().value()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/rma}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                <th:block th:replace="~{fragments/rma-list :: hidden('status')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('status', null, ${page.statusMenu().options()})}"></th:block>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{rma.list.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <details class="cl-filter-menu is-end" data-cl-filter-menu="dates">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{rma.list.dates.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
+                            </summary>
+                            <form method="get" th:action="@{/dashboard/rma}" class="cl-filter-menu-panel" data-cl-list-form>
+                                <th:block th:replace="~{fragments/rma-list :: hidden('dates')}"></th:block>
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{rma.list.dates.presets}">
+                                    <ul class="cl-date-presets">
+                                        <li th:each="p : ${page.dates().presets()}">
+                                            <a class="cl-filter-menu-item" th:href="@{${p.href()}}" th:attr="aria-current=${p.active()} ? 'true' : null"
+                                               data-cl-list-nav><span class="cl-filter-menu-text" th:text="${p.label()}"></span></a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="cl-filter-menu-dates">
+                                    <label><span th:text="#{rma.list.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/></label>
+                                    <label><span th:text="#{rma.list.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/></label>
+                                </div>
+                                <div class="cl-filter-menu-actions">
+                                    <button type="submit" class="cl-button is-primary" th:text="#{rma.list.apply}"></button>
+                                </div>
+                            </form>
+                        </details>
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>
-
-                    <div th:replace="~{fragments/pagination :: pagination(${'/dashboard/rma'}, ${currentPage}, ${hasNextPage}, ${searchParams})}"></div>
                 </div>
-            </div>
 
+                <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                    </div>
+                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                       th:text="${page.resultsLine()}"></p>
+                </div>
+
+                <th:block th:unless="${page.rows().isEmpty()}">
+                <nav class="cl-table-sortbar" th:attr="aria-label=#{rma.list.sort}"><span class="cl-eyebrow" th:text="#{rma.list.sort}"></span></nav>
+                <table class="cl-table is-orders is-rma">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{rma.list.column.rma}"></th>
+                        <th scope="col" th:text="#{rma.list.column.client}"></th>
+                        <th scope="col" class="is-secondary-column" th:text="#{rma.list.column.order}"></th>
+                        <th scope="col" th:text="#{rma.list.column.status}"></th>
+                        <th scope="col" aria-sort="descending"><span th:text="#{rma.list.column.created}"></span> <span aria-hidden="true">▼</span></th>
+                        <th scope="col" class="is-numeric" th:text="#{rma.list.column.value}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.rows()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.list.column.rma}">
+                            <a class="cl-row-link cl-table-code" th:href="@{${row.href()}}" th:title="${row.rmaId()}" th:text="${row.number()}"></a>
+                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.reference() != null}"> · <span class="cl-table-code" th:title="${row.reference()}" th:text="${row.reference()}"></span></th:block></span>
+                        </th>
+                        <td th:attr="data-label=#{rma.list.column.client}" th:classappend="${row.clientName() == null} ? 'is-empty' : ''">
+                            <span class="cl-cell-client" th:if="${row.clientName() != null}"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>
+                            <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
+                        </td>
+                        <td class="is-secondary-column cl-cards-hide" th:attr="data-label=#{rma.list.column.order}">
+                            <span class="cl-table-code" th:if="${row.orderNumber() != null}" th:text="${row.orderNumber()}" th:title="${row.orderId()}"></span>
+                        </td>
+                        <td th:attr="data-label=#{rma.list.column.status}">
+                            <span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span>
+                            <span class="cl-table-sub cl-rma-track" th:if="${row.trackText() != null}" th:text="${row.trackText()}"></span>
+                            <span class="cl-table-sub cl-rma-track" th:if="${row.marketplaceText() != null}" th:text="${row.marketplaceText()}"></span>
+                        </td>
+                        <td class="cl-cell-due" th:attr="data-label=#{rma.list.column.created}" th:classappend="${row.createdText() == null} ? 'is-empty' : ''">
+                            <span class="cl-cell-date" th:text="${row.createdText()}"></span>
+                            <span th:if="${row.ageText() != null}" class="cl-table-sub cl-due-note" th:classappend="${row.ageTone()}" th:text="${row.ageText()}"></span>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{rma.list.column.value}" th:classappend="${row.valueText() == null} ? 'is-empty' : ''">
+                            <span class="cl-cell-amount" th:text="${row.valueText()}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                </th:block>
+
+                <p th:if="${page.scope() != null}" class="cl-search-scope">
+                    <span th:text="${page.scope().text()}"></span>
+                    <a class="cl-link-button" th:href="@{${page.scope().moreHref()}}" th:text="${page.scope().moreLabel()} + ' ›'" data-cl-list-nav></a>
+                </p>
+
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}">
+                    <span th:text="${page.emptyState().text()}"></span>
+                    <a th:each="a : ${page.emptyState().actions()}" class="cl-link-button" th:href="@{${a.href()}}" th:text="${a.label()}" data-cl-list-nav></a>
+                </div>
+
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
         </div>
-    </section>
+    </div>
+</section>
 
-    <script th:inline="javascript">
-        const selectedStatuses = new Set(/*[[${selectedStatuses}]]*/ []);
-        const closedStatuses = /*[[${closedStatusNames}]]*/ [];
-
-        function navigateWithFilters() {
-            const params = new URLSearchParams();
-            if (selectedStatuses.size > 0) {
-                params.append('statuses', Array.from(selectedStatuses).join(','));
-            }
-            const query = params.toString();
-            window.location.href = '/dashboard/rma' + (query ? '?' + query : '');
-        }
-
-        document.querySelectorAll('.status-tag').forEach(tag => {
-            tag.addEventListener('click', function () {
-                closedStatuses.forEach(status => selectedStatuses.delete(status));
-                const status = this.getAttribute('data-status');
-                if (selectedStatuses.has(status)) {
-                    selectedStatuses.delete(status);
-                } else {
-                    selectedStatuses.add(status);
-                }
-                navigateWithFilters();
-            });
-        });
-
-        document.getElementById('closedToggle').addEventListener('click', function () {
-            const wasSelected = closedStatuses.every(status => selectedStatuses.has(status));
-            selectedStatuses.clear();
-            if (!wasSelected) {
-                closedStatuses.forEach(status => selectedStatuses.add(status));
-            }
-            navigateWithFilters();
-        });
-
-        document.getElementById('clearFilters').addEventListener('click', function () {
-            window.location.href = '/dashboard/rma';
-        });
-    </script>
+<script th:src="@{/js/list-page.js}" defer></script>
 </div>
+
 </body>
 </html>
