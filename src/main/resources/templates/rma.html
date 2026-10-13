@@ -158,7 +158,7 @@
                         </td>
                         <td th:attr="data-label=#{rma.list.column.status}">
                             <span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span>
-                            <span class="cl-table-sub cl-rma-track" th:if="${row.trackText() != null}"><i class="fas fa-truck" aria-hidden="true"></i> <span th:text="${row.trackText()}"></span></span>
+                            <span class="cl-table-sub cl-rma-track" th:if="${row.trackText() != null}" th:text="${row.trackText()}"></span>
                             <span class="cl-table-sub cl-rma-track" th:if="${row.marketplaceText() != null}" th:text="${row.marketplaceText()}"></span>
                         </td>
                         <td class="cl-cell-due" th:attr="data-label=#{rma.list.column.created}" th:classappend="${row.createdText() == null} ? 'is-empty' : ''">
