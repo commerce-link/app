@@ -12,10 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryListKey;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -33,7 +33,7 @@ class V020RenameDeliveriesListSortKeyDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static final String TRANSIT_DATED = "aaaa0001-0000-0000-0000-000000000000";
     static final String TRANSIT_UNDATED = "aaaa0002-0000-0000-0000-000000000000";
