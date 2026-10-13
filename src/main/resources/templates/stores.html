@@ -1,92 +1,230 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
-            <h1 class="title" th:text="#{store.management}"></h1>
-            <table class="table is-fullwidth is-striped">
+<section class="cl-page" th:with="query=${page.query()}, back=${page.back()}">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{stores.list.title}"></h1>
+                <div class="cl-page-actions">
+                    <!--/* A service operation over every store, not an action on one: kept behind a menu and a confirmation. */-->
+                    <details class="cl-menu">
+                        <summary class="cl-button">
+                            <span th:text="#{stores.list.more}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list">
+                            <li><a class="cl-menu-item is-danger" th:href="@{/dashboard/stores/cleanup-products(back=${back})}" data-cl-confirm
+                                   th:attr="data-cl-confirm-title=#{stores.list.cleanup.title}, data-cl-confirm-message=#{stores.list.cleanup.message},
+                                            data-cl-confirm-action=#{store.cleanup.button}">
+                                <span th:text="#{store.cleanup.button}"></span>
+                                <span class="cl-menu-desc" th:text="#{stores.list.cleanup.desc}"></span></a></li>
+                        </ul>
+                    </details>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/store/create}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{stores.list.create}"></span>
+                    </a>
+                </div>
+            </div>
+            <p class="cl-page-lead" th:text="#{stores.list.lead}"></p>
+        </header>
+
+        <div th:if="${storesNotice != null}" class="cl-alert" th:classappend="${storesNotice.tone()}" role="status">
+            <i class="fas cl-alert-icon" th:classappend="${storesNotice.icon()}" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${storesNotice.text()}"></p>
+        </div>
+
+        <section class="cl-card" aria-labelledby="stores-table-title">
+            <h2 class="cl-visually-hidden" id="stores-table-title" th:text="#{stores.list.table.title}"></h2>
+
+            <div class="cl-table-toolbar is-stacked">
+                <div class="cl-toolbar-row">
+                    <nav class="cl-segmented" th:attr="aria-label=#{stores.list.segment.label}">
+                        <a class="cl-segment" th:each="s : ${page.segments()}" th:href="@{${s.href()}}"
+                           th:attr="aria-current=${s.active()} ? 'page' : null"><span th:text="#{${s.labelKey()}}"></span>
+                            <span class="cl-segment-count" th:text="${s.count()}"></span></a>
+                    </nav>
+                    <div class="cl-toolbar-search">
+                        <form method="get" th:action="@{/dashboard/stores}" class="cl-search-form" role="search">
+                            <input type="hidden" name="status" th:if="${query.segment().name() != 'ALL'}" th:value="${query.segment().param()}"/>
+                            <input type="hidden" name="sort" th:if="${query.sort().name() != 'CREATED'}" th:value="${query.sort().param()}"/>
+                            <input type="hidden" name="dir" th:if="${query.ascending() != query.sort().defaultAscending()}"
+                                   th:value="${query.ascending()} ? 'asc' : 'desc'"/>
+                            <label class="cl-visually-hidden" for="stores-search" th:text="#{stores.list.search.label}"></label>
+                            <div class="cl-search-field">
+                                <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <input class="cl-input cl-table-search" type="search" id="stores-search" name="q" autocomplete="off"
+                                       th:value="${query.q()}" th:attr="placeholder=#{stores.list.search.placeholder}"/>
+                                <a th:if="${query.q() != null}" class="cl-search-clear" th:href="@{${query.withQ(null).href()}}"
+                                   th:attr="aria-label=#{stores.list.search.clear}"><span aria-hidden="true">×</span></a>
+                            </div>
+                            <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!--/* A phrase is shown as a chip with the count, like on the other lists. There are no filter menus to stand next to,
+                   so "Clear filters" follows the chip; it drops the phrase and keeps the segment and the sort. */-->
+            <div class="cl-list-meta is-stores" th:if="${query.q() != null}"
+                 th:with="chipLabel=#{stores.list.chip.search(${query.q()})}, clearHref=${query.withQ(null).href()}">
+                <div class="cl-filter-chips">
+                    <span class="cl-filter-chip">
+                        <span th:text="${chipLabel}"></span>
+                        <a class="cl-filter-chip-clear" th:href="@{${clearHref}}" th:attr="aria-label=#{stores.list.chip.clear(${chipLabel})}"><span
+                                aria-hidden="true">×</span></a>
+                    </span>
+                    <a class="cl-link-button cl-toolbar-clear" th:href="@{${clearHref}}" th:text="#{general.clear.filters}"></a>
+                </div>
+                <p class="cl-table-results" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
+            </div>
+
+            <!--/* The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
+            <table class="cl-table is-orders is-stores" th:unless="${page.rows().isEmpty()}">
+                <colgroup><col><col><col class="cl-col-status"><col class="cl-col-date"><col class="cl-col-menu"></colgroup>
                 <thead>
                 <tr>
-                    <th th:text="#{store.id}"></th>
-                    <th th:text="#{store.name}"></th>
-                    <th>
-                        <a th:href="@{/dashboard/stores(dir=${dir == 'asc'} ? 'desc' : 'asc')}">
-                            <span th:text="#{store.createdAt}"></span>
-                            <span th:text="${dir == 'asc'} ? '▲' : '▼'"></span>
-                        </a>
-                    </th>
-                    <th></th>
+                    <th scope="col" th:attr="aria-sort=${query.nameAriaSort()}">
+                        <a class="cl-table-sort" th:href="@{${query.nameSortHref()}}"
+                           th:text="#{stores.list.column.store}"></a></th>
+                    <th scope="col" th:text="#{stores.list.column.owner}"></th>
+                    <th scope="col" th:text="#{stores.list.column.state}"></th>
+                    <th scope="col" th:attr="aria-sort=${query.createdAriaSort()}">
+                        <a class="cl-table-sort" th:href="@{${query.createdSortHref()}}"
+                           th:text="#{stores.list.column.created}"></a></th>
+                    <th scope="col"><span class="cl-visually-hidden" th:text="#{stores.list.column.actions}"></span></th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="store : ${stores}">
-                    <td>
-                        <a th:href="@{'/dashboard/store/' + ${store.storeId}}" th:text="${store.storeId}"></a>
+                <tr th:each="row : ${page.rows()}">
+                    <th scope="row" class="cl-table-key" th:attr="data-label=#{stores.list.column.store}">
+                        <a class="cl-row-link cl-cell-name" th:href="@{/dashboard/store/{id}(id=${row.storeId()})}" th:text="${row.name()}"
+                           th:title="${row.name()}"></a>
+                        <span class="cl-table-sub"><span class="cl-table-code" th:text="${row.shortId()}" th:title="${row.storeId()}"></span><span
+                                class="cl-narrow-date" th:text="| · ${row.created() != null ? row.created() : '—'}|"></span></span>
+                    </th>
+                    <td class="cl-cell-owner" th:attr="data-label=#{stores.list.column.owner}">
+                        <th:block th:if="${row.ownerName() != null}">
+                            <span class="cl-cell-client" th:text="${row.ownerName()}" th:title="${row.ownerName()}"></span>
+                            <span class="cl-table-sub cl-cell-email" th:if="${row.ownerEmail() != null}" th:text="${row.ownerEmail()}"
+                                  th:title="${row.ownerEmail()}"></span>
+                        </th:block>
+                        <span class="cl-table-empty" th:unless="${row.ownerName() != null}">—</span>
                     </td>
-                    <td th:text="${store.name}"></td>
-                    <td th:text="${store.createdAt != null and #strings.length(store.createdAt) >= 10} ? ${#strings.substring(store.createdAt, 0, 10)} : ''"></td>
-                    <td th:with="deleteConfirm=${store.demo != null} ? #{store.delete.confirm} : (${store.trial != null} ? #{store.delete.confirm.trial(${store.trial.ownerEmail})} : #{store.delete.confirm.regular}),
-                                 inactive=${deactivations[store.storeId]}">
-                        <div th:if="${store.demo != null}" style="display:inline-block">
-                            <span class="tag is-warning" th:text="#{store.demo.badge}"></span>
-                            <span class="tag is-light" th:if="${store.demo.expiresAt != null and #strings.length(store.demo.expiresAt) >= 10}"
-                                  th:text="#{store.demo.expires} + ' ' + ${#strings.substring(store.demo.expiresAt, 0, 10)}"></span>
-                        </div>
-                        <div th:if="${store.trial != null}" th:with="status=${trials[store.storeId]}" style="display:inline-block">
-                            <span class="tag is-info" th:text="#{store.trial.badge}"></span>
-                            <span th:if="${status != null}" class="tag is-light" th:classappend="${status.expired()} ? 'is-danger'"
-                                  th:text="(${status.expired()} ? #{store.trial.ended} : #{store.trial.ends}) + ' ' + ${status.endsOn()}"></span>
-                        </div>
-                        <div th:if="${inactive != null}" style="display:inline-block">
-                            <span class="tag is-danger" th:text="#{store.activity.inactive.badge}"></span>
-                            <span th:if="${inactive.deletionOn() != null}" class="tag is-light is-danger"
-                                  th:text="#{store.activity.deletion} + ' ' + ${inactive.deletionOn()}"></span>
-                        </div>
-                        <form th:if="${store.trial != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/trial/convert'}" method="post"
-                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
-                              th:attr="data-confirm=#{store.trial.convert.confirm}">
-                            <button type="submit" class="button is-success is-small" th:text="#{store.trial.convert.button}"></button>
-                        </form>
-                        <form th:if="${inactive == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/deactivate'}" method="post"
-                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
-                              th:attr="data-confirm=#{store.activity.deactivate.confirm}">
-                            <button type="submit" class="button is-warning is-small" th:text="#{store.activity.deactivate.button}"></button>
-                        </form>
-                        <form th:if="${inactive != null and inactive.deletionOn() == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/activate'}" method="post"
-                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
-                              th:attr="data-confirm=#{store.activity.activate.confirm}">
-                            <button type="submit" class="button is-info is-small" th:text="#{store.activity.activate.button}"></button>
-                        </form>
-                        <form th:if="${store.demo != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
-                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
-                              th:attr="data-confirm=${deleteConfirm}">
-                            <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
-                        </form>
-                        <form th:if="${store.demo == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
-                              style="display:inline" onsubmit="var id = prompt(this.dataset.confirm); if (id === null) return false; this.confirmStoreId.value = id; return true;"
-                              th:attr="data-confirm=${deleteConfirm}">
-                            <input type="hidden" name="confirmStoreId">
-                            <button type="submit" class="button is-danger is-small" th:text="#{store.delete.button}"></button>
-                        </form>
+                    <td class="cl-cell-state" th:attr="data-label=#{stores.list.column.state}">
+                        <span class="cl-status" th:classappend="${row.state().tone()}" th:text="#{${row.state().labelKey()}}"></span>
+                        <span class="cl-table-sub cl-due-note" th:if="${row.noteDate() != null}"
+                              th:classappend="${row.state().noteWarn()} ? 'is-warn' : ''"
+                              th:text="#{${row.state().noteKey()}(${row.noteDate()}, ${row.noteDays()})}"></span>
+                    </td>
+                    <td class="cl-cell-created" th:attr="data-label=#{stores.list.column.created}">
+                        <span class="cl-cell-date" th:if="${row.created() != null}" th:text="${row.created()}"></span>
+                        <span class="cl-table-empty" th:unless="${row.created() != null}" th:title="#{stores.list.created.none}">—</span>
+                    </td>
+                    <td class="cl-table-actions">
+                        <details class="cl-menu">
+                            <summary class="cl-button is-icon" th:attr="aria-label=#{stores.list.menu.label(${row.name()})}">
+                                <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
+                            </summary>
+                            <ul class="cl-menu-list">
+                                <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}(id=${row.storeId()})}" th:text="#{stores.list.menu.open}"></a></li>
+                                <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}/copy(id=${row.storeId()})}" th:text="#{stores.list.menu.copy}"></a></li>
+                                <li class="cl-menu-sep" aria-hidden="true"></li>
+                                <li th:if="${row.canConvert()}"><a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                                       th:href="@{/dashboard/store/{id}/trial/convert(id=${row.storeId()}, back=${back})}"
+                                       th:attr="data-cl-confirm-title=#{stores.list.convert.title(${row.name()})}, data-cl-confirm-message=#{store.trial.convert.confirm},
+                                                data-cl-confirm-action=#{store.trial.convert.button}"
+                                       th:text="#{store.trial.convert.button}"></a></li>
+                                <li th:if="${row.canDeactivate()}"><a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                                       th:href="@{/dashboard/store/{id}/deactivate(id=${row.storeId()}, back=${back})}"
+                                       th:attr="data-cl-confirm-title=#{stores.list.deactivate.title(${row.name()})}, data-cl-confirm-message=#{store.activity.deactivate.confirm},
+                                                data-cl-confirm-action=#{store.activity.deactivate.button}"
+                                       th:text="#{store.activity.deactivate.button}"></a></li>
+                                <li th:if="${row.canActivate()}"><a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                                       th:href="@{/dashboard/store/{id}/activate(id=${row.storeId()}, back=${back})}"
+                                       th:attr="data-cl-confirm-title=#{stores.list.activate.title(${row.name()})}, data-cl-confirm-message=#{store.activity.activate.confirm},
+                                                data-cl-confirm-action=#{store.activity.activate.button}"
+                                       th:text="#{store.activity.activate.button}"></a></li>
+                                <li th:if="${row.activationBlocked()}"><span class="cl-menu-item" aria-disabled="true"><span
+                                        th:text="#{store.activity.activate.button}"></span><span class="cl-menu-reason"
+                                        th:text="#{stores.list.menu.activate.blocked}"></span></span></li>
+                                <li class="cl-menu-sep" aria-hidden="true"></li>
+                                <li th:if="${row.demo()}"><a class="cl-menu-item is-danger" data-cl-confirm
+                                       th:href="@{/dashboard/store/{id}/delete(id=${row.storeId()}, back=${back})}"
+                                       th:attr="data-cl-confirm-title=#{stores.list.delete.title(${row.name()})}, data-cl-confirm-message=#{store.delete.confirm},
+                                                data-cl-confirm-action=#{stores.list.delete.action}"
+                                       th:text="#{stores.list.menu.delete}"></a></li>
+                                <li th:unless="${row.demo()}"><a class="cl-menu-item is-danger" data-cl-dialog-open="store-delete-dialog"
+                                       th:href="@{${row.deleteDialogHref()}}"
+                                       th:attr="data-store-id=${row.storeId()}, data-store-name=${row.name()}, data-store-trial=${row.trial()},
+                                                data-owner-email=${row.trialOwnerEmail()},
+                                                data-action=@{/dashboard/store/{id}/delete(id=${row.storeId()}, back=${back})}"
+                                       th:text="#{stores.list.menu.delete}"></a></li>
+                            </ul>
+                        </details>
                     </td>
                 </tr>
                 </tbody>
             </table>
-            <div class="field is-grouped">
-                <div class="control">
-                    <a class="button is-primary" href="/dashboard/store/create" th:text="#{store.create}"></a>
-                </div>
-                <div class="control">
-                    <form action="/dashboard/stores/cleanup-products" method="post" style="display:inline">
-                        <button type="submit" class="button is-warning" th:text="#{store.cleanup.button}"></button>
-                    </form>
-                </div>
+
+            <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                <span th:text="${es.textArg() != null} ? #{${es.textKey()}(${es.textArg()})} : #{${es.textKey()}}"></span>
+                <a class="cl-link-button" th:href="@{${es.actionHref()}}" th:text="#{${es.actionKey()}}"></a>
             </div>
-        </div>
-    </section>
+        </section>
+
+        <!--/* One dialog for every store: stores.js fills it from the menu entry (cl:dialog-open); for ?delete= the server
+               renders it open, which is the path without JavaScript. The server checks the typed ID again. */-->
+        <dialog class="cl-dialog is-form" id="store-delete-dialog" aria-labelledby="store-delete-title"
+                th:with="d=${page.deleteDialog()}" th:attr="open=${d != null} ? 'open' : null">
+            <form method="post" th:action="${d != null} ? @{${d.actionPath()}(back=${back})} : @{/dashboard/stores}">
+                <h2 class="cl-dialog-title" id="store-delete-title" data-store-delete-title
+                    th:attr="data-pattern=#{stores.list.delete.title('{0}')}"
+                    th:text="${d != null} ? #{stores.list.delete.title(${d.name()})} : ''"></h2>
+                <div class="cl-dialog-body">
+                    <p class="cl-dialog-effect"><span data-store-delete-kind="regular" th:hidden="${d != null and d.trial()}"
+                                                      th:text="#{stores.list.delete.kind.regular}"></span><span
+                            data-store-delete-kind="trial" th:hidden="${d == null or !d.trial()}" th:text="#{stores.list.delete.kind.trial}"></span>
+                        <span th:text="#{stores.list.delete.lost}"></span></p>
+                    <ul class="cl-dialog-effects">
+                        <li th:text="#{stores.list.delete.effect.orders}"></li>
+                        <li th:text="#{stores.list.delete.effect.catalogs}"></li>
+                        <li th:text="#{stores.list.delete.effect.settings}"></li>
+                        <li data-store-delete-owner th:hidden="${d == null or !d.trial() or d.trialOwnerEmail() == null}"
+                            th:attr="data-pattern=#{stores.list.delete.effect.owner('{0}')}"
+                            th:text="${d != null and d.trial() and d.trialOwnerEmail() != null} ? #{stores.list.delete.effect.owner(${d.trialOwnerEmail()})} : ''"></li>
+                    </ul>
+                    <div class="cl-field">
+                        <label class="cl-label" for="confirm-store-id" th:text="#{stores.list.delete.confirm.label}"></label>
+                        <span class="cl-confirm-id" data-store-delete-id th:text="${d != null} ? ${d.storeId()} : ''"></span>
+                        <input class="cl-input" id="confirm-store-id" name="confirmStoreId" autocomplete="off" spellcheck="false"
+                               autocapitalize="off" required autofocus aria-describedby="confirm-store-id-help"/>
+                        <p class="cl-help" id="confirm-store-id-help" th:text="#{stores.list.delete.confirm.help}"></p>
+                    </div>
+                </div>
+                <div class="cl-dialog-actions">
+                    <button class="cl-button is-danger" type="submit" data-store-delete-submit th:text="#{stores.list.delete.action}"></button>
+                    <a class="cl-button" data-cl-dialog-close th:href="@{${back}}" th:text="#{general.cancel}"></a>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+    </div>
+</section>
+
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/stores.js}" defer></script>
 </div>
 </body>
 </html>
