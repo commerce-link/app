@@ -511,18 +511,6 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return entries;
     }
 
-    public List<Order> findByEmail(String storeId, String email) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":email", new AttributeValue().withS(email));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND email = :email")
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(Order.class, scanExpression);
-    }
-
     /**
      * Ids of the store's orders placed with this e-mail, newest first, at most limit. Reads StoreIdOrderedAtIndex (its
      * projection carries the e-mail) page by page instead of scanning the whole Orders table; the e-mail is compared
