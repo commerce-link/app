@@ -109,4 +109,34 @@ class ReportPeriodTest {
         assertThat(new ReportPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)).next().startsAfter(TODAY)).isTrue();
         assertThat(new ReportPeriod(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).next().startsAfter(TODAY)).isFalse();
     }
+
+    @Test
+    void aRangeLongerThanTheLongestReportKeepsItsEndAndIsShortened() {
+        // when
+        ReportPeriod mistyped = ReportPeriod.of(LocalDate.of(202, 9, 1), LocalDate.of(2026, 9, 30), TODAY);
+        ReportPeriod swapped = ReportPeriod.of(LocalDate.of(9999, 12, 31), LocalDate.of(1, 1, 1), TODAY);
+
+        // then
+        assertThat(mistyped).isEqualTo(new ReportPeriod(LocalDate.of(2021, 10, 1), LocalDate.of(2026, 9, 30)));
+        assertThat(swapped.length()).isLessThanOrEqualTo(366L * ReportPeriod.MAX_YEARS);
+        assertThat(ReportPeriod.tooLong(LocalDate.of(202, 9, 1), LocalDate.of(2026, 9, 30))).isTrue();
+        assertThat(ReportPeriod.tooLong(LocalDate.of(2021, 10, 1), LocalDate.of(2026, 9, 30))).isFalse();
+        assertThat(ReportPeriod.tooLong(LocalDate.of(2026, 9, 30), LocalDate.of(2021, 10, 1))).isFalse();
+    }
+
+    @Test
+    void wholeMonthsStepByCalendarMonthsAcrossLeapYearsAndYearEnds() {
+        // given
+        ReportPeriod march2024 = new ReportPeriod(LocalDate.of(2024, 3, 1), LocalDate.of(2024, 3, 31));
+        ReportPeriod firstQuarter = new ReportPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+        ReportPeriod year = new ReportPeriod(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31));
+        ReportPeriod twoYears = new ReportPeriod(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 12, 31));
+
+        // then
+        assertThat(march2024.previous()).isEqualTo(new ReportPeriod(LocalDate.of(2024, 2, 1), LocalDate.of(2024, 2, 29)));
+        assertThat(firstQuarter.previous()).isEqualTo(new ReportPeriod(LocalDate.of(2025, 10, 1), LocalDate.of(2025, 12, 31)));
+        assertThat(year.next()).isEqualTo(new ReportPeriod(LocalDate.of(2027, 1, 1), LocalDate.of(2027, 12, 31)));
+        assertThat(twoYears.previous()).isEqualTo(new ReportPeriod(LocalDate.of(2023, 1, 1), LocalDate.of(2024, 12, 31)));
+        assertThat(twoYears.next()).isEqualTo(new ReportPeriod(LocalDate.of(2027, 1, 1), LocalDate.of(2028, 12, 31)));
+    }
 }

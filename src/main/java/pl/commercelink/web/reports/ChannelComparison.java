@@ -13,6 +13,10 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
     public enum Channel { OWN, MARKETPLACE }
 
     public record Totals(String salesNet, String profitNet, String margin, int orders, String averageOrder) {
+
+        public String ordersText() {
+            return ReportNumbers.count(orders);
+        }
     }
 
     public record Row(String labelKey, boolean money, String own, String marketplace, Share share) {
@@ -44,8 +48,8 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
         boolean ownSold = own.getTotalNumberOfOrders() > 0;
         boolean marketplaceSold = marketplace.getTotalNumberOfOrders() > 0;
         List<Row> rows = List.of(
-                new Row("reports.channels.orders", false, String.valueOf(own.getTotalNumberOfOrders()),
-                        String.valueOf(marketplace.getTotalNumberOfOrders()),
+                new Row("reports.channels.orders", false, ReportNumbers.count(own.getTotalNumberOfOrders()),
+                        ReportNumbers.count(marketplace.getTotalNumberOfOrders()),
                         Share.of(own.getTotalNumberOfOrders(), marketplace.getTotalNumberOfOrders())),
                 new Row("reports.channels.sales", true, ReportNumbers.wholeAmount(own.getTotalPrice()),
                         ReportNumbers.wholeAmount(marketplace.getTotalPrice()), Share.of(own.getTotalPrice(), marketplace.getTotalPrice())),

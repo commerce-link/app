@@ -58,4 +58,21 @@ class SalesTimelineTest {
         }
         return days;
     }
+
+    @Test
+    void aRangeLongerThanAYearIsCutIntoCalendarMonths() {
+        // given
+        List<DailySales> days = days(LocalDate.of(2025, 1, 15), 400);
+
+        // when
+        List<SalesTimeline.Bucket> buckets = SalesTimeline.buckets(days);
+
+        // then
+        assertThat(buckets).hasSize(14);
+        assertThat(buckets.get(0).start()).isEqualTo(LocalDate.of(2025, 1, 15));
+        assertThat(buckets.get(0).end()).isEqualTo(LocalDate.of(2025, 1, 31));
+        assertThat(buckets.get(0).ownOrders()).isEqualTo(17);
+        assertThat(buckets.get(1).start()).isEqualTo(LocalDate.of(2025, 2, 1));
+        assertThat(buckets.get(1).end()).isEqualTo(LocalDate.of(2025, 2, 28));
+    }
 }

@@ -68,7 +68,7 @@ public record DailyChart(Metric metric, List<AxisTick> axis, List<Column> column
                 .max().orElse(0);
         ChartScale scale = ChartScale.fitting(max, !metric.money());
         List<AxisTick> axis = scale.ticks().stream().map(tick -> {
-            ReportNumbers.Axis value = metric.money() ? ReportNumbers.axis(tick) : new ReportNumbers.Axis(String.valueOf(Math.round(tick)), null);
+            ReportNumbers.Axis value = ReportNumbers.axis(tick, scale.tick());
             return new AxisTick(value.number(), value.unitKey(), scale.percent(tick));
         }).toList();
         List<Column> columns = new ArrayList<>();
@@ -91,11 +91,11 @@ public record DailyChart(Metric metric, List<AxisTick> axis, List<Column> column
     }
 
     private static String text(Metric metric, double value) {
-        return metric.money() ? ReportNumbers.amount(value) : String.valueOf(Math.round(value));
+        return metric.money() ? ReportNumbers.amount(value) : ReportNumbers.count(Math.round(value));
     }
 
     private static String total(Metric metric, double value) {
-        return metric.money() ? ReportNumbers.wholeAmount(value) : String.valueOf(Math.round(value));
+        return metric.money() ? ReportNumbers.wholeAmount(value) : ReportNumbers.count(Math.round(value));
     }
 
     private static String label(SalesTimeline.Bucket bucket, SalesTimeline.Granularity granularity, Locale locale) {

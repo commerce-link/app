@@ -1,5 +1,6 @@
 package pl.commercelink.financials;
 
+import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -251,5 +252,16 @@ class FinancialReportGeneratorTest {
         delivery.setShippingCost(shipping);
         delivery.setPaymentCost(payment);
         return delivery;
+    }
+
+    @Test
+    void aReportAskedForAfterThePoolWasShutDownFailsInsteadOfWaiting() {
+        // given
+        order("o1", LocalDateTime.of(2026, 9, 1, 10, 0), false, 123, 80);
+        when(ordersRepository.findAllPastOrders(FROM, TO, STORE)).thenReturn(List.of(index("o1")));
+        generator.shutdown();
+
+        // when / then
+        assertThatThrownBy(() -> generator.generate(STORE, FROM, TO)).isInstanceOf(RejectedExecutionException.class);
     }
 }

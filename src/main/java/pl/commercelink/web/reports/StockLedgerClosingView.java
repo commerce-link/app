@@ -15,6 +15,8 @@ public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, boole
                                      String previousLabel, List<ClosedPeriod> closedPeriods) {
 
     private static final String CLOSE_PATH = "/dashboard/reports/stock-ledger/close";
+    /** Closed periods shown at once; a store closing every month would otherwise grow the page by a row a month. */
+    public static final int RECENT_PERIODS = 6;
 
     public record ClosedPeriod(LocalDate from, LocalDate to, String label, String rangeText, String regenerateHref) {
     }
@@ -30,6 +32,16 @@ public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, boole
         StockLedgerPeriod offered = last != null ? last.next() : new StockLedgerPeriod(fallbackFrom, fallbackTo);
         return new StockLedgerClosingView(offered.from(), offered.to(), last != null, dayText(offered.from()),
                 last != null ? StockLedgerPeriodLabel.of(last, locale) : null, periods);
+    }
+
+    /** The newest closed periods: the ones downloaded and generated again in practice. */
+    public List<ClosedPeriod> recentPeriods() {
+        return closedPeriods.subList(0, Math.min(RECENT_PERIODS, closedPeriods.size()));
+    }
+
+    /** The rest, behind "Older periods" on the page. */
+    public List<ClosedPeriod> olderPeriods() {
+        return closedPeriods.size() > RECENT_PERIODS ? closedPeriods.subList(RECENT_PERIODS, closedPeriods.size()) : List.of();
     }
 
     public StockLedgerClosingView withRange(LocalDate from, LocalDate to) {

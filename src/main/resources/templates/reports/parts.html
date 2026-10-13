@@ -9,7 +9,7 @@
         <h1 class="cl-page-title" th:text="#{reports.title}"></h1>
         <button th:replace="~{fragments/screen-intro :: toggle}"></button>
         <div class="cl-page-actions is-report">
-            <a class="cl-button is-closing" th:href="@{${page.closingHref()}}"
+            <a class="cl-button has-state" th:href="@{${page.closingHref()}}"
                th:title="${page.closing().lastClosed() != null} ? #{reports.closing.lastClosed(${page.closing().lastClosed()})} : null">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-lock"></i></span>
                 <span th:text="${page.closing().pending()} ? #{reports.closing.pending(${page.closing().month()})} : #{reports.closing.open}"></span>
@@ -34,7 +34,6 @@
                             </a>
                         </li>
                     </th:block>
-                    <li class="cl-menu-foot" th:text="#{reports.download.foot(${page.rangeText()})}"></li>
                 </ul>
             </details>
         </div>
@@ -64,9 +63,11 @@
                 </div>
                 <div class="cl-filter-menu-dates">
                     <label><span th:text="#{reports.from}"></span>
-                        <input class="cl-input" type="date" name="dateFrom" th:value="${page.dateFrom()}" required></label>
+                        <input class="cl-input" type="date" name="dateFrom" th:value="${page.dateFrom()}"
+                               th:min="${page.dateMin()}" th:max="${page.dateMax()}" required></label>
                     <label><span th:text="#{reports.to}"></span>
-                        <input class="cl-input" type="date" name="dateTo" th:value="${page.dateTo()}" required></label>
+                        <input class="cl-input" type="date" name="dateTo" th:value="${page.dateTo()}"
+                               th:min="${page.dateMin()}" th:max="${page.dateMax()}" required></label>
                 </div>
                 <div class="cl-filter-menu-actions">
                     <button type="submit" class="cl-button is-primary" th:text="#{reports.period.apply}"></button>
@@ -83,6 +84,10 @@
         </a>
     </div>
     <p th:text="${page.rangeText()}"></p>
+    <p class="cl-loading cl-report-loading" role="status" hidden data-cl-report-loading>
+        <span class="cl-spinner" aria-hidden="true"></span><span th:text="#{reports.loading}"></span></p>
+    <p th:if="${page.shortened()}" class="cl-report-note" role="status"
+       th:text="#{reports.period.shortened(${page.maxYears()}, ${page.rangeText()})}"></p>
 </div>
 
 <section th:fragment="channels(channels)" class="cl-card cl-chart is-full" aria-labelledby="channels-title">
@@ -96,7 +101,7 @@
                 <span class="cl-stat-value" th:text="#{general.currency.amount(${channels.totals().profitNet()})}"></span>
                 <span class="cl-stat-hint" th:if="${channels.totals().margin() != null}" th:text="#{reports.channels.marginHint(${channels.totals().margin()})}"></span></li>
             <li><span class="cl-eyebrow" th:text="#{reports.channels.orders}"></span>
-                <span class="cl-stat-value" th:text="${channels.totals().orders()}"></span>
+                <span class="cl-stat-value" th:text="${channels.totals().ordersText()}"></span>
                 <span class="cl-stat-hint" th:text="#{reports.channels.averageHint(${channels.totals().averageOrder()})}"></span></li>
         </ul>
         <p th:if="${channels.missing() != null}" class="cl-card-desc cl-compare-note"
@@ -132,7 +137,7 @@
        turns the segmented buttons into a switch. */-->
 <section th:fragment="daily(charts, empty)" class="cl-card cl-chart is-full" aria-labelledby="daily-title" data-cl-chart>
     <div class="cl-card-head">
-        <h2 class="cl-card-title" id="daily-title" th:text="#{${charts[0].metric().titleKey()}}" data-cl-chart-heading></h2>
+        <h2 class="cl-card-title" id="daily-title" th:text="#{reports.chart.title}" data-cl-chart-heading></h2>
         <div class="cl-segmented" role="group" th:attr="aria-label=#{reports.chart.switch}" hidden data-cl-chart-switch>
             <button th:each="chart, iter : ${charts}" type="button" class="cl-segment"
                     th:attr="aria-pressed=${iter.first}, data-cl-chart-show=${chart.metric().key()}, data-cl-chart-title=#{${chart.metric().titleKey()}}"
@@ -162,7 +167,7 @@
                         th:with="own=${chart.metric().money()} ? #{general.currency.amount(${col.own()})} : ${col.own()},
                                  marketplace=${chart.metric().money()} ? #{general.currency.amount(${col.marketplace()})} : ${col.marketplace()},
                                  total=${chart.metric().money()} ? #{general.currency.amount(${col.total()})} : ${col.total()}"
-                        th:attr="aria-label=#{reports.chart.columnLabel(${col.label()}, ${own}, ${marketplace})}">
+                        th:attr="aria-label=#{reports.chart.columnLabel(${col.label()}, ${own}, ${marketplace}, ${total})}">
                         <span class="cl-chart-seg" th:style="'height:' + ${col.ownHeight()} + '%'"></span>
                         <span class="cl-chart-seg is-2" th:style="'height:' + ${col.marketplaceHeight()} + '%'"></span>
                         <span class="cl-chart-tip" role="tooltip">
@@ -205,8 +210,12 @@
     <div class="cl-card-head"><h2 class="cl-card-title" id="suppliers-title" th:text="#{reports.suppliers.title}"></h2></div>
     <p th:if="${suppliers.empty()}" class="cl-list-empty" th:text="#{reports.empty.deliveries}"></p>
     <th:block th:unless="${suppliers.empty()}">
-        <p class="cl-chart-figure"><strong th:text="${suppliers.deliveries()}"></strong>
-            <span th:text="${#messages.msg('reports.suppliers.figure', #messages.msg('general.currency.amount', suppliers.totalCosts()))}"></span></p>
+        <ul class="cl-figures">
+            <li><span class="cl-eyebrow" th:text="#{reports.suppliers.count}"></span>
+                <span class="cl-stat-value" th:text="${suppliers.deliveriesText()}"></span></li>
+            <li><span class="cl-eyebrow" th:text="#{reports.suppliers.costs}"></span>
+                <span class="cl-stat-value" th:text="#{general.currency.amount(${suppliers.totalCosts()})}"></span></li>
+        </ul>
         <p class="cl-card-desc" th:text="#{reports.suppliers.desc}"></p>
         <table class="cl-table is-bars is-channels">
             <thead><tr>
@@ -219,14 +228,14 @@
             <tbody><tr th:each="row : ${suppliers.rows()}">
                 <th scope="row" class="cl-table-key" th:text="${row.name()} ?: #{reports.suppliers.none}"></th>
                 <td class="is-bar" aria-hidden="true"><span class="cl-meter"><span th:style="'width:' + ${row.meter()} + '%'"></span></span></td>
-                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${row.deliveries()}"></td>
+                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${row.deliveriesText()}"></td>
                 <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.shipping}" th:text="#{general.currency.amount(${row.shipping()})}"></td>
                 <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.payment}" th:text="#{general.currency.amount(${row.payment()})}"></td>
             </tr></tbody>
             <tfoot><tr>
                 <th scope="row" class="cl-table-key" th:text="#{reports.chart.total}"></th>
                 <td class="is-bar"></td>
-                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${suppliers.deliveries()}"></td>
+                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${suppliers.deliveriesText()}"></td>
                 <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.shipping}" th:text="#{general.currency.amount(${suppliers.shipping()})}"></td>
                 <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.payment}" th:text="#{general.currency.amount(${suppliers.payment()})}"></td>
             </tr></tfoot>

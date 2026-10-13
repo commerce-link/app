@@ -9,6 +9,10 @@ import java.util.List;
 public record SupplierCosts(List<Row> rows, int deliveries, String shipping, String payment, String totalCosts) {
 
     public record Row(String name, int deliveries, double meter, String shipping, String payment) {
+
+        public String deliveriesText() {
+            return ReportNumbers.count(deliveries);
+        }
     }
 
     public static SupplierCosts of(List<SupplierDeliveries> suppliers, SupplierLabelMap labels) {
@@ -22,6 +26,10 @@ public record SupplierCosts(List<Row> rows, int deliveries, String shipping, Str
         double payment = suppliers.stream().mapToDouble(SupplierDeliveries::paymentCost).sum();
         return new SupplierCosts(rows, suppliers.stream().mapToInt(SupplierDeliveries::deliveries).sum(),
                 ReportNumbers.amount(shipping), ReportNumbers.amount(payment), ReportNumbers.amount(shipping + payment));
+    }
+
+    public String deliveriesText() {
+        return ReportNumbers.count(deliveries);
     }
 
     public boolean empty() {

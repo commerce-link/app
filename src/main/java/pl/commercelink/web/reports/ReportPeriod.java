@@ -12,12 +12,27 @@ public record ReportPeriod(LocalDate from, LocalDate to) {
 
     private static final String[] ROMAN = {"I", "II", "III", "IV"};
 
-    /** No range asked for opens the previous month, the period most often settled with the accountant. */
+    /** The page draws a column per day, week or month of the range; a typo in a year must not make it draw thousands. */
+    public static final int MAX_YEARS = 5;
+
+    /**
+     * No range asked for opens the previous month, the period most often settled with the accountant. A range longer
+     * than {@link #MAX_YEARS} keeps its end and is shortened to that many years.
+     */
     public static ReportPeriod of(LocalDate from, LocalDate to, LocalDate today) {
         if (from == null || to == null) {
             return month(today.minusMonths(1));
         }
-        return from.isAfter(to) ? new ReportPeriod(to, from) : new ReportPeriod(from, to);
+        LocalDate start = from.isAfter(to) ? to : from;
+        LocalDate end = from.isAfter(to) ? from : to;
+        return tooLong(start, end) ? new ReportPeriod(end.minusYears(MAX_YEARS).plusDays(1), end) : new ReportPeriod(start, end);
+    }
+
+    /** Whether the asked range, in either order, is longer than the page shows. */
+    public static boolean tooLong(LocalDate from, LocalDate to) {
+        LocalDate start = from.isAfter(to) ? to : from;
+        LocalDate end = from.isAfter(to) ? from : to;
+        return start.isBefore(end.minusYears(MAX_YEARS).plusDays(1));
     }
 
     static ReportPeriod month(LocalDate day) {
@@ -41,30 +56,29 @@ public record ReportPeriod(LocalDate from, LocalDate to) {
         return ChronoUnit.DAYS.between(from, to) + 1;
     }
 
+    // whole calendar months (a month, a quarter, a year, two years) step by as many months, so a step never lands on
+    // "2.01–31.12" because of a leap year; any other range steps by its length in days
     public ReportPeriod previous() {
-        if (isFullYear()) {
-            return new ReportPeriod(from.minusYears(1), from.minusDays(1));
-        }
-        if (isFullQuarter()) {
-            return new ReportPeriod(from.minusMonths(3), from.minusDays(1));
-        }
-        if (isFullMonth()) {
-            return month(from.minusMonths(1));
+        if (isWholeMonths()) {
+            return new ReportPeriod(from.minusMonths(months()), from.minusDays(1));
         }
         return new ReportPeriod(from.minusDays(length()), from.minusDays(1));
     }
 
     public ReportPeriod next() {
-        if (isFullYear()) {
-            return new ReportPeriod(to.plusDays(1), to.plusYears(1));
-        }
-        if (isFullQuarter()) {
-            return new ReportPeriod(to.plusDays(1), to.plusDays(1).plusMonths(3).minusDays(1));
-        }
-        if (isFullMonth()) {
-            return month(to.plusDays(1));
+        if (isWholeMonths()) {
+            LocalDate start = to.plusDays(1);
+            return new ReportPeriod(start, start.plusMonths(months()).minusDays(1));
         }
         return new ReportPeriod(to.plusDays(1), to.plusDays(length()));
+    }
+
+    private boolean isWholeMonths() {
+        return from.getDayOfMonth() == 1 && to.plusDays(1).getDayOfMonth() == 1;
+    }
+
+    private long months() {
+        return ChronoUnit.MONTHS.between(from, to.plusDays(1));
     }
 
     public boolean startsAfter(LocalDate day) {

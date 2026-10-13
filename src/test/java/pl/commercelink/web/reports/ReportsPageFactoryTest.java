@@ -82,4 +82,42 @@ class ReportsPageFactoryTest {
         // then
         assertThat(page.nextHref()).isNull();
     }
+
+    @Test
+    void everyFileIsOfferedForThePeriodOfThePage() {
+        // given
+        FinancialReport empty = new FinancialReport(FROM, TO, 0, 0, 0, 0, Map.of(), 0, 0, 0);
+        when(generator.generate("s1", FROM, TO)).thenReturn(new FinancialReports(empty, empty, List.of(), List.of()));
+        when(supplierLabels.forStoreId("s1")).thenReturn(labels);
+        when(closing.closedPeriods("s1")).thenReturn(List.of());
+
+        // when
+        ReportsPage page = factory.create("s1", FROM, TO, TODAY, PL);
+
+        // then
+        List<String> hrefs = page.files().stream().flatMap(group -> group.files().stream()).map(ReportsPage.FileLink::href).toList();
+        assertThat(hrefs).hasSize(6).allMatch(href -> href.endsWith("?dateFrom=2026-09-01&dateTo=2026-09-30"));
+        assertThat(hrefs).extracting(href -> href.substring(0, href.indexOf('?'))).doesNotHaveDuplicates();
+        assertThat(page.files()).extracting(ReportsPage.FileGroup::titleKey)
+                .containsExactly("reports.files.group.sales", "reports.files.group.purchases");
+    }
+
+    @Test
+    void aMistypedYearIsShortenedToTheLongestReportAndThePageSaysSo() {
+        // given
+        LocalDate shortenedFrom = LocalDate.of(2021, 10, 1);
+        FinancialReport empty = new FinancialReport(shortenedFrom, TO, 0, 0, 0, 0, Map.of(), 0, 0, 0);
+        when(generator.generate("s1", shortenedFrom, TO)).thenReturn(new FinancialReports(empty, empty, List.of(), List.of()));
+        when(supplierLabels.forStoreId("s1")).thenReturn(labels);
+        when(closing.closedPeriods("s1")).thenReturn(List.of());
+
+        // when
+        ReportsPage page = factory.create("s1", LocalDate.of(202, 9, 1), TO, TODAY, PL);
+
+        // then
+        assertThat(page.shortened()).isTrue();
+        assertThat(page.dateFrom()).isEqualTo("2021-10-01");
+        assertThat(page.dateMin()).isEqualTo("2000-01-01");
+        assertThat(page.dateMax()).isEqualTo("2027-12-31");
+    }
 }

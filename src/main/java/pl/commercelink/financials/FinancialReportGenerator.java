@@ -90,12 +90,13 @@ public class FinancialReportGenerator {
                 }
                 items.putAll(window.poll().join());
             }
-        } catch (CompletionException e) {
+        } catch (RuntimeException e) {
+            // a failed chunk, or a pool already shut down refusing the next one: the chunks still queued are dropped
             window.forEach(pending -> pending.cancel(true));
-            if (e.getCause() instanceof RuntimeException cause) {
+            if (e instanceof CompletionException && e.getCause() instanceof RuntimeException cause) {
                 throw cause;
             }
-            if (e.getCause() instanceof Error cause) {
+            if (e instanceof CompletionException && e.getCause() instanceof Error cause) {
                 throw cause;
             }
             throw e;

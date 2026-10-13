@@ -22,6 +22,8 @@ public class ReportsPageFactory {
 
     private static final String PATH = "/dashboard/reports";
     private static final String CLOSING_PATH = PATH + "/stock-ledger";
+    /** The date fields catch a mistyped year before the request: nothing in the panel is older or more than a year ahead. */
+    private static final LocalDate EARLIEST_DAY = LocalDate.of(2000, 1, 1);
 
     private final FinancialReportGenerator generator;
     private final SupplierLabels supplierLabels;
@@ -36,15 +38,17 @@ public class ReportsPageFactory {
         ReportPeriod previous = period.previous();
         ReportPeriod next = period.next();
         boolean nextAvailable = !next.startsAfter(today);
+        boolean shortened = dateFrom != null && dateTo != null && ReportPeriod.tooLong(dateFrom, dateTo);
         return new ReportsPage(
-                period.label(locale, messages), period.rangeText(),
+                period.label(locale, messages), period.rangeText(), shortened,
                 href(previous), previous.label(locale, messages),
                 nextAvailable ? href(next) : null, nextAvailable ? next.label(locale, messages) : null,
                 Arrays.stream(PeriodPreset.values())
                         .map(preset -> new ReportsPage.PresetLink(preset.messageKey(), href(preset.period(today)),
                                 preset.period(today).equals(period)))
                         .toList(),
-                period.from().toString(), period.to().toString(), CLOSING_PATH + "?from=" + period.from() + "&to=" + period.to(),
+                period.from().toString(), period.to().toString(),
+                EARLIEST_DAY.toString(), LocalDate.of(today.getYear() + 1, 12, 31).toString(), CLOSING_PATH + "?from=" + period.from() + "&to=" + period.to(),
                 files(period),
                 ChannelComparison.of(reports.ownSources(), reports.marketplace()),
                 Arrays.stream(DailyChart.Metric.values())

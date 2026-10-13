@@ -125,35 +125,53 @@ public class FinancialReportsController {
                 stockLedgerPeriodClosing.closedPeriods(getStoreId()), fallback.from(), fallback.to(), locale);
         // after a held closing the form keeps the range that was held, so it can be closed once settled
         StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
-        model.addAttribute("backHref", backToReport(from, to));
+        ReportPeriod report = reportPeriod(from, to);
+        model.addAttribute("backHref", report == null ? REPORTS_PATH : REPORTS_PATH + "?" + report.query());
+        model.addAttribute("report", report);
         model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
         return "reports/stock-ledger";
     }
 
-    /** The report the page was opened from keeps its period; a missing or unreadable one opens the report's default. */
-    private static String backToReport(String from, String to) {
+    /** The report the page was opened from, carried through its forms so "‹ Reports" returns to it; none if unreadable. */
+    private static ReportPeriod reportPeriod(String from, String to) {
         if (from == null || to == null) {
-            return REPORTS_PATH;
+            return null;
         }
         try {
-            return REPORTS_PATH + "?" + new ReportPeriod(LocalDate.parse(from), LocalDate.parse(to)).query();
+            return new ReportPeriod(LocalDate.parse(from), LocalDate.parse(to));
         } catch (DateTimeParseException e) {
-            return REPORTS_PATH;
+            return null;
         }
     }
 
-    /** Without JavaScript "Generate again" opens this page; with it, confirm-dialog.js posts to the same address. */
+    private static String stockLedgerPath(ReportPeriod report) {
+        return report == null ? STOCK_LEDGER_PATH : STOCK_LEDGER_PATH + "?from=" + report.from() + "&to=" + report.to();
+    }
+
+    /**
+     * Without JavaScript "Generate again" opens this page; with it, confirm-dialog.js posts to the same address. Only a
+     * closed period is generated again, so any other range goes back to the closing page.
+     */
     @GetMapping(STOCK_LEDGER_PATH + "/close")
     public String confirmStockLedgerRegeneration(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                                  @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                                 @RequestParam(value = "from", required = false) String from,
+                                                 @RequestParam(value = "to", required = false) String to,
                                                  Model model, Locale locale) {
-        String label = StockLedgerPeriodLabel.of(new StockLedgerPeriod(dateFrom, dateTo), locale);
+        StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
+        String back = stockLedgerPath(reportPeriod(from, to));
+        if (!stockLedgerPeriodClosing.closedPeriods(getStoreId()).contains(period)) {
+            return "redirect:" + back;
+        }
+        String label = StockLedgerPeriodLabel.of(period, locale);
+        ReportPeriod report = reportPeriod(from, to);
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("reports.stockLedger.regenerate.confirm.title", new Object[]{label}, locale),
                 messageSource.getMessage("reports.stockLedger.regenerate.confirm.message", null, locale),
                 messageSource.getMessage("reports.stockLedger.closing.regenerate", null, locale),
-                STOCK_LEDGER_PATH + "/close?dateFrom=" + dateFrom + "&dateTo=" + dateTo,
-                STOCK_LEDGER_PATH, false));
+                STOCK_LEDGER_PATH + "/close?dateFrom=" + dateFrom + "&dateTo=" + dateTo
+                        + (report == null ? "" : "&from=" + report.from() + "&to=" + report.to()),
+                back, false));
         model.addAttribute("backLabel", messageSource.getMessage("reports.stockLedger.closing.title", null, locale));
         return "settings-confirm";
     }
@@ -162,6 +180,8 @@ public class FinancialReportsController {
     @PostMapping(STOCK_LEDGER_PATH + "/close")
     public String closeStockLedgerPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                         @RequestParam(value = "from", required = false) String from,
+                                         @RequestParam(value = "to", required = false) String to,
                                          RedirectAttributes redirectAttributes, Locale locale) throws IOException {
         StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
         Object[] label = {StockLedgerPeriodLabel.of(period, locale)};
@@ -185,12 +205,14 @@ public class FinancialReportsController {
             }
             case NotAllowed notAllowed -> {
                 List<Object> arguments = new ArrayList<>(List.of(label));
-                arguments.addAll(notAllowed.arguments());
+                // a day reads like the rest of the page ("1.10.2026"), not as an ISO date
+                notAllowed.arguments().forEach(argument -> arguments.add(
+                        argument instanceof LocalDate day ? new ReportPeriod(day, day).rangeText() : argument));
                 redirectAttributes.addFlashAttribute("ledgerError",
                         messageSource.getMessage(notAllowed.messageKey(), arguments.toArray(), locale));
             }
         }
-        return "redirect:" + STOCK_LEDGER_PATH;
+        return "redirect:" + stockLedgerPath(reportPeriod(from, to));
     }
 
     @GetMapping("/dashboard/reports/productWeightOriginComplianceExport")

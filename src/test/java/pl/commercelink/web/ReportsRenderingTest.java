@@ -38,10 +38,10 @@ class ReportsRenderingTest {
     private static ReportsPage page(boolean pending, FinancialReport own, FinancialReport marketplace,
                                     List<SalesTimeline.Bucket> buckets, SupplierCosts suppliers) {
         ReportPeriod period = new ReportPeriod(FROM, TO);
-        return new ReportsPage("wrzesień 2026", "1–30.09.2026",
+        return new ReportsPage("wrzesień 2026", "1–30.09.2026", false,
                 "/dashboard/reports?dateFrom=2026-08-01&dateTo=2026-08-31", "sierpień 2026", null, null,
                 List.of(new ReportsPage.PresetLink("reports.period.preset.previousMonth", "/dashboard/reports?" + period.query(), true)),
-                "2026-09-01", "2026-09-30", "/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30",
+                "2026-09-01", "2026-09-30", "2000-01-01", "2027-12-31", "/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30",
                 List.of(new ReportsPage.FileGroup("reports.files.group.sales", List.of(
                         new ReportsPage.FileLink("reports.files.orders", "reports.files.orders.desc",
                                 ReportFile.ORDERS.href(period))))),
@@ -186,9 +186,9 @@ class ReportsRenderingTest {
 
         // then
         assertThat(html).containsPattern("<strong>1[^<]000,00 PLN</strong>");
-        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1[^\"]000,00 PLN, marketplace 2[^\"]000,00 PLN\"");
+        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1[^\"]000,00 PLN, marketplace 2[^\"]000,00 PLN, total 3[^\"]000,00 PLN\"");
         assertThat(html).containsPattern("data-label=\"Store\">1[^<]000,00 PLN<");
-        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1, marketplace 2\"");
+        assertThat(html).containsPattern("aria-label=\"1\\.09: store 1, marketplace 2, total 3\"");
     }
 
     @Test
@@ -213,5 +213,53 @@ class ReportsRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??").contains("Raporty");
+    }
+
+    @Test
+    void withoutJavaScriptTheChartCardTitleDoesNotRepeatThePanelTitle() {
+        // when
+        String html = render(page(false, 141));
+
+        // then
+        assertThat(html).containsPattern("id=\"daily-title\"[^>]*>Sales, profit and orders day by day<")
+                .containsPattern("cl-chart-panel-title\">Net sales day by day<");
+    }
+
+    @Test
+    void countsCarryAThousandsSeparatorAndDeliveriesAreALabelledFigure() {
+        // when
+        String html = render(page(false, 1291));
+
+        // then
+        assertThat(html).containsPattern("cl-stat-value\">1\\D615<");
+        assertThat(html).contains(">Deliveries<").contains(">Shipping and payment costs<").doesNotContain("deliveries ·");
+    }
+
+    @Test
+    void theDateFieldsRefuseAMistypedYearAndAShortenedRangeIsExplained() {
+        // given
+        ReportsPage page = page(false, 141);
+        ReportsPage shortened = new ReportsPage(page.periodLabel(), page.rangeText(), true, page.previousHref(),
+                page.previousLabel(), page.nextHref(), page.nextLabel(), page.presets(), page.dateFrom(), page.dateTo(),
+                page.dateMin(), page.dateMax(), page.closingHref(), page.files(), page.channels(), page.charts(),
+                page.suppliers(), page.closing());
+
+        // when
+        String plain = render(page);
+        String html = render(shortened);
+
+        // then
+        assertThat(plain).contains("min=\"2000-01-01\"").contains("max=\"2027-12-31\"").doesNotContain("cl-report-note");
+        assertThat(html).contains("cl-report-note").contains("A report covers at most 5 years, so it shows 1–30.09.2026.");
+    }
+
+    @Test
+    void thePeriodBarCarriesAHiddenLoadingStatusForAPeriodFetchedInTheBackground() {
+        // when
+        String html = render(page(false, 141));
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-loading cl-report-loading\" role=\"status\" hidden data-cl-report-loading>")
+                .contains("Loading the report…");
     }
 }
