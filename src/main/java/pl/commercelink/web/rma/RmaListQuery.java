@@ -30,6 +30,7 @@ public record RmaListQuery(Scope scope, Set<RMAStatus> statuses, String q, Perio
     public static final List<RMAStatus> CLOSED_STATUSES = Arrays.stream(RMAStatus.values()).filter(RMAStatus::isClosed).toList();
 
     private static final Pattern ID_LIKE = Pattern.compile("[0-9a-fA-F-]{4,36}");
+    private static final Pattern UUID_LIKE = Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     public enum Scope {
         ACTIVE("active"), CLOSED("closed");
@@ -116,6 +117,11 @@ public record RmaListQuery(Scope scope, Set<RMAStatus> statuses, String q, Perio
     /** The lower-cased search when it looks like (the start of) an RMA id, as in OrderArchiveQuery.searchMode; else null. */
     public String idPrefix() {
         return q != null && ID_LIKE.matcher(q).matches() && q.chars().anyMatch(Character::isDigit) ? q.toLowerCase(Locale.ROOT) : null;
+    }
+
+    /** The lower-cased search when it is a whole id (UUID) of an RMA or an order; else null. */
+    public String fullId() {
+        return q != null && UUID_LIKE.matcher(q).matches() ? q.toLowerCase(Locale.ROOT) : null;
     }
 
     public boolean searchesActive() {

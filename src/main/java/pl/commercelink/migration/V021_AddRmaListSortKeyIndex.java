@@ -32,7 +32,8 @@ import java.util.function.Predicate;
  * the same; the next start repairs them. Cost: one narrow-projection scan per start, writes only for stale or missing
  * keys, and index creation is skipped when it exists.
  * <p>
- * Waits are bounded; Mongock is an ApplicationRunner, so a timeout fails start-up and the next start resumes.
+ * Waits are bounded; a timeout or any other failure is logged and the next start resumes (see execute). Once no
+ * version older than this one can be deployed again, runAlways can be dropped in a later version.
  */
 @Slf4j
 @ChangeUnit(id = "V021-add-rma-list-sort-key-index", order = "021", author = "commercelink", runAlways = true)
@@ -59,10 +60,23 @@ public class V021_AddRmaListSortKeyIndex {
         this.timeout = timeout;
     }
 
+    /**
+     * Neither step may stop the application: the unit runs on every start, so a failure that ended start-up would end
+     * every later deploy too, while the list works without both (stale keys are dropped, a missing index means the
+     * partition read). A failure is logged at ERROR and the next start does the work again.
+     */
     @Execution
     public void execute() {
-        backfillRmaListSortKeys();
-        createIndexIfAbsent();
+        try {
+            backfillRmaListSortKeys();
+        } catch (RuntimeException e) {
+            log.error("V021: the RMA list keys were not backfilled, the next start tries again", e);
+        }
+        try {
+            createIndexIfAbsent();
+        } catch (RuntimeException e) {
+            log.error("V021: {} was not created, the RMA list reads the store partitions until a start creates it", INDEX, e);
+        }
     }
 
     private void createIndexIfAbsent() {

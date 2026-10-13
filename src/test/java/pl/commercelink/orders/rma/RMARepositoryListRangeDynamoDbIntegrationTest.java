@@ -8,6 +8,9 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.BillingMode;
+import com.amazonaws.services.dynamodbv2.model.DeleteGlobalSecondaryIndexAction;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexUpdate;
+import com.amazonaws.services.dynamodbv2.model.UpdateTableRequest;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -212,6 +215,26 @@ class RMARepositoryListRangeDynamoDbIntegrationTest {
         buildIndex();
         rmas = new RMARepository(client, () -> Long.MAX_VALUE / 2);
         check.run();
+    }
+
+    @Test
+    void anIndexDeletedWhileTheApplicationRunsFallsBackToThePartition() {
+        // given
+        buildIndex();
+        List<String> fromIndex = ids(rmas.listRange("store-1", ACTIVE, upperBound(ACTIVE, null), true));
+        client.updateTable(new UpdateTableRequest().withTableName("RMA").withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate()
+                .withDelete(new DeleteGlobalSecondaryIndexAction().withIndexName(RMARepository.LIST_INDEX))));
+        awaitIndexesActive();
+
+        // when
+        List<String> afterDelete = ids(rmas.listRange("store-1", ACTIVE, upperBound(ACTIVE, null), true));
+        boolean anyClosed = rmas.hasAnyInRange("store-1", CLOSED, upperBound(CLOSED, null));
+
+        // then
+        assertThat(fromIndex).containsExactly("a2", "a1", "a3");
+        assertThat(afterDelete).isEqualTo(fromIndex);
+        assertThat(anyClosed).isTrue();
+        assertThat(rmas.isListIndexActive()).isFalse();
     }
 
     // V021 creates the list index without waiting for it; until dynamodb-local has built it a query can read nothing and

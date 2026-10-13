@@ -77,7 +77,7 @@ class RmaListRenderingTest {
         assertThat(html).contains("class=\"cl-stat-grid is-orders\"").contains("Do sprawdzenia").contains("(aktywny filtr)")
                 .containsPattern("<a class=\"cl-segment\" href=\"/dashboard/rma\"[^>]*aria-current=\"page\"")
                 .contains("cl-segment-count").contains("data-cl-filter-menu=\"status\"").contains("data-cl-filter-menu=\"dates\"")
-                .contains("placeholder=\"Numer, e-mail, nazwisko, firma\"").contains("cl-date-presets")
+                .contains("placeholder=\"Numer, e-mail, nazwisko albo firma\"").contains("cl-date-presets")
                 .containsPattern("value=\"ItemsReceived\"[^>]*checked");
     }
 
@@ -139,5 +139,23 @@ class RmaListRenderingTest {
                 .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"box\"").doesNotContain("class=\"tag")
                 .doesNotContain("class=\"table").doesNotContain("class=\"button").doesNotContain("th:utext")
                 .doesNotContain("<script th:inline").doesNotContain("pagination :: pagination(");
+    }
+
+    @Test
+    void aSearchTextIsEscapedInTheFieldChipScopeLineAndEmptyState() {
+        // given
+        String attack = "<script>alert(1)</script>\"'><img src=x onerror=alert(2)>";
+        RmaListQuery query = RmaListQuery.parse(new LinkedMultiValueMap<>(Map.of("q", List.of(attack))));
+        RmaListPage withScope = page(query, List.of(), null, new SearchScope("Brak RMA dla „" + attack + "”.", "Szukaj w starszych",
+                query.href()), List.of(new Chip("Szukane: " + attack, "/dashboard/rma", "Wyczyść: " + attack)), tiles());
+        RmaListPage withEmpty = page(query, List.of(), new EmptyState("Brak RMA dla „" + attack + "”.", List.of()), null, List.of(), tiles());
+
+        // when
+        String html = SettingsTemplateRenderer.render(RESULTS, Map.of("page", withScope))
+                + SettingsTemplateRenderer.render(RESULTS, Map.of("page", withEmpty));
+
+        // then
+        assertThat(html).doesNotContain("<script>alert(1)").doesNotContain("<img src=x")
+                .contains("&lt;script&gt;alert(1)&lt;/script&gt;");
     }
 }

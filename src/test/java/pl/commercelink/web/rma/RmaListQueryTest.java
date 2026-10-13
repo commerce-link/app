@@ -157,4 +157,21 @@ class RmaListQueryTest {
         assertThat(q.offset()).isEqualTo(25);
         assertThat(q.href()).contains("scope=active", "q=x", "after=", "offset=25").doesNotContain("before=");
     }
+
+    @Test
+    void oldMixedStatusesKeepTheActiveOnesAndALonePageIsNoOldAddress() {
+        // when / then
+        assertThat(RmaListQuery.legacyHref(params(Map.of("statuses", List.of("New,Completed")))))
+                .contains("/dashboard/rma?status=New");
+        assertThat(RmaListQuery.legacyHref(params(Map.of("page", List.of("3"))))).isEmpty();
+    }
+
+    @Test
+    void onlyAWholeUuidIsAWholeId() {
+        // when / then
+        assertThat(RmaListQuery.parse(params(Map.of("q", List.of("84788BE0-00FA-4DF9-B1C5-158CBC217F47")))).fullId())
+                .isEqualTo("84788be0-00fa-4df9-b1c5-158cbc217f47");
+        assertThat(RmaListQuery.parse(params(Map.of("q", List.of("84788be0")))).fullId()).isNull();
+        assertThat(RmaListQuery.parse(params(Map.of("q", List.of("84788be0-00fa-4df9-b1c5-158cbc217f4")))).fullId()).isNull();
+    }
 }

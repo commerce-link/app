@@ -111,6 +111,20 @@ class RmaRowMapperTest {
     }
 
     @Test
+    void aMarketplaceReturnWithoutTheMarketplaceNameShowsItsStatusAlone() {
+        // given
+        RMA rma = rma(RMAStatus.Approved, LocalDateTime.of(2026, 10, 12, 9, 0));
+        rma.setExternalReturnId("ret-1");
+        rma.setExternalReturnStatus(MarketplaceReturnStatus.IN_TRANSIT);
+
+        // when
+        RmaRow row = mapper.map(rma, TODAY);
+
+        // then
+        assertThat(row.marketplaceText()).isEqualTo("W drodze");
+    }
+
+    @Test
     void aDeliveredShipmentShowsTheDay() {
         // given
         RMA rma = rma(RMAStatus.ItemsReceived, LocalDateTime.of(2026, 10, 10, 9, 0));

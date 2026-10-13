@@ -81,4 +81,18 @@ class RmaListMessagesTest {
         // when / then
         assertThat(keys).allMatch(pl::containsKey).allMatch(en::containsKey);
     }
+
+    @Test
+    void theListKeysArePairedInBothLanguages() throws Exception {
+        // given
+        Properties pl = load("messages_pl.properties");
+        Properties en = load("messages_en.properties");
+
+        // when
+        Set<String> polish = pl.stringPropertyNames().stream().filter(k -> k.startsWith("rma.list.")).collect(java.util.stream.Collectors.toSet());
+        Set<String> english = en.stringPropertyNames().stream().filter(k -> k.startsWith("rma.list.")).collect(java.util.stream.Collectors.toSet());
+
+        // then
+        assertThat(polish).isNotEmpty().isEqualTo(english);
+    }
 }

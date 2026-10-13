@@ -57,6 +57,10 @@ class RmaListServiceTest {
             String prefix = call.getArgument(1);
             return store.stream().filter(r -> r.getRmaId().startsWith(prefix)).toList();
         });
+        lenient().when(repository.findById(eq("s1"), anyString())).thenAnswer(call ->
+                store.stream().filter(r -> r.getRmaId().equals(call.getArgument(1))).findFirst().orElse(null));
+        lenient().when(repository.findByOrderId(eq("s1"), anyString())).thenAnswer(call ->
+                store.stream().filter(r -> call.getArgument(1).equals(r.getOrderId())).toList());
     }
 
     private RMA add(String id, RMAStatus status, LocalDateTime createdAt, String email) {
@@ -367,7 +371,7 @@ class RmaListServiceTest {
     }
 
     @Test
-    void anOldClosedRmaIsFoundByAnEightCharacterPrefix() {
+    void anOldClosedRmaIsFoundByAnEightCharacterPrefixAndTheTextSearchStillOffersOlder() {
         // given
         for (int i = 0; i < 600; i++) {
             add(String.format("%08x-aaaa-bbbb-cccc-000000000000", 0x1000 + i), RMAStatus.Completed,
@@ -379,7 +383,74 @@ class RmaListServiceTest {
 
         // then
         assertThat(ids(page)).containsExactly("00001257-aaaa-bbbb-cccc-000000000000");
+        assertThat(page.scope().moreHref()).contains("offset=1");
+    }
+
+    @Test
+    void aWholeOrderIdFindsAnOldRmaAtOnceWhateverTheBatch() {
+        // given
+        for (int i = 0; i < 600; i++) {
+            add("c" + i, RMAStatus.Completed, LocalDateTime.of(2026, 10, 9, 12, 0).minusHours(i), "c@x.pl");
+        }
+        String orderId = "84788be0-00fa-4df9-b1c5-158cbc217f47";
+        store.get(599).setOrderId(orderId);
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of(orderId.toUpperCase())));
+
+        // then
+        assertThat(ids(page)).containsExactly("c599");
         assertThat(page.scope()).isNull();
+        assertThat(page.pagination().totalItems()).isEqualTo(1);
+        org.mockito.Mockito.verify(repository).findByOrderId("s1", orderId);
+    }
+
+    @Test
+    void aWholeIdThatMatchesNothingSaysSoWithoutOfferingOlder() {
+        // given
+        seedActiveAndClosed();
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of("84788be0-00fa-4df9-b1c5-158cbc217f47")));
+
+        // then
+        assertThat(page.rows()).isEmpty();
+        assertThat(page.scope()).isNull();
+        assertThat(page.emptyState().text()).startsWith("Brak RMA dla „84788be0-00fa-4df9-b1c5-158cbc217f47”.");
+    }
+
+    @Test
+    void anRmaNumberPrefixDoesNotHideAnRmaFoundByItsOrderNumber() {
+        // given
+        add("e2e0028a-b5dc-4d73-825b-f07aba661640", RMAStatus.Completed, LocalDateTime.of(2024, 12, 9, 21, 56), "k@x.pl");
+        add("f1", RMAStatus.Processing, LocalDateTime.of(2026, 10, 9, 9, 0), "z@x.pl").setOrderId("e2e0028a-ffff-4fff-8fff-ffffffffffff");
+
+        // when
+        RmaListPage page = page(Map.of("q", List.of("e2e0028a")));
+
+        // then
+        assertThat(ids(page)).containsExactly("f1", "e2e0028a-b5dc-4d73-825b-f07aba661640");
+    }
+
+    @Test
+    void thePagesAfterAnIdPrefixDoNotRepeatTheRmasItListed() {
+        // given
+        LocalDateTime base = LocalDateTime.of(2026, 10, 9, 12, 0);
+        for (int i = 0; i < 600; i++) {
+            add("c" + i, RMAStatus.Completed, base.minusHours(i), "c@x.pl");
+        }
+        store.get(10).setOrderId("x-abcd1234");
+        store.get(560).setOrderId("y-abcd1234");
+        add("abcd1234-0000-4000-8000-000000000000", RMAStatus.Completed, base.minusHours(580).minusMinutes(30), "a@x.pl");
+
+        // when
+        RmaListPage first = page(Map.of("q", List.of("abcd1234")));
+        RmaListPage more = page(params(first.scope().moreHref()));
+
+        // then
+        assertThat(ids(first)).containsExactly("c10", "abcd1234-0000-4000-8000-000000000000");
+        assertThat(first.scope().moreHref()).contains("offset=2");
+        assertThat(ids(more)).containsExactly("c560");
     }
 
     @Test
@@ -422,8 +493,10 @@ class RmaListServiceTest {
 
         // then
         assertThat(page.rows()).isEmpty();
-        assertThat(page.scope().text()).startsWith("Brak RMA dla „nobody” wśród zgłoszeń utworzonych od ");
+        assertThat(page.scope().text()).startsWith("Brak RMA dla „nobody” wśród zgłoszeń utworzonych od ")
+                .endsWith("Szukamy po numerze RMA i zamówienia, e-mailu, nazwisku i firmie.");
         assertThat(page.scope().moreHref()).isNotNull();
+        assertThat(page.resultsLine()).isEqualTo("RMA: 0");
     }
 
     @Test

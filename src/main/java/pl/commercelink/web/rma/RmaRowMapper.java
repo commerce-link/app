@@ -62,9 +62,7 @@ public class RmaRowMapper {
                 text("RMAStatus." + status.name()),
                 tone(status),
                 track(rma.getShipments()),
-                marketplace && rma.getExternalReturnStatus() != null
-                        ? text("rma.list.marketplace.status", rma.getMarketplace(), text("MarketplaceReturnStatus." + rma.getExternalReturnStatus().name()))
-                        : null,
+                marketplace ? marketplaceStatus(rma) : null,
                 rma.getCreatedAt() == null ? null : DAY.format(rma.getCreatedAt()),
                 age == null ? null : age == 0 ? text("rma.list.age.today") : age == 1 ? text("rma.list.age.one") : text("rma.list.age.days", age),
                 age != null && age >= STALE_AFTER_DAYS ? "is-warn" : null,
@@ -80,6 +78,15 @@ public class RmaRowMapper {
             case Completed -> "is-ok";
             case Rejected -> "is-neutral";
         };
+    }
+
+    /** "Allegro: W drodze"; a return whose marketplace name is missing shows the status alone, never "null: ...". */
+    private String marketplaceStatus(RMA rma) {
+        if (rma.getExternalReturnStatus() == null) {
+            return null;
+        }
+        String status = text("MarketplaceReturnStatus." + rma.getExternalReturnStatus().name());
+        return StringUtils.isBlank(rma.getMarketplace()) ? status : text("rma.list.marketplace.status", rma.getMarketplace(), status);
     }
 
     private String track(List<Shipment> shipments) {

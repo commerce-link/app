@@ -6,6 +6,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Repository;
 import com.amazonaws.AmazonClientException;
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
@@ -93,18 +95,35 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
             private final Deque<RMA> buffer = new ArrayDeque<>();
             private Map<String, AttributeValue> startKey;
             private boolean exhausted;
+            private boolean started;
+            private Iterator<RMA> partition;
 
             @Override
             public boolean hasNext() {
+                if (partition != null) {
+                    return partition.hasNext();
+                }
                 while (buffer.isEmpty() && !exhausted) {
-                    QueryResult page = amazonDynamoDB.query(new QueryRequest()
-                            .withTableName("RMA")
-                            .withIndexName(LIST_INDEX)
-                            .withKeyConditionExpression("storeId = :storeId AND rmaListSortKey BETWEEN :lo AND :hi")
-                            .withExpressionAttributeValues(values)
-                            .withScanIndexForward(!newestFirst)
-                            .withLimit(LIST_PAGE)
-                            .withExclusiveStartKey(startKey));
+                    QueryResult page;
+                    try {
+                        page = amazonDynamoDB.query(new QueryRequest()
+                                .withTableName("RMA")
+                                .withIndexName(LIST_INDEX)
+                                .withKeyConditionExpression("storeId = :storeId AND rmaListSortKey BETWEEN :lo AND :hi")
+                                .withExpressionAttributeValues(values)
+                                .withScanIndexForward(!newestFirst)
+                                .withLimit(LIST_PAGE)
+                                .withExclusiveStartKey(startKey));
+                    } catch (AmazonServiceException e) {
+                        // a range half read from the index cannot be finished from the partition without repeating rows
+                        if (started || !isMissingIndex(e)) {
+                            throw e;
+                        }
+                        indexGone(e);
+                        partition = partitionRange(storeId, lo, hi, newestFirst);
+                        return partition.hasNext();
+                    }
+                    started = true;
                     for (Map<String, AttributeValue> item : page.getItems()) {
                         RMA rma = dynamoDBMapper.marshallIntoObject(RMA.class, item);
                         AttributeValue stored = item.get("rmaListSortKey");
@@ -123,7 +142,7 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 }
-                return buffer.poll();
+                return partition != null ? partition.next() : buffer.poll();
             }
         };
     }
@@ -147,14 +166,38 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
         if (!isListIndexActive()) {
             return partitionRange(storeId, lo, hi, true).hasNext();
         }
-        QueryResult page = amazonDynamoDB.query(new QueryRequest()
-                .withTableName("RMA")
-                .withIndexName(LIST_INDEX)
-                .withKeyConditionExpression("storeId = :storeId AND rmaListSortKey BETWEEN :lo AND :hi")
-                .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue(storeId),
-                        ":lo", new AttributeValue(lo), ":hi", new AttributeValue(hi)))
-                .withLimit(1));
-        return !page.getItems().isEmpty();
+        try {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("RMA")
+                    .withIndexName(LIST_INDEX)
+                    .withKeyConditionExpression("storeId = :storeId AND rmaListSortKey BETWEEN :lo AND :hi")
+                    .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue(storeId),
+                            ":lo", new AttributeValue(lo), ":hi", new AttributeValue(hi)))
+                    .withLimit(1));
+            return !page.getItems().isEmpty();
+        } catch (AmazonServiceException e) {
+            if (!isMissingIndex(e)) {
+                throw e;
+            }
+            indexGone(e);
+            return partitionRange(storeId, lo, hi, true).hasNext();
+        }
+    }
+
+    /**
+     * The index was deleted while the application runs (e.g. by hand, before a rollback): the list goes back to the
+     * partition read instead of failing, and asks for the index again after INDEX_CHECK_MILLIS, like before it was built.
+     */
+    private void indexGone(AmazonServiceException e) {
+        log.warn("RMA list index {} is gone, the list reads the store partition: {}", LIST_INDEX, e.getErrorMessage());
+        listIndexActive = false;
+        listIndexCheckedAt = clockMillis.getAsLong();
+    }
+
+    // DynamoDB answers a query of a missing index with ValidationException "The table does not have the specified index"
+    static boolean isMissingIndex(AmazonServiceException e) {
+        return e instanceof ResourceNotFoundException || ("ValidationException".equals(e.getErrorCode())
+                && e.getErrorMessage() != null && e.getErrorMessage().contains("specified index"));
     }
 
     /**
@@ -175,6 +218,19 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
             startKey = page.getLastEvaluatedKey();
         } while (startKey != null && !startKey.isEmpty());
         return found;
+    }
+
+    /**
+     * The store's RMAs of this order. There is no index on orderId, so the store's partition is read, but the filter runs
+     * in DynamoDB and only the matches come back: the cost of the list before the redesign, paid only when a whole order
+     * id is searched.
+     */
+    public List<RMA> findByOrderId(String storeId, String orderId) {
+        DynamoDBQueryExpression<RMA> query = new DynamoDBQueryExpression<RMA>()
+                .withKeyConditionExpression("storeId = :storeId")
+                .withFilterExpression("orderId = :orderId")
+                .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue(storeId), ":orderId", new AttributeValue(orderId)));
+        return new java.util.ArrayList<>(dynamoDBMapper.query(RMA.class, query));
     }
 
     public RMA findById(String storeId, String rmaId) {

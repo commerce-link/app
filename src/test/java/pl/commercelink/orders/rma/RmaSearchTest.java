@@ -40,6 +40,18 @@ class RmaSearchTest {
     }
 
     @Test
+    void matchesWithoutPolishDiacriticsEitherWay() {
+        // when / then
+        assertThat(RmaSearch.matches(rma(), "lukasz")).isTrue();
+        assertThat(RmaSearch.matches(rma(), "ŁUKASZ")).isTrue();
+        assertThat(RmaSearch.matches(rma(), "graficzne")).isTrue();
+        RMA zielinska = rma();
+        zielinska.getShippingDetails().setSurname("Zielińska-Ćwiek");
+        assertThat(RmaSearch.matches(zielinska, "zielinska-cwiek")).isTrue();
+        assertThat(RmaSearch.matches(zielinska, "zielińska")).isTrue();
+    }
+
+    @Test
     void aBareRmaMatchesOnlyItsId() {
         // given
         RMA bare = new RMA();

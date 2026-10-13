@@ -48,16 +48,17 @@ public class RmaListService {
 
     private record TileDef(String key, Set<RMAStatus> statuses) { }
 
+    /** resume: the position a search goes on from (the last RMA it looked at), null when it is complete. */
     private record Result(List<RMA> rmas, int offset, String previousHref, String nextHref, Long total,
-                          LocalDate scannedUntil, String moreHref) {
+                          LocalDate scannedUntil, String moreHref, RmaCursor resume) {
         static Result of(List<RMA> rmas, int offset, String previousHref, String nextHref, Long total) {
-            return new Result(rmas, offset, previousHref, nextHref, total, null, null);
+            return new Result(rmas, offset, previousHref, nextHref, total, null, null, null);
         }
     }
 
     public RmaListPage page(String storeId, RmaListQuery q, LocalDate today, Locale locale) {
         List<RMA> allActive = drain(rmas.listRange(storeId, ACTIVE, upperBound(ACTIVE, null), true));
-        Result result = q.q() != null ? byId(storeId, q, today).orElseGet(() -> search(storeId, q, allActive, today))
+        Result result = q.q() != null ? find(storeId, q, allActive, today)
                 : q.effectiveScope() == Scope.CLOSED ? browseClosed(storeId, q, today)
                 : browseActive(q, allActive, today);
         RmaRowMapper mapper = new RmaRowMapper(messages, locale);
@@ -72,7 +73,8 @@ public class RmaListService {
         boolean storeEmpty = allActive.isEmpty() && !q.isFiltered() && rows.isEmpty() && q.offset() == 0
                 && !rmas.hasAnyInRange(storeId, lowerBound(CLOSED, null), upperBound(CLOSED, null));
         EmptyState empty = rows.isEmpty() && scope == null ? emptyState(q, storeEmpty, locale) : null;
-        String results = rows.isEmpty() ? ""
+        // a batch that found nothing still says so to a screen reader ("RMA: 0"), like an empty list of the archive
+        String results = rows.isEmpty() ? (scope == null ? "" : text(locale, "rma.list.results", 0))
                 : pager.openEnded() ? text(locale, "rma.list.results.range", pager.fromIndex() + 1, pager.toIndex())
                 : text(locale, "rma.list.results", pager.totalItems());
         return new RmaListPage(q, storeEmpty ? List.of() : tiles(q, allActive, locale), segments(q, allActive.size(), locale),
@@ -118,22 +120,56 @@ public class RmaListService {
     }
 
     /**
-     * A search that looks like an RMA id is first a key query on the table, so an RMA is found whatever its age and not
-     * only within the SEARCH_BATCH window (same idea as OrderArchiveService.byNumber). Nothing found falls back to the
-     * text search, which still finds an order number or a reference.
+     * A whole id (UUID) is looked up exactly, as the RMA id and as the order id, so an RMA is found at once whatever its
+     * age, which the list before the redesign did for an order id and the SEARCH_BATCH window would not. A search that
+     * looks like the start of an RMA id is the text search plus every RMA whose id starts with it (a key query, same idea
+     * as OrderArchiveService.byNumber): the ones older than the batch are added to the first page, and the following
+     * pages leave them out, so an RMA found by its order number is never hidden behind one found by its own number.
      */
-    private Optional<Result> byId(String storeId, RmaListQuery q, LocalDate today) {
-        String prefix = q.idPrefix();
-        if (prefix == null || q.offset() > 0 || q.after() != null) {
-            return Optional.empty();
+    private Result find(String storeId, RmaListQuery q, List<RMA> allActive, LocalDate today) {
+        boolean firstPage = q.offset() == 0 && q.after() == null;
+        if (q.fullId() != null && firstPage) {
+            return byFullId(storeId, q, q.fullId(), today);
         }
+        String prefix = q.idPrefix();
+        if (prefix == null) {
+            return search(storeId, q, allActive, today, r -> false);
+        }
+        if (!firstPage) {
+            return search(storeId, q, allActive, today, r -> idStartsWith(r, prefix));
+        }
+        Result found = search(storeId, q, allActive, today, r -> false);
+        Set<String> shown = found.rmas().stream().map(RMA::getRmaId).collect(Collectors.toSet());
+        List<RMA> older = rmas.findByIdPrefix(storeId, prefix).stream()
+                .filter(r -> !shown.contains(r.getRmaId()) && q.accepts(r.getStatus()) && withinDates(r, q, today))
+                .sorted(Comparator.comparing(RmaListService::position).reversed())
+                .toList();
+        if (older.isEmpty()) {
+            return found;
+        }
+        // the search stopped before these (it reads newest first), so they follow its rows in the list's order
+        List<RMA> rows = new ArrayList<>(found.rmas());
+        rows.addAll(older);
+        String next = found.nextHref() == null ? null : q.after(found.resume(), rows.size()).href();
+        String more = found.moreHref() == null ? null : q.after(found.resume(), rows.size()).href();
+        Long total = found.total() == null ? null : (long) rows.size();
+        return new Result(rows, 0, found.previousHref(), next, total, found.scannedUntil(), more, found.resume());
+    }
+
+    private Result byFullId(String storeId, RmaListQuery q, String id, LocalDate today) {
+        Map<String, RMA> found = new LinkedHashMap<>();
+        Optional.ofNullable(rmas.findById(storeId, id)).ifPresent(r -> found.put(r.getRmaId(), r));
+        rmas.findByOrderId(storeId, id).forEach(r -> found.putIfAbsent(r.getRmaId(), r));
         // q.accepts also applies the scope: an active search never lists a closed RMA and the other way round
-        List<RMA> found = rmas.findByIdPrefix(storeId, prefix).stream()
+        List<RMA> rows = found.values().stream()
                 .filter(r -> q.accepts(r.getStatus()) && withinDates(r, q, today))
                 .sorted(Comparator.comparing(RmaListService::position).reversed())
-                .limit(PAGE)
                 .toList();
-        return found.isEmpty() ? Optional.empty() : Optional.of(Result.of(found, 0, null, null, (long) found.size()));
+        return Result.of(rows, 0, null, null, (long) rows.size());
+    }
+
+    private static boolean idStartsWith(RMA rma, String prefix) {
+        return rma.getRmaId() != null && rma.getRmaId().toLowerCase(Locale.ROOT).startsWith(prefix);
     }
 
     /**
@@ -141,7 +177,7 @@ public class RmaListService {
      * newest first across both. When SEARCH_BATCH closed RMAs have been looked at, it stops before anything older than
      * the last one read: the next request continues from there.
      */
-    private Result search(String storeId, RmaListQuery q, List<RMA> allActive, LocalDate today) {
+    private Result search(String storeId, RmaListQuery q, List<RMA> allActive, LocalDate today, Predicate<RMA> skip) {
         String cursor = q.after() == null ? null : q.after().position();
         Iterator<RMA> active = q.searchesActive()
                 ? allActive.stream().filter(r -> cursor == null || position(r).compareTo(cursor) < 0).iterator()
@@ -174,7 +210,7 @@ public class RmaListService {
                 continue;
             }
             last = next;
-            if (q.accepts(next.getStatus()) && withinDates(next, q, today) && RmaSearch.matches(next, q.q())) {
+            if (!skip.test(next) && q.accepts(next.getStatus()) && withinDates(next, q, today) && RmaSearch.matches(next, q.q())) {
                 matched.add(next);
             }
         }
@@ -184,10 +220,11 @@ public class RmaListService {
         if (batchSpent && last != null) {
             LocalDate until = last.getCreatedAt() == null ? today : last.getCreatedAt().toLocalDate();
             return new Result(matched, q.offset(), previous, null, null, until,
-                    q.after(RmaCursor.of(last), q.offset() + matched.size()).href());
+                    q.after(RmaCursor.of(last), q.offset() + matched.size()).href(), RmaCursor.of(last));
         }
         if (matched.size() == PAGE && more) {
-            return Result.of(matched, q.offset(), previous, q.after(RmaCursor.of(last), q.offset() + PAGE).href(), null);
+            return new Result(matched, q.offset(), previous, q.after(RmaCursor.of(last), q.offset() + PAGE).href(), null,
+                    null, null, RmaCursor.of(last));
         }
         Long total = q.offset() == 0 ? (long) matched.size() : null;
         return Result.of(matched, q.offset(), previous, null, total);
