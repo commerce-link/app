@@ -12338,7 +12338,7 @@ a.cl-link-button:hover {
     font-size: 13.5px;
 }
 
-/* Reports (app#NNN): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
+/* Reports (app#290): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
    docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
 :root {
     --cl-chart-1: var(--cl-supplier-1);
