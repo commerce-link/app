@@ -13194,7 +13194,10 @@ a.cl-link-button:hover {
 @media screen and (max-width: 719px) {
     /* checkbox beside the item name, the quantity and price rows below it */
     .cl-page .cl-table.is-rma-items tbody tr.cl-row-main {
+        display: grid;
         grid-template-columns: 44px minmax(0, 1fr);
+        column-gap: 8px;
+        align-items: start;
     }
 
     .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check {

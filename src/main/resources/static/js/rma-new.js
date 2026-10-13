@@ -15,7 +15,9 @@
     // Same output as the server's Money.format in both languages (non-breaking space groups, comma decimal); Intl would
     // leave 4-digit amounts ungrouped in Polish.
     function formatMoney(amount) {
-        const fixed = (Math.round(amount * 100) / 100).toFixed(2);
+        // toPrecision(15) drops the binary noise (1.005 * 100 = 100.49999999999999) so half cents round up like HALF_UP
+        const cents = Math.round(Number((amount * 100).toPrecision(15)));
+        const fixed = (cents / 100).toFixed(2);
         const [whole, cents] = fixed.split('.');
         return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + cents;
     }
@@ -92,7 +94,6 @@
             event.preventDefault();
             event.stopImmediatePropagation();
             emptyHelp.hidden = false;
-            emptyHelp.setAttribute('role', 'status');
         }
     }, true);
 })();

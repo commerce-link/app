@@ -230,7 +230,7 @@
         </button>
         <p th:if="${p.summary().canCreate()}" class="cl-help" id="create-help" th:text="#{rma.new.create.help}"></p>
         <p th:unless="${p.summary().canCreate()}" class="cl-help is-warn" id="create-blocked" th:text="#{rma.new.create.blocked}"></p>
-        <p class="cl-help is-warn" id="rma-empty-help" hidden th:text="#{rma.new.create.empty}"></p>
+        <p class="cl-help is-warn" id="rma-empty-help" role="status" hidden th:text="#{rma.new.create.empty}"></p>
         <a class="cl-button" th:href="@{${p.backHref()}}" th:text="#{rma.new.cancel}"></a>
     </div>
 </section>
