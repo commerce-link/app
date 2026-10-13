@@ -11,6 +11,7 @@
     const pieces = form.querySelector('[data-cl-rma-pieces]');
     const value = form.querySelector('[data-cl-rma-value]');
     const emptyHelp = document.getElementById('rma-empty-help');
+    const status = form.querySelector('[data-cl-rma-status]');
 
     // Same output as the server's Money.format in both languages (non-breaking space groups, comma decimal); Intl would
     // leave 4-digit amounts ungrouped in Polish.
@@ -65,6 +66,7 @@
         value.textContent = formatMoney(amount);
         if (items > 0) {
             emptyHelp.hidden = true;
+            status.textContent = '';
         }
     }
 
@@ -94,6 +96,9 @@
             event.preventDefault();
             event.stopImmediatePropagation();
             emptyHelp.hidden = false;
+            // emptied first and filled a moment later, so a screen reader announces every refused submit, not only the first
+            status.textContent = '';
+            setTimeout(() => { status.textContent = emptyHelp.textContent; }, 100);
         }
     }, true);
 })();

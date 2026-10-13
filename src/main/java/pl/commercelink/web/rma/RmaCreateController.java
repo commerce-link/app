@@ -1,12 +1,16 @@
 package pl.commercelink.web.rma;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.InvalidPropertyException;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -22,6 +26,7 @@ import pl.commercelink.orders.rma.RmaOrderSearch;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.RmaCreateForm;
 
+import java.io.IOException;
 import java.util.Locale;
 
 @Controller
@@ -48,6 +53,7 @@ public class RmaCreateController {
                        @RequestParam(required = false) String orderId,
                        @RequestParam(required = false) String serialNo,
                        @RequestParam(required = false, name = "byEmail") String byEmail,
+                       @RequestParam(required = false) String serial,
                        Model model, Locale locale) {
         // addresses of the page before the redesign keep working
         String legacy = StringUtils.firstNonBlank(orderId, serialNo, byEmail);
@@ -61,7 +67,7 @@ public class RmaCreateController {
             return "redirect:" + target.encode().buildAndExpand(legacy.trim(), from).toUriString();
         }
         String storeId = storeId();
-        model.addAttribute("page", pages.build(storeId, search.search(storeId, q), from, locale));
+        model.addAttribute("page", pages.build(storeId, search.search(storeId, q), from, serial, locale));
         return "rma-new";
     }
 
@@ -73,7 +79,7 @@ public class RmaCreateController {
             redirect.addFlashAttribute("successMessage", messages.getMessage("rma.create.success", null, locale));
             return "redirect:/dashboard/rma/" + outcome.rmaId();
         }
-        Order order = form.getOrderId() == null ? null : orders.findById(storeId, form.getOrderId());
+        Order order = RmaCreateService.readableOrderId(form.getOrderId()) ? orders.findById(storeId, form.getOrderId()) : null;
         if (order == null || !order.isEligibleForRMACreation()) {
             // the service may have seen the order eligible and rejected only the fields, then it changed before this read
             String errorKey = outcome.pageErrorKey() == null ? RmaCreateService.ORDER_GONE : outcome.pageErrorKey();
@@ -83,6 +89,12 @@ public class RmaCreateController {
         }
         model.addAttribute("page", pages.rebuild(storeId, order, form, outcome, locale));
         return "rma-new";
+    }
+
+    // an item index the page never prints (negative, or past the binder's 256 rows) only comes from a crafted request
+    @ExceptionHandler(InvalidPropertyException.class)
+    void refuseCraftedIndex(HttpServletResponse response) throws IOException {
+        response.sendError(HttpStatus.BAD_REQUEST.value());
     }
 
     private String storeId() {

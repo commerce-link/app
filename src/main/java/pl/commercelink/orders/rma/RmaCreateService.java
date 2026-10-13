@@ -34,8 +34,16 @@ public class RmaCreateService {
         }
     }
 
+    /**
+     * Whether a posted order id can be looked up at all: a crafted one longer than any order id would break DynamoDB's
+     * 1024-byte key limit, so it is treated as an order that is gone, without a read.
+     */
+    public static boolean readableOrderId(String orderId) {
+        return orderId != null && !orderId.isBlank() && orderId.length() <= RmaOrderSearch.MAX_QUERY;
+    }
+
     public Outcome create(String storeId, RmaCreateForm form) {
-        Order order = form.getOrderId() == null ? null : orders.findById(storeId, form.getOrderId());
+        Order order = readableOrderId(form.getOrderId()) ? orders.findById(storeId, form.getOrderId()) : null;
         if (order == null || !order.isEligibleForRMACreation()) {
             return new Outcome(null, ORDER_GONE, List.of());
         }

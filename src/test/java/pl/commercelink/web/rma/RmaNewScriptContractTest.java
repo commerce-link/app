@@ -26,7 +26,8 @@ class RmaNewScriptContractTest {
 
         // then
         for (String hook : new String[]{"data-cl-rma-new", "data-cl-rma-item", "data-cl-rma-select", "data-cl-rma-qty",
-                "data-cl-rma-detail", "data-cl-rma-count", "data-cl-rma-pieces", "data-cl-rma-value", "rma-empty-help"}) {
+                "data-cl-rma-detail", "data-cl-rma-count", "data-cl-rma-pieces", "data-cl-rma-value", "rma-empty-help",
+                "data-cl-rma-status"}) {
             assertThat(js).as(hook).contains(hook);
             assertThat(template).as(hook).contains(hook);
         }
@@ -46,6 +47,6 @@ class RmaNewScriptContractTest {
         assertThat(end).isGreaterThan(start);
         String block = css.substring(start, end);
         assertThat(block.lines().filter(l -> l.startsWith(".cl-page") || l.startsWith("    .cl-page")))
-                .allMatch(l -> l.contains("is-rma-items") || l.contains("is-rma-orders") || l.contains("cl-rma-item-fields"));
+                .allMatch(l -> l.contains("is-rma-items") || l.contains("is-rma-order") || l.contains("cl-rma-item-fields"));
     }
 }

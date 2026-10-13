@@ -60,9 +60,9 @@ class RmaCreateControllerTest {
     @Test
     void oldParametersRedirectToTheSearch() {
         // when
-        String byOrder = asStore(() -> controller.show(null, null, "abc-1", null, null, new ExtendedModelMap(), PL));
-        String bySerial = asStore(() -> controller.show(null, "order", null, "SN 1/2", null, new ExtendedModelMap(), PL));
-        String byEmail = asStore(() -> controller.show(null, null, null, null, "a+b@x.pl", new ExtendedModelMap(), PL));
+        String byOrder = asStore(() -> controller.show(null, null, "abc-1", null, null, null, new ExtendedModelMap(), PL));
+        String bySerial = asStore(() -> controller.show(null, "order", null, "SN 1/2", null, null, new ExtendedModelMap(), PL));
+        String byEmail = asStore(() -> controller.show(null, null, null, null, "a+b@x.pl", null, new ExtendedModelMap(), PL));
 
         // then
         assertThat(byOrder).isEqualTo("redirect:/dashboard/rma/new?q=abc-1");
@@ -76,11 +76,11 @@ class RmaCreateControllerTest {
         RmaOrderSearch.Result result = new RmaOrderSearch.Result(RmaOrderSearch.Kind.EMPTY, null, false, null, null, List.of(), false);
         RmaNewPage page = mock(RmaNewPage.class);
         when(search.search(STORE, "x")).thenReturn(result);
-        when(pages.build(STORE, result, "order", PL)).thenReturn(page);
+        when(pages.build(STORE, result, "order", null, PL)).thenReturn(page);
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = asStore(() -> controller.show("x", "order", null, null, null, model, PL));
+        String view = asStore(() -> controller.show("x", "order", null, null, null, null, model, PL));
 
         // then
         assertThat(view).isEqualTo("rma-new");
@@ -190,5 +190,51 @@ class RmaCreateControllerTest {
 
         // then
         assertThat(binder.getAllowedFields()).containsExactlyInAnyOrder("orderId", "email", "from", "items*");
+    }
+
+    @Test
+    void anOrderChosenFromASerialListPassesTheSerialToThePage() {
+        // given
+        RmaOrderSearch.Result result = new RmaOrderSearch.Result(RmaOrderSearch.Kind.EMPTY, null, false, null, null, List.of(), false);
+        RmaNewPage page = mock(RmaNewPage.class);
+        when(search.search(STORE, "abc-1")).thenReturn(result);
+        when(pages.build(STORE, result, null, "SN-1", PL)).thenReturn(page);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStore(() -> controller.show("abc-1", null, null, null, null, "SN-1", model, PL));
+
+        // then
+        assertThat(model.get("page")).isSameAs(page);
+    }
+
+    @Test
+    void aCraftedItemIndexIsABadRequest() throws Exception {
+        // given
+        jakarta.servlet.http.HttpServletResponse response = mock(jakarta.servlet.http.HttpServletResponse.class);
+
+        // when
+        controller.refuseCraftedIndex(response);
+
+        // then
+        verify(response).sendError(400);
+    }
+
+    @Test
+    void anOverlongOrderIdIsNotReadAfterARejectedSubmit() {
+        // given
+        String overlong = "e".repeat(2000);
+        RmaCreateForm form = new RmaCreateForm();
+        form.setOrderId(overlong);
+        when(service.create(STORE, form)).thenReturn(new RmaCreateService.Outcome(null, RmaCreateService.ORDER_GONE, List.of()));
+        RmaOrderSearch.Result notFound = new RmaOrderSearch.Result(RmaOrderSearch.Kind.NOT_FOUND, overlong, false, null, null, List.of(), false);
+        when(search.search(STORE, overlong)).thenReturn(notFound);
+        when(pages.build(STORE, notFound, null, PL)).thenReturn(mock(RmaNewPage.class));
+
+        // when
+        asStore(() -> controller.create(form, new ExtendedModelMap(), redirect, PL));
+
+        // then
+        verify(orders, never()).findById(any(), any());
     }
 }

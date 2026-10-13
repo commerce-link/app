@@ -136,6 +136,69 @@ class RmaNewPageFactoryTest {
     }
 
     @Test
+    void aChoiceFoundBySerialKeepsTheSerialAndTheWayBackInItsLinks() {
+        // given
+        Order other = order(OrderStatus.Delivered);
+        other.setOrderId("1f2e3d4c-0000-4000-8000-000000000002");
+        RmaOrderSearch.Result bySerial = new RmaOrderSearch.Result(RmaOrderSearch.Kind.CHOICE, "SN 1/2", false, null, null,
+                List.of(order(OrderStatus.Delivered), other), false);
+        RmaOrderSearch.Result byPrefix = new RmaOrderSearch.Result(RmaOrderSearch.Kind.CHOICE, "8C1D0291", false, null, null,
+                List.of(order(OrderStatus.Delivered)), false);
+
+        // when
+        RmaNewPage serialPage = factory.build(STORE, bySerial, "order", PL);
+        RmaNewPage prefixPage = factory.build(STORE, byPrefix, null, PL);
+
+        // then
+        assertThat(serialPage.choice().rows().get(0).href())
+                .isEqualTo("/dashboard/rma/new?q=" + ORDER_ID + "&from=order&serial=SN%201%2F2");
+        assertThat(serialPage.from()).isEqualTo("order");
+        assertThat(prefixPage.choice().rows().get(0).href()).isEqualTo("/dashboard/rma/new?q=" + ORDER_ID);
+    }
+
+    @Test
+    void anOrderChosenFromASerialListTicksTheItemWithThatSerial() {
+        // given
+        when(orderItems.findByOrderIdAndStatuses(ORDER_ID, RmaCreateService.REPORTABLE))
+                .thenReturn(List.of(item("i1", null, 1), item("i2", "SN-9, SN-1", 1)));
+        when(coverage.claims(STORE, List.of("i1", "i2"))).thenReturn(Map.of());
+        RmaOrderSearch.Result full = new RmaOrderSearch.Result(RmaOrderSearch.Kind.ORDER, ORDER_ID, false, order(OrderStatus.Delivered), null, List.of(), false);
+
+        // when
+        RmaNewPage page = factory.build(STORE, full, null, "SN-1", PL);
+
+        // then
+        assertThat(page.items()).extracting(RmaNewPage.ItemRow::selected).containsExactly(false, true);
+    }
+
+    @Test
+    void anErrorOnAnItemPostedUnderAnotherIndexIsShownAtItsRow() {
+        // given
+        when(orderItems.findByOrderIdAndStatuses(ORDER_ID, RmaCreateService.REPORTABLE)).thenReturn(List.of(item("i1", null, 2)));
+        when(coverage.claims(STORE, List.of("i1"))).thenReturn(Map.of());
+        List<RmaCreateForm.Item> items = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            items.add(new RmaCreateForm.Item());
+        }
+        items.get(5).setItemId("i1");
+        items.get(5).setSelected(true);
+        items.get(5).setQty("1");
+        RmaCreateForm form = new RmaCreateForm();
+        form.setOrderId(ORDER_ID);
+        form.setEmail("anna@x.pl");
+        form.setItems(items);
+        RmaCreateService.Outcome outcome = new RmaCreateService.Outcome(null, null, List.of(
+                new RmaCreateForm.Error("items5.resolution", "rma.new.error.resolution", new Object[0], "Produkt i1")));
+
+        // when
+        RmaNewPage page = factory.rebuild(STORE, order(OrderStatus.Delivered), form, outcome, PL);
+
+        // then
+        assertThat(page.fieldErrors()).containsOnlyKeys("items0.resolution");
+        assertThat(page.errorSummary()).containsOnlyKeys("items0.resolution");
+    }
+
+    @Test
     void aRejectedSubmitKeepsWhatWasTypedAndNamesTheItemInTheSummary() {
         // given
         when(orderItems.findByOrderIdAndStatuses(ORDER_ID, RmaCreateService.REPORTABLE)).thenReturn(List.of(item("i1", null, 2)));

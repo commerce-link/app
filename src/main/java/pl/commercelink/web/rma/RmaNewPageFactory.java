@@ -9,6 +9,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.SerialNumbers;
 import pl.commercelink.orders.rma.OpenRmaCoverage;
 import pl.commercelink.orders.rma.RmaCreateService;
 import pl.commercelink.orders.rma.RmaOrderSearch;
@@ -26,6 +27,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -34,31 +37,39 @@ import java.util.stream.Stream;
 public class RmaNewPageFactory {
 
     static final String FROM_ORDER = "order";
+    private static final Pattern ITEM_FIELD = Pattern.compile("items(\\d+)\\.(\\w+)");
 
     private final OrderItemsRepository orderItems;
     private final OpenRmaCoverage coverage;
     private final MessageSource messages;
 
     public RmaNewPage build(String storeId, RmaOrderSearch.Result result, String from, Locale locale) {
+        return build(storeId, result, from, null, locale);
+    }
+
+    /** serial: the serial number an order was chosen by from a list, so its item is ticked as when it is the only hit. */
+    public RmaNewPage build(String storeId, RmaOrderSearch.Result result, String from, String serial, Locale locale) {
         return switch (result.kind()) {
             case EMPTY -> page(RmaNewPage.State.START, null, null, from, msg("rma.new.lead", locale), locale);
             case NOT_FOUND -> notFound(result, from, locale);
             case CHOICE -> choice(result, from, locale);
             case ORDER -> result.order().isEligibleForRMACreation()
-                    ? orderPage(storeId, result.order(), result.query(), from, result.serialItemId(), null, null, locale)
+                    ? orderPage(storeId, result.order(), result.query(), from, result.serialItemId(), serial, null, null, locale)
                     : ineligible(result, from, locale);
         };
     }
 
     public RmaNewPage rebuild(String storeId, Order order, RmaCreateForm form, RmaCreateService.Outcome outcome, Locale locale) {
-        return orderPage(storeId, order, order.getOrderId(), form.getFrom(), null, form, outcome, locale);
+        return orderPage(storeId, order, order.getOrderId(), form.getFrom(), null, null, form, outcome, locale);
     }
 
     private RmaNewPage page(RmaNewPage.State state, String query, Order order, String from, String lead, Locale locale) {
-        boolean fromOrder = FROM_ORDER.equals(from) && order != null;
+        // from=order travels with every search, also through a list or "not found", until an order is shown
+        boolean fromOrder = FROM_ORDER.equals(from);
+        boolean backToOrder = fromOrder && order != null;
         return new RmaNewPage(state, query,
-                fromOrder ? "/dashboard/orders/" + order.getOrderId() : "/dashboard/rma",
-                fromOrder ? msg("rma.new.back.order", locale, ConversionUtil.getShortenedId(order.getOrderId())) : msg("rma.new.back.list", locale),
+                backToOrder ? "/dashboard/orders/" + order.getOrderId() : "/dashboard/rma",
+                backToOrder ? msg("rma.new.back.order", locale, ConversionUtil.getShortenedId(order.getOrderId())) : msg("rma.new.back.list", locale),
                 fromOrder ? FROM_ORDER : null, lead, null, null, null, null, List.of(), null, null, null, Map.of(), Map.of());
     }
 
@@ -69,7 +80,12 @@ public class RmaNewPageFactory {
     }
 
     private RmaNewPage choice(RmaOrderSearch.Result result, String from, Locale locale) {
-        List<RmaNewPage.ChoiceRow> rows = result.orders().stream().map(this::choiceRow).toList();
+        // a list found by serial number (no order id starts with the query) keeps it, so the chosen order ticks that item
+        String lowerQuery = result.query().toLowerCase(Locale.ROOT);
+        String serial = !result.byEmail() && result.orders().stream().noneMatch(o -> o.getOrderId().startsWith(lowerQuery))
+                ? result.query() : null;
+        String keptFrom = FROM_ORDER.equals(from) ? FROM_ORDER : null;
+        List<RmaNewPage.ChoiceRow> rows = result.orders().stream().map(o -> choiceRow(o, keptFrom, serial)).toList();
         String lead = result.byEmail()
                 ? msg("rma.new.lead.choice.email", locale, result.query(), rows.size())
                 : msg("rma.new.lead.choice.match", locale, rows.size());
@@ -80,12 +96,12 @@ public class RmaNewPageFactory {
         return with(base, null, choice, null, null, List.of(), null, null, null, Map.of(), Map.of());
     }
 
-    private RmaNewPage.ChoiceRow choiceRow(Order order) {
+    private RmaNewPage.ChoiceRow choiceRow(Order order, String from, String serial) {
         boolean eligible = order.isEligibleForRMACreation();
         String unavailable = eligible ? null : order.hasStatus(OrderStatus.Cancelled)
                 ? "rma.new.choice.unavailable.cancelled" : "rma.new.choice.unavailable.early";
         return new RmaNewPage.ChoiceRow(ConversionUtil.getShortenedId(order.getOrderId()), order.getOrderId(),
-                eligible ? searchHref(order.getOrderId()) : null, OrderFormats.date(order.getOrderedAt()),
+                eligible ? searchHref(order.getOrderId(), from, serial) : null, OrderFormats.date(order.getOrderedAt()),
                 OrderLabels.status(order.getStatus()), OrderLabels.tone(order.getStatus()), Money.format(order.getTotalPrice()),
                 unavailable);
     }
@@ -103,9 +119,13 @@ public class RmaNewPageFactory {
         return with(base, header(order, locale), null, null, ineligible, List.of(), null, null, null, Map.of(), Map.of());
     }
 
-    private RmaNewPage orderPage(String storeId, Order order, String query, String from, String serialItemId,
+    private RmaNewPage orderPage(String storeId, Order order, String query, String from, String serialItemId, String serial,
                                  RmaCreateForm form, RmaCreateService.Outcome outcome, Locale locale) {
         List<OrderItem> reportable = orderItems.findByOrderIdAndStatuses(order.getOrderId(), RmaCreateService.REPORTABLE);
+        if (serialItemId == null && serial != null) {
+            serialItemId = reportable.stream().filter(i -> SerialNumbers.contains(i.getSerialNo(), serial))
+                    .map(OrderItem::getItemId).findFirst().orElse(null);
+        }
         Map<String, String> claims = coverage.claims(storeId, reportable.stream().map(OrderItem::getItemId).toList());
         List<RmaNewPage.ItemRow> rows = new ArrayList<>();
         for (int i = 0; i < reportable.size(); i++) {
@@ -136,13 +156,33 @@ public class RmaNewPageFactory {
             pageError = outcome.pageErrorKey() == null ? null : msg(outcome.pageErrorKey(), locale);
             for (RmaCreateForm.Error error : outcome.errors()) {
                 String text = messages.getMessage(error.key(), error.args(), locale);
-                fieldErrors.put(error.field(), text);
-                summaryErrors.put(error.field(), error.itemName() == null ? text : error.itemName() + " — " + text);
+                String field = rowField(error.field(), form, rows);
+                fieldErrors.put(field, text);
+                summaryErrors.put(field, error.itemName() == null ? text : error.itemName() + " — " + text);
             }
         }
         String lead = msg("rma.new.lead.order", locale);
         RmaNewPage base = page(RmaNewPage.State.ORDER, query, order, from, lead, locale);
         return with(base, header(order, locale), null, null, null, rows, emptyText, summary, pageError, summaryErrors, fieldErrors);
+    }
+
+    /**
+     * The posted form names an item field by its index in the request; the page prints the fields by the item's row.
+     * They differ when the order's items changed after the page was opened (or the request was crafted), so the error
+     * is moved to the row of the same item, which keeps the summary's links pointing at fields that exist.
+     */
+    private static String rowField(String field, RmaCreateForm form, List<RmaNewPage.ItemRow> rows) {
+        Matcher m = field == null ? null : ITEM_FIELD.matcher(field);
+        if (m == null || !m.matches() || form == null) {
+            return field;
+        }
+        int posted = Integer.parseInt(m.group(1));
+        if (posted >= form.getItems().size() || form.getItems().get(posted) == null) {
+            return field;
+        }
+        String itemId = form.getItems().get(posted).getItemId();
+        return rows.stream().filter(r -> r.itemId().equals(itemId)).findFirst()
+                .map(r -> RmaCreateForm.field(r.index(), m.group(2))).orElse(field);
     }
 
     private RmaNewPage.Header header(Order order, Locale locale) {
@@ -195,7 +235,22 @@ public class RmaNewPageFactory {
     }
 
     static String searchHref(String orderId) {
-        return UriComponentsBuilder.fromPath("/dashboard/rma/new").queryParam("q", "{q}").encode().buildAndExpand(orderId).toUriString();
+        return searchHref(orderId, null, null);
+    }
+
+    static String searchHref(String orderId, String from, String serial) {
+        UriComponentsBuilder href = UriComponentsBuilder.fromPath("/dashboard/rma/new").queryParam("q", "{q}");
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("q", orderId);
+        if (from != null) {
+            href.queryParam("from", "{from}");
+            values.put("from", from);
+        }
+        if (serial != null) {
+            href.queryParam("serial", "{serial}");
+            values.put("serial", serial);
+        }
+        return href.encode().buildAndExpand(values).toUriString();
     }
 
     private static RmaNewPage with(RmaNewPage base, RmaNewPage.Header order, RmaNewPage.Choice choice, String notFoundDesc,

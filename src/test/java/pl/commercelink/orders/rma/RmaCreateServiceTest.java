@@ -120,6 +120,20 @@ class RmaCreateServiceTest {
     }
 
     @Test
+    void anOrderIdLongerThanAnyKeyIsGoneWithoutARead() {
+        // given
+        RmaCreateForm form = form("i1", "1");
+        form.setOrderId("e".repeat(2000));
+
+        // when
+        RmaCreateService.Outcome outcome = service.create(STORE, form);
+
+        // then
+        assertThat(outcome.pageErrorKey()).isEqualTo("rma.new.error.orderGone");
+        verify(orders, never()).findById(any(), any());
+    }
+
+    @Test
     void anItemClaimedSinceThePageWasOpenedIsRefused() {
         // given
         when(orders.findById(STORE, ORDER)).thenReturn(order(OrderStatus.Completed));

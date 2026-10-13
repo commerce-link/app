@@ -117,4 +117,36 @@ class RmaNewTemplateTest {
                 .doesNotContain("class=\"button").doesNotContain("alert(")
                 .contains("/js/rma-new.js");
     }
+
+    @Test
+    void anOrderWithoutAPlacedDateLeavesTheDateOut() {
+        // given
+        RmaNewPage base = order(Map.of(), Map.of(), null);
+        RmaNewPage.Header undated = new RmaNewPage.Header("8c1d0291-full", "8c1d0291", "/dashboard/orders/8c1d0291-full",
+                "OrderStatus.Delivered", "is-ok", null, "Anna Nowak", "Sklep");
+        RmaNewPage page = new RmaNewPage(base.state(), base.query(), base.backHref(), base.backLabel(), base.from(),
+                base.leadText(), undated, null, null, null, base.items(), null, base.summary(), null, Map.of(), Map.of());
+
+        // when
+        String html = content(render(page));
+
+        // then
+        assertThat(html).doesNotContain("null").doesNotContain("złożone").doesNotContain(">Złożone<");
+    }
+
+    @Test
+    void aClaimedItemIsTheTargetOfItsErrorAndTheTotalNamesItsCurrency() {
+        // given
+        Map<String, String> error = Map.of("items2.selected", "jest już w otwartym RMA e3b0c442");
+
+        // when
+        String html = content(render(order(error, error, null)));
+
+        // then
+        assertThat(html).contains("href=\"#items2.selected\"").containsPattern("<th [^>]*id=\"items2.selected\"[^>]*tabindex=\"-1\"")
+                .contains("<span>PLN</span>");
+        // the refused empty submit is announced by a live region that is never hidden; the visible help is not one
+        assertThat(html).containsPattern("<span class=\"cl-visually-hidden\" role=\"status\" data-cl-rma-status></span>")
+                .doesNotContainPattern("id=\"rma-empty-help\"[^>]*role=");
+    }
 }

@@ -13356,6 +13356,16 @@ a.cl-link-button:hover {
         content: none;
     }
 }
+/* links inside dense content (the RMA holding an item, the order number in the order card): a 44 px touch target
+   below 1024 px without moving the line, as .cl-lead-link; their text is 14-17 px high, hence 15 px each side */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-rma-items .cl-table-sub a.cl-table-code,
+    .cl-page .cl-kv.is-rma-order a.cl-table-code {
+        display: inline-block;
+        padding-block: 15px;
+        margin-block: -15px;
+    }
+}
 /* End of new RMA page */
 
 /* --- Stores list (super admin, /dashboard/stores; spec docs/active/stores-list-redesign/2026-10-13-stores-list-design.md).

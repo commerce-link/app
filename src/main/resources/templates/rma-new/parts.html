@@ -17,7 +17,7 @@
         <a class="cl-lead-link" th:href="@{${p.order().href()}}" th:text="${p.order().shortId()}"
            th:title="${p.order().orderId()}"></a>
         <th:block th:if="${p.order().client() != null}"> · <span th:text="${p.order().client()}"></span></th:block>
-        · <span th:text="#{rma.new.lead.ordered(${p.order().ordered()})}"></span>
+        <th:block th:if="${p.order().ordered() != null}"> · <span th:text="#{rma.new.lead.ordered(${p.order().ordered()})}"></span></th:block>
     </p>
     <p class="cl-page-lead" th:if="${p.state().name() == 'START' or p.state().name() == 'CHOICE'}" th:text="${p.leadText()}"></p>
 </div>
@@ -127,7 +127,9 @@
                     <input th:if="${!r.claimed()}" type="hidden" th:name="|_items[${i}].selected|" value="on"/>
                     <input th:if="${!r.claimed()}" type="hidden" th:name="|items[${i}].itemId|" th:value="${r.itemId()}"/>
                 </td>
-                <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.new.items.col.item}">
+                <!--/* a claimed row has no checkbox: its cell takes the id the error summary links to */-->
+                <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.new.items.col.item}, id=${r.claimed() ? selId : null},
+                                                            tabindex=${r.claimed() ? '-1' : null}">
                     <span th:text="${r.name()}"></span>
                     <span class="cl-table-sub">
                         <span th:text="${r.sub()}"></span>
@@ -193,12 +195,12 @@
 
 <section th:fragment="orderCard(p)" class="cl-card" aria-labelledby="order-title">
     <div class="cl-card-head"><h2 class="cl-card-title" id="order-title" th:text="#{rma.new.order.title}"></h2></div>
-    <dl class="cl-kv is-column cl-card-inset">
+    <dl class="cl-kv is-column cl-card-inset is-rma-order">
         <div><dt th:text="#{rma.new.order.number}"></dt>
             <dd><a class="cl-table-code" th:href="@{${p.order().href()}}" th:title="${p.order().orderId()}" th:text="${p.order().shortId()}"></a></dd></div>
         <div><dt th:text="#{rma.new.order.status}"></dt>
             <dd><span class="cl-status" th:classappend="${p.order().statusTone()}" th:text="#{${p.order().statusKey()}}"></span></dd></div>
-        <div><dt th:text="#{rma.new.order.ordered}"></dt><dd th:text="${p.order().ordered()}"></dd></div>
+        <div th:if="${p.order().ordered() != null}"><dt th:text="#{rma.new.order.ordered}"></dt><dd th:text="${p.order().ordered()}"></dd></div>
         <div th:if="${p.order().client() != null}"><dt th:text="#{rma.new.order.client}"></dt><dd th:text="${p.order().client()}"></dd></div>
         <div><dt th:text="#{rma.new.order.source}"></dt><dd th:text="${p.order().source()}"></dd></div>
     </dl>
@@ -222,7 +224,8 @@
         <div><dt th:text="#{rma.new.summary.items}"></dt><dd class="is-numeric"><output data-cl-rma-count th:text="${p.summary().count()}"></output></dd></div>
         <div><dt th:text="#{rma.new.summary.pieces}"></dt><dd class="is-numeric"><output data-cl-rma-pieces th:text="${p.summary().pieces()}"></output></dd></div>
         <div class="cl-kv-total"><dt th:text="#{rma.new.summary.value}"></dt>
-            <dd class="is-numeric"><output data-cl-rma-value aria-live="polite" th:text="${p.summary().value()}"></output> PLN</dd></div>
+            <dd class="is-numeric"><output data-cl-rma-value aria-live="polite" th:text="${p.summary().value()}"></output>
+                <span th:text="#{rma.new.summary.currency}"></span></dd></div>
     </dl>
     <div class="cl-card-footer is-stacked">
         <button type="submit" class="cl-button is-primary" th:disabled="${!p.summary().canCreate()}"
@@ -231,7 +234,9 @@
         </button>
         <p th:if="${p.summary().canCreate()}" class="cl-help" id="create-help" th:text="#{rma.new.create.help}"></p>
         <p th:unless="${p.summary().canCreate()}" class="cl-help is-warn" id="create-blocked" th:text="#{rma.new.create.blocked}"></p>
-        <p class="cl-help is-warn" id="rma-empty-help" role="status" hidden th:text="#{rma.new.create.empty}"></p>
+        <p class="cl-help is-warn" id="rma-empty-help" hidden th:text="#{rma.new.create.empty}"></p>
+        <!--/* a live region must exist, empty and not hidden, before its text arrives; the script fills it on every refused submit */-->
+        <span class="cl-visually-hidden" role="status" data-cl-rma-status></span>
         <a class="cl-button" th:href="@{${p.backHref()}}" th:text="#{rma.new.cancel}"></a>
     </div>
 </section>

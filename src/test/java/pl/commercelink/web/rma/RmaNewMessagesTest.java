@@ -30,7 +30,7 @@ class RmaNewMessagesTest {
             "rma.new.order.title", "rma.new.order.number", "rma.new.order.status", "rma.new.order.ordered",
             "rma.new.order.client", "rma.new.order.source", "rma.new.order.source.shop",
             "rma.new.summary.title", "rma.new.email.label", "rma.new.email.help", "rma.new.summary.items",
-            "rma.new.summary.pieces", "rma.new.summary.value", "rma.new.create", "rma.new.create.help",
+            "rma.new.summary.pieces", "rma.new.summary.value", "rma.new.summary.currency", "rma.new.create", "rma.new.create.help",
             "rma.new.create.empty", "rma.new.create.blocked", "rma.new.cancel",
             "rma.new.errors.title", "rma.new.error.noItems", "rma.new.error.orderGone", "rma.new.error.itemsChanged",
             "rma.new.error.qty", "rma.new.error.resolution", "rma.new.error.reason", "rma.new.error.claimed",
