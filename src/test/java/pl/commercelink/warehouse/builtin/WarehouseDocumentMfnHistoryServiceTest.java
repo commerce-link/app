@@ -5,12 +5,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +69,28 @@ class WarehouseDocumentMfnHistoryServiceTest {
 
         // then
         assertThat(history.rows()).extracting(MfnHistoryRow::stockChange).containsExactly(0);
+    }
+
+    @Test
+    void eachRowCarriesItsDocumentsReasonAndNoteWithoutExtraReads() {
+        // given
+        when(items.findByDeliveryId("del-1")).thenReturn(List.of(
+                item("d1", DocumentType.GoodsReceipt, 5, LocalDateTime.of(2026, 10, 2, 8, 0)),
+                item("d2", DocumentType.InternalIssue, 2, LocalDateTime.of(2026, 10, 3, 11, 0))));
+        WarehouseDocument plain = doc("d1", "PZ/1");
+        WarehouseDocument destruction = doc("d2", "RW/1");
+        destruction.setReason(DocumentReason.Destruction);
+        destruction.setNote("Zalany w magazynie B");
+        when(documents.findByDocumentId("s1", "d1")).thenReturn(plain);
+        when(documents.findByDocumentId("s1", "d2")).thenReturn(destruction);
+
+        // when
+        MfnHistory history = service.history("s1", "del-1", "MZ-V9P2T0BW");
+
+        // then
+        assertThat(history.rows()).extracting(MfnHistoryRow::reason).containsExactly(null, DocumentReason.Destruction);
+        assertThat(history.rows()).extracting(MfnHistoryRow::note).containsExactly(null, "Zalany w magazynie B");
+        verify(documents, times(2)).findByDocumentId(org.mockito.ArgumentMatchers.eq("s1"), org.mockito.ArgumentMatchers.anyString());
     }
 
     private static WarehouseDocumentItem item(String documentId, DocumentType type, int qty, LocalDateTime at) {

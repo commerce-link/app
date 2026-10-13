@@ -17,7 +17,6 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.orders.OrderItem;
@@ -374,14 +373,6 @@ class WarehouseController {
         manualWarehouseFulfilment.accept(getStoreId(), form);
         // fixed, not the form's redirectUrl: a posted value must not choose where the browser goes (spec B1)
         return "redirect:/dashboard/warehouse?statuses=New";
-    }
-
-    @GetMapping("/dashboard/warehouse/items/destroyed")
-    String fetchDestroyedWarehouseItems(Model model) {
-        List<WarehouseItem> destroyedItems = warehouseRepository.findAll(getStoreId(), FulfilmentStatus.Destroyed);
-        model.addAttribute("warehouseItems", destroyedItems);
-        model.addAttribute("DestroyedStatus", FulfilmentStatus.Destroyed);
-        return "destroyedWarehouseItems";
     }
 
     private String getStoreId() {

@@ -227,4 +227,50 @@ class WarehouseListStylesContractTest {
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-col-delivery { width: 12%; }");
         assertThat(table).contains(".cl-page .cl-table.is-warehouse .cl-cell-delivery { display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: top; }");
     }
+
+    @Test
+    void destroyedArchiveCardKeepsTheRowMenuInTheCornerInsteadOfTheCheckbox() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // the archive table has no checkbox: the phone card drops its left gutter and pins the ⋯ menu top right
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed .cl-col-date { width: 8rem; }");
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody tr { padding: 12px 76px 12px 16px; position: relative; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody :is(th.cl-table-key, td:not(.cl-table-actions)) { display: contents; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed tbody td.cl-table-actions { display: block; position: absolute; top: 8px; right: 8px; padding: 0; }");
+    }
+
+    @Test
+    void destroyedArchiveMenuColumnFitsTheTouchTargetInsideTheCardEdge() throws Exception {
+        // given
+        String section = section();
+
+        // when / then
+        // 8 px + the 44 px target (36 px from 1024 px) + the card's 20 px right edge: at 3.5rem the button reached the card border
+        assertThat(section).contains(".cl-page .cl-table.is-warehouse.is-destroyed .cl-col-menu { width: 4.5rem; }")
+                .contains(".cl-page .cl-table.is-warehouse.is-destroyed td.cl-table-actions { padding-left: 8px; }")
+                .doesNotContain(".cl-col-menu { width: 3.5rem; }");
+    }
+
+    @Test
+    void activeTileUnitIsReadableOnTheAccentFill() throws Exception {
+        // given
+        String css = css();
+
+        // when / then
+        // the destroyed archive's loss tiles put "PLN" in an active tile: --cl-ink-3 there is 4.04:1, like the hint was
+        assertThat(css).contains(".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-hint,\n"
+                + ".cl-page .cl-stat.is-link[aria-current=\"true\"] .cl-stat-value-of {\n    color: var(--cl-ink-2);\n}");
+    }
+
+    @Test
+    void searchFieldEndsAPlaceholderThatDoesNotFitWithAnEllipsis() throws Exception {
+        // given
+        String css = css();
+
+        // when / then
+        // on a phone the field shares its row with "Szukaj" and "Filtry": a hard cut ("Nazwa, EAN, l") read as a defect
+        assertThat(css).contains(".cl-page .cl-search-field .cl-table-search {\n    width: 100%;\n    padding-left: 36px;\n    padding-right: 40px;\n    text-overflow: ellipsis;\n}");
+    }
 }
