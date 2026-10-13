@@ -20,17 +20,11 @@ import java.util.NoSuchElementException;
 import java.util.function.LongSupplier;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
 @Repository
@@ -173,88 +167,6 @@ public class RMARepository extends DynamoDbRepository<RMA>  {
     public List<RMA> findAll() {
         DynamoDBScanExpression scanExpression = new DynamoDBScanExpression();
         return dynamoDBMapper.scan(RMA.class, scanExpression);
-    }
-
-    public List<RMA> searchRMAEntries(String storeId, RMAFilter filter, int page, int pageSize) {
-        if (isNotBlank(filter.getRmaId())) {
-            RMA rma = findById(storeId, filter.getRmaId());
-            return rma != null ? Collections.singletonList(rma) : Collections.emptyList();
-        } else {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            Map<String, String> expressionAttributeNames = new HashMap<>();
-            StringBuilder filterExpression = new StringBuilder();
-            eav.put(":storeId", new AttributeValue().withS(storeId));
-
-            if (isNotBlank(filter.getOrderId())) {
-                eav.put(":orderId", new AttributeValue().withS(filter.getOrderId()));
-                appendFilter(filterExpression, "orderId = :orderId");
-            }
-
-            if (isNotBlank(filter.getEmail())) {
-                eav.put(":email", new AttributeValue().withS(filter.getEmail()));
-                appendFilter(filterExpression, "email = :email");
-            }
-
-            if (filter.getCreatedAtStart() != null && filter.getCreatedAtEnd() != null) {
-                eav.put(":createdAtStart", new AttributeValue().withS(filter.getCreatedAtStart().toString()));
-                eav.put(":createdAtEnd", new AttributeValue().withS(filter.getCreatedAtEnd().toString()));
-                appendFilter(filterExpression, "createdAt BETWEEN :createdAtStart AND :createdAtEnd");
-            } else if (filter.getCreatedAtStart() != null) {
-                eav.put(":createdAtStart", new AttributeValue().withS(filter.getCreatedAtStart().toString()));
-                appendFilter(filterExpression, "createdAt >= :createdAtStart");
-            } else if (filter.getCreatedAtEnd() != null) {
-                eav.put(":createdAtEnd", new AttributeValue().withS(filter.getCreatedAtEnd().toString()));
-                appendFilter(filterExpression, "createdAt <= :createdAtEnd");
-            }
-
-            if (filter.hasStatuses()) {
-                expressionAttributeNames.put("#status", "status");
-                List<String> statusPlaceholders = new ArrayList<>();
-                for (int i = 0; i < filter.getStatuses().size(); i++) {
-                    String placeholder = ":status" + i;
-                    eav.put(placeholder, new AttributeValue().withS(filter.getStatuses().get(i).name()));
-                    statusPlaceholders.add(placeholder);
-                }
-                appendFilter(filterExpression, "#status IN (" + String.join(", ", statusPlaceholders) + ")");
-            }
-
-            // Exclude Rejected and Completed RMA by default
-            if (!filter.hasAnyFilter()) {
-                expressionAttributeNames.put("#status", "status");
-                eav.put(":rejectedStatus", new AttributeValue().withS(RMAStatus.Rejected.name()));
-                eav.put(":completedStatus", new AttributeValue().withS(RMAStatus.Completed.name()));
-                appendFilter(filterExpression, "NOT (#status IN (:rejectedStatus, :completedStatus))");
-            }
-
-            DynamoDBQueryExpression<RMA> queryExpression = new DynamoDBQueryExpression<RMA>()
-                    .withKeyConditionExpression("storeId = :storeId")
-                    .withFilterExpression(filterExpression.length() > 0 ? filterExpression.toString() : null)
-                    .withExpressionAttributeValues(eav)
-                    .withExpressionAttributeNames(expressionAttributeNames.isEmpty() ? null : expressionAttributeNames);
-
-            return queryWithPagination(queryExpression, page, pageSize, RMA.class);
-        }
-
-
-    }
-
-    public Map<RMAStatus, Long> countActiveByStatus(String storeId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":rejectedStatus", new AttributeValue().withS(RMAStatus.Rejected.name()));
-        eav.put(":completedStatus", new AttributeValue().withS(RMAStatus.Completed.name()));
-
-        DynamoDBQueryExpression<RMA> queryExpression = new DynamoDBQueryExpression<RMA>()
-                .withKeyConditionExpression("storeId = :storeId")
-                .withFilterExpression("NOT (#status IN (:rejectedStatus, :completedStatus))")
-                .withExpressionAttributeNames(Collections.singletonMap("#status", "status"))
-                .withExpressionAttributeValues(eav)
-                .withProjectionExpression("#status");
-
-        return dynamoDBMapper.query(RMA.class, queryExpression).stream()
-                .map(RMA::getStatus)
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
     }
 
     public List<RMA> findAllByStoreIdAndStatus(String storeId, RMAStatus... statuses) {

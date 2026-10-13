@@ -12349,6 +12349,10 @@ a.cl-link-button:hover {
     white-space: nowrap;
 }
 
+.cl-page .cl-table.is-rma .cl-due-note.is-warn {
+    font-weight: 600;
+}
+
 @media screen and (min-width: 720px) and (max-width: 1215px) {
     .cl-page .cl-table.is-rma .is-secondary-column {
         display: none;

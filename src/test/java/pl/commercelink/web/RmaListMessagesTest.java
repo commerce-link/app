@@ -50,9 +50,14 @@ class RmaListMessagesTest {
 
     @Test
     void everyKeyExistsInPolishAndEnglish() throws Exception {
+        // given
         Properties pl = load("messages_pl.properties");
         Properties en = load("messages_en.properties");
+
+        // when
         Set<String> used = keysUsed();
+
+        // then
         assertThat(used).isNotEmpty();
         assertThat(used.stream().filter(k -> !pl.containsKey(k)).toList()).as("missing in PL").isEmpty();
         assertThat(used.stream().filter(k -> !en.containsKey(k)).toList()).as("missing in EN").isEmpty();
@@ -73,7 +78,7 @@ class RmaListMessagesTest {
             keys.add("rma.list.dates." + period);
         }
 
-        // then
+        // when / then
         assertThat(keys).allMatch(pl::containsKey).allMatch(en::containsKey);
     }
 }
