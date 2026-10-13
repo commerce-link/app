@@ -19,6 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RmaCreateService {
 
+    public static final String ORDER_GONE = "rma.new.error.orderGone";
     public static final List<FulfilmentStatus> REPORTABLE = List.of(FulfilmentStatus.Delivered, FulfilmentStatus.Reserved);
 
     private final OrdersRepository orders;
@@ -36,7 +37,7 @@ public class RmaCreateService {
     public Outcome create(String storeId, RmaCreateForm form) {
         Order order = form.getOrderId() == null ? null : orders.findById(storeId, form.getOrderId());
         if (order == null || !order.isEligibleForRMACreation()) {
-            return new Outcome(null, "rma.new.error.orderGone", List.of());
+            return new Outcome(null, ORDER_GONE, List.of());
         }
         Map<String, OrderItem> reportable = new LinkedHashMap<>();
         orderItems.findByOrderIdAndStatuses(order.getOrderId(), REPORTABLE).forEach(i -> reportable.put(i.getItemId(), i));

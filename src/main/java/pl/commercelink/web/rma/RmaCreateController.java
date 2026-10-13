@@ -75,8 +75,10 @@ public class RmaCreateController {
         }
         Order order = form.getOrderId() == null ? null : orders.findById(storeId, form.getOrderId());
         if (order == null || !order.isEligibleForRMACreation()) {
+            // the service may have seen the order eligible and rejected only the fields, then it changed before this read
+            String errorKey = outcome.pageErrorKey() == null ? RmaCreateService.ORDER_GONE : outcome.pageErrorKey();
             RmaNewPage page = pages.build(storeId, search.search(storeId, form.getOrderId()), form.getFrom(), locale);
-            model.addAttribute("page", page.withPageError(messages.getMessage(outcome.pageErrorKey(), null, locale)));
+            model.addAttribute("page", page.withPageError(messages.getMessage(errorKey, null, locale)));
             return "rma-new";
         }
         model.addAttribute("page", pages.rebuild(storeId, order, form, outcome, locale));
