@@ -18,7 +18,7 @@ public class StoreCreationService {
 
     public Store createStore(CreateStoreRequest request) {
         Store store = new Store();
-        store.setStoreId(generateFreeStoreId());
+        store.setStoreId(request.storeId() != null ? request.storeId() : freeStoreId());
         store.setName(request.name());
         store.setApiKey(request.apiKey());
         store.setCreatedAt(Instant.now().toString());
@@ -43,7 +43,7 @@ public class StoreCreationService {
         return store;
     }
 
-    private String generateFreeStoreId() {
+    public String freeStoreId() {
         for (int attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt++) {
             String storeId = UniqueIdentifierGenerator.generate();
             if (storesRepository.findById(storeId) == null) {

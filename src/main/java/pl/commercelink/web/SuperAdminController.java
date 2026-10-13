@@ -154,7 +154,7 @@ public class SuperAdminController {
                               Locale locale,
                               RedirectAttributes redirectAttributes) {
         try {
-            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey));
+            Store store = storeCreationService.createStore(CreateStoreRequest.bare(null, name, apiKey));
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
             return String.format("redirect:/dashboard/store/%s", store.getStoreId());
         } catch (Exception e) {
@@ -184,7 +184,7 @@ public class SuperAdminController {
                             Locale locale,
                             RedirectAttributes redirectAttributes) {
         try {
-            Store newStore = storeCopyService.copyStore(storeId, newStoreName);
+            Store newStore = storeCopyService.copyStore(storeId, storeCreationService.freeStoreId(), newStoreName);
             redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage("store.copy.success", new Object[]{newStoreName}, locale));
             return String.format("redirect:/dashboard/store/%s", newStore.getStoreId());

@@ -192,7 +192,7 @@ class SuperAdminControllerTest {
         // given
         Store created = new Store();
         created.setStoreId("srv-gen-001");
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"))).thenReturn(created);
+        when(storeCreationService.createStore(CreateStoreRequest.bare(null, "Nowy sklep", "key-9"))).thenReturn(created);
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
@@ -200,14 +200,14 @@ class SuperAdminControllerTest {
 
         // then
         assertEquals("redirect:/dashboard/store/srv-gen-001", view);
-        verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"));
+        verify(storeCreationService).createStore(CreateStoreRequest.bare(null, "Nowy sklep", "key-9"));
         verifyNoMoreInteractions(storeCreationService);
     }
 
     @Test
     void createStoreShowsErrorFlashWhenCreationFails() {
         // given
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", null)))
+        when(storeCreationService.createStore(CreateStoreRequest.bare(null, "Nowy sklep", null)))
                 .thenThrow(new IllegalStateException("Could not generate a unique store id"));
         when(messageSource.getMessage("store.create.error", null, locale)).thenReturn("Błąd tworzenia");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();

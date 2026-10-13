@@ -54,7 +54,7 @@ class StoreCopyServiceTest {
         when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
 
         // when
-        storeCopyService.copyStore("store-1", "Kopia");
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
 
         // then
         ArgumentCaptor<ProductCatalog> catalogCaptor = ArgumentCaptor.forClass(ProductCatalog.class);
@@ -82,10 +82,27 @@ class StoreCopyServiceTest {
         when(productRepository.findAll("cat-def-1")).thenReturn(List.of(serviceProduct));
 
         // when
-        storeCopyService.copyStore("store-1", "Kopia");
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
 
         // then
         verify(productRepository).batchSave(productsCaptor.capture());
         assertThat(productsCaptor.getValue().get(0).isService()).isTrue();
+    }
+
+    @Test
+    void copyIsSavedUnderTheGivenId() {
+        // given
+        Store source = new Store();
+        source.setStoreId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(source);
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of());
+
+        // when
+        Store copy = storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        assertThat(copy.getStoreId()).isEqualTo("copy000001");
+        assertThat(copy.getName()).isEqualTo("Kopia");
+        verify(storesRepository).save(copy);
     }
 }
