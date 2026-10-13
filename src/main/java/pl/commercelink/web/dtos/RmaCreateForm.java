@@ -9,8 +9,10 @@ import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.starter.util.ConversionUtil;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** What the new RMA page posts. Only these fields bind (RmaCreateController#binder): status, ids and the store never come from the request. */
 @Getter
@@ -62,6 +64,7 @@ public class RmaCreateForm {
      */
     public List<Error> validate(Map<String, OrderItem> reportable, Map<String, String> claims) {
         List<Error> errors = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
         if (selectedItems().isEmpty()) {
             errors.add(new Error(null, "rma.new.error.noItems", new Object[0], null));
             return errors;
@@ -72,7 +75,8 @@ public class RmaCreateForm {
                 continue;
             }
             OrderItem orderItem = reportable.get(item.getItemId());
-            if (orderItem == null) {
+            // a repeated id would save two RMA items for one order item and exceed its quantity
+            if (orderItem == null || !seen.add(item.getItemId())) {
                 return List.of(new Error(null, "rma.new.error.itemsChanged", new Object[0], null));
             }
             String name = orderItem.getName();
@@ -83,7 +87,7 @@ public class RmaCreateForm {
             if (item.getResolution() == null) {
                 errors.add(new Error(field(i, "resolution"), "rma.new.error.resolution", new Object[0], name));
             }
-            if (item.getReason() != null && item.getReason().length() > MAX_REASON) {
+            if (item.getReason() != null && item.getReason().trim().length() > MAX_REASON) {
                 errors.add(new Error(field(i, "reason"), "rma.new.error.reason", new Object[]{MAX_REASON}, name));
             }
             String claimedBy = claims.get(item.getItemId());

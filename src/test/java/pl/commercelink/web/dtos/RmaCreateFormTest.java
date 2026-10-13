@@ -122,4 +122,30 @@ class RmaCreateFormTest {
         // then
         assertThat(errors).extracting(RmaCreateForm.Error::key).containsExactly("rma.new.error.email.required");
     }
+
+    @Test
+    void aRepeatedItemIsAPageError() {
+        // given
+        RmaCreateForm form = form("anna@x.pl", item("i1", true, "1", RMAResolutionType.Return, null),
+                item("i1", true, "1", RMAResolutionType.Return, null));
+
+        // when
+        List<RmaCreateForm.Error> errors = form.validate(REPORTABLE, Map.of());
+
+        // then
+        assertThat(errors).extracting(RmaCreateForm.Error::field, RmaCreateForm.Error::key)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(null, "rma.new.error.itemsChanged"));
+    }
+
+    @Test
+    void trailingWhitespaceDoesNotMakeAReasonTooLong() {
+        // given
+        RmaCreateForm form = form("anna@x.pl", item("i1", true, "1", RMAResolutionType.Return, "x".repeat(1000) + "   "));
+
+        // when
+        List<RmaCreateForm.Error> errors = form.validate(REPORTABLE, Map.of());
+
+        // then
+        assertThat(errors).isEmpty();
+    }
 }
