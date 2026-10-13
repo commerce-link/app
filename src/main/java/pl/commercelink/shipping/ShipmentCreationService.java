@@ -31,18 +31,33 @@ public class ShipmentCreationService {
     static final String NOT_CREATED_KEY = "shipping.creation.notCreated";
 
     private final ShippingService shippingService;
+    private final ShippingProviders shippingProviders;
     private final ShipmentOwners owners;
     private final ShipmentCreationEventPublisher publisher;
     private final MessageSource messageSource;
     private final ShippingIntegrationNames shippingIntegrationNames;
 
+    /** Through the store's default integration (RMA, customer returns, the warehouse, the default steps of an order). */
     public ShipmentCreationStart start(ShipmentCreationCheckRequest seed, ShipmentRequest request, Store store,
                                        Shipment placeholder) {
-        ShippingProvider provider = shippingService.providerFor(store);
+        return start(seed, request, store, placeholder, shippingService.providerFor(store),
+                shippingService.providerName(store));
+    }
+
+    /** Through the integration the operator chose for an order ("Wyślij przez"); the store must have it. */
+    public ShipmentCreationStart start(ShipmentCreationCheckRequest seed, ShipmentRequest request, Store store,
+                                       Shipment placeholder, String providerName) {
+        ShippingProvider provider = shippingProviders.forName(store, providerName)
+                .orElseThrow(() -> new ShippingUnavailableException(store == null ? null : store.getStoreId()));
+        return start(seed, request, store, placeholder, provider, providerName);
+    }
+
+    private ShipmentCreationStart start(ShipmentCreationCheckRequest seed, ShipmentRequest request, Store store,
+                                        Shipment placeholder, ShippingProvider provider, String providerName) {
         String commandId = UUID.randomUUID().toString();
         ShipmentCreationCheckRequest check = seed.toBuilder()
                 .commandId(commandId)
-                .provider(shippingService.providerName(store))
+                .provider(providerName)
                 .attempt(1)
                 .build();
         placeholder.setProvider(check.getProvider());

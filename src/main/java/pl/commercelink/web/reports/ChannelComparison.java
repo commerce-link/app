@@ -4,8 +4,11 @@ import pl.commercelink.financials.FinancialReport;
 
 import java.util.List;
 
-/** The "store and marketplace" card: three totals and the two channels side by side, one measure per row. */
-public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) {
+/**
+ * The "store and marketplace" card: three totals, the measures that add up (orders, sales, profit) side by side with
+ * each channel's share, and a profile of each channel with the figures that do not add up into a share.
+ */
+public record ChannelComparison(Totals totals, List<Row> rows, List<Profile> profiles, Channel missing) {
 
     /** Below this share the percent no longer fits inside its segment; it stays in the bar's title and label. */
     private static final double LABELLED_SHARE = 12;
@@ -20,6 +23,10 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
     }
 
     public record Row(String labelKey, boolean money, String own, String marketplace, Share share) {
+    }
+
+    /** Net cost, margin and average order of one channel; margin and average order are null without orders. */
+    public record Profile(Channel channel, String costNet, String margin, String averageOrder) {
     }
 
     public record Share(double own, double marketplace, String ownText, String marketplaceText,
@@ -45,8 +52,6 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
         Channel missing = orders == 0 ? null
                 : own.getTotalNumberOfOrders() == 0 ? Channel.OWN
                 : marketplace.getTotalNumberOfOrders() == 0 ? Channel.MARKETPLACE : null;
-        boolean ownSold = own.getTotalNumberOfOrders() > 0;
-        boolean marketplaceSold = marketplace.getTotalNumberOfOrders() > 0;
         List<Row> rows = List.of(
                 new Row("reports.channels.orders", false, ReportNumbers.count(own.getTotalNumberOfOrders()),
                         ReportNumbers.count(marketplace.getTotalNumberOfOrders()),
@@ -54,16 +59,16 @@ public record ChannelComparison(Totals totals, List<Row> rows, Channel missing) 
                 new Row("reports.channels.sales", true, ReportNumbers.wholeAmount(own.getTotalPrice()),
                         ReportNumbers.wholeAmount(marketplace.getTotalPrice()), Share.of(own.getTotalPrice(), marketplace.getTotalPrice())),
                 new Row("reports.channels.profit", true, ReportNumbers.wholeAmount(own.getTotalProfit()),
-                        ReportNumbers.wholeAmount(marketplace.getTotalProfit()), Share.of(own.getTotalProfit(), marketplace.getTotalProfit())),
-                new Row("reports.channels.cost", true, ReportNumbers.wholeAmount(own.getTotalCost()),
-                        ReportNumbers.wholeAmount(marketplace.getTotalCost()), null),
-                new Row("reports.channels.margin", false, ownSold ? margin(own.getTotalProfit(), own.getTotalPrice()) : null,
-                        marketplaceSold ? margin(marketplace.getTotalProfit(), marketplace.getTotalPrice()) : null, null),
-                new Row("reports.channels.averageOrder", true,
-                        ownSold ? ReportNumbers.wholeAmount(own.getTotalPrice() / own.getTotalNumberOfOrders()) : null,
-                        marketplaceSold ? ReportNumbers.wholeAmount(marketplace.getTotalPrice() / marketplace.getTotalNumberOfOrders()) : null,
-                        null));
-        return new ChannelComparison(totals, rows, missing);
+                        ReportNumbers.wholeAmount(marketplace.getTotalProfit()), Share.of(own.getTotalProfit(), marketplace.getTotalProfit())));
+        List<Profile> profiles = List.of(profile(Channel.OWN, own), profile(Channel.MARKETPLACE, marketplace));
+        return new ChannelComparison(totals, rows, profiles, missing);
+    }
+
+    private static Profile profile(Channel channel, FinancialReport report) {
+        int orders = report.getTotalNumberOfOrders();
+        return new Profile(channel, ReportNumbers.wholeAmount(report.getTotalCost()),
+                orders > 0 ? margin(report.getTotalProfit(), report.getTotalPrice()) : null,
+                orders > 0 ? ReportNumbers.wholeAmount(report.getTotalPrice() / orders) : null);
     }
 
     public boolean empty() {

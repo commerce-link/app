@@ -77,6 +77,15 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     /**
+     * Name the provider's own settings are stored under. Usually the same as the credentials; an integration that
+     * borrows another one's credentials (Wysyłam z Allegro uses the Allegro marketplace connection) keeps its settings
+     * apart, so saving or deleting them never touches the borrowed secret or tokens.
+     */
+    protected String configurationNameFor(String providerName, D descriptor) {
+        return credentialNameFor(providerName, descriptor);
+    }
+
+    /**
      * Name the configuration is stored under when the adapter is gone and there is no descriptor to ask. Factories
      * that decorate the name (marketplaces append a suffix) must override this, otherwise an uninstalled adapter
      * would be read and deleted under a name that belongs to another integration.
@@ -134,9 +143,11 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     void handleAuthorizationLost(String storeId, D descriptor) {
         Store store = storesRepository.findById(storeId);
-        onAuthorizationLost(store, descriptor);
-        storesRepository.save(store);
-        afterAuthorizationLostSaved(store, descriptor);
+        // a save of an unchanged store would only risk a version conflict inside the token path
+        if (onAuthorizationLost(store, descriptor)) {
+            storesRepository.save(store);
+            afterAuthorizationLostSaved(store, descriptor);
+        }
     }
 
     public static String resolveAuthEndpoint(String apiUrl, String path) {
@@ -154,7 +165,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return headers;
     }
 
-    protected void onAuthorizationLost(Store store, D descriptor) {
+    /** Records the lost authorization on the store; returns false when the store was left unchanged. */
+    protected boolean onAuthorizationLost(Store store, D descriptor) {
+        return false;
     }
 
     protected void afterAuthorizationLostSaved(Store store, D descriptor) {
@@ -171,7 +184,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     public Map<String, String> loadConfiguration(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         String configName = descriptor != null
-                ? credentialNameFor(providerName, descriptor)
+                ? configurationNameFor(providerName, descriptor)
                 : credentialNameWithoutDescriptor(providerName);
         return configurationManager.loadConfiguration(store, configName);
     }
@@ -186,7 +199,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         if (descriptor == null) {
             return new HashMap<>();
         }
-        String configName = credentialNameFor(providerName, descriptor);
+        String configName = configurationNameFor(providerName, descriptor);
         return configurationManager.getConfigurationForUI(store, configName, descriptor);
     }
 
@@ -196,7 +209,7 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         if (descriptor == null) {
             return new HashMap<>();
         }
-        return configurationManager.getConfigurationForUI(store, credentialNameFor(providerName, descriptor), descriptor);
+        return configurationManager.getConfigurationForUI(store, configurationNameFor(providerName, descriptor), descriptor);
     }
 
     public void deleteConfiguration(Store store, String providerName) {
@@ -207,24 +220,30 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
             configurationManager.deleteConfiguration(store, credentialNameWithoutDescriptor(providerName));
             return;
         }
-        String configName = credentialNameFor(providerName, descriptor);
+        String configName = configurationNameFor(providerName, descriptor);
         configurationManager.deleteConfiguration(store, configName);
 
+        String credentialName = credentialNameFor(providerName, descriptor);
+        // credentials kept under another name belong to the integration that lent them; they stay
+        if (!credentialName.equals(configName)) {
+            return;
+        }
         if (descriptor.authConfig() instanceof AuthConfig.OAuth2
                 && credentialStore != null && tokenStore != null) {
-            credentialStore.deleteSecrets(store.getStoreId(), configName);
-            tokenStore.deleteToken(store.getStoreId(), configName, "access_token");
-            tokenStore.deleteToken(store.getStoreId(), configName, "refresh_token");
+            credentialStore.deleteSecrets(store.getStoreId(), credentialName);
+            tokenStore.deleteToken(store.getStoreId(), credentialName, "access_token");
+            tokenStore.deleteToken(store.getStoreId(), credentialName, "refresh_token");
         }
     }
 
     public void saveConfiguration(Store store, String providerName, Map<String, String> configuration) {
         D descriptor = getDescriptor(providerName);
         if (descriptor != null && configuration != null) {
-            String configName = credentialNameFor(providerName, descriptor);
+            String configName = configurationNameFor(providerName, descriptor);
             boolean persisted = configurationManager.saveConfiguration(store, configName, descriptor, configuration);
             if (persisted) {
-                seedRefreshToken(store, descriptor, configName, configuration);
+                // a refresh token typed into the settings belongs with the credentials it refreshes
+                seedRefreshToken(store, descriptor, credentialNameFor(providerName, descriptor), configuration);
             }
         }
     }

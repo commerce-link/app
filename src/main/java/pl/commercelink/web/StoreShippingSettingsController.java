@@ -34,6 +34,7 @@ public class StoreShippingSettingsController {
 
     private final StoresRepository storesRepository;
     private final ShippingAccounts shippingAccounts;
+    private final AllegroShippingSettings allegroShippingSettings;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     @GetMapping("/dashboard/store/shipping")
@@ -70,6 +71,9 @@ public class StoreShippingSettingsController {
         model.addAttribute("webhookTokenMissing", account.configured() && shippingAccounts.webhookTokenMissing(store));
         model.addAttribute("accountHref", SettingsPaths.store(storeId, "/shipping/account"));
         model.addAttribute("disconnectHref", SettingsPaths.store(storeId, "/shipping/account/disconnect"));
+        model.addAttribute("allegroShipping", allegroShippingSettings.summary(store));
+        model.addAttribute("allegroHref", SettingsPaths.store(storeId, "/shipping/allegro"));
+        model.addAttribute("allegroDisconnectHref", SettingsPaths.store(storeId, "/shipping/allegro/disconnect"));
 
         // A carrier saved without a display name is named by its service name rather than printed as "null".
         model.addAttribute("carriers", configuration.getAuthorizedCarriers().stream()

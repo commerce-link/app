@@ -38,10 +38,13 @@ class RmaNewScriptContractTest {
         // given
         String css = read("static/css/commercelink.css");
         int start = css.indexOf("/* New RMA page");
+        // the block is closed by its own marker: other screens' blocks may follow it after a merge
+        int end = css.indexOf("/* End of new RMA page */", start);
 
         // then
         assertThat(start).isPositive();
-        String block = css.substring(start);
+        assertThat(end).isGreaterThan(start);
+        String block = css.substring(start, end);
         assertThat(block.lines().filter(l -> l.startsWith(".cl-page") || l.startsWith("    .cl-page")))
                 .allMatch(l -> l.contains("is-rma-items") || l.contains("is-rma-orders") || l.contains("cl-rma-item-fields"));
     }

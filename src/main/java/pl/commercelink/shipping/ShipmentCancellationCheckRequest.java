@@ -16,12 +16,19 @@ public class ShipmentCancellationCheckRequest {
     private String externalId;
     private String commandId;
     private int attempt;
+    /** The integration the cancelled shipment belongs to; null in a message sent before the field existed. */
+    private String provider;
 
     public static ShipmentCancellationCheckRequest first(String storeId, String orderId, String externalId, String commandId) {
-        return new ShipmentCancellationCheckRequest(storeId, orderId, externalId, commandId, 1);
+        return first(storeId, orderId, externalId, commandId, null);
+    }
+
+    public static ShipmentCancellationCheckRequest first(String storeId, String orderId, String externalId, String commandId,
+                                                         String provider) {
+        return new ShipmentCancellationCheckRequest(storeId, orderId, externalId, commandId, 1, provider);
     }
 
     public ShipmentCancellationCheckRequest nextAttempt() {
-        return new ShipmentCancellationCheckRequest(storeId, orderId, externalId, commandId, attempt + 1);
+        return new ShipmentCancellationCheckRequest(storeId, orderId, externalId, commandId, attempt + 1, provider);
     }
 }

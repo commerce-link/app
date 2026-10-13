@@ -11,6 +11,9 @@ public record ShipmentCreationStart(Outcome outcome, String error, boolean provi
 
     static ShipmentCreationStart started() { return new ShipmentCreationStart(Outcome.STARTED, null, false); }
 
+    /** A started creation, for tests outside this package. */
+    public static ShipmentCreationStart startedForTest() { return started(); }
+
     static ShipmentCreationStart refused(String error, boolean providerAnswer) {
         return new ShipmentCreationStart(Outcome.REFUSED, error, providerAnswer);
     }

@@ -9,11 +9,13 @@ import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
 import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.orders.*;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.List;
 import java.util.Optional;
 import pl.commercelink.stores.IntegrationType;
 
@@ -107,8 +109,11 @@ public class MarketplaceOrderLifecycleEventListener {
     }
 
     private Optional<ShipmentUpdate> extractShipmentUpdate(Order order, Store store, String marketplace) {
-        Optional<ShipmentUpdate> tracked = order.getShipments().stream()
+        List<Shipment> withShippingData = order.getShipments().stream()
                 .filter(Shipment::hasShippingData)
+                .toList();
+        Optional<ShipmentUpdate> tracked = withShippingData.stream()
+                .filter(s -> !attachedByMarketplace(s, marketplace))
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
                         carrierDictionary.translate(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), marketplace, s.getCarrier()).orElse(null),
@@ -119,12 +124,20 @@ public class MarketplaceOrderLifecycleEventListener {
             return tracked;
         }
 
+        // shipments already attached by the marketplace (Wysyłam z Allegro) and collection shipments: no number to
+        // send, the order is only marked as sent
+        boolean onlyAttachedShipments = !withShippingData.isEmpty();
         boolean hasCollectionShipment = order.getShipments().stream().anyMatch(Shipment::hasCollectionData);
-        if (hasCollectionShipment) {
+        if (onlyAttachedShipments || hasCollectionShipment) {
             return Optional.of(new ShipmentUpdate(null, null, null, null));
         }
 
         return Optional.empty();
+    }
+
+    // Allegro attaches the waybill of its own shipments; posting it again is refused (422) and duplicates it otherwise
+    private static boolean attachedByMarketplace(Shipment shipment, String marketplace) {
+        return ShippingProviders.ALLEGRO.equals(shipment.getProvider()) && "Allegro".equalsIgnoreCase(marketplace);
     }
 
     private Optional<InvoiceUpdate> extractInvoiceUpdate(Order order) {

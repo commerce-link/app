@@ -13,7 +13,9 @@ import pl.commercelink.shipping.api.ShipmentCancellation;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -32,6 +34,7 @@ public class ShipmentCancellationSettler {
     private final OrderEventsRepository orderEventsRepository;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final OrderRealizationStepBack realizationStepBack;
+    private final ShipmentTrackingsRepository shipmentTrackingsRepository;
 
     /** What a confirmed cancellation did: whether the shipments were cleared and whether the order went back. */
     public record Success(boolean cleared, boolean backToRealization) {
@@ -48,12 +51,17 @@ public class ShipmentCancellationSettler {
         AtomicBoolean backToRealization = new AtomicBoolean();
         AtomicBoolean stepBackRecorded = new AtomicBoolean();
         AtomicBoolean nothingAnnounced = new AtomicBoolean();
+        Set<String> cancelledTrackingNos = new LinkedHashSet<>();
         boolean cleared = modify(request, (order, shipment) -> {
             // each attempt of the executor starts clean, except for the step-back event: it is saved once, before the
             // first save of the order, so a retry after a version conflict does not record it twice
             backToRealization.set(false);
             nothingAnnounced.set(false);
+            cancelledTrackingNos.clear();
             String courierOrderId = request.getExternalId();
+            order.getShipments().stream()
+                    .filter(s -> courierOrderId.equals(s.getExternalId()) && s.getTrackingNo() != null)
+                    .forEach(s -> cancelledTrackingNos.add(s.getTrackingNo()));
             List<Shipment> remaining = order.getShipments().stream()
                     .filter(s -> !courierOrderId.equals(s.getExternalId()))
                     .collect(Collectors.toCollection(ArrayList::new));
@@ -75,18 +83,34 @@ public class ShipmentCancellationSettler {
         if (cleared && nothingAnnounced.get()) {
             orderEventsRepository.deleteByOrderIdAndName(request.getOrderId(), EmailNotificationType.ORDER_SHIPPING.name());
         }
+        if (cleared) {
+            closeTrackings(request, cancelledTrackingNos);
+        }
         return new Success(cleared, cleared && backToRealization.get());
     }
 
-    /** The provider refused the command. The reason is not stored on the shipment: this log is where it is kept. */
+    /** The provider refused the command: its words are kept on the cancellation, for the shipment's row. */
     public boolean fail(ShipmentCancellationCheckRequest request, String error) {
         boolean failed = modify(request,
-                (order, shipment) -> shipment.setCancellation(shipment.getCancellation().failed()));
+                (order, shipment) -> shipment.setCancellation(shipment.getCancellation().failed(error)));
         if (failed) {
             log.warn("Shipment cancellation failed store={} order={} externalId={} commandId={}: {}",
                     request.getStoreId(), request.getOrderId(), request.getExternalId(), request.getCommandId(), error);
         }
         return failed;
+    }
+
+    // best effort: the order is settled already, and a row that stays open is closed by ShipmentTrackingUpdates when it
+    // finds the number gone from the order
+    private void closeTrackings(ShipmentCancellationCheckRequest request, Set<String> trackingNos) {
+        for (String trackingNo : trackingNos) {
+            try {
+                shipmentTrackingsRepository.expireSilently(request.getStoreId(), trackingNo);
+            } catch (RuntimeException e) {
+                log.warn("Tracking of a cancelled shipment not closed store={} trackingNo={}: {}",
+                        request.getStoreId(), trackingNo, e.toString());
+            }
+        }
     }
 
     public boolean unconfirmed(ShipmentCancellationCheckRequest request) {

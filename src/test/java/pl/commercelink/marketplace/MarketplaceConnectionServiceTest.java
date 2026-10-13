@@ -13,6 +13,7 @@ import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotificationType;
@@ -54,6 +55,8 @@ class MarketplaceConnectionServiceTest {
     private MarketplaceReturnsImportScheduler returnsImportScheduler;
     @Mock
     private StoreNotificationService notificationService;
+    @Mock
+    private ShippingProviders shippingProviders;
 
     private MarketplaceConnectionService service;
     private Store store;
@@ -61,7 +64,7 @@ class MarketplaceConnectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new MarketplaceConnectionService(storesRepository, providerFactory, configurationManager,
-                ordersImportScheduler, returnsImportScheduler, notificationService, 5);
+                ordersImportScheduler, returnsImportScheduler, notificationService, shippingProviders, 5);
         store = new Store();
         store.setStoreId("store-1");
         when(providerFactory.availableProviders()).thenReturn(List.of(ALLEGRO, EMPIK));
@@ -203,6 +206,51 @@ class MarketplaceConnectionServiceTest {
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.unknown");
         verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void disconnectingAllegroAlsoSwitchesOffWysylamZAllegro() {
+        // given: a store with the Allegro marketplace and Wysyłam z Allegro using its connection
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+        store.addAdditionalShippingIntegration("allegro");
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Allegro");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(shippingProviders).disconnectAdditional(store, "allegro");
+    }
+
+    @Test
+    void aFailedAllegroDisconnectPutsTheWysylamZAllegroSettingsBack() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+        store.addAdditionalShippingIntegration("allegro");
+        ProviderConfigurationManager.SecretSnapshot before =
+                new ProviderConfigurationManager.SecretSnapshot(true, Map.of("labelFormat", "ZPL"));
+        when(configurationManager.snapshot(store, "allegro")).thenReturn(before);
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Allegro");
+
+        // then
+        assertThat(result.hasErrors()).isTrue();
+        verify(configurationManager).restore(store, "allegro", before);
+    }
+
+    @Test
+    void disconnectingAnotherMarketplaceLeavesWysylamZAllegro() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        store.addAdditionalShippingIntegration("allegro");
+
+        // when
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(shippingProviders, never()).disconnectAdditional(any(), any());
     }
 
     @Test

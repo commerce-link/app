@@ -242,6 +242,65 @@ public class Store {
         integrations.removeIf(config -> config.getType() == type);
     }
 
+    /** The integration the store-wide shipping settings belong to (carrier dictionary, carriers, webhook), or null. */
+    @DynamoDBIgnore
+    public String defaultShippingIntegration() {
+        return getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    /** The shipping integrations next to the default one (ShippingConfiguration#additionalIntegrations). */
+    @DynamoDBIgnore
+    public List<String> additionalShippingIntegrations() {
+        if (shippingConfiguration == null || shippingConfiguration.getAdditionalIntegrations() == null) {
+            return List.of();
+        }
+        return shippingConfiguration.getAdditionalIntegrations().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /** Adds an additional shipping integration once; a store without shipping settings gets them. */
+    @DynamoDBIgnore
+    public void addAdditionalShippingIntegration(String name) {
+        if (name == null || additionalShippingIntegrations().contains(name)) {
+            return;
+        }
+        if (shippingConfiguration == null) {
+            shippingConfiguration = new ShippingConfiguration();
+        }
+        if (shippingConfiguration.getAdditionalIntegrations() == null) {
+            shippingConfiguration.setAdditionalIntegrations(new LinkedList<>());
+        }
+        shippingConfiguration.getAdditionalIntegrations().add(name);
+    }
+
+    @DynamoDBIgnore
+    public void removeAdditionalShippingIntegration(String name) {
+        if (shippingConfiguration != null && shippingConfiguration.getAdditionalIntegrations() != null) {
+            shippingConfiguration.getAdditionalIntegrations().removeIf(existing -> Objects.equals(existing, name));
+        }
+    }
+
+    /** The default integration first, then the additional ones; a lost default (null name) is left out. */
+    @DynamoDBIgnore
+    public List<String> shippingIntegrationNames() {
+        List<String> names = new ArrayList<>();
+        String defaultName = defaultShippingIntegration();
+        if (defaultName != null) {
+            names.add(defaultName);
+        }
+        additionalShippingIntegrations().stream()
+                .filter(name -> !names.contains(name))
+                .forEach(names::add);
+        return List.copyOf(names);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasShippingIntegration(String name) {
+        return name != null && shippingIntegrationNames().contains(name);
+    }
+
     @DynamoDBIgnore
     public void removeMarketplaceIntegration(String marketplaceName) {
         marketplaces.removeIf(m -> marketplaceName.equals(m.getName()));

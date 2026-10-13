@@ -3,7 +3,14 @@ package pl.commercelink.web;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.shipping.AllegroShippingView;
 import pl.commercelink.shipping.ParcelForm;
+import pl.commercelink.shipping.ShippingIntegrationChoiceView;
+import pl.commercelink.shipping.ShippingIntegrationOption;
+import pl.commercelink.shipping.api.DeliveryPoint;
+import pl.commercelink.shipping.api.DeliveryType;
+import pl.commercelink.shipping.api.PackageOption;
+import pl.commercelink.shipping.api.ShipmentProposal;
 import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.api.ShippingEstimate;
 import pl.commercelink.stores.PackageTemplate;
@@ -79,7 +86,8 @@ class ShippingTemplateTest {
 
     static String page(String html) {
         int start = html.indexOf("<section class=\"cl-page\"");
-        return html.substring(start, html.indexOf("</section>", html.lastIndexOf("shipping-create-form")) + "</section>".length());
+        int createForm = Math.max(html.lastIndexOf("shipping-create-form"), html.lastIndexOf("allegro-create-form"));
+        return html.substring(start, html.indexOf("</section>", createForm) + "</section>".length());
     }
 
     static String render(Map<String, Object> variables) {
@@ -296,5 +304,176 @@ class ShippingTemplateTest {
             properties.load(reader);
         }
         return properties;
+    }
+
+    static ShipmentProposal allegroProposal() {
+        return ShipmentProposal.available("Allegro One Box, One Kurier", "ALLEGRO", new DeliveryPoint("ALBOX-WAW-0231"),
+                DeliveryType.LOCKER, List.of(new PackageOption("PACKAGE", new BigDecimal("64"), new BigDecimal("38"),
+                        new BigDecimal("41"), new BigDecimal("25"))), new BigDecimal("5000"), new BigDecimal("5000"));
+    }
+
+    static Map<String, Object> allegroModel() {
+        ShippingForm form = new ShippingForm(ORDER_ID, "orders");
+        form.setProvider("allegro");
+        form.setPackageTemplateId("t-pc");
+        form.setCashOnDelivery(true);
+        form.setCashOnDeliveryAmount(919.99);
+        form.setParcels(new ArrayList<>(List.of(new ParcelForm(30, 20, 15, 2, 920, "Akcesoria", "package"))));
+        Map<String, Object> variables = model(form, List.of(recipient("Katarzyna", "Złota 59")), orderView());
+        List<ShippingIntegrationOption> options = List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null),
+                ShippingIntegrationOption.available("allegro", "Wysyłam z Allegro", allegroProposal()).suggestedCopy());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(options, "allegro",
+                "Podpowiadamy Wysyłam z Allegro, bo zamówienie jest z Allegro.", null));
+        variables.put("allegroShipping", new AllegroShippingView("Allegro One Box, One Kurier", "One by Allegro",
+                "ALBOX-WAW-0231", "shipping.allegro.deliveryType.LOCKER", "Katarzyna Wiśniewska · +48 512 345 678",
+                "Limity metody Allegro One Box, One Kurier: najwyżej 64 × 38 × 41 cm, najwyżej 25 kg. Jedna paczka w przesyłce.",
+                "Do zapłaty w zamówieniu: 919,99 PLN. Pobranie wypłaci Allegro. Najwyżej 5 000,00 PLN.",
+                "Co najmniej kwota pobrania, najwyżej 5 000,00 PLN.", "shipping.allegro.labelFormat.PDF_A6",
+                "/dashboard/store/shipping/allegro"));
+        variables.put("allegroErrors", Map.of());
+        return variables;
+    }
+
+    @Test
+    void allegroOrderShowsTheChoiceAndTheOneStepAllegroForm() {
+        // when
+        String html = render(allegroModel());
+
+        // then
+        assertThat(html).contains("id=\"provider-form\"").contains(">Wyślij przez<")
+                .contains("name=\"provider\" value=\"allegro\"").contains("checked")
+                .contains("Podpowiadamy Wysyłam z Allegro, bo zamówienie jest z Allegro.")
+                .contains("id=\"allegro-create-form\"")
+                .contains("action=\"/dashboard/orders/" + ORDER_ID + "/shipping/allegro/create\"")
+                .contains("<dt>Metoda dostawy</dt><dd>Allegro One Box, One Kurier</dd>")
+                .contains("<dd>ALBOX-WAW-0231</dd>").contains("<dd>Automat paczkowy</dd>")
+                .contains("najwyżej 64 × 38 × 41 cm").contains("Każdy karton to osobna przesyłka")
+                .contains("name=\"parcels[0].depth\" value=\"20\"").contains("name=\"parcels[0].value\" value=\"920\"")
+                .contains("name=\"cashOnDeliveryAmount\"").contains("wg cennika Allegro")
+                .contains("PDF A6").contains("href=\"/dashboard/store/shipping/allegro\"")
+                .contains(">Utwórz przesyłkę<")
+                // the Furgonetka steps are not on the page
+                .doesNotContain("id=\"shipping-estimate-form\"").doesNotContain("id=\"shipping-template-form\"")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void allegroGreyedWithItsReasonForAShopOrder() {
+        // given
+        ShippingForm form = pricedOrderForm();
+        form.setProvider("furgonetka");
+        Map<String, Object> variables = model(form, List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.allegroOnly", null),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()),
+                "furgonetka", null, null));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).containsPattern("name=\"provider\" value=\"allegro\"[^>]*disabled")
+                .contains("Tylko dla zamówień z Allegro.")
+                .contains("id=\"shipping-estimate-form\"")
+                .contains("type=\"hidden\" name=\"provider\" value=\"furgonetka\"");
+    }
+
+    @Test
+    void allegroOrderSwitchedToFurgonetkaWarnsAboutTheBuyersMethod() {
+        // given
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.available("allegro", "Wysyłam z Allegro", allegroProposal()).suggestedCopy(),
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null)),
+                "furgonetka", null, "Kupujący wybrał Allegro One Box, One Kurier. Koszt pokryjesz z konta integracji Furgonetka, "
+                        + "a numer przesyłki wyślemy do Allegro jak dziś."));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("class=\"cl-alert is-warn\"").contains("Kupujący wybrał Allegro One Box, One Kurier.");
+    }
+
+    @Test
+    void singleIntegrationHasNoChoiceCard() {
+        // given
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.available("furgonetka", "Furgonetka", null).suggestedCopy()), "furgonetka", null, null));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).doesNotContain("id=\"provider-form\"");
+    }
+
+    @Test
+    void onlyAnUnavailableAllegroShowsItsReasonAndNeitherFormNorDefaultSteps() {
+        // given
+        Map<String, Object> variables = model(new ShippingForm(ORDER_ID, "orders"),
+                List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.consent", null)),
+                null, null, null));
+        variables.put("shippingUnavailable", "Żadna integracja wysyłki nie nada tego zamówienia.");
+
+        // when
+        String html = SettingsTemplateRenderer.render("shipping", variables).replaceAll("\\s+", " ");
+
+        // then
+        assertThat(html).contains("id=\"provider-form\"").contains("Brak zgody na przesyłki w aplikacji Allegro")
+                .containsPattern("name=\"provider\" value=\"allegro\"[^>]*disabled")
+                .contains("id=\"shipping-unavailable\"").contains("Żadna integracja wysyłki nie nada tego zamówienia.")
+                .doesNotContain("id=\"shipping-template-form\"").doesNotContain("id=\"allegro-create-form\"")
+                .doesNotContain("Wczytaj paczki");
+    }
+
+    @Test
+    void whenTheDefaultAndAllegroAreBothUnavailableBothReasonsShowAndNoStepsDo() {
+        // given
+        Map<String, Object> variables = model(new ShippingForm(ORDER_ID, "orders"),
+                List.of(recipient("Jan", "Polna 1")), orderView());
+        variables.put("integrationChoice", new ShippingIntegrationChoiceView(List.of(
+                ShippingIntegrationOption.unavailable("furgonetka", "Furgonetka", "shipping.integration.reason.notConnected", null),
+                ShippingIntegrationOption.unavailable("allegro", "Wysyłam z Allegro", "shipping.integration.reason.authLost", null)),
+                null, null, null));
+        variables.put("shippingUnavailable", "Żadna integracja wysyłki nie nada tego zamówienia.");
+
+        // when
+        String html = SettingsTemplateRenderer.render("shipping", variables).replaceAll("\\s+", " ");
+
+        // then
+        assertThat(html).contains("Integracja nie jest podłączona.").contains("Połączenie z Allegro wygasło")
+                .contains("id=\"shipping-unavailable\"").doesNotContain("id=\"shipping-template-form\"")
+                .doesNotContain("Wczytaj paczki");
+    }
+
+    @Test
+    void allegroFieldErrorsAreShownNextToTheirFields() {
+        // given
+        Map<String, Object> variables = allegroModel();
+        variables.put("allegroErrors", Map.of("insurance", "Ubezpieczenie musi wynosić co najmniej kwotę pobrania (920 PLN)."));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("id=\"allegro-insurance-error\"")
+                .contains("Ubezpieczenie musi wynosić co najmniej kwotę pobrania (920 PLN).")
+                .containsPattern("id=\"allegro-insurance\"[^>]*aria-invalid=\"true\"");
+    }
+
+    @Test
+    void cashOnDeliveryTellsThatAllegroPaysItOutToTheSellersAllegroFunds() {
+        // when
+        String html = render(allegroModel());
+
+        // then
+        assertThat(html).contains("id=\"allegro-cod-payout\"")
+                .contains("Pobranie wypłaci Allegro na Twoje środki w Allegro.")
+                .doesNotContain("konto sklepu").doesNotContain("konta bankowego");
     }
 }

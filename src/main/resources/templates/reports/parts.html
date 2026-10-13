@@ -130,6 +130,23 @@
                 <span class="cl-compare-val is-mkt" th:text="${row.marketplace() == null} ? '—' : (${row.money()} ? #{general.currency.amount(${row.marketplace()})} : ${row.marketplace()})"></span>
             </div>
         </div>
+        <div class="cl-compare-profiles">
+            <section th:each="profile : ${channels.profiles()}" class="cl-compare-profile"
+                     th:with="own=${profile.channel().name() == 'OWN'}, titleId=|channel-profile-${#strings.toLowerCase(profile.channel().name())}|"
+                     th:attr="aria-labelledby=${titleId}">
+                <h3 class="cl-compare-profile-title" th:id="${titleId}">
+                    <span class="cl-chart-key" th:classappend="${own} ? '' : 'is-2'" aria-hidden="true"></span>
+                    <span th:text="${own} ? #{reports.channel.own} : #{reports.channel.marketplace}"></span></h3>
+                <dl class="cl-kv is-column">
+                    <div><dt th:text="#{reports.channels.cost}"></dt>
+                        <dd class="is-numeric" th:text="#{general.currency.amount(${profile.costNet()})}"></dd></div>
+                    <div><dt th:text="#{reports.channels.margin}"></dt>
+                        <dd class="is-numeric" th:text="${profile.margin()} ?: '—'"></dd></div>
+                    <div><dt th:text="#{reports.channels.averageOrder}"></dt>
+                        <dd class="is-numeric" th:text="${profile.averageOrder() == null} ? '—' : #{general.currency.amount(${profile.averageOrder()})}"></dd></div>
+                </dl>
+            </section>
+        </div>
     </th:block>
 </section>
 

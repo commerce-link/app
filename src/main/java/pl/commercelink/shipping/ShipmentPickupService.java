@@ -65,12 +65,15 @@ public class ShipmentPickupService {
     }
 
     /** Windows common to the packages, from today on; daysAhead differs between the page and the immediate pickup. */
-    public List<PickupWindow> windows(Store store, String provider, List<String> externalIds, int daysAhead) {
+    public List<PickupWindow> windows(Store store, String provider, String pickUpAddressId, List<String> externalIds,
+                                      int daysAhead) {
         ShippingProvider shippingProvider = providerFor(store, provider);
         if (shippingProvider == null || !shippingProvider.supportsPickups() || externalIds.isEmpty()) {
             return List.of();
         }
-        return shippingProvider.pickupWindows(externalIds, LocalDate.now(), daysAhead);
+        // Allegro needs the address the courier comes to; Furgonetka ignores it (the overload delegates)
+        return shippingProvider.pickupWindows(externalIds, shippingService.pickupAddress(store, pickUpAddressId),
+                LocalDate.now(), daysAhead);
     }
 
     /**
@@ -79,9 +82,10 @@ public class ShipmentPickupService {
      * group without a courier: on a refusal each package is asked about alone, the refused ones are named with the
      * provider's reason and the windows are those of the rest. An error that is not a refusal is thrown as before.
      */
-    public PageWindows pageWindows(Store store, String provider, List<String> externalIds, int daysAhead) {
+    public PageWindows pageWindows(Store store, String provider, String pickUpAddressId, List<String> externalIds,
+                                 int daysAhead) {
         try {
-            return new PageWindows(windows(store, provider, externalIds, daysAhead), Map.of());
+            return new PageWindows(windows(store, provider, pickUpAddressId, externalIds, daysAhead), Map.of());
         } catch (RuntimeException e) {
             if (!ProviderErrors.isRefusal(e)) {
                 throw e;
@@ -89,7 +93,7 @@ public class ShipmentPickupService {
             Map<String, String> refused = new LinkedHashMap<>();
             for (String externalId : externalIds) {
                 try {
-                    windows(store, provider, List.of(externalId), daysAhead);
+                    windows(store, provider, pickUpAddressId, List.of(externalId), daysAhead);
                 } catch (RuntimeException single) {
                     if (!ProviderErrors.isRefusal(single)) {
                         throw single;
@@ -101,7 +105,7 @@ public class ShipmentPickupService {
                 throw e;
             }
             List<String> rest = externalIds.stream().filter(id -> !refused.containsKey(id)).toList();
-            return new PageWindows(windows(store, provider, rest, daysAhead), refused);
+            return new PageWindows(windows(store, provider, pickUpAddressId, rest, daysAhead), refused);
         }
     }
 
@@ -109,7 +113,8 @@ public class ShipmentPickupService {
     public record PageWindows(List<PickupWindow> windows, Map<String, String> refused) {
     }
 
-    public PickupStart order(Store store, String provider, List<PickupTarget> targets, PickupWindow window) {
+    public PickupStart order(Store store, String provider, String pickUpAddressId, List<PickupTarget> targets,
+                             PickupWindow window) {
         ShippingProvider shippingProvider = providerFor(store, provider);
         if (shippingProvider == null) {
             return PickupStart.gone();
@@ -124,7 +129,8 @@ public class ShipmentPickupService {
         List<String> externalIds = marked.stream().map(PickupTarget::externalId).distinct().toList();
         PickupOrder result;
         try {
-            result = shippingProvider.orderPickup(externalIds, window, commandId);
+            result = shippingProvider.orderPickup(externalIds, shippingService.pickupAddress(store, pickUpAddressId),
+                    window, commandId);
         } catch (RuntimeException e) {
             if (ProviderErrors.isRefusal(e)) {
                 return refused(check, ProviderErrors.describe(e));
@@ -213,11 +219,8 @@ public class ShipmentPickupService {
         return check.getTargets().stream().map(PickupTarget::externalId).toList();
     }
 
-    // the window and the command go to the integration that created the packages, which must be the store's
+    // the window and the command go to the integration that created the packages, if the store still has it
     private ShippingProvider providerFor(Store store, String provider) {
-        if (provider == null || !provider.equals(shippingService.providerName(store))) {
-            return null;
-        }
-        return shippingService.providerFor(store);
+        return provider == null ? null : shippingService.providerNamed(store, provider).orElse(null);
     }
 }

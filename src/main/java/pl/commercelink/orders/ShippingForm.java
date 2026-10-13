@@ -21,6 +21,8 @@ public class ShippingForm {
     private boolean toClient;
     private boolean cashOnDelivery;
     private double cashOnDeliveryAmount;
+    /** The shipping integration the page ships through ("Wyślij przez"); null: the store's default one. */
+    private String provider;
 
     private ShippingForm() {}
 
@@ -30,7 +32,13 @@ public class ShippingForm {
     }
 
     public String getShippingAction() {
-        return createActionUrl("shipping");
+        String url = createActionUrl("shipping");
+        return StringUtils.isNotBlank(provider) ? url + "?provider=" + provider : url;
+    }
+
+    /** "Utwórz przesyłkę" of the Wysyłam z Allegro form: one step, no pricing. */
+    public String getShippingAllegroCreateAction() {
+        return createActionUrl("shipping/allegro/create");
     }
 
     public String getShippingTemplateAction() {
@@ -152,5 +160,13 @@ public class ShippingForm {
 
     public void setCashOnDeliveryAmount(double cashOnDeliveryAmount) {
         this.cashOnDeliveryAmount = cashOnDeliveryAmount;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
     }
 }

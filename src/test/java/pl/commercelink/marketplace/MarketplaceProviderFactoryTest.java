@@ -66,9 +66,10 @@ class MarketplaceProviderFactoryTest {
         when(descriptor.name()).thenReturn("Allegro");
 
         // when
-        factory.onAuthorizationLost(store, descriptor);
+        boolean changed = factory.onAuthorizationLost(store, descriptor);
 
         // then
+        assertThat(changed).isTrue();
         assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isFalse();
         verifyNoInteractions(notificationService);
     }

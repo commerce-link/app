@@ -80,7 +80,8 @@ public class ImmediatePickup {
         Store store = storesRepository.findById(creation.getStoreId());
         List<PickupWindow> windows;
         try {
-            windows = pickupService.windows(store, creation.getProvider(), externalIds, DAYS_AHEAD);
+            windows = pickupService.windows(store, creation.getProvider(), creation.getPickUpAddressId(), externalIds,
+                    DAYS_AHEAD);
         } catch (RuntimeException e) {
             // the owner reports the failed pickup in its own way (a notification, an error for a customer's return)
             log.warn("Pickup of {} {} in store {} was not ordered: its windows could not be read", creation.getOwnerType(),
@@ -96,7 +97,8 @@ public class ImmediatePickup {
         List<PickupTarget> targets = externalIds.stream().map(id -> target(creation, id, created)).toList();
         PickupStart start;
         try {
-            start = pickupService.order(store, creation.getProvider(), targets, window);
+            start = pickupService.order(store, creation.getProvider(), creation.getPickUpAddressId(), targets,
+                    window);
         } catch (RuntimeException e) {
             // the service logged it and failed what it had marked, so the pickup can be ordered again
             log.warn("Pickup of {} {} in store {} was not ordered: marking its packages broke off",

@@ -75,7 +75,7 @@ class ShipmentPickupControllerTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
-        when(pickupService.pageWindows(any(), any(), anyList(), anyInt()))
+        when(pickupService.pageWindows(any(), any(), any(), anyList(), anyInt()))
                 .thenReturn(new ShipmentPickupService.PageWindows(List.of(), Map.of()));
         controller = new ShipmentPickupController(pickupService, storesRepository, providerFactory, messages);
     }
@@ -120,10 +120,26 @@ class ShipmentPickupControllerTest {
     }
 
     @Test
+    void anAllegroOwnNetworkCarrierReadsOneByAllegroInTheGroupLabel() {
+        // given
+        PickupGroup one = group("ALLEGRO_ONE_KURIER", "addr-1",
+                entry("7", ShipmentOwnerType.ORDER, ORDER_1, "ALLEGRO_ONE_KURIER", "addr-1"));
+        when(pickupService.groups(STORE_ID)).thenReturn(List.of(one));
+        when(pickupService.pageWindows(any(), any(), any(), any(), eq(4))).thenReturn(new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of()));
+
+        // when
+        ShipmentPickupPage page = open(one.key(), BACK);
+
+        // then
+        assertThat(page.groups()).extracting(ShipmentPickupPage.GroupOption::label)
+                .allMatch(label -> label.startsWith("One by Allegro · ") && !label.contains("ALLEGRO_ONE_KURIER"));
+    }
+
+    @Test
     void theRequestedGroupIsShownWithItsPackagesAndTheWindowsOfTheNextFourDays() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
-        when(pickupService.pageWindows(store, "furgonetka", List.of("1", "2"), 4)).thenReturn(new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of()));
+        when(pickupService.pageWindows(eq(store), eq("furgonetka"), any(), eq(List.of("1", "2")), eq(4))).thenReturn(new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of()));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -152,7 +168,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(page.selectedKey()).isEqualTo(DHL.key());
-        verify(pickupService).pageWindows(store, "furgonetka", List.of("9"), 4);
+        verify(pickupService).pageWindows(store, "furgonetka", "addr-1", List.of("9"), 4);
     }
 
     @Test
@@ -177,14 +193,14 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(page.hasGroups()).isFalse();
-        verify(pickupService, never()).pageWindows(any(), any(), anyList(), anyInt());
+        verify(pickupService, never()).pageWindows(any(), any(), any(), anyList(), anyInt());
     }
 
     @Test
     void aProviderErrorReadingTheWindowsIsShownInsteadOfThem() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.pageWindows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingException("Brak usługi odbioru"));
+        when(pickupService.pageWindows(any(), any(), any(), anyList(), anyInt())).thenThrow(new ShippingException("Brak usługi odbioru"));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -198,7 +214,7 @@ class ShipmentPickupControllerTest {
     void aDisconnectedIntegrationIsNamedWhenTheWindowsAreRead() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.pageWindows(any(), any(), anyList(), anyInt())).thenThrow(new ShippingUnavailableException(STORE_ID));
+        when(pickupService.pageWindows(any(), any(), any(), anyList(), anyInt())).thenThrow(new ShippingUnavailableException(STORE_ID));
 
         // when
         ShipmentPickupPage page = open(DPD.key(), BACK);
@@ -254,7 +270,7 @@ class ShipmentPickupControllerTest {
     void orderingFromTheListReturnsToTheSameListWithThePlainMessage() {
         // given: order 1's package is left out, which an order page would be told about
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -284,7 +300,7 @@ class ShipmentPickupControllerTest {
     void ordersThePickupForTheChosenPackagesOfTheGroup() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
-        when(pickupService.order(eq(store), eq("furgonetka"), anyList(), eq(WINDOW))).thenReturn(PickupStart.started());
+        when(pickupService.order(eq(store), eq("furgonetka"), any(), anyList(), eq(WINDOW))).thenReturn(PickupStart.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         String back = "/dashboard/rma/" + ORDER_2;
@@ -294,7 +310,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:" + back);
-        verify(pickupService).order(eq(store), eq("furgonetka"),
+        verify(pickupService).order(eq(store), eq("furgonetka"), any(),
                 eq(List.of(new PickupTarget(ShipmentOwnerType.RMA, ORDER_2, "2", "TRK-2"))), eq(WINDOW));
         assertThat(redirect.getFlashAttributes().get("successMessage"))
                 .isEqualTo("Zamawiamy odbiór. Termin pojawi się przy przesyłkach za kilka sekund.");
@@ -304,7 +320,7 @@ class ShipmentPickupControllerTest {
     void theOrderWhosePackageWasLeftOutIsToldItsPackageIsNotInThePickup() {
         // given: the operator came from order 1 and unticked its package (refused by the carrier, or deselected)
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -320,7 +336,7 @@ class ShipmentPickupControllerTest {
     void theRmaWhosePackageWasLeftOutIsToldItsPackageIsNotInThePickup() {
         // given: an order and an RMA may share an id-shaped path; only the RMA's own package counts
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.started());
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -335,7 +351,7 @@ class ShipmentPickupControllerTest {
     void aPageWithoutAPackageInTheGroupGetsThePlainMessage() {
         // given: the order list, and an order whose packages wait in another group
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DHL, DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.started());
         RedirectAttributesModelMap fromList = new RedirectAttributesModelMap();
         RedirectAttributesModelMap fromOtherOrder = new RedirectAttributesModelMap();
 
@@ -363,7 +379,7 @@ class ShipmentPickupControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/shipping/pickups/new?group=furgonetka%7Cdpd%7Caddr-2&back="
                 + "%2Fdashboard%2Forders%2F" + ORDER_1);
         assertThat(redirect.getFlashAttributes().get("pickupError")).isEqualTo("Zaznacz co najmniej jedną paczkę.");
-        verify(pickupService, never()).order(any(), any(), any(), any());
+        verify(pickupService, never()).order(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -377,7 +393,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(redirect.getFlashAttributes().get("pickupError")).isEqualTo("Wybierz termin odbioru.");
-        verify(pickupService, never()).order(any(), any(), any(), any());
+        verify(pickupService, never()).order(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -405,7 +421,7 @@ class ShipmentPickupControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:" + BACK);
-        verify(pickupService, never()).order(any(), any(), any(), any());
+        verify(pickupService, never()).order(any(), any(), any(), any(), any());
         assertThat(redirect.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("Żadna z wybranych paczek nie czeka już na odbiór.");
     }
@@ -414,7 +430,7 @@ class ShipmentPickupControllerTest {
     void theProvidersRefusalIsShownOnReturn() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.refused("cmd-1", "Brak okna"));
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.refused("cmd-1", "Brak okna"));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -428,7 +444,7 @@ class ShipmentPickupControllerTest {
     void aDisconnectedIntegrationOrdersNothing() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenThrow(new ShippingUnavailableException(STORE_ID));
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenThrow(new ShippingUnavailableException(STORE_ID));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
@@ -444,7 +460,7 @@ class ShipmentPickupControllerTest {
     void theOrderGoesBackOnlyWithinTheDashboard() {
         // given
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.order(any(), any(), anyList(), any())).thenReturn(PickupStart.started());
+        when(pickupService.order(any(), any(), any(), anyList(), any())).thenReturn(PickupStart.started());
 
         // when
         String view = controller.order(DPD.key(), List.of("1"), WINDOW_VALUE, "https://evil.example",
@@ -458,7 +474,7 @@ class ShipmentPickupControllerTest {
     void aPackageTheCarrierRefusesIsNamedAndLeftOutWhileTheOthersKeepTheirWindows() {
         // given: package 2 was booked in the provider's panel, so the carrier gives no windows for it
         when(pickupService.groups(STORE_ID)).thenReturn(List.of(DPD));
-        when(pickupService.pageWindows(store, "furgonetka", List.of("1", "2"), 4)).thenReturn(
+        when(pickupService.pageWindows(eq(store), eq("furgonetka"), any(), eq(List.of("1", "2")), eq(4))).thenReturn(
                 new ShipmentPickupService.PageWindows(List.of(WINDOW), Map.of("2", "Przesyłka została już zamówiona")));
 
         // when

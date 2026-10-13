@@ -29,6 +29,8 @@ public final class ShipmentResults {
             s.setTrackingUrl(parcel.trackingUrl());
             s.setShippedAt(now);
             s.setPickup(pickupOf(parcel));
+            // only the refusal is stored; a cancellable parcel keeps the attribute empty like older records
+            s.setCancellable(parcel.cancellable() ? null : Boolean.FALSE);
             return s;
         }).toList();
     }
