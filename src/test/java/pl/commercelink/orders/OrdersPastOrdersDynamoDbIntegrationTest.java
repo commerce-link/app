@@ -14,9 +14,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,7 +30,7 @@ class OrdersPastOrdersDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static OrdersRepository orders;
     static final LocalDate FROM = LocalDate.of(2026, 5, 1);

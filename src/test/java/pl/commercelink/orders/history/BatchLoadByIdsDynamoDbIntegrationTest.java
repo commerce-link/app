@@ -14,13 +14,13 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMARepository;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.util.List;
 import java.util.Set;
@@ -34,7 +34,7 @@ class BatchLoadByIdsDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static AmazonDynamoDB client;
     static DynamoDBMapper mapper;
