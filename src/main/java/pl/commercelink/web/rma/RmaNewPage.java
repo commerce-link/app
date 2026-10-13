@@ -37,6 +37,11 @@ public record RmaNewPage(State state, String query, String backHref, String back
     public record Summary(String email, int count, int pieces, String value, boolean canCreate) {
     }
 
+    public RmaNewPage withPageError(String error) {
+        return new RmaNewPage(state, query, backHref, backLabel, from, leadText, order, choice, notFoundDesc, ineligible,
+                items, itemsEmptyText, summary, error, errorSummary, fieldErrors);
+    }
+
     public boolean hasErrors() {
         return pageError != null || !errorSummary.isEmpty();
     }
