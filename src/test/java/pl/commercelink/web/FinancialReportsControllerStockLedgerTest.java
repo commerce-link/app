@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.ui.ExtendedModelMap;
+import org.springframework.ui.Model;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Delivery;
@@ -23,6 +25,8 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
+import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.reports.ReportPeriod;
 import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
@@ -40,6 +44,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,7 +56,8 @@ class FinancialReportsControllerStockLedgerTest {
     private static final LocalDate FROM = LocalDate.of(2026, 3, 1);
     private static final LocalDate TO = LocalDate.of(2026, 3, 31);
     private static final StockLedgerPeriod MARCH = new StockLedgerPeriod(FROM, TO);
-    private static final String CLOSING_SECTION = "redirect:/dashboard/reports#stock-ledger-closing";
+    private static final String LABEL_MARCH = "marzec 2026";
+    private static final String CLOSING_SECTION = "redirect:/dashboard/reports/stock-ledger";
 
     @Mock
     private StockLedgerPeriodClosing stockLedgerPeriodClosing;
@@ -83,16 +89,43 @@ class FinancialReportsControllerStockLedgerTest {
     }
 
     @Test
-    void closedPeriodIsConfirmedOnTheClosingSection() throws Exception {
+    void theBackLinkOfTheClosingPageReturnsToTheReportWithItsPeriod() {
+        // given
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.stockLedger(model, PL, "2026-03-01", "2026-03-31");
+
+        // then
+        assertThat(model.getAttribute("backHref")).isEqualTo("/dashboard/reports?dateFrom=2026-03-01&dateTo=2026-03-31");
+    }
+
+    @Test
+    void theBackLinkFallsBackToTheReportWhenThePeriodIsMissingOrUnreadable() {
+        // given
+        Model withoutParams = new ExtendedModelMap();
+        Model unreadable = new ExtendedModelMap();
+
+        // when
+        controller.stockLedger(withoutParams, PL, null, null);
+        controller.stockLedger(unreadable, PL, "yesterday", "2026-03-31");
+
+        // then
+        assertThat(withoutParams.getAttribute("backHref")).isEqualTo("/dashboard/reports");
+        assertThat(unreadable.getAttribute("backHref")).isEqualTo("/dashboard/reports");
+    }
+
+    @Test
+    void closedPeriodIsConfirmedOnTheClosingPage() throws Exception {
         // given
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Closed(MARCH, false, List.of()));
 
         // when
-        String view = controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        String view = controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
         assertThat(view).isEqualTo(CLOSING_SECTION);
-        verify(redirectAttributes).addFlashAttribute("successMessage", "reports.stockLedger.closing.closed");
+        verify(redirectAttributes).addFlashAttribute("ledgerSuccess", "reports.stockLedger.closing.closed");
     }
 
     @Test
@@ -101,10 +134,10 @@ class FinancialReportsControllerStockLedgerTest {
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Closed(MARCH, true, List.of()));
 
         // when
-        controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
-        verify(redirectAttributes).addFlashAttribute("successMessage", "reports.stockLedger.closing.regenerated");
+        verify(redirectAttributes).addFlashAttribute("ledgerSuccess", "reports.stockLedger.closing.regenerated");
     }
 
     @Test
@@ -114,10 +147,10 @@ class FinancialReportsControllerStockLedgerTest {
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Closed(MARCH, true, List.of(april)));
 
         // when
-        controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
-        verify(messageSource).getMessage(eq("reports.stockLedger.closing.outdated"), aryEq(new Object[]{MARCH.label(), april.label()}), eq(PL));
+        verify(messageSource).getMessage(eq("reports.stockLedger.closing.outdated"), aryEq(new Object[]{LABEL_MARCH, "kwiecień 2026"}), eq(PL));
         verify(redirectAttributes).addFlashAttribute("ledgerOutdated", "reports.stockLedger.closing.outdated");
     }
 
@@ -130,29 +163,29 @@ class FinancialReportsControllerStockLedgerTest {
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Blocked(List.of(delivery)));
 
         // when
-        String view = controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        String view = controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
         assertThat(view).isEqualTo(CLOSING_SECTION);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "reports.stockLedger.closing.blocked");
+        verify(redirectAttributes).addFlashAttribute("ledgerError", "reports.stockLedger.closing.blocked");
         verify(redirectAttributes).addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(FROM, TO, List.of(
                 new StockLedgerClosingBlocker(delivery.getDeliveryId(), delivery.getShortenedDeliveryId(), "Manual Hurt",
                         "ZS/1/2026", LocalDate.of(2026, 3, 15), "reports.stockLedger.closing.missing.sync"))));
     }
 
     @Test
-    void gapBeforeThePeriodNamesTheDayTheNextPeriodStarts() throws Exception {
+    void gapBeforeThePeriodNamesTheDayTheNextPeriodStartsAsThePageWritesDays() throws Exception {
         // given
         LocalDate nextFrom = LocalDate.of(2026, 2, 1);
         when(stockLedgerPeriodClosing.close(STORE_ID, MARCH))
                 .thenReturn(new NotAllowed("reports.stockLedger.closing.error.gap", List.of(nextFrom)));
 
         // when
-        controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
-        verify(messageSource).getMessage(eq("reports.stockLedger.closing.error.gap"), aryEq(new Object[]{MARCH.label(), nextFrom}), eq(PL));
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "reports.stockLedger.closing.error.gap");
+        verify(messageSource).getMessage(eq("reports.stockLedger.closing.error.gap"), aryEq(new Object[]{LABEL_MARCH, "1.02.2026"}), eq(PL));
+        verify(redirectAttributes).addFlashAttribute("ledgerError", "reports.stockLedger.closing.error.gap");
     }
 
     @Test
@@ -162,10 +195,10 @@ class FinancialReportsControllerStockLedgerTest {
                 .thenReturn(new NotAllowed("reports.stockLedger.closing.error.notOver"));
 
         // when
-        controller.closeStockLedgerPeriod(FROM, TO, redirectAttributes, PL);
+        controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "reports.stockLedger.closing.error.notOver");
+        verify(redirectAttributes).addFlashAttribute("ledgerError", "reports.stockLedger.closing.error.notOver");
     }
 
     @Test
@@ -190,5 +223,79 @@ class FinancialReportsControllerStockLedgerTest {
         // when / then
         assertThatThrownBy(() -> controller.closedStockLedger(FROM, TO, new MockHttpServletResponse()))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void theConfirmationPageClosesNothing() throws Exception {
+        // given
+        Model model = new ExtendedModelMap();
+        when(stockLedgerPeriodClosing.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH));
+
+        // when
+        String view = controller.confirmStockLedgerRegeneration(FROM, TO, null, null, model, PL);
+
+        // then
+        assertThat(view).isEqualTo("settings-confirm");
+        ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+        assertThat(confirm.actionPath()).isEqualTo("/dashboard/reports/stock-ledger/close?dateFrom=" + FROM + "&dateTo=" + TO);
+        assertThat(confirm.cancelPath()).isEqualTo("/dashboard/reports/stock-ledger");
+        assertThat(confirm.destructive()).isFalse();
+        verify(stockLedgerPeriodClosing, never()).close(any(), any());
+    }
+
+    @Test
+    void theConfirmationPageCarriesTheReportPeriodToTheActionAndBack() throws Exception {
+        // given
+        Model model = new ExtendedModelMap();
+        when(stockLedgerPeriodClosing.closedPeriods(STORE_ID)).thenReturn(List.of(MARCH));
+
+        // when
+        controller.confirmStockLedgerRegeneration(FROM, TO, "2026-09-01", "2026-09-30", model, PL);
+
+        // then
+        ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+        assertThat(confirm.actionPath()).isEqualTo("/dashboard/reports/stock-ledger/close?dateFrom=2026-03-01&dateTo=2026-03-31"
+                + "&from=2026-09-01&to=2026-09-30");
+        assertThat(confirm.cancelPath()).isEqualTo("/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30");
+    }
+
+    @Test
+    void aRangeThatIsNotAClosedPeriodHasNothingToGenerateAgain() {
+        // given
+        Model model = new ExtendedModelMap();
+        when(stockLedgerPeriodClosing.closedPeriods(STORE_ID)).thenReturn(List.of());
+
+        // when
+        String view = controller.confirmStockLedgerRegeneration(FROM, TO, "2026-09-01", "2026-09-30", model, PL);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30");
+        assertThat(model.getAttribute("confirm")).isNull();
+    }
+
+    @Test
+    void afterClosingThePageStillReturnsToTheReportItWasOpenedFrom() throws Exception {
+        // given
+        when(stockLedgerPeriodClosing.close(STORE_ID, MARCH)).thenReturn(new Closed(MARCH, false, List.of()));
+
+        // when
+        String view = controller.closeStockLedgerPeriod(FROM, TO, "2026-09-01", "2026-09-30", redirectAttributes, PL);
+        String unreadable = controller.closeStockLedgerPeriod(FROM, TO, "//evil.example", "x", redirectAttributes, PL);
+
+        // then
+        assertThat(view).isEqualTo(CLOSING_SECTION + "?from=2026-09-01&to=2026-09-30");
+        assertThat(unreadable).isEqualTo(CLOSING_SECTION);
+    }
+
+    @Test
+    void theClosingPageKeepsTheReportPeriodForItsForms() {
+        // given
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.stockLedger(model, PL, "2026-09-01", "2026-09-30");
+
+        // then
+        assertThat(model.getAttribute("report")).isEqualTo(new ReportPeriod(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)));
     }
 }
