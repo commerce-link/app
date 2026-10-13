@@ -14,9 +14,7 @@
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
                     <a class="cl-button" th:href="@{/dashboard/item/history}"><i class="fas fa-history" aria-hidden="true"></i><span th:text="#{rma.list.history}"></span></a>
-                    <a class="cl-button is-primary" th:href="@{/dashboard/rma/new}">
-                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span><span th:text="#{rma.list.create}"></span>
-                    </a>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/rma/new}"><i class="fas fa-plus" aria-hidden="true"></i><span th:text="#{rma.list.create}"></span></a>
                 </div>
             </div>
             <p class="cl-page-lead" th:text="#{rma.list.lead}"></p>
