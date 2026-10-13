@@ -17,9 +17,14 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
                               String deliveryHref, String movesTitle, List<Move> moves, String summary, String emptyText) {
 
     public record Move(String documentNo, String documentHref, String typeName, boolean incoming, String date,
-                       String change, String changeTone, String after) {}
+                       String change, String changeTone, String after, String reason, String note) {}
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm");
+
+    /** The same page with another delivery link; null names the delivery id without a link (an item without a delivery). */
+    public ItemHistoryPage withDeliveryHref(String href) {
+        return new ItemHistoryPage(backHref, backLabel, productName, mfn, deliveryShortId, href, movesTitle, moves, summary, emptyText);
+    }
 
     public static ItemHistoryPage of(MfnHistory history, String deliveryId, String mfn, String backHref, String backLabel,
                                      MessageSource messages, Locale locale) {
@@ -34,7 +39,9 @@ public record ItemHistoryPage(String backHref, String backLabel, String productN
             moves.add(new Move(r.documentNo(), DocumentRowMapper.detailsHref("/dashboard", r.documentId()),
                     typeName(r, kind, messages, locale), kind != null && kind.incoming(),
                     r.createdAt() == null ? "—" : r.createdAt().format(WHEN), change, tone,
-                    messages.getMessage("warehouse.documents.history.after", new Object[]{r.stockAfter()}, locale)));
+                    messages.getMessage("warehouse.documents.history.after", new Object[]{r.stockAfter()}, locale),
+                    r.reason() == null ? null : messages.getMessage("DocumentReason." + r.reason().name(), null, locale),
+                    r.note() == null || r.note().isBlank() ? null : r.note().trim()));
         }
         return new ItemHistoryPage(backHref, backLabel, history.productName(), mfn, DocumentRowMapper.shortId(deliveryId),
                 DeliveryLinks.of(false, null, URLEncoder.encode(deliveryId, StandardCharsets.UTF_8)).details(),

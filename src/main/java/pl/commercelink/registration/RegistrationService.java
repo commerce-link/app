@@ -28,7 +28,7 @@ public class RegistrationService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final int STORE_NAME_MIN = 2;
-    private static final int STORE_NAME_MAX = 60;
+    static final int STORE_NAME_MAX = 60;
 
     private final CognitoUserService cognitoUserService;
     private final StoreSeeder storeSeeder;

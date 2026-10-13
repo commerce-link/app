@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ExtendedModelMap;
 
 import java.util.Locale;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,11 +107,9 @@ class RegistrationControllerTest {
     }
 
     @Test
-    void showsErrorWhenTermsNotAccepted() {
+    void showsTermsErrorUnderTheCheckbox() {
         // given
         captchaPasses();
-        when(messageSource.getMessage(eq("registration.error.terms-consent-required"), any(), any(Locale.class)))
-                .thenReturn("Zaakceptuj regulamin.");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -119,18 +118,18 @@ class RegistrationControllerTest {
 
         // then
         assertEquals("register", view);
-        assertEquals("Zaakceptuj regulamin.", model.getAttribute("errorMessage"));
+        assertEquals(Map.of("termsConsent", "registration.error.terms-consent-required"), model.getAttribute("fieldErrors"));
+        assertEquals("termsConsent", model.getAttribute("autofocus"));
+        assertNull(model.getAttribute("errorMessage"));
         verify(registrationService, never()).validateCandidate(anyString(), anyString());
     }
 
     @Test
-    void showsErrorWhenEmailAlreadyTaken() {
+    void showsTakenEmailErrorUnderTheEmailField() {
         // given
         captchaPasses();
         when(registrationService.validateCandidate("user@example.com", "Sklep Testowy"))
                 .thenThrow(new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS));
-        when(messageSource.getMessage(eq("registration.error.email-exists"), any(), any(Locale.class)))
-                .thenReturn("Konto istnieje.");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -139,8 +138,28 @@ class RegistrationControllerTest {
 
         // then
         assertEquals("register", view);
-        assertEquals("Konto istnieje.", model.getAttribute("errorMessage"));
+        assertEquals(Map.of("email", "registration.error.email-exists"), model.getAttribute("fieldErrors"));
+        assertEquals("email", model.getAttribute("autofocus"));
+        assertEquals("user@example.com", model.getAttribute("email"));
+        assertEquals(true, model.getAttribute("termsConsent"));
+        assertNull(model.getAttribute("errorMessage"));
         assertNull(sessionPending());
+    }
+
+    @Test
+    void showsStoreNameErrorUnderTheStoreNameField() {
+        // given
+        captchaPasses();
+        when(registrationService.validateCandidate("user@example.com", "S"))
+                .thenThrow(new RegistrationException(RegistrationException.Reason.INVALID_STORE_NAME));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.register("user@example.com", "S", null, "on", "token", request, model, Locale.ROOT);
+
+        // then
+        assertEquals(Map.of("storeName", "registration.error.invalid-store-name"), model.getAttribute("fieldErrors"));
+        assertEquals("storeName", model.getAttribute("autofocus"));
     }
 
     @Test
@@ -197,11 +216,9 @@ class RegistrationControllerTest {
     }
 
     @Test
-    void rejectsWeakPasswordAndKeepsPendingRegistration() {
+    void rejectsWeakPasswordUnderThePasswordFieldAndKeepsPendingRegistration() {
         // given
         pending("user@example.com", "Sklep Testowy");
-        when(messageSource.getMessage(eq("registration.error.weak-password"), any(), any(Locale.class)))
-                .thenReturn("Hasło za słabe.");
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -209,9 +226,30 @@ class RegistrationControllerTest {
 
         // then
         assertEquals("register-password", view);
-        assertEquals("Hasło za słabe.", model.getAttribute("errorMessage"));
+        assertEquals(Map.of("password", "registration.error.weak-password"), model.getAttribute("fieldErrors"));
+        assertEquals("password", model.getAttribute("autofocus"));
+        assertNull(model.getAttribute("errorMessage"));
         assertNotNull(sessionPending());
         verifyNoInteractions(registrationService, autoLoginService);
+    }
+
+    @Test
+    void showsTakenEmailAsAlertOnPasswordStepBecauseThePageHasNoEmailField() {
+        // given
+        pending("user@example.com", "Sklep Testowy");
+        when(registrationService.register("user@example.com", "Sklep Testowy", "1.1.1.1", PASSWORD))
+                .thenThrow(new RegistrationException(RegistrationException.Reason.EMAIL_EXISTS));
+        when(messageSource.getMessage(eq("registration.error.email-exists"), any(), any(Locale.class)))
+                .thenReturn("Konto istnieje.");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.setPassword(PASSWORD, request, response, model, Locale.ROOT);
+
+        // then
+        assertEquals("Konto istnieje.", model.getAttribute("errorMessage"));
+        assertEquals(Map.of(), model.getAttribute("fieldErrors"));
+        assertEquals("password", model.getAttribute("autofocus"));
     }
 
     @Test
@@ -311,8 +349,23 @@ class RegistrationControllerTest {
         // then
         assertEquals("register", view);
         assertEquals(true, model.getAttribute("demoMode"));
+        assertEquals(2, model.getAttribute("stepTotal"));
+        assertEquals(Map.of(), model.getAttribute("fieldErrors"));
+        assertEquals("email", model.getAttribute("autofocus"));
         assertEquals(3, model.getAttribute("ttlDays"));
         assertEquals(14, model.getAttribute("trialDays"));
         assertEquals("site-key", model.getAttribute("captchaSiteKey"));
+    }
+
+    @Test
+    void registerPageLimitsTheStoreNameToTheLengthTheServerAccepts() {
+        // given
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller(false).registerPage(model);
+
+        // then
+        assertEquals(RegistrationService.STORE_NAME_MAX, model.getAttribute("storeNameMaxLength"));
     }
 }
