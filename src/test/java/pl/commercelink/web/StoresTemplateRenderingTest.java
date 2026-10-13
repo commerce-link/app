@@ -166,7 +166,8 @@ class StoresTemplateRenderingTest {
         String withoutPhrase = render(page(row), null);
 
         // then
-        assertThat(withPhrase).contains("role=\"status\"").contains("Results: 1");
+        assertThat(withPhrase).contains("role=\"status\"").contains("Results: 1")
+                .contains("<p class=\"cl-table-results cl-visually-hidden\" role=\"status\">");
         assertThat(withoutPhrase).doesNotContain("cl-table-results");
     }
 

@@ -73,7 +73,8 @@
             </div>
 
             <div class="cl-list-meta is-count-only" th:if="${query.q() != null}">
-                <p class="cl-table-results" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
+                <!--/* For screen readers only, like the offers list without chips: the segment counts already show the number. */-->
+                <p class="cl-table-results cl-visually-hidden" role="status" th:text="#{stores.list.results(${#lists.size(page.rows())})}"></p>
             </div>
 
             <!--/* The name's link covers the whole row; the actions cell sits above it (commercelink.css). */-->
