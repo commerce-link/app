@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
@@ -58,65 +59,49 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
     }
 
     List<WarehouseItem> findAll(String storeId, FulfilmentStatus status) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":status", new AttributeValue().withS(status.name()));
-
-        Map<String, String> ean = new HashMap<>();
-        ean.put("#status", "status");
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND #status = :status")
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(ean);
-
-        return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
+        return findAllFiltered(storeId, null, List.of(status));
     }
 
+    /**
+     * One store's items, optionally narrowed to categories and statuses. A Query on the store's partition: a Scan read the
+     * items of every store and only then dropped the others, on each list view and each filter click.
+     */
     List<WarehouseItem> findAllFiltered(String storeId, List<String> categories, List<FulfilmentStatus> statuses) {
         Map<String, AttributeValue> eav = new HashMap<>();
         Map<String, String> ean = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-
-        StringBuilder filterExpression = new StringBuilder("storeId = :storeId");
-
+        List<String> conditions = new ArrayList<>();
         if (categories != null && !categories.isEmpty()) {
             ean.put("#category", "category");
-            StringBuilder categoryFilter = new StringBuilder();
-            for (int i = 0; i < categories.size(); i++) {
-                String key = ":category" + i;
-                eav.put(key, new AttributeValue().withS(categories.get(i)));
-                if (i > 0) {
-                    categoryFilter.append(" OR ");
-                }
-                categoryFilter.append("#category = ").append(key);
-            }
-            filterExpression.append(" AND (").append(categoryFilter).append(")");
+            conditions.add(anyOf("#category", ":category", categories, eav));
         }
-
         if (statuses != null && !statuses.isEmpty()) {
             ean.put("#status", "status");
-            StringBuilder statusFilter = new StringBuilder();
-            for (int i = 0; i < statuses.size(); i++) {
-                String key = ":status" + i;
-                eav.put(key, new AttributeValue().withS(statuses.get(i).name()));
-                if (i > 0) {
-                    statusFilter.append(" OR ");
-                }
-                statusFilter.append("#status = ").append(key);
-            }
-            filterExpression.append(" AND (").append(statusFilter).append(")");
+            conditions.add(anyOf("#status", ":status", statuses.stream().map(FulfilmentStatus::name).toList(), eav));
         }
 
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(filterExpression.toString())
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(ean);
-
-        return dynamoDBMapper.scan(WarehouseItem.class, scanExpression);
+        WarehouseItem key = new WarehouseItem();
+        key.setStoreId(storeId);
+        DynamoDBQueryExpression<WarehouseItem> query = new DynamoDBQueryExpression<WarehouseItem>()
+                .withHashKeyValues(key)
+                .withConsistentRead(false);
+        // DynamoDB refuses an empty filter, empty names or empty values
+        if (!conditions.isEmpty()) {
+            query.withFilterExpression(String.join(" AND ", conditions))
+                    .withExpressionAttributeNames(ean)
+                    .withExpressionAttributeValues(eav);
+        }
+        return dynamoDBMapper.query(WarehouseItem.class, query);
     }
 
-    /** Every item of the store whose serial field contains the text; fragments match too, callers filter exactly. */
+    private static String anyOf(String name, String valuePrefix, List<String> values, Map<String, AttributeValue> eav) {
+        List<String> alternatives = new ArrayList<>();
+        for (int i = 0; i < values.size(); i++) {
+            eav.put(valuePrefix + i, new AttributeValue().withS(values.get(i)));
+            alternatives.add(name + " = " + valuePrefix + i);
+        }
+        return "(" + String.join(" OR ", alternatives) + ")";
+    }
+
     List<WarehouseItem> findBySerialNoCandidates(String storeId, String serialNo) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));

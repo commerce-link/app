@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE">CommerceLink</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" th:href="@{/css/commercelink.css}">
+    <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
+</head>
+<body>
+<div class="cl-page cl-signup-page">
+    <main class="cl-signup">
+        <div class="cl-signup-top">
+            <p th:replace="~{fragments/signup :: brand}"></p>
+            <th:block layout:fragment="top"></th:block>
+        </div>
+        <div class="cl-signup-content" layout:fragment="content"></div>
+        <p class="cl-signup-foot" th:text="#{signup.footer(${#dates.format(#dates.createNow(), 'yyyy')})}"></p>
+    </main>
+    <aside th:replace="~{fragments/signup :: panel}"></aside>
+</div>
+</body>
+</html>

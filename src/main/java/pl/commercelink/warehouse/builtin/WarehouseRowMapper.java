@@ -37,13 +37,14 @@ class WarehouseRowMapper {
     private final Predicate<String> connectedSupplier;
     private final Predicate<String> knownSupplier;
     private final boolean admin;
+    private final String back;
 
     /**
      * connectedSupplier tells a supplier identity of the store's connections from any other delivery id; knownSupplier
      * tells any supplier name (connected or not) from a delivery id.
      */
     WarehouseRowMapper(MessageSource messages, Locale locale, DeliveryRedirectResolver redirects, UnaryOperator<String> supplierLabel,
-                       Predicate<String> connectedSupplier, Predicate<String> knownSupplier, boolean admin) {
+                       Predicate<String> connectedSupplier, Predicate<String> knownSupplier, boolean admin, String back) {
         this.messages = messages;
         this.locale = locale;
         this.redirects = redirects;
@@ -51,6 +52,7 @@ class WarehouseRowMapper {
         this.connectedSupplier = connectedSupplier;
         this.knownSupplier = knownSupplier;
         this.admin = admin;
+        this.back = back;
     }
 
     static boolean uncategorized(String category) {
@@ -72,7 +74,7 @@ class WarehouseRowMapper {
         String systemCost = item.hasUnitSystemCost()
                 ? text("warehouse.item.system.cost.tooltip", Money.format(item.systemCost().netValue()), Money.format(item.systemCost().grossValue()))
                 : null;
-        return new WarehouseItemRow(item.getItemId(), "/dashboard/warehouse/items/" + item.getItemId(), item.getName(), codes,
+        return new WarehouseItemRow(item.getItemId(), ItemBack.itemHref(item.getItemId(), back), item.getName(), codes,
                 marked ? text("ItemCondition." + condition.name()) : null,
                 condition == ItemCondition.Damaged ? "is-bad" : marked ? "is-warn" : null,
                 StringUtils.trimToNull(item.getComment()),

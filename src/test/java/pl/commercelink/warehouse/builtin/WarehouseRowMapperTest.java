@@ -32,7 +32,7 @@ class WarehouseRowMapperTest {
      */
     private static WarehouseRowMapper mapper(boolean admin) {
         return new WarehouseRowMapper(messages(), PL, new DeliveryRedirectResolver(),
-                identity -> "Acme".equals(identity) ? "Acme Polska" : identity, "Acme"::equals, Set.of("Acme", "Kosatec")::contains, admin);
+                identity -> "Acme".equals(identity) ? "Acme Polska" : identity, "Acme"::equals, Set.of("Acme", "Kosatec")::contains, admin, null);
     }
 
     private static WarehouseItem item() {
@@ -41,6 +41,21 @@ class WarehouseRowMapperTest {
         item.setItemId("6e01f99c-0000-0000-0000-000000000000");
         item.setStatus(FulfilmentStatus.Delivered);
         return item;
+    }
+
+    @Test
+    void rowLinkCarriesTheListItCameFrom() {
+        // given
+        WarehouseItem item = item();
+        WarehouseRowMapper mapper = new WarehouseRowMapper(messages(), PL, new DeliveryRedirectResolver(), s -> s, s -> false,
+                s -> false, false, "/dashboard/warehouse?statuses=all&page=2");
+
+        // when
+        WarehouseItemRow row = mapper.map(item);
+
+        // then
+        assertThat(row.href()).isEqualTo("/dashboard/warehouse/items/" + item.getItemId()
+                + "?back=%2Fdashboard%2Fwarehouse%3Fstatuses%3Dall%26page%3D2");
     }
 
     @Test
