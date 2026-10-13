@@ -67,7 +67,7 @@ public record RmaListQuery(Scope scope, Set<RMAStatus> statuses, String q, Perio
         if (q != null || effective == Scope.ACTIVE || after != null) {
             before = null;
         }
-        if (effective == Scope.ACTIVE) {
+        if (effective == Scope.ACTIVE && q == null) {
             after = null;
             offset = Math.max(0, offset);
         } else {

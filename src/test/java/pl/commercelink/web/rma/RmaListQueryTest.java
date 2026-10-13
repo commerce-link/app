@@ -141,4 +141,20 @@ class RmaListQueryTest {
         assertThat(RmaListQuery.legacyHref(params(Map.of("rmaId", List.of(""), "orderId", List.of("o-1")))))
                 .contains("/dashboard/rma?q=o-1");
     }
+
+    @Test
+    void aSearchInTheActiveScopeStillPagesByCursor() {
+        // given
+        String cursor = new RmaCursor("2026-10-13T09:05", "a1").encode();
+
+        // when
+        RmaListQuery q = parse(Map.of("scope", List.of("active"), "q", List.of("x"), "after", List.of(cursor),
+                "before", List.of(cursor), "offset", List.of("25")));
+
+        // then
+        assertThat(q.after()).isEqualTo(new RmaCursor("2026-10-13T09:05", "a1"));
+        assertThat(q.before()).isNull();
+        assertThat(q.offset()).isEqualTo(25);
+        assertThat(q.href()).contains("scope=active", "q=x", "after=", "offset=25").doesNotContain("before=");
+    }
 }
