@@ -21,4 +21,9 @@ public record StockLedgerClosingBlocker(String deliveryId, String number, String
                         ? "reports.stockLedger.closing.missing.invoice"
                         : "reports.stockLedger.closing.missing.sync");
     }
+
+    /** The day as the rest of the page writes it ("9.10.2026"). */
+    public String receivedText() {
+        return receivedOn == null ? "" : new ReportPeriod(receivedOn, receivedOn).rangeText();
+    }
 }

@@ -1,4 +1,7 @@
 package pl.commercelink.financials;
 
-public record FinancialReports(FinancialReport ownSources, FinancialReport marketplace) {
+import java.util.List;
+
+public record FinancialReports(FinancialReport ownSources, FinancialReport marketplace,
+                               List<DailySales> days, List<SupplierDeliveries> suppliers) {
 }

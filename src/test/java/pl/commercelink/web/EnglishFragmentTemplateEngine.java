@@ -29,6 +29,10 @@ final class EnglishFragmentTemplateEngine {
     }
 
     static TemplateEngine create() {
+        return create(Locale.ENGLISH);
+    }
+
+    static TemplateEngine create(Locale locale) {
         StringTemplateResolver stringResolver = new StringTemplateResolver();
         stringResolver.setOrder(1);
         stringResolver.setTemplateMode(TemplateMode.HTML);
@@ -44,7 +48,7 @@ final class EnglishFragmentTemplateEngine {
         templateEngine.setDialect(new SpringStandardDialect());
         templateEngine.addTemplateResolver(stringResolver);
         templateEngine.addTemplateResolver(classpathResolver);
-        templateEngine.setMessageResolver(new EnglishMessages());
+        templateEngine.setMessageResolver(new LocaleMessages(locale));
         templateEngine.setLinkBuilder(new ContextRootLinkBuilder());
         return templateEngine;
     }
@@ -62,13 +66,19 @@ final class EnglishFragmentTemplateEngine {
         }
     }
 
-    private static class EnglishMessages implements IMessageResolver {
+    private static class LocaleMessages implements IMessageResolver {
 
-        private final ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.ENGLISH);
+        private final Locale locale;
+        private final ResourceBundle messages;
+
+        LocaleMessages(Locale locale) {
+            this.locale = locale;
+            this.messages = ResourceBundle.getBundle("messages", locale);
+        }
 
         @Override
         public String getName() {
-            return "english";
+            return "messages";
         }
 
         @Override
@@ -84,7 +94,7 @@ final class EnglishFragmentTemplateEngine {
             String message = messages.getString(key);
             return parameters == null || parameters.length == 0
                     ? message
-                    : new MessageFormat(message, Locale.ENGLISH).format(parameters);
+                    : new MessageFormat(message, locale).format(parameters);
         }
 
         @Override
