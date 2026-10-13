@@ -94,6 +94,7 @@ class RmaNewTemplateTest {
         assertThat(html).contains("data-cl-error-summary").contains("Popraw zaznaczone pola, żeby utworzyć RMA")
                 .contains("href=\"#items0.qty\"").contains("href=\"#email\"")
                 .contains("aria-invalid=\"true\"").contains("id=\"items0.qty-error\"").contains("id=\"email-error\"");
+        assertThat(html.split("data-cl-error-summary", -1)).hasSize(2);
     }
 
     @Test

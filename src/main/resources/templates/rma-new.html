@@ -8,7 +8,8 @@
     <section class="cl-page">
         <div class="cl-page-body is-wide">
             <div th:replace="~{rma-new/parts :: header(${p})}"></div>
-            <div th:if="${p.pageError() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <div th:if="${p.pageError() != null}" class="cl-alert is-bad" tabindex="-1"
+                 th:attr="data-cl-error-summary=${p.errorSummary().isEmpty()} ? '' : null">
                 <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${p.pageError()}"></p>
             </div>

@@ -156,7 +156,7 @@
                 <td colspan="4">
                     <div class="cl-row-detail-inner">
                         <div class="cl-rma-item-fields">
-                            <fieldset class="cl-choice-group is-row" th:id="${resId}"
+                            <fieldset class="cl-choice-group is-row" tabindex="-1" th:id="${resId}"
                                       th:attr="aria-invalid=${resErr != null ? 'true' : null}, aria-describedby=${resErr != null ? resId + '-error' : null}">
                                 <legend class="cl-label" th:text="#{rma.new.resolution.legend}"></legend>
                                 <label class="cl-choice" th:each="res : ${T(pl.commercelink.orders.rma.RMAResolutionType).values()}">
