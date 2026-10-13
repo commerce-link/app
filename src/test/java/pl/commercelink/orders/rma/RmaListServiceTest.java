@@ -105,7 +105,7 @@ class RmaListServiceTest {
         assertThat(ids(page)).containsExactly("n1", "w1", "a1", "r1");
         assertThat(page.tiles()).extracting(RmaListPage.Tile::label, RmaListPage.Tile::count)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("Do rozpatrzenia", 1L),
-                        org.assertj.core.groups.Tuple.tuple("Czekamy na klienta", 2L),
+                        org.assertj.core.groups.Tuple.tuple("Czeka na przesyłkę", 2L),
                         org.assertj.core.groups.Tuple.tuple("Do sprawdzenia", 1L),
                         org.assertj.core.groups.Tuple.tuple("W realizacji", 0L));
         assertThat(page.segments()).extracting(RmaListPage.SegmentLink::count, RmaListPage.SegmentLink::active)
