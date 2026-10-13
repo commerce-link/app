@@ -12340,6 +12340,84 @@ a.cl-link-button:hover {
     font-size: 13.5px;
 }
 
+/* RMA list (spec 2026-10-13): the return shipment and the marketplace state each get their own line under the status
+   pill; the order column gives way to the customer below 1216 px and is hidden on the phone card (cl-cards-hide).
+   The age warning (.cl-due-note.is-warn) is already styled by the orders table, which is-rma extends. */
+.cl-page .cl-table.is-rma .cl-rma-track {
+    display: block;
+}
+
+.cl-page .cl-table.is-rma .cl-cell-date {
+    white-space: nowrap;
+}
+
+/* A long word in a company or surname (Konstantynopolitańczykiewiczówna) breaks instead of widening the table past the
+   card (design system §1.4). */
+.cl-page .cl-table.is-rma .cl-cell-client {
+    overflow-wrap: anywhere;
+}
+
+/* A pill whose label wraps keeps its dot on the first line instead of centring it between the lines; on one line the
+   dot sits where it always does (6 px into an 18 px line). It wraps between words only: breaking anywhere would let the
+   status column shrink to one letter ("Zatwi / erdzo / ny") beside a long client. */
+.cl-page .cl-table.is-rma .cl-status {
+    align-items: flex-start;
+    overflow-wrap: normal;
+}
+
+.cl-page .cl-table.is-rma .cl-status::before {
+    margin-top: 6px;
+}
+
+/* The orders table tones every age note, so its hover rule leaves .cl-due-note alone; an untoned RMA age ("3 dni") in
+   --cl-ink-3 would be 4.48:1 on the hover tint. */
+.cl-page .cl-table.is-rma tbody tr:hover .cl-due-note:not(.is-warn) {
+    color: var(--cl-ink-2);
+}
+
+/* The Allegro return reference is longer than the 14ch the orders table allows a code; it wraps instead of ending in an
+   ellipsis, since the list is the only place to read it without opening the RMA (the full text is also the title). */
+.cl-page .cl-table.is-rma .cl-table-key .cl-table-sub .cl-table-code {
+    display: inline;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* Phone card: the number is the row's name and is always shown whole, so its column is as wide as the number and the
+   status pill takes the rest and wraps when its text is long; the pill sits at the card's edge, its text starts at the
+   dot. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-rma tr {
+        grid-template-columns: max-content minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-rma .cl-table-key .cl-row-link {
+        flex-shrink: 0;
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .cl-page .cl-table.is-rma .cl-status {
+        white-space: normal;
+    }
+}
+
+/* Beside the sidebar the status column would otherwise be as wide as "Oczekiwanie na przedmioty" and push the table
+   past the card at 720-789 px; the pill wraps like on the phone card. */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-rma .is-secondary-column {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-rma .cl-status {
+        white-space: normal;
+    }
+}
+
 /* Reports (app#290): period switcher, channel comparison card, HTML column chart, supplier cost table. Mockups:
    docs/active/reports-redesign/makiety/ (variant E2b). One colour per sales channel across the whole page. */
 :root {
@@ -12528,6 +12606,13 @@ a.cl-link-button:hover {
 .cl-page .cl-compare-row .cl-hbar-track { height: 24px; }
 .cl-page .cl-compare-row .cl-hbar-seg { font-size: 12px; }
 .cl-page .cl-compare-row.is-plain .cl-compare-mid { font-size: 12.5px; color: var(--cl-ink-2); text-align: center; }
+/* figures of each channel that do not add up into a share (net cost, margin, average order): one panel per channel
+   under the share rows, a key dot in the title as in the head, values as dl.cl-kv.is-column (label left, number right,
+   one line also on a phone); the panels stack below 720 px */
+.cl-page .cl-compare-profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 20px 20px; }
+.cl-page .cl-compare-profile { border: 1px solid var(--cl-line); border-radius: var(--cl-radius); padding: 12px 16px 14px; }
+.cl-page .cl-compare-profile-title { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-compare-profile dl.cl-kv { gap: 8px; padding: 0; }
 /* 720–1023 px: the share bar is narrow, so the measure column gives it room and a segment keeps its percent whole */
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-compare-head, .cl-page .cl-compare-row { grid-template-columns: 120px minmax(100px, max-content) minmax(0, 1fr) minmax(100px, max-content); gap: 4px 10px; }
@@ -12547,6 +12632,7 @@ a.cl-link-button:hover {
     .cl-page .cl-compare-val.is-mkt { text-align: right; grid-row: 2; grid-column: 2; }
     .cl-page .cl-compare-mid { grid-column: 1 / -1; grid-row: 3; }
     .cl-page .cl-compare-row.is-plain .cl-compare-mid { display: none; }
+    .cl-page .cl-compare-profiles { grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0 16px 16px; }
 }
 
 /* Stock ledger closing subpage: fixed-start facts, inline date fields and the spacing between its cards.

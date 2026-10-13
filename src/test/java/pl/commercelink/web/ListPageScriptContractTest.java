@@ -22,6 +22,7 @@ class ListPageScriptContractTest {
         String pagination = read("src/main/resources/templates/fragments/pagination.html");
         String orders = read("src/main/resources/templates/orders/list.html") + pagination;
         String deliveries = read("src/main/resources/templates/deliveries.html") + pagination;
+        String rma = read("src/main/resources/templates/rma.html") + pagination;
 
         // then
         for (String hook : List.of("data-cl-list-results", "data-cl-list-path", "data-cl-list-fragment", "data-cl-list-nav",
@@ -29,6 +30,7 @@ class ListPageScriptContractTest {
             assertThat(script).as("script uses " + hook).contains(hook);
             assertThat(orders).as("orders list renders " + hook).contains(hook);
             assertThat(deliveries).as("deliveries list renders " + hook).contains(hook);
+            assertThat(rma).as("RMA list renders " + hook).contains(hook);
         }
         assertThat(deliveries).contains("data-cl-toolbar-toggle").contains("data-cl-autosubmit-hide").contains("/js/list-page.js");
         assertThat(orders).doesNotContain("data-cl-" + "orders-").contains("/js/list-page.js").doesNotContain("orders-" + "list.js");
