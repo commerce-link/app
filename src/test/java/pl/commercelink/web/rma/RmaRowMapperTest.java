@@ -111,6 +111,42 @@ class RmaRowMapperTest {
     }
 
     @Test
+    void aBuyerSentParcelJoinsTheMarketplaceLineInsteadOfWaitingForever() {
+        // given: the import records the buyer's carrier and waybill, nothing tracks it
+        RMA rma = rma(RMAStatus.WaitingForItems, LocalDateTime.of(2026, 10, 12, 9, 0));
+        rma.setMarketplace("Allegro");
+        rma.setExternalReturnId("ret-1");
+        rma.setExternalReturnStatus(MarketplaceReturnStatus.DELIVERED);
+        Shipment parcel = new Shipment();
+        parcel.setCarrier("DPD");
+        parcel.setTrackingNo("0000123456789");
+        rma.setShipments(List.of(parcel));
+
+        // when
+        RmaRow row = mapper.map(rma, TODAY);
+
+        // then
+        assertThat(row.trackText()).isNull();
+        assertThat(row.marketplaceText()).isEqualTo("Allegro: Doręczony · DPD");
+    }
+
+    @Test
+    void aShopRmaShipmentWithoutDatesStillWaitsForPickup() {
+        // given
+        RMA rma = rma(RMAStatus.Approved, LocalDateTime.of(2026, 10, 12, 9, 0));
+        Shipment parcel = new Shipment();
+        parcel.setCarrier("InPost");
+        rma.setShipments(List.of(parcel));
+
+        // when
+        RmaRow row = mapper.map(rma, TODAY);
+
+        // then
+        assertThat(row.trackText()).isEqualTo("InPost · czeka na nadanie");
+        assertThat(row.marketplaceText()).isNull();
+    }
+
+    @Test
     void aMarketplaceReturnWithoutTheMarketplaceNameShowsItsStatusAlone() {
         // given
         RMA rma = rma(RMAStatus.Approved, LocalDateTime.of(2026, 10, 12, 9, 0));

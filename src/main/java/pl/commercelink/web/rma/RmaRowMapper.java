@@ -61,7 +61,7 @@ public class RmaRowMapper {
                 StringUtils.trimToNull(rma.getOrderId()),
                 text("RMAStatus." + status.name()),
                 tone(status),
-                track(rma.getShipments()),
+                marketplace ? trackedOnly(rma.getShipments()) : track(rma.getShipments()),
                 marketplace ? marketplaceStatus(rma) : null,
                 rma.getCreatedAt() == null ? null : DAY.format(rma.getCreatedAt()),
                 age == null ? null : age == 0 ? text("rma.list.age.today") : age == 1 ? text("rma.list.age.one") : text("rma.list.age.days", age),
@@ -80,13 +80,35 @@ public class RmaRowMapper {
         };
     }
 
-    /** "Allegro: W drodze"; a return whose marketplace name is missing shows the status alone, never "null: ...". */
+    /**
+     * "Allegro: W drodze · DPD". The buyer sends a marketplace return with a waybill of their own: the import records its
+     * carrier and number but nothing tracks it, so the marketplace's status is the only state the parcel has, and its
+     * carrier joins that line instead of a "czeka na nadanie" that would never change. A return whose marketplace name
+     * is missing shows the status alone, never "null: ...".
+     */
     private String marketplaceStatus(RMA rma) {
         if (rma.getExternalReturnStatus() == null) {
             return null;
         }
         String status = text("MarketplaceReturnStatus." + rma.getExternalReturnStatus().name());
-        return StringUtils.isBlank(rma.getMarketplace()) ? status : text("rma.list.marketplace.status", rma.getMarketplace(), status);
+        String line = StringUtils.isBlank(rma.getMarketplace()) ? status : text("rma.list.marketplace.status", rma.getMarketplace(), status);
+        Shipment last = last(rma.getShipments());
+        return last == null || isTracked(last) || StringUtils.isBlank(last.getCarrier()) ? line
+                : text("rma.list.marketplace.withCarrier", line, last.getCarrier());
+    }
+
+    /** A return shipment of a marketplace return, shown only when the store booked it and so knows its dates. */
+    private String trackedOnly(List<Shipment> shipments) {
+        Shipment last = last(shipments);
+        return last != null && isTracked(last) ? track(shipments) : null;
+    }
+
+    private static boolean isTracked(Shipment shipment) {
+        return shipment.getShippedAt() != null || shipment.getDeliveredAt() != null;
+    }
+
+    private static Shipment last(List<Shipment> shipments) {
+        return shipments == null || shipments.isEmpty() ? null : shipments.get(shipments.size() - 1);
     }
 
     private String track(List<Shipment> shipments) {
