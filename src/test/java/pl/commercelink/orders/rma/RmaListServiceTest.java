@@ -254,6 +254,87 @@ class RmaListServiceTest {
         assertThat(second.pagination().previousHref()).isEqualTo("/dashboard/rma");
     }
 
+    @Test
+    void aRecordWithoutStatusCountsAsNew() {
+        // given
+        seedActiveAndClosed();
+        add("x1", null, LocalDateTime.of(2026, 10, 13, 10, 0), "x@x.pl");
+
+        // when
+        RmaListPage page = page(Map.of());
+
+        // then
+        assertThat(ids(page)).contains("x1");
+        assertThat(page.tiles().get(0).count()).isEqualTo(2L);
+        assertThat(page.statusMenu().options().get(0).value()).isEqualTo("New");
+        assertThat(page.statusMenu().options().get(0).count()).isEqualTo(2L);
+    }
+
+    @Test
+    void closedBackwardPagingReproducesTheSamePagesForwardPagingShowed() {
+        // given
+        seedActiveAndClosed();
+
+        // when
+        RmaListPage first = page(Map.of("scope", List.of("closed")));
+        RmaListPage second = page(params(first.pagination().nextHref()));
+        RmaListPage third = page(params(second.pagination().nextHref()));
+        RmaListPage backTo2 = page(params(third.pagination().previousHref()));
+        RmaListPage backTo1 = page(params(backTo2.pagination().previousHref()));
+
+        // then
+        assertThat(ids(third)).hasSize(10);
+        assertThat(ids(backTo2)).isEqualTo(ids(second));
+        assertThat(backTo2.pagination().fromIndex()).isEqualTo(25);
+        assertThat(ids(backTo1)).isEqualTo(ids(first));
+        assertThat(backTo1.pagination().fromIndex()).isEqualTo(0);
+    }
+
+    @Test
+    void closedBackwardPagingWithAStatusFilterSkipsOtherStatuses() {
+        // given
+        seedActiveAndClosed();
+        for (int i = 60; i < 90; i++) {
+            add("c" + i, RMAStatus.Completed, LocalDateTime.of(2026, 10, 9, 12, 0).minusDays(i), "c" + i + "@x.pl");
+        }
+        Map<String, List<String>> filter = Map.of("scope", List.of("closed"), "status", List.of("Completed"));
+
+        // when
+        RmaListPage first = page(filter);
+        RmaListPage second = page(params(first.pagination().nextHref()));
+        RmaListPage third = page(params(second.pagination().nextHref()));
+        RmaListPage backTo2 = page(params(third.pagination().previousHref()));
+        RmaListPage backTo1 = page(params(backTo2.pagination().previousHref()));
+
+        // then
+        assertThat(first.rows()).hasSize(25);
+        assertThat(second.rows()).hasSize(25);
+        assertThat(third.rows()).hasSize(25);
+        assertThat(ids(backTo2)).isEqualTo(ids(second));
+        assertThat(ids(backTo1)).isEqualTo(ids(first));
+        assertThat(ids(first)).noneMatch(id -> Integer.parseInt(id.substring(1)) % 4 == 0);
+    }
+
+    @Test
+    void aSearchBatchBoundaryKeepsInterleavedActiveRmasInOrderAndExactlyOnce() {
+        // given
+        LocalDateTime base = LocalDateTime.of(2026, 10, 9, 12, 0);
+        for (int i = 0; i < 600; i++) {
+            add("c" + i, RMAStatus.Completed, base.minusHours(i), i == 550 ? "needle@x.pl" : "c@x.pl");
+        }
+        add("aNewest", RMAStatus.New, base.plusHours(5), "needle@x.pl");
+        add("aInside", RMAStatus.New, base.minusHours(100).minusMinutes(30), "needle@x.pl");
+        add("aAfterBoundary", RMAStatus.New, base.minusHours(520).minusMinutes(30), "needle@x.pl");
+
+        // when
+        RmaListPage first = page(Map.of("q", List.of("needle")));
+        RmaListPage more = page(params(first.scope().moreHref()));
+
+        // then
+        assertThat(ids(first)).containsExactly("aNewest", "aInside");
+        assertThat(ids(more)).containsExactly("aAfterBoundary", "c550");
+    }
+
     private static Map<String, List<String>> params(String href) {
         Map<String, List<String>> out = new LinkedHashMap<>();
         String query = href.contains("?") ? href.substring(href.indexOf('?') + 1) : "";

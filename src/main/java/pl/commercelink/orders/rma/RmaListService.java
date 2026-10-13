@@ -173,7 +173,7 @@ public class RmaListService {
 
     private List<Tile> tiles(RmaListQuery q, List<RMA> allActive, Locale locale) {
         return TILES.stream().map(def -> {
-            long count = allActive.stream().filter(r -> def.statuses().contains(r.getStatus())).count();
+            long count = allActive.stream().filter(r -> def.statuses().contains(statusOf(r))).count();
             boolean active = q.effectiveScope() == Scope.ACTIVE && q.statuses().equals(def.statuses());
             String href = active ? q.withStatuses(Set.of()).href() : q.forTile(def.statuses()).href();
             return new Tile(text(locale, "rma.list.tile." + def.key()), text(locale, "rma.list.tile." + def.key() + ".hint"),
@@ -190,8 +190,8 @@ public class RmaListService {
 
     private StatusMenu statusMenu(RmaListQuery q, List<RMA> allActive, Locale locale) {
         boolean counted = q.effectiveScope() == Scope.ACTIVE;
-        Map<RMAStatus, Long> counts = allActive.stream().filter(r -> r.getStatus() != null)
-                .collect(Collectors.groupingBy(RMA::getStatus, Collectors.counting()));
+        Map<RMAStatus, Long> counts = allActive.stream()
+                .collect(Collectors.groupingBy(RmaListService::statusOf, Collectors.counting()));
         List<StatusOption> options = q.allowedStatuses().stream()
                 .map(s -> new StatusOption(s.name(), text(locale, "RMAStatus." + s.name()),
                         counted ? counts.getOrDefault(s, 0L) : null, q.statuses().contains(s)))
@@ -271,6 +271,11 @@ public class RmaListService {
         if (rma.getCreatedAt() == null) return false;
         LocalDate day = rma.getCreatedAt().toLocalDate();
         return (from == null || !day.isBefore(from)) && (to == null || !day.isAfter(to));
+    }
+
+    // a record without a status counts as New, like RmaListQuery.accepts does
+    private static RMAStatus statusOf(RMA rma) {
+        return rma.getStatus() == null ? RMAStatus.New : rma.getStatus();
     }
 
     private static String position(RMA rma) {
