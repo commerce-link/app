@@ -37,8 +37,6 @@ class ReportGenerationListenerTest {
 
     @Test
     void theMessageIsHandedToTheGeneratorOfItsReportType() throws Exception {
-        // given
-
         // when
         listener.handleMessage(CLOSING);
 

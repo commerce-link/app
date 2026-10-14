@@ -241,8 +241,6 @@ class FinancialReportsControllerStockLedgerTest {
 
     @Test
     void afterClosingThePageStillReturnsToTheReportItWasOpenedFrom() throws Exception {
-        // given
-
         // when
         String view = controller.closeStockLedgerPeriod(FROM, TO, "2026-09-01", "2026-09-30", redirectAttributes, PL);
         String unreadable = controller.closeStockLedgerPeriod(FROM, TO, "//evil.example", "x", redirectAttributes, PL);
@@ -266,8 +264,6 @@ class FinancialReportsControllerStockLedgerTest {
 
     @Test
     void anAllowedClosingIsSentToTheQueueAndAcceptedAtOnce() {
-        // given
-
         // when
         String view = controller.closeStockLedgerPeriod(FROM, TO, null, null, redirectAttributes, PL);
 

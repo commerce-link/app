@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReportGenerationPublisherTest {
@@ -31,7 +32,7 @@ class ReportGenerationPublisherTest {
     void theMessageCarriesTheStoreTheReportTypeAndTheRange() {
         // given
         ArgumentCaptor<Consumer<SqsSendOptions<Object>>> captor = ArgumentCaptor.forClass(Consumer.class);
-        org.mockito.Mockito.when(options.queue(any())).thenReturn(options);
+        when(options.queue(any())).thenReturn(options);
 
         // when
         publisher.order("store-1", ReportType.STOCK_LEDGER_CLOSING, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));

@@ -276,8 +276,6 @@ class StockLedgerPeriodClosingTest {
 
     @Test
     void checkOfAnAllowedPeriodFindsNothingToRefuse() {
-        // given
-
         // when
         var refusal = closing.check(STORE_ID, MARCH);
 
