@@ -120,7 +120,7 @@
     </th>
     <td class="is-numeric" th:attr="data-label=#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
         <span class="cl-price-margin"><span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span><th:block
-              th:if="${row.margin() != null}"><th:block th:replace="~{offers/basket :: margin(${row.margin()})}"></th:block></th:block></span>
+              th:if="${row.margin() != null}"><th:block th:replace="~{offers/basket :: margin(${row.margin()}, ${row.market() != null and row.market().unavailable()})}"></th:block></th:block></span>
     </td>
     <td class="is-numeric" th:attr="data-label=#{offers.basket.items.column.market(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
         <span th:if="${row.market() == null}" class="cl-table-empty" th:text="#{offers.basket.market.service}"></span>
@@ -134,14 +134,15 @@
 </tr>
 
 <!--/* The order's margin mark (orders/details/items :: margin) with the estimate's own wording: the cost is the market
-       median now, not a purchase. Same element, classes and tones. */-->
-<span th:fragment="margin(m)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
+       median now, not a purchase. Same element, classes and tones. marketDown: the supplier index did not answer, which
+       says nothing about the product's offers. */-->
+<span th:fragment="margin(m, marketDown)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
-      th:with="text=${m.tone().name() == 'UNKNOWN'} ? #{offers.basket.margin.unknown}
+      th:with="text=${marketDown} ? #{offers.basket.margin.unavailable} : (${m.tone().name() == 'UNKNOWN'} ? #{offers.basket.margin.unknown}
                 : #{${'offers.basket.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
                     ${#messages.msg('general.currency.amount', m.profit())},
                     ${#messages.msg('general.currency.amount', m.cost())},
-                    ${#messages.msg('general.currency.amount', m.profitNet())})}"
+                    ${#messages.msg('general.currency.amount', m.profitNet())})})"
       th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
       th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
 

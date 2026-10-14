@@ -75,6 +75,7 @@ class BasketViewRenderingTest {
                 .contains("data-cl-copy=\"" + ID + "\"")
                 .contains("data-cl-confirm-tone=\"primary\"")
                 .contains("Utworzyć zamówienie z koszyka 8f3a21c7?")
+                .contains("Przejdziesz do danych klienta. Po ich zatwierdzeniu powstanie zamówienie")
                 .contains("href=\"/dashboard/basket/view/" + ID + "/order\"")
                 .contains("Utwórz ofertę z koszyka")
                 .contains("Pozycje i dane klienta przejdą do nowej oferty")
@@ -100,6 +101,7 @@ class BasketViewRenderingTest {
                 .contains("Usługa")
                 .contains("Ilość × cena (PLN)")
                 .contains("Rynek (PLN)")
+                .contains("data-label=\"Rynek (PLN)\"")
                 .contains("Kopiuj kod producenta");
     }
 
@@ -196,6 +198,8 @@ class BasketViewRenderingTest {
 
         // then
         assertThat(html).contains("<span class=\"cl-table-empty\">brak danych</span>")
+                .contains("data-tooltip=\"Nie udało się pobrać ofert dostawców — marży nie da się teraz oszacować.\"")
+                .doesNotContain("Brak ofert dostawców")
                 .doesNotContain("Brak w asortymencie");
     }
 
@@ -208,7 +212,7 @@ class BasketViewRenderingTest {
         String html = html(page);
 
         // then
-        assertThat(html).contains("691,06 PLN · 12,3 %");
+        assertThat(html).contains("691,06 PLN · 12,3%");
     }
 
     @Test
