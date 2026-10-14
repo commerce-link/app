@@ -13529,3 +13529,52 @@ a.cl-link-button:hover {
 .cl-page .cl-dialog [hidden] {
     display: none;
 }
+
+/* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
+   reconciliation of an uploaded statement on the Payments page (payments-statement.html). The pages are built from the
+   shared components; only what has no counterpart among them is here. */
+
+/* Wide tables (the statement, the payout, the sample file's preview) scroll sideways inside their card. */
+.cl-page .cl-statement-scroll {
+    overflow-x: auto;
+    min-width: 0;
+}
+
+/* the payers' rows are edited in the table: its fields keep a readable width and the table scrolls instead */
+.cl-page .cl-statement-scroll.is-fields .cl-input,
+.cl-page .cl-statement-scroll.is-fields .cl-select {
+    min-width: 180px;
+}
+
+.cl-page .cl-table.is-statement {
+    min-width: 1080px;
+}
+
+/* the full transfer title, references without spaces included, wraps within a bounded column */
+.cl-page .cl-statement-operation {
+    min-width: 260px;
+    max-width: 380px;
+}
+
+.cl-page .cl-statement-title {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-statement-key {
+    margin-right: 4px;
+    font-size: 12px;
+    color: var(--cl-ink-3);
+}
+
+/* the number the match was found by */
+.cl-page .cl-statement-title mark {
+    padding: 0 2px;
+    border-radius: 3px;
+    background: var(--cl-warn-soft);
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-statement-order + .cl-statement-order {
+    margin-top: 6px;
+}

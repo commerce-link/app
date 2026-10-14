@@ -1,0 +1,226 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${paymentsHref}, ${backLabel}, ${pageTitle}, #{store.payments.statement.lead}, null)}"></div>
+
+            <!--/* A plain post, not data-cl-async: the sample file goes with it and the page comes back with its preview. */-->
+            <form id="statement-format-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}" method="post"
+                  enctype="multipart/form-data" novalidate>
+                <div th:replace="~{fragments/settings-form :: errorSummary('statement-format-errors', ${errors}, null)}"></div>
+
+                <datalist id="statement-headers">
+                    <option th:each="header : ${headers}" th:value="${header}"></option>
+                </datalist>
+                <input type="hidden" name="sampleData" th:value="*{sampleData}"/>
+                <input type="hidden" name="sampleName" th:value="*{sampleName}"/>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.statement.sample.section}"></legend>
+                        <div class="cl-field" th:with="sampleError=${errors['sample']}">
+                            <label class="cl-label" for="sample">
+                                <span th:text="#{store.payments.statement.sample.file}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span>
+                            </label>
+                            <!--/* the file is read as soon as it is chosen, with the preview button below; without
+                                   JavaScript choosing a file sends nothing, so a button of its own sends it */-->
+                            <div class="cl-file-row">
+                                <input class="cl-file" th:classappend="${sampleError != null} ? 'is-invalid'" id="sample" name="sample"
+                                       type="file" accept=".csv,.txt,text/csv,text/plain" data-cl-submit-on-change="statement-preview"
+                                       th:attr="aria-invalid=${sampleError != null ? 'true' : null},
+                                                aria-describedby=${sampleError != null ? 'sample-help sample-error' : 'sample-help'}"/>
+                                <noscript>
+                                    <button class="cl-button" type="submit" name="action" value="preview"
+                                            th:text="#{store.payments.statement.sample.read}"></button>
+                                </noscript>
+                            </div>
+                            <p class="cl-help" id="sample-help" th:text="#{store.payments.statement.sample.help}"></p>
+                            <p th:if="*{sampleName != null}" class="cl-help" th:text="#{store.payments.statement.sample.current(*{sampleName})}"></p>
+                            <p th:if="${sampleError != null}" class="cl-field-error" id="sample-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${sampleError}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.statement.reading.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: selectField('encoding', 'store.payments.statement.encoding', *{encoding}, ${encodings}, 'off', true, ${errors['encoding']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: selectField('separator', 'store.payments.statement.separator', *{separator}, ${separators}, 'off', true, ${errors['separator']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldWith('headerRow', 'store.payments.statement.headerRow', *{headerRow}, 'text', 'off', true, ${errors['headerRow']}, #{store.payments.statement.headerRow.help}, 'numeric', null, false)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('dateFormat', 'store.payments.statement.dateFormat', *{dateFormat}, ${dateFormats}, 'off', true, ${errors['dateFormat']}, null)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('decimalMark', 'store.payments.statement.decimalMark', *{decimalMark}, ${decimalMarks}, 'off', true, null, null)}"></div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.statement.columns.section}"></legend>
+                        <p class="cl-help" th:text="#{store.payments.statement.columns.help}"></p>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3" th:insert="~{fragments/statement-fields :: columnField('dateColumn', 'store.payments.statement.dateColumn', *{dateColumn}, true, ${errors['dateColumn']}, #{store.payments.statement.dateColumn.help})}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/statement-fields :: columnField('transactionNoColumn', 'store.payments.statement.transactionNoColumn', *{transactionNoColumn}, false, null, #{store.payments.statement.transactionNoColumn.help})}"></div>
+
+                            <fieldset class="cl-choice-group is-row">
+                                <legend class="cl-label" th:text="#{store.payments.statement.amountMode}"></legend>
+                                <label class="cl-choice">
+                                    <input type="radio" name="amountMode" value="single" id="amountMode-single" th:checked="*{!split}"/>
+                                    <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{store.payments.statement.amountMode.single}"></span></span>
+                                </label>
+                                <label class="cl-choice">
+                                    <input type="radio" name="amountMode" value="split" id="amountMode-split" th:checked="*{split}"/>
+                                    <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{store.payments.statement.amountMode.split}"></span></span>
+                                </label>
+                            </fieldset>
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('amountColumn', 'store.payments.statement.amountColumn', *{amountColumn}, false, ${errors['amountColumn']}, #{store.payments.statement.amountColumn.help})}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('creditColumn', 'store.payments.statement.creditColumn', *{creditColumn}, false, ${errors['creditColumn']}, #{store.payments.statement.splitColumn.help})}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('debitColumn', 'store.payments.statement.debitColumn', *{debitColumn}, false, ${errors['debitColumn']}, #{store.payments.statement.splitColumn.help})}"></div>
+
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('titleColumn1', 'store.payments.statement.titleColumn', *{titleColumn1}, true, ${errors['titleColumn1']}, #{store.payments.statement.titleColumn.help})}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('titleColumn2', 'store.payments.statement.titleColumn.more', *{titleColumn2}, false, null, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/statement-fields :: columnField('titleColumn3', 'store.payments.statement.titleColumn.more', *{titleColumn3}, false, null, null)}"></div>
+
+                            <div class="cl-span-3" th:insert="~{fragments/statement-fields :: columnField('senderColumn', 'store.payments.statement.senderColumn', *{senderColumn}, false, null, null)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/statement-fields :: columnField('senderAccountColumn', 'store.payments.statement.senderAccountColumn', *{senderAccountColumn}, false, null, null)}"></div>
+                        </div>
+                    </fieldset>
+
+                    <section th:if="${preview != null}" class="cl-fieldset" aria-labelledby="statement-preview-title">
+                        <h2 class="cl-fieldset-title" id="statement-preview-title" th:text="#{store.payments.statement.preview.title}"></h2>
+                        <div th:if="${preview.error() != null}" class="cl-alert is-warn" role="status">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <p class="cl-alert-text" th:text="${preview.error()}"></p>
+                        </div>
+                        <p th:if="${!preview.headers().isEmpty()}" class="cl-help"
+                           th:text="#{store.payments.statement.preview.headers(${#strings.listJoin(preview.headers(), ' · ')})}"></p>
+                        <div th:if="${!preview.rows().isEmpty()}" class="cl-statement-scroll">
+                            <table class="cl-table is-compact">
+                                <thead>
+                                <tr>
+                                    <th scope="col" th:text="#{store.payments.statement.preview.date}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.preview.kind}"></th>
+                                    <th scope="col" class="is-numeric" th:text="#{store.payments.statement.preview.amount}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.preview.column.title}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.preview.sender}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.preview.number}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="row : ${preview.rows()}">
+                                    <td class="cl-nowrap" th:text="${row.date()}"></td>
+                                    <td>
+                                        <span th:if="${row.incoming()}" class="cl-status is-ok" th:text="#{PaymentDirection.Incoming}"></span>
+                                        <span th:unless="${row.incoming()}" class="cl-status is-neutral" th:text="#{PaymentDirection.Outgoing}"></span>
+                                    </td>
+                                    <td class="is-numeric cl-nowrap" th:text="${row.amount()}"></td>
+                                    <td th:text="${row.title()}"></td>
+                                    <td th:text="${row.sender()}"></td>
+                                    <td class="cl-table-code" th:text="${row.number()}"></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p th:if="${preview.operations() > 0}" class="cl-help"
+                           th:text="#{store.payments.statement.preview.summary(${preview.operations()}, ${preview.incoming()}, ${preview.outgoing()})}"></p>
+                        <p th:if="${preview.skipped() > 0}" class="cl-help"
+                           th:text="#{store.payments.statement.preview.skipped(${preview.skipped()})}"></p>
+                        <ul th:if="${!preview.problems().isEmpty()}" class="cl-help">
+                            <li th:each="problem : ${preview.problems()}" th:text="${problem}"></li>
+                        </ul>
+                    </section>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.statement.channels.section}"></legend>
+                        <p class="cl-help" th:text="#{store.payments.statement.channels.help}"></p>
+                        <div class="cl-statement-scroll is-fields">
+                            <table class="cl-table is-compact">
+                                <thead>
+                                <tr>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.match}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.source}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.method}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.provider}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.net}"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="channel, s : *{channels}"
+                                    th:with="matchId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'match')},
+                                             sourceId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'source')},
+                                             methodId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'method')},
+                                             providerId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'provider')}">
+                                    <td>
+                                        <input class="cl-input" type="text" autocomplete="off" th:id="${matchId}"
+                                               th:name="|channels[${s.index}].match|" th:value="${channel.match}"
+                                               th:classappend="${errors[matchId] != null} ? 'is-invalid'"
+                                               th:attr="aria-label=#{store.payments.statement.channels.match}, aria-invalid=${errors[matchId] != null ? 'true' : null}"/>
+                                        <p th:if="${errors[matchId] != null}" class="cl-field-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors[matchId]}}"></span>
+                                        </p>
+                                    </td>
+                                    <td>
+                                        <select class="cl-select" th:id="${sourceId}" th:name="|channels[${s.index}].source|"
+                                                th:classappend="${errors[sourceId] != null} ? 'is-invalid'"
+                                                th:attr="aria-label=#{store.payments.statement.channels.source}, aria-invalid=${errors[sourceId] != null ? 'true' : null}">
+                                            <option th:each="option : ${sourceOptions}" th:value="${option.value()}" th:text="${option.label()}"
+                                                    th:selected="${option.value() == (channel.source == null ? '' : channel.source)}"></option>
+                                        </select>
+                                        <p th:if="${errors[sourceId] != null}" class="cl-field-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors[sourceId]}}"></span>
+                                        </p>
+                                    </td>
+                                    <td>
+                                        <select class="cl-select" th:id="${methodId}" th:name="|channels[${s.index}].method|"
+                                                th:classappend="${errors[methodId] != null} ? 'is-invalid'"
+                                                th:attr="aria-label=#{store.payments.statement.channels.method}, aria-invalid=${errors[methodId] != null ? 'true' : null}">
+                                            <option th:each="option : ${methodOptions}" th:value="${option.value()}" th:text="${option.label()}"
+                                                    th:selected="${option.value() == (channel.method == null ? '' : channel.method)}"></option>
+                                        </select>
+                                        <p th:if="${errors[methodId] != null}" class="cl-field-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors[methodId]}}"></span>
+                                        </p>
+                                    </td>
+                                    <td>
+                                        <select class="cl-select" th:id="${providerId}" th:name="|channels[${s.index}].provider|"
+                                                th:attr="aria-label=#{store.payments.statement.channels.provider}">
+                                            <option th:each="option : ${providerOptions}" th:value="${option.value()}" th:text="${option.label()}"
+                                                    th:selected="${option.value() == (channel.provider == null ? '' : channel.provider)}"></option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <label class="cl-check">
+                                            <input type="checkbox" value="true" th:name="|channels[${s.index}].netOfFees|" th:checked="${channel.netOfFees}"/>
+                                            <span th:text="#{store.payments.statement.channels.net.short}"></span>
+                                        </label>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" name="action" value="save" th:text="#{store.payments.statement.save}"></button>
+                        <button class="cl-button" type="submit" name="action" value="preview" id="statement-preview"
+                                th:text="#{store.payments.statement.preview.action}"></button>
+                        <a class="cl-button" th:href="@{${paymentsHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('statement-format-errors').focus();
+    </script>
+    <script th:src="@{/js/submit-on-change.js}" defer></script>
+</div>
+</body>
+</html>

@@ -10,6 +10,10 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.BankAccount;
+import pl.commercelink.stores.BankStatementFormat;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.payments.PayableRow;
 import pl.commercelink.web.payments.PaymentSide;
 import pl.commercelink.web.payments.PaymentsController;
@@ -19,6 +23,7 @@ import pl.commercelink.web.payments.PaymentsQuery;
 import pl.commercelink.web.payments.ReceivableRow;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,6 +56,8 @@ class PaymentSourcesPageRenderTest {
 
     @Mock
     private PaymentsModelFactory factory;
+    @Mock
+    private StoresRepository storesRepository;
     @InjectMocks
     private PaymentsController controller;
 
@@ -159,6 +166,46 @@ class PaymentSourcesPageRenderTest {
         // fetching payments from the invoicing system cannot be sent twice
         assertThat(html).containsPattern("action=\"/dashboard/deliveries/syncPaymentStatuses\"[^>]*data-cl-submit-once")
                 .contains("/js/submit-once.js");
+    }
+
+    @Test
+    void anAccountWithAStatementFormatOpensTheUploadDialog() {
+        // given
+        BankAccount account = new BankAccount();
+        account.setId("account-1");
+        account.setBankName("mBank");
+        account.setIban("PL61114020040000340276554567");
+        BankStatementFormat format = new BankStatementFormat();
+        format.setEncoding("windows-1250");
+        format.setSeparator(";");
+        format.setDateFormat("yyyy-MM-dd");
+        format.setDateColumn("Data");
+        format.setAmountColumn("Kwota");
+        format.setTitleColumns(List.of("Tytul"));
+        account.setStatementFormat(format);
+        Store store = new Store();
+        store.setBankAccounts(new ArrayList<>(List.of(account)));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        String html = render(model(PaymentSide.PAYABLES, true));
+
+        // then
+        assertThat(html).contains("data-cl-dialog-open=\"statement-upload-dialog\"").contains("id=\"statement-upload-dialog\"")
+                .contains("value=\"account-1\"").contains("enctype=\"multipart/form-data\"").contains("/js/dialog.js")
+                .doesNotContain("payments-statement-reason").doesNotContain("??");
+    }
+
+    @Test
+    void withoutAStatementFormatTheUploadPointsToTheSettings() {
+        // given / when
+        String html = render(model(PaymentSide.PAYABLES, true));
+
+        // then
+        assertThat(html).contains("id=\"payments-statement-reason\"").contains("Wgraj wyciąg bankowy")
+                .containsPattern("class=\"cl-tooltip is-end\"\\s+data-tooltip=\"By skorzystać z tej funkcji, ustaw format wyciągu przy rachunku bankowym")
+                .contains("fa-upload").doesNotContain("fa-file-upload")
+                .doesNotContain("id=\"statement-upload-dialog\"");
     }
 
     static int occurrences(String html, String needle) {
