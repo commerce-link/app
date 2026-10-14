@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,12 +17,16 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.financials.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.reports.GeneratedReports;
+import pl.commercelink.reports.ReportGenerationPublisher;
+import pl.commercelink.reports.ReportType;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.warehouse.builtin.StockLedgerClosingResult;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Blocked;
-import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
+import pl.commercelink.web.reports.GeneratedReportView;
 import pl.commercelink.web.reports.ReportPeriod;
 import pl.commercelink.web.reports.ReportsPageFactory;
 import pl.commercelink.web.reports.StockLedgerClosingView;
@@ -36,7 +41,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -52,7 +57,10 @@ public class FinancialReportsController {
     private GoogleOfflineConversionsExport googleOfflineConversionsExport;
 
     @Autowired
-    private StockLedgerExport stockLedgerExport;
+    private ReportGenerationPublisher reportGenerationPublisher;
+
+    @Autowired
+    private GeneratedReports generatedReports;
 
     @Autowired
     private ProductWeightOriginComplianceReportExport productWeightOriginComplianceReportExport;
@@ -101,12 +109,6 @@ public class FinancialReportsController {
         response.getWriter().write(csv);
     }
 
-    @GetMapping("/dashboard/reports/stockLedgerExport")
-    public void stockLedgerExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
-        byte[] csv = stockLedgerExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
-        writeStockLedger(response, dateFrom, dateTo, csv);
-    }
-
     @GetMapping("/dashboard/reports/stock-ledger/closed")
     public void closedStockLedger(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                   @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -129,7 +131,36 @@ public class FinancialReportsController {
         model.addAttribute("backHref", report == null ? REPORTS_PATH : REPORTS_PATH + "?" + report.query());
         model.addAttribute("report", report);
         model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
+        model.addAttribute("generatedReports", generatedReports.recent(getStoreId()).stream()
+                .map(entry -> GeneratedReportView.of(entry, STOCK_LEDGER_PATH + "/generated", messageSource, locale)).toList());
+        model.addAttribute("ledgerExportRange", report != null ? report : fallback);
         return "reports/stock-ledger";
+    }
+
+    @GetMapping(STOCK_LEDGER_PATH + "/generated")
+    public void generatedStockLedger(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                     HttpServletResponse response) throws IOException {
+        byte[] csv = generatedReports.find(getStoreId(), ReportType.STOCK_LEDGER_EXPORT, dateFrom, dateTo)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        writeStockLedger(response, dateFrom.toString(), dateTo.toString(), csv);
+    }
+
+    @PostMapping(STOCK_LEDGER_PATH + "/export")
+    public String orderStockLedgerExport(@RequestParam("exportFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+                                         @RequestParam("exportTo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+                                         @RequestParam(value = "from", required = false) String from,
+                                         @RequestParam(value = "to", required = false) String to,
+                                         RedirectAttributes redirectAttributes, Locale locale) {
+        if (dateFrom.isAfter(dateTo)) {
+            redirectAttributes.addFlashAttribute("ledgerError",
+                    messageSource.getMessage("reports.stockLedger.closing.error.range", null, locale));
+        } else {
+            reportGenerationPublisher.order(getStoreId(), ReportType.STOCK_LEDGER_EXPORT, dateFrom, dateTo);
+            redirectAttributes.addFlashAttribute("ledgerSuccess", messageSource.getMessage("reports.generated.accepted",
+                    new Object[]{StockLedgerPeriodLabel.of(new StockLedgerPeriod(dateFrom, dateTo), locale)}, locale));
+        }
+        return "redirect:" + stockLedgerPath(reportPeriod(from, to));
     }
 
     /** The report the page was opened from, carried through its forms so "‹ Reports" returns to it; none if unreadable. */
@@ -176,41 +207,33 @@ public class FinancialReportsController {
         return "settings-confirm";
     }
 
-    /** Closes the range, or generates it again when it is closed already. */
+    /** Orders the closing of the range, or generating it again when it is closed already; a refusal is answered at once. */
     @PostMapping(STOCK_LEDGER_PATH + "/close")
     public String closeStockLedgerPeriod(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
                                          @RequestParam(value = "from", required = false) String from,
                                          @RequestParam(value = "to", required = false) String to,
-                                         RedirectAttributes redirectAttributes, Locale locale) throws IOException {
+                                         RedirectAttributes redirectAttributes, Locale locale) {
         StockLedgerPeriod period = new StockLedgerPeriod(dateFrom, dateTo);
         Object[] label = {StockLedgerPeriodLabel.of(period, locale)};
-        switch (stockLedgerPeriodClosing.close(getStoreId(), period)) {
-            case Closed closed -> {
-                redirectAttributes.addFlashAttribute("ledgerSuccess", messageSource.getMessage(
-                        closed.regenerated() ? "reports.stockLedger.closing.regenerated" : "reports.stockLedger.closing.closed",
-                        label, locale));
-                if (!closed.outdatedLaterPeriods().isEmpty()) {
-                    String laterLabels = closed.outdatedLaterPeriods().stream().map(later -> StockLedgerPeriodLabel.of(later, locale)).collect(Collectors.joining(", "));
-                    redirectAttributes.addFlashAttribute("ledgerOutdated", messageSource.getMessage(
-                            "reports.stockLedger.closing.outdated", new Object[]{label[0], laterLabels}, locale));
-                }
-            }
-            case Blocked blocked -> {
-                SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-                redirectAttributes.addFlashAttribute("ledgerError",
-                        messageSource.getMessage("reports.stockLedger.closing.blocked", label, locale));
-                redirectAttributes.addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(dateFrom, dateTo,
-                        blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList()));
-            }
-            case NotAllowed notAllowed -> {
-                List<Object> arguments = new ArrayList<>(List.of(label));
-                // a day reads like the rest of the page ("1.10.2026"), not as an ISO date
-                notAllowed.arguments().forEach(argument -> arguments.add(
-                        argument instanceof LocalDate day ? new ReportPeriod(day, day).rangeText() : argument));
-                redirectAttributes.addFlashAttribute("ledgerError",
-                        messageSource.getMessage(notAllowed.messageKey(), arguments.toArray(), locale));
-            }
+        Optional<StockLedgerClosingResult> refusal = stockLedgerPeriodClosing.check(getStoreId(), period);
+        if (refusal.isEmpty()) {
+            reportGenerationPublisher.order(getStoreId(), ReportType.STOCK_LEDGER_CLOSING, dateFrom, dateTo);
+            redirectAttributes.addFlashAttribute("ledgerSuccess",
+                    messageSource.getMessage("reports.stockLedger.closing.accepted", label, locale));
+        } else if (refusal.get() instanceof Blocked blocked) {
+            SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+            redirectAttributes.addFlashAttribute("ledgerError",
+                    messageSource.getMessage("reports.stockLedger.closing.blocked", label, locale));
+            redirectAttributes.addFlashAttribute("ledgerWarning", new StockLedgerClosingWarning(dateFrom, dateTo,
+                    blocked.deliveries().stream().map(delivery -> StockLedgerClosingBlocker.of(delivery, labels)).toList()));
+        } else if (refusal.get() instanceof NotAllowed notAllowed) {
+            List<Object> arguments = new ArrayList<>(List.of(label));
+            // a day reads like the rest of the page ("1.10.2026"), not as an ISO date
+            notAllowed.arguments().forEach(argument -> arguments.add(
+                    argument instanceof LocalDate day ? new ReportPeriod(day, day).rangeText() : argument));
+            redirectAttributes.addFlashAttribute("ledgerError",
+                    messageSource.getMessage(notAllowed.messageKey(), arguments.toArray(), locale));
         }
         return "redirect:" + stockLedgerPath(reportPeriod(from, to));
     }

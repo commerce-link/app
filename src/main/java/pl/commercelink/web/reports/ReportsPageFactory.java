@@ -61,7 +61,7 @@ public class ReportsPageFactory {
     private static List<ReportsPage.FileGroup> files(ReportPeriod period) {
         Map<String, List<ReportsPage.FileLink>> groups = Arrays.stream(ReportFile.values())
                 .collect(Collectors.groupingBy(ReportFile::group, LinkedHashMap::new, Collectors.mapping(
-                        file -> new ReportsPage.FileLink(file.titleKey(), file.descriptionKey(), file.href(period)),
+                        file -> new ReportsPage.FileLink(file.titleKey(), file.descriptionKey(), file.href(period), file.immediate()),
                         Collectors.toList())));
         return groups.entrySet().stream().map(group -> new ReportsPage.FileGroup(group.getKey(), group.getValue())).toList();
     }

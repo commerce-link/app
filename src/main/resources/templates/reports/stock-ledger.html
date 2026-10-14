@@ -91,6 +91,54 @@
                 </div>
             </form>
 
+            <form class="cl-card" method="post" th:action="@{/dashboard/reports/stock-ledger/export}" aria-labelledby="export-title">
+                <div class="cl-card-head"><h2 class="cl-card-title" id="export-title" th:text="#{reports.generated.export.title}"></h2></div>
+                <p class="cl-card-desc" th:text="#{reports.generated.export.desc}"></p>
+                <th:block th:if="${report != null}">
+                    <input type="hidden" name="from" th:value="${report.from()}">
+                    <input type="hidden" name="to" th:value="${report.to()}">
+                </th:block>
+                <div class="cl-card-body cl-ledger-fields">
+                    <div class="cl-inline-fields">
+                        <div class="cl-field">
+                            <label class="cl-label" for="export-from" th:text="#{reports.from}"></label>
+                            <input class="cl-input" id="export-from" type="date" name="exportFrom" th:value="${ledgerExportRange.from()}" required>
+                        </div>
+                        <div class="cl-field">
+                            <label class="cl-label" for="export-to" th:text="#{reports.to}"></label>
+                            <input class="cl-input" id="export-to" type="date" name="exportTo" th:value="${ledgerExportRange.to()}" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="cl-card-footer">
+                    <button type="submit" class="cl-button is-primary" th:text="#{reports.generated.export.submit}"></button>
+                </div>
+            </form>
+
+            <section class="cl-card cl-ledger-generated" aria-labelledby="generated-title">
+                <div class="cl-card-head"><h2 class="cl-card-title" id="generated-title" th:text="#{reports.generated.title}"></h2></div>
+                <p th:if="${generatedReports.isEmpty()}" class="cl-list-empty" th:text="#{reports.generated.empty}"></p>
+                <th:block th:unless="${generatedReports.isEmpty()}">
+                    <p class="cl-card-desc" th:text="#{reports.generated.desc}"></p>
+                    <table class="cl-table">
+                        <thead><tr>
+                            <th scope="col" th:text="#{reports.generated.col.report}"></th>
+                            <th scope="col" th:text="#{reports.generated.col.generated}"></th>
+                            <th scope="col"><span class="cl-visually-hidden" th:text="#{reports.stockLedger.actions}"></span></th>
+                        </tr></thead>
+                        <tbody><tr th:each="report : ${generatedReports}">
+                            <th scope="row" class="cl-table-key"><span th:text="${report.title()}"></span>
+                                <span class="cl-table-sub" th:text="${report.periodText()}"></span></th>
+                            <td th:attr="data-label=#{reports.generated.col.generated}" th:text="${report.generatedAt()}"></td>
+                            <td class="cl-table-actions">
+                                <a class="cl-link-button" th:href="@{${report.downloadHref()}}">
+                                    <i class="fas fa-download" aria-hidden="true"></i><span th:text="#{reports.generated.download}"></span></a>
+                            </td>
+                        </tr></tbody>
+                    </table>
+                </th:block>
+            </section>
+
             <section class="cl-card cl-ledger-closed" aria-labelledby="closed-title">
                 <div class="cl-card-head"><h2 class="cl-card-title" id="closed-title" th:text="#{reports.stockLedger.closing.closedPeriods}"></h2></div>
                 <p th:unless="${closing.closedPeriods().isEmpty()}" class="cl-card-desc" th:text="#{reports.stockLedger.closed.desc}"></p>

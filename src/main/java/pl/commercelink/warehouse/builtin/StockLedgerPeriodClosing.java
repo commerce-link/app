@@ -57,29 +57,36 @@ public class StockLedgerPeriodClosing {
         return closings.closedPeriods(storeId);
     }
 
+    /** The refusal the closing would end with, so a request can be turned down before any work is queued. */
+    public Optional<StockLedgerClosingResult> check(String storeId, StockLedgerPeriod period) {
+        if (period.from().isAfter(period.to())) {
+            return Optional.of(new NotAllowed("reports.stockLedger.closing.error.range"));
+        }
+        if (!period.to().isBefore(LocalDate.now(clock))) {
+            return Optional.of(new NotAllowed("reports.stockLedger.closing.error.notOver"));
+        }
+        List<StockLedgerPeriod> closed = closings.closedPeriods(storeId);
+        if (!closed.isEmpty() && !closed.contains(period)) {
+            LocalDate nextFrom = closed.get(closed.size() - 1).next().from();
+            if (!period.from().equals(nextFrom)) {
+                return Optional.of(new NotAllowed("reports.stockLedger.closing.error.gap", List.<Object>of(nextFrom)));
+            }
+        }
+        List<Delivery> unsettled = unsettledDeliveries(storeId, period);
+        return unsettled.isEmpty() ? Optional.empty() : Optional.of(new Blocked(unsettled));
+    }
+
     /**
      * A new period starts the day after the last closed one, so the closed periods form one chain; only the first can
      * start anywhere, to close the history back in time. A closed range can always be closed again to regenerate it.
      */
     public StockLedgerClosingResult close(String storeId, StockLedgerPeriod period) throws IOException {
-        if (period.from().isAfter(period.to())) {
-            return new NotAllowed("reports.stockLedger.closing.error.range");
-        }
-        if (!period.to().isBefore(LocalDate.now(clock))) {
-            return new NotAllowed("reports.stockLedger.closing.error.notOver");
+        Optional<StockLedgerClosingResult> refusal = check(storeId, period);
+        if (refusal.isPresent()) {
+            return refusal.get();
         }
         List<StockLedgerPeriod> closed = closings.closedPeriods(storeId);
         boolean regenerating = closed.contains(period);
-        if (!regenerating && !closed.isEmpty()) {
-            LocalDate nextFrom = closed.get(closed.size() - 1).next().from();
-            if (!period.from().equals(nextFrom)) {
-                return new NotAllowed("reports.stockLedger.closing.error.gap", List.<Object>of(nextFrom));
-            }
-        }
-        List<Delivery> unsettled = unsettledDeliveries(storeId, period);
-        if (!unsettled.isEmpty()) {
-            return new Blocked(unsettled);
-        }
 
         byte[] report = StockLedgerRow.toCsv(stockLedgerService.generate(storeId, period.from(), period.to()));
         List<StockLedgerPeriod> outdated = regenerating ? outdatedAfter(storeId, period, closed, report) : List.of();

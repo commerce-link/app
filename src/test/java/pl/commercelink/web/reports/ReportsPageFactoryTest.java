@@ -96,7 +96,12 @@ class ReportsPageFactoryTest {
 
         // then
         List<String> hrefs = page.files().stream().flatMap(group -> group.files().stream()).map(ReportsPage.FileLink::href).toList();
-        assertThat(hrefs).hasSize(6).allMatch(href -> href.endsWith("?dateFrom=2026-09-01&dateTo=2026-09-30"));
+        assertThat(hrefs).hasSize(6);
+        assertThat(hrefs.stream().filter(href -> !href.contains("/stock-ledger")).toList())
+                .hasSize(5).allMatch(href -> href.endsWith("?dateFrom=2026-09-01&dateTo=2026-09-30"));
+        assertThat(hrefs).contains("/dashboard/reports/stock-ledger?from=2026-09-01&to=2026-09-30");
+        assertThat(page.files().stream().flatMap(group -> group.files().stream())
+                .filter(file -> file.href().contains("/stock-ledger")).map(ReportsPage.FileLink::download)).containsExactly(false);
         assertThat(hrefs).extracting(href -> href.substring(0, href.indexOf('?'))).doesNotHaveDuplicates();
         assertThat(page.files()).extracting(ReportsPage.FileGroup::titleKey)
                 .containsExactly("reports.files.group.sales", "reports.files.group.purchases");

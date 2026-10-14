@@ -20,6 +20,10 @@ public record ReportsPage(String periodLabel, String rangeText, boolean shortene
     public record FileGroup(String titleKey, List<FileLink> files) {
     }
 
-    public record FileLink(String titleKey, String descriptionKey, String href) {
+    public record FileLink(String titleKey, String descriptionKey, String href, boolean download) {
+
+        public FileLink(String titleKey, String descriptionKey, String href) {
+            this(titleKey, descriptionKey, href, true);
+        }
     }
 }
