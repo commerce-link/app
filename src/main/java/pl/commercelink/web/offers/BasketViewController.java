@@ -16,8 +16,6 @@ import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.settings.ConfirmAction;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
@@ -52,9 +50,7 @@ public class BasketViewController {
             return "redirect:" + page;
         }
         String shortId = basket.getShortenedBasketId();
-        String back = BasketViewPageFactory.backHref(returnTo);
-        String action = "/dashboard/basket/view/" + basketId + "/order"
-                + (back.equals(BasketViewPageFactory.BASKETS_PATH) ? "" : "?returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8));
+        String action = "/dashboard/basket/view/" + basketId + "/order" + BasketViewPageFactory.returnToQuery(returnTo);
         model.addAttribute("confirm", new ConfirmAction(
                 messages.getMessage("offers.basket.order.confirm.title", new Object[]{shortId}, locale),
                 messages.getMessage("offers.basket.order.confirm.message", null, locale),
@@ -75,9 +71,7 @@ public class BasketViewController {
     }
 
     private String pageHref(String basketId, String returnTo) {
-        String back = BasketViewPageFactory.backHref(returnTo);
-        return "/dashboard/basket/view/" + basketId
-                + (back.equals(BasketViewPageFactory.BASKETS_PATH) ? "" : "?returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8));
+        return "/dashboard/basket/view/" + basketId + BasketViewPageFactory.returnToQuery(returnTo);
     }
 
     /** Only the store's own shop baskets; an offer or a template has its own page, another store's id does not exist here. */

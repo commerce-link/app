@@ -76,12 +76,11 @@ public class BasketViewPageFactory {
 
         Summary summary = summary(basket, store, items, market);
         String back = backHref(returnTo);
-        String query = returnTo == null || back.equals(BASKETS_PATH) ? "" : "?returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8);
         LocalDate deletion = basket.getCreatedAt() == null ? null : basket.getCreatedAt().toLocalDate().plusDays(cleanupDays);
         long daysLeft = deletion == null ? Long.MAX_VALUE : ChronoUnit.DAYS.between(now.toLocalDate(), deletion);
 
         return new BasketViewPage(id, basket.getShortenedBasketId(), back,
-                "/dashboard/basket/view/" + id + "/order" + query,
+                "/dashboard/basket/view/" + id + "/order" + returnToQuery(returnTo),
                 "/dashboard/offer/new?intent=copy&sourceId=" + id,
                 BasketClient.fullName(basket),
                 basket.getCreatedAt() == null ? null : DATE_TIME.format(basket.getCreatedAt()),
@@ -102,6 +101,12 @@ public class BasketViewPageFactory {
         }
         String safe = OfferController.safeReturnTo(returnTo);
         return safe.equals(returnTo) ? returnTo : BASKETS_PATH;
+    }
+
+    /** The one place a user-supplied return address is put back into a query string; empty for the default list and for anything unsafe. */
+    static String returnToQuery(String returnTo) {
+        String back = backHref(returnTo);
+        return back.equals(BASKETS_PATH) ? "" : "?returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8);
     }
 
     /** Live supplier offers per item, never saved; null when the index cannot answer (the page still renders). */

@@ -177,6 +177,16 @@ class BasketViewControllerTest {
         assertThat(confirm).isEqualTo("redirect:/dashboard/basket/view/b-1");
     }
 
+    @Test
+    void returnToQueryEncodesOnlySafeNonDefaultAddresses() {
+        // when / then
+        assertThat(BasketViewPageFactory.returnToQuery(null)).isEmpty();
+        assertThat(BasketViewPageFactory.returnToQuery("https://evil.example")).isEmpty();
+        assertThat(BasketViewPageFactory.returnToQuery(BasketViewPageFactory.BASKETS_PATH)).isEmpty();
+        assertThat(BasketViewPageFactory.returnToQuery("/dashboard/offers?segment=baskets&q=8f"))
+                .isEqualTo("?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dbaskets%26q%3D8f");
+    }
+
     private void assertNotFound(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
         assertThatThrownBy(call)
                 .isInstanceOf(ResponseStatusException.class)
