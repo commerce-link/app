@@ -119,6 +119,32 @@ class RmaItemControllerTest {
     }
 
     @Test
+    void unknownItemOnPostIsNotFoundAndSavesNothing() {
+        // given
+        when(rmaRepository.findById(STORE, RMA_ID)).thenReturn(rma(RMAStatus.ItemsReceived));
+        when(rmaItemsRepository.findById(RMA_ID, ITEM_ID)).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> save(new RmaItemForm(), null, new MockHttpServletResponse(), new RedirectAttributesModelMap()))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void showSkipsTheDeliveryLookupForAnItemWithoutADelivery() throws Exception {
+        // given
+        RMAItem item = item();
+        item.setDeliveryId("Unknown");
+        stored(RMAStatus.ItemsReceived, item);
+
+        // when
+        asStore(() -> controller.show(RMA_ID, ITEM_ID, new ExtendedModelMap(), PL));
+
+        // then
+        verifyNoInteractions(deliveriesRepository, supplierLabels);
+    }
+
+    @Test
     void showRendersThePageWithTheOrderItemAndDelivery() throws Exception {
         // given
         RMAItem item = item();

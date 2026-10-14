@@ -97,11 +97,17 @@ public class RmaItemPageFactory {
                 new RmaItemPage.Fact(text(locale, "rma.item.page.value.vat"), Math.round((item.getTax() - 1) * 100) + "%"));
     }
 
+    // Items added by hand carry the "Unknown" delivery id; there is no delivery to show or look up for them.
+    static boolean showsDelivery(String deliveryId) {
+        String id = StringUtils.trimToNull(deliveryId);
+        return id != null && !UNKNOWN_DELIVERY.equalsIgnoreCase(id);
+    }
+
     private RmaItemPage.Context context(String storeId, RMA rma, RMAStatus rmaStatus, RMAItem item, Delivery delivery,
                                         String deliverySupplier, RmaItemForm form, Locale locale) {
         String orderId = StringUtils.trimToNull(rma.getOrderId());
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
-        boolean hasDelivery = deliveryId != null && !UNKNOWN_DELIVERY.equalsIgnoreCase(deliveryId);
+        boolean hasDelivery = showsDelivery(deliveryId);
         return new RmaItemPage.Context("/dashboard/rma/" + rma.getRmaId(), shortId(rma.getRmaId()),
                 text(locale, "RMAStatus." + rmaStatus.name()), RmaRowMapper.tone(rmaStatus),
                 source(rma, locale), client(rma),

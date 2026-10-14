@@ -112,7 +112,7 @@ class RmaItemController {
                         String savedMessage, Locale locale) {
         OrderItem orderItem = StringUtils.isAnyBlank(rma.getOrderId(), item.getItemId()) ? null
                 : orderItemsRepository.findById(rma.getOrderId(), item.getItemId());
-        Delivery delivery = StringUtils.isBlank(item.getDeliveryId()) ? null : deliveriesRepository.findById(getStoreId(), item.getDeliveryId());
+        Delivery delivery = !RmaItemPageFactory.showsDelivery(item.getDeliveryId()) ? null : deliveriesRepository.findById(getStoreId(), item.getDeliveryId());
         String supplier = delivery == null || delivery.getProvider() == null ? null : supplierLabels.forStoreId(getStoreId()).of(delivery.getProvider());
         return pages.page(getStoreId(), rma, item, orderItem, delivery, supplier, posted, errors, errorMessage, savedMessage, locale);
     }
