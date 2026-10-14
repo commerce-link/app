@@ -25,6 +25,8 @@ public class BankAccount {
     private String currency;
     @DynamoDBAttribute(attributeName = "default")
     private boolean _default;
+    @DynamoDBAttribute(attributeName = "statementFormat")
+    private BankStatementFormat statementFormat;
 
     public BankAccount() {
         this.id = UUID.randomUUID().toString();
@@ -80,5 +82,19 @@ public class BankAccount {
 
     public void set_default(boolean isDefault) {
         this._default = isDefault;
+    }
+
+    public BankStatementFormat getStatementFormat() {
+        return statementFormat;
+    }
+
+    public void setStatementFormat(BankStatementFormat statementFormat) {
+        this.statementFormat = statementFormat;
+    }
+
+    /** Whether operators can upload this account's statements on the Payments page. */
+    @DynamoDBIgnore
+    public boolean hasStatementFormat() {
+        return statementFormat != null && statementFormat.isComplete();
     }
 }

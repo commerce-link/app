@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.StoresRepository;
 
 import java.util.Locale;
 
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.verify;
 class PaymentsControllerTest {
 
     @Mock PaymentsModelFactory factory;
+    @Mock StoresRepository storesRepository;
     @InjectMocks PaymentsController controller;
 
     @Test
@@ -36,7 +38,7 @@ class PaymentsControllerTest {
 
             // then
             assertThat(view).isEqualTo("payments");
-            assertThat(model).containsKeys("page", "paymentSources");
+            assertThat(model).containsKeys("page", "paymentSources", "statementAccounts");
             verify(factory).page(eq("store-1"), any(), any(), any());
         }
     }

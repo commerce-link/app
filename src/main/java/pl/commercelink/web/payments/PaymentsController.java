@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderShipmentForm;
 
@@ -22,10 +23,13 @@ import java.util.Locale;
 public class PaymentsController {
 
     private final PaymentsModelFactory factory;
+    private final StoresRepository storesRepository;
 
     @GetMapping(PaymentsQuery.PATH)
     public String payments(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
         addPage(params, locale, model);
+        // the upload dialog sits outside the results block, so the fragment does not need the accounts
+        model.addAttribute("statementAccounts", StatementAccounts.of(storesRepository.findById(CustomSecurityContext.getStoreId())));
         return "payments";
     }
 

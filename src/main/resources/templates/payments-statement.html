@@ -1,0 +1,282 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+<section class="cl-page" th:with="currency=#{general.currency.amount('{0}')}">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{/dashboard/payments}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                <span th:text="#{payments.title}"></span>
+            </a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{payments.statement.title}"></h1>
+            </div>
+        </header>
+
+        <div th:each="notice : ${page.notices()}" class="cl-alert" th:classappend="${notice.tone()}" role="status">
+            <i class="fas cl-alert-icon" th:classappend="${notice.tone() == 'is-ok'} ? 'fa-check-circle' : 'fa-exclamation-circle'" aria-hidden="true"></i>
+            <div>
+                <p class="cl-alert-title" th:text="${notice.text()}"></p>
+                <ul th:if="${!notice.details().isEmpty()}" class="cl-alert-list">
+                    <li th:each="detail : ${notice.details()}" th:text="${detail}"></li>
+                </ul>
+            </div>
+        </div>
+
+        <div th:if="${!page.problems().isEmpty()}" class="cl-alert is-warn" role="status">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <details class="cl-row-disclosure">
+                <summary th:text="#{payments.statement.problems(${page.problems().size()})}"></summary>
+                <ul class="cl-alert-list">
+                    <li th:each="problem : ${page.problems()}" th:text="${problem}"></li>
+                </ul>
+            </details>
+        </div>
+
+        <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{payments.statement.tiles}">
+            <li th:each="tile : ${page.tiles()}" th:attr="data-cl-tile=${tile.id()}">
+                <div class="cl-stat">
+                    <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                    <span class="cl-stat-value"><span data-cl-tile-count th:text="${tile.count()}"></span> <span class="cl-stat-value-of" data-cl-tile-amount th:text="${tile.amount()}"></span></span>
+                    <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                </div>
+            </li>
+        </ul>
+
+        <form id="statement-book-form" method="post" th:action="@{/dashboard/payments/statement/book}" data-cl-statement data-cl-submit-once
+              th:attr="data-currency=${currency},
+                       data-text-selected=#{payments.statement.selected('{0}', '{1}', '{2}')},
+                       data-text-assigned=#{payments.statement.orders.assigned('{0}')},
+                       data-text-payout=#{payments.statement.orders.payout('{0}', '{1}')},
+                       data-text-unassigned=#{payments.statement.orders.none},
+                       data-text-no-payment=#{payments.statement.payment.none},
+                       data-text-payment-orders=#{payments.statement.payment.orders('{0}')},
+                       data-text-assign=#{payments.statement.action.assign},
+                       data-text-change=#{payments.statement.action.change}">
+            <input type="hidden" name="accountId" th:value="${page.accountId()}"/>
+            <input type="hidden" name="fileName" th:value="${page.fileName()}"/>
+            <input type="hidden" name="operations" th:value="${page.operationsJson()}"/>
+            <input type="hidden" name="allocations" id="statement-allocations" th:value="${page.allocationsJson()}"/>
+            <input type="hidden" name="outgoing" th:value="${page.outgoing()}"/>
+            <input type="hidden" name="skipped" th:value="${page.skipped()}"/>
+            <input type="hidden" name="problems" th:value="${page.problemsJson()}"/>
+
+            <section class="cl-card" aria-labelledby="statement-table-title">
+                <h2 class="cl-visually-hidden" id="statement-table-title" th:text="#{payments.statement.table}"></h2>
+                <div class="cl-statement-scroll">
+                    <table class="cl-table is-statement">
+                        <thead>
+                        <tr>
+                            <th scope="col" class="cl-table-check">
+                                <label class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" data-cl-statement-all th:attr="aria-label=#{payments.statement.selectAll}"/>
+                                </label>
+                            </th>
+                            <th scope="col" th:text="#{payments.statement.column.date}"></th>
+                            <th scope="col" th:text="#{payments.statement.column.operation}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{payments.statement.column.amount}"></th>
+                            <th scope="col" th:text="#{payments.statement.column.match}"></th>
+                            <th scope="col" th:text="#{payments.statement.column.orders}"></th>
+                            <th scope="col" th:text="#{payments.statement.column.payment}"></th>
+                            <th scope="col" class="cl-table-actions"><span class="cl-visually-hidden" th:text="#{payments.column.actions}"></span></th>
+                        </tr>
+                        </thead>
+                        <tbody th:each="group : ${page.groups()}" th:hidden="${group.rows().isEmpty()}" th:attr="data-cl-group=${group.id()}">
+                        <tr class="cl-table-group">
+                            <th scope="rowgroup" colspan="8"><span class="cl-eyebrow"><span th:text="${group.title()}"></span> · <span
+                                    data-cl-group-count th:text="${group.rows().size()}"></span></span></th>
+                        </tr>
+                        <tr th:each="row : ${group.rows()}"
+                            th:attr="data-number=${row.number()}, data-amount=${row.amountGrosze()}, data-payout=${row.payout()},
+                                     data-channels=${row.channels()}, data-candidates=${row.candidatesJson()},
+                                     data-date=${row.date()}, data-sender=${row.sender()}, data-title=${row.titleText()}">
+                            <td class="cl-table-check">
+                                <label th:if="${row.group() != 'BOOKED'}" class="cl-check-target">
+                                    <input type="checkbox" class="cl-check-input" name="selected" th:value="${row.number()}"
+                                           th:checked="${row.selected()}" th:disabled="${!row.selectable()}" data-cl-statement-row
+                                           th:attr="aria-label=#{payments.statement.select(${row.date()}, ${row.amount()})}"/>
+                                </label>
+                                <th:block th:if="${row.group() == 'BOOKED'}">
+                                    <i class="fas fa-check" aria-hidden="true"></i>
+                                    <span class="cl-visually-hidden" th:text="#{payments.statement.group.BOOKED}"></span>
+                                </th:block>
+                            </td>
+                            <td class="cl-nowrap cl-tabular" th:text="${row.date()}"></td>
+                            <td class="cl-statement-operation">
+                                <strong th:text="${row.sender()}"></strong>
+                                <span class="cl-statement-title"><span class="cl-statement-key" th:text="#{payments.statement.title.label}"></span>
+                                    <th:block th:each="part : ${row.title()}"><mark th:if="${part.hit()}" th:text="${part.text()}"></mark><th:block th:unless="${part.hit()}" th:text="${part.text()}"></th:block></th:block></span>
+                                <span class="cl-table-sub cl-table-code" th:text="${row.number()}"></span>
+                            </td>
+                            <td class="is-numeric"><span class="cl-cell-amount" th:text="${row.amount()}"></span></td>
+                            <td>
+                                <span class="cl-table-pills">
+                                    <span class="cl-status" th:classappend="${row.rule().tone()}" th:text="${row.rule().label()}"></span>
+                                    <span th:each="warning : ${row.warnings()}" class="cl-status" th:classappend="${warning.tone()}" th:text="${warning.label()}"></span>
+                                </span>
+                            </td>
+                            <td data-cl-statement-orders>
+                                <div th:each="ref : ${row.orders()}" class="cl-statement-order">
+                                    <a class="cl-table-code" th:href="@{${ref.href()}}" th:text="${ref.shortId()}"></a>
+                                    <span th:if="${ref.client() != null}" th:text="${ref.client()}"></span>
+                                    <span th:if="${ref.detail() != null}" class="cl-table-sub" th:text="${ref.detail()}"></span>
+                                </div>
+                                <span th:if="${row.ordersNote() != null}" class="cl-table-sub" th:text="${row.ordersNote()}"></span>
+                            </td>
+                            <td data-cl-statement-payment>
+                                <strong th:text="${row.paymentType()}"></strong>
+                                <span th:if="${row.paymentReference() != null}" class="cl-table-sub" th:text="${row.paymentReference()}"></span>
+                            </td>
+                            <td class="cl-table-actions">
+                                <button th:if="${row.actionLabel() != null}" type="button" class="cl-link-button" data-cl-statement-open
+                                        th:text="${row.actionLabel()}"></button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="cl-card-footer">
+                    <button type="submit" class="cl-button is-primary" data-cl-statement-submit
+                            th:disabled="${page.selectedCount() == 0}" th:text="#{payments.statement.submit}"></button>
+                    <div>
+                        <strong role="status" data-cl-statement-total
+                                th:text="#{payments.statement.selected(${page.selectedCount()}, ${page.selectedOrders()}, ${page.selectedTotal()})}"></strong>
+                        <p class="cl-help is-note" th:text="#{payments.statement.bar.help}"></p>
+                    </div>
+                </div>
+            </section>
+        </form>
+    </div>
+</section>
+
+<div class="cl-page cl-dialog-host">
+    <dialog class="cl-dialog is-form is-wide" id="statement-assign-dialog" aria-labelledby="statement-assign-title"
+            th:attr="data-text-title=#{payments.statement.assign.title('{0}')},
+                     data-text-remaining=#{payments.statement.assign.remaining.left('{0}')},
+                     data-text-over=#{payments.statement.assign.remaining.over('{0}')},
+                     data-text-owed=#{payments.statement.assign.owed('{0}')},
+                     data-text-paid=#{payments.statement.orders.after.paid},
+                     data-text-underpaid=#{payments.statement.warning.UNDERPAID('{0}')},
+                     data-text-overpaid=#{payments.statement.warning.OVERPAID('{0}')},
+                     data-text-empty=#{payments.statement.assign.empty},
+                     data-text-none=#{payments.statement.assign.none},
+                     data-text-more=#{payments.statement.assign.more('{0}', '{1}')},
+                     data-text-apply=#{payments.statement.assign.apply},
+                     data-text-clear=#{payments.statement.assign.clear}">
+        <h2 class="cl-dialog-title" id="statement-assign-title" data-cl-dialog-title></h2>
+        <div class="cl-dialog-body">
+            <p class="cl-dialog-message" th:text="#{payments.statement.assign.lead}"></p>
+            <dl class="cl-kv is-column" data-cl-operation>
+                <div><dt th:text="#{payments.statement.column.date}"></dt><dd data-field="date"></dd></div>
+                <div><dt th:text="#{store.payments.statement.senderColumn}"></dt><dd data-field="sender"></dd></div>
+                <div class="cl-kv-wide"><dt th:text="#{store.payments.statement.preview.column.title}"></dt><dd class="cl-kv-text" data-field="title"></dd></div>
+            </dl>
+            <div class="cl-field">
+                <label class="cl-label" for="statement-assign-search" th:text="#{payments.statement.assign.search}"></label>
+                <input class="cl-input" type="search" id="statement-assign-search" autocomplete="off" data-cl-assign-search
+                       th:attr="placeholder=#{payments.statement.assign.search.placeholder}"/>
+            </div>
+            <div class="cl-choice-group is-scroll" data-cl-assign-list></div>
+            <p class="cl-help is-note" data-cl-assign-note hidden></p>
+            <table class="cl-table is-compact cl-quantity-table" data-cl-assign-table hidden>
+                <caption class="cl-visually-hidden" th:text="#{payments.statement.assign.allocations}"></caption>
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{payments.statement.column.orders}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{payments.statement.column.amount}"></th>
+                </tr>
+                </thead>
+                <tbody data-cl-assign-allocations></tbody>
+            </table>
+            <dl class="cl-kv is-column" data-cl-assign-summary>
+                <div class="cl-kv-total">
+                    <dt th:text="#{payments.statement.assign.remaining}"></dt>
+                    <dd class="is-numeric"><span class="cl-status" data-cl-assign-remaining></span></dd>
+                </div>
+            </dl>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="button" class="cl-button is-primary" data-cl-assign-apply th:text="#{payments.statement.assign.apply}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </dialog>
+
+    <dialog class="cl-dialog is-form is-wide" id="statement-payout-dialog" aria-labelledby="statement-payout-title"
+            th:attr="data-text-title=#{payments.statement.payout.title('{0}')},
+                     data-text-lower=#{payments.statement.payout.lower('{0}')},
+                     data-text-higher=#{payments.statement.payout.higher('{0}')},
+                     data-text-fee=#{payments.statement.payout.fee.of('{0}')},
+                     data-text-missing=#{payments.statement.payout.missing('{0}')},
+                     data-text-count=#{payments.statement.payout.count('{0}')}">
+        <h2 class="cl-dialog-title" id="statement-payout-title" data-cl-dialog-title></h2>
+        <div class="cl-dialog-body">
+            <p class="cl-dialog-message" th:text="#{payments.statement.payout.lead}"></p>
+            <dl class="cl-kv is-column" data-cl-operation>
+                <div><dt th:text="#{payments.statement.column.date}"></dt><dd data-field="date"></dd></div>
+                <div><dt th:text="#{store.payments.statement.senderColumn}"></dt><dd data-field="sender"></dd></div>
+                <div><dt th:text="#{payments.statement.payout.payer}"></dt><dd data-field="payer"></dd></div>
+                <div class="cl-kv-wide"><dt th:text="#{store.payments.statement.preview.column.title}"></dt><dd class="cl-kv-text" data-field="title"></dd></div>
+            </dl>
+            <div class="cl-field">
+                <label class="cl-label" for="statement-payout-search" th:text="#{payments.statement.payout.search}"></label>
+                <input class="cl-input" type="search" id="statement-payout-search" autocomplete="off" data-cl-payout-search/>
+            </div>
+            <div class="cl-statement-scroll">
+                <table class="cl-table is-compact cl-quantity-table">
+                    <thead>
+                    <tr>
+                        <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{payments.statement.payout.pick}"></span></th>
+                        <th scope="col" th:text="#{payments.statement.column.orders}"></th>
+                        <th scope="col" th:text="#{payments.statement.payout.ordered}"></th>
+                        <th scope="col" th:text="#{payments.statement.column.payment}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{payments.statement.payout.owed}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{payments.statement.payout.fee}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{payments.statement.payout.net}"></th>
+                    </tr>
+                    </thead>
+                    <tbody data-cl-payout-rows></tbody>
+                </table>
+            </div>
+            <p class="cl-help is-note" data-cl-payout-empty hidden th:text="#{payments.statement.payout.empty}"></p>
+            <dl class="cl-kv is-column">
+                <div><dt th:text="#{payments.statement.payout.owed}"></dt><dd class="is-numeric" data-cl-payout-gross></dd></div>
+                <div><dt th:text="#{payments.statement.payout.fee}"></dt><dd class="is-numeric" data-cl-payout-fee></dd></div>
+                <div><dt th:text="#{payments.statement.payout.net}"></dt><dd class="is-numeric" data-cl-payout-net></dd></div>
+                <div><dt th:text="#{payments.statement.payout.transfer}"></dt><dd class="is-numeric" data-cl-payout-transfer></dd></div>
+                <div class="cl-kv-total">
+                    <dt th:text="#{payments.statement.payout.difference}"></dt>
+                    <dd class="is-numeric"><span class="cl-status" data-cl-payout-diff></span></dd>
+                </div>
+            </dl>
+            <div class="cl-field">
+                <label class="cl-check">
+                    <input type="checkbox" data-cl-payout-auto-fee aria-describedby="statement-payout-auto-fee-help"/>
+                    <span th:text="#{order.payment.fee.autofill}"></span>
+                </label>
+                <p class="cl-help" id="statement-payout-auto-fee-help" th:text="#{payments.statement.payout.autoFee.help}"></p>
+            </div>
+            <p class="cl-field-error" data-cl-payout-missing hidden></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="button" class="cl-button is-primary" data-cl-payout-apply th:text="#{payments.statement.payout.apply}"></button>
+            <button type="button" class="cl-button" data-cl-payout-auto th:text="#{payments.statement.payout.auto}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            <span class="cl-help" data-cl-payout-count></span>
+        </div>
+    </dialog>
+</div>
+
+<script type="application/json" id="statement-receivables" th:utext="${page.receivablesJson()}"></script>
+<script type="application/json" id="statement-channels" th:utext="${page.channelsJson()}"></script>
+<script th:src="@{/js/submit-once.js}" defer></script>
+<script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/statement-reconciliation.js}" defer></script>
+</div>
+
+</body>
+</html>
