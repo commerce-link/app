@@ -17,8 +17,10 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.offer.imports.OfferImporter;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
@@ -88,11 +90,38 @@ public class OfferController {
     @GetMapping("/dashboard/offer/new")
     public String showContactDetailsForm(@RequestParam String intent,
                                          @RequestParam(required = false) String sourceId,
-                                         Model model) {
-        model.addAttribute("contactDetails", new ContactDetails());
+                                         Model model, Locale locale) {
+        ContactDetails contact = new ContactDetails();
+        String offerName = null;
+        Optional<Basket> storeBasket = "copy".equals(intent) && sourceId != null
+                ? basketsRepository.findById(getStoreId(), sourceId).filter(b -> b.hasType(BasketType.Basket))
+                : Optional.empty();
+        if (storeBasket.isPresent()) {
+            // a shop basket carries the customer's billing and shipping details, the offer's contact starts from them
+            fillFrom(contact, storeBasket.get());
+            offerName = messageSource.getMessage("offers.basket.offerName",
+                    new Object[]{storeBasket.get().getShortenedBasketId()}, locale);
+        }
+        model.addAttribute("contactDetails", contact);
+        model.addAttribute("offerName", offerName);
         model.addAttribute("intent", intent);
         model.addAttribute("sourceId", sourceId);
         return "offerContact";
+    }
+
+    /** Billing first, shipping fills what billing left empty. */
+    private static void fillFrom(ContactDetails contact, Basket basket) {
+        BillingDetails b = basket.getBillingDetails();
+        ShippingDetails s = basket.getShippingDetails();
+        contact.setName(firstNonBlank(b == null ? null : b.getName(), s == null ? null : s.getName()));
+        contact.setSurname(firstNonBlank(b == null ? null : b.getSurname(), s == null ? null : s.getSurname()));
+        contact.setCompanyName(firstNonBlank(b == null ? null : b.getCompanyName(), s == null ? null : s.getCompanyName()));
+        contact.setEmail(firstNonBlank(b == null ? null : b.getEmail(), s == null ? null : s.getEmail()));
+        contact.setPhone(firstNonBlank(b == null ? null : b.getPhone(), s == null ? null : s.getPhone()));
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return StringUtils.isNotBlank(first) ? first.trim() : StringUtils.trimToNull(second);
     }
 
     @PostMapping("/dashboard/offer/new")
