@@ -252,7 +252,7 @@ public class OfferController {
     }
 
     /** Back to the list the delete came from, never to another address (no open redirect, no header injection). */
-    static String safeReturnTo(String returnTo) {
+    public static String safeReturnTo(String returnTo) {
         if (returnTo == null || returnTo.contains("\r") || returnTo.contains("\n")
                 // RedirectView expands {…} as URI templates, which would fail after the delete already happened
                 || returnTo.contains("{") || returnTo.contains("}")) {
