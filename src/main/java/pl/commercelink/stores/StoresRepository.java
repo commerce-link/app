@@ -1,6 +1,7 @@
 package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -23,6 +24,11 @@ public class StoresRepository extends DynamoDbRepository<Store> {
 
     public Store findById(String storeId) {
         return dynamoDBMapper.load(Store.class, storeId);
+    }
+
+    /** A strongly consistent read: sees a store saved a moment ago by another request (a lost race on the same id). */
+    public Store findByIdConsistently(String storeId) {
+        return dynamoDBMapper.load(Store.class, storeId, DynamoDBMapperConfig.ConsistentReads.CONSISTENT.config());
     }
 
     public List<Store> findAll() {

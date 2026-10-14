@@ -97,7 +97,16 @@ class StoresTemplateRenderingTest {
         assertThat(html).contains("cl-status is-ok").contains(">Full account<");
         assertThat(html).doesNotContain("cl-due-note").doesNotContain("/trial/convert");
         assertThat(html).contains("href=\"/dashboard/store/" + STORE_ID + "\"");
-        assertThat(html).contains("href=\"/dashboard/store/" + STORE_ID + "/copy\"");
+        assertThat(html).contains("href=\"/dashboard/store/" + STORE_ID + "/copy?back=");
+    }
+
+    @Test
+    void createButtonCarriesTheListState() {
+        // when
+        String html = render(page(row(StoreState.FULL, null, false, false, false, true, false, false)), null);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/create?back=");
     }
 
     @Test

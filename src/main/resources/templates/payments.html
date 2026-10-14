@@ -13,6 +13,22 @@
                 <h1 class="cl-page-title" th:text="#{payments.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
+                    <!--/* A statement is read with its account's format: without one the action stays visible, greyed
+                           out, with the reason in a tooltip. The tooltip sits on a wrapper: the greyed button's opacity
+                           would fade a tooltip of its own. */-->
+                    <a th:if="${!statementAccounts.isEmpty()}" class="cl-button" th:href="@{/dashboard/payments/statement}"
+                       data-cl-dialog-open="statement-upload-dialog">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-upload"></i></span>
+                        <span th:text="#{payments.statement.upload.action}"></span>
+                    </a>
+                    <span th:if="${statementAccounts.isEmpty()}" class="cl-tooltip is-end"
+                          th:attr="data-tooltip=#{payments.statement.upload.unavailable.help}">
+                        <button type="button" class="cl-button" aria-disabled="true" aria-describedby="payments-statement-reason">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-upload"></i></span>
+                            <span th:text="#{payments.statement.upload.action}"></span>
+                        </button>
+                        <span class="cl-visually-hidden" id="payments-statement-reason" th:text="#{payments.statement.upload.unavailable.help}"></span>
+                    </span>
                     <!--/* Fetching payments needs an invoicing system: without one the action stays visible, greyed out,
                            with the reason next to it (spec §6.2). */-->
                     <form th:if="${page.invoicingConnected()}" class="cl-page-action-form" method="post"
@@ -264,8 +280,15 @@
         paymentSources=${paymentSources},
         loadMoneyJs=true)}"></div>
 
+<div class="cl-page cl-dialog-host" th:if="${!statementAccounts.isEmpty()}">
+    <dialog class="cl-dialog is-form" id="statement-upload-dialog" aria-labelledby="statement-upload-title">
+        <form th:replace="~{payments-statement-upload :: uploadForm(true)}"></form>
+    </dialog>
+</div>
+
 <script th:src="@{/js/list-page.js}" defer></script>
 <script th:src="@{/js/submit-once.js}" defer></script>
+<script th:src="@{/js/dialog.js}" defer></script>
 </div>
 
 </body>

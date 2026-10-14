@@ -6,6 +6,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +29,7 @@ class StoreCreationServiceTest {
         when(storesRepository.findById(anyString())).thenReturn(null);
 
         // when
-        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", "key-1"));
+        Store store = service.createStore(CreateStoreRequest.bare(null, "Sklep X", "key-1"));
 
         // then
         assertNotNull(store.getStoreId());
@@ -49,7 +50,7 @@ class StoreCreationServiceTest {
                 .thenReturn(null);
 
         // when
-        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", null));
+        Store store = service.createStore(CreateStoreRequest.bare(null, "Sklep X", null));
 
         // then
         assertNotNull(store.getStoreId());
@@ -63,7 +64,7 @@ class StoreCreationServiceTest {
 
         // when / then
         assertThrows(IllegalStateException.class,
-                () -> service.createStore(CreateStoreRequest.bare("Sklep X", null)));
+                () -> service.createStore(CreateStoreRequest.bare(null, "Sklep X", null)));
         verify(storesRepository, never()).save(any());
         verify(storesRepository, times(5)).findById(anyString());
     }
@@ -91,7 +92,7 @@ class StoreCreationServiceTest {
         when(storesRepository.findById(anyString())).thenReturn(null);
 
         // when
-        service.createStore(CreateStoreRequest.bare("Sklep X", null));
+        service.createStore(CreateStoreRequest.bare(null, "Sklep X", null));
 
         // then
         verifyNoInteractions(seeder);
@@ -165,9 +166,34 @@ class StoreCreationServiceTest {
         when(storesRepository.findById(anyString())).thenReturn(null);
 
         // when
-        Store store = service.createStore(CreateStoreRequest.bare("Sklep X", null));
+        Store store = service.createStore(CreateStoreRequest.bare(null, "Sklep X", null));
 
         // then
         assertNull(store.getBillingDetails());
+    }
+
+    @Test
+    void createsStoreUnderTheGivenIdWithoutLookingForAFreeOne() {
+        // when
+        Store store = service.createStore(CreateStoreRequest.bare("abcde12345", "Sklep X", "ab12cd"));
+
+        // then
+        assertEquals("abcde12345", store.getStoreId());
+        assertEquals("ab12cd", store.getApiKey());
+        verify(storesRepository, never()).findById(anyString());
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void freeStoreIdSkipsTakenIds() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(new Store()).thenReturn(null);
+
+        // when
+        String id = service.freeStoreId();
+
+        // then
+        assertTrue(UniqueIdentifierGenerator.isWellFormed(id));
+        verify(storesRepository, times(2)).findById(anyString());
     }
 }
