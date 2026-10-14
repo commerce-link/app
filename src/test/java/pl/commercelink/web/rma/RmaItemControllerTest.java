@@ -145,6 +145,20 @@ class RmaItemControllerTest {
     }
 
     @Test
+    void showLooksTheDeliveryUpByItsTrimmedId() throws Exception {
+        // given
+        RMAItem item = item();
+        item.setDeliveryId(" d-1 ");
+        stored(RMAStatus.ItemsReceived, item);
+
+        // when
+        asStore(() -> controller.show(RMA_ID, ITEM_ID, new ExtendedModelMap(), PL));
+
+        // then
+        verify(deliveriesRepository).findById(STORE, "d-1");
+    }
+
+    @Test
     void showRendersThePageWithTheOrderItemAndDelivery() throws Exception {
         // given
         RMAItem item = item();

@@ -13,8 +13,9 @@ public record RmaItemPage(String rmaId, String rmaItemId, String backHref, Strin
                           SerialHint serialHint, Resolution resolution, List<Fact> values, String total, Context context,
                           String savedMessage) {
 
+    // the address the previous release also maps (RmaItemController); switch to the page address when that alias goes
     public String action() {
-        return "/dashboard/rma/" + rmaId + "/items/" + rmaItemId;
+        return "/dashboard/rma/" + rmaId + "/items/" + rmaItemId + "/save";
     }
 
     public record SerialHint(String text, boolean warn) {

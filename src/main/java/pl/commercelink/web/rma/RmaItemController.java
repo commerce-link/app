@@ -53,7 +53,8 @@ class RmaItemController {
         return VIEW;
     }
 
-    // only a page opened before the redesign posts here (still open during a rolling deploy); it sends no version
+    // A page opened before the redesign posts here without a version. The new page posts here too for one release: during
+    // a rolling deploy its post may reach an instance of the previous release, which maps only this address.
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/save")
     String saveFromPageBeforeRedesign(@PathVariable String rmaId, @PathVariable String rmaItemId, @ModelAttribute("form") RmaItemForm form,
                                       @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
@@ -112,7 +113,8 @@ class RmaItemController {
                         String savedMessage, Locale locale) {
         OrderItem orderItem = StringUtils.isAnyBlank(rma.getOrderId(), item.getItemId()) ? null
                 : orderItemsRepository.findById(rma.getOrderId(), item.getItemId());
-        Delivery delivery = !RmaItemPageFactory.showsDelivery(item.getDeliveryId()) ? null : deliveriesRepository.findById(getStoreId(), item.getDeliveryId());
+        Delivery delivery = !RmaItemPageFactory.showsDelivery(item.getDeliveryId()) ? null
+                : deliveriesRepository.findById(getStoreId(), item.getDeliveryId().trim());
         String supplier = delivery == null || delivery.getProvider() == null ? null : supplierLabels.forStoreId(getStoreId()).of(delivery.getProvider());
         return pages.page(getStoreId(), rma, item, orderItem, delivery, supplier, posted, errors, errorMessage, savedMessage, locale);
     }

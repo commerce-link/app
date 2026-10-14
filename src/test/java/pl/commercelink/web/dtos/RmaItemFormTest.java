@@ -1,6 +1,7 @@
 package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.rma.RMAItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,10 +96,61 @@ class RmaItemFormTest {
         form.applyTo(item);
 
         // then
-        assertThat(item.getSerialNo()).isEqualTo("B2, B1");
+        assertThat(item.getSerialNo()).isEqualTo("B2,B1");
         assertThat(item.getReason()).isNull();
         assertThat(item.getComment()).isEqualTo("Checked");
         assertThat(item.getQty()).isEqualTo(2);
         assertThat(item.getName()).isEqualTo("RTX 4070");
+    }
+
+    @Test
+    void valuesAtTheLimitAreAccepted() {
+        // given
+        RmaItemForm form = RmaItemForm.of(stored());
+        form.setSerialNo("s".repeat(RmaItemForm.MAX_SERIAL));
+        form.setReason("r".repeat(RmaItemForm.MAX_REASON));
+        form.setComment("c".repeat(RmaItemForm.MAX_COMMENT));
+
+        // when / then
+        assertThat(form.validate(stored())).isEmpty();
+    }
+
+    @Test
+    void serialLimitCountsTheStoredFormNotWhatWasTyped() {
+        // given: 501 characters typed, 500 once the spaces after the commas are dropped
+        RmaItemForm form = RmaItemForm.of(stored());
+        form.setSerialNo("a".repeat(249) + ", " + "b".repeat(250));
+
+        // when / then
+        assertThat(form.validate(stored())).isEmpty();
+    }
+
+    @Test
+    void unchangedSerialNumbersTypedWithSpacesAreNotAChange() {
+        // given
+        RMAItem item = stored();
+        item.setSerialNo("s".repeat(RmaItemForm.MAX_SERIAL) + ",T1");
+        RmaItemForm form = RmaItemForm.of(item);
+        form.setSerialNo("s".repeat(RmaItemForm.MAX_SERIAL) + ", T1");
+
+        // when / then
+        assertThat(form.validate(item)).isEmpty();
+    }
+
+    @Test
+    void savedSerialNumbersAreRemovedFromTheOrderItemWhenPartOfItsQuantityIsReturned() {
+        // given: the order item has 3 units and the operator narrows the RMA item to two of them
+        RMAItem item = stored();
+        RmaItemForm form = new RmaItemForm();
+        form.setSerialNo("A, B");
+        form.applyTo(item);
+        OrderItem orderItem = new OrderItem();
+        orderItem.setSerialNo("A,B,C");
+
+        // when: OrdersRMAManager.splitOrderItem on accepting the return or a replacement
+        orderItem.removeSerialNumbers(item.getSerialNo());
+
+        // then
+        assertThat(orderItem.getSerialNo()).isEqualTo("C");
     }
 }

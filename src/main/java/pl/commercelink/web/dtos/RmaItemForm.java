@@ -45,7 +45,7 @@ public class RmaItemForm {
     /** A value saved before the limits existed (or imported from a marketplace) may stay as long as it is. */
     public Map<String, String> validate(RMAItem stored) {
         Map<String, String> errors = new LinkedHashMap<>();
-        if (tooLong(serialNo, MAX_SERIAL, stored.getSerialNo())) errors.put("serialNo", "rma.item.page.error.serialNo");
+        if (tooLong(serials(serialNo), MAX_SERIAL, serials(stored.getSerialNo()))) errors.put("serialNo", "rma.item.page.error.serialNo");
         if (tooLong(reason, MAX_REASON, stored.getReason())) errors.put("reason", "rma.item.page.error.reason");
         if (tooLong(comment, MAX_COMMENT, stored.getComment())) errors.put("comment", "rma.item.page.error.comment");
         return errors;
@@ -53,10 +53,15 @@ public class RmaItemForm {
 
     /** Writes the three fields onto the item; call only after validate() returned no errors. */
     public void applyTo(RMAItem item) {
-        String serials = String.join(", ", SerialNumbers.parse(serialNo));
-        item.setSerialNo(serials.isEmpty() ? null : serials);
+        item.setSerialNo(StringUtils.trimToNull(serials(serialNo)));
         item.setReason(StringUtils.trimToNull(normalised(reason)));
         item.setComment(StringUtils.trimToNull(normalised(comment)));
+    }
+
+    // Joined with a bare comma, as the page before the redesign stored them: Item.removeSerialNumbers splits on ","
+    // without trimming, so "A, B" would leave B on the order item when part of its quantity is returned or replaced.
+    private static String serials(String text) {
+        return String.join(",", SerialNumbers.parse(text));
     }
 
     private static boolean tooLong(String posted, int max, String stored) {

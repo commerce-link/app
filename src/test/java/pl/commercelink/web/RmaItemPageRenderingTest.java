@@ -53,7 +53,7 @@ class RmaItemPageRenderingTest {
         assertThat(html).contains("RTX 4070").contains("cl-status is-warn").contains("Not decided yet");
         assertThat(html).contains("href=\"/dashboard/orders/order-1\"").contains("href=\"/dashboard/item/history?serialNo=A1\"");
         assertThat(html).contains("The customer sees it");
-        assertThat(html).contains("action=\"/dashboard/rma/rma-1/items/item-1\"");
+        assertThat(html).contains("action=\"/dashboard/rma/rma-1/items/item-1/save\"");
     }
 
     @Test
@@ -84,6 +84,6 @@ class RmaItemPageRenderingTest {
         String html = render("itemForm", page(false, Map.of(), null, true));
 
         // then
-        assertThat(html).contains("cl-help is-warn").contains("Number X9 is not on the order item");
+        assertThat(html).contains("cl-help is-break is-warn").contains("Number X9 is not on the order item");
     }
 }

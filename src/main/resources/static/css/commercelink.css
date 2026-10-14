@@ -13567,3 +13567,15 @@ a.cl-link-button:hover {
     white-space: pre-line;
     overflow-wrap: anywhere;
 }
+
+/* Help text that quotes what was typed (an RMA item's serial numbers): a long value without spaces breaks anywhere
+   instead of widening the field and scrolling the page sideways. */
+.cl-page .cl-help.is-break {
+    overflow-wrap: anywhere;
+}
+
+/* A textarea for a few sentences (an RMA item's reason and comment): lower than the email-body default, so two of them
+   still leave the save button above the fold on a 1366×768 laptop (design system §6.1). */
+.cl-input.cl-textarea.is-short {
+    min-height: 72px;
+}

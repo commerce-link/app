@@ -63,13 +63,13 @@
                             <input class="cl-input" id="serialNo" name="serialNo" type="text" autocomplete="off" th:value="${f.serialNo}"
                                    th:classappend="${p.errors()['serialNo'] != null} ? 'is-invalid'"
                                    th:attr="aria-invalid=${p.errors()['serialNo'] != null ? 'true' : null}, aria-describedby=${p.errors()['serialNo'] != null ? 'serialNo-help serialNo-error' : 'serialNo-help'}">
-                            <p class="cl-help" id="serialNo-help" th:classappend="${p.serialHint().warn()} ? 'is-warn'" th:text="${p.serialHint().text()}"></p>
+                            <p class="cl-help is-break" id="serialNo-help" th:classappend="${p.serialHint().warn()} ? 'is-warn'" th:text="${p.serialHint().text()}"></p>
                             <p th:if="${p.errors()['serialNo'] != null}" class="cl-field-error" id="serialNo-error"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${p.errors()['serialNo']}}"></span></p>
                         </div>
                         <div class="cl-span-6 cl-field" th:each="t : ${ {'reason', 'comment'} }">
                             <label class="cl-label" th:for="${t}"><span th:text="#{|rma.item.page.field.${t}|}"></span>
                                 <span class="cl-optional" th:text="#{form.optional}"></span></label>
-                            <textarea class="cl-input cl-textarea" rows="3" th:id="${t}" th:name="${t}" th:text="${t == 'reason'} ? ${f.reason} : ${f.comment}"
+                            <textarea class="cl-input cl-textarea is-short" rows="2" th:id="${t}" th:name="${t}" th:text="${t == 'reason'} ? ${f.reason} : ${f.comment}"
                                       th:classappend="${p.errors().get(t) != null} ? 'is-invalid'"
                                       th:attr="aria-invalid=${p.errors().get(t) != null ? 'true' : null}, aria-describedby=${p.errors().get(t) != null ? t + '-help ' + t + '-error' : t + '-help'}"></textarea>
                             <p class="cl-help" th:id="${t} + '-help'" th:text="#{|rma.item.page.${t}.help|}"></p>
