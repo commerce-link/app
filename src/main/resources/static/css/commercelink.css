@@ -13550,3 +13550,20 @@ a.cl-link-button:hover {
 .cl-page .cl-dialog [hidden] {
     display: none;
 }
+
+/* RMA item page (2026-10-14): a record description whose values are long texts (reason, comment) — the label above,
+   the value across the whole card and its line breaks kept, instead of two narrow columns. */
+.cl-page dl.cl-kv.is-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+}
+.cl-page dl.cl-kv.is-stacked > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+.cl-page dl.cl-kv.is-stacked dd {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}

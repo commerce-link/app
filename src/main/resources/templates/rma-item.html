@@ -3,113 +3,127 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
+<section class="cl-page" th:fragment="body" th:with="p=${page}">
+    <div class="cl-page-body is-wide">
 
-    <section class="section">
-        <div class="container">
-
-            <div class="box">
-                <h3 class="title is-3" th:text="#{rma.item.edit}"></h3>
-
-                <form th:object="${rmaItem}" method="post" th:action="@{/dashboard/rma/{rmaId}/items/{rmaItemId}/save(rmaId=${rmaId},rmaItemId=${rmaItem.rmaItemId})}">
-                    <input type="hidden" th:field="*{rmaId}" />
-                    <input type="hidden" th:field="*{rmaItemId}" />
-                    <input type="hidden" th:field="*{itemId}" />
-                    <input type="hidden" th:field="*{tax}" />
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.item.name}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{name}" disabled />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.quantity}"></label>
-                        <div class="control">
-                            <input class="input" type="number" th:field="*{qty}" disabled />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.desired.resolution}">Desired Resolution</label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select th:field="*{desiredResolution}" disabled>
-                                    <option th:each="r : ${rmaResolutionsTypes}"
-                                            th:value="${r}"
-                                            th:text="${r}">
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.actual.resolution}">Actual Resolution</label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select th:field="*{actualResolution}" readonly disabled>
-                                    <option th:each="r : ${rmaResolutionsTypes}"
-                                            th:value="${r}"
-                                            th:text="${r}">
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.serial.no}">Serial No</label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{serialNo}" th:disabled="${isClosed}" />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.reason}">Reason</label>
-                        <div class="control">
-                            <textarea class="textarea" th:field="*{reason}" th:disabled="${isClosed}">
-                            </textarea>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.comment}"></label>
-                        <div class="control">
-                            <textarea class="textarea" th:field="*{comment}" th:disabled="${isClosed}">
-                            </textarea>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.status}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select th:field="*{status}" disabled>
-                                    <option th:each="s : ${rmaStatusTypes}" th:value="${s}" th:text="${s}">
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field is-grouped mt-5">
-                        <div class="control">
-                            <button class="button is-primary" type="submit" th:disabled="${isClosed}" th:text="#{general.save}"></button>
-                        </div>
-                        <div class="control">
-                            <a class="button" th:href="@{/dashboard/rma/{rmaId}(rmaId=${rmaId})}" th:text="#{general.cancel}"></a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
+        <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, ${p.backLabel()}, ${p.name()}, null, ~{::itemStatus}, ~{::itemMeta}, null)}">
+            <th:block th:fragment="itemStatus"><span class="cl-status" th:classappend="${p.statusTone()}" th:text="${p.statusLabel()}"></span></th:block>
+            <th:block th:fragment="itemMeta">
+                <p class="cl-record-meta">
+                    <span th:text="${p.qty()}"></span>
+                    <span th:if="${p.ean() != null}" th:text="#{rma.item.page.meta.ean(${p.ean()})}"></span>
+                    <span th:if="${p.mfn() != null}" th:text="#{rma.item.page.meta.mfn(${p.mfn()})}"></span>
+                    <span><span th:text="#{rma.item.page.meta.id}"></span>&nbsp;<button type="button" class="cl-copy-inline"
+                            th:attr="data-cl-copy=${p.rmaItemId()}, aria-label=#{rma.item.page.meta.copy}"><span class="cl-copy-code"><span th:text="${p.shortId()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button></span>
+                </p>
+            </th:block>
         </div>
-    </section>
 
+        <th:block th:replace="~{fragments/settings-form :: savedAlert}"></th:block>
+
+        <div th:if="${p.readOnly()}" class="cl-layout-aside">
+            <div class="cl-layout-main">
+                <div class="cl-stack is-wide">
+                    <section class="cl-card is-status" aria-labelledby="rma-item-closed-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-closed-title"><i class="fas fa-lock" aria-hidden="true"></i><span th:text="${p.closedTitle()}"></span></h2></div>
+                        <p class="cl-card-desc" th:text="#{rma.item.page.closed.text}"></p>
+                    </section>
+                    <section class="cl-card" aria-labelledby="rma-item-data-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-data-title" th:text="#{rma.item.page.card.form}"></h2></div>
+                        <dl class="cl-kv is-stacked cl-card-inset">
+                            <div><dt th:text="#{rma.item.page.field.serialNo}"></dt><dd th:text="${#strings.isEmpty(p.form().serialNo)} ? '—' : ${p.form().serialNo}"></dd></div>
+                            <div><dt th:text="#{rma.item.page.field.reason}"></dt><dd th:text="${#strings.isEmpty(p.form().reason)} ? '—' : ${p.form().reason}"></dd></div>
+                            <div><dt th:text="#{rma.item.page.field.comment}"></dt><dd th:text="${#strings.isEmpty(p.form().comment)} ? '—' : ${p.form().comment}"></dd></div>
+                        </dl>
+                    </section>
+                </div>
+            </div>
+            <div class="cl-layout-side is-grid" th:insert="~{::sideCards}"></div>
+        </div>
+
+        <!--/* The whole layout is the form: an async save answers this fragment, so the side cards (serial history links) follow the saved values too. */-->
+        <form th:unless="${page.readOnly()}" th:fragment="itemForm" th:with="p=${page}, f=${page.form()}"
+              id="rma-item-form" class="cl-layout-aside" method="post" novalidate data-cl-async
+              th:action="@{${p.action()}}"
+              th:attr="data-success-message=${p.savedMessage()}, data-error-message=#{form.save.failed}">
+            <div class="cl-layout-main">
+                <input type="hidden" name="version" th:if="${f.version != null}" th:value="${f.version}">
+                <div th:if="${p.errorMessage() != null}" class="cl-alert is-bad" role="status" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${p.errorMessage()}"></p>
+                </div>
+                <div th:replace="~{fragments/settings-form :: errorSummary('rma-item-errors', ${p.errors()}, null)}"></div>
+                <section class="cl-card" aria-labelledby="rma-item-form-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-form-title" th:text="#{rma.item.page.card.form}"></h2></div>
+                    <div class="cl-form-grid cl-card-grid">
+                        <div class="cl-span-6 cl-field">
+                            <label class="cl-label" for="serialNo"><span th:text="#{rma.item.page.field.serialNo}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                            <input class="cl-input" id="serialNo" name="serialNo" type="text" autocomplete="off" th:value="${f.serialNo}"
+                                   th:classappend="${p.errors()['serialNo'] != null} ? 'is-invalid'"
+                                   th:attr="aria-invalid=${p.errors()['serialNo'] != null ? 'true' : null}, aria-describedby=${p.errors()['serialNo'] != null ? 'serialNo-help serialNo-error' : 'serialNo-help'}">
+                            <p class="cl-help" id="serialNo-help" th:classappend="${p.serialHint().warn()} ? 'is-warn'" th:text="${p.serialHint().text()}"></p>
+                            <p th:if="${p.errors()['serialNo'] != null}" class="cl-field-error" id="serialNo-error"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${p.errors()['serialNo']}}"></span></p>
+                        </div>
+                        <div class="cl-span-6 cl-field" th:each="t : ${ {'reason', 'comment'} }">
+                            <label class="cl-label" th:for="${t}"><span th:text="#{|rma.item.page.field.${t}|}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                            <textarea class="cl-input cl-textarea" rows="3" th:id="${t}" th:name="${t}" th:text="${t == 'reason'} ? ${f.reason} : ${f.comment}"
+                                      th:classappend="${p.errors().get(t) != null} ? 'is-invalid'"
+                                      th:attr="aria-invalid=${p.errors().get(t) != null ? 'true' : null}, aria-describedby=${p.errors().get(t) != null ? t + '-help ' + t + '-error' : t + '-help'}"></textarea>
+                            <p class="cl-help" th:id="${t} + '-help'" th:text="#{|rma.item.page.${t}.help|}"></p>
+                            <p th:if="${p.errors().get(t) != null}" class="cl-field-error" th:id="${t} + '-error'"><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="#{${p.errors().get(t)}}"></span></p>
+                        </div>
+                    </div>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
+                        <a class="cl-button" th:href="@{${p.backHref()}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </section>
+            </div>
+            <div class="cl-layout-side is-grid">
+                <th:block th:fragment="sideCards">
+                <section class="cl-card" aria-labelledby="rma-item-resolution-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-resolution-title" th:text="#{rma.item.page.card.resolution}"></h2></div>
+                    <dl class="cl-kv is-column">
+                        <div><dt th:text="#{rma.item.page.resolution.desired}"></dt><dd th:text="${page.resolution().desired() ?: '—'}"></dd></div>
+                        <div><dt th:text="#{rma.item.page.resolution.actual}"></dt>
+                            <dd><span th:if="${page.resolution().actual() != null}" th:text="${page.resolution().actual()}"></span>
+                                <span th:unless="${page.resolution().actual() != null}" class="cl-muted" th:text="#{rma.item.page.resolution.none}"></span></dd></div>
+                    </dl>
+                </section>
+                <section class="cl-card" aria-labelledby="rma-item-value-title">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-value-title" th:text="#{rma.item.page.card.value}"></h2></div>
+                    <dl class="cl-kv is-column">
+                        <div th:each="v : ${page.values()}"><dt th:text="${v.label()}"></dt><dd class="is-numeric" th:text="${v.value()}"></dd></div>
+                        <div class="cl-kv-total"><dt th:text="#{rma.item.page.value.total}"></dt><dd class="is-numeric" th:text="${page.total()}"></dd></div>
+                    </dl>
+                </section>
+                <section class="cl-card" aria-labelledby="rma-item-context-title" th:with="c=${page.context()}">
+                    <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-context-title" th:text="#{rma.item.page.card.context}"></h2></div>
+                    <dl class="cl-kv is-column">
+                        <div><dt th:text="#{rma.item.page.context.rma}"></dt>
+                            <dd><a th:href="@{${c.rmaHref()}}" th:text="${c.rmaShortId()}"></a> <span class="cl-status" th:classappend="${c.rmaStatusTone()}" th:text="${c.rmaStatusLabel()}"></span></dd></div>
+                        <div><dt th:text="#{rma.item.page.context.source}"></dt><dd th:text="${c.source()}"></dd></div>
+                        <div th:if="${c.client() != null}"><dt th:text="#{rma.item.page.context.client}"></dt><dd th:text="${c.client()}"></dd></div>
+                        <div th:if="${c.orderHref() != null}"><dt th:text="#{rma.item.page.context.order}"></dt><dd><a th:href="@{${c.orderHref()}}" th:text="${c.orderShortId()}"></a></dd></div>
+                        <div th:if="${c.deliveryText() != null}"><dt th:text="#{rma.item.page.context.delivery}"></dt>
+                            <dd><a th:if="${c.deliveryHref() != null}" th:href="@{${c.deliveryHref()}}" th:text="${c.deliveryText()}"></a>
+                                <span th:unless="${c.deliveryHref() != null}" th:text="${c.deliveryText()}"></span>
+                                <span th:if="${c.deliverySupplier() != null}" th:text="|· ${c.deliverySupplier()}|"></span></dd></div>
+                        <div th:unless="${c.serials().isEmpty()}"><dt th:text="#{rma.item.page.context.history}"></dt>
+                            <dd><th:block th:each="s, it : ${c.serials()}"><a th:href="@{${s.href()}}" th:text="${s.serialNo()}"></a><br th:unless="${it.last}"></th:block></dd></div>
+                    </dl>
+                </section>
+                </th:block>
+            </div>
+        </form>
+    </div>
+</section>
+<script th:src="@{/js/async-form.js}" defer></script>
+<script th:src="@{/js/copy-field.js}" defer></script>
+<script th:src="@{/js/error-summary.js}" defer></script>
 </div>
-
 </body>
 </html>
