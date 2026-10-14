@@ -50,6 +50,13 @@ class StoreCreateFormTest {
     }
 
     @Test
+    void apiKeyThatCannotTravelInAHeaderIsRefused() {
+        // when / then — a space inside or a Polish letter would be saved and never match the x-api-key header
+        assertThat(form("Sklep", "ab cd ef").validate()).containsExactly(Map.entry("apiKey", "store.create.error.apiKey.chars"));
+        assertThat(form("Sklep", "kluczżółć99").validate()).containsExactly(Map.entry("apiKey", "store.create.error.apiKey.chars"));
+    }
+
+    @Test
     void apiKeyOfExactlySixCharactersIsKept() {
         // when / then
         assertThat(form("Sklep", "ab12cd").apiKeySuffix()).isEqualTo("ab12cd");

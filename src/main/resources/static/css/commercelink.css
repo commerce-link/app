@@ -5073,8 +5073,11 @@ a.cl-link-button:hover {
 }
 /* A short note under a page's form (a hint to another way of doing the same). */
 .cl-page .cl-form + .cl-help { margin-top: 12px; }
-/* Busy state of a submit-once button with data-cl-busy-label. */
-.cl-page .cl-button > .cl-spinner.is-compact { margin-right: 6px; }
+/* A link in a sentence outside the lead (the hint under the store create form, the source store of a copy): a 44 px touch
+   target below 1024 px without moving the line, as .cl-lead-link does in a lead. */
+@media (max-width: 1023px) {
+    .cl-page .cl-text-link { display: inline-block; padding-block: 13px; margin-block: -13px; }
+}
 .cl-page .cl-card-footer > [data-cl-busy-note] { flex-basis: 100%; margin: 0; }
 
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */

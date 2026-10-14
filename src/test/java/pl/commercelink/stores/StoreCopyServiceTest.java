@@ -14,6 +14,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.templates.EmailTemplatesRepository;
 
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,5 +105,29 @@ class StoreCopyServiceTest {
         assertThat(copy.getStoreId()).isEqualTo("copy000001");
         assertThat(copy.getName()).isEqualTo("Kopia");
         verify(storesRepository).save(copy);
+    }
+
+    @Test
+    void warehouseCopiesOnlyItsIdAndTheDocumentsSwitch() {
+        // given — the copy page lists the cost centre and the printers under "set up again" (store.copy.scope.no.warehouse)
+        WarehouseConfiguration warehouse = new WarehouseConfiguration();
+        warehouse.setWarehouseId("MAG-1");
+        warehouse.setCostCenterId("KC-1");
+        warehouse.setDocumentsGenerationEnabled(true);
+        warehouse.setPrinters(new LinkedList<>(List.of(new Printer())));
+        Store source = new Store();
+        source.setStoreId("store-1");
+        source.setWarehouseConfiguration(warehouse);
+        when(storesRepository.findById("store-1")).thenReturn(source);
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of());
+
+        // when
+        Store copy = storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        assertThat(copy.getWarehouseConfiguration().getWarehouseId()).isEqualTo("MAG-1");
+        assertThat(copy.getWarehouseConfiguration().isDocumentsGenerationEnabled()).isTrue();
+        assertThat(copy.getWarehouseConfiguration().getCostCenterId()).isNull();
+        assertThat(copy.getWarehouseConfiguration().getPrinters()).isEmpty();
     }
 }

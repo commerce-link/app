@@ -316,7 +316,9 @@ class SuperAdminControllerTest {
     @Test
     void lostRaceLandsOnTheStoreTheOtherRequestCreated() {
         // given
-        when(storesRepository.findById(NEW_ID)).thenReturn(null).thenReturn(store(NEW_ID, "Elektro-Max"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        // the other request's store is read back consistently, so an eventually consistent miss cannot report a failure
+        when(storesRepository.findByIdConsistently(NEW_ID)).thenReturn(store(NEW_ID, "Elektro-Max"));
         when(storeCreationService.createStore(any())).thenThrow(new ConditionalCheckFailedException("taken"));
         when(messageSource.getMessage(eq("store.create.duplicate"), aryEq(new Object[]{"Elektro-Max"}), eq(locale)))
                 .thenReturn("Już był");
@@ -787,6 +789,24 @@ class SuperAdminControllerTest {
     }
 
     @Test
+    void copyPageOfANamelessSourceNamesItByItsShortId() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, null));
+        when(storeCreationService.freeStoreId()).thenReturn(NEW_ID);
+        String shortId = STORE_ID.substring(0, 8);
+        when(messageSource.getMessage(eq("store.copy.name.suggested"), aryEq(new Object[]{shortId}), eq(locale)))
+                .thenReturn(shortId + " (kopia)");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.copyStorePage(STORE_ID, null, model, locale);
+
+        // then
+        assertEquals(shortId, model.getAttribute("sourceName"));
+        assertEquals(shortId + " (kopia)", ((StoreCopyForm) model.getAttribute("form")).getNewStoreName());
+    }
+
+    @Test
     void copyPageBackLeadsToTheSourceSettingsWithoutBack() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
@@ -952,7 +972,8 @@ class SuperAdminControllerTest {
     void lostCopyRaceLandsOnTheCopyTheOtherRequestMade() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store(STORE_ID, "Madman Gaming"));
-        when(storesRepository.findById(NEW_ID)).thenReturn(null).thenReturn(store(NEW_ID, "Kopia"));
+        when(storesRepository.findById(NEW_ID)).thenReturn(null);
+        when(storesRepository.findByIdConsistently(NEW_ID)).thenReturn(store(NEW_ID, "Kopia"));
         when(storeCopyService.copyStore(STORE_ID, NEW_ID, "Kopia")).thenThrow(new ConditionalCheckFailedException("taken"));
         when(messageSource.getMessage(eq("store.copy.duplicate"), aryEq(new Object[]{"Kopia"}), eq(locale)))
                 .thenReturn("Już była");

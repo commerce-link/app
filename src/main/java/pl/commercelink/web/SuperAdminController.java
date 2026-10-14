@@ -176,7 +176,7 @@ public class SuperAdminController {
             return "redirect:/dashboard/store/" + store.getStoreId();
         } catch (ConditionalCheckFailedException e) {
             // the same form sent twice at once: the other request saved the store first (Store is versioned)
-            Store raced = storesRepository.findById(form.getNewStoreId());
+            Store raced = storesRepository.findByIdConsistently(form.getNewStoreId());
             if (raced != null) {
                 return alreadyCreated(raced, form, back, model, locale, redirectAttributes);
             }
@@ -215,7 +215,7 @@ public class SuperAdminController {
     public String copyStorePage(@PathVariable String storeId, @RequestParam(required = false) String back, Model model,
                                 Locale locale) {
         Store source = existing(storeId);
-        StoreCopyForm form = StoreCopyForm.of(message("store.copy.name.suggested", locale, source.getName()),
+        StoreCopyForm form = StoreCopyForm.of(message("store.copy.name.suggested", locale, StoresListPageFactory.displayName(source)),
                 storeCreationService.freeStoreId());
         return renderCopy(source, form, Map.of(), null, back, model, locale);
     }
@@ -238,11 +238,11 @@ public class SuperAdminController {
         }
         try {
             Store copy = storeCopyService.copyStore(storeId, form.getNewStoreId(), form.trimmedName());
-            SettingsFlash.onRedirect(redirectAttributes, message("store.copy.success", locale, copy.getName(), source.getName()));
+            SettingsFlash.onRedirect(redirectAttributes, message("store.copy.success", locale, copy.getName(), StoresListPageFactory.displayName(source)));
             return "redirect:/dashboard/store/" + copy.getStoreId();
         } catch (ConditionalCheckFailedException e) {
             // the store is saved before its catalogs, so the request that lost the race copied nothing
-            Store raced = storesRepository.findById(form.getNewStoreId());
+            Store raced = storesRepository.findByIdConsistently(form.getNewStoreId());
             if (raced != null) {
                 return copyAlreadyMade(source, raced, form, back, model, locale, redirectAttributes);
             }
@@ -268,6 +268,7 @@ public class SuperAdminController {
     private String renderCopy(Store source, StoreCopyForm form, Map<String, String> errors, String formError, String back,
                               Model model, Locale locale) {
         model.addAttribute("source", source);
+        model.addAttribute("sourceName", StoresListPageFactory.displayName(source));
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("formError", formError);

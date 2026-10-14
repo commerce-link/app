@@ -24,7 +24,7 @@
                         <dl class="cl-kv">
                             <div>
                                 <dt th:text="#{store.copy.source.label}"></dt>
-                                <dd><a th:href="@{/dashboard/store/{id}(id=${source.storeId})}" th:text="${source.name}"></a>
+                                <dd><a class="cl-text-link" th:href="@{/dashboard/store/{id}(id=${source.storeId})}" th:text="${sourceName}"></a>
                                     <span class="cl-help is-note" th:text="#{store.copy.source.id(${source.storeId})}"></span></dd>
                             </div>
                         </dl>
@@ -42,7 +42,7 @@
                             <div>
                                 <p class="cl-scope-title" id="store-copy-scope-yes" th:text="#{store.copy.scope.yes}"></p>
                                 <ul class="cl-scope-list is-yes" aria-labelledby="store-copy-scope-yes">
-                                    <li th:each="item : ${ {'catalogs','notifications','suppliers','settings','invoicing','packages','brandColor'} }">
+                                    <li th:each="item : ${ {'catalogs','notifications','suppliers','settings','warehouse','invoicing','packages','brandColor'} }">
                                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
                                         <span th:text="#{${'store.copy.scope.yes.' + item}}"></span>
                                     </li>
@@ -51,7 +51,7 @@
                             <div>
                                 <p class="cl-scope-title" id="store-copy-scope-no" th:text="#{store.copy.scope.no}"></p>
                                 <ul class="cl-scope-list is-no" aria-labelledby="store-copy-scope-no">
-                                    <li th:each="item : ${ {'company','addresses','payments','marketplaces','reporting','ownSuppliers','users'} }">
+                                    <li th:each="item : ${ {'company','addresses','warehouse','payments','marketplaces','reporting','ownSuppliers','users'} }">
                                         <span class="icon is-small" aria-hidden="true"><i class="fas fa-minus"></i></span>
                                         <span th:text="#{${'store.copy.scope.no.' + item}}"></span>
                                     </li>

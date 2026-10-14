@@ -34,8 +34,16 @@ public class StoreCreateForm {
         String key = StringUtils.strip(apiKey);
         if (StringUtils.isNotEmpty(key) && key.length() < DefaultApiKeyValidator.KEY_SUFFIX_LENGTH) {
             errors.put("apiKey", "store.create.error.apiKey.short");
+        } else if (StringUtils.isNotEmpty(key) && !isHeaderSafe(key)) {
+            errors.put("apiKey", "store.create.error.apiKey.chars");
         }
         return errors;
+    }
+
+    // The suffix is compared with the end of the x-api-key header, which carries printable ASCII only: a key with a space
+    // or a Polish letter would be saved and never match, so the store's REST API would refuse every request.
+    private static boolean isHeaderSafe(String key) {
+        return key.chars().allMatch(c -> c > 0x20 && c < 0x7F);
     }
 
     public String trimmedName() {

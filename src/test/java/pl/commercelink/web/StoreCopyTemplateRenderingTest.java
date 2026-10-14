@@ -21,6 +21,7 @@ class StoreCopyTemplateRenderingTest {
         source.setName("Madman Gaming");
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("source", source);
+        context.setVariable("sourceName", "Madman Gaming");
         context.setVariable("form", StoreCopyForm.of("Madman Gaming (copy)", "abcde12345"));
         context.setVariable("errors", errors);
         context.setVariable("formError", formError);
@@ -42,6 +43,9 @@ class StoreCopyTemplateRenderingTest {
         assertThat(html).contains("value=\"Madman Gaming (copy)\"").contains("name=\"newStoreId\" value=\"abcde12345\"");
         assertThat(html).contains("cl-scope-list is-yes").contains("cl-scope-list is-no");
         assertThat(html).contains("Product catalogs with categories and products").contains("Access details and feed files of own suppliers");
+        // StoreCopyService copies the warehouse id and the documents switch, not the cost centre or the printers
+        assertThat(html).contains("Warehouse: warehouse ID and creating documents").contains("Warehouse cost centre and label printers")
+                .doesNotContain("Checkout, RMA and warehouse settings");
         assertThat(html).contains("data-cl-submit-once").contains("data-cl-busy-label=\"Copying…\"").contains("data-cl-busy-note");
         assertThat(html).doesNotContain("class=\"notification").doesNotContain("is-success").doesNotContain("name=\"back\"");
     }
