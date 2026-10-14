@@ -12,6 +12,7 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Comparator;
@@ -111,6 +112,11 @@ public class StockLedgerPeriodClosing {
                     period.label(), storeId, e);
             return true;
         }
+    }
+
+    /** When the period's report was last generated: a period closed again shows the new moment. */
+    public Optional<Instant> generatedAt(String storeId, StockLedgerPeriod period) {
+        return closings.generatedAt(storeId, period);
     }
 
     public Optional<byte[]> closedReport(String storeId, StockLedgerPeriod period) {

@@ -36,11 +36,14 @@ import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 @Controller
@@ -123,8 +126,11 @@ public class FinancialReportsController {
                               @RequestParam(value = "from", required = false) String from,
                               @RequestParam(value = "to", required = false) String to) {
         ReportPeriod fallback = ReportPeriod.of(null, null, LocalDate.now());
-        StockLedgerClosingView closing = StockLedgerClosingView.of(
-                stockLedgerPeriodClosing.closedPeriods(getStoreId()), fallback.from(), fallback.to(), locale);
+        List<StockLedgerPeriod> closedPeriods = stockLedgerPeriodClosing.closedPeriods(getStoreId());
+        Map<StockLedgerPeriod, Instant> generatedAt = new HashMap<>();
+        closedPeriods.forEach(closed -> stockLedgerPeriodClosing.generatedAt(getStoreId(), closed)
+                .ifPresent(moment -> generatedAt.put(closed, moment)));
+        StockLedgerClosingView closing = StockLedgerClosingView.of(closedPeriods, generatedAt, fallback.from(), fallback.to(), locale);
         // after a held closing the form keeps the range that was held, so it can be closed once settled
         StockLedgerClosingWarning warning = (StockLedgerClosingWarning) model.getAttribute("ledgerWarning");
         ReportPeriod report = reportPeriod(from, to);

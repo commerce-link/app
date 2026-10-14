@@ -162,11 +162,13 @@
 
 <!--/* One table for the newest closed periods and the same one again behind "Older periods". */-->
     <table th:fragment="closedPeriods(periods, reportQuery)" class="cl-table">
-        <thead><tr><th scope="col" th:text="#{reports.stockLedger.period}"></th>
+        <thead><tr><th scope="col" th:text="#{reports.generated.col.report}"></th>
+            <th scope="col" th:text="#{reports.generated.col.generated}"></th>
             <th scope="col"><span class="cl-visually-hidden" th:text="#{reports.stockLedger.actions}"></span></th></tr></thead>
         <tbody><tr th:each="closed : ${periods}">
             <th scope="row" class="cl-table-key"><span th:text="${closed.label()}"></span>
                 <span class="cl-table-sub" th:unless="${closed.rangeText() == closed.label()}" th:text="${closed.rangeText()}"></span></th>
+            <td th:attr="data-label=#{reports.generated.col.generated}" th:text="${closed.generatedAt() != null} ? ${closed.generatedAt()} : '–'"></td>
             <td class="cl-table-actions">
                 <a class="cl-link-button" th:href="@{/dashboard/reports/stock-ledger/closed(dateFrom=${closed.from()},dateTo=${closed.to()})}"
                    th:attr="aria-label=#{reports.stockLedger.download.label(${closed.label()})}">
