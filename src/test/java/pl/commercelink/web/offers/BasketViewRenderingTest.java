@@ -213,4 +213,24 @@ class BasketViewRenderingTest {
                 .doesNotContain("style=\"")
                 .doesNotContain(" button is-primary");
     }
+
+    @Test
+    void contentWrapperRendersWithoutTheParameterisedFragmentsInPlace() {
+        // given
+        BasketViewPage page = fullPage();
+
+        // when
+        String html = render("<div th:replace=\"~{offers/basket :: [layout:fragment='content']}\"></div>",
+                Map.of("page", page));
+
+        // then
+        assertThat(html.split("<h1", -1)).hasSize(2);
+        assertThat(html).contains("id=\"pozycje\"")
+                .contains("id=\"summary-title\"")
+                .contains("id=\"customer-title\"")
+                .contains("id=\"facts-title\"")
+                .contains("/js/menu.js")
+                .contains("/js/copy-field.js")
+                .contains("/js/confirm-dialog.js");
+    }
 }

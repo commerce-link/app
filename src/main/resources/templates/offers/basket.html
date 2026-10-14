@@ -104,6 +104,7 @@
 <script th:src="@{/js/menu.js}" defer></script>
 <script th:src="@{/js/copy-field.js}" defer></script>
 <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
 
 <tr th:fragment="row(row)">
     <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.basket.items.column.product}">
@@ -201,6 +202,5 @@
     </dl>
     <p class="cl-card-desc cl-card-note cl-basket-note" th:text="#{offers.basket.facts.note(${f.cleanupDays()})}"></p>
 </section>
-</div>
 </body>
 </html>
