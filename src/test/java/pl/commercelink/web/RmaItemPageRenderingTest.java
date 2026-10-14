@@ -64,6 +64,7 @@ class RmaItemPageRenderingTest {
         // then
         assertThat(html).doesNotContain("<form").doesNotContain("??");
         assertThat(html).contains("RMA completed").contains("cl-kv is-stacked").contains("Artefacts");
+        assertThat(html).contains("id=\"rma-item-context-title\"").contains("href=\"/dashboard/orders/order-1\"").contains("Not decided yet");
     }
 
     @Test
