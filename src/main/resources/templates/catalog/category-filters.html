@@ -12,8 +12,6 @@
                     ~{::filtersLead}, null)}">
                 <th:block th:fragment="filtersLead">
                     <span th:text="${category.name} + ' · ' + #{catalog.category.filters.lead}"></span>
-                    <a th:if="${matchingProducts != null}" th:href="@{${productsAddHref}}"
-                       th:text="#{catalog.category.filters.matching(${matchingProducts})}"></a>
                 </th:block>
             </div>
 

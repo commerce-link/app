@@ -3,276 +3,39 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-<div layout:fragment="content">
-    <style>
-        .tabs ul {
-            margin: 0;
-            list-style: none;
-        }
-        .tabs li + li {
-            margin-top: 0;
-        }
-    </style>
-
-    <section class="section">
-        <div class="container">
-            <h1 class="title is-3" th:text="#{rma.new}"></h1>
-
-            <div class="box">
-                <form id="createRmaForm" th:action="@{/dashboard/rma/new}" method="post" th:object="${rma}">
-                    <input type="hidden" name="mode" id="modeInput" th:value="${mode}">
-
-                    <div class="tabs is-boxed" id="modeTabs">
-                        <ul>
-                            <li th:classappend="${mode == 'BY_ORDER_LINE'} ? 'is-active'">
-                                <a data-mode="BY_ORDER_LINE"><span th:text="#{rma.by.order.line}"></span></a>
-                            </li>
-                            <li th:classappend="${mode == 'BY_SERIAL_NO'} ? 'is-active'">
-                                <a data-mode="BY_SERIAL_NO"><span th:text="#{rma.by.serial.no}"></span></a>
-                            </li>
-                            <li th:classappend="${mode == 'BY_EMAIL'} ? 'is-active'">
-                                <a data-mode="BY_EMAIL"><span th:text="#{rma.by.email}"></span></a>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div class="field mt-2" th:if="${emailOrders != null}">
-                        <ul>
-                            <li th:each="order : ${emailOrders}">
-                                <a th:href="@{'/dashboard/rma/new?orderId=' + ${order.orderId}}"
-                                   th:text="${order.orderId + ' (' + #temporals.format(order.orderedAt, 'yyyy-MM-dd HH:mm:ss') + ')'}"></a>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <input type="hidden" th:field="*{storeId}" />
-                    <input type="hidden" th:field="*{status}" />
-                    <input type="hidden" th:field="*{rmaId}" />
-
-                    <!-- BY_ORDER_LINE -->
-                    <div class="field" id="orderIdField">
-                        <label class="label" th:text="#{rma.order.id}"></label>
-                        <input class="input" type="text" th:field="*{orderId}" th:placeholder="#{rma.order.id.placeholder}">
-                        <p class="help" id="orderIdAssist"></p>
-                    </div>
-
-                    <!-- BY_SERIAL_NO -->
-                    <div class="field" id="serialNoField" style="display:none;">
-                        <label class="label" th:text="#{rma.serial.no}"></label>
-                        <input class="input" type="text" name="serialNo"
-                               th:placeholder="#{rma.serial.no.placeholder}"
-                               th:value="${param.serialNo != null ? param.serialNo : ''}">
-                        <p class="help" id="serialNoAssist"></p>
-                    </div>
-
-                    <!-- BY EMAIL-->
-                    <div class="field" id="emailField" style="display:none;">
-                        <label class="label" th:text="#{rma.email}"></label>
-                        <input class="input" type="email" name="byEmail"
-                               th:placeholder="#{rma.email.placeholder}"
-                               th:value="${param.email != null ? param.email : ''}">
-                        <p class="help" id="emailAssist"></p>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{rma.order.item}"></label>
-
-                        <div class="control" th:if="${orderItems != null and !#lists.isEmpty(orderItems)}">
-                            <div class="box has-background-white-ter mb-3" th:each="orderItem, i : ${orderItems}">
-                                <div class="is-flex is-align-items-center" style="gap: 0.6rem">
-                                    <label class="checkbox is-flex-grow-1">
-                                        <input type="checkbox"
-                                               class="rma-item-checkbox"
-                                               th:attr="data-row=${i.index}"
-                                               th:field="*{draftRmaItems[__${i.index}__].itemId}"
-                                               th:value="${orderItem.itemId}">
-                                        <span class="has-text-weight-semibold" th:text="${orderItem.name}"></span>
-                                    </label>
-                                    <span class="tag" th:text="#{rma.max.qty(${orderItem.qty})}"></span>
-                                </div>
-
-                                <!-- Per-item details: hidden until checkbox is checked -->
-                                <div class="mt-3 pt-3 rma-item-details"
-                                     th:attr="id='rma-item-details-' + ${i.index}"
-                                     style="display:none; border-top: 1px dashed #dbdbdb;">
-                                    <div class="columns mb-0">
-                                        <div class="column is-half py-2">
-                                            <div class="field">
-                                                <label class="label" th:text="#{rma.resolution}"></label>
-                                                <div class="control">
-                                                    <div class="select is-fullwidth">
-                                                        <select class="rma-item-resolution"
-                                                                th:field="*{draftRmaItems[__${i.index}__].desiredResolution}" disabled>
-                                                            <option th:each="res : ${rmaResolutionTypes}"
-                                                                    th:value="${res}" th:text="${enumI18n.localize(res)}"></option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="column is-half py-2">
-                                            <div class="field">
-                                                <label class="label" th:text="#{rma.quantity}"></label>
-                                                <div class="control">
-                                                    <input class="input rma-item-quantity" type="number" min="1"
-                                                           th:attr="max=${orderItem.qty}"
-                                                           th:field="*{draftRmaItems[__${i.index}__].qty}" disabled>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="field">
-                                        <label class="label" th:text="#{rma.reason}"></label>
-                                        <div class="control">
-                                            <textarea class="textarea rma-item-reason" rows="2"
-                                                      th:field="*{draftRmaItems[__${i.index}__].reason}"
-                                                      th:placeholder="#{rma.reason.placeholder}" disabled></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="notification is-warning is-light" th:if="${orderItems == null or #lists.isEmpty(orderItems)}">
-                            <p th:text="#{rma.order.item.validation}"></p>
-                        </div>
-                    </div>
-
-                    <div class="field mt-3">
-                        <label class="label" th:text="#{rma.email}"></label>
-                        <div class="control">
-                            <input class="input" type="email" th:field="*{email}" th:placeholder="#{rma.email.placeholder}" required>
-                        </div>
-                    </div>
-
-                    <div class="field is-grouped is-justify-content-flex-end">
-                        <p class="control">
-                            <a class="button" th:href="@{/dashboard/rma}" th:text="#{general.cancel}"></a>
-                        </p>
-                        <p class="control">
-                            <button class="button is-link" type="submit" th:text="#{general.create}"></button>
-                        </p>
-                    </div>
-                </form>
+<!--/* New RMA (spec docs/active/rma-new-redesign/2026-10-13-rma-new-design.md): one search, then the order's items. */-->
+<div layout:fragment="content" th:with="p=${page}">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <div th:replace="~{rma-new/parts :: header(${p})}"></div>
+            <div th:if="${p.pageError() != null}" class="cl-alert is-bad" tabindex="-1"
+                 th:attr="data-cl-error-summary=${p.errorSummary().isEmpty()} ? '' : null">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${p.pageError()}"></p>
             </div>
+            <div th:replace="~{fragments/settings-form :: errorSummaryTextTitled('rma-errors', ${p.errorSummary()}, 'rma.new.errors.title')}"></div>
+            <!--/* th:replace runs before th:if on the same element, so every conditional fragment sits in a th:block */-->
+            <th:block th:if="${p.state().name() == 'START'}"><section th:replace="~{rma-new/parts :: searchCard(${p})}"></section></th:block>
+            <th:block th:if="${p.state().name() == 'NOT_FOUND'}"><section th:replace="~{rma-new/parts :: notFound(${p})}"></section></th:block>
+            <th:block th:if="${p.state().name() == 'INELIGIBLE'}"><section th:replace="~{rma-new/parts :: ineligible(${p})}"></section></th:block>
+            <th:block th:if="${p.state().name() == 'CHOICE'}"><section th:replace="~{rma-new/parts :: choice(${p})}"></section></th:block>
+            <form th:if="${p.state().name() == 'ORDER'}" id="rma-create-form" class="cl-layout-aside" method="post"
+                  th:action="@{/dashboard/rma/new}" novalidate data-cl-submit-once data-cl-rma-new>
+                <input type="hidden" name="orderId" th:value="${p.order().orderId()}"/>
+                <input th:if="${p.from() != null}" type="hidden" name="from" th:value="${p.from()}"/>
+                <div class="cl-layout-main">
+                    <section th:replace="~{rma-new/parts :: items(${p})}"></section>
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <section th:replace="~{rma-new/parts :: orderCard(${p})}"></section>
+                    <section th:replace="~{rma-new/parts :: summaryCard(${p})}"></section>
+                </aside>
+            </form>
         </div>
     </section>
-
-    <script>
-        (function () {
-            const orderIdField = document.getElementById('orderIdField');
-            const serialNoField = document.getElementById('serialNoField');
-            const emailField = document.getElementById('emailField');
-            const modeInput = document.getElementById('modeInput');
-            const tabs = document.querySelectorAll('#modeTabs a[data-mode]');
-
-            function setMode(mode) {
-                orderIdField.style.display = (mode === 'BY_ORDER_LINE') ? '' : 'none';
-                serialNoField.style.display = (mode === 'BY_SERIAL_NO') ? '' : 'none';
-                emailField.style.display = (mode === 'BY_EMAIL') ? '' : 'none';
-                modeInput.value = mode;
-                tabs.forEach(tab => tab.closest('li').classList.toggle('is-active', tab.dataset.mode === mode));
-            }
-
-            setMode(modeInput.value || 'BY_ORDER_LINE');
-
-            tabs.forEach(tab => {
-                tab.addEventListener('click', e => {
-                    e.preventDefault();
-                    setMode(tab.dataset.mode);
-                });
-            });
-        })();
-
-        // Wire item checkboxes (enable resolution, reason, qty when checked)
-        (function () {
-            function wireRmaItemCheckboxes() {
-                document.querySelectorAll('.rma-item-checkbox').forEach(cb => {
-                    const row = cb.getAttribute('data-row');
-                    const details = document.getElementById('rma-item-details-' + row);
-                    const resolution = details?.querySelector('.rma-item-resolution');
-                    const reason = details?.querySelector('.rma-item-reason');
-                    const quantity = details?.querySelector('.rma-item-quantity');
-
-                    function updateVisibility() {
-                        if (cb.checked) {
-                            details.style.display = '';
-                            resolution?.removeAttribute('disabled');
-                            resolution?.setAttribute('required', 'required');
-                            reason?.removeAttribute('disabled');
-                            quantity?.removeAttribute('disabled');
-                            quantity?.setAttribute('required', 'required');
-                        } else {
-                            details.style.display = 'none';
-                            resolution?.setAttribute('disabled', 'disabled');
-                            resolution?.removeAttribute('required');
-                            reason?.setAttribute('disabled', 'disabled');
-                            quantity?.setAttribute('disabled', 'disabled');
-                            quantity?.removeAttribute('required');
-                        }
-                    }
-
-                    cb.addEventListener('change', updateVisibility);
-                    updateVisibility();
-                });
-            }
-
-            wireRmaItemCheckboxes();
-        })();
-
-        (function () {
-            function wireAssist(inputSelector, assistSelector, msg, paramName) {
-                const input = document.querySelector(inputSelector);
-                const assist = document.querySelector(assistSelector);
-
-                input?.addEventListener('input', () => {
-                    const val = input.value.trim();
-                    if (val) {
-                        assist.innerHTML =
-                            msg + ': <a th:href="@{/dashboard/rma/new}" ' +
-                            'href="/dashboard/rma/new?' + paramName + '=' + encodeURIComponent(val) + '">' +
-                            '/dashboard/rma/new?' + paramName + '=' + val + '</a>';
-                    } else {
-                        assist.innerHTML = '';
-                    }
-                });
-            }
-
-            const orderMsg  = /*[[#{rma.reload.order.preload.items}]]*/ 'Reload with this Order ID to preload items';
-            const serialMsg = /*[[#{rma.reload.order.preload.items}]]*/ 'Reload with this Serial No to preload item';
-            const emailMsg  = /*[[#{rma.reload.email.preload.orders}]]*/ 'Reload with this Email to see orders';
-
-            wireAssist('input[name="orderId"]', '#orderIdAssist', orderMsg, 'orderId');
-            wireAssist('input[name="serialNo"]', '#serialNoAssist', serialMsg, 'serialNo');
-            wireAssist('input[name="byEmail"]', '#emailAssist', emailMsg, 'byEmail');
-        })();
-
-        // Require at least one item checked
-        (function () {
-            const form = document.getElementById('createRmaForm');
-            form.addEventListener('submit', function (e) {
-                const checkedItems = document.querySelectorAll('.rma-item-checkbox:checked');
-                if (checkedItems.length === 0) {
-                    e.preventDefault();
-                    alert("Please select at least one Order Item before submitting.");
-                    return false;
-                }
-            });
-        })();
-
-        // Back to allowed max item
-        (function () {
-            document.addEventListener("input", function(e) {
-                if (e.target.classList.contains("rma-item-quantity")) {
-                    const max = parseInt(e.target.max, 10);
-                    const val = parseInt(e.target.value, 10);
-                    if (val > max) {
-                        e.target.value = max;
-                    }
-                }
-            });
-        })();
-    </script>
+    <script th:src="@{/js/error-summary.js}" defer></script>
+    <script th:src="@{/js/submit-once.js}" defer></script>
+    <script th:src="@{/js/rma-new.js}" defer></script>
 </div>
 </body>
 </html>
