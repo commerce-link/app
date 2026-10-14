@@ -258,4 +258,28 @@ class StockLedgerPeriodClosingTest {
         delivery.setSynced(synced);
         return delivery;
     }
+
+    @Test
+    void checkRefusesWithoutDoingTheReportsWork() {
+        // given
+        List<StockLedgerPeriod> closed = List.of(MARCH);
+        when(closings.closedPeriods(STORE_ID)).thenReturn(closed);
+        StockLedgerPeriod gap = new StockLedgerPeriod(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31));
+
+        // when
+        var refusal = closing.check(STORE_ID, gap);
+
+        // then
+        assertThat(refusal).contains(new NotAllowed("reports.stockLedger.closing.error.gap", List.<Object>of(APRIL.from())));
+        verifyNoInteractions(stockLedgerService);
+    }
+
+    @Test
+    void checkOfAnAllowedPeriodFindsNothingToRefuse() {
+        // when
+        var refusal = closing.check(STORE_ID, MARCH);
+
+        // then
+        assertThat(refusal).isEmpty();
+    }
 }

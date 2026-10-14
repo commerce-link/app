@@ -12681,15 +12681,11 @@ a.cl-link-button:hover {
 .cl-page .cl-inline-fields .cl-field { min-width: 180px; }
 .cl-page .cl-ledger-notice { margin-bottom: 20px; }
 .cl-page .cl-ledger-closed { margin-top: 28px; }
-/* closed periods: one labelled column, already named by the card title and description, so the header band is left
-   to screen readers; both tables end on the card edge or the "Older periods" line, without the table margin */
-.cl-page .cl-ledger-closed .cl-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* closed periods: both tables end on the card edge or the "Older periods" line, without the table margin */
 .cl-page .cl-ledger-closed .cl-table { margin: 0; }
-/* without the header band the first row would run into the card description: the row line opens the list instead */
-.cl-page .cl-ledger-closed > .cl-table { margin-top: 12px; border-top: 1px solid var(--cl-line); }
 .cl-page .cl-ledger-fields { display: grid; gap: 12px; }
-/* The closed-periods table has no column labels to repeat on a phone, so the generic stacked row would leave an empty
-   84 px label column: the period and its actions share one line instead. */
+/* The closed-periods table does not repeat its column labels on a phone (the generic stacked row would spend an
+   84 px label column on them): the period, its date and its actions share one line instead. */
 .cl-page .cl-ledger-closed .cl-table-sub { white-space: nowrap; }
 /* deliveries holding a closing: the delivery number is the card's title on a phone, and a 44 px target below 1024 px */
 @media screen and (max-width: 1023px) {
