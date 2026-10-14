@@ -148,24 +148,6 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
         return dynamoDBMapper.scan(OrderItem.class, scanExpression);
     }
 
-    public OrderItem findBySerialNoAndStatuses(String serialNo, List<FulfilmentStatus> statuses) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":serialNo", new AttributeValue().withS(serialNo));
-
-        Map<String, String> ean = new HashMap<>();
-        ean.put("#status", "status");
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("contains(serialNo, :serialNo) and #status IN (" + buildStatusesFilter(statuses, eav) + ")")
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(ean);
-
-        return dynamoDBMapper.scan(OrderItem.class, scanExpression)
-                .stream()
-                .findFirst()
-                .orElse(null);
-    }
-
     private String buildStatusesFilter(List<FulfilmentStatus> statuses, Map<String, AttributeValue> eav) {
         StringBuilder statusFilter = new StringBuilder();
         for (int i = 0; i < statuses.size(); i++) {

@@ -511,16 +511,39 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return entries;
     }
 
-    public List<Order> findByEmail(String storeId, String email) {
+    /**
+     * Ids of the store's orders placed with this e-mail, newest first, at most limit. Reads StoreIdOrderedAtIndex (its
+     * projection carries the e-mail) page by page instead of scanning the whole Orders table; the e-mail is compared
+     * without case and surrounding spaces, which a filter expression cannot do.
+     */
+    public List<String> findOrderIdsByEmail(String storeId, String email, int limit) {
+        String wanted = email.trim().toLowerCase(Locale.ROOT);
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":email", new AttributeValue().withS(email));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND email = :email")
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(Order.class, scanExpression);
+        List<String> ids = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("Orders")
+                    .withIndexName(ORDERED_AT_INDEX)
+                    .withKeyConditionExpression("storeId = :storeId")
+                    .withProjectionExpression("orderId, email")
+                    .withExpressionAttributeValues(eav)
+                    .withScanIndexForward(false)
+                    .withExclusiveStartKey(startKey));
+            for (Map<String, AttributeValue> item : page.getItems()) {
+                AttributeValue itemEmail = item.get("email");
+                if (itemEmail != null && itemEmail.getS() != null
+                        && itemEmail.getS().trim().toLowerCase(Locale.ROOT).equals(wanted)) {
+                    ids.add(item.get("orderId").getS());
+                    if (ids.size() == limit) {
+                        return ids;
+                    }
+                }
+            }
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return ids;
     }
 
     private LocalDateTime parseOrderedAt(String orderedAtString) {
