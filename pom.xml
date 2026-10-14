@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.10.46</version>
+    <version>2026.10.47</version>
     <packaging>jar</packaging>
 
     <parent>
