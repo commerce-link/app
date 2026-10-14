@@ -269,7 +269,10 @@ class BasketViewPageFactoryTest {
         // then
         assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.UNAVAILABLE);
         assertThat(page.products()).hasSize(1);
-        assertThat(page.products().get(0).market().missing()).isTrue();
+        BasketViewPage.Market market = page.products().get(0).market();
+        assertThat(market.unavailable()).isTrue();
+        assertThat(market.missing()).isFalse();
+        assertThat(page.products().get(0).margin().tone()).isEqualTo(ItemMargin.Tone.UNKNOWN);
         assertThat(page.summary().items()).isEqualTo("6" + NBSP + "899,00");
     }
 
@@ -302,6 +305,62 @@ class BasketViewPageFactoryTest {
         assertThat(page.empty()).isTrue();
         assertThat(page.total()).isEqualTo("0,00");
         assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.NO_PRODUCTS);
+    }
+
+    @Test
+    void onlyTheChosenVariantAndPlainItemsAreCounted() {
+        // given
+        BasketItem cheap = item("Laptop A", "L-A", 1, 3000.00);
+        cheap.setVariantGroupId("g1");
+        BasketItem chosen = item("Laptop B", "L-B", 1, 4000.00);
+        chosen.setVariantGroupId("g1");
+        chosen.setVariantSelected(true);
+        BasketItem plain = item("Monitor", "M-1", 2, 1000.00);
+
+        // when
+        BasketViewPage page = build(basket(cheap, chosen, plain));
+
+        // then
+        assertThat(page.itemsCount()).isEqualTo(2);
+        assertThat(page.products()).extracting(BasketViewPage.Row::name).containsExactly("Laptop B", "Monitor");
+        assertThat(page.summary().items()).isEqualTo("6" + NBSP + "000,00");
+    }
+
+    @Test
+    void deletionPillCountsDaysWhenTwoAreLeft() {
+        // given
+        Basket basket = basket(item("Laptop", "L-1", 1, 6899.00));
+        basket.setCreatedAt(NOW.minusDays(12));
+
+        // when
+        BasketViewPage page = build(basket);
+
+        // then
+        assertThat(page.deletionPill()).isEqualTo(new BasketViewPage.Pill("offers.basket.pill.deletion.days", 2L));
+        assertThat(page.facts().deletion()).isEqualTo("16.10.2026 · dni: 2");
+    }
+
+    @Test
+    void differentDeliveryEmailOrPhoneIsNotTheSameAddress() {
+        // given
+        Basket otherEmail = basket(item("Laptop", "L-1", 1, 6899.00));
+        otherEmail.setBillingDetails(billing("Marta", "Zielińska", null, "Lipowa 1", "Łódź"));
+        otherEmail.getBillingDetails().setEmail("a@x.pl");
+        otherEmail.setShippingDetails(shipping("Marta", "Zielińska", "Lipowa 1", "Łódź"));
+        otherEmail.getShippingDetails().setEmail("b@x.pl");
+        Basket otherPhone = basket(item("Laptop", "L-1", 1, 6899.00));
+        otherPhone.setBillingDetails(billing("Marta", "Zielińska", null, "Lipowa 1", "Łódź"));
+        otherPhone.getBillingDetails().setPhone("+48 601");
+        otherPhone.setShippingDetails(shipping("Marta", "Zielińska", "Lipowa 1", "Łódź"));
+        otherPhone.getShippingDetails().setPhone("+48 602");
+
+        // when
+        BasketViewPage emailPage = build(otherEmail);
+        BasketViewPage phonePage = build(otherPhone);
+
+        // then
+        assertThat(emailPage.customer().sameAddress()).isFalse();
+        assertThat(phonePage.customer().sameAddress()).isFalse();
     }
 
     @Test

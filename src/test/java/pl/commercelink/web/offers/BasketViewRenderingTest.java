@@ -176,9 +176,53 @@ class BasketViewRenderingTest {
 
         // then
         assertThat(html).contains("Koszyk jest pusty.")
+                .doesNotContain("basket-estimate")
                 .contains("aria-disabled=\"true\"")
                 .contains("Pusty koszyk — nie ma z czego")
                 .doesNotContain("data-cl-confirm-tone");
+    }
+
+    @Test
+    void unavailableMarketIsNotShownAsMissingFromTheAssortment() {
+        // given
+        Row row = new Row("Laptop Dell", "Laptopy", "DELL-1", 1, "6" + NBSP + "899,00", false,
+                ItemMargin.of(6899, 0, 1.23), Market.indexDown());
+        BasketViewPage page = page("Biuro", 1, null, List.of(row), List.of(),
+                summary(DeliveryState.CHOSEN, new Estimate(EstimateState.UNAVAILABLE, null, null, null, null, 0)),
+                new Customer(BILLING, BILLING, true));
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-table-empty\">brak danych</span>")
+                .doesNotContain("Brak w asortymencie");
+    }
+
+    @Test
+    void netProfitIsFormattedWithTheCurrencyBundle() {
+        // given
+        BasketViewPage page = fullPage();
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(html).contains("691,06 PLN · 12,3 %");
+    }
+
+    @Test
+    void itemsDescriptionSitsOutsideTheCardHead() {
+        // given
+        BasketViewPage page = fullPage();
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(html).containsPattern("</div>\\s*<p class=\"cl-card-desc\">Ceny brutto")
+                .doesNotContain("cl-basket-note")
+                .contains("cl-card-foot-note");
     }
 
     @Test

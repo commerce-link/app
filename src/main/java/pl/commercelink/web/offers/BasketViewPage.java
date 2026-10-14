@@ -25,14 +25,23 @@ public record BasketViewPage(String basketId, String shortId, String backHref, S
     public record Pill(String key, Object arg) {
     }
 
-    /** market null = a service; market.missing() = a product no enabled supplier offers. */
+    /** market null = a service; market.missing() = a product no enabled supplier offers; market.unavailable() = no answer from the index. */
     public record Row(String name, String category, String mfn, long qty, String unitPrice, boolean service,
                       ItemMargin margin, Market market) {
     }
 
-    public record Market(boolean missing, String low, String median, int suppliers, long stock) {
+    /** unavailable = the supplier index could not answer, which says nothing about the assortment. */
+    public record Market(boolean missing, boolean unavailable, String low, String median, int suppliers, long stock) {
+        public Market(boolean missing, String low, String median, int suppliers, long stock) {
+            this(missing, false, low, median, suppliers, stock);
+        }
+
         static Market none() {
             return new Market(true, null, null, 0, 0);
+        }
+
+        static Market indexDown() {
+            return new Market(false, true, null, null, 0, 0);
         }
     }
 

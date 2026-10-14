@@ -70,7 +70,7 @@ public class BasketViewPageFactory {
         List<Row> products = new ArrayList<>();
         List<Row> services = new ArrayList<>();
         for (BasketItem item : items) {
-            Row row = row(item, market == null ? null : market.get(item));
+            Row row = row(item, market == null ? null : market.get(item), market == null);
             (item.isService() ? services : products).add(row);
         }
 
@@ -125,7 +125,7 @@ public class BasketViewPageFactory {
         }
     }
 
-    private Row row(BasketItem item, OfferItem offer) {
+    private Row row(BasketItem item, OfferItem offer, boolean marketUnavailable) {
         String category = StringUtils.isBlank(item.getCategory()) ? null
                 : StringUtils.trimToNull(categoryLocalizer.localize(item.getCategory(), null));
         if (item.isService()) {
@@ -136,7 +136,7 @@ public class BasketViewPageFactory {
         Market market = known
                 ? new Market(false, Money.format(offer.getLowestCost()), Money.format(offer.getMedianCost()),
                 offer.getSupplierCount(), offer.getTotalQty())
-                : Market.none();
+                : marketUnavailable ? Market.indexDown() : Market.none();
         ItemMargin margin = ItemMargin.of(item.getUnitPrice(), known ? offer.getMedianCost() : 0, DEFAULT_VAT_RATE);
         return new Row(item.getName(), category, StringUtils.trimToNull(item.getMfn()), item.getQty(),
                 Money.format(item.getUnitPrice()), false, margin, market);
@@ -160,6 +160,8 @@ public class BasketViewPageFactory {
                 }
             } catch (RuntimeException e) {
                 // a removed delivery option must not take the page down; the list counts it as 0 too
+                log.warn("Delivery option of basket {} (store {}, delivery option {}) unresolved on the basket view: {}",
+                        basket.getBasketId(), basket.getStoreId(), basket.getDeliveryOptionId(), e.toString());
                 state = DeliveryState.UNKNOWN;
             }
         }
@@ -211,7 +213,8 @@ public class BasketViewPageFactory {
         boolean same = hasAny(billing) && hasAny(shipping)
                 && Objects.equals(billing.name(), shipping.name()) && Objects.equals(billing.company(), shipping.company())
                 && Objects.equals(billing.street(), shipping.street()) && Objects.equals(billing.cityLine(), shipping.cityLine())
-                && Objects.equals(billing.country(), shipping.country());
+                && Objects.equals(billing.country(), shipping.country())
+                && Objects.equals(billing.email(), shipping.email()) && Objects.equals(billing.phone(), shipping.phone());
         return new Customer(billing, shipping, same);
     }
 
