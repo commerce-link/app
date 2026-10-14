@@ -27,7 +27,6 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -91,8 +90,6 @@ public class CatalogCategoryController {
     /** The error message of a broken brand line carries its number, which no message key can hold. */
     private static final String BRAND_LINE_ERROR = "catalog.filter.brandLines.line";
 
-    /** No count of the matching products: the inventory could not answer. */
-    private static final int UNKNOWN_MATCH_COUNT = -1;
 
     /** Outcome of a refused category action, shown by the catalog page in its body; the layout banner is Bulma markup. */
     private static final String ERROR_FLASH = "catalogError";
@@ -116,7 +113,6 @@ public class CatalogCategoryController {
     private final StoresRepository storesRepository;
     private final PimCategoryOptions pimCategoryOptions;
     private final MarketplaceConnections marketplaces;
-    private final ProductRecommendationEngine recommendationEngine;
     private final Inventory inventory;
     private final MessageSource messageSource;
 
@@ -477,12 +473,6 @@ public class CatalogCategoryController {
         model.addAttribute("formAction", CatalogPaths.categoryFilters(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backHref", CatalogPaths.categorySettings(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
-        // The lead is a block of the template: the name as text and, when known, the count linked to adding products.
-        int matching = matchingProducts(category);
-        if (matching != UNKNOWN_MATCH_COUNT) {
-            model.addAttribute("matchingProducts", matching);
-        }
-        model.addAttribute("productsAddHref", CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()));
         return FILTERS_VIEW;
     }
 
@@ -495,21 +485,6 @@ public class CatalogCategoryController {
         return texts;
     }
 
-    /**
-     * The count is a pass over the inventory on every render of the page, the failed saves included; the page is rare
-     * enough for that. Nothing of the page depends on the count, so an inventory that cannot answer only costs the line.
-     */
-    private int matchingProducts(CategoryDefinition category) {
-        if (!category.hasCategoryMapping()) {
-            return 0;
-        }
-        try {
-            return recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).size();
-        } catch (RuntimeException e) {
-            log.warn("Cannot count the products matching the filters of category {}", category.getCategoryId(), e);
-            return UNKNOWN_MATCH_COUNT;
-        }
-    }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")
     public String confirmDelete(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale,
