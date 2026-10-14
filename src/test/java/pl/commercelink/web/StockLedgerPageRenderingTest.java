@@ -4,7 +4,6 @@ import pl.commercelink.web.reports.ReportPeriod;
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.context.Context;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
-import pl.commercelink.web.reports.GeneratedReportView;
 import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingView;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
@@ -28,14 +27,7 @@ class StockLedgerPageRenderingTest {
     }
 
     private static String render(StockLedgerClosingView closing, StockLedgerClosingWarning warning, String error, ReportPeriod report) {
-        return render(closing, warning, error, report, List.of());
-    }
-
-    private static String render(StockLedgerClosingView closing, StockLedgerClosingWarning warning, String error, ReportPeriod report,
-                                 List<GeneratedReportView> generated) {
         Context context = new Context(Locale.ENGLISH);
-        context.setVariable("generatedReports", generated);
-        context.setVariable("ledgerExportRange", report != null ? report : new ReportPeriod(FROM, TO));
         context.setVariable("report", report);
         context.setVariable("ledgerClosing", closing);
         context.setVariable("ledgerWarning", warning);
@@ -187,37 +179,6 @@ class StockLedgerPageRenderingTest {
 
         // then
         assertThat(html).doesNotContain("cl-ledger-older").contains("January 2026").contains("June 2026");
-    }
-
-    @Test
-    void theReportIsOrderedByAFormAndNoJobsYetSaysSo() {
-        // given
-        StockLedgerClosingView closing = StockLedgerClosingView.of(List.of(AUGUST), FROM, TO, Locale.ENGLISH);
-
-        // when
-        String html = render(closing, null, null);
-
-        // then
-        assertThat(html).doesNotContain("??");
-        assertThat(html).contains("action=\"/dashboard/reports/stock-ledger/export\"")
-                .contains("name=\"exportFrom\" value=\"2026-09-01\"")
-                .contains("No report is ready yet");
-    }
-
-    @Test
-    void aGeneratedReportOffersItsFile() {
-        // given
-        StockLedgerClosingView closing = StockLedgerClosingView.of(List.of(AUGUST), FROM, TO, Locale.ENGLISH);
-        GeneratedReportView report = new GeneratedReportView("Stock movements and levels", "1–30.09.2026", "14.10.2026 10:05",
-                "/dashboard/reports/stock-ledger/generated?dateFrom=2026-09-01&dateTo=2026-09-30");
-
-        // when
-        String html = render(closing, null, null, null, List.of(report));
-
-        // then
-        assertThat(html).doesNotContain("??").contains("Stock movements and levels").contains("14.10.2026 10:05")
-                .contains("href=\"/dashboard/reports/stock-ledger/generated?dateFrom=2026-09-01&amp;dateTo=2026-09-30\"")
-                .doesNotContain("No report is ready yet");
     }
 
     @Test

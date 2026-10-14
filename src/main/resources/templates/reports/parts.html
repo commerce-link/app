@@ -28,11 +28,7 @@
                     <th:block th:each="group : ${page.files()}">
                         <li class="cl-menu-group" aria-hidden="true" th:text="#{${group.titleKey()}}"></li>
                         <li th:each="file : ${group.files()}">
-                            <a th:if="${file.download()}" class="cl-menu-item" th:href="@{${file.href()}}" download>
-                                <span class="cl-menu-item-row"><i class="fas fa-file-alt" aria-hidden="true"></i><span th:text="#{${file.titleKey()}}"></span></span>
-                                <span class="cl-menu-desc" th:text="#{${file.descriptionKey()}}"></span>
-                            </a>
-                            <a th:unless="${file.download()}" class="cl-menu-item" th:href="@{${file.href()}}">
+                            <a class="cl-menu-item" th:href="@{${file.href()}}" download>
                                 <span class="cl-menu-item-row"><i class="fas fa-file-alt" aria-hidden="true"></i><span th:text="#{${file.titleKey()}}"></span></span>
                                 <span class="cl-menu-desc" th:text="#{${file.descriptionKey()}}"></span>
                             </a>

@@ -9,7 +9,6 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Closed;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.Optional;
 
 /**
  * Closes the period from the queue. The request was checked when it was ordered, but the world moves while it waits
@@ -29,11 +28,10 @@ class StockLedgerClosingReportGenerator implements ReportGenerator {
     }
 
     @Override
-    public Optional<byte[]> generate(String storeId, LocalDate dateFrom, LocalDate dateTo) throws IOException {
+    public void generate(String storeId, LocalDate dateFrom, LocalDate dateTo) throws IOException {
         StockLedgerClosingResult result = stockLedgerPeriodClosing.close(storeId, new StockLedgerPeriod(dateFrom, dateTo));
         if (!(result instanceof Closed)) {
             log.warn("Closing of {}..{} for store {} not done: {}", dateFrom, dateTo, storeId, result);
         }
-        return Optional.empty();
     }
 }

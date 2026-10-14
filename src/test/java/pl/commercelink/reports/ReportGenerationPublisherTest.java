@@ -34,13 +34,13 @@ class ReportGenerationPublisherTest {
         org.mockito.Mockito.when(options.queue(any())).thenReturn(options);
 
         // when
-        publisher.order("store-1", ReportType.STOCK_LEDGER_EXPORT, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
+        publisher.order("store-1", ReportType.STOCK_LEDGER_CLOSING, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30));
 
         // then
         verify(sqsTemplate).send(captor.capture());
         captor.getValue().accept(options);
         verify(options).queue("report-generation-queue");
-        verify(options).payload(new ReportGenerationRequest("store-1", "STOCK_LEDGER_EXPORT", "2026-09-01", "2026-09-30"));
+        verify(options).payload(new ReportGenerationRequest("store-1", "STOCK_LEDGER_CLOSING", "2026-09-01", "2026-09-30"));
         assertThat(ReportGenerationPublisher.QUEUE_NAME).isEqualTo("report-generation-queue");
     }
 }

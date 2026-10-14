@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.Optional;
 
 @Slf4j
 @Component
@@ -15,7 +14,6 @@ import java.util.Optional;
 class ReportGenerationListener {
 
     private final ReportGenerators generators;
-    private final GeneratedReports generatedReports;
 
     // Not caught: the message comes back after the visibility timeout and, after three receives, lands in the DLQ.
     // Nothing else records a failed report, so the ERROR logged here (Sentry) is the operator's only signal.
@@ -30,10 +28,7 @@ class ReportGenerationListener {
         LocalDate dateFrom = LocalDate.parse(request.getDateFrom());
         LocalDate dateTo = LocalDate.parse(request.getDateTo());
         try {
-            Optional<byte[]> file = generators.forType(type).generate(request.getStoreId(), dateFrom, dateTo);
-            if (file.isPresent()) {
-                generatedReports.save(request.getStoreId(), type, dateFrom, dateTo, file.get());
-            }
+            generators.forType(type).generate(request.getStoreId(), dateFrom, dateTo);
         } catch (IOException | RuntimeException e) {
             log.error("Report {} {}..{} of store {} failed", type, dateFrom, dateTo, request.getStoreId(), e);
             throw e;

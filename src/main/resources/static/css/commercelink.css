@@ -12660,15 +12660,8 @@ a.cl-link-button:hover {
 .cl-page .cl-inline-fields .cl-field { min-width: 180px; }
 .cl-page .cl-ledger-notice { margin-bottom: 20px; }
 .cl-page .cl-ledger-closed { margin-top: 28px; }
-/* closed periods: the header band reads like the one of the generated reports; both tables end on the card edge or the
-   "Older periods" line, without the table margin */
+/* closed periods: both tables end on the card edge or the "Older periods" line, without the table margin */
 .cl-page .cl-ledger-closed .cl-table { margin: 0; }
-/* the generated reports and the closed periods share their column widths, so the two lists line up one above the other */
-@media screen and (min-width: 720px) {
-    .cl-page :is(.cl-ledger-generated, .cl-ledger-closed) .cl-table { table-layout: fixed; }
-    .cl-page :is(.cl-ledger-generated, .cl-ledger-closed) .cl-table thead th:nth-child(1) { width: 45%; }
-    .cl-page :is(.cl-ledger-generated, .cl-ledger-closed) .cl-table thead th:nth-child(2) { width: 30%; }
-}
 .cl-page .cl-ledger-fields { display: grid; gap: 12px; }
 /* The closed-periods table has no column labels to repeat on a phone, so the generic stacked row would leave an empty
    84 px label column: the period and its actions share one line instead. */

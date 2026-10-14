@@ -17,7 +17,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.financials.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.reports.GeneratedReports;
 import pl.commercelink.reports.ReportGenerationPublisher;
 import pl.commercelink.reports.ReportType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -26,7 +25,6 @@ import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.Blocked;
 import pl.commercelink.warehouse.builtin.StockLedgerClosingResult.NotAllowed;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 import pl.commercelink.warehouse.builtin.StockLedgerPeriodClosing;
-import pl.commercelink.web.reports.GeneratedReportView;
 import pl.commercelink.web.reports.ReportPeriod;
 import pl.commercelink.web.reports.ReportsPageFactory;
 import pl.commercelink.web.reports.StockLedgerClosingView;
@@ -62,8 +60,9 @@ public class FinancialReportsController {
     @Autowired
     private ReportGenerationPublisher reportGenerationPublisher;
 
+
     @Autowired
-    private GeneratedReports generatedReports;
+    private StockLedgerExport stockLedgerExport;
 
     @Autowired
     private ProductWeightOriginComplianceReportExport productWeightOriginComplianceReportExport;
@@ -112,6 +111,12 @@ public class FinancialReportsController {
         response.getWriter().write(csv);
     }
 
+    @GetMapping("/dashboard/reports/stockLedgerExport")
+    public void stockLedgerExport(@RequestParam("dateFrom") String dateFrom, @RequestParam("dateTo") String dateTo, HttpServletResponse response) throws IOException {
+        byte[] csv = stockLedgerExport.run(getStoreId(), LocalDate.parse(dateFrom), LocalDate.parse(dateTo));
+        writeStockLedger(response, dateFrom, dateTo, csv);
+    }
+
     @GetMapping("/dashboard/reports/stock-ledger/closed")
     public void closedStockLedger(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
                                   @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
@@ -137,36 +142,7 @@ public class FinancialReportsController {
         model.addAttribute("backHref", report == null ? REPORTS_PATH : REPORTS_PATH + "?" + report.query());
         model.addAttribute("report", report);
         model.addAttribute("ledgerClosing", warning == null ? closing : closing.withRange(warning.dateFrom(), warning.dateTo()));
-        model.addAttribute("generatedReports", generatedReports.recent(getStoreId()).stream()
-                .map(entry -> GeneratedReportView.of(entry, STOCK_LEDGER_PATH + "/generated", messageSource, locale)).toList());
-        model.addAttribute("ledgerExportRange", report != null ? report : fallback);
         return "reports/stock-ledger";
-    }
-
-    @GetMapping(STOCK_LEDGER_PATH + "/generated")
-    public void generatedStockLedger(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-                                     HttpServletResponse response) throws IOException {
-        byte[] csv = generatedReports.find(getStoreId(), ReportType.STOCK_LEDGER_EXPORT, dateFrom, dateTo)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        writeStockLedger(response, dateFrom.toString(), dateTo.toString(), csv);
-    }
-
-    @PostMapping(STOCK_LEDGER_PATH + "/export")
-    public String orderStockLedgerExport(@RequestParam("exportFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-                                         @RequestParam("exportTo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
-                                         @RequestParam(value = "from", required = false) String from,
-                                         @RequestParam(value = "to", required = false) String to,
-                                         RedirectAttributes redirectAttributes, Locale locale) {
-        if (dateFrom.isAfter(dateTo)) {
-            redirectAttributes.addFlashAttribute("ledgerError",
-                    messageSource.getMessage("reports.stockLedger.closing.error.range", null, locale));
-        } else {
-            reportGenerationPublisher.order(getStoreId(), ReportType.STOCK_LEDGER_EXPORT, dateFrom, dateTo);
-            redirectAttributes.addFlashAttribute("ledgerSuccess", messageSource.getMessage("reports.generated.accepted",
-                    new Object[]{StockLedgerPeriodLabel.of(new StockLedgerPeriod(dateFrom, dateTo), locale)}, locale));
-        }
-        return "redirect:" + stockLedgerPath(reportPeriod(from, to));
     }
 
     /** The report the page was opened from, carried through its forms so "‹ Reports" returns to it; none if unreadable. */

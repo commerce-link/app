@@ -19,7 +19,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.reports.GeneratedReports;
 import pl.commercelink.reports.ReportGenerationPublisher;
 import pl.commercelink.reports.ReportType;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -66,8 +65,6 @@ class FinancialReportsControllerStockLedgerTest {
     private StockLedgerPeriodClosing stockLedgerPeriodClosing;
     @Mock
     private ReportGenerationPublisher reportGenerationPublisher;
-    @Mock
-    private GeneratedReports generatedReports;
     @Mock
     private SupplierLabels supplierLabels;
     @Mock
@@ -293,66 +290,4 @@ class FinancialReportsControllerStockLedgerTest {
         verify(reportGenerationPublisher, never()).order(any(), any(), any(), any());
     }
 
-    @Test
-    void theStockLedgerReportIsOrderedFromTheQueueForTheChosenRange() {
-        // given
-
-        // when
-        String view = controller.orderStockLedgerExport(FROM, TO, "2026-09-01", "2026-09-30", redirectAttributes, PL);
-
-        // then
-        assertThat(view).isEqualTo(CLOSING_SECTION + "?from=2026-09-01&to=2026-09-30");
-        verify(reportGenerationPublisher).order(STORE_ID, ReportType.STOCK_LEDGER_EXPORT, FROM, TO);
-        verify(redirectAttributes).addFlashAttribute("ledgerSuccess", "reports.generated.accepted");
-    }
-
-    @Test
-    void aReportOfAnInvertedRangeIsNotOrdered() {
-        // given
-
-        // when
-        controller.orderStockLedgerExport(TO, FROM, null, null, redirectAttributes, PL);
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("ledgerError", "reports.stockLedger.closing.error.range");
-        verify(reportGenerationPublisher, never()).order(any(), any(), any(), any());
-    }
-
-    @Test
-    void aGeneratedReportIsDownloadedWithTheBomAndThePeriodInItsName() throws Exception {
-        // given
-        when(generatedReports.find(STORE_ID, ReportType.STOCK_LEDGER_EXPORT, FROM, TO)).thenReturn(Optional.of("x".getBytes()));
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        // when
-        controller.generatedStockLedger(FROM, TO, response);
-
-        // then
-        assertThat(response.getHeader("Content-Disposition")).contains("stock-ledger-2026-03-01_2026-03-31.csv");
-        assertThat(response.getContentAsByteArray()).containsExactly(0xEF, 0xBB, 0xBF, 'x');
-    }
-
-    @Test
-    void aReportThatIsNotGeneratedHasNothingToDownload() {
-        // given
-        when(generatedReports.find(STORE_ID, ReportType.STOCK_LEDGER_EXPORT, FROM, TO)).thenReturn(Optional.empty());
-
-        // when / then
-        assertThatThrownBy(() -> controller.generatedStockLedger(FROM, TO, new MockHttpServletResponse()))
-                .isInstanceOf(ResponseStatusException.class);
-    }
-
-    @Test
-    void thePageListsTheGeneratedReportsOfTheStore() {
-        // given
-        Model model = new ExtendedModelMap();
-        when(generatedReports.recent(STORE_ID)).thenReturn(List.of(
-                new GeneratedReports.Entry(ReportType.STOCK_LEDGER_EXPORT, FROM, TO, java.time.Instant.parse("2026-10-14T08:00:00Z"))));
-
-        // when
-        controller.stockLedger(model, PL, null, null);
-
-        // then
-        assertThat((List<?>) model.getAttribute("generatedReports")).hasSize(1);
-    }
 }
