@@ -28,7 +28,7 @@ public class StoreCopyService {
         this.emailTemplatesRepository = emailTemplatesRepository;
     }
 
-    public Store copyStore(String sourceStoreId, String newStoreName) {
+    public Store copyStore(String sourceStoreId, String newStoreId, String newStoreName) {
         if (StringUtils.isBlank(newStoreName)) {
             throw new IllegalArgumentException("Store name must not be blank");
         }
@@ -38,7 +38,6 @@ public class StoreCopyService {
             throw new IllegalArgumentException("Source store not found: " + sourceStoreId);
         }
 
-        String newStoreId = UniqueIdentifierGenerator.generate();
         System.out.println("[StoreCopy] Starting copy of store " + sourceStoreId + " -> " + newStoreId);
 
         Store newStore = copyStoreEntity(source, newStoreId, newStoreName);
@@ -52,6 +51,7 @@ public class StoreCopyService {
         return newStore;
     }
 
+    // The copy page lists what is and is not copied (store.copy.scope.* in messages_*): change those texts with this method.
     private Store copyStoreEntity(Store source, String newStoreId, String newStoreName) {
         Store target = new Store();
         target.setStoreId(newStoreId);

@@ -8,6 +8,8 @@ import pl.commercelink.stores.StoresRepository;
 @Component
 public class DefaultApiKeyValidator implements ApiKeyValidator {
 
+    public static final int KEY_SUFFIX_LENGTH = 6;
+
     private final StoresRepository storesRepository;
 
     public DefaultApiKeyValidator(StoresRepository storesRepository) {
@@ -25,7 +27,7 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
             return false;
         }
 
-        String last6Chars = StringUtils.substring(apiKey, -6);
-        return StringUtils.equals(store.getApiKey(), last6Chars);
+        String suffix = StringUtils.right(apiKey, KEY_SUFFIX_LENGTH);
+        return StringUtils.equals(store.getApiKey(), suffix);
     }
 }
