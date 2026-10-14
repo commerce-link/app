@@ -339,35 +339,6 @@ public class OfferController {
         return "redirect:/dashboard/offer/" + offerId;
     }
 
-@GetMapping("/dashboard/basket/view/{basketId}")
-    public String viewBasket(@PathVariable String basketId, Model model) {
-        Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), basketId);
-        if (!existingBasketOpt.isPresent()) {
-            model.addAttribute("error", "Basket not found");
-            return "error";
-        }
-        Basket basket = existingBasketOpt.get();
-
-        List<BasketItem> basketItems = basket.getBasketItems();
-        double totalPrice = basketItems.stream()
-                .mapToDouble(BasketItem::getTotalPrice)
-                .sum();
-        double totalCost = basketItems.stream()
-                .mapToDouble(BasketItem::getTotalCost)
-                .sum();
-        double totalProfitGross = totalPrice - totalCost;
-        double totalProfitNet = totalProfitGross / DEFAULT_VAT_RATE;
-
-        model.addAttribute("basket", basket);
-        model.addAttribute("basketItems", basketItems);
-        model.addAttribute("totalPrice", totalPrice);
-        model.addAttribute("totalCost", totalCost);
-        model.addAttribute("totalProfitGross", Math.round(totalProfitGross * 100.0) / 100.0);
-        model.addAttribute("totalProfitNet", Math.round(totalProfitNet * 100.0) / 100.0);
-
-        return "basketView";
-    }
-
     @PostMapping("/dashboard/offer/new/csv")
     public String createOfferFromImport(@ModelAttribute OfferCreationDto dto,
                                         RedirectAttributes redirectAttributes,
