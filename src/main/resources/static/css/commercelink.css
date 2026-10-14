@@ -13599,3 +13599,11 @@ a.cl-link-button:hover {
 .cl-page .cl-statement-order + .cl-statement-order {
     margin-top: 6px;
 }
+
+/* --- Basket view (store cart preview, /dashboard/basket/view/{id}) */
+/* the market column fits "99 999,00 → 99 999,00" on one line */
+.cl-page .cl-table col.cl-col-market { width: 184px; }
+/* notes under a card's list keep the card's side padding */
+.cl-page .cl-card > .cl-basket-note { padding: 0 20px 16px; margin: 0; }
+/* the estimate's note sits inside the disclosure body, which already insets it and draws no rule above */
+.cl-page .cl-disclosure-body > .cl-card-desc.cl-basket-note { padding: 8px 0 0; border-top: 0; }
