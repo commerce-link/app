@@ -54,6 +54,7 @@ class RmaItemPageRenderingTest {
         assertThat(html).contains("href=\"/dashboard/orders/order-1\"").contains("href=\"/dashboard/item/history?serialNo=A1\"");
         assertThat(html).contains("The customer sees it");
         assertThat(html).contains("action=\"/dashboard/rma/rma-1/items/item-1/save\"");
+        assertThat(html).contains("cl-form-grid cl-card-grid is-last");
     }
 
     @Test

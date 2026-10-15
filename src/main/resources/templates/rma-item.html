@@ -56,7 +56,7 @@
                 <div th:replace="~{fragments/settings-form :: errorSummary('rma-item-errors', ${p.errors()}, null)}"></div>
                 <section class="cl-card" aria-labelledby="rma-item-form-title">
                     <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-form-title" th:text="#{rma.item.page.card.form}"></h2></div>
-                    <div class="cl-form-grid cl-card-grid">
+                    <div class="cl-form-grid cl-card-grid is-last">
                         <div class="cl-span-6 cl-field">
                             <label class="cl-label" for="serialNo"><span th:text="#{rma.item.page.field.serialNo}"></span>
                                 <span class="cl-optional" th:text="#{form.optional}"></span></label>
