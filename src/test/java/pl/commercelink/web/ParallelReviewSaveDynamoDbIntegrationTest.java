@@ -181,6 +181,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         Inventory inventory = mock(Inventory.class);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
         PimCatalog pimCatalog = mock(PimCatalog.class);
+        org.mockito.Mockito.when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
         BrandMapper brandMapper = mock(BrandMapper.class);
         MessageSource messageSource = mock(MessageSource.class);
         CatalogPlacement placement = mock(CatalogPlacement.class);

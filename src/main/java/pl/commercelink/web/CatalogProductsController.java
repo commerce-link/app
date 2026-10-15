@@ -350,7 +350,7 @@ public class CatalogProductsController {
                     currentFilter, model, locale);
         }
         InventoryKey key = matched.getInventoryKey();
-        Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+        Optional<PimEntry> entry = pimCatalog.forStore(storeId()).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
         Product prefilled = new ProductRecommendation(category, matched, entry).toProduct();
         ProductForm form = ProductForm.from(prefilled);
         // Nothing is saved yet, so there is no identity to protect: the PIM entry is resolved again when it is.
@@ -395,7 +395,7 @@ public class CatalogProductsController {
         }
         // Resolved the way the prefill and the review resolve it, through the whole inventory key: asked by its own
         // two codes alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
-        review.pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
+        review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
             product.setPimId(entry.pimId());
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
@@ -464,7 +464,7 @@ public class CatalogProductsController {
             Product asSaved = new Product();
             asSaved.setEan(StringUtils.trimToNull(form.getEan()));
             asSaved.setManufacturerCode(StringUtils.trimToNull(form.getManufacturerCode()));
-            joined = review.pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
+            joined = review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
         }
         if (form.identifiersChanged() || joined.isPresent()) {
             // Corrected codes, or the entry they lead to, must not be another product's of the category: the category

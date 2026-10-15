@@ -39,6 +39,7 @@ class StoreInventoryProviderManualTest {
     @Mock InventoryAutoDiscovery autoDiscovery;
     @Mock StoreFeedItemLoader storeFeedItemLoader;
     @Mock ExchangeRates exchangeRates;
+    @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
@@ -55,7 +56,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -83,7 +84,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -93,5 +94,9 @@ class StoreInventoryProviderManualTest {
         // then
         verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:Enabled"), descriptorCaptor.capture(), any());
         assertEquals("manual:Enabled", descriptorCaptor.getValue().name());
+    }
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
     }
 }

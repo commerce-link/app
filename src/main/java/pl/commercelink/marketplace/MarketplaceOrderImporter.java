@@ -56,7 +56,7 @@ public class MarketplaceOrderImporter {
                     basketItemId,
                     product.name(),
                     product.manufacturerCode(),
-                    resolveProductCategory(product.manufacturerCode()),
+                    resolveProductCategory(store.getStoreId(), product.manufacturerCode()),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -161,8 +161,8 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    private String resolveProductCategory(String mfn) {
-        return pimCatalog.findByMpn(mfn)
+    private String resolveProductCategory(String storeId, String mfn) {
+        return pimCatalog.forStore(storeId).findByMpn(mfn)
                 .map(PimEntry::category)
                 .orElse(Categories.UNCATEGORIZED);
     }

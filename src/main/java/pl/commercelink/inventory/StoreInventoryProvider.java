@@ -10,6 +10,7 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -32,6 +33,7 @@ public class StoreInventoryProvider {
     private final InventoryAutoDiscovery autoDiscovery;
     private final StoreFeedItemLoader storeFeedItemLoader;
     private final ExchangeRates exchangeRates;
+    private final PimCatalog pimCatalog;
 
     @Value("${inventory.store-cache.ttl-minutes}")
     long defaultTtlMinutes;
@@ -84,7 +86,7 @@ public class StoreInventoryProvider {
             }
         }
 
-        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems)), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.forStore(storeId))), LocalDateTime.now());
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {

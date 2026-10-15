@@ -34,6 +34,12 @@ class PIMIndexEventSchedulerTest {
     @InjectMocks
     private PIMIndexEventScheduler scheduler;
 
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+    }
+
+
     private static Store store(String storeId) {
         Store store = new Store();
         store.setStoreId(storeId);

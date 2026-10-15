@@ -55,6 +55,12 @@ class MarketplaceOrderImporterTest {
     @InjectMocks
     private MarketplaceOrderImporter importer;
 
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+    }
+
+
     private static CarrierDictionary dictionaryForMorele() {
         CarrierDictionary dictionary = new CarrierDictionary();
         dictionary.setCarriers(Map.of("Morele", Map.of("furgonetka", "{\"2\":\"InPost\",\"6\":\"Zabka\"}")));

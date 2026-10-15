@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimLookup;
 import pl.commercelink.pim.api.PimEntryRequest;
 import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
@@ -78,8 +79,9 @@ class PIMIndexEventScheduler {
                 ? getRecommendedProducts(storeId, categoryDefinition)
                 : productRepository.findAll(categoryDefinition.getCategoryId());
 
+        PimLookup pim = pimCatalog.forStore(storeId);
         return products.stream()
-                .filter(product -> pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).isEmpty())
+                .filter(product -> pim.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).isEmpty())
                 .map(p -> toPimEntryRequest(storeId, categoryDefinition.getType(), p))
                 .collect(Collectors.toList());
     }

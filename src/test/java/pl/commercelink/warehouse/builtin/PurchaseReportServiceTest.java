@@ -45,6 +45,12 @@ class PurchaseReportServiceTest {
 
     @InjectMocks private PurchaseReportService service;
 
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+    }
+
+
     @BeforeEach
     void setUp() {
         when(documentRepository.findAllInDateRange(anyString(), any(), any())).thenReturn(List.of());

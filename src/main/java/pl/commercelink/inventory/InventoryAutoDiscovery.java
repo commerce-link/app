@@ -5,6 +5,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimLookup;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
@@ -26,7 +27,13 @@ class InventoryAutoDiscovery {
     /*
         This method uses maps and various other tricks to improve performance of the auto-discovery process. Do not modify unless you are confident in your changes.
      */
+    /** Matches against the global PIM view: the shared inventory belongs to no store. */
     Collection<MatchedInventory> run(List<InventoryItem> inventoryItems) {
+        return run(inventoryItems, pimCatalog);
+    }
+
+    /** @param pim the PIM view to match known entries in: a store's own inventory uses that store's view */
+    Collection<MatchedInventory> run(List<InventoryItem> inventoryItems, PimLookup pim) {
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
@@ -37,7 +44,7 @@ class InventoryAutoDiscovery {
 
         // Resolve already known mappings based on the PIM index
         Map<String, MatchedInventory> keyToMatchedInventory = new HashMap<>();
-        for (PimEntry pimEntry : pimCatalog.findAll()) {
+        for (PimEntry pimEntry : pim.findAll()) {
             InventoryKey inventoryKey = InventoryKey.fromPimEntry(pimEntry);
 
             Collection<InventoryItem> matchingItems = new LinkedHashSet<>();

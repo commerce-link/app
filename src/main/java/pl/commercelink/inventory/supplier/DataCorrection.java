@@ -67,8 +67,7 @@ class DataCorrection {
         }
 
         return pimCatalog.findByMpn(mfn)
-                .map(PimEntry::gtins)
-                .flatMap(gtins -> gtins.stream().findFirst());
+                .flatMap(PimEntry::primaryGtin);
     }
 
     Optional<PimEntry> resolveFromPim(String ean, String mfn) {

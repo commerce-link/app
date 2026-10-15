@@ -49,6 +49,12 @@ class ProductsAddReviewTest {
     @Mock private CatalogPlacement catalogPlacement;
     @InjectMocks private ProductsAddReview review;
 
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+    }
+
+
     private CategoryDefinition gpu;
 
     @BeforeEach

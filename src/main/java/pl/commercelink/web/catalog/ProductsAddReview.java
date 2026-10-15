@@ -13,6 +13,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimLookup;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
@@ -87,7 +88,7 @@ public class ProductsAddReview {
                 skippedExisting.add(ean);
                 continue;
             }
-            Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+            Optional<PimEntry> entry = pimCatalog.forStore(storeId).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
             sources.add(ean);
         }
@@ -163,7 +164,7 @@ public class ProductsAddReview {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            pimEntryOf(enabled, key, product).ifPresent(entry -> {
+            pimEntryOf(storeId, enabled, key, product).ifPresent(entry -> {
                 product.setPimId(entry.pimId());
                 product.setBrand(brandMapper.unifyBrand(entry.brand()));
             });
@@ -186,17 +187,18 @@ public class ProductsAddReview {
     }
 
     /** The PIM entry of a product: by the inventory's own key when the inventory knows it, else by its identifiers. */
-    public Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
+    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, InventoryKey key, Product product) {
         MatchedInventory matched = inventory.findByInventoryKey(key);
         if (!matched.isEmpty()) {
             InventoryKey known = matched.getInventoryKey();
-            Optional<PimEntry> byInventoryKey = pimCatalog.findByPimIdOrGtinsOrMpns(
+            PimLookup pim = pimCatalog.forStore(storeId);
+            Optional<PimEntry> byInventoryKey = pim.findByPimIdOrGtinsOrMpns(
                     known.getId(), known.getProductEans(), known.getProductCodes());
             if (byInventoryKey.isPresent()) {
                 return byInventoryKey;
             }
         }
-        return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        return pimCatalog.forStore(storeId).findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
     }
 
     /**

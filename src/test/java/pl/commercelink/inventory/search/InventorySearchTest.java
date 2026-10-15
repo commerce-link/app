@@ -64,6 +64,12 @@ class InventorySearchTest {
     private StoresRepository storesRepository;
     @Mock
     private PimCatalog pimCatalog;
+
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+    }
+
     @Mock
     private TaxonomyCache taxonomyCache;
     @Mock
