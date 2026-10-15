@@ -18,6 +18,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.web.rma.RmaAddressForm;
+import pl.commercelink.web.rma.RmaAddressPage;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
@@ -53,6 +55,11 @@ public class RMAController {
     private final OpenRmaCoverage openRmaCoverage;
 
     private final RmaShipmentsViewFactory rmaShipmentsViewFactory;
+
+    private final OrdersRepository ordersRepository;
+
+    /** Set by "Ship to client" when the RMA's address is incomplete: the address page then shows every missing field. */
+    public static final String ADDRESS_INCOMPLETE_FLASH = "rmaAddressIncomplete";
 
     @Value("${app.domain}")
     private String appDomain;
@@ -101,13 +108,23 @@ public class RMAController {
         return "rma-detail";
     }
 
+    /** The address "Ship to client" sends the goods back to; ?fill=order puts the order's address in the form, unsaved. */
     @GetMapping("/dashboard/rma/{rmaId}/shipping")
-    public String editRmaShipping(@PathVariable String rmaId, Model model) {
+    public String editRmaShipping(@PathVariable String rmaId, @RequestParam(required = false) String fill, Model model,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        model.addAttribute("rma", rma);
-        model.addAttribute("isClosed", isClosed(rma));
-
-        return "rma-shipping";
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        ShippingDetails orderAddress = orderAddressOf(rma);
+        boolean filled = "order".equals(fill) && orderAddress != null;
+        RmaAddressForm form = RmaAddressForm.of(filled ? orderAddress : rma.getShippingDetails());
+        boolean incomplete = Boolean.TRUE.equals(model.getAttribute(ADDRESS_INCOMPLETE_FLASH));
+        if (incomplete) {
+            form = form.withErrors(form.validate(null));
+        }
+        return addressPage(rma, form, orderAddress, filled, incomplete, model);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}")
@@ -378,19 +395,40 @@ public class RMAController {
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShippingDetails")
-    public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
+    public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma, Model model,
                                         RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        if (updatedRma.getShippingDetails() != null) {
-            existingRma.setShippingDetails(updatedRma.getShippingDetails());
+        RmaAddressForm form = RmaAddressForm.of(updatedRma.getShippingDetails());
+        Map<String, String> errors = form.validate(existingRma.getShippingDetails());
+        if (!errors.isEmpty()) {
+            return addressPage(existingRma, form.withErrors(errors), orderAddressOf(existingRma), false, false, model);
         }
-
+        existingRma.setShippingDetails(form.applyTo(existingRma.getShippingDetails()));
         rmaRepository.save(existingRma);
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.address.saved", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private String addressPage(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
+                               boolean incomplete, Model model) {
+        boolean fillAvailable = !filled && orderAddress != null && form.differsFrom(orderAddress);
+        model.addAttribute("page", new RmaAddressPage(rma.getRmaId(), RmaAddressPage.shortId(rma.getRmaId()),
+                RmaAddressPage.shortId(rma.getOrderId()), form, fillAvailable, filled,
+                !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete));
+        return "rma/address";
+    }
+
+    /** The order's shipping address when the order exists and has one, else null. */
+    private ShippingDetails orderAddressOf(RMA rma) {
+        if (rma.getOrderId() == null) {
+            return null;
+        }
+        Order order = ordersRepository.findById(getStoreId(), rma.getOrderId());
+        return order != null && RmaAddressForm.hasAnyValue(order.getShippingDetails()) ? order.getShippingDetails() : null;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShipments")

@@ -53,7 +53,7 @@ class RmaAddressMessagesTest {
         Set<String> used = keysUsed();
 
         // then
-        assertThat(used).contains("rma.address.page.title", "order.address.name");
+        assertThat(used).contains("rma.address.page.title", "order.address.name", "rma.address.saved", "billing.phone.required");
         assertThat(used).allSatisfy(key -> {
             assertThat(pl).containsKey(key);
             assertThat(en).containsKey(key);

@@ -95,6 +95,8 @@ class RMAControllerTest {
     private RedirectAttributes redirectAttributes;
     @Mock
     private OpenRmaCoverage openRmaCoverage;
+    @Mock
+    private pl.commercelink.orders.OrdersRepository ordersRepository;
 
     @InjectMocks
     private RMAController controller;
@@ -528,10 +530,12 @@ class RMAControllerTest {
                         c.markItemsAsReceived(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
                 endpoint("splitRmaItem", (c, ra) ->
                         c.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, ra, Locale.ENGLISH)),
+                endpoint("editRmaShipping", (c, ra) ->
+                        c.editRmaShipping(RMA_ID, null, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH)),
                 endpoint("updateShippingDetails", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShippingDetails(new ShippingDetails());
-                    c.updateShippingDetails(RMA_ID, postedRma, ra, Locale.ENGLISH);
+                    c.updateShippingDetails(RMA_ID, postedRma, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
                 }),
                 endpoint("updateShipments", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
