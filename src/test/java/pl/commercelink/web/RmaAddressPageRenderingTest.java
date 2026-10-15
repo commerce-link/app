@@ -49,6 +49,7 @@ class RmaAddressPageRenderingTest {
 
         // then
         assertThat(html).contains("href=\"/dashboard/rma/rma-1/shipping?fill=order\"").contains("Fill with the order address");
+        assertThat(html).contains("fa-paste").doesNotContain("fa-file-import");
         assertThat(html).contains("cl-alert is-warn").contains("has no return address yet");
     }
 
@@ -70,7 +71,31 @@ class RmaAddressPageRenderingTest {
         // then
         assertThat(html).contains("Complete the address to ship the goods to the customer");
         assertThat(html).doesNotContain("has no return address yet");
+        assertThat(html).doesNotContain("data-cl-error-summary").doesNotContain("Nothing was saved");
+        assertThat(html).contains("id=\"shippingDetails.phone\"").contains("aria-invalid=\"true\"");
+    }
+
+    @Test
+    void keepsTheErrorSummaryAfterAFailedSave() {
+        // given
+        RmaAddressForm withErrors = RmaAddressForm.of(null).withErrors(RmaAddressForm.of(null).validate(null));
+
+        // when
+        String html = render(new RmaAddressPage("rma-1", "rma-1", null, withErrors, false, false, true, false));
+
+        // then
         assertThat(html).contains("data-cl-error-summary").contains("href=\"#shippingDetails.phone\"")
                 .contains("aria-invalid=\"true\"");
+    }
+
+    @Test
+    void putsNameSurnameAndCompanyInOneRow() {
+        // when
+        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", form(), false, false, false, false));
+
+        // then
+        for (String field : new String[]{"name", "surname", "companyName"}) {
+            assertThat(html).containsPattern("cl-span-2[^>]*>\\s*<div class=\"cl-field\">\\s*<label[^>]*for=\"shippingDetails." + field + "\"");
+        }
     }
 }

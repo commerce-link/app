@@ -28,7 +28,7 @@
                 <h2 class="cl-card-title" id="rma-address-title" th:text="#{rma.address.card.title}"></h2>
                 <div th:if="${p.fillAvailable()}" class="cl-card-actions">
                     <a class="cl-button" th:href="@{/dashboard/rma/{r}/shipping(r=${p.rmaId()}, fill='order')}">
-                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-file-import"></i></span>
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-paste"></i></span>
                         <span th:text="#{rma.address.fill.from.order}"></span>
                     </a>
                 </div>
@@ -38,11 +38,14 @@
                   th:with="a=${p.form()}"
                   th:action="@{/dashboard/rma/{r}/updateShippingDetails(r=${p.rmaId()})}">
                 <div class="cl-card-inset">
-                    <div th:replace="~{fragments/settings-form :: errorSummary('rma-address-errors', ${a.errors()}, null)}"></div>
+                    <!--/* Arriving from "Ship to client" nothing was submitted, so "not saved" would be false; the field errors and the alert above say what is missing. */-->
+                    <th:block th:unless="${p.incompleteForShipping()}">
+                        <div th:replace="~{fragments/settings-form :: errorSummary('rma-address-errors', ${a.errors()}, null)}"></div>
+                    </th:block>
                     <div class="cl-form-grid cl-card-grid">
-                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null)}"></div>
-                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null)}"></div>
-                        <div th:insert="~{fragments/settings-form :: textField('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null)}"></div>
                         <div th:insert="~{fragments/settings-form :: textField('shippingDetails.streetAndNumber', 'order.address.street', ${a.streetAndNumber()}, 'text', 'off', true, ${a.error('streetAndNumber')}, null)}"></div>
                         <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.postalCode', 'order.address.postal', ${a.postalCode()}, 'text', 'off', true, ${a.error('postalCode')}, null)}"></div>
                         <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.city', 'order.address.city', ${a.city()}, 'text', 'off', true, ${a.error('city')}, null)}"></div>
