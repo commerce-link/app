@@ -69,7 +69,7 @@ class DailyPriceSnapshotGenerator {
             log.warn("Daily price snapshot skipped for store {}: the store is inactive", storeId);
             return;
         }
-        InventoryView view = inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.PRICING);
+        InventoryView view = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
         List<DailyPriceSnapshot> rows = DailyPriceSnapshotBuilder.build(view, day);
         if (rows.isEmpty()) {
             return;

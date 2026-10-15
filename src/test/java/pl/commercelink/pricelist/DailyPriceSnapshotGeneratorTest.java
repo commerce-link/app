@@ -97,10 +97,10 @@ class DailyPriceSnapshotGeneratorTest {
     }
 
     @Test
-    void storeRunUsesTheStoreViewAndStoresItUnderTheStore() throws Exception {
+    void storeRunUsesOnlyTheStoresSuppliersAndStoresItUnderTheStore() throws Exception {
         // given
         when(storeActivity.isActive(STORE_ID)).thenReturn(true);
-        when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(view);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(view);
         when(view.findAllWithPimId()).thenReturn(List.of(offerFromTwoSuppliers()));
 
         // when
@@ -109,6 +109,7 @@ class DailyPriceSnapshotGeneratorTest {
         // then
         verify(fileStorage).put(eq("stores"), eq("store-1/daily-price-snapshot/2026-10-07.csv"), any(byte[].class));
         verify(inventory, never()).withGlobalData();
+        verify(inventory, never()).withEnabledSuppliersAndWarehouseData(anyString(), any(SupplierScope.class));
         verifyNoInteractions(fanOut);
     }
 
@@ -128,7 +129,7 @@ class DailyPriceSnapshotGeneratorTest {
     void storeWithoutPricedOffersGetsNoFile() throws Exception {
         // given
         when(storeActivity.isActive(STORE_ID)).thenReturn(true);
-        when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(view);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.PRICING)).thenReturn(view);
         when(view.findAllWithPimId()).thenReturn(List.of());
 
         // when
