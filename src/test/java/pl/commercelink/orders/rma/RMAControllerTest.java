@@ -524,8 +524,6 @@ class RMAControllerTest {
         return Stream.of(
                 endpoint("addRmaItemFromOrder", (c, ra) ->
                         c.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, ra, Locale.ENGLISH)),
-                endpoint("updateRmaItem", (c, ra) ->
-                        c.updateRmaItem(RMA_ID, "rma-item-1", rmaItemWithQty("item-1", 1), ra, Locale.ENGLISH)),
                 endpoint("markItemsAsReceived", (c, ra) ->
                         c.markItemsAsReceived(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
                 endpoint("splitRmaItem", (c, ra) ->

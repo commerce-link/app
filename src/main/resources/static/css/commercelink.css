@@ -13551,6 +13551,35 @@ a.cl-link-button:hover {
     display: none;
 }
 
+/* RMA item page (2026-10-14): a record description whose values are long texts (reason, comment) — the label above,
+   the value across the whole card and its line breaks kept, instead of two narrow columns. */
+.cl-page dl.cl-kv.is-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+}
+.cl-page dl.cl-kv.is-stacked > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+.cl-page dl.cl-kv.is-stacked dd {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* Help text that quotes what was typed (an RMA item's serial numbers): a long value without spaces breaks anywhere
+   instead of widening the field and scrolling the page sideways. */
+.cl-page .cl-help.is-break {
+    overflow-wrap: anywhere;
+}
+
+/* A textarea for a few sentences (an RMA item's reason and comment): lower than the email-body default, so two of them
+   still leave the save button above the fold on a 1366×768 laptop (design system §6.1). */
+.cl-input.cl-textarea.is-short {
+    min-height: 72px;
+}
+
 /* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
    reconciliation of an uploaded statement on the Payments page (payments-statement.html). The pages are built from the
    shared components; only what has no counterpart among them is here. */
