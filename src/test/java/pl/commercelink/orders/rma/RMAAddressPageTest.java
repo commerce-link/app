@@ -230,6 +230,42 @@ class RMAAddressPageTest {
     }
 
     @Test
+    void comingFromShipToClientDoesNotFlagTheFormatOfUntouchedValues() {
+        // given
+        ShippingDetails partial = address("Warszawa");
+        partial.setCountry("Polska");
+        partial.setPhone(null);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(partial));
+        ExtendedModelMap model = new ExtendedModelMap();
+        model.addAttribute(RMAController.ADDRESS_INCOMPLETE_FLASH, true);
+
+        // when
+        get(null, model);
+
+        // then
+        RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
+        assertThat(page.form().errors()).containsOnlyKeys("shippingDetails.phone");
+    }
+
+    @Test
+    void aBlankOrderIdLooksUpNoOrder() {
+        // given
+        RMA rma = openRma(address("Warszawa"));
+        rma.setOrderId("");
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = get(null, model);
+
+        // then
+        assertThat(view).isEqualTo("rma/address");
+        RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
+        assertThat(page.fillAvailable()).isFalse();
+        verify(ordersRepository, never()).findById(any(), any());
+    }
+
+    @Test
     void anInvalidSaveRendersTheTypedValuesWithErrorsAndSavesNothing() {
         // given
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(address("Warszawa")));

@@ -1,6 +1,7 @@
 package pl.commercelink.orders.rma;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
@@ -122,7 +123,8 @@ public class RMAController {
         RmaAddressForm form = RmaAddressForm.of(filled ? orderAddress : rma.getShippingDetails());
         boolean incomplete = Boolean.TRUE.equals(model.getAttribute(ADDRESS_INCOMPLETE_FLASH));
         if (incomplete) {
-            form = form.withErrors(form.validate(null));
+            // against the saved address only the missing fields are reported; passing null would also flag the format of values nobody touched
+            form = form.withErrors(form.validate(rma.getShippingDetails()));
         }
         return addressPage(rma, form, orderAddress, filled, incomplete, model);
     }
@@ -424,7 +426,7 @@ public class RMAController {
 
     /** The order's shipping address when the order exists and has one, else null. */
     private ShippingDetails orderAddressOf(RMA rma) {
-        if (rma.getOrderId() == null) {
+        if (StringUtils.isBlank(rma.getOrderId())) {
             return null;
         }
         Order order = ordersRepository.findById(getStoreId(), rma.getOrderId());
