@@ -1,0 +1,65 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The address "Ship to client" sends an RMA's goods back to. A page of its own while rma-detail is on Bulma; the
+       form is a fragment so the redesigned RMA page can open it in a dialog later (as the order's address). */-->
+<div layout:fragment="content">
+<section class="cl-page" th:fragment="body" th:with="p=${page}">
+    <div class="cl-page-body is-form">
+        <div th:replace="~{fragments/settings-header :: subpageWithActions(|/dashboard/rma/${p.rmaId()}|, #{rma.item.page.back(${p.rmaShortId()})}, #{rma.address.page.title}, #{rma.address.page.lead}, null)}"></div>
+
+        <div th:if="${p.filled()}" class="cl-alert is-info">
+            <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{rma.address.filled(${p.orderShortId()})}"></p>
+        </div>
+        <div th:if="${p.incompleteForShipping()}" class="cl-alert is-warn">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{rma.address.incomplete.for.shipping}"></p>
+        </div>
+        <div th:if="${p.missing() and !p.filled() and !p.incompleteForShipping()}" class="cl-alert is-warn">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="${p.fillAvailable()} ? #{rma.address.missing.with.order} : #{rma.address.missing}"></p>
+        </div>
+
+        <section class="cl-card" aria-labelledby="rma-address-title">
+            <div class="cl-card-head">
+                <h2 class="cl-card-title" id="rma-address-title" th:text="#{rma.address.card.title}"></h2>
+                <div th:if="${p.fillAvailable()}" class="cl-card-actions">
+                    <a class="cl-button" th:href="@{/dashboard/rma/{r}/shipping(r=${p.rmaId()}, fill='order')}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-file-import"></i></span>
+                        <span th:text="#{rma.address.fill.from.order}"></span>
+                    </a>
+                </div>
+            </div>
+            <!--/* Autofill is off: the operator types the customer's address, not their own. */-->
+            <form th:fragment="addressForm(p)" id="rma-address-form" class="cl-form" method="post" novalidate
+                  th:with="a=${p.form()}"
+                  th:action="@{/dashboard/rma/{r}/updateShippingDetails(r=${p.rmaId()})}">
+                <div class="cl-card-inset">
+                    <div th:replace="~{fragments/settings-form :: errorSummary('rma-address-errors', ${a.errors()}, null)}"></div>
+                    <div class="cl-form-grid cl-card-grid">
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null)}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null)}"></div>
+                        <div th:insert="~{fragments/settings-form :: textField('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null)}"></div>
+                        <div th:insert="~{fragments/settings-form :: textField('shippingDetails.streetAndNumber', 'order.address.street', ${a.streetAndNumber()}, 'text', 'off', true, ${a.error('streetAndNumber')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.postalCode', 'order.address.postal', ${a.postalCode()}, 'text', 'off', true, ${a.error('postalCode')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.city', 'order.address.city', ${a.city()}, 'text', 'off', true, ${a.error('city')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.country', 'order.address.country', ${a.country()}, 'text', 'off', true, ${a.error('country')}, #{order.address.country.help})}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.email', 'order.address.email', ${a.email()}, 'email', 'off', true, ${a.error('email')}, null)}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.phone', 'order.address.phone', ${a.phone()}, 'tel', 'off', true, ${a.error('phone')}, null)}"></div>
+                    </div>
+                </div>
+                <div class="cl-card-footer">
+                    <button type="submit" class="cl-button is-primary" th:text="#{rma.address.save}"></button>
+                    <a class="cl-button" th:href="@{/dashboard/rma/{r}(r=${p.rmaId()})}" th:text="#{general.cancel}"></a>
+                </div>
+            </form>
+        </section>
+    </div>
+</section>
+<script th:src="@{/js/error-summary.js}" defer></script>
+</div>
+</body>
+</html>
