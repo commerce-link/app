@@ -86,4 +86,14 @@ class RmaItemPageRenderingTest {
         // then
         assertThat(html).contains("cl-help is-break is-warn").contains("Number X9 is not on the order item");
     }
+
+    @Test
+    void rmaStatusHasItsOwnRowUnderTheRmaLink() {
+        // when
+        String html = render("body", page(false, Map.of(), null, false));
+
+        // then
+        assertThat(html).containsPattern("<dt>RMA</dt><dd><a href=\"/dashboard/rma/rma-1\">rma-1</a></dd>")
+                .containsPattern("<dt>RMA status</dt>\\s*<dd><span class=\"cl-status is-warn\">Items received</span></dd>");
+    }
 }

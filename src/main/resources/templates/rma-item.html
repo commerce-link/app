@@ -103,8 +103,9 @@
                 <section class="cl-card" aria-labelledby="rma-item-context-title" th:with="c=${page.context()}">
                     <div class="cl-card-head"><h2 class="cl-card-title" id="rma-item-context-title" th:text="#{rma.item.page.card.context}"></h2></div>
                     <dl class="cl-kv is-column">
-                        <div><dt th:text="#{rma.item.page.context.rma}"></dt>
-                            <dd><a th:href="@{${c.rmaHref()}}" th:text="${c.rmaShortId()}"></a> <span class="cl-status" th:classappend="${c.rmaStatusTone()}" th:text="${c.rmaStatusLabel()}"></span></dd></div>
+                        <div><dt th:text="#{rma.item.page.context.rma}"></dt><dd><a th:href="@{${c.rmaHref()}}" th:text="${c.rmaShortId()}"></a></dd></div>
+                        <div><dt th:text="#{rma.item.page.context.rmaStatus}"></dt>
+                            <dd><span class="cl-status" th:classappend="${c.rmaStatusTone()}" th:text="${c.rmaStatusLabel()}"></span></dd></div>
                         <div><dt th:text="#{rma.item.page.context.source}"></dt><dd th:text="${c.source()}"></dd></div>
                         <div th:if="${c.client() != null}"><dt th:text="#{rma.item.page.context.client}"></dt><dd th:text="${c.client()}"></dd></div>
                         <div th:if="${c.orderHref() != null}"><dt th:text="#{rma.item.page.context.order}"></dt><dd><a th:href="@{${c.orderHref()}}" th:text="${c.orderShortId()}"></a></dd></div>
