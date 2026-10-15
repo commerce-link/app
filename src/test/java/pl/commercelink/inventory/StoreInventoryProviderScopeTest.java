@@ -50,13 +50,17 @@ class StoreInventoryProviderScopeTest {
     @Mock private TaxonomyCache taxonomyCache;
     @Mock private SupplierRegistry supplierRegistry;
 
+    private final PimEntry storeEntry = new PimEntry("s1-2", List.of(
+            new PimIdentifier(FEED_EAN, PimIdentifierType.GTIN),
+            new PimIdentifier(SIBLING_EAN, PimIdentifierType.GTIN),
+            new PimIdentifier(MPN, PimIdentifierType.MPN)),
+            "Brand", "Store product", "GPU", null, true, null, null, null, "s1");
+
     private Collection<MatchedInventory> inventoryOf(String storeId) {
-        PimEntry storeEntry = new PimEntry("s1-2", List.of(
-                new PimIdentifier(FEED_EAN, PimIdentifierType.GTIN),
-                new PimIdentifier(SIBLING_EAN, PimIdentifierType.GTIN),
-                new PimIdentifier(MPN, PimIdentifierType.MPN)),
-                "Brand", "Store product", "GPU", null, true, null, null, null, "s1");
-        PimCatalog pimCatalog = ScopedPimCatalog.of(storeEntry);
+        return inventoryOf(storeId, ScopedPimCatalog.of(storeEntry));
+    }
+
+    private Collection<MatchedInventory> inventoryOf(String storeId, PimCatalog pimCatalog) {
         InventoryAutoDiscovery autoDiscovery = new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
         StoreInventoryProvider provider = new StoreInventoryProvider(cache, storesRepository, supplierProviderFactory,
                 autoDiscovery, storeFeedItemLoader, exchangeRates, pimCatalog);
@@ -84,5 +88,27 @@ class StoreInventoryProviderScopeTest {
                 assertThat(group.getInventoryKey().getId()).isEqualTo("s1-2"));
         assertThat(other).singleElement().satisfies(group ->
                 assertThat(group.getInventoryKey().getId()).isNull());
+    }
+
+    @Test
+    void storeEntryShadowingAGlobalEntryTakesTheStoresFeedItems() {
+        // given: a global entry listed before the store's entry, sharing the feed item's EAN
+        PimEntry globalEntry = new PimEntry("g-1", List.of(new PimIdentifier(FEED_EAN, PimIdentifierType.GTIN)),
+                "Brand", "Global product", "GPU", null, true, null, null);
+        PimCatalog pimCatalog = ScopedPimCatalog.of(globalEntry, storeEntry);
+
+        // when
+        Collection<MatchedInventory> owner = inventoryOf("s1", pimCatalog);
+        Collection<MatchedInventory> other = inventoryOf("s2", pimCatalog);
+
+        // then: the item lands in the store entry's group in the owner's view and in the global one elsewhere
+        assertThat(owner).singleElement().satisfies(group -> {
+            assertThat(group.getInventoryKey().getId()).isEqualTo("s1-2");
+            assertThat(group.getInventoryItems()).extracting(InventoryItem::ean).containsExactly(FEED_EAN);
+        });
+        assertThat(other).singleElement().satisfies(group -> {
+            assertThat(group.getInventoryKey().getId()).isEqualTo("g-1");
+            assertThat(group.getInventoryItems()).extracting(InventoryItem::ean).containsExactly(FEED_EAN);
+        });
     }
 }
