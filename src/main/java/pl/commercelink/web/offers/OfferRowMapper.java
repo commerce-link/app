@@ -81,12 +81,18 @@ public class OfferRowMapper {
 
     public OfferListPage.BasketRow basket(Basket basket) {
         String id = basket.getBasketId();
-        String client = client(basket.getContactDetails());
+        String client = BasketClient.shortName(basket);
         LocalDateTime created = basket.getCreatedAt();
-        return new OfferListPage.BasketRow("/dashboard/basket/view/" + id, basket.getShortenedBasketId(), id,
+        return new OfferListPage.BasketRow(basketHref(id), basket.getShortenedBasketId(), id,
                 client != null ? client : text("offers.list.client.guest"),
                 created == null ? null : date(created) + ", " + TIME.format(created),
                 itemsText(basket), itemsCount(basket), money(value(basket)));
+    }
+
+    /** The preview carries the list's address, so its back link returns to the same search and page. */
+    private String basketHref(String id) {
+        String href = "/dashboard/basket/view/" + id;
+        return returnTo == null ? href : href + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
     }
 
     /** "pozycje: n" where no column header names the number (offer name line, phone card); the bare n in the column. */
