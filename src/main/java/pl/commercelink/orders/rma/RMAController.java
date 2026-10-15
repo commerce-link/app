@@ -101,22 +101,6 @@ public class RMAController {
         return "rma-detail";
     }
 
-    @GetMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId, Model model) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
-
-        model.addAttribute("rma", rma);
-        model.addAttribute("rmaId", rmaId);
-        model.addAttribute("rmaItem", rmaItem);
-        model.addAttribute("isClosed", isClosed(rma));
-        model.addAttribute("rmaStatusTypes", RMAStatus.values());
-        model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
-
-        return "rma-item";
-    }
-
     @GetMapping("/dashboard/rma/{rmaId}/shipping")
     public String editRmaShipping(@PathVariable String rmaId, Model model) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
@@ -246,34 +230,6 @@ public class RMAController {
 
         rma.increaseShippingInsurance(newRMAItem.getTotalPrice());
         rmaRepository.save(rma);
-
-        return "redirect:/dashboard/rma/" + rmaId;
-    }
-
-    @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/save")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId,
-                                @ModelAttribute("rmaItem") RMAItem formItem,
-                                RedirectAttributes redirectAttributes, Locale locale) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
-        if (blocked.isPresent()) {
-            return blocked.get();
-        }
-        RMAItem existing = rmaItemsRepository.findById(rmaId, rmaItemId);
-        if (existing == null) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.not.found", null, locale));
-            return "redirect:/dashboard/rma/" + rmaId;
-        }
-
-        existing.setSerialNo(formItem.getSerialNo());
-        existing.setReason(formItem.getReason());
-        existing.setComment(formItem.getComment());
-
-        rmaItemsRepository.save(existing);
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("rma.item.update.success", null, locale));
 
         return "redirect:/dashboard/rma/" + rmaId;
     }
