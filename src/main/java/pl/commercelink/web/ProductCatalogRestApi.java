@@ -65,7 +65,7 @@ public class ProductCatalogRestApi {
             @PathVariable("storeId") String storeId,
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId) {
-        return new ProductsList(recommendationEngine, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
+        return new ProductsList(pimCatalog, recommendationEngine, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
                 .generate(storeId, catalogId, categoryId);
     }
 
@@ -76,7 +76,7 @@ public class ProductCatalogRestApi {
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId,
             @PathVariable("productId") String productId) {
-        return new ProductDetails(pimCatalog, productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
+        return new ProductDetails(pimCatalog.forStore(storeId), productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
                 .generate(storeId, catalogId, categoryId, productId);
     }
 

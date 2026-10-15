@@ -6,7 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimLookup;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 class ProductRecommendationEngineTest {
 
     @Mock
-    private PimCatalog pimCatalog;
+    private PimLookup pim;
 
     @Mock
     private ProductRepository productRepository;
@@ -41,7 +41,7 @@ class ProductRecommendationEngineTest {
         when(inventory.findAllByProductCategoryIds(List.of("194", "195"))).thenReturn(Map.of());
 
         // when
-        engine.getRecommendations(definition, inventory);
+        engine.getRecommendations(pim, definition, inventory);
 
         // then
         verify(inventory).findAllByProductCategoryIds(List.of("194", "195"));
@@ -54,7 +54,7 @@ class ProductRecommendationEngineTest {
         definition.setCategory("Karty graficzne");
 
         // when
-        List<ProductRecommendation> recommendations = engine.getRecommendations(definition, inventory);
+        List<ProductRecommendation> recommendations = engine.getRecommendations(pim, definition, inventory);
 
         // then
         assertThat(recommendations).isEmpty();
@@ -67,7 +67,7 @@ class ProductRecommendationEngineTest {
         CategoryDefinition unmappedDefinition = new CategoryDefinition().withGeneratedId();
 
         // when
-        List<ProductRecommendation> recommendations = engine.getRecommendations(unmappedDefinition, inventory);
+        List<ProductRecommendation> recommendations = engine.getRecommendations(pim, unmappedDefinition, inventory);
 
         // then
         assertThat(recommendations).isEmpty();

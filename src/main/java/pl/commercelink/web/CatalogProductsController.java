@@ -229,7 +229,7 @@ public class CatalogProductsController {
         List<RecommendationRow> rows = List.of();
         if (category.hasCategoryMapping()) {
             SupplierLabelMap labels = supplierLabels.forStoreId(storeId());
-            rows = recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+            rows = recommendationEngine.getRecommendations(pimCatalog.forStore(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
                     .map(recommendation -> RecommendationRow.of(recommendation, catalogId, categoryId, labels::of))
                     .toList();
         }
@@ -687,7 +687,7 @@ public class CatalogProductsController {
             // Without PIM categories the engine has nothing to match, and reading the inventory would be wasted work.
             // The engine answers in its own order (brand, then price); both kinds of category read the same way.
             return category.hasCategoryMapping()
-                    ? recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+                    ? recommendationEngine.getRecommendations(pimCatalog.forStore(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
                             .sorted(byLabelThenName(ProductRecommendation::getLabel, ProductRecommendation::getName))
                             .map(recommendation -> ProductRow.ofRecommendation(recommendation, category))
                             .toList()

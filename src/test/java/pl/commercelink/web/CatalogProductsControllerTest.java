@@ -145,6 +145,7 @@ class CatalogProductsControllerTest {
         catalog.getCategories().add(gpu);
         when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
         when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        lenient().when(pimCatalog.forStore(any())).thenReturn(pimCatalog);
         lenient().when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
@@ -200,7 +201,7 @@ class CatalogProductsControllerTest {
         // The default is what the page shows without a filter in the address; the script starts from the address and
         // drops a parameter only when it equals this default, so "status=all" (and "status=disabled") stay in it.
         assertThat(result.getModelAndView().getModel().get("filterDefault")).isEqualTo("status:active feature:all label:all");
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
     }
 
     /**
@@ -242,7 +243,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getEan()).thenReturn("1");
         when(recommendation.getLowestGrossPrice()).thenReturn(2749.0);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
 
         // when
         var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
@@ -267,7 +268,7 @@ class CatalogProductsControllerTest {
         CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
         assertThat(page.hasMapping()).isFalse();
         assertThat(page.rows()).isEmpty();
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
     }
 
@@ -320,7 +321,7 @@ class CatalogProductsControllerTest {
         when(recommendation.hasPimId()).thenReturn(true);
         when(recommendation.getName()).thenReturn("MSI RTX 5070");
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
 
         // when
         var result = mvc.perform(get(categoryPath()).param("status", "all").param("feature", "marketplace"))
@@ -345,7 +346,7 @@ class CatalogProductsControllerTest {
                 recommendation("RTX 5060", "ASUS RTX 5060"),
                 recommendation("RTX 5070", "Gigabyte RTX 5070"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(engineOrder);
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(engineOrder);
 
         // when
         var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
@@ -516,7 +517,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getAlternativeEans()).thenReturn(List.of("1", "2"));
         when(recommendation.getAlternativeProductCodes()).thenReturn(List.of("MFN-1"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
         when(supplierLabels.forStoreId(STORE_ID)).thenReturn(supplierLabelMap);
         when(supplierLabelMap.of("Acme")).thenReturn("Acme Parts");
 
@@ -547,7 +548,7 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasMapping", false))
                 .andExpect(model().attribute("rows", List.of()));
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
         verify(supplierLabels, never()).forStoreId(anyString());
     }

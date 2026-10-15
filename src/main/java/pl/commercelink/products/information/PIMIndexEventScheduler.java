@@ -91,7 +91,7 @@ class PIMIndexEventScheduler {
     }
 
     private List<Product> getRecommendedProducts(String storeId, CategoryDefinition categoryDefinition) {
-        return recommendationEngine.getRecommendations(categoryDefinition, inventory.withEnabledSuppliersOnly(storeId))
+        return recommendationEngine.getRecommendations(pimCatalog.forStore(storeId), categoryDefinition, inventory.withEnabledSuppliersOnly(storeId))
                 .stream()
                 .map(ProductRecommendation::toProduct)
                 .collect(Collectors.toList());

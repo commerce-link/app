@@ -69,9 +69,9 @@ class InventoryViewStoreListingsTest {
 
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
-                ProductRecommendationEngine.class.getDeclaredConstructor(PimCatalog.class, ProductRepository.class);
+                ProductRecommendationEngine.class.getDeclaredConstructor(ProductRepository.class);
         ctor.setAccessible(true);
-        return ctor.newInstance(pimCatalog, productRepository);
+        return ctor.newInstance(productRepository);
     }
 
     private CategoryDefinition cpuCategory() {
@@ -168,7 +168,7 @@ class InventoryViewStoreListingsTest {
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimCatalog, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);
@@ -192,7 +192,7 @@ class InventoryViewStoreListingsTest {
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimCatalog, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);

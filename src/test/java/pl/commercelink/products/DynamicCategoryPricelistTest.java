@@ -70,7 +70,8 @@ class DynamicCategoryPricelistTest {
 
     @BeforeEach
     void setUp() {
-        recommendationEngine = new ProductRecommendationEngine(pimCatalog, productRepository);
+        recommendationEngine = new ProductRecommendationEngine(productRepository);
+        when(pimCatalog.forStore(any())).thenReturn(pimCatalog);
 
         when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
@@ -108,6 +109,7 @@ class DynamicCategoryPricelistTest {
 
         AvailabilityAndPriceList availabilityAndPriceList = new AvailabilityAndPriceList(
                 inventory,
+                pimCatalog,
                 productCatalogRepository,
                 productRepository,
                 recommendationEngine,

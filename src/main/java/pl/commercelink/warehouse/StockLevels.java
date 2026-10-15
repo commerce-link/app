@@ -13,6 +13,7 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendation;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.SupplierScope;
@@ -40,6 +41,9 @@ public class StockLevels {
 
     @Autowired
     private RollingPriceAggregateRepository rollingPriceAggregateRepository;
+
+    @Autowired
+    private PimCatalog pimCatalog;
 
     @Autowired
     private ProductRecommendationEngine recommendationEngine;
@@ -70,7 +74,7 @@ public class StockLevels {
         List<StockProductLevel> stockProductLevels = new LinkedList<>();
 
         for (CategoryDefinition category : categories) {
-            List<Product> products = resolveProducts(category, scope, enabledInventory);
+            List<Product> products = resolveProducts(storeId, category, scope, enabledInventory);
 
             for (Product product : products) {
                 int expectedQty = product.getStockExpectedQty();
@@ -126,12 +130,12 @@ public class StockLevels {
                 .collect(Collectors.toList());
     }
 
-    private List<Product> resolveProducts(CategoryDefinition category, RestockScope scope, InventoryView enabledInventory) {
+    private List<Product> resolveProducts(String storeId, CategoryDefinition category, RestockScope scope, InventoryView enabledInventory) {
         if (category.hasType(CategoryDefinitionType.Dynamic)) {
             if (scope == RestockScope.ExpectedStockQty) {
                 return Collections.emptyList();
             }
-            return recommendationEngine.getRecommendations(category, enabledInventory).stream()
+            return recommendationEngine.getRecommendations(pimCatalog.forStore(storeId), category, enabledInventory).stream()
                     .filter(ProductRecommendation::hasPimId)
                     .map(ProductRecommendation::toProduct)
                     .filter(p -> !p.isService())
