@@ -98,7 +98,7 @@ public record OrderAddressForm(String orderId, String type, String name, String 
             found.put(field("country"), "order.address.country.invalid");
         }
         if (changed(email, saved == null ? null : saved.email, saved == null)
-                && require(found, "email", email, "billing.email.required") && !EMAIL.matcher(email.trim()).matches()) {
+                && require(found, "email", email, "billing.email.required") && !isEmail(email)) {
             found.put(field("email"), "billing.email.invalid");
         }
         if (changed(phone, saved == null ? null : saved.phone, saved == null)
@@ -124,6 +124,11 @@ public record OrderAddressForm(String orderId, String type, String name, String 
     /** With nothing saved to compare with (validate()), every field counts as changed. */
     private static boolean changed(String posted, String saved, boolean nothingSaved) {
         return nothingSaved || !StringUtils.trimToEmpty(posted).equals(StringUtils.trimToEmpty(saved));
+    }
+
+    /** One "@" between non-blank parts and a dot in the domain, as the address forms have always required. */
+    public static boolean isEmail(String value) {
+        return EMAIL.matcher(value.trim()).matches();
     }
 
     /** "+48 22 390 45 10", "(22) 390-45-10", "600700800": allowed characters only, 9 to 15 digits. */
