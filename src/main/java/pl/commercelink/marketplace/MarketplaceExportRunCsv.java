@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.util.Pair;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.starter.csv.CSVReady;
@@ -16,10 +17,12 @@ import java.util.List;
 final class MarketplaceExportRunCsv {
 
     private static final String[] HEADERS =
-            {"pimId", "price", "quantity", "removalAttempts", "outcome", "reasonCode", "message"};
+            {"pimId", "price", "quantity", "removalAttempts", "outcome", "reasonCode", "message",
+                    "ean", "manufacturerCode"};
     private static final String FAILED_SUFFIX = "-failed";
     private static final int MAX_MESSAGE_CHARACTERS = 1000;
     private static final String TRUNCATION_MARKER = "\u2026";
+    private static final int COLUMNS_WITH_IDENTIFIERS = 9;
     private static final int FULL_COLUMNS = 7;
     private static final int COLUMNS_WITH_REMOVAL_ATTEMPTS = 4;
     private static final int LEGACY_COLUMNS = 3;
@@ -77,7 +80,9 @@ final class MarketplaceExportRunCsv {
                 row.length >= COLUMNS_WITH_REMOVAL_ATTEMPTS ? Integer.parseInt(row[3]) : 0,
                 row.length >= FULL_COLUMNS ? row[4] : "",
                 row.length >= FULL_COLUMNS ? row[5] : "",
-                row.length >= FULL_COLUMNS ? row[6] : "");
+                row.length >= FULL_COLUMNS ? row[6] : "",
+                row.length >= COLUMNS_WITH_IDENTIFIERS ? StringUtils.trimToNull(row[7]) : null,
+                row.length >= COLUMNS_WITH_IDENTIFIERS ? StringUtils.trimToNull(row[8]) : null);
     }
 
     private record CsvRow(MarketplaceOfferSnapshot snapshot) implements CSVReady {
@@ -91,7 +96,9 @@ final class MarketplaceExportRunCsv {
                     String.valueOf(snapshot.removalAttempts()),
                     snapshot.outcome(),
                     snapshot.reasonCode(),
-                    normalizeMessage(snapshot.message())
+                    normalizeMessage(snapshot.message()),
+                    snapshot.ean(),
+                    snapshot.manufacturerCode()
             };
         }
     }

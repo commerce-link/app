@@ -63,4 +63,18 @@ class MarketplaceExportRunViewTest {
         assertThat(view.rows()).extracting(MarketplaceExportRunView.Row::outcome)
                 .containsExactly(MarketplaceExportRunView.Outcome.UNKNOWN, MarketplaceExportRunView.Outcome.REJECTED);
     }
+
+    @Test
+    void readsAFailedRemovalAsItsOwnOutcome() {
+        // given
+        List<MarketplaceOfferSnapshot> snapshots = List.of(
+                MarketplaceOfferSnapshot.removalFailed("pim-A", 100L, 3, "NOT_FOUND", "no such offer", "EAN-A", null));
+
+        // when
+        MarketplaceExportRunView view = MarketplaceExportRunView.of(snapshots);
+
+        // then
+        assertThat(view.rows().get(0).outcome()).isEqualTo(MarketplaceExportRunView.Outcome.REMOVAL_FAILED);
+        assertThat(view.count(MarketplaceExportRunView.Outcome.REMOVAL_FAILED)).isEqualTo(1);
+    }
 }
