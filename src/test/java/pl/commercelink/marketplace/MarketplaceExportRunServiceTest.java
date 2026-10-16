@@ -11,6 +11,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.starter.storage.FileStorage;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,6 +56,8 @@ class MarketplaceExportRunServiceTest {
 
     @Captor
     private ArgumentCaptor<byte[]> bytesCaptor;
+
+    private final List<TrackedReader> openedRunFiles = new ArrayList<>();
 
     private MarketplaceExportRunService service;
 
@@ -442,6 +447,176 @@ class MarketplaceExportRunServiceTest {
         assertThat(service.findRun(STORE_ID, MARKETPLACE, CATALOG_ID, RUN_ID)).isEmpty();
     }
 
+    @Test
+    void searchOfferReturnsTheRowOfTheProductFromEveryRunThatHasItNewestFirst() {
+        // given
+        givenMarketplaceObjects(
+                runFile(CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv", offersCsv("pim-A", "pim-B")),
+                runFile(OTHER_CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv", offersCsv("pim-B")),
+                runFile(CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv", offersCsv("pim-B", "pim-A")));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits())
+                .extracting(hit -> hit.run().runId(), hit -> hit.run().catalogId(), hit -> hit.offer().pimId())
+                .containsExactly(
+                        tuple("8213503599_2026-08-12_01-00-00", CATALOG_ID, "pim-A"),
+                        tuple("8213589999_2026-08-11_01-00-00", CATALOG_ID, "pim-A"));
+        assertThat(search.searchedRuns()).isEqualTo(3);
+        assertThat(search.unreadableRuns()).isZero();
+        assertThat(search.oldestSearchedRunId()).isEqualTo("8213589999_2026-08-11_01-00-00");
+    }
+
+    @Test
+    void searchOfferMatchesTheWholePimIdOnly() {
+        // given
+        givenMarketplaceObjects(runFile(CATALOG_PREFIX + RUN_ID + ".csv", offersCsv("pim-AB", "xpim-A")));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).isEmpty();
+        assertThat(search.searchedRuns()).isEqualTo(1);
+    }
+
+    @Test
+    void searchOfferKeepsThePriceQuantityAndOutcomeOfTheFoundRow() {
+        // given
+        givenMarketplaceObjects(runFile(CATALOG_PREFIX + RUN_ID + ".csv", MarketplaceExportRunCsv.toBytes(List.of(
+                MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L).rejected("MISSING_PARAMETER", "no warranty")))));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).singleElement().satisfies(hit -> {
+            assertThat(hit.offer().price()).isEqualTo(3503L);
+            assertThat(hit.offer().quantity()).isEqualTo(7L);
+            assertThat(hit.offer().outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REJECTED);
+            assertThat(hit.offer().reasonCode()).isEqualTo("MISSING_PARAMETER");
+            assertThat(hit.offer().message()).isEqualTo("no warranty");
+        });
+    }
+
+    @Test
+    void searchOfferFindsTheProductInAFailedRun() {
+        // given
+        givenMarketplaceObjects(runFile(CATALOG_PREFIX + RUN_ID + "-failed.csv", offersCsv("pim-A")));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).singleElement().satisfies(hit -> {
+            assertThat(hit.run().runId()).isEqualTo(RUN_ID);
+            assertThat(hit.run().failed()).isTrue();
+        });
+    }
+
+    @Test
+    void searchOfferStopsOpeningRunsOnceItHasTheHitLimit() {
+        // given
+        String[] keys = runKeysOf(CATALOG_PREFIX, 5);
+        for (String key : keys) {
+            runFile(key, offersCsv("pim-A"));
+        }
+        givenMarketplaceObjects(keys);
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 2);
+
+        // then
+        assertThat(search.hits()).hasSize(2);
+        assertThat(search.searchedRuns()).isEqualTo(2);
+        assertThat(search.oldestSearchedRunId()).isEqualTo("8213415301_2026-08-13_01-31-05");
+        verify(fileStorage, times(2)).get(eq(BUCKET), anyString());
+    }
+
+    @Test
+    void searchOfferOpensNoMoreRunsThanTheRunLimit() {
+        // given
+        String[] keys = runKeysOf(CATALOG_PREFIX, 5);
+        for (String key : keys) {
+            runFile(key, offersCsv("pim-B"));
+        }
+        givenMarketplaceObjects(keys);
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 3, 10);
+
+        // then
+        assertThat(search.hits()).isEmpty();
+        assertThat(search.searchedRuns()).isEqualTo(3);
+        verify(fileStorage, times(3)).get(eq(BUCKET), anyString());
+    }
+
+    @Test
+    void searchOfferStreamsEachRunAndClosesItInsteadOfLoadingWholeFiles() {
+        // given
+        givenMarketplaceObjects(
+                runFile(CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv", offersCsv("pim-B")),
+                runFile(CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv", offersCsv("pim-A", "pim-B")));
+
+        // when
+        service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        verify(fileStorage, never()).getBytes(anyString(), anyString());
+        assertThat(openedRunFiles).hasSize(2).allMatch(TrackedReader::isClosed);
+    }
+
+    @Test
+    void searchOfferSkipsAndCountsRunsThatCannotBeRead() {
+        // given
+        String missing = CATALOG_PREFIX + "8213415334_2026-08-13_01-31-05.csv";
+        when(fileStorage.get(BUCKET, missing)).thenThrow(new IllegalStateException("S3 unavailable"));
+        givenMarketplaceObjects(
+                missing,
+                runFile(CATALOG_PREFIX + "8213503599_2026-08-12_01-00-00.csv", legacyCsv("pim-A;not-a-number;7;0")),
+                runFile(CATALOG_PREFIX + "8213589999_2026-08-11_01-00-00.csv", offersCsv("pim-A")));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).extracting(hit -> hit.run().runId())
+                .containsExactly("8213589999_2026-08-11_01-00-00");
+        assertThat(search.searchedRuns()).isEqualTo(3);
+        assertThat(search.unreadableRuns()).isEqualTo(2);
+    }
+
+    @Test
+    void searchOfferFindsTheProductInALegacyRunFile() {
+        // given
+        givenMarketplaceObjects(runFile(CATALOG_PREFIX + RUN_ID + ".csv", legacyCsv("pim-A;1999;7;1")));
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).singleElement().satisfies(hit -> {
+            assertThat(hit.offer().price()).isEqualTo(1999L);
+            assertThat(hit.offer().removalAttempts()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void searchOfferReportsNothingSearchedWhenTheMarketplaceHasNoRuns() {
+        // given
+        givenMarketplaceObjects();
+
+        // when
+        MarketplaceExportOfferSearch search = service.searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+
+        // then
+        assertThat(search.hits()).isEmpty();
+        assertThat(search.searchedRuns()).isZero();
+        assertThat(search.oldestSearchedRunId()).isNull();
+    }
+
     private MarketplaceExportRunService serviceAt(String instant) {
         return new MarketplaceExportRunService(
                 fileStorage, BUCKET, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
@@ -453,6 +628,15 @@ class MarketplaceExportRunServiceTest {
 
     private String object(String key, byte[] data) {
         when(fileStorage.getBytes(BUCKET, key)).thenReturn(data);
+        return key;
+    }
+
+    private String runFile(String key, byte[] data) {
+        when(fileStorage.get(BUCKET, key)).thenAnswer(invocation -> {
+            TrackedReader reader = new TrackedReader(data);
+            openedRunFiles.add(reader);
+            return reader;
+        });
         return key;
     }
 
@@ -480,7 +664,28 @@ class MarketplaceExportRunServiceTest {
         return ("pimId;price;qty;removalAttempts\n" + csvRow + "\n").getBytes(StandardCharsets.UTF_8);
     }
 
-    private byte[] offersCsv(String pimId) {
-        return MarketplaceExportRunCsv.toBytes(List.of(MarketplaceOfferSnapshot.published(pimId, 1999L, 7L)));
+    private byte[] offersCsv(String... pimIds) {
+        return MarketplaceExportRunCsv.toBytes(Stream.of(pimIds)
+                .map(pimId -> MarketplaceOfferSnapshot.published(pimId, 1999L, 7L))
+                .toList());
+    }
+
+    private static final class TrackedReader extends InputStreamReader {
+
+        private boolean closed;
+
+        private TrackedReader(byte[] data) {
+            super(new ByteArrayInputStream(data), StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
+        }
+
+        private boolean isClosed() {
+            return closed;
+        }
     }
 }

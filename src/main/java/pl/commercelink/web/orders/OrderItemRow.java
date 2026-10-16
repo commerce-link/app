@@ -166,8 +166,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                     : saleLock != null ? saleLock.menuReasonKey() : null;
             states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
         }
-        boolean invoiced = order.isInvoiced();
-        String consolidateReason = invoiced ? "order.item.unavailable.invoiced"
+        String consolidateReason = order.hasClosingDocument() ? "order.item.unavailable.invoiced"
                 : receiptLock.locks() ? receiptLock.key("order.item.unavailable.receipt") : null;
         states.add(new ItemAction.State(ItemAction.CONSOLIDATE,
                 item.isConsolidated() ? "order.item.menu.deconsolidate" : "order.item.menu.consolidate",

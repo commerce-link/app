@@ -1,15 +1,19 @@
 package pl.commercelink.marketplace;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.storage.FileStorage;
 
+import java.io.Reader;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class MarketplaceExportRunService {
 
@@ -92,6 +96,31 @@ public class MarketplaceExportRunService {
             System.err.println("Failed to list marketplace export runs: " + exception.getMessage());
             return List.of();
         }
+    }
+
+    public MarketplaceExportOfferSearch searchOffer(String storeId, String marketplace, String pimId, int runLimit,
+                                                    int hitLimit) {
+        List<MarketplaceExportOfferSearch.Hit> hits = new ArrayList<>();
+        int searchedRuns = 0;
+        int unreadableRuns = 0;
+        String oldestSearchedRunId = null;
+        for (MarketplaceExportRunHeader run : findRuns(storeId, marketplace, runLimit)) {
+            if (hits.size() >= hitLimit) {
+                break;
+            }
+            searchedRuns++;
+            oldestSearchedRunId = run.runId();
+            String key = runKey(storeId, run.marketplace(), run.catalogId(), run.runId(), run.failed());
+            try (Reader reader = fileStorage.get(bucketName, key)) {
+                MarketplaceExportRunCsv.find(reader, pimId)
+                        .ifPresent(offer -> hits.add(new MarketplaceExportOfferSearch.Hit(run, offer)));
+            } catch (Exception exception) {
+                unreadableRuns++;
+                log.warn("Skipping unreadable marketplace export run {} while searching for {}: {}",
+                        key, pimId, exception.getMessage());
+            }
+        }
+        return new MarketplaceExportOfferSearch(hits, searchedRuns, unreadableRuns, oldestSearchedRunId);
     }
 
     public Optional<MarketplaceExportRunFile> findRun(String storeId,
