@@ -55,6 +55,12 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
     public record Row(String pimId, Long price, long quantity, Outcome outcome, int removalAttempts, String reasonCode,
                       String message) {
 
+        static Row of(MarketplaceOfferSnapshot snapshot) {
+            return new Row(snapshot.pimId(), snapshot.price() > 0 ? snapshot.price() : null, snapshot.quantity(),
+                    Outcome.of(snapshot.outcome()), snapshot.removalAttempts(),
+                    StringUtils.trimToNull(snapshot.reasonCode()), StringUtils.trimToNull(snapshot.message()));
+        }
+
         /** Text the search box matches: the product id and the marketplace's words about it. */
         public String searchText() {
             return String.join(" ", StringUtils.defaultString(pimId), StringUtils.defaultString(reasonCode),
@@ -74,11 +80,9 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
                 abortMessage = StringUtils.defaultIfBlank(snapshot.message(), "");
                 continue;
             }
-            Outcome outcome = Outcome.of(snapshot.outcome());
-            counts.merge(outcome, 1, Integer::sum);
-            rows.add(new Row(snapshot.pimId(), snapshot.price() > 0 ? snapshot.price() : null, snapshot.quantity(), outcome,
-                    snapshot.removalAttempts(), StringUtils.trimToNull(snapshot.reasonCode()),
-                    StringUtils.trimToNull(snapshot.message())));
+            Row row = Row.of(snapshot);
+            counts.merge(row.outcome(), 1, Integer::sum);
+            rows.add(row);
         }
         return new MarketplaceExportRunView(rows, counts, abortMessage);
     }

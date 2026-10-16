@@ -873,7 +873,7 @@ public class OrderPageModelFactory {
         if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
             return "order.items.add.locked.goods.issue";
         }
-        if (order.isInvoiced()) {
+        if (order.getClosingDocument().isPresent()) {
             return "order.items.add.locked.invoiced";
         }
         if (receiptLock.locks()) {

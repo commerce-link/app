@@ -9,10 +9,12 @@ import pl.commercelink.starter.csv.CSVWriter;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 final class MarketplaceExportRunCsv {
 
@@ -51,6 +53,12 @@ final class MarketplaceExportRunCsv {
             }
         }
         return snapshots;
+    }
+
+    static Optional<MarketplaceOfferSnapshot> find(Reader reader, String pimId) {
+        return new CSVLoader(reader)
+                .findRow(CSVLoader.DEFAULT_SEPARATOR, row -> row.length >= LEGACY_COLUMNS && pimId.equals(row[0]))
+                .map(MarketplaceExportRunCsv::toSnapshot);
     }
 
     static String runIdFrom(String key) {

@@ -14,7 +14,9 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class CSVLoader {
 
@@ -73,6 +75,35 @@ public class CSVLoader {
                     String[] nextLine = csvReader.readNext();
                     if (nextLine == null) break;
                     rowConsumer.accept(nextLine);
+                } catch (CsvMalformedLineException e) {
+                    log.warn("Skipping malformed CSV row at line {}: {}", csvReader.getLinesRead(), e.getMessage());
+                }
+            }
+        } catch (IOException | CsvValidationException e) {
+            throw new RuntimeException("Error reading CSV file", e);
+        }
+    }
+
+    public Optional<String[]> findRow(Character separator, Predicate<String[]> matches) {
+        CSVParser parser = new CSVParserBuilder()
+                .withSeparator(separator)
+                .withIgnoreQuotations(false)
+                .build();
+
+        try (CSVReader csvReader = new CSVReaderBuilder(reader)
+                .withSkipLines(1)
+                .withCSVParser(parser)
+                .build()) {
+
+            while (true) {
+                try {
+                    String[] nextLine = csvReader.readNext();
+                    if (nextLine == null) {
+                        return Optional.empty();
+                    }
+                    if (matches.test(nextLine)) {
+                        return Optional.of(nextLine);
+                    }
                 } catch (CsvMalformedLineException e) {
                     log.warn("Skipping malformed CSV row at line {}: {}", csvReader.getLinesRead(), e.getMessage());
                 }
