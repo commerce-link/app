@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import pl.commercelink.marketplace.MarketplaceExportOfferSearch;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
@@ -20,6 +22,7 @@ import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.settings.MarketplaceExportRunView;
+import pl.commercelink.web.settings.MarketplaceExportSearchView;
 import pl.commercelink.web.settings.SettingsPaths;
 
 import java.nio.charset.StandardCharsets;
@@ -39,6 +42,8 @@ public class MarketplaceExportHistoryController {
                     + "/{runId:(?:\\d{10}_)?\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}}";
 
     static final int LISTED_RUNS_LIMIT = 25;
+    static final int SEARCHED_RUNS_LIMIT = 500;
+    static final int SEARCH_HITS_LIMIT = 10;
 
     private final MarketplaceExportRunService marketplaceExportRunService;
     private final MarketplaceConnections marketplaces;
@@ -56,16 +61,19 @@ public class MarketplaceExportHistoryController {
 
     @GetMapping("/dashboard/store/marketplaces/exports" + MARKETPLACE_PATH)
     @PreAuthorize("hasRole('ADMIN')")
-    public String exportHistory(@PathVariable String marketplace, Model model, Locale locale) {
-        return renderHistory(getStoreId(), marketplace, model, locale);
+    public String exportHistory(@PathVariable String marketplace,
+                                @RequestParam(required = false) String pimId,
+                                Model model, Locale locale) {
+        return renderHistory(getStoreId(), marketplace, pimId, model, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/marketplaces/exports" + MARKETPLACE_PATH)
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String superAdminExportHistory(@PathVariable String storeId,
                                           @PathVariable String marketplace,
+                                          @RequestParam(required = false) String pimId,
                                           Model model, Locale locale) {
-        return renderHistory(storeId, marketplace, model, locale);
+        return renderHistory(storeId, marketplace, pimId, model, locale);
     }
 
     @GetMapping("/dashboard/store/marketplaces/exports" + RUN_PATH)
@@ -104,15 +112,25 @@ public class MarketplaceExportHistoryController {
         return renderRunFile(storeId, marketplace, catalogId, runId);
     }
 
-    private String renderHistory(String storeId, String marketplace, Model model, Locale locale) {
+    private String renderHistory(String storeId, String marketplace, String pimId, Model model, Locale locale) {
         List<MarketplaceExportRunHeader> runs =
                 marketplaceExportRunService.findRuns(storeId, marketplace, LISTED_RUNS_LIMIT);
+
+        String searchedPimId = StringUtils.trimToNull(pimId);
+        if (searchedPimId != null && !runs.isEmpty()) {
+            MarketplaceExportOfferSearch search = marketplaceExportRunService.searchOffer(
+                    storeId, marketplace, searchedPimId, SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
+            model.addAttribute("search", MarketplaceExportSearchView.of(searchedPimId, search, SEARCH_HITS_LIMIT));
+        }
 
         String displayName = marketplaces.displayName(marketplace);
         model.addAttribute("marketplace", marketplace);
         model.addAttribute("displayName", displayName);
         model.addAttribute("catalogNames", runs.isEmpty() ? Map.of() : catalogNames(storeId));
         model.addAttribute("marketplacesHref", SettingsPaths.store(storeId, "/marketplaces"));
+        model.addAttribute("historyHref", SettingsPaths.store(storeId, "/marketplaces/exports/" + marketplace));
+        model.addAttribute("searchRunLimit", SEARCHED_RUNS_LIMIT);
+        model.addAttribute("searchHitLimit", SEARCH_HITS_LIMIT);
         model.addAttribute("backLabel", messageSource.getMessage("store.marketplaces", null, locale));
         model.addAttribute("pageTitle", messageSource.getMessage("store.marketplaces.exports.history.title",
                 new Object[]{displayName}, locale));
