@@ -1692,6 +1692,22 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void itemsCanBeAddedToAnRmaReplacementOrderThoughItCountsAsInvoiced() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setSource(new pl.commercelink.orders.OrderSource("RMA", pl.commercelink.orders.OrderSourceType.Other));
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(item(FulfilmentStatus.New)), ADMIN, PL);
+
+        // then
+        assertThat(order.isInvoiced()).isTrue();
+        assertThat(page.items().canAddItems()).isTrue();
+        assertThat(page.items().addItemsReasonKey()).isNull();
+        assertThat(OrderPageModelFactory.addItemsLockedKey(order, false)).isNull();
+    }
+
+    @Test
     void theLockKeysOfTheControllerAgreeWithThePage() {
         // given
         Order order = order(OrderStatus.New);
