@@ -10,11 +10,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MarketplaceExportRunCsvTest {
 
     @Test
-    void writesAndReadsBackEverySevenColumnRow() {
+    void writesAndReadsBackEveryRow() {
         // given
         List<MarketplaceOfferSnapshot> rows = List.of(
-                MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L),
-                MarketplaceOfferSnapshot.removalPending("pim-B", 999L, 2),
+                MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L, "EAN-A", "MFN-A"),
+                MarketplaceOfferSnapshot.removalPending("pim-B", 999L, 2, "EAN-B", null),
                 MarketplaceOfferSnapshot.published("pim-C", 500L, 1L).rejected("VALIDATION", "price too low"),
                 MarketplaceOfferSnapshot.exportAborted("java.lang.IllegalStateException: marketplace unavailable"));
 
@@ -27,19 +27,20 @@ class MarketplaceExportRunCsvTest {
                         row.pimId(), row.price(), row.quantity(), row.removalAttempts(),
                         row.outcome(),
                         row.reasonCode() == null ? "" : row.reasonCode(),
-                        row.message() == null ? "" : row.message()))
+                        row.message() == null ? "" : row.message(),
+                        row.ean(), row.manufacturerCode()))
                 .toList());
     }
 
     @Test
-    void writesTheSevenColumnHeader() {
+    void writesTheNineColumnHeader() {
         // when
         String csv = new String(MarketplaceExportRunCsv.toBytes(
                 List.of(MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L))), StandardCharsets.UTF_8);
 
         // then
         assertThat(csv.lines().findFirst()).hasValue(
-                "\"pimId\";\"price\";\"quantity\";\"removalAttempts\";\"outcome\";\"reasonCode\";\"message\"");
+                "\"pimId\";\"price\";\"quantity\";\"removalAttempts\";\"outcome\";\"reasonCode\";\"message\";\"ean\";\"manufacturerCode\"");
     }
 
     @Test
@@ -126,6 +127,22 @@ class MarketplaceExportRunCsvTest {
         // then
         assertThat(normalized).hasSize(1001);
         assertThat(normalized).isEqualTo("x".repeat(1000) + "\u2026");
+    }
+
+    @Test
+    void readsSevenColumnRowsWrittenBeforeTheIdentifiersWereRecordedWithoutEan() {
+        // given
+        byte[] content = ("pimId;price;quantity;removalAttempts;outcome;reasonCode;message\n"
+                + "pim-1;1999;0;2;REMOVAL_PENDING;;\n").getBytes(StandardCharsets.UTF_8);
+
+        // when
+        List<MarketplaceOfferSnapshot> rows = MarketplaceExportRunCsv.parse(content);
+
+        // then
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).removalAttempts()).isEqualTo(2);
+        assertThat(rows.get(0).ean()).isNull();
+        assertThat(rows.get(0).manufacturerCode()).isNull();
     }
 
     @Test
