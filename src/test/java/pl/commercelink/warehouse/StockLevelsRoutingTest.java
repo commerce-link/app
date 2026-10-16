@@ -81,7 +81,7 @@ class StockLevelsRoutingTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-s")).thenReturn(List.of(serviceProduct));
         when(productRepository.findAll("cat-r")).thenReturn(List.of(regularProduct));
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
 
         // when
         List<StockProductLevel> levels =
@@ -114,7 +114,7 @@ class StockLevelsRoutingTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-u")).thenReturn(List.of(namelessProduct));
         when(productRepository.findAll("cat-m")).thenReturn(List.of(namedProduct));
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
 
         // when
         List<StockProductLevel> levels =
@@ -142,7 +142,7 @@ class StockLevelsRoutingTest {
         when(catalog.getCategories()).thenReturn(List.of(mappedDefinition));
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-m")).thenReturn(List.of(product));
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
 
         // when
         List<StockProductLevel> levels =
@@ -162,7 +162,7 @@ class StockLevelsRoutingTest {
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(catalog.getCategories()).thenReturn(List.of(definition));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
 
         // when
@@ -197,7 +197,7 @@ class StockLevelsRoutingTest {
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-in")).thenReturn(List.of(includedProduct));
         when(productRepository.findAll("cat-out")).thenReturn(List.of(excludedProduct));
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
 
         // when
         List<StockProductLevel> levels =
@@ -224,7 +224,7 @@ class StockLevelsRoutingTest {
         when(catalog.getCategories()).thenReturn(List.of(excludedDefinition));
         when(inventory.withEnabledSuppliersOnly(STORE_ID, SupplierScope.FULFILMENT)).thenReturn(inventoryView);
         when(productRepository.findAll("cat-out")).thenReturn(List.of(product));
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
 
         // when
         List<StockProductLevel> levels =
