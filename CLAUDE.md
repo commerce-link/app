@@ -83,7 +83,7 @@ A provider's per-store configuration (API keys and other settings) lives in Secr
 | `migration/` | Mongock `@ChangeUnit` schema migrations |
 | `offer/` | Customer-facing product offer views and CSV offer import |
 | `orders/` | Order core: lifecycle, statuses, fulfilment algorithms, RMA, notifications, events, imports, POS |
-| `payments/` | Payment orchestration: `PaymentProviderFactory`, `PaymentWebhookRegistry` |
+| `payments/` | Payment orchestration: `PaymentProviderFactory`, `PaymentWebhookRegistry`; `statements/` bank statement reconciliation |
 | `pricelist/` | Pricelist generation, daily snapshots, rolling price aggregates |
 | `printing/` | `PrintProviderRegistry` discovers printer adapters; printer profiles per store in `WarehouseConfiguration.printers` |
 | `products/` | Store product catalog, pricing strategies, health scoring, filters; `information/` consumes the external PIM |
@@ -176,6 +176,12 @@ Readers use `RollingPriceAggregateRepository.loadForStore(storeId)`: the global 
 **Order statuses** (`OrderStatus`): New, Blocked, Assembly, Assembled, Realization, Shipping, Delivered, Cancelled, Completed
 **Fulfilment statuses** (`FulfilmentStatus`): New, Allocation, Ordered, Reserved, Delivered, InRMA, InExternalService, Returned, Replaced, Destroyed
 **RMA statuses** (`RMAStatus`): New, Approved, Rejected, WaitingForItems, ItemsReceived, Processing, Completed
+
+### Bank Statement Reconciliation
+
+Customers' transfers are booked from a bank statement on `/dashboard/payments` ("Wgraj wyciąg bankowy", `web/payments/StatementController`). How to read an account's CSV export is stored with the account (`BankAccount.statementFormat`, `BankStatementFormat`: encoding, separator, header row below the bank's preamble, date format, decimal mark, columns, and the payout rows - payers that settle many orders with one transfer, each row a payer's text and the orders it pays by source, payment method and provider or carrier, several rows per payer allowed); it is set on `/dashboard/store/payments/bank-accounts/{id}/statement`, where a sample file fills the form in (`BankStatementSniffer`) and is previewed but never stored. Nothing of a statement is stored either: the upload is parsed once (`BankStatementParser`), the operations and the operator's choices travel with the reconciliation page as JSON, and the ticked ones are booked in one post. Only money in is reconciled; money out (deliveries) is left out. Operators upload statements from the last booked operation on, which is tracked outside the app.
+
+`StatementMatcher` proposes orders for each incoming operation against the open orders (the Payments page's read), in this order: its number already on a payment (booked), a transfer from a configured payer (a payout: the orders its title names by order, document or reference number - a gateway such as PayNow paying out each payment less its fee, the difference then being the fee of the one named order - else a run by date of the orders of one of the payer's rows, or of all of them, adding up to the transfer, net of fees where the order's first row says so), an order number in the title (whole id, 8-character short id, external id; a closed order named there is read by `OrdersRepository.findByShortId`), a document or pending payment reference number in the title, and the amount (with the sender matching the client, or the description when the export has no sender column). Only a number in the title for exactly what is owed (or a payout naming its orders that adds up) is ticked by itself. `StatementBooking` saves each order through `OrderLifecycle.update`: the pending payment is filled (or a payment added) with the operation's number in `bankTransactionNo` and its date in `bankTransactionDate`; a bank without operation numbers gets a fixed one derived from the operation (`OperationNumbers`, "WB-..."). That number makes a repeated booking a no-op. A payout keeps the order's payment method and records the fee the payer kept; a direct transfer for an order waiting for another method turns the pending payment into a bank transfer, refused while an invoice or e-receipt fixes the method. The method of an order is never changed otherwise, and the existing reference number stays.
 
 ### Stock Ledger Period Closing
 

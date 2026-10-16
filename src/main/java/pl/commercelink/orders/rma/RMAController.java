@@ -22,12 +22,9 @@ import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 @Controller
@@ -44,8 +41,6 @@ public class RMAController {
     private final RMALifecycle rmaLifecycle;
 
     private final RMAManager rmaManager;
-
-    private final OrdersRepository orderRepository;
 
     private final OrderItemsRepository orderItemsRepository;
 
@@ -78,57 +73,6 @@ public class RMAController {
         }
     }
 
-    @GetMapping("/dashboard/rma/new")
-    public String showCreateRma(@RequestParam(value = "orderId", required = false) String orderId,
-                                @RequestParam(value = "serialNo", required = false) String serialNo,
-                                @RequestParam(value = "byEmail", required = false) String email,
-                                Model model, Locale locale) {
-        List<OrderItem> orderItems = new ArrayList<>();
-        RMA rma = new RMA(getStoreId());
-        RmaCreateMode mode = RmaCreateMode.BY_ORDER_LINE;
-
-        if (isNotBlank(orderId)) {
-            rma.setOrderId(orderId);
-            Order order = orderRepository.findById(getStoreId(), orderId);
-            if (order != null) {
-                if (!order.isEligibleForRMACreation()) {
-                    model.addAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-                } else {
-                    orderItems = orderItemsRepository.findByOrderIdAndStatuses(orderId, Arrays.asList(FulfilmentStatus.Delivered, FulfilmentStatus.Reserved));
-                    rma.setEmail(order.getEmail());
-                }
-            }
-        } else if (isNotBlank(serialNo)) {
-            mode = RmaCreateMode.BY_SERIAL_NO;
-            OrderItem orderItem = orderItemsRepository.findBySerialNoAndStatuses(serialNo, Arrays.asList(FulfilmentStatus.Delivered, FulfilmentStatus.Reserved));
-            if (orderItem != null) {
-                orderItems = Collections.singletonList(orderItem);
-
-                Order order = orderRepository.findById(getStoreId(), orderItem.getOrderId());
-                if (!order.isEligibleForRMACreation()) {
-                    model.addAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-                    orderItems = new ArrayList<>();
-                } else {
-                    rma.setOrderId(order.getOrderId());
-                    rma.setEmail(order.getEmail());
-                }
-            }
-        } else if (isNotBlank(email)) {
-            mode = RmaCreateMode.BY_EMAIL;
-            List<Order> emailOrders = orderRepository.findByEmail(getStoreId(), email);
-            if (!emailOrders.isEmpty()) {
-                model.addAttribute("emailOrders", emailOrders);
-            }
-        }
-
-        model.addAttribute("rma", rma);
-        model.addAttribute("orderItems", orderItems);
-        model.addAttribute("mode", mode.name());
-        model.addAttribute("rmaResolutionTypes", RMAResolutionType.values());
-
-        return "rma-new";
-    }
-
     @GetMapping("/dashboard/rma/{rmaId}")
     public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
@@ -157,22 +101,6 @@ public class RMAController {
         return "rma-detail";
     }
 
-    @GetMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId, Model model) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
-
-        model.addAttribute("rma", rma);
-        model.addAttribute("rmaId", rmaId);
-        model.addAttribute("rmaItem", rmaItem);
-        model.addAttribute("isClosed", isClosed(rma));
-        model.addAttribute("rmaStatusTypes", RMAStatus.values());
-        model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
-
-        return "rma-item";
-    }
-
     @GetMapping("/dashboard/rma/{rmaId}/shipping")
     public String editRmaShipping(@PathVariable String rmaId, Model model) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
@@ -180,39 +108,6 @@ public class RMAController {
         model.addAttribute("isClosed", isClosed(rma));
 
         return "rma-shipping";
-    }
-
-    @PostMapping("/dashboard/rma/new")
-    public String createRma(@ModelAttribute RMA rma, RedirectAttributes redirectAttributes, Locale locale) {
-        Order order = orderRepository.findById(getStoreId(), rma.getOrderId());
-        if (order == null || !order.isEligibleForRMACreation()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-            return "redirect:/dashboard/rma/new";
-        }
-        rma.setStoreId(getStoreId());
-
-        List<RMAItem> draftRmaItems = rma.getDraftRmaItems().stream()
-                .filter(RMAItem::isComplete)
-                .map(rmaItem -> {
-                    OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
-                    return new RMAItem(rma.getRmaId(), orderItem, rmaItem);
-                })
-                .collect(Collectors.toList());
-
-        if (draftRmaItems.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.no.items.selected", null, locale));
-            return "redirect:/dashboard/rma/new";
-        }
-
-        rma.setCreatedAt(LocalDateTime.now());
-        rma.setEmailNotificationsEnabled(true);
-        rma.setShippingInsurance(RMAItem.computeTotalPrice(draftRmaItems));
-        rmaRepository.save(rma);
-
-        rmaItemsRepository.batchSave(draftRmaItems);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.create.success", null, locale));
-        return "redirect:/dashboard/rma/" + rma.getRmaId();
     }
 
     @PostMapping("/dashboard/rma/{rmaId}")
@@ -335,34 +230,6 @@ public class RMAController {
 
         rma.increaseShippingInsurance(newRMAItem.getTotalPrice());
         rmaRepository.save(rma);
-
-        return "redirect:/dashboard/rma/" + rmaId;
-    }
-
-    @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/save")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId,
-                                @ModelAttribute("rmaItem") RMAItem formItem,
-                                RedirectAttributes redirectAttributes, Locale locale) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
-        if (blocked.isPresent()) {
-            return blocked.get();
-        }
-        RMAItem existing = rmaItemsRepository.findById(rmaId, rmaItemId);
-        if (existing == null) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.not.found", null, locale));
-            return "redirect:/dashboard/rma/" + rmaId;
-        }
-
-        existing.setSerialNo(formItem.getSerialNo());
-        existing.setReason(formItem.getReason());
-        existing.setComment(formItem.getComment());
-
-        rmaItemsRepository.save(existing);
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("rma.item.update.success", null, locale));
 
         return "redirect:/dashboard/rma/" + rmaId;
     }
@@ -688,12 +555,6 @@ public class RMAController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
-    }
-
-    public enum RmaCreateMode {
-        BY_ORDER_LINE,
-        BY_SERIAL_NO,
-        BY_EMAIL
     }
 
     private MediaType getContentType(String fileName) {

@@ -29,7 +29,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
-import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentPickup;
@@ -84,8 +83,6 @@ class RMAControllerTest {
     private RMALifecycle rmaLifecycle;
     @Mock
     private RMAManager rmaManager;
-    @Mock
-    private OrdersRepository orderRepository;
     @Mock
     private OrderItemsRepository orderItemsRepository;
     @Mock
@@ -527,8 +524,6 @@ class RMAControllerTest {
         return Stream.of(
                 endpoint("addRmaItemFromOrder", (c, ra) ->
                         c.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, ra, Locale.ENGLISH)),
-                endpoint("updateRmaItem", (c, ra) ->
-                        c.updateRmaItem(RMA_ID, "rma-item-1", rmaItemWithQty("item-1", 1), ra, Locale.ENGLISH)),
                 endpoint("markItemsAsReceived", (c, ra) ->
                         c.markItemsAsReceived(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
                 endpoint("splitRmaItem", (c, ra) ->
@@ -616,32 +611,6 @@ class RMAControllerTest {
         assertThat(target.getStoreId()).isEqualTo(STORE_ID);
         assertThat(target.getExternalReturnId()).isNull();
         assertThat(target.getMarketplaceDecisions()).isEmpty();
-    }
-
-    @Test
-    void createRmaStoresTheRmaUnderTheSessionStoreRegardlessOfTheSubmittedOne() {
-        // given
-        RMA posted = new RMA("victim-store");
-        posted.setOrderId(ORDER_ID);
-        RMAItem draft = rmaItemWithQty("item-1", 1);
-        draft.setDesiredResolution(RMAResolutionType.Return);
-        posted.setDraftRmaItems(List.of(draft));
-        Order order = mock(Order.class);
-        when(order.isEligibleForRMACreation()).thenReturn(true);
-        when(orderRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findById(ORDER_ID, "item-1"))
-                .thenReturn(orderItemWithQtyAndStatus("item-1", 1, FulfilmentStatus.Delivered));
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.createRma(posted, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
-        verify(rmaRepository).save(saved.capture());
-        assertThat(saved.getValue().getStoreId()).isEqualTo(STORE_ID);
     }
 
     // ------------------------------------------------------------------

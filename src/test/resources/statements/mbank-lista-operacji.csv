@@ -1,0 +1,43 @@
+mBank S.A. BankowoúÊ Detaliczna;
+        Skrytka Pocztowa 2108;
+        90-959 £Ûdü 2;
+        www.mBank.pl;
+        mLinia: 801 300 800;
+        +48 (42) 6 300 800;
+        
+
+#Klient;
+DEMO STORE SP”£KA Z OGRANICZON• ODPOWIEDZIALNOåCI•;
+
+Lista operacji;
+
+#Za okres:;
+12.10.2026;13.10.2026;
+
+#zgodnie z wybranymi filtrami wyszukiwania;
+      #dla rachunkÛw:;
+      mBiznes konto Komfort - 61114020040000340276554567;
+      
+      #Lista nie jest dokumentem w rozumieniu art. 7 Ustawy Prawo Bankowe (Dz. U. Nr 140 z 1997 roku, poz.939 z pÛüniejszymi zmianami), poniewaø operacje moøna samodzielnie edytowaÊ.;
+      
+      #Waluta;#Wp≥ywy;#Wydatki;
+PLN;13 014,00;-3 516,50;
+      
+#Data operacji;#Opis operacji;#Rachunek;#Kategoria;#Kwota;
+2026-10-13;"JAN TESTOWY UL. TESTOWA 1 00-001 WARSZAWA, Zamowienie 00000000-1000-0000-0000-000000000001  JAN TESTOWY                                    UL. TESTOWA 1                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    11109010140000071219812874  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";3 998,00 PLN;;
+2026-10-13;"OP£ATA ZA PRZELEW ZEWN TRZNY                  ";"mBiznes konto Komfort 6111 ... 4567";"Op≥aty i odsetki";-1,50 PLN;;
+2026-10-13;"ANNA PRZYK£ADOWA UL. LIPOWA 4 30-001 KRAK”W, Platnosc za zamowienie ABCD1234  ANNA PRZYK£ADOWA                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    83102018110000030201459921  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";1 249,00 PLN;;
+2026-10-13;"KAMIL PR”BNY UL. POLNA 7 61-001 POZNA—, zamowienie EFGH5678 czesc 1  KAMIL PR”BNY                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    27105014451000009031218812  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";500,00 PLN;;
+2026-10-13;"MBANK S.A. PAYNOW, /OPF/X///// P£ATNOå∆ NR: TEST-PAY-NOW-001 (klient@example.com)  UL.SENATORSKA 18                                    00-950 WARSZAWA                                    PRZELEW WEWN TRZNY PRZYCHODZ•CY                                    39114020040000330278750000  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";899,00 PLN;;
+2026-10-13;"OP£ATA ZA PRZELEW ZEWN TRZNY                  ";"mBiznes konto Komfort 6111 ... 4567";"Op≥aty i odsetki";-1,50 PLN;;
+2026-10-13;"ACME DYSTRYBUCJA SP. Z O.O. ul. Hurtowa 1, Faktura: FV/0001/10/2026  ACME DYSTRYBUCJA SP. Z O.O.                                    PRZELEW ZEWN TRZNY WYCHODZ•CY                                    33116022020000000600000001  ";"mBiznes konto Komfort 6111 ... 4567";"Materia≥y i us≥ugi - inne";-2 310,50 PLN;;
+2026-10-13;"Santander Consumer Bank S.A. 54-202 Wroc≥aw ul. Legnicka 48 B, 870000000001/2150.00/0000001 , , ,  Santander Consumer Bank S.A.                                    54-202 Wroc≥aw                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    38212000010001000000000001  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";2 150,00 PLN;;
+2026-10-13;"GOOGLE *ADS0000000000  ZAKUP PRZY UØYCIU KARTY - INTERNET                                          ";"mBiznes konto Komfort 6111 ... 4567";"Promocja i reklama";-200,00 PLN;;
+2026-10-12;"BNP PARIBAS BANK POLSKA S.A. UL. KASPRZAKA 2 01-211 WARSZAWA POLSKA, p≥atnoúÊ za kredyty DEMO STORE SP”£KA Z OGRANICZON•  BNP PARIBAS BANK POLSKA S.A.                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    13160000031724467650000001  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";3 400,00 PLN;;
+2026-10-13;"OP£ATA ZA PRZELEW ZEWN TRZNY                  ";"mBiznes konto Komfort 6111 ... 4567";"Op≥aty i odsetki";-1,50 PLN;;
+2026-10-12;"KRAJOWY INTEGRATOR P£ATNOåCI S.A., /OPT/X/////TR-TEST-0001  KRAJOWY INTEGRATOR P£ATNOåCI S.A.  61-894 POZNA—                                    PRZELEW WEWN TRZNY WYCHODZ•CY                                    53114011240000290291000000  ";"mBiznes konto Komfort 6111 ... 4567";"Bez kategorii";-1 000,00 PLN;;
+2026-10-12;"TOMASZ ZWYK£Y UL. KR”TKA 2 80-001 GDA—SK, zwrot pozyczki  TOMASZ ZWYK£Y                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    45124012340000000000000001  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";500,00 PLN;;
+2026-10-12;"MARIA KOWALSKA UL. JASNA 3 90-001 £”Dè, zakupy  MARIA KOWALSKA                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    61105000000000000000000001  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";159,00 PLN;;
+2026-10-12;"MARIA KOWALSKA UL. JASNA 3 90-001 £”Dè, zakupy  MARIA KOWALSKA                                    PRZELEW ZEWN TRZNY PRZYCHODZ•CY                                    61105000000000000000000001  ";"mBiznes konto Komfort 6111 ... 4567";"Wp≥ywy - inne";159,00 PLN;;
+2026-10-13;"OP£ATA ZA PRZELEW ZEWN TRZNY                  ";"mBiznes konto Komfort 6111 ... 4567";"Op≥aty i odsetki";-1,50 PLN;;
+

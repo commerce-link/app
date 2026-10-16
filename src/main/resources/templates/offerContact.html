@@ -18,7 +18,7 @@
             <div class="field">
                 <label class="label" th:text="#{offers.name}"></label>
                 <div class="control">
-                    <input class="input" type="text" name="offerName" th:placeholder="#{offers.name.placeholder}" required>
+                    <input class="input" type="text" name="offerName" th:value="${offerName}" th:placeholder="#{offers.name.placeholder}" required>
                 </div>
             </div>
             <div class="field">

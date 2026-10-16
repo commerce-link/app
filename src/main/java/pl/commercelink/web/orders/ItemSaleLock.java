@@ -9,7 +9,7 @@ import java.util.Objects;
 
 /**
  * Why an item's sale fields (name, quantity, VAT rate) are fixed: the order's sale is registered and the order must not
- * drift from its document. INVOICED: a closing document is on the order ({@link Order#isInvoiced()}: an invoice or a
+ * drift from its document. INVOICED: a closing document is on the order ({@link Order#hasClosingDocument()}: an invoice or a
  * receipt); RECEIPT_ISSUING: an e-receipt is being issued and its request snapshot is frozen, but its document is not
  * on the order yet (ReceiptOrderState#locksOrder); RECEIPT_ATTACHING: the same once the receipt is fiscalised and
  * only its document is still being attached; RECEIPT_ATTACH_FAILED: attaching it keeps failing. A sale is corrected with a correcting invoice or a return, outside
@@ -59,7 +59,7 @@ public enum ItemSaleLock {
 
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     public static ItemSaleLock of(Order order, ReceiptLock receiptLock) {
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return INVOICED;
         }
         return switch (receiptLock) {

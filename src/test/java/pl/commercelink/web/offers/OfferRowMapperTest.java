@@ -6,6 +6,7 @@ import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.ContactDetails;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.stores.CheckoutConfiguration;
@@ -259,10 +260,46 @@ class OfferRowMapperTest {
         OfferListPage.BasketRow row = mapper(storeWithoutCheckout()).basket(basket);
 
         // then
-        assertThat(row.href()).isEqualTo("/dashboard/basket/view/" + ID);
+        assertThat(row.href()).isEqualTo("/dashboard/basket/view/" + ID + "?returnTo=%2Fdashboard%2Foffers%3Fq%3DCAD");
         assertThat(row.created()).isEqualTo("02.10, 09:30");
         assertThat(row.client()).isEqualTo("gość, bez danych");
         assertThat(row.itemsCount()).isEqualTo("2");
         assertThat(row.itemsText()).isEqualTo("pozycje: 2");
+    }
+
+    @Test
+    void storeBasketRowNamesTheClientFromBillingDetails() {
+        // given
+        Basket basket = storeBasket();
+        BillingDetails billing = new BillingDetails();
+        billing.setName("Marta");
+        billing.setSurname("Zielińska");
+        billing.setCompanyName("Biuro Rachunkowe Zielińska");
+        basket.setBillingDetails(billing);
+
+        // when
+        OfferListPage.BasketRow row = mapper(null).basket(basket);
+
+        // then
+        assertThat(row.client()).isEqualTo("Biuro Rachunkowe Zielińska");
+    }
+
+    @Test
+    void storeBasketRowLinksToThePreviewWithTheListToReturnTo() {
+        // when
+        OfferListPage.BasketRow row = mapper(null).basket(storeBasket());
+
+        // then
+        assertThat(row.href()).isEqualTo("/dashboard/basket/view/" + ID + "?returnTo=%2Fdashboard%2Foffers%3Fq%3DCAD");
+    }
+
+    private static Basket storeBasket() {
+        Basket basket = new Basket();
+        basket.setStoreId("store-1");
+        basket.setBasketId(ID);
+        basket.setType(BasketType.Basket);
+        basket.setCreatedAt(LocalDateTime.of(2026, 10, 2, 9, 30));
+        basket.setBasketItems(new java.util.LinkedList<>(List.of(item(1, 449.00))));
+        return basket;
     }
 }

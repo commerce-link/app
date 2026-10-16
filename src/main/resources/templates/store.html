@@ -23,6 +23,8 @@
                 </div>
             </header>
 
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
             <div th:replace="~{fragments/screen-intro :: panel('store', 'fas fa-cog')}"></div>
 
             <div th:replace="~{fragments/store-settings :: sections(${overview.sections()})}"></div>

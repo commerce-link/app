@@ -166,6 +166,9 @@ public class OrderPageModelFactory {
         // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
         boolean canDelete = !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty()
                 && !order.isInvoiced() && !receiptLocked;
+        // not tied to readOnly: a completed order is closed, yet a return is exactly when an RMA is reported
+        String rmaHref = !viewer.superAdmin() && order.isEligibleForRMACreation()
+                ? "/dashboard/rma/new?q=" + order.getOrderId() + "&from=order" : null;
         return new OrderPageModel.Header(
                 OrderLabels.status(order.getStatus()), OrderLabels.tone(order.getStatus()), !readOnly,
                 order.hasStatus(OrderStatus.Completed),
@@ -191,7 +194,8 @@ public class OrderPageModelFactory {
                 cancelUnavailableKey(order, items, canDelete),
                 cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
                 canDelete,
-                deleteMessage(order, messageSource, locale));
+                deleteMessage(order, messageSource, locale),
+                rmaHref);
     }
 
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
@@ -285,7 +289,7 @@ public class OrderPageModelFactory {
                 .map(i -> serialItemRow(i, labels)).toList();
         List<OrderPageModel.BulkActionButton> bulk = new ArrayList<>();
         for (BulkAction action : BulkAction.values()) {
-            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.isInvoiced()) {
+            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.hasClosingDocument()) {
                 continue;
             }
             BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLock);
@@ -869,7 +873,7 @@ public class OrderPageModelFactory {
         if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
             return "order.items.add.locked.goods.issue";
         }
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return "order.items.add.locked.invoiced";
         }
         if (receiptLock.locks()) {

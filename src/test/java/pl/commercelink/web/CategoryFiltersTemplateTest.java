@@ -114,7 +114,7 @@ class CategoryFiltersTemplateTest {
     }
 
     /** The page as the controller renders it, header included, for a category with the given name. */
-    private static String renderedPage(String categoryName, Integer matchingProducts) {
+    private static String renderedPage(String categoryName) {
         CategoryDefinition category = new CategoryDefinition().withName(categoryName).withGeneratedId();
         Context context = new Context();
         context.setVariable("form", RecommendationFiltersForm.from(category));
@@ -127,37 +127,23 @@ class CategoryFiltersTemplateTest {
         context.setVariable("formAction", "/dashboard/catalogs/c1/category/k1/settings/filters");
         context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/settings");
         context.setVariable("backLabel", "Category settings");
-        context.setVariable("productsAddHref", "/dashboard/catalogs/c1/category/k1/products/add");
-        if (matchingProducts != null) {
-            context.setVariable("matchingProducts", matchingProducts);
-        }
         context.setVariable("redirectTo", null);
         return EnglishFragmentTemplateEngine.create().process("catalog/category-filters", context);
     }
 
     /**
      * The lead is a block of the template, not HTML put together in the controller and printed unescaped: a category
-     * name with markup is shown as text, and the count links to the page that adds the products (D-M50, D-C3).
+     * name with markup is shown as text (D-M50). It carries no count of products to add: counting them read the whole
+     * inventory on every render of the page.
      */
     @Test
-    void theLeadShowsTheCategoryNameAsTextAndLinksTheCountToAddingProducts() {
+    void theLeadShowsTheCategoryNameAsTextAndNoCount() {
         // when
-        String html = renderedPage("<b>GPU</b>", 8);
+        String html = renderedPage("<b>GPU</b>");
 
         // then
         String lead = html.substring(html.indexOf("<p class=\"cl-page-lead\">"), html.indexOf("</p>", html.indexOf("<p class=\"cl-page-lead\">")));
         assertThat(lead).contains("&lt;b&gt;GPU&lt;/b&gt; · narrow down the products suggested from the inventory.")
-                .doesNotContain("<b>")
-                .contains("<a href=\"/dashboard/catalogs/c1/category/k1/products/add\">Not yet added today: 8</a>");
-    }
-
-    @Test
-    void theLeadLeavesTheCountOutWhenItIsUnknown() {
-        // when
-        String html = renderedPage("GPU", null);
-
-        // then
-        assertThat(html).contains("GPU · narrow down the products suggested from the inventory.")
-                .doesNotContain("Not yet added today");
+                .doesNotContain("<b>").doesNotContain("<a").doesNotContain("Not yet added today");
     }
 }

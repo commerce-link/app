@@ -5059,6 +5059,27 @@ a.cl-link-button:hover {
     margin-top: 4px;
 }
 
+/* Scope of an operation: what it does and what it leaves out, two lists side by side (store copy, 2026-10-13). */
+.cl-page .cl-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.cl-page .cl-scope-title { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; color: var(--cl-ink); }
+.cl-page .cl-scope-list { margin: 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.4; color: var(--cl-ink-2); }
+.cl-page .cl-scope-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; margin: 0; }
+.cl-page .cl-scope-list li + li { margin-top: 4px; }
+.cl-page .cl-scope-list .icon { width: 16px; height: 1.4em; }
+.cl-page .cl-scope-list.is-yes .icon { color: var(--cl-ok); }
+.cl-page .cl-scope-list.is-no .icon { color: var(--cl-ink-3); }
+@media (max-width: 719px) {
+    .cl-page .cl-scope { grid-template-columns: minmax(0, 1fr); }
+}
+/* A short note under a page's form (a hint to another way of doing the same). */
+.cl-page .cl-form + .cl-help { margin-top: 12px; }
+/* A link in a sentence outside the lead (the hint under the store create form, the source store of a copy): a 44 px touch
+   target below 1024 px without moving the line, as .cl-lead-link does in a lead. */
+@media (max-width: 1023px) {
+    .cl-page .cl-text-link { display: inline-block; padding-block: 13px; margin-block: -13px; }
+}
+.cl-page .cl-card-footer > [data-cl-busy-note] { flex-basis: 100%; margin: 0; }
+
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
     /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the select-all box and
@@ -13232,6 +13253,142 @@ a.cl-link-button:hover {
     }
 }
 
+/* New RMA page (/dashboard/rma/new): items table with the selection as a form field and the resolution/reason row
+   under a ticked item (pattern of the new-delivery table), and the list of orders to choose from. */
+.cl-page .cl-table.is-rma-items tr.cl-row-main.is-open > * {
+    background: var(--cl-surface-2);
+    border-bottom-color: transparent;
+}
+
+/* --cl-ink-3 falls under 4.5:1 on --cl-surface-2 */
+.cl-page .cl-table.is-rma-items tr.cl-row-main.is-open .cl-table-sub {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.cl-row-detail > td {
+    padding: 0 20px 16px 64px;
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.cl-row-detail[hidden] {
+    display: none;
+}
+
+.cl-page .cl-table.is-rma-items .cl-min {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-rma-items .cl-input:disabled {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-rma-items tr.is-unavailable > * {
+    color: var(--cl-ink-2);
+}
+
+/* .cl-row-detail-inner is a bordered box without padding (it usually holds a .cl-subtable with its own cell padding) */
+.cl-page .cl-rma-item-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+    padding: 12px 16px 16px;
+}
+
+.cl-page .cl-rma-item-fields .cl-field {
+    margin: 0;
+}
+
+.cl-page .cl-rma-item-fields .cl-textarea {
+    min-height: 72px;
+}
+
+.cl-page .cl-table.is-rma-orders tr.is-unavailable > * {
+    color: var(--cl-ink-2);
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-rma-item-fields .cl-choice-group.is-row {
+        grid-template-columns: repeat(3, max-content);
+        column-gap: 24px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    /* checkbox beside the item name, the quantity and price rows below it */
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        column-gap: 8px;
+        align-items: start;
+    }
+
+    /* the row is a grid with gaps between its cells: the ticked tint goes on the row, not on each cell */
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main.is-open {
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main.is-open > * {
+        background: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check {
+        display: block;
+        grid-column: 1;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td.cl-table-check::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > th.cl-table-key {
+        display: block;
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody tr.cl-row-main > td:not(.cl-table-check) {
+        grid-column: 1 / -1;
+    }
+
+    .cl-page .cl-table.is-rma-items tbody th.cl-table-key::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail {
+        padding: 0 16px 12px;
+        border-top: 0;
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail > td {
+        display: block;
+        padding: 0;
+        background: none;
+    }
+
+    .cl-page .cl-table.is-rma-items tr.cl-row-detail > td::before {
+        content: none;
+    }
+}
+/* links inside dense content (the RMA holding an item, the order number in the order card): a 44 px touch target
+   below 1024 px without moving the line, as .cl-lead-link; their text is 14-17 px high, hence 15 px each side */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-rma-items .cl-table-sub a.cl-table-code,
+    .cl-page .cl-kv.is-rma-order a.cl-table-code {
+        display: inline-block;
+        padding-block: 15px;
+        margin-block: -15px;
+    }
+}
+/* End of new RMA page */
+
 /* --- Stores list (super admin, /dashboard/stores; spec docs/active/stores-list-redesign/2026-10-13-stores-list-design.md).
    The orders row (is-orders) with the offers' action column; one pill per row, its date under it. */
 .cl-page .cl-table.is-stores .cl-col-status { width: 13rem; }
@@ -13392,4 +13549,95 @@ a.cl-link-button:hover {
 
 .cl-page .cl-dialog [hidden] {
     display: none;
+}
+
+/* RMA item page (2026-10-14): a record description whose values are long texts (reason, comment) — the label above,
+   the value across the whole card and its line breaks kept, instead of two narrow columns. */
+.cl-page dl.cl-kv.is-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+}
+.cl-page dl.cl-kv.is-stacked > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+.cl-page dl.cl-kv.is-stacked dd {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* Help text that quotes what was typed (an RMA item's serial numbers): a long value without spaces breaks anywhere
+   instead of widening the field and scrolling the page sideways. */
+.cl-page .cl-help.is-break {
+    overflow-wrap: anywhere;
+}
+
+/* A textarea for a few sentences (an RMA item's reason and comment): lower than the email-body default, so two of them
+   still leave the save button above the fold on a 1366×768 laptop (design system §6.1). */
+.cl-input.cl-textarea.is-short {
+    min-height: 72px;
+}
+
+/* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
+   reconciliation of an uploaded statement on the Payments page (payments-statement.html). The pages are built from the
+   shared components; only what has no counterpart among them is here. */
+
+/* Wide tables (the statement, the payout, the sample file's preview) scroll sideways inside their card. */
+.cl-page .cl-statement-scroll {
+    overflow-x: auto;
+    min-width: 0;
+}
+
+/* the payers' rows are edited in the table: its fields keep a readable width and the table scrolls instead */
+.cl-page .cl-statement-scroll.is-fields .cl-input,
+.cl-page .cl-statement-scroll.is-fields .cl-select {
+    min-width: 180px;
+}
+
+.cl-page .cl-table.is-statement {
+    min-width: 1080px;
+}
+
+/* the full transfer title, references without spaces included, wraps within a bounded column */
+.cl-page .cl-statement-operation {
+    min-width: 260px;
+    max-width: 380px;
+}
+
+.cl-page .cl-statement-title {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-statement-key {
+    margin-right: 4px;
+    font-size: 12px;
+    color: var(--cl-ink-3);
+}
+
+/* the number the match was found by */
+.cl-page .cl-statement-title mark {
+    padding: 0 2px;
+    border-radius: 3px;
+    background: var(--cl-warn-soft);
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-statement-order + .cl-statement-order {
+    margin-top: 6px;
+}
+
+/* --- Basket view (store cart preview, /dashboard/basket/view/{id}) */
+/* the market column fits "99 999,00 → 99 999,00" on one line */
+.cl-page .cl-table col.cl-col-market { width: 184px; }
+/* notes under a card's list keep the card's side padding */
+.cl-page .cl-card > .cl-card-foot-note { padding: 0 20px 16px; margin: 0; }
+/* the estimate's note sits inside the disclosure body, which already insets it and draws no rule above */
+.cl-page .cl-disclosure-body > .cl-card-desc.cl-card-foot-note { padding: 8px 0 0; border-top: 0; }
+/* as cards (< 720 px) the market range carries its column name ("Rynek (PLN): 2 521,46 → 2 574,00"): next to the price it
+   would be a second bare amount; the price itself ("1 × 3 019,00") speaks for itself, as in the order */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-basket-items.is-wrap tbody tr > td.is-numeric:last-child::before { content: attr(data-label) ": "; }
 }

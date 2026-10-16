@@ -21,12 +21,14 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import pl.commercelink.marketplace.MarketplaceExportOfferSearch;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.web.settings.MarketplaceExportRunView;
+import pl.commercelink.web.settings.MarketplaceExportSearchView;
 import pl.commercelink.starter.security.model.CustomUser;
 
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -263,7 +266,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
+        String view = controller.exportHistory(MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-history");
@@ -281,7 +284,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
+        controller.exportHistory(MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
 
         // then
         verify(marketplaceExportRunService).findRuns(STORE_ID, MARKETPLACE, 25);
@@ -296,7 +299,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.superAdminExportHistory("store-2", MARKETPLACE, model, Locale.forLanguageTag("pl"));
+        String view = controller.superAdminExportHistory("store-2", MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-history");
@@ -313,10 +316,103 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
+        controller.exportHistory(MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(exportRunsOf(model)).isEmpty();
+    }
+
+    @Test
+    void historyPageSearchesTheProductInTheLastFiveHundredRunsForItsTenNewestHits() {
+        // given
+        givenRuns(STORE_ID, headers(3));
+        givenSearch(STORE_ID, searchWithOneHit());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, " pim-A ", model, Locale.forLanguageTag("pl"));
+
+        // then
+        verify(marketplaceExportRunService).searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+        MarketplaceExportSearchView search = (MarketplaceExportSearchView) model.getAttribute("search");
+        assertThat(search.pimId()).isEqualTo("pim-A");
+        assertThat(search.hits()).singleElement()
+                .satisfies(hit -> assertThat(hit.offer().pimId()).isEqualTo("pim-A"));
+    }
+
+    @Test
+    void historyPageDoesNotSearchWithoutAPimId() {
+        // given
+        givenRuns(STORE_ID, headers(3));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
+        controller.exportHistory(MARKETPLACE, "  ", model, Locale.forLanguageTag("pl"));
+
+        // then
+        verify(marketplaceExportRunService, never()).searchOffer(anyString(), anyString(), anyString(), anyInt(), anyInt());
+        assertThat(model.getAttribute("search")).isNull();
+    }
+
+    @Test
+    void historyPageDoesNotSearchAMarketplaceWithoutRuns() {
+        // given
+        givenRuns(STORE_ID, List.of());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, "pim-A", model, Locale.forLanguageTag("pl"));
+
+        // then
+        verify(marketplaceExportRunService, never()).searchOffer(anyString(), anyString(), anyString(), anyInt(), anyInt());
+        assertThat(model.getAttribute("search")).isNull();
+    }
+
+    @Test
+    void historyPageSendsTheSearchFormToItsOwnAddress() {
+        // given
+        givenRuns(STORE_ID, headers(1));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, null, model, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(model.getAttribute("historyHref")).isEqualTo("/dashboard/store/marketplaces/exports/" + MARKETPLACE);
+        assertThat(model.getAttribute("searchRunLimit")).isEqualTo(500);
+        assertThat(model.getAttribute("searchHitLimit")).isEqualTo(10);
+    }
+
+    @Test
+    void superAdminHistoryPageSearchesTheStoreFromThePath() {
+        // given
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+        givenRuns("store-2", headers(2));
+        givenSearch("store-2", searchWithOneHit());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.superAdminExportHistory("store-2", MARKETPLACE, "pim-A", model, Locale.forLanguageTag("pl"));
+
+        // then
+        verify(marketplaceExportRunService).searchOffer("store-2", MARKETPLACE, "pim-A", 500, 10);
+        assertThat(model.getAttribute("historyHref"))
+                .isEqualTo("/dashboard/store/store-2/marketplaces/exports/" + MARKETPLACE);
+    }
+
+    @Test
+    void resolvesTheProductSearchOfTheHistoryUrl() throws Exception {
+        // given
+        givenRuns(STORE_ID, headers(1));
+        givenSearch(STORE_ID, searchWithOneHit());
+
+        // when / then
+        MockMvcBuilders.standaloneSetup(controller).build()
+                .perform(get("/dashboard/store/marketplaces/exports/{marketplace}", MARKETPLACE).param("pimId", "pim-A"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("store-marketplace-export-history"))
+                .andExpect(model().attributeExists("search"));
     }
 
     @Test
@@ -354,6 +450,17 @@ class MarketplaceExportHistoryControllerTest {
 
     private void givenRuns(String storeId, List<MarketplaceExportRunHeader> runs) {
         when(marketplaceExportRunService.findRuns(eq(storeId), eq(MARKETPLACE), anyInt())).thenReturn(runs);
+    }
+
+    private void givenSearch(String storeId, MarketplaceExportOfferSearch search) {
+        when(marketplaceExportRunService.searchOffer(eq(storeId), eq(MARKETPLACE), anyString(), anyInt(), anyInt()))
+                .thenReturn(search);
+    }
+
+    private MarketplaceExportOfferSearch searchWithOneHit() {
+        return new MarketplaceExportOfferSearch(List.of(new MarketplaceExportOfferSearch.Hit(
+                new MarketplaceExportRunHeader(MARKETPLACE, CATALOG_ID, RUN_ID, false),
+                MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L))), 1, 0, RUN_ID);
     }
 
     private List<MarketplaceExportRunHeader> headers(int count) {

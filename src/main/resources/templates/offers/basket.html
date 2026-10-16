@@ -1,0 +1,208 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+<!--/* Store basket preview, read only (spec docs/active/basket-view-redesign): record header, the items with an
+       estimated margin and the market now, and the side column of the record layout (summary, customer, basket). */-->
+<section th:fragment="page" class="cl-page" th:with="p=${page}">
+    <div class="cl-page-body is-wide">
+        <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, #{offers.basket.back},
+                 #{offers.basket.title(${p.shortId()})}, ~{::basketCopy}, ~{::basketStatus}, ~{::basketMeta}, ~{::basketActions})}">
+            <th:block th:fragment="basketCopy">
+                <button type="button" class="cl-copy-inline is-icon"
+                        th:attr="data-cl-copy=${p.basketId()}, aria-label=#{offers.basket.copyId}, title=${p.basketId()}">
+                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+                </button>
+            </th:block>
+            <th:block th:fragment="basketStatus">
+                <span th:if="${p.deletionPill() != null}" class="cl-status is-warn"
+                      th:text="${p.deletionPill().arg() != null} ? #{${p.deletionPill().key()}(${p.deletionPill().arg()})} : #{${p.deletionPill().key()}}"></span>
+            </th:block>
+            <th:block th:fragment="basketMeta">
+                <p class="cl-record-meta">
+                    <span><strong th:text="${p.hasClient()} ? ${p.client()} : #{offers.basket.customer.guest}"></strong></span>
+                    <span th:if="${p.createdAt() != null}" th:text="#{offers.basket.meta.created(${p.createdAt()})}"></span>
+                    <span><strong th:text="#{general.currency.amount(${p.total()})}"></strong></span>
+                    <span th:text="#{offers.list.items(${p.itemsCount()})}"></span>
+                </p>
+                <p th:if="${p.empty()}" class="cl-help is-note" id="basket-order-reason" th:text="#{offers.basket.order.empty}"></p>
+            </th:block>
+            <th:block th:fragment="basketActions">
+                <!--/* Creating the order deletes the basket (BasketOrderImporter), so it is confirmed; the confirmation is a
+                       change, not a removal, hence the primary tone. Without JavaScript the link opens the confirmation page. */-->
+                <a th:unless="${p.empty()}" class="cl-button is-primary" th:href="@{${p.orderHref()}}" data-cl-confirm
+                   data-cl-confirm-tone="primary"
+                   th:attr="data-cl-confirm-title=#{offers.basket.order.confirm.title(${p.shortId()})},
+                            data-cl-confirm-message=#{offers.basket.order.confirm.message},
+                            data-cl-confirm-action=#{offers.basket.order.confirm.action}">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-shopping-cart"></i></span>
+                    <span th:text="#{offers.basket.order}"></span>
+                </a>
+                <button th:if="${p.empty()}" type="button" class="cl-button is-primary" aria-disabled="true"
+                        aria-describedby="basket-order-reason">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-shopping-cart"></i></span>
+                    <span th:text="#{offers.basket.order}"></span>
+                </button>
+                <details class="cl-menu">
+                    <summary class="cl-button">
+                        <span th:text="#{offers.basket.more}"></span>
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                    </summary>
+                    <ul class="cl-menu-list" id="basket-more-menu">
+                        <li><a class="cl-menu-item" th:href="@{${p.offerHref()}}">
+                            <span th:text="#{offers.basket.offer}"></span>
+                            <span class="cl-menu-desc" th:text="${p.customer().empty()} ? #{offers.basket.offer.desc.items} : #{offers.basket.offer.desc.client}"></span>
+                        </a></li>
+                        <li><button type="button" class="cl-menu-item" hidden data-cl-copy-reveal th:attr="data-cl-copy=${p.basketId()}"
+                                    th:text="#{offers.basket.copyId}"></button></li>
+                    </ul>
+                </details>
+            </th:block>
+        </div>
+
+        <div class="cl-layout-aside">
+            <div class="cl-layout-main">
+                <section class="cl-card" id="pozycje" aria-labelledby="items-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="items-title" th:text="#{offers.basket.items.title(${p.itemsCount()})}"></h2>
+                    </div>
+                    <p th:unless="${p.empty()}" class="cl-card-desc" th:text="#{offers.basket.items.desc}"></p>
+                    <div class="cl-card-section">
+                        <table th:unless="${p.empty()}" class="cl-table is-compact is-wrap is-basket-items">
+                            <caption class="cl-visually-hidden" th:text="#{offers.basket.items.caption}"></caption>
+                            <colgroup><col><col class="cl-col-price"><col class="cl-col-market"></colgroup>
+                            <thead>
+                            <tr th:with="unit=${#strings.trim(#messages.msg('general.currency.amount', ''))}">
+                                <th scope="col" th:text="#{offers.basket.items.column.product}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{order.items.column.price(${unit})}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{offers.basket.items.column.market(${unit})}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <th:block th:each="row : ${p.products()}"><tr th:replace="~{offers/basket :: row(${row})}"></tr></th:block>
+                            <tr th:if="${!p.services().isEmpty()}" class="cl-table-group">
+                                <th scope="rowgroup" colspan="3"><span class="cl-eyebrow" th:text="#{offers.basket.items.group.services}"></span></th>
+                            </tr>
+                            <th:block th:each="row : ${p.services()}"><tr th:replace="~{offers/basket :: row(${row})}"></tr></th:block>
+                            </tbody>
+                        </table>
+                        <p th:if="${p.empty()}" class="cl-list-empty" th:text="#{offers.basket.items.empty}"></p>
+                    </div>
+                </section>
+            </div>
+            <div class="cl-layout-side">
+                <section th:replace="~{offers/basket :: summaryCard(${p.summary()}, ${p.empty()})}"></section>
+                <section th:replace="~{offers/basket :: customer(${p.customer()})}"></section>
+                <section th:replace="~{offers/basket :: facts(${p.facts()})}"></section>
+            </div>
+        </div>
+    </div>
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+</section>
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/copy-field.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+
+<tr th:fragment="row(row)">
+    <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.basket.items.column.product}">
+        <span th:text="${row.name()}"></span>
+        <span th:if="${row.service()}" class="cl-table-marks"><span class="cl-status is-neutral" th:text="#{offers.basket.items.pill.service}"></span></span>
+        <span th:if="${row.category() != null or row.mfn() != null}" class="cl-table-sub">
+            <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
+            <th:block th:if="${row.mfn() != null}">
+                <span th:if="${row.category() != null}" class="cl-table-sep">·</span>
+                <span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{offers.basket.mfn.copy(${row.mfn()})}"><span class="cl-copy-code"><span th:text="${row.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
+            </th:block>
+        </span>
+    </th>
+    <td class="is-numeric" th:attr="data-label=#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
+        <span class="cl-price-margin"><span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span><th:block
+              th:if="${row.margin() != null}"><th:block th:replace="~{offers/basket :: margin(${row.margin()}, ${row.market() != null and row.market().unavailable()})}"></th:block></th:block></span>
+    </td>
+    <td class="is-numeric" th:attr="data-label=#{offers.basket.items.column.market(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
+        <span th:if="${row.market() == null}" class="cl-table-empty" th:text="#{offers.basket.market.service}"></span>
+        <span th:if="${row.market() != null and row.market().unavailable()}" class="cl-table-empty" th:text="#{offers.basket.market.unavailable}"></span>
+        <span th:if="${row.market() != null and row.market().missing()}" class="cl-status is-warn" th:text="#{offers.basket.market.missing}"></span>
+        <th:block th:if="${row.market() != null and !row.market().missing() and !row.market().unavailable()}">
+            <span th:text="#{offers.basket.market.range(${row.market().low()}, ${row.market().median()})}"></span>
+            <span class="cl-table-sub" th:text="#{offers.basket.market.stock(${row.market().suppliers()}, ${row.market().stock()})}"></span>
+        </th:block>
+    </td>
+</tr>
+
+<!--/* The order's margin mark (orders/details/items :: margin) with the estimate's own wording: the cost is the market
+       median now, not a purchase. Same element, classes and tones. marketDown: the supplier index did not answer, which
+       says nothing about the product's offers. */-->
+<span th:fragment="margin(m, marketDown)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
+      th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
+      th:with="text=${marketDown} ? #{offers.basket.margin.unavailable} : (${m.tone().name() == 'UNKNOWN'} ? #{offers.basket.margin.unknown}
+                : #{${'offers.basket.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
+                    ${#messages.msg('general.currency.amount', m.profit())},
+                    ${#messages.msg('general.currency.amount', m.cost())},
+                    ${#messages.msg('general.currency.amount', m.profitNet())})})"
+      th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
+      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
+
+<section th:fragment="summaryCard(s, empty)" class="cl-card" aria-labelledby="summary-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{offers.basket.summary.title}"></h2></div>
+    <dl class="cl-kv is-column">
+        <div><dt th:text="#{offers.basket.summary.items}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.items()})}"></dd></div>
+        <div th:if="${s.deliveryState().name() == 'CHOSEN'}"><dt th:text="#{offers.basket.summary.delivery(${s.deliveryName()})}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.delivery()})}"></dd></div>
+        <div th:if="${s.deliveryState().name() == 'NONE'}"><dt th:text="#{offers.basket.summary.delivery.plain}"></dt><dd th:text="#{offers.basket.summary.delivery.none}"></dd></div>
+        <div th:if="${s.deliveryState().name() == 'UNKNOWN'}"><dt th:text="#{offers.basket.summary.delivery.plain}"></dt><dd th:text="#{offers.basket.summary.delivery.unknown}"></dd></div>
+        <div class="cl-kv-total"><dt th:text="#{offers.basket.summary.total}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.total()})}"></dd></div>
+        <div><dt th:text="#{offers.basket.summary.net}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.net()})}"></dd></div>
+        <div><dt th:text="#{offers.basket.summary.vat}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.vat()})}"></dd></div>
+    </dl>
+    <p th:if="${s.deliveryState().name() == 'UNKNOWN'}" class="cl-help is-warn cl-card-foot-note" th:text="#{offers.basket.summary.delivery.unknown.help}"></p>
+    <details th:unless="${empty}" class="cl-disclosure" id="basket-estimate" open th:with="e=${s.estimate()}">
+        <summary th:text="#{offers.basket.estimate.title}"></summary>
+        <div class="cl-disclosure-body">
+            <dl th:if="${e.state().name() == 'OK'}" class="cl-kv is-column">
+                <div><dt th:text="#{offers.basket.estimate.cost}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${e.cost()})}"></dd></div>
+                <div class="cl-kv-total"><dt th:text="#{offers.basket.estimate.profit}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${e.profit()})}"></dd></div>
+                <div><dt th:text="#{offers.basket.estimate.profitNet}"></dt><dd class="is-numeric" th:text="#{offers.basket.estimate.profitNet.value(${#messages.msg('general.currency.amount', e.profitNet())}, ${e.margin()})}"></dd></div>
+            </dl>
+            <p class="cl-card-desc cl-card-note cl-card-foot-note">
+                <th:block th:switch="${e.state().name()}">
+                    <span th:case="'OK'" th:text="#{offers.basket.estimate.note}"></span>
+                    <span th:case="'NO_OFFERS'" th:text="#{offers.basket.estimate.none}"></span>
+                    <span th:case="'UNAVAILABLE'" th:text="#{offers.basket.estimate.unavailable}"></span>
+                    <span th:case="'NO_PRODUCTS'" th:text="#{offers.basket.estimate.services}"></span>
+                </th:block>
+                <span th:if="${e.state().name() == 'OK' and e.missing() > 0}" th:text="#{offers.basket.estimate.missing(${e.missing()})}"></span>
+            </p>
+        </div>
+    </details>
+</section>
+
+<section th:fragment="customer(c)" class="cl-card" aria-labelledby="customer-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="customer-title" th:text="#{offers.basket.customer.title}"></h2></div>
+    <p th:if="${c.empty()}" class="cl-card-desc cl-card-foot-note" th:text="#{offers.basket.customer.empty}"></p>
+    <div th:if="${c.hasBilling()}" class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.basket.customer.billing}"></span></div>
+        <th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block>
+    </div>
+    <div th:if="${c.hasShipping()}" class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.basket.customer.shipping}"></span></div>
+        <span th:if="${c.sameAddress()}" th:text="#{offers.basket.customer.sameAddress}"></span>
+        <th:block th:unless="${c.sameAddress()}"><th:block th:replace="~{orders/details/customer :: address(${c.shipping()})}"></th:block></th:block>
+    </div>
+</section>
+
+<section th:fragment="facts(f)" class="cl-card" aria-labelledby="facts-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="facts-title" th:text="#{offers.basket.facts.title}"></h2></div>
+    <dl class="cl-kv is-column">
+        <div th:if="${f.createdAt() != null}"><dt th:text="#{offers.basket.facts.created}"></dt><dd th:text="${f.createdAt()}"></dd></div>
+        <div th:if="${f.sourceKey() != null}"><dt th:text="#{offers.basket.facts.source}"></dt><dd th:text="#{${f.sourceKey()}}"></dd></div>
+        <div th:if="${f.affiliate() != null}"><dt th:text="#{offers.basket.facts.affiliate}"></dt><dd th:text="${f.affiliate()}"></dd></div>
+        <div th:if="${f.fulfilmentKey() != null}"><dt th:text="#{offers.basket.facts.fulfilment}"></dt><dd th:text="#{${f.fulfilmentKey()}}"></dd></div>
+        <div th:if="${f.deletion() != null}"><dt th:text="#{offers.basket.facts.deletion}"></dt><dd th:text="${f.deletion()}"></dd></div>
+    </dl>
+    <p class="cl-card-desc cl-card-note cl-card-foot-note" th:text="#{offers.basket.facts.note(${f.cleanupDays()})}"></p>
+</section>
+</body>
+</html>
