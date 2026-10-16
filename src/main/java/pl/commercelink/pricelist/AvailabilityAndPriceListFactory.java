@@ -30,14 +30,15 @@ public class AvailabilityAndPriceListFactory {
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
     }
 
-    public AvailabilityAndPriceList create(InventoryView inventory) {
+    public AvailabilityAndPriceList create(InventoryView inventory, String storeId) {
         return new AvailabilityAndPriceList(
                 inventory,
                 productCatalogRepository,
                 productRepository,
                 recommendationEngine,
                 rollingPriceAggregateRepository,
-                sellingPriceHistoryRepository
+                sellingPriceHistoryRepository,
+                storeId
         );
     }
 }

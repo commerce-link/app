@@ -66,7 +66,7 @@ class PricelistEventListenerRoutingTest {
     void handlePricelistEventCallsInventoryWithPricingScope() throws IOException {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenReturn(List.of());
 
         PricelistEventPayload payload = new PricelistEventPayload(STORE_ID, CATALOG_ID);
@@ -82,7 +82,7 @@ class PricelistEventListenerRoutingTest {
     void completedPricelistCalculationIsRecordedAfterPublishing() throws IOException {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenReturn(List.of());
         when(pricelistRepository.save(STORE_ID, CATALOG_ID, List.of())).thenReturn("pricelist-1");
 
@@ -99,7 +99,7 @@ class PricelistEventListenerRoutingTest {
     void failedPricelistCalculationIsNotRecorded() {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenThrow(new IllegalStateException("inventory unavailable"));
 
         // when / then
