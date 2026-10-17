@@ -108,6 +108,17 @@ class StoreMarketplacesTemplateTest {
     }
 
     @Test
+    void aMarketplaceWithoutItsAdapterKeepsItsExportHistoryButNotItsCatalogs() {
+        // when
+        String html = list(List.of(view("Ceneo", "Ceneo", State.MISSING, null, List.of("Główny"), false)), false);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/Ceneo\"").contains("Historia eksportu");
+        assertThat(html).doesNotContain("Oferty z katalogów");
+        assertThat(html.indexOf("odłącz go")).isLessThan(html.indexOf("Historia eksportu"));
+    }
+
+    @Test
     void anEmptyListSaysSo() {
         // when
         String html = list(List.of(), true);

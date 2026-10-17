@@ -148,9 +148,22 @@ public class Order {
         return source != null && source.getType() == OrderSourceType.PointOfSale;
     }
 
+    /**
+     * A closing invoice or receipt is on the order, or it is an RMA replacement (no sale of its own): nothing is left to
+     * invoice and the order (billing, payments, split, deletion) stays as it is.
+     */
     @DynamoDBIgnore
     public boolean isInvoiced() {
-        return isRMAReplacementOrder() || getClosingDocument().isPresent();
+        return isRMAReplacementOrder() || hasClosingDocument();
+    }
+
+    /**
+     * A closing invoice or receipt lists the items, so they stay as issued. Unlike {@link #isInvoiced()}, an RMA
+     * replacement without one keeps its items editable (add, edit, remove, merge, split set).
+     */
+    @DynamoDBIgnore
+    public boolean hasClosingDocument() {
+        return getClosingDocument().isPresent();
     }
 
     @DynamoDBIgnore

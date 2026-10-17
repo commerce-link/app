@@ -289,7 +289,7 @@ public class OrderPageModelFactory {
                 .map(i -> serialItemRow(i, labels)).toList();
         List<OrderPageModel.BulkActionButton> bulk = new ArrayList<>();
         for (BulkAction action : BulkAction.values()) {
-            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.isInvoiced()) {
+            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.hasClosingDocument()) {
                 continue;
             }
             BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLock);
@@ -873,7 +873,7 @@ public class OrderPageModelFactory {
         if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
             return "order.items.add.locked.goods.issue";
         }
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return "order.items.add.locked.invoiced";
         }
         if (receiptLock.locks()) {

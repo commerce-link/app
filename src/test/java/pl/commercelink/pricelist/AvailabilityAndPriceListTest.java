@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -64,14 +65,15 @@ class AvailabilityAndPriceListTest {
 
     @BeforeEach
     void setUp() {
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Collections.emptyMap());
+        when(rollingPriceAggregateRepository.loadForStore(anyString())).thenReturn(Collections.emptyMap());
         availabilityAndPriceList = new AvailabilityAndPriceList(
                 inventory,
                 productCatalogRepository,
                 productRepository,
                 recommendationEngine,
                 rollingPriceAggregateRepository,
-                sellingPriceHistoryRepository
+                sellingPriceHistoryRepository,
+                "store-1"
         );
 
         product = new Product();
