@@ -15,6 +15,7 @@ import pl.commercelink.web.orders.NewOrderPage.DeliveryState;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -126,12 +127,11 @@ class NewOrderTemplateRenderingTest {
 
         // then
         assertThat(element(courierSame, "id=\"shipping-fields\""))
-                .contains("data-cl-variant-when=\"shipment!=PersonalCollection shippingAddress=other\"").contains("hidden");
-        assertThat(element(courierOther, "id=\"shipping-fields\"")).doesNotContain("hidden");
-        assertThat(element(pickup, "id=\"shipping-fields\"")).doesNotContain("hidden");
-        assertThat(element(collection, "id=\"shipping-fields\"")).contains("hidden");
-        assertThat(element(courierSame, "data-cl-variant-when=\"shipment=Courier\"")).startsWith("<fieldset").doesNotContain("hidden");
-        assertThat(element(pickup, "data-cl-variant-when=\"shipment=Courier\"")).contains("hidden");
+                .contains("data-cl-variant-when=\"shipment!=PersonalCollection shippingAddress=other\"");
+        for (String html : List.of(courierSame, courierOther, pickup, collection)) {
+            assertThat(element(html, "id=\"shipping-fields\"")).doesNotContain("hidden");
+            assertThat(element(html, "data-cl-variant-when=\"shipment=Courier\"")).startsWith("<fieldset").doesNotContain("hidden");
+        }
         assertThat(courierSame).containsSubsequence("data-cl-variant-when=\"shipment=Courier\"", ">Shipping address<",
                 "type=\"radio\" name=\"shippingAddress\"", ">To the billing address<", ">To another address<");
         assertThat(element(pickup, "data-cl-variant-when=\"shipment=PickupPoint\"")).doesNotContain("hidden");

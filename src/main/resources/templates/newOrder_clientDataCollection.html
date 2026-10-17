@@ -6,12 +6,12 @@
 <!--/* New order from a basket or an offer (OrdersController, web.orders.NewOrderPage / NewOrderForm). The server checks
        the form and answers with this page and its errors; the parts that depend on the delivery method and the shipping
        address choice are switched by variant-fields.js and rendered in the state of the model, so the page looks right
-       before the script runs. A part that holds a field error is never rendered hidden. */-->
+       before the script runs. Containers that hold inputs (the shipping address radios and #shipping-fields) are never rendered
+       hidden: without JavaScript every field must stay reachable, and variant-fields.js hides and disables them on load. */-->
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body is-form"
              th:with="type=${form.shipmentType != null ? form.shipmentType.name() : null},
-                      shippingErrors=${!errors.keySet().?[startsWith('shippingDetails.')].isEmpty()},
                       deliveryPrice=${#messages.msg('general.currency.amount', page.deliveryPrice())}">
             <th:block th:with="backLabel=${page.offer()} ? #{order.new.back.offer(${page.sourceName()})} : #{order.new.back.basket(${page.sourceName()})},
                                lead=${!page.offer()} ? #{order.new.lead.basket(${page.sourceName()})} : (${page.billingFromContact()} ? #{order.new.lead.offer.contact(${page.sourceName()})} : #{order.new.lead.offer(${page.sourceName()})})">
@@ -82,7 +82,7 @@
                                th:text="${page.offer()} ? #{order.new.mismatch.offer(${page.deliveryName()}, ${deliveryPrice})} : #{order.new.mismatch.basket(${page.deliveryName()}, ${deliveryPrice})}"></p>
                         </div>
 
-                        <fieldset class="cl-choice-group is-row" data-cl-variant-when="shipment=Courier" th:hidden="${type != 'Courier'}">
+                        <fieldset class="cl-choice-group is-row" data-cl-variant-when="shipment=Courier">
                             <legend class="cl-label" th:text="#{order.new.shippingAddress}"></legend>
                             <label class="cl-choice">
                                 <input type="radio" name="shippingAddress" value="same" th:checked="${shippingAddress != 'other'}"
@@ -101,8 +101,7 @@
 
                         <!--/* A pickup point switches the address radios off, so their condition is skipped and the fields show. */-->
                         <fieldset id="shipping-fields" class="cl-choice-group" th:attr="aria-label=#{order.new.shippingAddress}"
-                                  data-cl-variant-when="shipment!=PersonalCollection shippingAddress=other"
-                                  th:hidden="${!shippingErrors and (type == 'PersonalCollection' or (type == 'Courier' and shippingAddress != 'other'))}">
+                                  data-cl-variant-when="shipment!=PersonalCollection shippingAddress=other">
                             <div th:replace="~{orders/details/address :: addressGrid(${shipping}, null, false)}"></div>
                         </fieldset>
 

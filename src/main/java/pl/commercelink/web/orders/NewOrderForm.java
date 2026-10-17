@@ -96,11 +96,16 @@ public record NewOrderForm(ClientDataDto dto, String shippingAddress) {
 
     private ShippingDetails shippingToImport(BillingDetails billing, Basket basket) {
         ShipmentType type = dto.getShipmentType();
-        if (type == ShipmentType.Courier && shipsToOtherAddress()) {
+        if (shipsToOtherAddress()) {
             return postedShipping();
         }
         if (type == ShipmentType.PickupPoint && !isShippingEmptyExceptCountry()) {
-            return postedShipping();
+            ShippingDetails posted = postedShipping();
+            if (StringUtils.isBlank(posted.getCountry())) {
+                // A typed pickup address without a country is still a usable address: it is in the billing country.
+                posted.setCountry(StringUtils.defaultIfBlank(billing.getCountry(), "PL"));
+            }
+            return posted;
         }
         if (type == ShipmentType.Courier || type == ShipmentType.PickupPoint) {
             return copyOf(billing);

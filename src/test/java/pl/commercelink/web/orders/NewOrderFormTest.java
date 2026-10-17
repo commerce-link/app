@@ -230,4 +230,74 @@ class NewOrderFormTest {
         // then
         assertThat(form.shipsToOtherAddress()).isFalse();
     }
+
+    @Test
+    void pickupPointChecksShippingPhoneAndCountryFormats() {
+        // given
+        ShippingDetails badPhone = new ShippingDetails();
+        badPhone.setPhone("abc");
+        ShippingDetails badCountry = new ShippingDetails();
+        badCountry.setCountry("Niemcy");
+
+        // when
+        Map<String, String> phoneErrors = NewOrderForm.of(dto(ShipmentType.PickupPoint, person("Prosta 1"), badPhone), "same").validate();
+        Map<String, String> countryErrors = NewOrderForm.of(dto(ShipmentType.PickupPoint, person("Prosta 1"), badCountry), "same").validate();
+
+        // then
+        assertThat(phoneErrors).containsExactly(Map.entry("shippingDetails.phone", "billing.phone.invalid"));
+        assertThat(countryErrors).containsExactly(Map.entry("shippingDetails.country", "order.address.country.invalid"));
+    }
+
+    @Test
+    void nullFormDoesNotThrowAndReportsErrors() {
+        // when
+        Map<String, String> errors = NewOrderForm.of(null, null).validate();
+
+        // then
+        assertThat(errors).containsKeys("shipmentType", "paymentSource");
+    }
+
+    @Test
+    void importKeepsTheBillingTaxId() {
+        // given
+        BillingDetails billing = person("Prosta 1");
+        billing.setTaxId("5252525252");
+
+        // when
+        ClientDataDto result = NewOrderForm.of(dto(ShipmentType.Courier, billing, null), "same").toImport(null);
+
+        // then
+        assertThat(result.getBillingDetails().getTaxId()).isEqualTo("5252525252");
+    }
+
+    @Test
+    void countryNameIsRefusedForCourierToo() {
+        // given
+        BillingDetails billing = person("Prosta 1");
+        billing.setCountry("Polska");
+
+        // when
+        Map<String, String> errors = NewOrderForm.of(dto(ShipmentType.Courier, billing, null), "same").validate();
+
+        // then
+        assertThat(errors).containsEntry("billingDetails.country", "order.address.country.invalid");
+    }
+
+    @Test
+    void pickupPointWithTypedShippingAndNoCountryTakesTheBillingCountry() {
+        // given
+        ShippingDetails noCountry = new ShippingDetails();
+        noCountry.setCity("Gdansk");
+        BillingDetails noBillingCountry = person("Prosta 1");
+        noBillingCountry.setCountry("");
+
+        // when
+        ClientDataDto fromBilling = NewOrderForm.of(dto(ShipmentType.PickupPoint, person("Prosta 1"), noCountry), "same").toImport(null);
+        ClientDataDto fallback = NewOrderForm.of(dto(ShipmentType.PickupPoint, noBillingCountry, noCountry), "same").toImport(null);
+
+        // then
+        assertThat(fromBilling.getShippingDetails().getCity()).isEqualTo("Gdansk");
+        assertThat(fromBilling.getShippingDetails().getCountry()).isEqualTo("PL");
+        assertThat(fallback.getShippingDetails().getCountry()).isEqualTo("PL");
+    }
 }
