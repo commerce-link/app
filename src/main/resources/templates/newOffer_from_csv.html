@@ -1,87 +1,94 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{layout(ownsErrorMessage=true)}">
 <body>
 
-<div layout:fragment="content" class="container">
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions('/dashboard/offers', #{offers.new.back.offers}, #{offers.new.csv.title}, #{offers.new.csv.lead}, null)}"></div>
 
-    <form th:action="@{/dashboard/offer/new/csv}" th:object="${form}" enctype="multipart/form-data" method="post" class="box">
-        <h2 class="title is-4" th:text="#{offers.create.from.source}"></h2>
-        <div class="field">
-            <label class="label" for="orderReferenceType" th:text="#{client.order.reference.type}"></label>
-            <div class="control">
-                <input class="input" type="text" id="orderReferenceType" th:field="*{type}" readonly />
-            </div>
+            <form id="offer-new-csv-form" class="cl-form" th:action="@{/dashboard/offer/new/csv}" th:object="${form}"
+                  enctype="multipart/form-data" method="post" data-cl-form-check>
+                <div th:replace="~{fragments/offer-create :: serverError}"></div>
+                <div th:replace="~{fragments/settings-form :: formCheckSummary('offers.new.errors.title')}"></div>
+                <!--/* The importer is picked by type and CSV is the only one, so the operator never chooses it. */-->
+                <input type="hidden" name="type" th:value="*{type}">
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{offers.new.offer}"></legend>
+                        <div class="cl-form-grid">
+                            <!--/* With file-input.js the native input covers the whole field, so a click or a dropped file
+                                   reaches it directly; the script only writes the chosen file's name and size. Without the
+                                   script the plain native input shows. The chosen name is read out through aria-describedby.
+                                   The size limit is the multipart limit, checked before sending (form-check.js). */-->
+                            <div class="cl-field" data-cl-file-input-field>
+                                <label class="cl-label" for="csvFile"><span th:text="#{offers.new.csv.file}"></span></label>
+                                <div class="cl-file-input" data-cl-file-input
+                                     th:attr="data-empty-text=#{offers.new.csv.file.empty},data-change-text=#{offers.new.csv.file.change}">
+                                    <input class="cl-file" type="file" id="csvFile" name="csvFile" accept=".csv,text/csv" required
+                                           aria-describedby="csvFile-name csvFile-help"
+                                           th:attr="data-cl-required-message=#{offers.new.csv.file.required},
+                                                    data-cl-max-bytes=${uploadLimit?.toBytes()},
+                                                    data-cl-size-message=${uploadLimit == null ? null : #messages.msg('offers.new.csv.file.too.large', uploadLimit.toMegabytes())}">
+                                    <span class="cl-button cl-file-input-button" aria-hidden="true">
+                                        <span class="icon is-small"><i class="fas fa-upload"></i></span>
+                                        <span th:text="#{offers.new.csv.file.choose}"></span>
+                                    </span>
+                                    <span class="cl-file-input-icon" aria-hidden="true"><i class="fas fa-file-alt"></i></span>
+                                    <span class="cl-file-input-text" aria-hidden="true">
+                                        <span class="cl-file-input-name is-empty" id="csvFile-name" data-cl-file-input-name th:text="#{offers.new.csv.file.empty}"></span>
+                                        <span class="cl-file-input-meta" data-cl-file-input-meta th:text="#{offers.new.csv.file.drop}"></span>
+                                    </span>
+                                </div>
+                                <p class="cl-help" id="csvFile-help" th:text="#{offers.new.csv.file.help}"></p>
+                            </div>
+                        </div>
+                        <details class="cl-disclosure" id="offer-csv-format">
+                            <summary th:text="#{offers.new.csv.format}"></summary>
+                            <div class="cl-disclosure-body">
+                                <p class="cl-format-intro" th:text="#{offers.new.csv.format.intro}"></p>
+                                <table class="cl-table is-compact is-wrap cl-format-table">
+                                    <thead>
+                                    <tr>
+                                        <th scope="col" th:text="#{offers.new.csv.format.column}"></th>
+                                        <th scope="col" th:text="#{offers.new.csv.format.content}"></th>
+                                        <th scope="col" th:text="#{offers.new.csv.format.sample}"></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="i : ${#numbers.sequence(1, 7)}">
+                                        <th scope="row" th:text="${i} + '. ' + #{${'offers.new.csv.col' + i + '.name'}}"></th>
+                                        <td th:text="#{${'offers.new.csv.col' + i + '.desc'}}"></td>
+                                        <td class="cl-format-sample" th:text="#{${'offers.new.csv.col' + i + '.sample'}}"></td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                                <pre class="cl-code-block" th:attr="aria-label=#{offers.new.csv.format.example}"
+                                     th:text="#{offers.new.csv.format.example.content}"></pre>
+                                <p class="cl-format-download">
+                                    <a th:href="@{/files/offer-import-example.csv}" download>
+                                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-download"></i></span>
+                                        <span th:text="#{offers.new.csv.format.download}"></span>
+                                    </a>
+                                </p>
+                            </div>
+                        </details>
+                        <div class="cl-form-grid">
+                            <div th:replace="~{fragments/offer-create :: offerName(*{offerName}, false)}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset th:replace="~{fragments/offer-create :: contact('contactDetails.', *{contactDetails})}"></fieldset>
+                    <details th:replace="~{fragments/offer-create :: gclid(*{gclid})}"></details>
+                    <div th:replace="~{fragments/offer-create :: footer('/dashboard/offers')}"></div>
+                </div>
+            </form>
         </div>
-
-        <div class="field">
-            <label class="label" th:text="#{client.csv.file}"></label>
-            <div class="control">
-                <input class="input" type="file" th:field="*{csvFile}" accept=".csv" required>
-            </div>
-        </div>
-
-        <div class="field">
-            <label class="label" for="offerName" th:text="#{offers.name}">Offer Name</label>
-            <div class="control">
-                <input class="input" type="text" id="offerName" th:field="*{offerName}" required>
-            </div>
-        </div>
-
-        <fieldset class="box">
-            <legend class="label" th:text="#{offers.contact.title}"></legend>
-            <p class="help" th:text="#{offers.contact.subtitle}"></p>
-
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.name}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{contactDetails.name}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.surname}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{contactDetails.surname}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.company}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{contactDetails.companyName}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.email}"></label>
-                <div class="control">
-                    <input class="input" type="email" th:field="*{contactDetails.email}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.phone}"></label>
-                <div class="control">
-                    <input class="input" type="tel" th:field="*{contactDetails.phone}">
-                </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.gclid}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{gclid}">
-                </div>
-                <p class="help" th:text="#{offers.contact.gclid.help}"></p>
-            </div>
-            <p class="help" th:text="#{offers.contact.requirement}"></p>
-        </fieldset>
-
-        <div class="field">
-            <div class="control" style="margin-top: 20px">
-                <button class="button is-primary" type="submit" th:text="#{offers.create}"></button>
-                <a th:href="@{/dashboard/offers}" class="button is-light" th:text="#{general.cancel}"></a>
-            </div>
-        </div>
-    </form>
-
-
+    </section>
+    <script th:src="@{/js/file-input.js}" defer></script>
+    <script th:src="@{/js/form-check.js}" defer></script>
+    <script th:src="@{/js/error-summary.js}" defer></script>
 </div>
 
 </body>

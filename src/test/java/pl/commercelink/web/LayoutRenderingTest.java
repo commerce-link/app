@@ -49,6 +49,26 @@ class LayoutRenderingTest {
         return templateEngine().process(DECORATING_PAGE, context);
     }
 
+    private static final String PAGE_OWNING_ERRORS = "<html xmlns:th=\"http://www.thymeleaf.org\" "
+            + "xmlns:layout=\"http://www.ultraq.net.nz/thymeleaf/layout\" layout:decorate=\"~{layout(ownsErrorMessage=true)}\">"
+            + "<body><div layout:fragment=\"content\">" + CONTENT_MARKER + "</div></body></html>";
+
+    @Test
+    void showsTheErrorFlashAsABannerUnlessThePageShowsItItself() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+        context.setVariable("errorMessage", "Brakuje danych");
+
+        // when
+        String usual = render(context);
+        String owning = templateEngine().process(PAGE_OWNING_ERRORS, context);
+
+        // then
+        assertThat(usual).contains("notification is-danger is-small has-text-centered");
+        assertThat(owning).contains(CONTENT_MARKER).doesNotContain("notification is-danger");
+    }
+
     private WebContext webContext() {
         JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
         IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());

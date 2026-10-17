@@ -1538,6 +1538,205 @@ body.cl-drawer-open .cl-sidebar {
     border-color: var(--cl-bad);
 }
 
+/* File field (new offer from CSV): the frame of a text field, dashed until a file is chosen. The native input covers the
+   whole field with opacity 0, so a click and a dropped file reach it without JavaScript; file-input.js adds is-enhanced
+   and writes the file's name and size. Without the script the native input shows as .cl-file and the rest is hidden. */
+.cl-page .cl-file-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cl-page .cl-file-input:not(.is-enhanced) > :not(input) {
+    display: none;
+}
+
+.cl-page .cl-file-input.is-enhanced {
+    min-height: 52px;
+    padding: 7px 12px 7px 8px;
+    border: 1px dashed var(--cl-ink-3);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-file-input.is-enhanced > input[type=file] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.cl-page .cl-file-input.is-enhanced:hover,
+.cl-page .cl-file-input.is-enhanced:focus-within {
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-file-input.is-enhanced:focus-within {
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-page .cl-file-input.is-enhanced.has-file {
+    border-style: solid;
+    border-color: var(--cl-line);
+}
+
+.cl-page .cl-file-input.is-enhanced.is-dragover {
+    border-style: solid;
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-file-input.is-enhanced.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-page .cl-file-input-button {
+    flex: none;
+    pointer-events: none;
+}
+
+.cl-page .cl-file-input.is-enhanced:hover > .cl-file-input-button {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-file-input-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--cl-radius);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-file-input.is-enhanced:not(.has-file) > .cl-file-input-icon,
+.cl-page .cl-file-input.is-enhanced.has-file > .cl-file-input-button {
+    display: none;
+}
+
+.cl-page .cl-file-input-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-file-input-name {
+    overflow: hidden;
+    color: var(--cl-ink);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-file-input-name.is-empty {
+    color: var(--cl-ink-3);
+    font-weight: 400;
+}
+
+.cl-page .cl-file-input-meta {
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-file-input.is-enhanced {
+        min-height: 58px;
+    }
+}
+
+/* A message shown by a script stays out of the layout until then (.cl-field-error is display: flex). */
+.cl-page .cl-field-error[hidden] {
+    display: none;
+}
+
+/* A group note replaced by the rule's own message while the group shows it (form-check.js). */
+.cl-page .cl-fieldset > [data-cl-any-of-note][hidden] {
+    display: none;
+}
+
+/* The group title floats and only its next sibling clears it; that is the note, hidden while a rule message shows. */
+.cl-page .cl-fieldset > [data-cl-any-of] {
+    clear: both;
+}
+
+.cl-page .cl-fieldset > .cl-help + .cl-form-grid,
+.cl-page .cl-fieldset > .cl-field-error + .cl-form-grid {
+    margin-top: var(--cl-gap-fields);
+}
+
+.cl-page .cl-fieldset > .cl-field-error:not([hidden]) + .cl-field-error {
+    margin-top: 4px;
+}
+
+/* The sentence above an import format reads as help, not as a Bulma paragraph (specific enough to beat .content p). */
+.cl-page .cl-disclosure-body > p.cl-format-intro {
+    margin: 0 0 8px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* Several lines of a literal file or snippet (the example CSV); .cl-code is the one-line counterpart in running text. */
+.cl-page .cl-code-block {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* Columns of an import format: number and name, what to enter, an example value. */
+.cl-page .cl-format-table {
+    margin-top: 4px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-format-table tbody th {
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 500;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-format-table .cl-format-sample {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+}
+
+.cl-page .cl-disclosure-body > p.cl-format-download {
+    margin: 10px 0 0;
+}
+
+.cl-page .cl-format-download a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-format-download a {
+        min-height: 44px;
+    }
+}
+
 .cl-color-row {
     display: flex;
     flex-wrap: wrap;

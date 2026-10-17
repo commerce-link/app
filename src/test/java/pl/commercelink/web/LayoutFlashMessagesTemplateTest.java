@@ -9,7 +9,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Flash messages are rendered once, by the layout; pages decorated with it must not add their own copy. */
+/**
+ * Flash messages are rendered once, by the layout; pages decorated with it must not add their own copy. A page that shows
+ * errorMessage in its content instead turns the banner off with layout(ownsErrorMessage=true).
+ */
 class LayoutFlashMessagesTemplateTest {
 
     private static final List<String> LAYOUT_PAGES = List.of("deliveries", "deliveries/details", "deliveries/create/items",
@@ -26,7 +29,7 @@ class LayoutFlashMessagesTemplateTest {
 
         // then
         assertThat(layout).contains("<div th:if=\"${successMessage}\" class=\"notification is-success is-small has-text-centered\">");
-        assertThat(layout).contains("<div th:if=\"${errorMessage}\" class=\"notification is-danger is-small has-text-centered\">");
+        assertThat(layout).contains("<div th:if=\"${errorMessage} and ${ownsErrorMessage != true}\" class=\"notification is-danger is-small has-text-centered\">");
         assertThat(layout).contains("<div th:if=\"${warningMessage}\" class=\"notification is-warning is-small has-text-centered\">");
     }
 
