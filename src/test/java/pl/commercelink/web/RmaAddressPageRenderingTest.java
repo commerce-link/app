@@ -27,7 +27,7 @@ class RmaAddressPageRenderingTest {
     @Test
     void rendersTheHeaderTheFieldsAndTheFooterWithoutBulma() {
         // when
-        String html = render(new RmaAddressPage("rma-123456789", "rma-1234", "ord-5678", form(), false, false, false, false));
+        String html = render(new RmaAddressPage("rma-123456789", "rma-1234", "ord-5678", form(), false, false, false, false, false));
 
         // then
         assertThat(html).doesNotContain("??").doesNotContain("\"button is-primary").doesNotContain("class=\"box")
@@ -38,6 +38,7 @@ class RmaAddressPageRenderingTest {
         assertThat(html).contains("name=\"shippingDetails.name\"").contains("value=\"Jan\"")
                 .contains("name=\"shippingDetails.companyName\"").contains("name=\"shippingDetails.phone\"")
                 .contains("type=\"tel\"").contains("type=\"email\"").contains("autocomplete=\"off\"");
+        assertThat(html.split("maxlength=\"100\"", -1)).hasSize(10);
         assertThat(html).contains("Save address").contains("cl-card-footer");
         assertThat(html).doesNotContain("Fill with the order").doesNotContain("cl-alert");
     }
@@ -45,7 +46,7 @@ class RmaAddressPageRenderingTest {
     @Test
     void offersTheOrderAddressAndWarnsWhenTheRmaHasNone() {
         // when
-        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", RmaAddressForm.of(null), true, false, true, false));
+        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", RmaAddressForm.of(null), true, false, true, false, false));
 
         // then
         assertThat(html).contains("href=\"/dashboard/rma/rma-1/shipping?fill=order\"").contains("Fill with the order address");
@@ -56,7 +57,7 @@ class RmaAddressPageRenderingTest {
     @Test
     void confirmsAFilledAddressIsNotSavedYet() {
         // when
-        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", form(), false, true, false, false));
+        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", form(), false, true, false, false, false));
 
         // then
         assertThat(html).contains("cl-alert is-info").contains("ord-5678").contains("check it and save");
@@ -66,12 +67,14 @@ class RmaAddressPageRenderingTest {
     void explainsWhyTheOperatorLandedHereFromShipToClient() {
         // when
         RmaAddressForm withErrors = RmaAddressForm.of(null).withErrors(RmaAddressForm.of(null).validate(null));
-        String html = render(new RmaAddressPage("rma-1", "rma-1", null, withErrors, false, false, true, true));
+        String html = render(new RmaAddressPage("rma-1", "rma-1", null, withErrors, false, false, true, true, true));
 
-        // then
-        assertThat(html).contains("Complete the address to ship the goods to the customer");
-        assertThat(html).doesNotContain("has no return address yet");
-        assertThat(html).doesNotContain("data-cl-error-summary").doesNotContain("Nothing was saved");
+        // then: a focused summary (read out by a screen reader) that does not claim a save failed
+        assertThat(html).contains("data-cl-error-summary").contains("Complete the address to ship the goods to the customer:")
+                .contains("href=\"#shippingDetails.phone\"");
+        assertThat(html).doesNotContain("Changes were not saved").doesNotContain("has no return address yet")
+                .doesNotContain("cl-alert is-warn");
+        assertThat(html).contains("<input type=\"hidden\" name=\"shipToClient\" value=\"true\">");
         assertThat(html).contains("id=\"shippingDetails.phone\"").contains("aria-invalid=\"true\"");
     }
 
@@ -81,21 +84,43 @@ class RmaAddressPageRenderingTest {
         RmaAddressForm withErrors = RmaAddressForm.of(null).withErrors(RmaAddressForm.of(null).validate(null));
 
         // when
-        String html = render(new RmaAddressPage("rma-1", "rma-1", null, withErrors, false, false, true, false));
+        String html = render(new RmaAddressPage("rma-1", "rma-1", null, withErrors, false, false, true, false, false));
 
-        // then
-        assertThat(html).contains("data-cl-error-summary").contains("href=\"#shippingDetails.phone\"")
-                .contains("aria-invalid=\"true\"");
+        // then: the summary says what is missing, so the "no address yet" warning would only push the save button down
+        assertThat(html).contains("data-cl-error-summary").contains("Changes were not saved")
+                .contains("href=\"#shippingDetails.phone\"").contains("aria-invalid=\"true\"");
+        assertThat(html).doesNotContain("has no return address yet").doesNotContain("name=\"shipToClient\"");
     }
 
     @Test
     void putsNameSurnameAndCompanyInOneRow() {
         // when
-        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", form(), false, false, false, false));
+        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", form(), false, false, false, false, false));
 
         // then
         for (String field : new String[]{"name", "surname", "companyName"}) {
             assertThat(html).containsPattern("cl-span-2[^>]*>\\s*<div class=\"cl-field\">\\s*<label[^>]*for=\"shippingDetails." + field + "\"");
         }
+    }
+
+    @Test
+    void anRmaWithoutAnyAddressArrivingFromShipToClientGetsOneFocusedNotice() {
+        // when
+        String html = render(new RmaAddressPage("rma-1", "rma-1", null, RmaAddressForm.of(null), false, false, true, true, true));
+
+        // then: the notice takes the focus in place of a summary, and no field is marked before anything is submitted
+        assertThat(html).containsPattern("class=\"cl-alert is-warn\"[^>]*tabindex=\"-1\"[^>]*data-cl-error-summary");
+        assertThat(html).contains("Complete the address to ship the goods to the customer. This RMA has no return address yet.");
+        assertThat(html).doesNotContain("aria-invalid").doesNotContain("cl-alert is-bad");
+        assertThat(html).contains("name=\"shipToClient\"");
+    }
+
+    @Test
+    void theNoAddressNoticeOfAPlainVisitIsNotFocused() {
+        // when
+        String html = render(new RmaAddressPage("rma-1", "rma-1", "ord-5678", RmaAddressForm.of(null), true, false, true, false, false));
+
+        // then
+        assertThat(html).contains("cl-alert is-warn").doesNotContain("data-cl-error-summary").doesNotContain("tabindex=\"-1\"");
     }
 }

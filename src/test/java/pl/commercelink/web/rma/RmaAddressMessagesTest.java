@@ -21,6 +21,7 @@ class RmaAddressMessagesTest {
     private static final Path[] FILES = {
             Path.of("src/main/resources/templates/rma/address.html"),
             Path.of("src/main/java/pl/commercelink/web/rma/RmaAddressForm.java"),
+            Path.of("src/main/java/pl/commercelink/web/rma/RmaAddressPage.java"),
             Path.of("src/main/java/pl/commercelink/orders/rma/RMAController.java")};
 
     private static Properties load(String file) throws Exception {

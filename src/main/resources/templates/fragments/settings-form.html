@@ -5,11 +5,16 @@
 <!--/* Error summary above a settings form. errors maps a field id to the message key of its error, in page order;
        labels (or null) maps a field id to a label prepended to the message, for fields whose labels are not message
        keys (provider settings). Focused after a failed save, links move to the fields. */-->
-<div th:fragment="errorSummary(id, errors, labels)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
-     tabindex="-1" data-cl-error-summary>
+<div th:fragment="errorSummary(id, errors, labels)"
+     th:replace="~{fragments/settings-form :: errorSummaryTitled(${id}, ${errors}, ${labels}, 'form.errors.title')}"></div>
+
+<!--/* errorSummary with its own title key, for a page that shows errors nobody submitted (an RMA address that "Ship to
+       client" refused): form.errors.title would say changes were not saved. */-->
+<div th:fragment="errorSummaryTitled(id, errors, labels, titleKey)" th:if="${!errors.isEmpty()}" th:id="${id}"
+     class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
     <div>
-        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
         <ul class="cl-alert-list">
             <li th:each="error : ${errors}">
                 <a th:href="'#' + ${error.key}"

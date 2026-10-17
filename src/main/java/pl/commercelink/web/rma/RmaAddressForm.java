@@ -16,13 +16,22 @@ import java.util.stream.Stream;
  * "Ship to client" needs (ShippingDetails#isProperlyFilled) is required whether changed or not: an address without
  * them would be saved only to be refused when the parcel is booked. Formats (country code, email, phone) are checked
  * only on a field the operator changed, as on the order's address form, so a marketplace address with a country name
- * does not block correcting the street.
+ * does not block correcting the street. A person is named by the first name or the company (the surname alone would be
+ * shown as "null Kowalski" by ShippingDetails#getFullName). A changed value is limited to MAX_LENGTH characters, the
+ * limit of the customer's own address change: without one a pasted text could grow the RMA past DynamoDB's item size.
+ * A changed value may not contain "<" or ">", as on the customer's address change: the address goes on to the carrier's
+ * label and to e-mail templates the stores edit themselves, where markup would not be escaped by this page.
  */
 public record RmaAddressForm(String name, String surname, String companyName, String streetAndNumber,
                              String postalCode, String city, String country, String email, String phone,
                              Map<String, String> errors) {
 
+    public static final int MAX_LENGTH = 100;
+    static final String TOO_LONG = "rma.address.too.long";
+    static final String MARKUP = "rma.address.no.markup";
+
     private static final Pattern COUNTRY = Pattern.compile("[A-Z]{2}");
+    private static final Locale POLISH = Locale.forLanguageTag("pl");
 
     public static RmaAddressForm of(ShippingDetails details) {
         ShippingDetails d = details != null ? details : new ShippingDetails();
@@ -33,6 +42,11 @@ public record RmaAddressForm(String name, String surname, String companyName, St
     /** The posted name of a field, also its id. */
     public static String field(String property) {
         return "shippingDetails." + property;
+    }
+
+    /** MAX_LENGTH for the template, which may not reach static fields. */
+    public int maxLength() {
+        return MAX_LENGTH;
     }
 
     public String error(String property) {
@@ -49,7 +63,7 @@ public record RmaAddressForm(String name, String surname, String companyName, St
         ShippingDetails s = saved != null ? saved : new ShippingDetails();
         boolean nothingSaved = saved == null;
         Map<String, String> found = new LinkedHashMap<>();
-        if (StringUtils.isBlank(name) && StringUtils.isBlank(surname) && StringUtils.isBlank(companyName)) {
+        if (StringUtils.isBlank(name) && StringUtils.isBlank(companyName)) {
             found.put(field("name"), "order.address.name.or.company.required");
         }
         require(found, "streetAndNumber", streetAndNumber, "billing.street.required");
@@ -67,7 +81,47 @@ public record RmaAddressForm(String name, String surname, String companyName, St
                 && !OrderAddressForm.isPhone(phone)) {
             found.put(field("phone"), "billing.phone.invalid");
         }
-        return found;
+        return withTextErrors(found, s, nothingSaved);
+    }
+
+    /** The order's address put in the form: a country name ("Polska", "Poland") becomes its code, unknown text stays. */
+    public RmaAddressForm withCountryCode() {
+        return new RmaAddressForm(name, surname, companyName, streetAndNumber, postalCode, city, countryCode(country), email,
+                phone, errors);
+    }
+
+    static String countryCode(String value) {
+        String trimmed = StringUtils.trimToEmpty(value);
+        if (COUNTRY.matcher(trimmed.toUpperCase(Locale.ROOT)).matches()) {
+            return trimmed.toUpperCase(Locale.ROOT);
+        }
+        for (String code : Locale.getISOCountries()) {
+            Locale country = new Locale("", code);
+            if (trimmed.equalsIgnoreCase(country.getDisplayCountry(POLISH)) || trimmed.equalsIgnoreCase(country.getDisplayCountry(Locale.ENGLISH))) {
+                return code;
+            }
+        }
+        return value;
+    }
+
+    /** found with an error added, in form order, on each changed field with "<" or ">" or longer than MAX_LENGTH. */
+    private Map<String, String> withTextErrors(Map<String, String> found, ShippingDetails saved, boolean nothingSaved) {
+        String[][] fields = {{"name", name, saved.getName()}, {"surname", surname, saved.getSurname()},
+                {"companyName", companyName, saved.getCompanyName()}, {"streetAndNumber", streetAndNumber, saved.getStreetAndNumber()},
+                {"postalCode", postalCode, saved.getPostalCode()}, {"city", city, saved.getCity()},
+                {"country", country, saved.getCountry()}, {"email", email, saved.getEmail()}, {"phone", phone, saved.getPhone()}};
+        Map<String, String> ordered = new LinkedHashMap<>();
+        for (String[] f : fields) {
+            String key = found.get(field(f[0]));
+            if (key == null && changed(f[1], f[2], nothingSaved)) {
+                String value = StringUtils.trimToEmpty(f[1]);
+                key = StringUtils.containsAny(value, '<', '>') ? MARKUP : value.length() > MAX_LENGTH ? TOO_LONG : null;
+            }
+            if (key != null) {
+                ordered.put(field(f[0]), key);
+            }
+        }
+        return ordered;
     }
 
     /** The address to store: the saved one's id and default flag kept, values trimmed, a newly typed country in capitals. */
@@ -87,7 +141,7 @@ public record RmaAddressForm(String name, String surname, String companyName, St
         RmaAddressForm o = of(other);
         return Stream.of(new String[][]{{name, o.name}, {surname, o.surname}, {companyName, o.companyName},
                         {streetAndNumber, o.streetAndNumber}, {postalCode, o.postalCode}, {city, o.city},
-                        {country, o.country}, {email, o.email}, {phone, o.phone}})
+                        {normalizedCountry(country), normalizedCountry(o.country)}, {email, o.email}, {phone, o.phone}})
                 .anyMatch(pair -> !Objects.equals(StringUtils.trimToEmpty(pair[0]), StringUtils.trimToEmpty(pair[1])));
     }
 

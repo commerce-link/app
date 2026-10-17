@@ -535,7 +535,7 @@ class RMAControllerTest {
                 endpoint("updateShippingDetails", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShippingDetails(new ShippingDetails());
-                    c.updateShippingDetails(RMA_ID, postedRma, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
+                    c.updateShippingDetails(RMA_ID, postedRma, false, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
                 }),
                 endpoint("updateShipments", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);

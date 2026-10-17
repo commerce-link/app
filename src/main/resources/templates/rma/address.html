@@ -14,13 +14,11 @@
             <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
             <p class="cl-alert-text" th:text="#{rma.address.filled(${p.orderShortId()})}"></p>
         </div>
-        <div th:if="${p.incompleteForShipping()}" class="cl-alert is-warn">
+        <!--/* Focused like an error summary (error-summary.js) when "Ship to client" sent the operator here. */-->
+        <div th:if="${p.showMissingWarning()}" class="cl-alert is-warn"
+             th:attr="tabindex=${p.focusMissingWarning()} ? '-1' : null, data-cl-error-summary=${p.focusMissingWarning()} ? 'true' : null">
             <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-text" th:text="#{rma.address.incomplete.for.shipping}"></p>
-        </div>
-        <div th:if="${p.missing() and !p.filled() and !p.incompleteForShipping()}" class="cl-alert is-warn">
-            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-text" th:text="${p.fillAvailable()} ? #{rma.address.missing.with.order} : #{rma.address.missing}"></p>
+            <p class="cl-alert-text" th:text="#{${p.missingWarningKey()}}"></p>
         </div>
 
         <section class="cl-card" aria-labelledby="rma-address-title">
@@ -38,20 +36,18 @@
                   th:with="a=${p.form()}"
                   th:action="@{/dashboard/rma/{r}/updateShippingDetails(r=${p.rmaId()})}">
                 <div class="cl-card-inset">
-                    <!--/* Arriving from "Ship to client" nothing was submitted, so "not saved" would be false; the field errors and the alert above say what is missing. */-->
-                    <th:block th:unless="${p.incompleteForShipping()}">
-                        <div th:replace="~{fragments/settings-form :: errorSummary('rma-address-errors', ${a.errors()}, null)}"></div>
-                    </th:block>
+                    <div th:replace="~{fragments/settings-form :: errorSummaryTitled('rma-address-errors', ${a.errors()}, null, ${p.errorSummaryTitleKey()})}"></div>
+                    <input th:if="${p.shipToClient()}" type="hidden" name="shipToClient" value="true">
                     <div class="cl-form-grid cl-card-grid">
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null)}"></div>
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null)}"></div>
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null)}"></div>
-                        <div th:insert="~{fragments/settings-form :: textField('shippingDetails.streetAndNumber', 'order.address.street', ${a.streetAndNumber()}, 'text', 'off', true, ${a.error('streetAndNumber')}, null)}"></div>
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.postalCode', 'order.address.postal', ${a.postalCode()}, 'text', 'off', true, ${a.error('postalCode')}, null)}"></div>
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.city', 'order.address.city', ${a.city()}, 'text', 'off', true, ${a.error('city')}, null)}"></div>
-                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.country', 'order.address.country', ${a.country()}, 'text', 'off', true, ${a.error('country')}, #{order.address.country.help})}"></div>
-                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.email', 'order.address.email', ${a.email()}, 'email', 'off', true, ${a.error('email')}, null)}"></div>
-                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.phone', 'order.address.phone', ${a.phone()}, 'tel', 'off', true, ${a.error('phone')}, null)}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.streetAndNumber', 'order.address.street', ${a.streetAndNumber()}, 'text', 'off', true, ${a.error('streetAndNumber')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.postalCode', 'order.address.postal', ${a.postalCode()}, 'text', 'off', true, ${a.error('postalCode')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.city', 'order.address.city', ${a.city()}, 'text', 'off', true, ${a.error('city')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.country', 'order.address.country', ${a.country()}, 'text', 'off', true, ${a.error('country')}, #{order.address.country.help}, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.email', 'order.address.email', ${a.email()}, 'email', 'off', true, ${a.error('email')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.phone', 'order.address.phone', ${a.phone()}, 'tel', 'off', true, ${a.error('phone')}, null, null, null, false, ${a.maxLength()})}"></div>
                     </div>
                 </div>
                 <div class="cl-card-footer">

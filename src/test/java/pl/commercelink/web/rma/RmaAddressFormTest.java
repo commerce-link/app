@@ -182,4 +182,92 @@ class RmaAddressFormTest {
         assertThat(RmaAddressForm.hasAnyValue(ShippingDetails._default())).isFalse();
         assertThat(RmaAddressForm.hasAnyValue(complete())).isTrue();
     }
+
+    @Test
+    void aSurnameAloneDoesNotNameThePerson() {
+        // given: getFullName() would print "null Kowalski" on the customer's page
+        ShippingDetails d = complete();
+        d.setName(" ");
+
+        // when
+        Map<String, String> errors = posted(d).validate(null);
+
+        // then
+        assertThat(errors).containsExactly(Map.entry("shippingDetails.name", "order.address.name.or.company.required"));
+    }
+
+    @Test
+    void aChangedValueLongerThanTheLimitIsRefusedInFormOrder() {
+        // given
+        ShippingDetails d = complete();
+        d.setStreetAndNumber("U".repeat(RmaAddressForm.MAX_LENGTH + 1));
+        d.setEmail("e".repeat(RmaAddressForm.MAX_LENGTH) + "@example.com");
+        d.setCompanyName("C".repeat(RmaAddressForm.MAX_LENGTH));
+
+        // when
+        Map<String, String> errors = posted(d).validate(complete());
+
+        // then
+        assertThat(errors).containsExactly(
+                Map.entry("shippingDetails.streetAndNumber", "rma.address.too.long"),
+                Map.entry("shippingDetails.email", "rma.address.too.long"));
+    }
+
+    @Test
+    void anUnchangedLongValueFromEarlierDataIsNotRefused() {
+        // given
+        ShippingDetails saved = complete();
+        saved.setStreetAndNumber("U".repeat(200));
+
+        // then
+        assertThat(posted(saved).validate(saved)).isEmpty();
+    }
+
+    @Test
+    void aCountryNameFromTheOrderBecomesItsCode() {
+        // then
+        assertThat(RmaAddressForm.countryCode("Polska")).isEqualTo("PL");
+        assertThat(RmaAddressForm.countryCode(" poland ")).isEqualTo("PL");
+        assertThat(RmaAddressForm.countryCode("Niemcy")).isEqualTo("DE");
+        assertThat(RmaAddressForm.countryCode("de")).isEqualTo("DE");
+        assertThat(RmaAddressForm.countryCode("Atlantyda")).isEqualTo("Atlantyda");
+        assertThat(RmaAddressForm.countryCode(null)).isNull();
+    }
+
+    @Test
+    void differsFromIgnoresTheCaseOfTheCountry() {
+        // given
+        ShippingDetails lower = complete();
+        lower.setCountry("pl");
+
+        // then
+        assertThat(posted(lower).differsFrom(complete())).isFalse();
+    }
+
+    @Test
+    void aChangedValueWithMarkupIsRefusedWhileQuotesAndAmpersandsAreKept() {
+        // given
+        ShippingDetails d = complete();
+        d.setName("<script>alert(1)</script>");
+        d.setCompanyName("Kowalski & Syn \"O'Brien\"");
+        d.setCity("Łódź >");
+
+        // when
+        Map<String, String> errors = posted(d).validate(complete());
+
+        // then
+        assertThat(errors).containsExactly(
+                Map.entry("shippingDetails.name", "rma.address.no.markup"),
+                Map.entry("shippingDetails.city", "rma.address.no.markup"));
+    }
+
+    @Test
+    void markupSavedEarlierDoesNotBlockASave() {
+        // given
+        ShippingDetails saved = complete();
+        saved.setCompanyName("<b>Firma</b>");
+
+        // then
+        assertThat(posted(saved).validate(saved)).isEmpty();
+    }
 }

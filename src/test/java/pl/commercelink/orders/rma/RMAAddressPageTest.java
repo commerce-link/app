@@ -88,9 +88,13 @@ class RMAAddressPageTest {
     }
 
     private String post(RMA posted, ExtendedModelMap model) {
+        return post(posted, false, model);
+    }
+
+    private String post(RMA posted, boolean shipToClient, ExtendedModelMap model) {
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            return controller.updateShippingDetails(RMA_ID, posted, model, redirectAttributes, Locale.ENGLISH);
+            return controller.updateShippingDetails(RMA_ID, posted, shipToClient, model, redirectAttributes, Locale.ENGLISH);
         }
     }
 
@@ -226,6 +230,8 @@ class RMAAddressPageTest {
         // then
         RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
         assertThat(page.incompleteForShipping()).isTrue();
+        assertThat(page.shipToClient()).isTrue();
+        assertThat(page.errorSummaryTitleKey()).isEqualTo("rma.address.incomplete.for.shipping");
         assertThat(page.form().errors()).containsOnlyKeys("shippingDetails.phone");
     }
 
@@ -308,5 +314,78 @@ class RMAAddressPageTest {
         assertThat(existing.getShippingDetails().getId()).isEqualTo("addr-1");
         assertThat(existing.getEmail()).isEqualTo("buyer@example.com");
         verify(redirectAttributes).addFlashAttribute("successMessage", "saved");
+    }
+
+    @Test
+    void fillingWithAnOrderAddressTurnsItsCountryNameIntoTheCode() {
+        // given: a marketplace order keeps the country as the marketplace sent it
+        ShippingDetails marketplace = address("Kraków");
+        marketplace.setCountry("Polska");
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(null));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWith(marketplace));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        get("order", model);
+
+        // then
+        RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
+        assertThat(page.form().country()).isEqualTo("PL");
+        assertThat(page.form().validate(null)).isEmpty();
+    }
+
+    @Test
+    void aFailedSaveAfterShipToClientKeepsTheFlagAndTheUsualSummaryTitle() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(null));
+        RMA posted = new RMA(STORE_ID);
+        posted.setShippingDetails(address("Kraków"));
+        posted.getShippingDetails().setPhone(null);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        post(posted, true, model);
+
+        // then
+        RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
+        assertThat(page.shipToClient()).isTrue();
+        assertThat(page.incompleteForShipping()).isFalse();
+        assertThat(page.errorSummaryTitleKey()).isEqualTo("form.errors.title");
+        assertThat(page.showMissingWarning()).isFalse();
+    }
+
+    @Test
+    void aSaveAfterShipToClientSaysToSelectTheItemsAgain() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(null));
+        when(messageSource.getMessage(eq("rma.address.saved.ship.again"), any(), any())).thenReturn("select again");
+        RMA posted = new RMA(STORE_ID);
+        posted.setShippingDetails(address("Kraków"));
+
+        // when
+        String view = post(posted, true, new ExtendedModelMap());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
+        verify(redirectAttributes).addFlashAttribute("successMessage", "select again");
+    }
+
+    @Test
+    void comingFromShipToClientWithoutAnyAddressShowsOneNoticeInsteadOfFieldErrors() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(openRma(null));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderWith(address("Gdańsk")));
+        ExtendedModelMap model = new ExtendedModelMap();
+        model.addAttribute(RMAController.ADDRESS_INCOMPLETE_FLASH, true);
+
+        // when
+        get(null, model);
+
+        // then
+        RmaAddressPage page = (RmaAddressPage) model.getAttribute("page");
+        assertThat(page.form().errors()).isEmpty();
+        assertThat(page.focusMissingWarning()).isTrue();
+        assertThat(page.missingWarningKey()).isEqualTo("rma.address.missing.for.shipping.with.order");
+        assertThat(page.shipToClient()).isTrue();
     }
 }

@@ -120,13 +120,14 @@ public class RMAController {
         }
         ShippingDetails orderAddress = orderAddressOf(rma);
         boolean filled = "order".equals(fill) && orderAddress != null;
-        RmaAddressForm form = RmaAddressForm.of(filled ? orderAddress : rma.getShippingDetails());
+        RmaAddressForm form = filled ? RmaAddressForm.of(orderAddress).withCountryCode() : RmaAddressForm.of(rma.getShippingDetails());
         boolean incomplete = Boolean.TRUE.equals(model.getAttribute(ADDRESS_INCOMPLETE_FLASH));
-        if (incomplete) {
+        if (incomplete && RmaAddressForm.hasAnyValue(rma.getShippingDetails())) {
             // against the saved address only the missing fields are reported; passing null would also flag the format of values nobody touched
             form = form.withErrors(form.validate(rma.getShippingDetails()));
         }
-        return addressPage(rma, form, orderAddress, filled, incomplete, model);
+        // an RMA with no address at all gets one notice instead of an error on every field nobody has touched yet
+        return addressPage(rma, form, orderAddress, filled, incomplete, incomplete, model);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}")
@@ -397,8 +398,9 @@ public class RMAController {
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShippingDetails")
-    public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma, Model model,
-                                        RedirectAttributes redirectAttributes, Locale locale) {
+    public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
+                                        @RequestParam(name = RmaAddressPage.SHIP_TO_CLIENT_PARAM, required = false) boolean shipToClient,
+                                        Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
         if (blocked.isPresent()) {
@@ -407,20 +409,22 @@ public class RMAController {
         RmaAddressForm form = RmaAddressForm.of(updatedRma.getShippingDetails());
         Map<String, String> errors = form.validate(existingRma.getShippingDetails());
         if (!errors.isEmpty()) {
-            return addressPage(existingRma, form.withErrors(errors), orderAddressOf(existingRma), false, false, model);
+            return addressPage(existingRma, form.withErrors(errors), orderAddressOf(existingRma), false, false, shipToClient, model);
         }
         existingRma.setShippingDetails(form.applyTo(existingRma.getShippingDetails()));
         rmaRepository.save(existingRma);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.address.saved", null, locale));
+        // the item selection was lost on the way here from "Ship to client": the details page is where it is made again
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage(shipToClient ? "rma.address.saved.ship.again" : "rma.address.saved", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
     private String addressPage(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
-                               boolean incomplete, Model model) {
+                               boolean incomplete, boolean shipToClient, Model model) {
         boolean fillAvailable = !filled && orderAddress != null && form.differsFrom(orderAddress);
         model.addAttribute("page", new RmaAddressPage(rma.getRmaId(), RmaAddressPage.shortId(rma.getRmaId()),
                 RmaAddressPage.shortId(rma.getOrderId()), form, fillAvailable, filled,
-                !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete));
+                !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete, shipToClient));
         return "rma/address";
     }
 
