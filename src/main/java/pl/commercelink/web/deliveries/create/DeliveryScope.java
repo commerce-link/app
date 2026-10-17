@@ -69,8 +69,6 @@ public interface DeliveryScope {
     /** Records a delivery ordered outside the system; the payload is the delivery id. */
     OperationResult<String> save(DeliveryCreationForm form);
 
-    /** Dropship only: hands the unticked lines back without creating a delivery. */
-    default void releaseUnselected(DeliveryCreationForm form) {
-        throw new UnsupportedOperationException("Releasing without a delivery is a dropship action");
-    }
+    /** Hands the unticked lines back without creating a delivery. */
+    void releaseUnselected(DeliveryCreationForm form);
 }

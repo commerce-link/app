@@ -54,6 +54,10 @@ public record DeliveryCreateLinks(String base, String provider, String orderId, 
         return root() + "/manual";
     }
 
+    public String releaseAll() {
+        return root() + "/release-all";
+    }
+
     public String save() {
         return root() + "/manual/save";
     }

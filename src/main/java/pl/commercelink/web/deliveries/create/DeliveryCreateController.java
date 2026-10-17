@@ -119,6 +119,24 @@ public class DeliveryCreateController {
         return showStepOneAfterBack(storeId, provider, orderId, from, form, binding, model, flash, locale);
     }
 
+    @PostMapping(STORE + "/release-all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String releaseAll(@PathVariable("provider") String provider,
+                             @RequestParam(value = "order", required = false) String orderId,
+                             @RequestParam(value = "from", required = false) String from,
+                             RedirectAttributes flash, Locale locale) {
+        return releaseAllAllocations(storeId(), provider, orderId, from, flash, locale);
+    }
+
+    @PostMapping(SUPER + "/release-all")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String releaseAllForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("provider") String provider,
+                                          @RequestParam(value = "order", required = false) String orderId,
+                                          @RequestParam(value = "from", required = false) String from,
+                                          RedirectAttributes flash, Locale locale) {
+        return releaseAllAllocations(storeId, provider, orderId, from, flash, locale);
+    }
+
     // ---- step 2, outside the system
 
     @PostMapping(STORE + "/manual")
@@ -393,6 +411,21 @@ public class DeliveryCreateController {
             addPage(model, scope, links, form);
             model.addAttribute("errors", Map.of());
             return "deliveries/create/manual";
+        });
+    }
+
+    /** The one-click form of unticking every planned line of a warehouse batch and releasing the unticked ones. */
+    private String releaseAllAllocations(String storeId, String provider, String orderId, String from,
+                                         RedirectAttributes flash, Locale locale) {
+        DeliveryCreateLinks links = links(storeId, provider, orderId, from);
+        return withScope(storeId, provider, links, flash, locale, scope -> {
+            DeliveryCreationForm planned = scope.plannedForm();
+            if (planned != null) {
+                planned.getItems().forEach(item -> item.getAllocations().forEach(allocation -> allocation.setSelected(false)));
+                scope.releaseUnselected(planned);
+                flash.addFlashAttribute("successMessage", message("orders.dropship.unselectedReleased", locale));
+            }
+            return "redirect:" + (links.dropship() ? links.order() : links.preview());
         });
     }
 
