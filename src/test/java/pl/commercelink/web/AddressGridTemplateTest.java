@@ -26,7 +26,7 @@ class AddressGridTemplateTest {
         Context context = contextFor(form());
 
         // when
-        String html = render("null", context);
+        String html = render("null", "false", context);
 
         // then
         assertThat(html).contains("billingDetails.city").doesNotContain("data-cl-variant-when");
@@ -38,10 +38,11 @@ class AddressGridTemplateTest {
         Context context = contextFor(form().withErrors(Map.of("billingDetails.city", "billing.city.required")));
 
         // when
-        String html = render("'" + CONDITION + "'", context);
+        String html = render("'" + CONDITION + "'", "false", context);
 
         // then
         assertThat(count(html, "data-cl-variant-when=\"" + CONDITION + "\"")).isEqualTo(4);
+        assertThat(html).doesNotContain("hidden=\"hidden\"");
         for (String field : new String[]{"streetAndNumber", "postalCode", "city", "country"}) {
             assertThat(labelOf(html, "billingDetails." + field)).contains("data-cl-variant-when=\"" + CONDITION + "\"");
         }
@@ -55,7 +56,7 @@ class AddressGridTemplateTest {
         Context context = contextFor(form());
 
         // when
-        String html = render("'" + CONDITION + "'", context);
+        String html = render("'" + CONDITION + "'", "false", context);
 
         // then
         Matcher city = Pattern.compile("<input[^>]*id=\"billingDetails.city\"[^>]*>").matcher(html);
@@ -63,9 +64,21 @@ class AddressGridTemplateTest {
         assertThat(city.group()).doesNotContain("required");
     }
 
-    private String render(String optionalWhen, Context context) {
+    @Test
+    void optionalNotesAreRenderedHiddenWhenTheConditionFails() {
+        // given
+        Context context = contextFor(form());
+
+        // when
+        String html = render("'" + CONDITION + "'", "true", context);
+
+        // then
+        assertThat(count(html, "data-cl-variant-when=\"" + CONDITION + "\" hidden=\"hidden\"")).isEqualTo(4);
+    }
+
+    private String render(String optionalWhen, String optionalHidden, Context context) {
         return engine.process("<div th:replace=\"~{orders/details/address :: addressGrid(${address}, " + optionalWhen
-                + ")}\"></div>", context);
+                + ", " + optionalHidden + ")}\"></div>", context);
     }
 
     private static OrderAddressForm form() {

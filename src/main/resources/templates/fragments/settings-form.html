@@ -93,11 +93,12 @@
 
 <!--/* textFieldLimited for a field that is required only under a condition the browser evaluates (variant-fields.js,
        e.g. shipment!=Courier): the "optional" note is shown by that script while the condition holds. The input is never
-       marked required, because the server validates it and the form is novalidate. */-->
-<div th:fragment="textFieldOptionalWhen(name, labelKey, value, type, autocomplete, errorKey, help, condition)" class="cl-field">
+       marked required, because the server validates it and the form is novalidate. hidden: the condition fails for the
+       choice the page was rendered with (the script recomputes it on load). */-->
+<div th:fragment="textFieldOptionalWhen(name, labelKey, value, type, autocomplete, errorKey, help, condition, hidden)" class="cl-field">
     <label class="cl-label" th:for="${name}">
         <span th:text="#{${labelKey}}"></span>
-        <span class="cl-optional" th:attr="data-cl-variant-when=${condition}" th:text="#{form.optional}"></span>
+        <span class="cl-optional" th:attr="data-cl-variant-when=${condition}" th:hidden="${hidden}" th:text="#{form.optional}"></span>
     </label>
     <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
            th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}"

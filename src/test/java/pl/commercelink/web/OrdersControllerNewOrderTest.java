@@ -31,6 +31,7 @@ import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.orders.NewOrderPage;
 
 import java.util.LinkedList;
@@ -41,6 +42,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mockStatic;
@@ -85,10 +87,12 @@ class OrdersControllerNewOrderTest {
         Basket basket = basket(BasketType.Basket);
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(messageSource.getMessage(anyString(), isNull(), anyString(), eq(Locale.ENGLISH)))
+                .thenAnswer(call -> "label " + call.getArgument(0));
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = ordersController.submitOrderBasedOnBasket(BASKET_ID, model);
+        String view = ordersController.submitOrderBasedOnBasket(BASKET_ID, model, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("newOrder_clientDataCollection");
@@ -104,7 +108,9 @@ class OrdersControllerNewOrderTest {
         assertThat(model.get("billing")).isNotNull();
         assertThat(model.get("shipping")).isNotNull();
         assertThat((Map<?, ?>) model.get("errors")).isEmpty();
-        assertThat((PaymentSource[]) model.get("paymentSources")).containsExactly(PaymentSource.values());
+        assertThat((List<PickerOption>) model.get("paymentOptions"))
+                .hasSize(PaymentSource.values().length)
+                .startsWith(new PickerOption("BankTransfer", "label PaymentSource.BankTransfer"));
     }
 
     @Test
@@ -114,7 +120,7 @@ class OrdersControllerNewOrderTest {
 
         // when
         ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
-                () -> ordersController.submitOrderBasedOnBasket(BASKET_ID, new ExtendedModelMap()));
+                () -> ordersController.submitOrderBasedOnBasket(BASKET_ID, new ExtendedModelMap(), Locale.ENGLISH));
 
         // then
         assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -128,7 +134,7 @@ class OrdersControllerNewOrderTest {
 
         // when
         ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
-                () -> ordersController.submitOrderBasedOnBasket(BASKET_ID, new ExtendedModelMap()));
+                () -> ordersController.submitOrderBasedOnBasket(BASKET_ID, new ExtendedModelMap(), Locale.ENGLISH));
 
         // then
         assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -178,6 +184,23 @@ class OrdersControllerNewOrderTest {
         assertThat((Map<String, String>) model.get("errors"))
                 .containsEntry("shipmentType", "order.new.shipment.required")
                 .containsEntry("paymentSource", "order.new.payment.required");
+        verifyNoInteractions(basketOrderImporter);
+    }
+
+    @Test
+    void postOfTemplateIsNotFound() {
+        // given
+        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket(BasketType.OfferTemplate)));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        ClientDataDto dto = posted(ShipmentType.Courier);
+
+        // when
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> ordersController.submitOrder(dto, new BeanPropertyBindingResult(dto, "form"), "same",
+                        new ExtendedModelMap(), new RedirectAttributesModelMap(), Locale.ENGLISH));
+
+        // then
+        assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         verifyNoInteractions(basketOrderImporter);
     }
 

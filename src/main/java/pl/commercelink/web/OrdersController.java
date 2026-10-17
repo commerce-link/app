@@ -77,6 +77,7 @@ import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.orders.BulkAction;
@@ -534,14 +535,14 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/new/from-basket")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model) {
+    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model, Locale locale) {
         Basket basket = basketsRepository.findById(getStoreId(), basketId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Store store = storesRepository.findById(getStoreId());
         NewOrderPage page = NewOrderPage.of(basket, store);
         // initialForm hands over the basket's own address objects; the basket is never saved here.
         NewOrderForm form = NewOrderForm.of(NewOrderPage.initialForm(basket, store), NewOrderPage.initialShippingAddress(basket));
-        return newOrderPage(page, form, Map.of(), model);
+        return newOrderPage(page, form, Map.of(), model, locale);
     }
 
     /**
@@ -566,20 +567,23 @@ public class OrdersController extends BaseController {
         NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
-            return newOrderPage(page, form, errors, model);
+            return newOrderPage(page, form, errors, model, locale);
         }
         Order order = basketOrderImporter._import(getStoreId(), form.toImport(basket.get()));
         return "redirect:/dashboard/orders/" + order.getOrderId();
     }
 
-    private String newOrderPage(NewOrderPage page, NewOrderForm form, Map<String, String> errors, Model model) {
+    private String newOrderPage(NewOrderPage page, NewOrderForm form, Map<String, String> errors, Model model, Locale locale) {
         model.addAttribute("page", page);
         model.addAttribute("form", form.dto());
         model.addAttribute("shippingAddress", form.shippingAddress());
         model.addAttribute("billing", form.billing().withErrors(errors));
         model.addAttribute("shipping", form.shipping().withErrors(errors));
         model.addAttribute("errors", errors);
-        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("paymentOptions", Arrays.stream(PaymentSource.values())
+                .map(source -> new PickerOption(source.name(),
+                        messageSource.getMessage("PaymentSource." + source.name(), null, source.name(), locale)))
+                .toList());
         return "newOrder_clientDataCollection";
     }
 

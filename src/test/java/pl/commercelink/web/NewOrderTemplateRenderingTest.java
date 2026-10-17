@@ -8,13 +8,16 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.orders.NewOrderForm;
 import pl.commercelink.web.orders.NewOrderPage;
 import pl.commercelink.web.orders.NewOrderPage.DeliveryState;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -135,8 +138,23 @@ class NewOrderTemplateRenderingTest {
         assertThat(element(collection, "data-cl-variant-when=\"shipment=PersonalCollection\"")).doesNotContain("hidden");
         assertThat(element(courierSame, "data-cl-variant-when=\"shipment=PersonalCollection\"")).contains("hidden");
         assertThat(courierSame).contains("data-cl-variant-select=\"shipment\"").contains("data-cl-variant-select=\"shippingAddress\"");
-        assertThat(courierSame).contains("data-cl-variant-when=\"shipment!=Courier\">optional<")
+        assertThat(courierSame).contains("aria-label=\"Shipping address\"")
                 .doesNotContain("cl-reveal").doesNotContain("differentShippingAddress");
+    }
+
+    @Test
+    void billingOptionalNotesFollowTheRenderedDeliveryMethod() {
+        // when
+        String courier = render(basketPage(), form(ShipmentType.Courier), NewOrderForm.SAME, Map.of());
+        String pickup = render(basketPage(), form(ShipmentType.PickupPoint), NewOrderForm.SAME, Map.of());
+        String collection = render(basketPage(), form(ShipmentType.PersonalCollection), NewOrderForm.SAME, Map.of());
+
+        // then
+        String note = "<span class=\"cl-optional\" data-cl-variant-when=\"shipment!=Courier\"";
+        assertThat(count(courier, note)).isEqualTo(4);
+        assertThat(count(courier, note + " hidden=\"hidden\">")).isEqualTo(4);
+        assertThat(count(pickup, note + ">")).isEqualTo(4);
+        assertThat(count(collection, note + ">")).isEqualTo(4);
     }
 
     @Test
@@ -204,7 +222,10 @@ class NewOrderTemplateRenderingTest {
         context.setVariable("billing", form.billing().withErrors(errors));
         context.setVariable("shipping", form.shipping().withErrors(errors));
         context.setVariable("errors", errors);
-        context.setVariable("paymentSources", PaymentSource.values());
+        ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.ENGLISH);
+        context.setVariable("paymentOptions", Arrays.stream(PaymentSource.values())
+                .map(source -> new PickerOption(source.name(), messages.getString("PaymentSource." + source.name())))
+                .toList());
         return engine.process("newOrder_clientDataCollection", context);
     }
 

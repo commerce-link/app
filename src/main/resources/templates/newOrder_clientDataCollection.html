@@ -45,28 +45,14 @@
                             </div>
                         </dl>
                         <div class="cl-form-grid">
-                            <div class="cl-span-3">
-                                <div class="cl-field" th:with="paymentError=${errors['paymentSource']}">
-                                    <label class="cl-label" for="paymentSource"><span th:text="#{order.new.payment}"></span></label>
-                                    <select class="cl-select" th:classappend="${paymentError != null} ? 'is-invalid'" id="paymentSource" name="paymentSource"
-                                            th:attr="aria-invalid=${paymentError != null ? 'true' : null},
-                                                     aria-describedby=${paymentError != null ? 'paymentSource-error' : null}">
-                                        <option th:each="source : ${paymentSources}" th:value="${source.name()}"
-                                                th:text="#{${'PaymentSource.' + source.name()}}" th:selected="${source == form.paymentSource}"></option>
-                                    </select>
-                                    <p th:if="${paymentError != null}" class="cl-field-error" id="paymentSource-error">
-                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                        <span th:text="#{${paymentError}}"></span>
-                                    </p>
-                                </div>
-                            </div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('paymentSource', 'order.new.payment', ${form.paymentSource != null ? form.paymentSource.name() : null}, ${paymentOptions}, 'off', true, ${errors['paymentSource']}, null)}"></div>
                         </div>
                     </fieldset>
 
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{order.customer.billing}"></legend>
                         <p class="cl-help" th:text="#{order.new.billing.note}"></p>
-                        <div th:replace="~{orders/details/address :: addressGrid(${billing}, 'shipment!=Courier')}"></div>
+                        <div th:replace="~{orders/details/address :: addressGrid(${billing}, 'shipment!=Courier', ${type == 'Courier'})}"></div>
                     </fieldset>
 
                     <fieldset class="cl-fieldset">
@@ -114,10 +100,10 @@
                            th:text="#{order.new.pickup.help}"></p>
 
                         <!--/* A pickup point switches the address radios off, so their condition is skipped and the fields show. */-->
-                        <fieldset id="shipping-fields" class="cl-choice-group"
+                        <fieldset id="shipping-fields" class="cl-choice-group" th:attr="aria-label=#{order.new.shippingAddress}"
                                   data-cl-variant-when="shipment!=PersonalCollection shippingAddress=other"
                                   th:hidden="${!shippingErrors and (type == 'PersonalCollection' or (type == 'Courier' and shippingAddress != 'other'))}">
-                            <div th:replace="~{orders/details/address :: addressGrid(${shipping}, null)}"></div>
+                            <div th:replace="~{orders/details/address :: addressGrid(${shipping}, null, false)}"></div>
                         </fieldset>
 
                         <p class="cl-help" data-cl-variant-when="shipment=PersonalCollection" th:hidden="${type != 'PersonalCollection'}"
