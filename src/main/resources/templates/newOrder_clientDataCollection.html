@@ -3,61 +3,138 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
+<!--/* New order from a basket or an offer (OrdersController, web.orders.NewOrderPage / NewOrderForm). The server checks
+       the form and answers with this page and its errors; the parts that depend on the delivery method and the shipping
+       address choice are switched by variant-fields.js and rendered in the state of the model, so the page looks right
+       before the script runs. A part that holds a field error is never rendered hidden. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form"
+             th:with="type=${form.shipmentType != null ? form.shipmentType.name() : null},
+                      shippingErrors=${!errors.keySet().?[startsWith('shippingDetails.')].isEmpty()},
+                      deliveryPrice=${#messages.msg('general.currency.amount', page.deliveryPrice())}">
+            <th:block th:with="backLabel=${page.offer()} ? #{order.new.back.offer(${page.sourceName()})} : #{order.new.back.basket(${page.sourceName()})},
+                               lead=${!page.offer()} ? #{order.new.lead.basket(${page.sourceName()})} : (${page.billingFromContact()} ? #{order.new.lead.offer.contact(${page.sourceName()})} : #{order.new.lead.offer(${page.sourceName()})})">
+                <div th:replace="~{fragments/settings-header :: subpageWithActions(${page.backHref()}, ${backLabel}, #{order.new.title}, ${lead}, null)}"></div>
+            </th:block>
 
-<div layout:fragment="content" class="container">
+            <form id="order-new-form" class="cl-form" th:action="@{/dashboard/orders/new/fulfilment}" method="post"
+                  novalidate data-cl-submit-once>
+                <div th:replace="~{fragments/settings-form :: errorSummaryTitled('order-new-errors', ${errors}, null, 'order.new.errors.title')}"></div>
+                <input type="hidden" name="orderReference" th:value="${form.orderReference}"/>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{order.new.section.order}"></legend>
+                        <dl class="cl-kv">
+                            <div>
+                                <dt th:text="${page.offer()} ? #{order.new.summary.offer} : #{order.new.summary.basket}"></dt>
+                                <dd><a class="cl-text-link" th:href="@{${page.backHref()}}" th:text="${page.sourceName()}"></a></dd>
+                            </div>
+                            <div>
+                                <dt th:text="#{order.new.summary.items}"></dt>
+                                <dd th:text="${page.itemsCount()}"></dd>
+                            </div>
+                            <div>
+                                <dt th:text="#{order.new.summary.delivery}"></dt>
+                                <dd th:text="${page.deliveryState().name() == 'CHOSEN'} ? #{order.new.summary.delivery.value(${page.deliveryName()}, ${deliveryPrice})}
+                                             : (${page.deliveryState().name() == 'NONE'} ? #{order.new.summary.delivery.none} : #{order.new.summary.delivery.unknown})"></dd>
+                            </div>
+                            <div>
+                                <dt th:text="#{order.new.summary.total}"></dt>
+                                <dd><strong th:text="#{general.currency.amount(${page.total()})}"></strong></dd>
+                            </div>
+                        </dl>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3">
+                                <div class="cl-field" th:with="paymentError=${errors['paymentSource']}">
+                                    <label class="cl-label" for="paymentSource"><span th:text="#{order.new.payment}"></span></label>
+                                    <select class="cl-select" th:classappend="${paymentError != null} ? 'is-invalid'" id="paymentSource" name="paymentSource"
+                                            th:attr="aria-invalid=${paymentError != null ? 'true' : null},
+                                                     aria-describedby=${paymentError != null ? 'paymentSource-error' : null}">
+                                        <option th:each="source : ${paymentSources}" th:value="${source.name()}"
+                                                th:text="#{${'PaymentSource.' + source.name()}}" th:selected="${source == form.paymentSource}"></option>
+                                    </select>
+                                    <p th:if="${paymentError != null}" class="cl-field-error" id="paymentSource-error">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${paymentError}}"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
 
-    <form th:action="@{/dashboard/orders/new/fulfilment}" th:object="${form}" method="post" class="box" onsubmit="copyBillingDetailsIfNeeded()">
-        <h2 class="title is-4" th:text="#{client.order.reference.title}"></h2>
-        <input type="hidden" th:field="*{orderReference}" />
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{order.customer.billing}"></legend>
+                        <p class="cl-help" th:text="#{order.new.billing.note}"></p>
+                        <div th:replace="~{orders/details/address :: addressGrid(${billing}, 'shipment!=Courier')}"></div>
+                    </fieldset>
 
-        <div class="field">
-            <label class="label" th:text="#{order.payment.source}"></label>
-            <div class="control">
-                <div class="select">
-                    <select th:field="*{paymentSource}" required>
-                        <option th:each="psource : ${paymentSources}" th:value="${psource}"
-                                th:text="${psource}"></option>
-                    </select>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{order.customer.shipping.plain}"></legend>
+                        <fieldset class="cl-choice-group is-row" th:attr="aria-label=#{order.new.shipment.label}">
+                            <label class="cl-choice" th:each="option, iter : ${ {'Courier', 'PickupPoint', 'PersonalCollection'} }">
+                                <input type="radio" name="shipmentType" th:id="${iter.first} ? 'shipmentType'" th:value="${option}"
+                                       th:checked="${type == option}" data-cl-variant-select="shipment"
+                                       th:attr="aria-describedby=${iter.first and errors['shipmentType'] != null ? 'shipmentType-error' : null}">
+                                <span class="cl-choice-text">
+                                    <span class="cl-choice-title" th:text="#{${'ShipmentType.' + option}}"></span>
+                                    <span class="cl-choice-description" th:text="#{${'order.new.shipment.' + option + '.desc'}}"></span>
+                                </span>
+                            </label>
+                            <p th:if="${errors['shipmentType'] != null}" class="cl-field-error" id="shipmentType-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['shipmentType']}}"></span>
+                            </p>
+                        </fieldset>
+
+                        <!--/* The delivery item comes from the basket's option whatever the method; the operator changes it later. */-->
+                        <div th:if="${page.hasDeliveryOption()}" class="cl-alert is-warn"
+                             th:attr="data-cl-variant-when='shipment!=' + ${page.deliveryType().name()}"
+                             th:hidden="${type == page.deliveryType().name()}">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <p class="cl-alert-text"
+                               th:text="${page.offer()} ? #{order.new.mismatch.offer(${page.deliveryName()}, ${deliveryPrice})} : #{order.new.mismatch.basket(${page.deliveryName()}, ${deliveryPrice})}"></p>
+                        </div>
+
+                        <fieldset class="cl-choice-group is-row" data-cl-variant-when="shipment=Courier" th:hidden="${type != 'Courier'}">
+                            <legend class="cl-label" th:text="#{order.new.shippingAddress}"></legend>
+                            <label class="cl-choice">
+                                <input type="radio" name="shippingAddress" value="same" th:checked="${shippingAddress != 'other'}"
+                                       data-cl-variant-select="shippingAddress">
+                                <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{order.new.shippingAddress.same}"></span></span>
+                            </label>
+                            <label class="cl-choice">
+                                <input type="radio" name="shippingAddress" value="other" th:checked="${shippingAddress == 'other'}"
+                                       data-cl-variant-select="shippingAddress">
+                                <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{order.new.shippingAddress.other}"></span></span>
+                            </label>
+                        </fieldset>
+
+                        <p class="cl-help" data-cl-variant-when="shipment=PickupPoint" th:hidden="${type != 'PickupPoint'}"
+                           th:text="#{order.new.pickup.help}"></p>
+
+                        <!--/* A pickup point switches the address radios off, so their condition is skipped and the fields show. */-->
+                        <fieldset id="shipping-fields" class="cl-choice-group"
+                                  data-cl-variant-when="shipment!=PersonalCollection shippingAddress=other"
+                                  th:hidden="${!shippingErrors and (type == 'PersonalCollection' or (type == 'Courier' and shippingAddress != 'other'))}">
+                            <div th:replace="~{orders/details/address :: addressGrid(${shipping}, null)}"></div>
+                        </fieldset>
+
+                        <p class="cl-help" data-cl-variant-when="shipment=PersonalCollection" th:hidden="${type != 'PersonalCollection'}"
+                           th:text="#{order.new.collection.help}"></p>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{order.new.submit}"></button>
+                        <a class="cl-button" th:href="@{${page.backHref()}}" th:text="#{general.cancel}"></a>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
-
-        <div class="field">
-            <label class="label" for="shipmentType" th:text="#{client.shipment.type}"></label>
-            <div class="control">
-                <div class="select">
-                    <select id="shipmentType" th:field="*{shipmentType}" onchange="toggleShippingDetails()">
-                        <option th:each="type : ${shipmentTypes}" th:value="${type}" th:text="${enumI18n.localize(type)}"></option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
-
-        <div class="field">
-            <div class="control" style="margin-top: 20px">
-                <button class="button is-primary" type="submit" th:text="#{general.submit}"></button>
-            </div>
-        </div>
-    </form>
-
-    <script>
-        function copyBillingDetailsIfNeeded() {
-            const shipmentType = document.getElementById('shipmentType').value;
-            if (shipmentType !== 'PersonalCollection' && !document.getElementById('differentShippingAddress').checked) {
-                document.getElementById('shippingName').value = document.getElementById('billingName').value;
-                document.getElementById('shippingSurname').value = document.getElementById('billingSurname').value;
-                document.getElementById('shippingCompanyName').value = document.getElementById('billingCompanyName').value;
-                document.getElementById('shippingStreetAndNumber').value = document.getElementById('billingStreetAndNumber').value;
-                document.getElementById('shippingPostalCode').value = document.getElementById('billingPostalCode').value;
-                document.getElementById('shippingCity').value = document.getElementById('billingCity').value;
-                document.getElementById('shippingEmail').value = document.getElementById('billingEmail').value;
-                document.getElementById('shippingPhone').value = document.getElementById('billingPhone').value;
-            }
-        }
-    </script>
-
+    </section>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+    <script th:src="@{/js/submit-once.js}" defer></script>
+    <script th:src="@{/js/error-summary.js}" defer></script>
 </div>
-
 </body>
 </html>

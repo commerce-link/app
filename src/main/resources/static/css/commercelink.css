@@ -6277,6 +6277,8 @@ a.cl-link-button:hover {
    the fieldset already pads its content, so the dl drops the padding it has as a card child */
 .cl-page .cl-fieldset > dl.cl-kv { padding: 0; }
 .cl-page .cl-fieldset > dl.cl-kv + .cl-help { margin: var(--cl-gap-fields) 0 0; }
+/* The fields under the record's facts (the payment method under the summary of a new order) */
+.cl-page .cl-fieldset > .cl-kv + .cl-form-grid { margin-top: 16px; }
 @media screen and (max-width: 719px) {
   .cl-page .cl-fieldset > dl.cl-kv { grid-template-columns: minmax(0, 1fr); }
   .cl-page .cl-fieldset > dl.cl-kv > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }

@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,7 +65,6 @@ import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
-import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -86,6 +86,8 @@ import pl.commercelink.web.orders.CustomerView;
 import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.MoveTargetView;
+import pl.commercelink.web.orders.NewOrderForm;
+import pl.commercelink.web.orders.NewOrderPage;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
@@ -533,42 +535,52 @@ public class OrdersController extends BaseController {
     @GetMapping("/dashboard/orders/new/from-basket")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model) {
-        Optional<Basket> basketOpt = basketsRepository.findById(getStoreId(), basketId);
-        if (!basketOpt.isPresent()) {
-            model.addAttribute("error", "Basket not found");
-            return "error";
-        }
-
-        Basket basket = basketOpt.get();
-        BillingDetails billingDetails = Optional.ofNullable(basket.getBillingDetails())
-                .orElseGet(BillingDetails::_default);
-        ShippingDetails shippingDetails = Optional.ofNullable(basket.getShippingDetails())
-                .orElseGet(ShippingDetails::_default);
-
+        Basket basket = basketsRepository.findById(getStoreId(), basketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Store store = storesRepository.findById(getStoreId());
-        ShipmentType shipmentType = basket.resolveDeliveryOption(store)
-                .map(DeliveryOption::getType)
-                .orElse(ShipmentType.Courier);
-
-        ClientDataDto form = new ClientDataDto();
-        form.setOrderReference(basketId);
-        form.setShipmentType(shipmentType);
-        form.setBillingDetails(billingDetails);
-        form.setShippingDetails(shippingDetails);
-
-        model.addAttribute("form", form);
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("orderSourceTypes", OrderSourceType.values());
-        model.addAttribute("paymentSources", PaymentSource.values());
-
-        return "newOrder_clientDataCollection";
+        NewOrderPage page = NewOrderPage.of(basket, store);
+        // initialForm hands over the basket's own address objects; the basket is never saved here.
+        NewOrderForm form = NewOrderForm.of(NewOrderPage.initialForm(basket, store), NewOrderPage.initialShippingAddress(basket));
+        return newOrderPage(page, form, Map.of(), model);
     }
 
+    /**
+     * The binding result keeps a tampered choice (shipmentType=xyz) from ending in 400: the field stays empty and the
+     * page asks for it like for a missing one. Address fields are plain strings and are checked by {@link NewOrderForm}.
+     */
     @PostMapping("/dashboard/orders/new/fulfilment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrder(@ModelAttribute ClientDataDto dto) {
-        Order order = basketOrderImporter._import(getStoreId(), dto);
+    public String submitOrder(@ModelAttribute("form") ClientDataDto dto, BindingResult bindingResult,
+                              @RequestParam(value = "shippingAddress", required = false) String shippingAddress,
+                              Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<Basket> basket = StringUtils.isBlank(dto.getOrderReference())
+                ? Optional.empty()
+                : basketsRepository.findById(getStoreId(), dto.getOrderReference());
+        // A second submit or a page restored with Back: the first one already turned the basket into an order.
+        if (basket.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.new.basket.gone", null, locale));
+            return "redirect:/dashboard/orders";
+        }
+        Store store = storesRepository.findById(getStoreId());
+        NewOrderPage page = NewOrderPage.of(basket.get(), store);
+        NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
+        Map<String, String> errors = form.validate();
+        if (!errors.isEmpty()) {
+            return newOrderPage(page, form, errors, model);
+        }
+        Order order = basketOrderImporter._import(getStoreId(), form.toImport(basket.get()));
         return "redirect:/dashboard/orders/" + order.getOrderId();
+    }
+
+    private String newOrderPage(NewOrderPage page, NewOrderForm form, Map<String, String> errors, Model model) {
+        model.addAttribute("page", page);
+        model.addAttribute("form", form.dto());
+        model.addAttribute("shippingAddress", form.shippingAddress());
+        model.addAttribute("billing", form.billing().withErrors(errors));
+        model.addAttribute("shipping", form.shipping().withErrors(errors));
+        model.addAttribute("errors", errors);
+        model.addAttribute("paymentSources", PaymentSource.values());
+        return "newOrder_clientDataCollection";
     }
 
     @PostMapping("/dashboard/orders/new/pos")
