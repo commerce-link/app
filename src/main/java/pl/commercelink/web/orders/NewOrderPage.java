@@ -16,6 +16,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,7 +77,7 @@ public record NewOrderPage(String basketId, boolean offer, String backHref, Stri
 
     public static String initialShippingAddress(Basket basket) {
         ShippingDetails shipping = basket.getShippingDetails();
-        if (shipping == null || allBlank(shippingParts(shipping))) {
+        if (shipping == null || isEmptyIgnoringCountry(shipping)) {
             return NewOrderForm.SAME;
         }
         BillingDetails billing = basket.getBillingDetails();
@@ -125,17 +126,19 @@ public record NewOrderPage(String basketId, boolean offer, String backHref, Stri
     }
 
     private static List<String> shippingParts(ShippingDetails d) {
-        return java.util.Arrays.asList(d.getName(), d.getSurname(), d.getCompanyName(), d.getStreetAndNumber(),
+        return Arrays.asList(d.getName(), d.getSurname(), d.getCompanyName(), d.getStreetAndNumber(),
                 d.getPostalCode(), d.getCity(), d.getCountry(), d.getEmail(), d.getPhone());
     }
 
     private static List<String> billingParts(BillingDetails d) {
-        return java.util.Arrays.asList(d.getName(), d.getSurname(), d.getCompanyName(), d.getStreetAndNumber(),
+        return Arrays.asList(d.getName(), d.getSurname(), d.getCompanyName(), d.getStreetAndNumber(),
                 d.getPostalCode(), d.getCity(), d.getCountry(), d.getEmail(), d.getPhone());
     }
 
-    private static boolean allBlank(List<String> parts) {
-        return parts.stream().allMatch(StringUtils::isBlank);
+    // The country is prefilled by ShippingDetails._default(), so it alone does not make an address filled in.
+    private static boolean isEmptyIgnoringCountry(ShippingDetails d) {
+        return Arrays.asList(d.getName(), d.getSurname(), d.getCompanyName(), d.getStreetAndNumber(),
+                d.getPostalCode(), d.getCity(), d.getEmail(), d.getPhone()).stream().allMatch(StringUtils::isBlank);
     }
 
     private static boolean sameParts(List<String> a, List<String> b) {

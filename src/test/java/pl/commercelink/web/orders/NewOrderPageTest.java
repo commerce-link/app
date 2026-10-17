@@ -241,6 +241,17 @@ class NewOrderPageTest {
     }
 
     @Test
+    void countryOnlyShippingAddressPresetsSame() {
+        // given
+        Basket basket = basket(BasketType.Basket, null);
+        basket.setBillingDetails(billing("Main 1"));
+        basket.setShippingDetails(ShippingDetails._default());
+
+        // when / then
+        assertThat(NewOrderPage.initialShippingAddress(basket)).isEqualTo(NewOrderForm.SAME);
+    }
+
+    @Test
     void totalIncludesDelivery() {
         // given
         Basket basket = basket(BasketType.Basket, "courier");
