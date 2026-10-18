@@ -117,6 +117,37 @@ class NewOrderPageTest {
     }
 
     @Test
+    void unknownDeliveryOptionBlocksTheOrder() {
+        // given
+        Basket unknown = basket(BasketType.Basket, "removed-option");
+        Basket known = basket(BasketType.Basket, "courier");
+
+        // when
+        NewOrderPage unknownPage = NewOrderPage.of(unknown, store);
+        NewOrderPage knownPage = NewOrderPage.of(known, store);
+
+        // then
+        assertThat(unknownPage.deliveryUnknown()).isTrue();
+        assertThat(knownPage.deliveryUnknown()).isFalse();
+    }
+
+    @Test
+    void deliveryOptionWithoutTypeCountsAsCourier() {
+        // given
+        store.getCheckoutConfiguration().getDeliveryOptions().add(option("untyped", "Kurier", 15.0, null));
+        Basket basket = basket(BasketType.Basket, "untyped");
+
+        // when
+        NewOrderPage page = NewOrderPage.of(basket, store);
+        ClientDataDto form = NewOrderPage.initialForm(basket, store);
+
+        // then
+        assertThat(page.deliveryState()).isEqualTo(DeliveryState.CHOSEN);
+        assertThat(page.deliveryType()).isEqualTo(ShipmentType.Courier);
+        assertThat(form.getShipmentType()).isEqualTo(ShipmentType.Courier);
+    }
+
+    @Test
     void noDeliveryOptionMeansCourierAndNone() {
         // given
         Basket basket = basket(BasketType.Basket, null);

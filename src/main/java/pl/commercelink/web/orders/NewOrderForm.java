@@ -40,6 +40,22 @@ public record NewOrderForm(ClientDataDto dto, String shippingAddress) {
         return new NewOrderForm(complete, OTHER.equals(shippingAddress) ? OTHER : SAME);
     }
 
+    /**
+     * The form shown again after an error when no shipping field was posted: the page switches those fields off for a
+     * courier to the billing address and for a personal collection. Without the basket's address the fields would come
+     * back empty, and a switch to a pickup point would then copy the billing address over the basket's pickup address.
+     */
+    public NewOrderForm withShippingOf(Basket basket) {
+        ClientDataDto shown = new ClientDataDto();
+        shown.setOrderReference(dto.getOrderReference());
+        shown.setShipmentType(dto.getShipmentType());
+        shown.setPaymentSource(dto.getPaymentSource());
+        shown.setBillingDetails(dto.getBillingDetails());
+        shown.setShippingDetails(basket.getShippingDetails() != null
+                ? basket.getShippingDetails().copy() : ShippingDetails._default());
+        return new NewOrderForm(shown, shippingAddress);
+    }
+
     public boolean shipsToOtherAddress() {
         return dto.getShipmentType() == ShipmentType.Courier && OTHER.equals(shippingAddress);
     }

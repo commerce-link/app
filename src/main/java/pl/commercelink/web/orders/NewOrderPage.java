@@ -31,6 +31,9 @@ public record NewOrderPage(String basketId, boolean offer, String backHref, Stri
     /** UNKNOWN: the basket points at a delivery option the store no longer has. */
     public enum DeliveryState { CHOSEN, NONE, UNKNOWN }
 
+    /** The error key of a basket whose delivery option is gone, also the id of the notice it links to. */
+    public static final String DELIVERY_FIELD = "deliveryOption";
+
     public static NewOrderPage of(Basket basket, Store store) {
         // Importing a template would delete it, and no screen leads here from one.
         if (basket.hasType(BasketType.OfferTemplate)) {
@@ -53,7 +56,8 @@ public record NewOrderPage(String basketId, boolean offer, String backHref, Stri
                 state = DeliveryState.CHOSEN;
                 deliveryName = option.get().getName();
                 deliveryPrice = option.get().getPrice();
-                deliveryType = option.get().getType();
+                // The type defaults to Courier; only hand-edited data has none, and the page must still open.
+                deliveryType = option.get().getType() != null ? option.get().getType() : ShipmentType.Courier;
             } else {
                 state = DeliveryState.UNKNOWN;
             }
@@ -87,6 +91,15 @@ public record NewOrderPage(String basketId, boolean offer, String backHref, Stri
 
     public boolean hasDeliveryOption() {
         return deliveryState == DeliveryState.CHOSEN;
+    }
+
+    /** The importer cannot add the delivery item of an option the store no longer has, so no order can be made. */
+    public boolean deliveryUnknown() {
+        return deliveryState == DeliveryState.UNKNOWN;
+    }
+
+    public String deliveryField() {
+        return DELIVERY_FIELD;
     }
 
     // An option removed from the store throws here; the page must still open and say so.

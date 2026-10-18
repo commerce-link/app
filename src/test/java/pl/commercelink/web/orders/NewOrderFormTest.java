@@ -211,6 +211,26 @@ class NewOrderFormTest {
     }
 
     @Test
+    void formShownAgainTakesTheBasketShippingWhenNoneWasPosted() {
+        // given
+        ShippingDetails inBasket = shippingWith("Paczkomat WAW01A", "PL");
+        Basket withAddress = new Basket();
+        withAddress.setShippingDetails(inBasket);
+        NewOrderForm form = NewOrderForm.of(dto(ShipmentType.Courier, person("Main 1"), null), "same");
+
+        // when
+        NewOrderForm shown = form.withShippingOf(withAddress);
+        NewOrderForm fallback = form.withShippingOf(new Basket());
+
+        // then
+        assertThat(shown.dto().getShippingDetails().getStreetAndNumber()).isEqualTo("Paczkomat WAW01A");
+        assertThat(shown.dto().getShippingDetails()).isNotSameAs(inBasket);
+        assertThat(shown.dto().getBillingDetails().getStreetAndNumber()).isEqualTo("Main 1");
+        assertThat(shown.shippingAddress()).isEqualTo(NewOrderForm.SAME);
+        assertThat(fallback.dto().getShippingDetails().getCountry()).isEqualTo("PL");
+    }
+
+    @Test
     void missingBillingAndShippingObjectsDoNotThrow() {
         // given
         NewOrderForm form = NewOrderForm.of(dto(ShipmentType.Courier, null, null), "other");

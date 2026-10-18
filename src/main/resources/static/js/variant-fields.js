@@ -3,7 +3,8 @@
 // - fieldset[data-cl-variant-group="group"][data-cl-variant="value"] shows only while the group's value is that value;
 // - [data-cl-variant-when="group=value group!=a|b"] shows only while every condition holds (a value list separated by |,
 //   an empty item for "nothing chosen"); a condition on a group with no enabled control is ignored.
-// Hidden fieldsets are also disabled, so their fields are not sent. Without JavaScript everything is visible and the server
+// Hidden fieldsets are also disabled, so their fields are not sent. A label's .cl-optional note marked this way also sets
+// aria-required on the label's field while the note is hidden. Without JavaScript everything is visible and the server
 // reads only the fields of the choices made.
 (function () {
     'use strict';
@@ -62,6 +63,15 @@
             element.hidden = !on;
             if (element.tagName === 'FIELDSET') {
                 element.disabled = !on;
+            }
+            // An "optional" note in a label: while it is hidden the field is required, which a screen reader must hear.
+            var label = element.classList.contains('cl-optional') ? element.closest('label') : null;
+            if (label && label.control) {
+                if (on) {
+                    label.control.removeAttribute('aria-required');
+                } else {
+                    label.control.setAttribute('aria-required', 'true');
+                }
             }
         });
     }

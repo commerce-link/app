@@ -213,6 +213,55 @@ class NewOrderTemplateRenderingTest {
         assertThat(contact).contains("The name, e-mail and phone come from the offer&#39;s contact");
     }
 
+    @Test
+    void mismatchWarningIsAnnouncedWhenItAppears() {
+        // when
+        String html = render(basketPage(), form(ShipmentType.PersonalCollection), NewOrderForm.SAME, Map.of());
+
+        // then
+        assertThat(element(html, "cl-alert is-warn")).contains("role=\"status\"");
+    }
+
+    @Test
+    void requiredStateFollowsTheRenderedDeliveryMethod() {
+        // when
+        String courier = render(basketPage(), form(ShipmentType.Courier), NewOrderForm.OTHER, Map.of());
+        String pickup = render(basketPage(), form(ShipmentType.PickupPoint), NewOrderForm.SAME, Map.of());
+
+        // then
+        assertThat(element(courier, "name=\"billingDetails.streetAndNumber\"")).contains("aria-required=\"true\"");
+        assertThat(element(pickup, "name=\"billingDetails.streetAndNumber\"")).doesNotContain("aria-required");
+        String shippingNote = "<span class=\"cl-optional\" data-cl-variant-when=\"shipment=PickupPoint\"";
+        assertThat(count(pickup, shippingNote + ">")).isEqualTo(7);
+        assertThat(count(courier, shippingNote + " hidden=\"hidden\">")).isEqualTo(7);
+        for (String field : new String[]{"name", "streetAndNumber", "postalCode", "city", "country", "email", "phone"}) {
+            assertThat(element(courier, "name=\"shippingDetails." + field + "\"")).contains("aria-required=\"true\"")
+                    .doesNotContain(" required");
+            assertThat(element(pickup, "name=\"shippingDetails." + field + "\"")).doesNotContain("aria-required")
+                    .doesNotContain(" required");
+        }
+        assertThat(element(pickup, "name=\"billingDetails.email\"")).contains("required");
+    }
+
+    @Test
+    void unknownDeliveryOptionRefusesTheOrderOnThePage() {
+        // when
+        String basket = render(page(false, DeliveryState.UNKNOWN, null, 0, null, false), form(ShipmentType.Courier),
+                NewOrderForm.SAME, Map.of());
+        String offer = render(page(true, DeliveryState.UNKNOWN, null, 0, null, false), form(ShipmentType.Courier),
+                NewOrderForm.SAME, Map.of());
+        String known = render(basketPage(), form(ShipmentType.Courier), NewOrderForm.SAME, Map.of());
+
+        // then
+        assertThat(element(basket, "cl-alert is-bad")).contains("id=\"deliveryOption\"").contains("role=\"status\"");
+        assertThat(basket).contains("so this basket cannot become an order");
+        assertThat(offer).contains("Choose another delivery in the offer details");
+        assertThat(element(basket, "aria-disabled=\"true\""))
+                .contains("type=\"button\"").contains("aria-describedby=\"deliveryOption\"");
+        assertThat(basket).doesNotContain("type=\"submit\"");
+        assertThat(known).contains("type=\"submit\"").doesNotContain("id=\"deliveryOption\"");
+    }
+
     private String render(NewOrderPage page, ClientDataDto dto, String shippingAddress, Map<String, String> errors) {
         NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
         Context context = new Context(Locale.ENGLISH);

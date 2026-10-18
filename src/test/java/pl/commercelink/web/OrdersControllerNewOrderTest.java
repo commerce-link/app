@@ -167,6 +167,53 @@ class OrdersControllerNewOrderTest {
     }
 
     @Test
+    void postWithErrorsShowsTheBasketShippingWhenNoShippingFieldWasSent() {
+        // given
+        Basket basket = basket(BasketType.Basket);
+        ShippingDetails pickup = ShippingDetails._default();
+        pickup.setStreetAndNumber("Paczkomat WAW01A");
+        basket.setShippingDetails(pickup);
+        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        ClientDataDto dto = posted(ShipmentType.Courier);
+        dto.setShippingDetails(null);
+        dto.getBillingDetails().setPhone("12");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = ordersController.submitOrder(dto, new BeanPropertyBindingResult(dto, "form"), "same", model,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("newOrder_clientDataCollection");
+        ClientDataDto form = (ClientDataDto) model.get("form");
+        assertThat(form.getShippingDetails().getStreetAndNumber()).isEqualTo("Paczkomat WAW01A");
+        assertThat(form.getBillingDetails().getPhone()).isEqualTo("12");
+        verifyNoInteractions(basketOrderImporter);
+    }
+
+    @Test
+    void postForBasketWithUnknownDeliveryOptionRendersThePageAndCreatesNothing() {
+        // given
+        Basket basket = basket(BasketType.Basket);
+        basket.setDeliveryOptionId("removed-option");
+        when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        ClientDataDto dto = posted(ShipmentType.Courier);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = ordersController.submitOrder(dto, new BeanPropertyBindingResult(dto, "form"), "same", model,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("newOrder_clientDataCollection");
+        assertThat((Map<String, String>) model.get("errors"))
+                .containsExactly(Map.entry(NewOrderPage.DELIVERY_FIELD, "order.new.delivery.unknown"));
+        verifyNoInteractions(basketOrderImporter);
+    }
+
+    @Test
     void postWithAnUnreadableChoiceAsksForIt() {
         // given
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket(BasketType.Basket)));

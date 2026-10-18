@@ -565,9 +565,15 @@ public class OrdersController extends BaseController {
         Store store = storesRepository.findById(getStoreId());
         NewOrderPage page = NewOrderPage.of(basket.get(), store);
         NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
-        Map<String, String> errors = form.validate();
+        Map<String, String> errors = new LinkedHashMap<>();
+        // The importer would fail on the missing option; the page answers with its notice instead of an error page.
+        if (page.deliveryUnknown()) {
+            errors.put(NewOrderPage.DELIVERY_FIELD, "order.new.delivery.unknown");
+        }
+        errors.putAll(form.validate());
         if (!errors.isEmpty()) {
-            return newOrderPage(page, form, errors, model, locale);
+            NewOrderForm shown = dto.getShippingDetails() == null ? form.withShippingOf(basket.get()) : form;
+            return newOrderPage(page, shown, errors, model, locale);
         }
         Order order = basketOrderImporter._import(getStoreId(), form.toImport(basket.get()));
         return "redirect:/dashboard/orders/" + order.getOrderId();
