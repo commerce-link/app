@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The files of an RMA (RmaDetailPage.Media) in a cl-media-grid: a thumbnail opening the file in a new tab, its name
+       and, on an open RMA, the choice to keep it. The card is one details save (spec §5.1): every tile posts its key as
+       a checked existingMedia box, so a file unticked with "Zachowaj" is removed by the save, without JavaScript too.
+       rma-detail.js swaps each box for "Usuń" / "Cofnij" and names how many files the save will remove. A closed RMA
+       shows the files without the form. */-->
+<section th:fragment="card" class="cl-card" id="pliki" aria-labelledby="media-title" th:with="m=${page.media()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="media-title" th:text="#{rma.detail.media.title}"></h2>
+    </div>
+    <form th:if="${m.editable()}" method="post" enctype="multipart/form-data"
+          th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}" data-cl-rma-details-form>
+        <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'existingMedia'} })}"></th:block>
+        <div class="cl-card-inset cl-stack">
+            <div class="cl-alert is-warn" role="status" hidden data-cl-rma-media-alert
+                 th:attr="data-template-one=#{rma.detail.media.removing.one('{n}')},
+                          data-template-few=#{rma.detail.media.removing.few('{n}')},
+                          data-template-many=#{rma.detail.media.removing.many('{n}')}">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"></p>
+            </div>
+            <ul th:replace="~{rma/detail/media :: grid(${m}, true)}"></ul>
+            <div class="cl-field">
+                <label class="cl-label" for="rmaMedia"><span th:text="#{rma.detail.media.upload}"></span>
+                    <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                <div class="cl-file-row">
+                    <input class="cl-file" id="rmaMedia" name="rmaMedia" type="file" multiple
+                           accept=".jpg,.jpeg,.png,.gif,.pdf,.mp4,.mov,.avi,.mkv" aria-describedby="rmaMedia-help">
+                </div>
+                <p class="cl-help" id="rmaMedia-help" th:text="#{rma.detail.media.upload.help}"></p>
+            </div>
+        </div>
+        <div class="cl-card-footer">
+            <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.media.save}"></button>
+        </div>
+    </form>
+    <div th:unless="${m.editable()}" class="cl-card-inset">
+        <ul th:replace="~{rma/detail/media :: grid(${m}, false)}"></ul>
+    </div>
+</section>
+
+<!--/* th:replace outranks th:if, so the empty state is chosen inside the fragment. */-->
+<th:block th:fragment="grid(m, editable)">
+    <ul th:unless="${m.tiles().isEmpty()}" class="cl-media-grid">
+        <li th:each="t, it : ${m.tiles()}" class="cl-media-tile" data-cl-rma-media-tile>
+            <a class="cl-media-thumb" th:classappend="${t.kind() == 'image'} ? 'is-photo'" th:href="@{${t.href()}}"
+               target="_blank" rel="noopener" th:attr="aria-label=#{rma.detail.media.open(${t.fileName()})}">
+                <img th:if="${t.kind() == 'image'}" th:src="@{${t.href()}}" alt="" loading="lazy">
+                <i th:unless="${t.kind() == 'image'}" aria-hidden="true"
+                   th:class="${t.kind() == 'video'} ? 'fas fa-play-circle' : (${t.kind() == 'pdf'} ? 'fas fa-file-pdf' : 'fas fa-file')"></i>
+            </a>
+            <div class="cl-media-meta">
+                <span class="cl-media-name" th:id="|media-name-${it.index}|" th:title="${t.fileName()}" th:text="${t.fileName()}"></span>
+                <th:block th:if="${editable}">
+                    <label class="cl-check" data-cl-rma-media-keep>
+                        <input type="checkbox" name="existingMedia" th:value="${t.key()}" checked data-cl-rma-media
+                               th:attr="aria-describedby=|media-name-${it.index}|">
+                        <span th:text="#{rma.detail.media.keep}"></span>
+                    </label>
+                    <button type="button" class="cl-link-button is-danger" hidden data-cl-rma-media-toggle
+                            th:attr="aria-describedby=|media-name-${it.index}|, data-remove-text=#{rma.detail.media.remove},
+                                     data-undo-text=#{rma.detail.media.undo}"
+                            th:text="#{rma.detail.media.remove}"></button>
+                </th:block>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${m.tiles().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.media.empty}"></p>
+</th:block>
+</body>
+</html>

@@ -23,7 +23,10 @@ class RmaDetailScriptContractTest {
         // given
         String js = read("static/js/rma-detail.js");
         String templates = read("templates/rma/detail/items.html") + read("templates/rma/detail/dialogs.html")
-                + read("templates/rma/detail/shipments.html") + read("templates/rma/detail/side.html");
+                + read("templates/rma/detail/shipments.html") + read("templates/rma/detail/side.html")
+                + read("templates/rma/detail/media.html") + read("templates/rma/detail/history.html")
+                + read("templates/rma/detail/parts.html") + read("templates/rma/detail/header.html")
+                + read("templates/rma-detail.html");
 
         // then
         for (String hook : new String[]{"rmaItemsForm", "data-rma-id", "data-cl-select-row", "data-status", "data-qty",
@@ -33,19 +36,25 @@ class RmaDetailScriptContractTest {
                 "data-cl-field-error", "split-qty1", "data-cl-rma-qty2", "data-cl-rma-split-name", "data-cl-rma-sum",
                 "data-cl-rma-enable", "data-skip-", "data-qty-template", "data-skipped-template", "data-cl-enter-guard",
                 "data-cl-rma-required", "data-cl-rma-counter", "data-cl-rma-add", "data-max-qty", "data-unit-price",
-                "data-cl-rma-add-max", "data-cl-rma-add-effect", "data-cl-rma-split-form", "data-cl-rma-js-only"}) {
+                "data-cl-rma-add-max", "data-cl-rma-add-effect", "data-cl-rma-split-form", "data-cl-rma-js-only",
+                "data-cl-rma-media", "data-cl-rma-media-toggle", "data-cl-rma-media-alert", "data-remove-text",
+                "data-undo-text"}) {
             assertThat(js).as("script: " + hook).contains(hook);
             assertThat(templates).as("templates: " + hook).contains(hook);
         }
         assertThat(templates).contains("name=\"qty2\"").contains("name=\"qty1\"").contains("checkSerialNumbers");
         assertThat(js).contains("/items/").contains("/split");
+        // a removed file stays in the form as an unchecked box; the script never drops the element
+        assertThat(js).contains("is-removed").doesNotContain(".remove()");
+        // with the script the split's second quantity follows the first and is not typed
+        assertThat(js).contains("readOnly");
         // the POST-only links are shown only where confirm-dialog.js can open its dialog
         assertThat(js).contains("HTMLDialogElement.prototype.showModal");
         assertThat(js).doesNotContain("alert(").doesNotContain("innerHTML").doesNotContain("onclick");
         // a string replacement would read "$&" in an item name as a pattern; placeholders go through a function
         assertThat(js).doesNotContainPattern("\\.replace\\('\\{");
         assertThat(templates).doesNotContain("onclick").doesNotContain("onchange").doesNotContain("style=")
-                .doesNotContain("<script");
+                .doesNotContainPattern("<script(?![^>]*src=)").doesNotContain("<style");
     }
 
     @Test

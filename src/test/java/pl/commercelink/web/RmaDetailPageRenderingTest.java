@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
-import org.thymeleaf.templatemode.TemplateMode;
-import org.thymeleaf.templateresolver.DefaultTemplateResolver;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.event.Event;
+import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
@@ -24,32 +24,27 @@ import pl.commercelink.web.rma.RmaDetailPage;
 import pl.commercelink.web.rma.RmaDetailPageFactory;
 import pl.commercelink.web.rma.RmaNotice;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The page frame of rma-detail.html: record header, notices and layout. The blocks not redesigned yet live in
- * rma/detail/legacy.html, whose th:field bindings need a Spring request context; here it is replaced by a stub with the
- * same fragment names, so only the new markup is rendered and checked.
+ * rma-detail.html rendered with the real templates: record header, notices, layout and every card and dialog. The
+ * page reads only the view objects (page, rmaItemsForm, rmaShipments, rmaNotice), so a plain Thymeleaf engine renders
+ * all of it.
  */
 class RmaDetailPageRenderingTest {
 
     private static final String RMA_ID = "rma-1abc-2222-3333-4444-555566667777";
     private static final String CLIENT_LINK = "https://app.example/store/store-1/client/rma/" + RMA_ID;
-    private static final String LEGACY_STUB = """
-            <html><body>
-            <div th:fragment="details">LEGACY-DETAILS</div>
-            <div th:fragment="events">LEGACY-EVENTS</div>
-            <div th:fragment="marketplace">LEGACY-MARKETPLACE</div>
-            <th:block th:fragment="scripts">LEGACY-SCRIPTS</th:block>
-            </body></html>""";
 
     private RmaDetailPageFactory factory;
 
@@ -124,12 +119,6 @@ class RmaDetailPageRenderingTest {
     private static String render(String template, RmaDetailPage page, RmaNotice notice, RMAItemsForm form,
                                  RmaShipmentsView shipments) {
         TemplateEngine engine = EnglishFragmentTemplateEngine.create();
-        DefaultTemplateResolver legacy = new DefaultTemplateResolver();
-        legacy.setOrder(0);
-        legacy.setTemplateMode(TemplateMode.HTML);
-        legacy.setResolvablePatterns(Set.of("rma/detail/legacy"));
-        legacy.setTemplate(LEGACY_STUB);
-        engine.addTemplateResolver(legacy);
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("page", page);
         context.setVariable("rmaNotice", notice);
@@ -192,8 +181,15 @@ class RmaDetailPageRenderingTest {
         String html = render("rma-detail :: body", page(rma), null);
 
         // then
-        assertThat(html).contains("href=\"/dashboard/rma/" + RMA_ID + "/resend-marketplace-decision\"")
-                .contains("data-cl-confirm-tone=\"primary\"").contains("id=\"cl-confirm-dialog\"");
+        String resend = "action=\"/dashboard/rma/" + RMA_ID + "/resend-marketplace-decision\"";
+        assertThat(html).containsPattern("<a class=\"cl-menu-item\" href=\"#zwrot-marketplace\" data-cl-dialog-open=\"resend-dialog\"")
+                .contains("id=\"zwrot-marketplace\"");
+        assertThat(dialog(html, "resend-dialog")).contains("method=\"post\" " + resend)
+                .contains("Send the decisions to Allegro again?").contains("cl-button is-primary");
+        // the card's own button opens the dialog with JavaScript; without it a plain POST form stands in
+        assertThat(html).containsPattern("hidden data-cl-rma-js-only data-cl-dialog-open=\"resend-dialog\"")
+                .containsPattern("(?s)<noscript><form method=\"post\" " + Pattern.quote(resend));
+        assertThat(html).doesNotContain("href=\"/dashboard/rma/" + RMA_ID + "/resend-marketplace-decision\"");
         assertThat(html).contains("Allegro: return RT-5512-0931");
     }
 
@@ -227,9 +223,9 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??").doesNotContain("style=").doesNotContain("onclick");
-        assertThat(html).contains("LEGACY-DETAILS").contains("LEGACY-EVENTS").contains("id=\"przesylki\"")
-                .contains("id=\"address-title\"");
-        assertThat(html).contains("class=\"cl-list-empty\"").doesNotContain("LEGACY-ITEMS");
+        assertThat(html).contains("id=\"przesylki\"").contains("id=\"address-title\"").contains("id=\"pliki\"")
+                .contains("id=\"settings-title\"").contains("id=\"historia\"").doesNotContain("id=\"zwrot-marketplace\"");
+        assertThat(html).contains("class=\"cl-list-empty\"");
     }
 
     @Test
@@ -252,7 +248,7 @@ class RmaDetailPageRenderingTest {
         assertThat(html).contains("data-cl-rma-action=\"accept\"").contains("data-accepts=\"Received\"")
                 .contains("data-single-min-qty=\"2\"").contains("data-skip-New=\"not received yet\"");
         assertThat(html).contains("Items (2)").contains("Client wants: return · unresolved").contains("2 × 100,00 PLN");
-        assertThat(html).doesNotContain("??").doesNotContain("LEGACY-ITEMS");
+        assertThat(html).doesNotContain("??");
     }
 
     @Test
@@ -414,18 +410,33 @@ class RmaDetailPageRenderingTest {
         while (forms.find()) {
             found.add(forms.group());
         }
-        assertThat(found).hasSize(3);
+        // next, status, reject, the media card and the settings card; nothing else posts there
+        assertThat(found).hasSize(5);
+        assertThat(Pattern.compile("<form[^>]*action=\"/dashboard/rma/" + RMA_ID + "\"").matcher(html).results().count())
+                .isEqualTo(found.size());
         for (String form : found) {
             assertThat(form).contains("data-cl-rma-details-form");
-            for (String field : new String[]{"status", "email", "rejectionReason", "emailNotificationsEnabled", "shippingInsurance"}) {
-                assertThat(form).as(field).contains("name=\"" + field + "\"");
+            for (String field : new String[]{"email", "rejectionReason", "emailNotificationsEnabled", "shippingInsurance"}) {
+                assertThat(fields(form, field)).as(field).hasSize(1);
+            }
+            List<String> status = fields(form, "status");
+            assertThat(status).as("status").isNotEmpty();
+            if (status.size() > 1) {
+                assertThat(status).allMatch(f -> f.contains("type=\"radio\""));
             }
             assertThat(inputs(form, "existingMedia")).hasSize(2);
             assertThat(form).contains("value=\"store-1/rma/x/photo.jpg\"").contains("value=\"store-1/rma/x/invoice.pdf\"");
-            assertThat(inputs(form, "emailNotificationsEnabled")).singleElement().asString().contains("value=\"false\"");
             assertThat(inputs(form, "shippingInsurance")).singleElement().asString().contains("value=\"4247.00\"");
             assertThat(inputs(form, "email")).singleElement().asString().contains("value=\"jan@example.com\"");
         }
+        String media = found.stream().filter(f -> f.contains("name=\"rmaMedia\"")).findFirst().orElseThrow();
+        assertThat(media).contains("enctype=\"multipart/form-data\"");
+        assertThat(inputs(media, "existingMedia")).allMatch(i -> i.contains("type=\"checkbox\"") && i.contains("checked"));
+        assertThat(inputs(media, "emailNotificationsEnabled")).singleElement().asString().contains("value=\"false\"");
+        String settings = found.stream().filter(f -> f.contains("name=\"_emailNotificationsEnabled\"")).findFirst().orElseThrow();
+        assertThat(inputs(settings, "existingMedia")).allMatch(i -> i.contains("type=\"hidden\""));
+        assertThat(settings).doesNotContain("name=\"rmaMedia\"");
+        assertThat(found.stream().filter(f -> f.contains("name=\"rmaMedia\""))).hasSize(1);
         assertThat(dialog(html, "next-dialog")).contains("name=\"status\" value=\"Processing\"")
                 .contains("name=\"rejectionReason\" value=\"Old reason\"");
         assertThat(dialog(html, "reject-dialog")).contains("name=\"status\" value=\"Rejected\"")
@@ -698,7 +709,6 @@ class RmaDetailPageRenderingTest {
                 .contains("class=\"cl-dialog-title\"").contains("data-cl-dialog-close").doesNotContain("cl-card-footer")
                 // the page form's 760 px cap would leave the wide dialog half empty
                 .doesNotContain("class=\"cl-form\"");
-        assertThat(html).doesNotContain("LEGACY-SHIPPING");
     }
 
     @Test
@@ -721,6 +731,175 @@ class RmaDetailPageRenderingTest {
         assertThat(closed).doesNotContain("data-cl-dialog-open=\"address-dialog\"").doesNotContain("id=\"address-dialog\"");
     }
 
+    @Test
+    void mediaTilesKeepFilesByCheckboxAndUploadKeepsTheAcceptedFormats() {
+        // given
+        RMA rma = rma(RMAStatus.ItemsReceived);
+        rma.setMedia(List.of("store-1/rma/x/photo.jpg", "store-1/rma/x/clip.mp4", "store-1/rma/x/protocol.pdf"));
+        RMA closed = rma(RMAStatus.Completed);
+        closed.setMedia(List.of("store-1/rma/x/photo.jpg"));
+
+        // when
+        String html = section(render("rma-detail :: body", page(rma), null), "pliki");
+        String empty = section(render("rma-detail :: body", page(rma(RMAStatus.ItemsReceived)), null), "pliki");
+        String readOnly = section(render("rma-detail :: body", page(closed), null), "pliki");
+
+        // then
+        assertThat(html).contains("<ul class=\"cl-media-grid\">");
+        assertThat(Pattern.compile("<li class=\"cl-media-tile\"").matcher(html).results().count()).isEqualTo(3);
+        assertThat(inputs(html, "existingMedia")).hasSize(3).allSatisfy(i -> assertThat(i)
+                .contains("type=\"checkbox\"").contains("checked").contains("data-cl-rma-media"));
+        assertThat(html).contains("<span>Keep</span>");
+        assertThat(html).contains("href=\"/rma/" + RMA_ID + "/media/photo.jpg\"").contains("target=\"_blank\"")
+                .contains("<img src=\"/rma/" + RMA_ID + "/media/photo.jpg\"").contains("fa-play-circle").contains("fa-file-pdf");
+        assertThat(inputs(html, "rmaMedia")).singleElement().asString().contains("class=\"cl-file\"").contains("multiple")
+                .contains("accept=\".jpg,.jpeg,.png,.gif,.pdf,.mp4,.mov,.avi,.mkv\"");
+        assertThat(html).contains("cl-file-row").contains("Save files");
+        assertThat(html).containsPattern("data-cl-rma-media-alert[^>]*hidden|hidden[^>]*data-cl-rma-media-alert");
+        assertThat(empty).contains("No files.").contains("name=\"rmaMedia\"");
+        assertThat(readOnly).contains("cl-media-tile").doesNotContain("name=\"existingMedia\"")
+                .doesNotContain("name=\"rmaMedia\"").doesNotContain("Save files");
+    }
+
+    @Test
+    void theNotificationsCheckboxCanBeUncheckedWithoutLosingTheField() {
+        // given
+        RMA rma = rma(RMAStatus.ItemsReceived);
+        rma.setEmailNotificationsEnabled(true);
+        rma.setShippingInsurance(4247);
+
+        // when
+        String html = render("rma-detail :: body", page(rma), null);
+        String closed = render("rma-detail :: body", page(rma(RMAStatus.Completed)), null);
+
+        // then
+        assertThat(inputs(html, "emailNotificationsEnabled")).anySatisfy(i -> assertThat(i)
+                .contains("type=\"checkbox\"").contains("value=\"true\"").contains("checked"));
+        assertThat(inputs(html, "_emailNotificationsEnabled")).singleElement().asString().contains("type=\"hidden\"");
+        assertThat(inputs(html, "shippingInsurance")).anySatisfy(i -> assertThat(i).contains("type=\"number\"")
+                .contains("step=\"0.01\"").contains("required").contains("value=\"4247.00\""));
+        assertThat(html).contains("Send the customer e-mails about changes");
+        assertThat(closed).doesNotContain("name=\"_emailNotificationsEnabled\"").contains("E-mail notifications")
+                .contains("<dd>jan@example.com</dd>");
+    }
+
+    @Test
+    void theEmailIsRequiredOnAStoreRmaButNotOnAMarketplaceReturn() {
+        // given: marketplace returns are imported with email == null (the marketplace's address is an alias and its
+        // buyer notifications are disabled), so a required e-mail would block every save of such an RMA
+        RMA store = rma(RMAStatus.New);
+        RMA marketplace = rma(RMAStatus.New);
+        marketplace.setEmail(null);
+        marketplace.setMarketplace("Empik");
+        marketplace.setExternalReturnId("ret-1");
+
+        // when
+        String storeHtml = render("rma-detail :: body", page(store), null);
+        String marketplaceHtml = render("rma-detail :: body", page(marketplace), null);
+
+        // then
+        assertThat(inputs(storeHtml, "email")).anySatisfy(i -> assertThat(i).contains("type=\"email\"").contains("required"));
+        assertThat(inputs(marketplaceHtml, "email")).anySatisfy(i -> assertThat(i).contains("type=\"email\"")
+                .doesNotContain("required"));
+        assertThat(marketplaceHtml).contains("Buyer from Empik");
+    }
+
+    @Test
+    void marketplaceCardNamesTheMarketplaceFromTheRmaAndListsDecisions() {
+        // given
+        RMA rma = rma(RMAStatus.WaitingForItems);
+        rma.setMarketplace("Empik");
+        rma.setExternalReturnId("ret-1");
+        rma.setExternalReturnReference("EM-77");
+        MarketplaceDecision decision = new MarketplaceDecision();
+        decision.setType("ReturnAccepted");
+        decision.setCommandId("5b1d0000-1111-2222-3333-44445555e07a");
+        decision.setRecordedAt(LocalDateTime.of(2026, 10, 16, 11, 42));
+        rma.setMarketplaceDecisions(new ArrayList<>(List.of(decision)));
+        RMA none = rma(RMAStatus.WaitingForItems);
+        none.setMarketplace("Empik");
+        none.setExternalReturnId("ret-2");
+
+        // when
+        String card = section(render("rma-detail :: body", page(rma), null), "zwrot-marketplace");
+        String empty = section(render("rma-detail :: body", page(none), null), "zwrot-marketplace");
+
+        // then
+        assertThat(card).contains("Return from Empik").contains("Status in Empik").contains("Decisions sent to Empik")
+                .contains("EM-77").contains("Refund").contains("16.10.2026 11:42")
+                .contains("title=\"5b1d0000-1111-2222-3333-44445555e07a\"").contains("5b1d…e07a")
+                .doesNotContain("Allegro");
+        assertThat(card).contains("data-cl-dialog-open=\"resend-dialog\"");
+        assertThat(empty).contains("No decision has been sent yet.").doesNotContain("resend-dialog");
+    }
+
+    @Test
+    void historyCollapsesAfterFourEvents() {
+        // given
+        RMA rma = rma(RMAStatus.Processing);
+        for (int day = 13; day <= 16; day++) {
+            rma.addEvent(new Event(EventType.email,
+                    "RMA_ITEMS_RECEIVED", LocalDateTime.of(2026, 10, day, 9, 0)));
+        }
+        RMA fewEvents = rma(RMAStatus.Processing);
+
+        // when
+        String card = section(render("rma-detail :: body", page(rma), null), "historia");
+        String few = section(render("rma-detail :: body", page(fewEvents), null), "historia");
+
+        // then
+        assertThat(card).contains("data-cl-collapse").contains("class=\"cl-collapse-body\"")
+                .containsPattern("<ol class=\"cl-timeline\" id=\"history-events\" data-cl-timeline-limit=\"4\"");
+        assertThat(Pattern.compile("<li class=\"cl-timeline-item\"").matcher(card).results().count()).isEqualTo(5);
+        assertThat(card.indexOf("16.10.2026 09:00")).isLessThan(card.indexOf("13.10.2026 09:00"));
+        assertThat(card.indexOf("13.10.2026 09:00")).isLessThan(card.indexOf("RMA reported"));
+        assertThat(card).contains("data-cl-timeline-more").contains("aria-controls=\"history-events\"");
+        assertThat(few).doesNotContain("data-cl-timeline-more").doesNotContain("data-cl-timeline-limit");
+    }
+
+    @Test
+    void aRejectedRmaShowsTheLockCardWithTheReason() {
+        // given
+        RMA rejected = rma(RMAStatus.Rejected);
+        rejected.setRejectionReason("No proof of purchase");
+
+        // when
+        String html = render("rma-detail :: body", page(rejected), null);
+        String completed = render("rma-detail :: body", page(rma(RMAStatus.Completed)), null);
+        String open = render("rma-detail :: body", page(rma(RMAStatus.Processing)), null);
+
+        // then
+        assertThat(html).contains("class=\"cl-card is-status\"").contains("fa-lock").contains("RMA rejected")
+                .contains("No proof of purchase");
+        assertThat(html.indexOf("cl-card is-status")).isLessThan(html.indexOf("id=\"pozycje\""));
+        assertThat(completed).contains("RMA completed").doesNotContain("No proof of purchase");
+        assertThat(open).doesNotContain("cl-card is-status");
+    }
+
+    @Test
+    void thePageHasNoBulmaLeftovers() {
+        // given
+        RMA rma = rma(RMAStatus.ItemsReceived);
+        rma.setMedia(List.of("store-1/rma/x/photo.jpg"));
+        rma.setMarketplace("Allegro");
+        rma.setExternalReturnId("ret-1");
+        String source = readTemplates("rma-detail", "rma/detail/header", "rma/detail/items", "rma/detail/dialogs",
+                "rma/detail/shipments", "rma/detail/side", "rma/detail/parts", "rma/detail/media", "rma/detail/history");
+
+        // when
+        String html = render("rma-detail :: body", page(rma, twoItems(), List.of(orderItem()), false), null,
+                new RMAItemsForm(twoItems()));
+
+        // then
+        for (String page : new String[]{html, source}) {
+            assertThat(page).doesNotContain("class=\"box\"").doesNotContain("class=\"modal")
+                    .doesNotContainPattern("class=\"(?:[^\"]* )?columns?[ \"]").doesNotContain("onclick").doesNotContain("onchange")
+                    .doesNotContain("confirmSave").doesNotContain("style=").doesNotContain("<style")
+                    .doesNotContain("rma/detail/legacy");
+            assertThat(page).doesNotContainPattern("<script(?![^>]*src=)");
+        }
+    }
+
     private static String textarea(String html, String name) {
         Matcher matcher = Pattern.compile("<textarea[^>]*name=\"" + name + "\"[^>]*>").matcher(html);
         assertThat(matcher.find()).as(name).isTrue();
@@ -731,6 +910,36 @@ class RmaDetailPageRenderingTest {
         Matcher matcher = Pattern.compile("(?s)<dialog[^>]*id=\"" + id + "\".*?</dialog>").matcher(html);
         assertThat(matcher.find()).as(id).isTrue();
         return matcher.group();
+    }
+
+    private static String section(String html, String id) {
+        Matcher matcher = Pattern.compile("(?s)<section[^>]*id=\"" + id + "\".*?</section>").matcher(html);
+        assertThat(matcher.find()).as(id).isTrue();
+        return matcher.group();
+    }
+
+    private static String readTemplates(String... names) {
+        StringBuilder all = new StringBuilder();
+        for (String name : names) {
+            try (InputStream in = RmaDetailPageRenderingTest.class.getClassLoader()
+                    .getResourceAsStream("templates/" + name + ".html")) {
+                assertThat(in).as(name).isNotNull();
+                all.append(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                throw new IllegalStateException(name, e);
+            }
+        }
+        return all.toString();
+    }
+
+    /** Every element posting the field: inputs, textareas and selects. */
+    private static List<String> fields(String html, String name) {
+        Matcher matcher = Pattern.compile("<(input|textarea|select)[^>]*name=\"" + name + "\"[^>]*>").matcher(html);
+        List<String> found = new ArrayList<>();
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        return found;
     }
 
     private static List<String> inputs(String html, String name) {

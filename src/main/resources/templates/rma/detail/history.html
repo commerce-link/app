@@ -1,0 +1,26 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The RMA's history (RmaDetailPage.History), newest first and ending with its creation. timeline.js folds the events
+       past data-cl-timeline-limit under the row of fragments/timeline :: more, rendered only when there are more of
+       them; without JavaScript every event stays visible. On a phone the card collapses to its header (collapse.js). */-->
+<section th:fragment="card" class="cl-card" id="historia" aria-labelledby="history-title" data-cl-collapse
+         th:with="h=${page.history()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="history-title" th:text="#{rma.detail.history.title}"></h2></div>
+    <div class="cl-collapse-body" id="history-body">
+        <ol class="cl-timeline" id="history-events" th:if="${!h.events().isEmpty()}"
+            th:attr="data-cl-timeline-limit=${h.hidden() > 0} ? ${h.visible()} : null">
+            <li th:each="e : ${h.events()}" class="cl-timeline-item">
+                <time th:text="${e.at()}"></time>
+                <p class="cl-timeline-title" th:text="${e.title()}"></p>
+            </li>
+        </ol>
+        <!--/* th:replace outranks th:if, so the guard sits on a wrapper. */-->
+        <th:block th:if="${h.hidden() > 0}"><th:block
+                th:replace="~{fragments/timeline :: more('history-events', #{${h.moreKey()}(${h.hidden()})},
+                    #{order.history.shown(${h.hidden()})}, #{order.history.hidden(${h.hidden()})}, #{order.history.less})}"></th:block></th:block>
+        <p th:if="${h.events().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.history.empty}"></p>
+    </div>
+</section>
+</body>
+</html>

@@ -63,14 +63,11 @@
                     <a class="cl-menu-item" th:href="${h.clientLink()}" target="_blank" rel="noopener"
                        th:text="#{rma.detail.menu.clientPage}"></a>
                 </li>
-                <!--/* offered on a closed RMA too: resending is how a decision lost on the way (DLQ) is recovered */-->
-                <li th:if="${h.resendHref() != null and page.marketplaceCard() != null}"
-                    th:with="card=${page.marketplaceCard()}">
-                    <a class="cl-menu-item" th:href="@{${h.resendHref()}}" data-cl-confirm data-cl-confirm-tone="primary"
-                       th:attr="data-cl-confirm-title=#{rma.detail.resend.confirm.title(${card.name()})},
-                                data-cl-confirm-message=#{rma.detail.resend.confirm.message(${card.name()}, ${card.decisions().size()})},
-                                data-cl-confirm-action=#{rma.detail.resend.confirm.action}"
-                       th:text="#{rma.detail.menu.resend(${card.name()})}"></a>
+                <!--/* offered on a closed RMA too: resending is how a decision lost on the way (DLQ) is recovered. It opens
+                       the marketplace card's #resend-dialog; without JavaScript it leads to the card and its POST form. */-->
+                <li th:if="${h.resendHref() != null and page.marketplaceCard() != null}">
+                    <a class="cl-menu-item" href="#zwrot-marketplace" data-cl-dialog-open="resend-dialog"
+                       th:text="#{rma.detail.menu.resend(${page.marketplaceCard().name()})}"></a>
                 </li>
                 <li>
                     <a th:if="${h.canChangeStatus()}" class="cl-menu-item" href="?open=status"

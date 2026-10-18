@@ -1,6 +1,123 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
+<!--/* "Klient i ustawienia" (RmaDetailPage.Settings): one details save (spec §5.1) editing the e-mail, the notifications
+       and the insurance; the other fields go along as they are. An unticked box posts nothing, so the
+       _emailNotificationsEnabled marker tells Spring to bind false. A marketplace buyer's e-mail is optional: the
+       marketplace sends the e-mails. A closed RMA shows the three values. */-->
+<section th:fragment="settings" class="cl-card" aria-labelledby="settings-title"
+         th:with="s=${page.settings()}, market=${page.marketplaceCard() != null ? page.marketplaceCard().name() : null}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="settings-title" th:text="#{rma.detail.settings.title}"></h2></div>
+    <form th:unless="${page.closed()}" class="cl-form" method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}"
+          data-cl-rma-details-form>
+        <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'email', 'emailNotificationsEnabled', 'shippingInsurance'} })}"></th:block>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" for="settings-email"><span th:text="#{rma.detail.settings.email}"></span>
+                    <span th:unless="${s.emailRequired()}" class="cl-optional" th:text="#{form.optional}"></span></label>
+                <input class="cl-input" id="settings-email" name="email" type="email" autocomplete="off"
+                       th:value="${s.email()}" th:required="${s.emailRequired()}"
+                       th:attr="aria-describedby=${market != null} ? 'settings-email-help' : null">
+                <p th:if="${market != null}" class="cl-help" id="settings-email-help"
+                   th:text="#{rma.detail.settings.email.help.marketplace(${market})}"></p>
+            </div>
+            <div class="cl-span-6 cl-field">
+                <label class="cl-check">
+                    <input type="checkbox" name="emailNotificationsEnabled" value="true" th:checked="${s.notifications()}"
+                           aria-describedby="settings-notifications-help">
+                    <span th:text="#{rma.detail.settings.notifications}"></span>
+                </label>
+                <input type="hidden" name="_emailNotificationsEnabled" value="on">
+                <p class="cl-help" id="settings-notifications-help" th:text="#{rma.detail.settings.notifications.help}"></p>
+            </div>
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" for="settings-insurance" th:text="#{rma.detail.settings.insurance}"></label>
+                <input class="cl-input is-numeric cl-input-days" id="settings-insurance" name="shippingInsurance" type="number"
+                       step="0.01" required inputmode="decimal" th:value="${s.insurance()}"
+                       aria-describedby="settings-insurance-help">
+                <p class="cl-help" id="settings-insurance-help" th:text="#{rma.detail.settings.insurance.help}"></p>
+            </div>
+        </div>
+        <div class="cl-card-footer">
+            <button type="submit" class="cl-button is-primary" th:text="#{general.save}"></button>
+        </div>
+    </form>
+    <dl th:if="${page.closed()}" class="cl-kv is-column cl-card-inset">
+        <div>
+            <dt th:text="#{rma.detail.settings.email.short}"></dt>
+            <dd th:text="${s.email() != null} ? ${s.email()} : '—'"></dd>
+        </div>
+        <div>
+            <dt th:text="#{rma.detail.settings.notifications.short}"></dt>
+            <dd th:text="${s.notifications()} ? #{rma.detail.settings.notifications.on} : #{rma.detail.settings.notifications.off}"></dd>
+        </div>
+        <div>
+            <dt th:text="#{rma.detail.settings.insurance.short}"></dt>
+            <dd class="is-numeric" th:text="${s.insuranceLabel()}"></dd>
+        </div>
+    </dl>
+</section>
+
+<!--/* "Zwrot z {marketplace}" (RmaDetailPage.MarketplaceCard), only on a return imported from a marketplace: its status
+       there, the return number and the decisions sent to it. "Wyślij decyzje ponownie…" opens #resend-dialog (also from
+       "Więcej", which links here); without JavaScript a plain POST form stands in. Resending stays offered on a closed
+       RMA: it is how a decision lost on the way is recovered. */-->
+<section th:fragment="marketplace" th:if="${page.marketplaceCard() != null}" class="cl-card" id="zwrot-marketplace"
+         aria-labelledby="marketplace-title" th:with="c=${page.marketplaceCard()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="marketplace-title" th:text="#{rma.detail.marketplace.title(${c.name()})}"></h2>
+    </div>
+    <dl class="cl-kv is-column cl-card-inset">
+        <div>
+            <dt th:text="#{rma.detail.marketplace.state(${c.name()})}"></dt>
+            <dd><span th:if="${c.statusLabel() != null}" class="cl-status" th:classappend="${c.statusTone()}"
+                      th:text="${c.statusLabel()}"></span><th:block th:if="${c.statusLabel() == null}">—</th:block></dd>
+        </div>
+        <div>
+            <dt th:text="#{rma.detail.marketplace.reference}"></dt>
+            <dd th:text="${c.reference() != null} ? ${c.reference()} : '—'"></dd>
+        </div>
+    </dl>
+    <div class="cl-card-head">
+        <h3 class="cl-card-title" th:text="#{rma.detail.marketplace.decisions(${c.name()})}"></h3>
+    </div>
+    <ul th:unless="${c.decisions().isEmpty()}" class="cl-list">
+        <li th:each="d : ${c.decisions()}" class="cl-list-item">
+            <div>
+                <p class="cl-list-title"><span th:text="${d.typeLabel()}"></span></p>
+                <p class="cl-list-desc">
+                    <span th:if="${d.recordedAt() != null}" th:text="${d.recordedAt()}"></span>
+                    <th:block th:if="${d.recordedAt() != null and d.commandShort() != null}"> · </th:block>
+                    <span th:if="${d.commandShort() != null}" th:title="${d.commandId()}"
+                          th:text="#{rma.detail.marketplace.decision.key(${d.commandShort()})}"></span>
+                </p>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${c.decisions().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.marketplace.decisions.empty}"></p>
+    <div th:if="${c.resendHref() != null}" class="cl-card-footer">
+        <button type="button" class="cl-link-button" hidden data-cl-rma-js-only data-cl-dialog-open="resend-dialog"
+                th:text="#{rma.detail.marketplace.resend}"></button>
+        <noscript><form method="post" th:action="@{${c.resendHref()}}"><button type="submit" class="cl-link-button"
+                th:text="#{rma.detail.marketplace.resend}"></button></form></noscript>
+    </div>
+</section>
+
+<!--/* The resend POST, unchanged; offered while decisions are recorded. */-->
+<dialog th:fragment="resendDialog" th:if="${page.marketplaceCard() != null and page.marketplaceCard().resendHref() != null}"
+        class="cl-dialog is-form" id="resend-dialog" aria-labelledby="resend-dialog-title" th:with="c=${page.marketplaceCard()}">
+    <form method="post" th:action="@{${c.resendHref()}}">
+        <h2 class="cl-dialog-title" id="resend-dialog-title" th:text="#{rma.detail.resend.confirm.title(${c.name()})}"></h2>
+        <div class="cl-dialog-body">
+            <p class="cl-dialog-effect" th:text="#{rma.detail.resend.confirm.message(${c.name()}, ${c.decisions().size()})}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.resend.confirm.action}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+
 <!--/* The return address card of the RMA details page (RmaDetailPage.Address): the address "Wyślij do klienta" sends
        the goods back to. "Edytuj" (or "Uzupełnij" without an address) opens the address form in a dialog; without
        JavaScript it leads to the address page. A missing or incomplete address is a warning, because shipping to the

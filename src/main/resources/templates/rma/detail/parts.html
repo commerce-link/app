@@ -14,5 +14,20 @@
         </ul>
     </div>
 </div>
+
+<!--/* The lock card on top of a closed RMA's work column (spec §4.9, the pattern of the RMA item page): why nothing can be
+       changed any more and, on a rejected RMA, the reason it was rejected with. */-->
+<section th:fragment="closedStatus" th:if="${page.closed()}" class="cl-card is-status" aria-labelledby="closed-title"
+         th:with="c=${page.current()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="closed-title"><i class="fas fa-lock" aria-hidden="true"></i><span
+            th:text="${c.status() == 'Rejected'} ? #{rma.detail.closed.Rejected} : #{rma.detail.closed.Completed}"></span></h2></div>
+    <p class="cl-card-desc" th:text="#{rma.detail.closed.text}"></p>
+    <dl th:if="${c.status() == 'Rejected' and !#strings.isEmpty(c.rejectionReason())}" class="cl-kv is-column cl-card-inset">
+        <div class="cl-kv-wide">
+            <dt th:text="#{rma.detail.reject.reason}"></dt>
+            <dd class="cl-kv-text" th:text="${c.rejectionReason()}"></dd>
+        </div>
+    </dl>
+</section>
 </body>
 </html>

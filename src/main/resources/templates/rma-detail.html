@@ -4,8 +4,9 @@
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
-    <!--/* RMA details (RmaDetailPage). The blocks still in the old look come from rma/detail/legacy.html until each one
-           is redesigned; they keep their own forms and scripts. */-->
+    <!--/* RMA details (RmaDetailPage): the record header, the work column (lock card of a closed RMA, items, shipments,
+           files) and the side column (customer and settings, marketplace return, return address, history). Every form
+           posting to /dashboard/rma/{id} carries the full field set (rma/detail/dialogs :: currentFields). */-->
     <section class="cl-page" th:fragment="body">
         <div class="cl-page-body is-wide">
             <div th:replace="~{rma/detail/header :: header}"></div>
@@ -13,26 +14,30 @@
 
             <div class="cl-layout-aside">
                 <div class="cl-layout-main">
+                    <section th:replace="~{rma/detail/parts :: closedStatus}"></section>
                     <section th:replace="~{rma/detail/items :: card}"></section>
                     <section th:replace="~{rma/detail/shipments :: card}"></section>
+                    <section th:replace="~{rma/detail/media :: card}"></section>
                 </div>
                 <div class="cl-layout-side">
-                    <div th:replace="~{rma/detail/legacy :: details}"></div>
-                    <th:block th:replace="~{rma/detail/legacy :: marketplace}"></th:block>
+                    <section th:replace="~{rma/detail/side :: settings}"></section>
+                    <section th:replace="~{rma/detail/side :: marketplace}"></section>
                     <section th:replace="~{rma/detail/side :: address}"></section>
-                    <div th:replace="~{rma/detail/legacy :: events}"></div>
+                    <section th:replace="~{rma/detail/history :: card}"></section>
                 </div>
             </div>
 
             <th:block th:replace="~{rma/detail/dialogs :: single}"></th:block>
             <th:block th:replace="~{rma/detail/shipments :: dialogs}"></th:block>
             <dialog th:replace="~{rma/detail/side :: addressDialog}"></dialog>
+            <dialog th:replace="~{rma/detail/side :: resendDialog}"></dialog>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-    <th:block th:replace="~{rma/detail/legacy :: scripts}"></th:block>
     <script th:src="@{/js/menu.js}" defer></script>
     <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/collapse.js}" defer></script>
+    <script th:src="@{/js/timeline.js}" defer></script>
     <script th:src="@{/js/table-select.js}" defer></script>
     <script th:src="@{/js/money.js}" defer></script>
     <script th:src="@{/js/copy-field.js}" defer></script>

@@ -1,5 +1,7 @@
 package pl.commercelink.web.rma;
 
+import pl.commercelink.web.orders.PluralForm;
+
 import java.util.List;
 
 /**
@@ -92,6 +94,15 @@ public record RmaDetailPage(String rmaId, String shortId, boolean closed, boolea
 
     /** events: newest first, ending with the RMA's creation; visible: how many show before "Pokaż starsze". */
     public record History(List<Event> events, int visible) {
+
+        /** The events past the first visible ones, folded under "Pokaż starsze" (0 when all of them show). */
+        public int hidden() {
+            return Math.max(0, events.size() - visible);
+        }
+
+        public String moreKey() {
+            return "order.history.more." + PluralForm.of(hidden());
+        }
     }
 
     public record Event(String at, String title) {

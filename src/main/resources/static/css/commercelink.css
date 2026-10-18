@@ -13580,6 +13580,75 @@ a.cl-link-button:hover {
     min-height: 72px;
 }
 
+/* cl-media-grid: attached files as tiles (first on the RMA details page). Each cl-media-tile has a thumbnail
+   (cl-media-thumb, a link to the file; .is-photo holds the image itself, other kinds an icon), the file name and the
+   tile's action under it. A tile marked is-removed is greyed and its name struck through until the save. */
+.cl-page .cl-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.cl-page .cl-media-tile {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+.cl-page .cl-media-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4 / 3;
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-3);
+    font-size: 28px;
+    text-decoration: none;
+}
+.cl-page .cl-media-thumb.is-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.cl-page .cl-media-thumb:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+.cl-page .cl-media-meta {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    padding: 6px 8px 8px;
+    font-size: 12.5px;
+}
+.cl-page .cl-media-name {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--cl-ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cl-page .cl-media-meta .cl-check {
+    min-height: 28px;
+    font-size: 12.5px;
+}
+.cl-page .cl-media-tile.is-removed {
+    border-style: dashed;
+}
+.cl-page .cl-media-tile.is-removed .cl-media-thumb,
+.cl-page .cl-media-tile.is-removed .cl-media-name {
+    opacity: .55;
+}
+.cl-page .cl-media-tile.is-removed .cl-media-name {
+    text-decoration: line-through;
+}
+
 /* RMA details page (spec docs/active/rma-detail-redesign/2026-10-17-rma-detail-design.md §9): only what the shared
    components have no counterpart for. */
 

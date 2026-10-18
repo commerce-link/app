@@ -412,9 +412,12 @@
 //   marketplace RMA the characters typed are counted against the limit (the counter's data-template);
 // - "Dodaj pozycję": the quantity is limited to the chosen order item (data-max-qty) and the effect names how much the
 //   insurance grows (data-unit-price × quantity, the server's own sum);
-// - the split without the items form (?open=split): the second quantity follows the first;
-// - the shipments card's POST-only menu entries (rma/detail/shipments :: card): the links that go through the
-//   confirmation dialog are shown ([data-cl-rma-js-only]); without JavaScript a noscript form stands in for each.
+// - the split without the items form (?open=split): the second quantity follows the first and is no longer typed;
+// - the POST-only controls (the shipments card's menu entries, the marketplace card's resend): the ones that go
+//   through a dialog are shown ([data-cl-rma-js-only]); without JavaScript a noscript form stands in for each;
+// - the files card (rma/detail/media :: card): each tile's "Zachowaj" box is replaced by "Usuń" / "Cofnij", which
+//   unticks and ticks it again (the box, not the tile, decides what the save keeps), and the alert above the grid
+//   names how many files the save will remove.
 // Every text comes from the templates' data attributes.
 (function () {
     'use strict';
@@ -523,6 +526,8 @@
             if (!first || !second) {
                 return;
             }
+            // without the script both quantities are typed; with it the second one is worked out
+            second.readOnly = true;
             first.addEventListener('input', function () {
                 var qty1 = parseInt(first.value, 10);
                 if (!isNaN(qty1)) {
@@ -530,6 +535,56 @@
                 }
             });
         });
+    }
+
+    // The Polish plural form, the same rule as the items card's script above and PluralForm.java.
+    function pluralForm(count) {
+        if (count === 1) {
+            return 'one';
+        }
+        var ones = count % 10;
+        var tens = count % 100;
+        return ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? 'few' : 'many';
+    }
+
+    function initMedia() {
+        var notice = document.querySelector('[data-cl-rma-media-alert]');
+        var boxes = Array.prototype.slice.call(document.querySelectorAll('input[data-cl-rma-media]'));
+        if (!notice || boxes.length === 0) {
+            return;
+        }
+        var text = notice.querySelector('.cl-alert-text');
+        var refresh = function () {
+            var removed = boxes.filter(function (box) {
+                return !box.checked;
+            }).length;
+            notice.hidden = removed === 0;
+            var attribute = { one: 'data-template-one', few: 'data-template-few', many: 'data-template-many' }[pluralForm(removed)];
+            text.textContent = removed === 0 ? '' : fill(notice.getAttribute(attribute) || '', '{n}', String(removed));
+        };
+        boxes.forEach(function (box) {
+            var tile = box.closest('[data-cl-rma-media-tile]');
+            var keep = box.closest('[data-cl-rma-media-keep]');
+            var toggle = tile && tile.querySelector('[data-cl-rma-media-toggle]');
+            if (!tile || !keep || !toggle) {
+                return;
+            }
+            var render = function () {
+                tile.classList.toggle('is-removed', !box.checked);
+                toggle.textContent = box.checked ? toggle.getAttribute('data-remove-text') : toggle.getAttribute('data-undo-text');
+                toggle.classList.toggle('is-danger', box.checked);
+            };
+            keep.hidden = true;
+            toggle.hidden = false;
+            toggle.addEventListener('click', function () {
+                box.checked = !box.checked;
+                render();
+                refresh();
+            });
+            // a page restored from the back/forward cache keeps the boxes as they were left
+            render();
+        });
+        refresh();
     }
 
     function showScriptedControls() {
@@ -546,6 +601,7 @@
         initReject();
         initAdd();
         initSplitForm();
+        initMedia();
         showScriptedControls();
     }
 
