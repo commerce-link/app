@@ -22,6 +22,7 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.rma.RmaAddressForm;
 import pl.commercelink.web.rma.RmaActionNotices;
 import pl.commercelink.web.rma.RmaAddressPage;
+import pl.commercelink.web.rma.RmaDetailPageFactory;
 import pl.commercelink.web.rma.RmaFlash;
 import pl.commercelink.web.rma.RmaNotice;
 import pl.commercelink.warehouse.api.ItemCondition;
@@ -62,6 +63,8 @@ public class RMAController {
 
     private final OrdersRepository ordersRepository;
 
+    private final RmaDetailPageFactory rmaDetailPageFactory;
+
     /** Set by "Ship to client" when the RMA's address is incomplete: the address page then shows every missing field. */
     public static final String ADDRESS_INCOMPLETE_FLASH = "rmaAddressIncomplete";
 
@@ -84,8 +87,11 @@ public class RMAController {
         }
     }
 
+    /** ?open= names the dialog rendered open without JavaScript (with ?item= for "split"); RmaDetailPage validates it. */
     @GetMapping("/dashboard/rma/{rmaId}")
-    public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
+    public String showRmaDetail(@PathVariable String rmaId, @RequestParam(required = false) String open,
+                                @RequestParam(name = "item", required = false) String splitItem, Model model,
+                                Locale locale) {
         RmaFlash.adoptLegacy(model);
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
@@ -107,8 +113,11 @@ public class RMAController {
         model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
-        model.addAttribute("refundDeliveryDefault",
-                rma.isMarketplaceReturn() && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems));
+        boolean refundDeliveryDefault = rma.isMarketplaceReturn()
+                && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems);
+        model.addAttribute("refundDeliveryDefault", refundDeliveryDefault);
+        model.addAttribute("page", rmaDetailPageFactory.page(getStoreId(), rma, rmaItems, remainingOrderItems,
+                orderAddressOf(rma), refundDeliveryDefault, rma.createClientRmaUrl(appDomain), open, splitItem, locale));
 
         return "rma-detail";
     }

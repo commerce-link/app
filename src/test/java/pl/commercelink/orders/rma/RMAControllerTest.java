@@ -11,12 +11,15 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.context.MessageSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import pl.commercelink.web.rma.RmaDetailPage;
+import pl.commercelink.web.rma.RmaDetailPageFactory;
 import pl.commercelink.web.rma.RmaFlash;
 import pl.commercelink.web.rma.RmaNotice;
 import org.springframework.util.LinkedMultiValueMap;
@@ -109,6 +112,9 @@ class RMAControllerTest {
 
     @Mock
     private RmaShipmentsViewFactory rmaShipmentsViewFactory;
+
+    @Spy
+    private RmaDetailPageFactory rmaDetailPageFactory = new RmaDetailPageFactory(realMessages());
 
     @InjectMocks
     private RMAController controller;
@@ -687,7 +693,7 @@ class RMAControllerTest {
     }
 
     // ------------------------------------------------------------------
-    // rma-detail.html: the email field is mandatory only for manual RMAs
+    // rma-detail.html (its details form, now in rma/detail/legacy.html): the email field is mandatory only for manual RMAs
     // ------------------------------------------------------------------
 
     @Test
@@ -709,16 +715,16 @@ class RMAControllerTest {
     }
 
     /**
-     * Renders the email input of {@code rma-detail.html} in isolation. The tag is taken from the real
+     * Renders the email input of {@code rma/detail/legacy.html} in isolation. The tag is taken from the real
      * template so a reverted {@code th:required} fails this test; only {@code th:field} and
      * {@code th:placeholder} are dropped, because those need a Spring binding context and the message
      * bundle, neither of which this plain unit test has.
      */
     private static String renderEmailInputOfRmaDetail(RMA rma) {
         Matcher emailInput = Pattern.compile("<input\\b[^>]*type=\"email\"[^>]*>")
-                .matcher(readTemplate("templates/rma-detail.html"));
+                .matcher(readTemplate("templates/rma/detail/legacy.html"));
         assertThat(emailInput.find())
-                .withFailMessage("no <input type=\"email\"> found in rma-detail.html")
+                .withFailMessage("no <input type=\"email\"> found in rma/detail/legacy.html")
                 .isTrue();
         String tag = emailInput.group().replaceAll("th:(field|placeholder)=\"[^\"]*\"", "");
 
@@ -741,9 +747,9 @@ class RMAControllerTest {
         failedCreation.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failed("Błąd"));
         RMA rma = rmaWithStatus(RMAStatus.Processing);
         rma.setShipments(new ArrayList<>(List.of(failedCreation, new Shipment(ShipmentType.Courier))));
-        String template = readTemplate("templates/rma-detail.html");
+        String template = readTemplate("templates/rma/detail/legacy.html");
         Matcher tbody = Pattern.compile("<tbody\\b[^>]*id=\"editRmaShipmentsBody\"[^>]*>").matcher(template);
-        assertThat(tbody.find()).withFailMessage("no editRmaShipmentsBody in rma-detail.html").isTrue();
+        assertThat(tbody.find()).withFailMessage("no editRmaShipmentsBody in rma/detail/legacy.html").isTrue();
 
         // when
         String html = render(tbody.group() + "</tbody>", rma);
@@ -979,11 +985,16 @@ class RMAControllerTest {
     // action outcomes are shown in the page, with the skipped items named
     // ------------------------------------------------------------------
 
-    private void answerMessagesFromTheRealBundles() {
+    private static ResourceBundleMessageSource realMessages() {
         ResourceBundleMessageSource real = new ResourceBundleMessageSource();
         real.setBasename("messages");
         real.setDefaultEncoding("UTF-8");
         real.setFallbackToSystemLocale(false);
+        return real;
+    }
+
+    private void answerMessagesFromTheRealBundles() {
+        ResourceBundleMessageSource real = realMessages();
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(inv -> real.getMessage(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)));
     }
@@ -1233,7 +1244,7 @@ class RMAControllerTest {
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.showRmaDetail(RMA_ID, model, Locale.ENGLISH);
+            controller.showRmaDetail(RMA_ID, null, null, model, Locale.ENGLISH);
         }
 
         // then
@@ -1241,5 +1252,29 @@ class RMAControllerTest {
         RmaNotice notice = (RmaNotice) model.getAttribute(RmaFlash.ATTRIBUTE);
         assertThat(notice.text()).isEqualTo("X");
         assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
+    }
+
+    @Test
+    void showRmaDetailPassesTheOpenDialogOnlyWhenKnown() {
+        // given
+        RMA rma = rmaWithStatus(RMAStatus.New);
+        rma.setRmaId(RMA_ID);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        Model known = new ExtendedModelMap();
+        Model unknown = new ExtendedModelMap();
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.showRmaDetail(RMA_ID, "next", null, known, Locale.ENGLISH);
+            controller.showRmaDetail(RMA_ID, "bogus", null, unknown, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("rma-detail");
+        assertThat(((RmaDetailPage) known.getAttribute("page")).openDialog()).isEqualTo("next");
+        assertThat(((RmaDetailPage) unknown.getAttribute("page")).openDialog()).isNull();
+        assertThat(known.asMap()).containsKeys("rma", "rmaItemsForm", "rmaShipments", "isClosed", "backofficeDomain");
     }
 }
