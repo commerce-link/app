@@ -44,7 +44,6 @@ class RmaDetailPageRenderingTest {
             <div th:fragment="details">LEGACY-DETAILS</div>
             <div th:fragment="events">LEGACY-EVENTS</div>
             <div th:fragment="marketplace">LEGACY-MARKETPLACE</div>
-            <div th:fragment="addItem">LEGACY-ADD-ITEM</div>
             <div th:fragment="shipping">LEGACY-SHIPPING</div>
             <div th:fragment="shipments">LEGACY-SHIPMENTS</div>
             <th:block th:fragment="scripts">LEGACY-SCRIPTS</th:block>
@@ -316,7 +315,9 @@ class RmaDetailPageRenderingTest {
         String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
 
         // then
-        assertThat(html).contains("href=\"?open=add\"").contains("data-cl-rma-legacy-add").contains("LEGACY-ADD-ITEM");
+        assertThat(html).contains("href=\"?open=add\"").contains("data-cl-dialog-open=\"add-dialog\"")
+                .doesNotContain("data-cl-rma-legacy-add");
+        assertThat(dialog(html, "add-dialog")).contains("action=\"/dashboard/rma/" + RMA_ID + "/add-item\"");
     }
 
     @Test
@@ -385,6 +386,177 @@ class RmaDetailPageRenderingTest {
         assertThat(delete).containsPattern("<button type=\"button\" class=\"cl-button\" data-cl-dialog-close autofocus=\"autofocus\">");
         assertThat(delete).doesNotContainPattern("<button type=\"submit\"[^>]*autofocus");
         assertThat(dialog(html, "accept-dialog")).doesNotContain("autofocus");
+    }
+
+    @Test
+    void everyFormPostingToTheDetailsActionCarriesTheFullFieldSet() {
+        // given
+        RMA rma = rma(RMAStatus.ItemsReceived);
+        rma.setMedia(List.of("store-1/rma/x/photo.jpg", "store-1/rma/x/invoice.pdf"));
+        rma.setRejectionReason("Old reason");
+        rma.setShippingInsurance(4247);
+        RmaDetailPage page = page(rma, twoItems(), List.of(orderItem()), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
+
+        // then
+        Matcher forms = Pattern.compile("(?s)<form[^>]*action=\"/dashboard/rma/" + RMA_ID + "\"[^>]*>.*?</form>").matcher(html);
+        List<String> found = new ArrayList<>();
+        while (forms.find()) {
+            found.add(forms.group());
+        }
+        assertThat(found).hasSize(3);
+        for (String form : found) {
+            assertThat(form).contains("data-cl-rma-details-form");
+            for (String field : new String[]{"status", "email", "rejectionReason", "emailNotificationsEnabled", "shippingInsurance"}) {
+                assertThat(form).as(field).contains("name=\"" + field + "\"");
+            }
+            assertThat(inputs(form, "existingMedia")).hasSize(2);
+            assertThat(form).contains("value=\"store-1/rma/x/photo.jpg\"").contains("value=\"store-1/rma/x/invoice.pdf\"");
+            assertThat(inputs(form, "emailNotificationsEnabled")).singleElement().asString().contains("value=\"false\"");
+            assertThat(inputs(form, "shippingInsurance")).singleElement().asString().contains("value=\"4247.00\"");
+            assertThat(inputs(form, "email")).singleElement().asString().contains("value=\"jan@example.com\"");
+        }
+        assertThat(dialog(html, "next-dialog")).contains("name=\"status\" value=\"Processing\"")
+                .contains("name=\"rejectionReason\" value=\"Old reason\"");
+        assertThat(dialog(html, "reject-dialog")).contains("name=\"status\" value=\"Rejected\"")
+                .doesNotContain("name=\"rejectionReason\" value=");
+    }
+
+    @Test
+    void theStatusDialogLeavesOutRejectedAndDisablesItemsReceivedWhileProcessing() {
+        // given
+        RmaDetailPage page = page(rma(RMAStatus.Processing));
+
+        // when
+        String html = render("rma-detail :: body", page, null);
+
+        // then
+        String status = dialog(html, "status-dialog");
+        List<String> radios = inputs(status, "status");
+        assertThat(radios).hasSize(6).noneMatch(radio -> radio.contains("value=\"Rejected\""));
+        assertThat(radios).filteredOn(radio -> radio.contains("value=\"ItemsReceived\"")).singleElement().asString()
+                .contains("disabled");
+        assertThat(radios).filteredOn(radio -> radio.contains("value=\"Processing\"")).singleElement().asString()
+                .contains("checked");
+        assertThat(radios).filteredOn(radio -> radio.contains("disabled")).hasSize(1);
+        assertThat(radios).filteredOn(radio -> radio.contains("checked")).hasSize(1);
+        assertThat(status).contains("type=\"radio\"").doesNotContain("type=\"hidden\" name=\"status\"");
+        assertThat(status).contains("Not available once processing has started.");
+        assertThat(status).doesNotContain("open=\"open\"");
+    }
+
+    @Test
+    void rejectDialogLimitsTheReasonOnlyOnAMarketplaceRma() {
+        // given
+        RMA marketplace = rma(RMAStatus.New);
+        marketplace.setExternalReturnId("r-1");
+        marketplace.setMarketplace("Allegro");
+
+        // when
+        String store = dialog(render("rma-detail :: body", page(rma(RMAStatus.New)), null), "reject-dialog");
+        String market = dialog(render("rma-detail :: body", page(marketplace), null), "reject-dialog");
+
+        // then
+        assertThat(textarea(store, "rejectionReason")).doesNotContain("maxlength").doesNotContain("data-cl-rma-counter")
+                .contains("required");
+        assertThat(textarea(market, "rejectionReason")).contains("maxlength=\"250\"").contains("data-cl-rma-counter")
+                .contains("required");
+        assertThat(market).contains("Allegro");
+        assertThat(store).contains("class=\"cl-button is-danger\"");
+    }
+
+    @Test
+    void openStatusRendersTheDialogOpenWithoutJavaScript() {
+        // given
+        RmaDetailPage page = factory.page("store-1", rma(RMAStatus.New), List.of(), List.of(), null, false, CLIENT_LINK,
+                "status", null, Locale.ENGLISH);
+
+        // when
+        String html = render("rma-detail :: body", page, null);
+
+        // then
+        assertThat(dialog(html, "status-dialog")).containsPattern("<dialog[^>]*open=\"open\"");
+        assertThat(dialog(html, "next-dialog")).doesNotContainPattern("<dialog[^>]*open=");
+        assertThat(dialog(html, "reject-dialog")).doesNotContainPattern("<dialog[^>]*open=");
+    }
+
+    @Test
+    void openSplitRendersTheSplitFormWithItsAction() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = factory.page("store-1", rma(RMAStatus.Processing), items, List.of(), null, false, CLIENT_LINK,
+                "split", "i-2", Locale.ENGLISH);
+        RmaDetailPage withoutSplit = page(rma(RMAStatus.Processing), items, List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+        String plain = render("rma-detail :: body", withoutSplit, null, new RMAItemsForm(items));
+
+        // then
+        String split = dialog(html, "split-form-dialog");
+        assertThat(split).containsPattern("<dialog[^>]*open=\"open\"")
+                .contains("action=\"/dashboard/rma/" + RMA_ID + "/items/i-2/split\"")
+                .contains("name=\"qty1\"").contains("name=\"qty2\"").contains("Mouse");
+        assertThat(html.indexOf("id=\"split-form-dialog\"")).isGreaterThan(html.indexOf("</form>", html.indexOf("id=\"rmaItemsForm\"")));
+        assertThat(plain).doesNotContain("split-form-dialog");
+    }
+
+    @Test
+    void addDialogKeepsTheNewRmaResolutionOrder() {
+        // given
+        OrderItem cable = orderItem();
+        cable.setPrice(19.99);
+        RmaDetailPage page = page(rma(RMAStatus.Processing), twoItems(), List.of(cable), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
+
+        // then
+        String add = dialog(html, "add-dialog");
+        List<String> radios = inputs(add, "desiredResolution");
+        assertThat(radios).hasSize(3);
+        assertThat(radios.get(0)).contains("value=\"Repair\"").contains("checked");
+        assertThat(radios.get(1)).contains("value=\"Replacement\"");
+        assertThat(radios.get(2)).contains("value=\"Return\"");
+        assertThat(add).containsPattern("<select[^>]*name=\"orderItemId\"[^>]*data-cl-rma-add");
+        assertThat(add).containsPattern("<option value=\"left-1\"[^>]*data-max-qty=\"1\"[^>]*data-unit-price=\"19.99\"");
+        assertThat(add).contains("name=\"quantity\"").contains("name=\"reason\"");
+        assertThat(add).doesNotContain("data-cl-rma-details-form");
+    }
+
+    @Test
+    void finishingAProcessingRmaWarnsAboutUnresolvedItems() {
+        // given
+        RmaDetailPage page = page(rma(RMAStatus.Processing), twoItems(), List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
+
+        // then
+        String next = dialog(html, "next-dialog");
+        assertThat(next).contains("name=\"status\" value=\"Completed\"").contains("cl-alert is-warn").contains(": 2.");
+    }
+
+    @Test
+    void aClosedRmaRendersNoSingleDialogs() {
+        // given
+        RmaDetailPage page = page(rma(RMAStatus.Rejected), twoItems(), List.of(orderItem()), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
+
+        // then
+        assertThat(html).doesNotContain("id=\"next-dialog\"").doesNotContain("id=\"status-dialog\"")
+                .doesNotContain("id=\"reject-dialog\"").doesNotContain("id=\"add-dialog\"")
+                .doesNotContain("data-cl-rma-details-form");
+    }
+
+    private static String textarea(String html, String name) {
+        Matcher matcher = Pattern.compile("<textarea[^>]*name=\"" + name + "\"[^>]*>").matcher(html);
+        assertThat(matcher.find()).as(name).isTrue();
+        return matcher.group();
     }
 
     private static String dialog(String html, String id) {

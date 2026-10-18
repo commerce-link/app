@@ -30,7 +30,9 @@ class RmaDetailScriptContractTest {
                 "data-reason", "data-cl-rma-dialog", "data-cl-selection-list", "data-cl-rma-title", "data-template-one",
                 "data-template-few", "data-template-many", "data-cl-dialog-submit", "data-cl-rma-condition",
                 "data-cl-field-error", "split-qty1", "data-cl-rma-qty2", "data-cl-rma-split-name", "data-cl-rma-sum",
-                "data-cl-rma-enable", "data-skip-", "data-qty-template", "data-skipped-template", "data-cl-enter-guard"}) {
+                "data-cl-rma-enable", "data-skip-", "data-qty-template", "data-skipped-template", "data-cl-enter-guard",
+                "data-cl-rma-required", "data-cl-rma-counter", "data-cl-rma-add", "data-max-qty", "data-unit-price",
+                "data-cl-rma-add-max", "data-cl-rma-add-effect", "data-cl-rma-split-form"}) {
             assertThat(js).as("script: " + hook).contains(hook);
             assertThat(templates).as("templates: " + hook).contains(hook);
         }

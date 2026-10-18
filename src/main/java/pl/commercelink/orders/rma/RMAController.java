@@ -104,18 +104,14 @@ public class RMAController {
                 .collect(Collectors.toList());
 
         model.addAttribute("rma", rma);
-        model.addAttribute("itemConditions", ItemCondition.values());
         model.addAttribute("rmaStatusTypes", RMAStatus.values());
-        model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
         model.addAttribute("rmaItemsForm", rmaItemsForm);
         model.addAttribute("backofficeDomain", appDomain);
         model.addAttribute("isClosed", isClosed(rma));
         model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
         model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("remainingOrderItems", remainingOrderItems);
         boolean refundDeliveryDefault = rma.isMarketplaceReturn()
                 && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems);
-        model.addAttribute("refundDeliveryDefault", refundDeliveryDefault);
         model.addAttribute("page", rmaDetailPageFactory.page(getStoreId(), rma, rmaItems, remainingOrderItems,
                 orderAddressOf(rma), refundDeliveryDefault, rma.createClientRmaUrl(appDomain), open, splitItem, locale));
 

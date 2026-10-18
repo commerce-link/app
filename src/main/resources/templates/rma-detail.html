@@ -24,7 +24,7 @@
                 </div>
             </div>
 
-            <div th:replace="~{rma/detail/legacy :: addItem}"></div>
+            <th:block th:replace="~{rma/detail/dialogs :: single}"></th:block>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>

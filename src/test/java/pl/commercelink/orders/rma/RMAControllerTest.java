@@ -361,6 +361,46 @@ class RMAControllerTest {
         assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.New);
     }
 
+    @Test
+    void updateRmaWithTheFullFieldSetChangesOnlyWhatTheFormEdits() {
+        // given: the next-status dialog posts the new status and every other field as the page's current values
+        RMA existingRma = rmaWithStatus(RMAStatus.ItemsReceived);
+        existingRma.setRmaId(RMA_ID);
+        existingRma.setEmail("buyer@example.com");
+        existingRma.setRejectionReason("Kept as it was");
+        existingRma.setEmailNotificationsEnabled(true);
+        existingRma.setShippingInsurance(4247.5);
+        existingRma.setMedia(new ArrayList<>(List.of("store-1/rma/rma-1/a.jpg", "store-1/rma/rma-1/b.pdf")));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existingRma);
+        RmaDetailPage.CurrentFields current = rmaDetailPageFactory.page(STORE_ID, existingRma, List.of(), List.of(), null,
+                false, null, null, null, Locale.ENGLISH).current();
+        RMA posted = new RMA(STORE_ID);
+        WebDataBinder binder = new WebDataBinder(posted);
+        controller.restrictBindableRmaFields(binder);
+        binder.bind(new MutablePropertyValues(Map.of(
+                "status", "Processing",
+                "email", current.email(),
+                "rejectionReason", current.rejectionReason(),
+                "emailNotificationsEnabled", String.valueOf(current.notifications()),
+                "shippingInsurance", current.insurance())));
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateRma(RMA_ID, posted, current.media(), emptyMedia, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(rmaLifecycle).update(existingRma);
+        assertThat(existingRma.getStatus()).isEqualTo(RMAStatus.Processing);
+        assertThat(existingRma.getEmail()).isEqualTo("buyer@example.com");
+        assertThat(existingRma.getRejectionReason()).isEqualTo("Kept as it was");
+        assertThat(existingRma.isEmailNotificationsEnabled()).isTrue();
+        assertThat(existingRma.getShippingInsurance()).isEqualTo(4247.5);
+        assertThat(existingRma.getMedia()).containsExactly("store-1/rma/rma-1/a.jpg", "store-1/rma/rma-1/b.pdf");
+        verifyNoInteractions(fileStorage);
+    }
+
     // ------------------------------------------------------------------
     // updateRma: the rejectionPending publish gate (Task 21 bug fix)
     // ------------------------------------------------------------------

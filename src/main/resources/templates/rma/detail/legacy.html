@@ -209,55 +209,6 @@
             </div>
 </th:block>
 
-<!--/* The "Dodaj pozycję" modal, opened by the items card's head button (data-cl-rma-legacy-add) or, without JavaScript,
-       by its ?open=add link; it goes away when its dialog is redesigned. */-->
-<div th:fragment="addItem">
-    <div id="rmaItemAddModalId" class="modal" th:classappend="${page.openDialog() == 'add'} ? 'is-active' : ''">
-        <div class="modal-background" onclick="toggleRmaAddItemModal(false)"></div>
-        <div class="modal-card" style="width:auto; max-width:90vw;">
-            <header class="modal-card-head is-align-items-start">
-                <p class="modal-card-title" th:text="#{rma.add.items}"></p>
-                <button type="button" class="delete" aria-label="close" onclick="toggleRmaAddItemModal(false)"></button>
-            </header>
-            <section class="modal-card-body">
-                <form id="rmaAddItemForm" th:action="@{/dashboard/rma/{rmaId}/add-item(rmaId=${rma.rmaId})}" method="post">
-                    <div class="field is-grouped is-flex-wrap-nowrap" style="gap:10px; align-items:center; flex-wrap:nowrap;">
-                        <div class="control" style="max-width: 40%">
-                            <div class="select">
-                                <select name="orderItemId" id="orderItemSelect" required onchange="updateRmaQtyMax()">
-                                    <option value="" th:text="#{general.select}"></option>
-                                    <option th:each="orderItem : ${remainingOrderItems}" th:value="${orderItem.itemId}"
-                                            th:text="${orderItem.name}" th:attr="data-maxqty=${orderItem.qty}">
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="control">
-                            <input id="rmaQuantityInput" class="input" type="number" name="quantity" min="1" value="1" style="width:80px;">
-                        </div>
-                        <div class="control">
-                            <div class="select">
-                                <select name="desiredResolution" required>
-                                    <option th:each="resolution : ${rmaResolutionsTypes}" th:value="${resolution}"
-                                            th:text="${enumI18n.localize(resolution)}"></option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="control" style="flex: 1">
-                            <input class="input" type="text" name="reason" th:placeholder="#{rma.reason.placeholder}" style="min-width:200px;">
-                        </div>
-                    </div>
-                </form>
-            </section>
-            <footer class="modal-card-foot">
-                <button class="button is-primary" type="button" onclick="submitAddRmaItem(event)" th:text="#{general.add}" th:disabled="${isClosed}"></button>
-                <button class="button" type="button" onclick="toggleRmaAddItemModal(false)" th:text="#{general.close}"></button>
-            </footer>
-        </div>
-    </div>
-
-</div>
-
 <div th:fragment="shipping">
             <h2 class="subtitle" th:text="#{order.shipping.details}"></h2>
 
@@ -511,38 +462,6 @@
                 });
             }
         });
-
-        function toggleRmaAddItemModal(show) {
-            const modal = document.getElementById('rmaItemAddModalId');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
-        }
-
-        function submitAddRmaItem(event) {
-            event.preventDefault();
-            const form = document.getElementById('rmaAddItemForm');
-            form.method = 'POST';
-            form.submit();
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('[data-cl-rma-legacy-add]').forEach(link => {
-                link.addEventListener('click', event => {
-                    event.preventDefault();
-                    toggleRmaAddItemModal(true);
-                });
-            });
-        });
-
-        function updateRmaQtyMax() {
-            const select = document.getElementById('orderItemSelect');
-            const selected = select.options[select.selectedIndex];
-            const maxQty = selected.getAttribute('data-maxqty');
-
-            const qtyInput = document.getElementById('rmaQuantityInput');
-            qtyInput.max = maxQty || 1;
-            qtyInput.value = Math.min(qtyInput.value, qtyInput.max);
-        }
 
         function toggleEditRmaShipmentsModal(show) {
             const modal = document.getElementById('editRmaShipmentsModal');

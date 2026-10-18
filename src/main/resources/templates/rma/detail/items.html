@@ -11,9 +11,8 @@
 <section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title" th:with="items=${page.items()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{rma.detail.items.title(${items.rows().size()})}"></h2>
-        <!--/* the add dialog is still the old modal (rma/detail/legacy :: addItem) until it is redesigned */-->
         <div th:if="${items.canAdd()}" class="cl-card-actions">
-            <a class="cl-button" href="?open=add" data-cl-rma-legacy-add>
+            <a class="cl-button" href="?open=add" data-cl-dialog-open="add-dialog">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{rma.detail.items.add}"></span>
             </a>

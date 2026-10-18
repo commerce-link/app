@@ -112,5 +112,192 @@
 <!--/* the sum of the deleted items' values, computed by rma-detail.js from the checked rows */-->
 <p th:fragment="deleteEffect" class="cl-dialog-effect" data-cl-rma-sum
    th:attr="data-template=#{rma.detail.dialog.delete.effect('{sum}')}"></p>
+
+<!--/* The stored values a form posting to /dashboard/rma/{id} does not edit itself. That save overwrites status, e-mail,
+       rejection reason, notifications, insurance and the media list with whatever is posted (spec §5.1, decision D5), so
+       every such form carries all of them: except names the ones the form shows itself. emailNotificationsEnabled goes
+       as true/false, because a missing field binds false. */-->
+<th:block th:fragment="currentFields(except)" th:with="c=${page.current()}">
+    <input th:unless="${except.contains('status')}" type="hidden" name="status" th:value="${c.status()}">
+    <input th:unless="${except.contains('email')}" type="hidden" name="email" th:value="${c.email()}">
+    <input th:unless="${except.contains('rejectionReason')}" type="hidden" name="rejectionReason" th:value="${c.rejectionReason()}">
+    <input th:unless="${except.contains('emailNotificationsEnabled')}" type="hidden" name="emailNotificationsEnabled"
+           th:value="${c.notifications()} ? 'true' : 'false'">
+    <input th:unless="${except.contains('shippingInsurance')}" type="hidden" name="shippingInsurance" th:value="${c.insurance()}">
+    <th:block th:unless="${except.contains('existingMedia')}">
+        <input th:each="key : ${c.media()}" type="hidden" name="existingMedia" th:value="${key}">
+    </th:block>
+</th:block>
+
+<!--/* The single dialogs (spec §5.3). Each has its own form outside #rmaItemsForm; ?open=… renders it open in the page
+       flow (dialog.js reopens it as a modal), which is how the header's links work without JavaScript. */-->
+<th:block th:fragment="single" th:with="h=${page.header()}">
+    <dialog th:if="${h.next() != null}" class="cl-dialog is-form" id="next-dialog" aria-labelledby="next-dialog-title"
+            th:attr="open=${page.openDialog() == 'next'} ? 'open' : null" th:with="n=${h.next()}">
+        <form method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}" data-cl-rma-details-form>
+            <input type="hidden" name="status" th:value="${n.target()}">
+            <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'status'} })}"></th:block>
+            <h2 class="cl-dialog-title" id="next-dialog-title" th:text="#{${n.titleKey()}}"></h2>
+            <div class="cl-dialog-body">
+                <div th:if="${n.unresolved() > 0}" class="cl-alert is-warn"><i class="fas fa-exclamation-triangle cl-alert-icon"
+                        aria-hidden="true"></i><p class="cl-alert-text" th:text="#{rma.detail.next.complete.unresolved(${n.unresolved()})}"></p></div>
+                <p class="cl-dialog-effect" th:text="#{${n.effectKey()}}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" th:text="#{${n.labelKey()}}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog th:if="${h.canChangeStatus()}" class="cl-dialog is-form" id="status-dialog" aria-labelledby="status-dialog-title"
+            th:attr="open=${page.openDialog() == 'status'} ? 'open' : null">
+        <form method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}" data-cl-rma-details-form>
+            <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'status'} })}"></th:block>
+            <h2 class="cl-dialog-title" id="status-dialog-title" th:text="#{rma.detail.status.title}"></h2>
+            <div class="cl-dialog-body">
+                <fieldset class="cl-choice-group">
+                    <legend class="cl-label" th:text="#{rma.detail.status.legend}"></legend>
+                    <label th:each="o : ${h.statusOptions()}" class="cl-choice"><input type="radio" name="status"
+                            th:value="${o.value()}" th:checked="${o.current()}" th:disabled="${o.disabled()}"><span
+                            class="cl-choice-text"><span class="cl-choice-title"
+                            th:text="${o.current()} ? #{rma.detail.status.option.current(${o.label()})} : ${o.label()}"></span><span
+                            class="cl-choice-description" th:text="${o.disabled()} ? #{rma.detail.status.unavailable} : #{${o.effectKey()}}"></span></span></label>
+                </fieldset>
+                <p class="cl-dialog-effect" th:text="#{rma.detail.status.rejectNote}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.status.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+
+    <!--/* The reason is required here on every RMA (rma-detail.js shows the error at the field; the attribute covers a
+           page without JavaScript); a marketplace takes at most 250 characters (RMA.requiresRejectionReason, unchanged). */-->
+    <dialog th:if="${h.canReject()}" class="cl-dialog is-form" id="reject-dialog" aria-labelledby="reject-dialog-title"
+            th:attr="open=${page.openDialog() == 'reject'} ? 'open' : null"
+            th:with="max=${T(pl.commercelink.orders.rma.RMA).MAX_REJECTION_REASON_LENGTH},
+                     reason=${page.current().rejectionReason()},
+                     market=${page.marketplaceCard() != null ? page.marketplaceCard().name() : null}">
+        <form method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}" data-cl-rma-details-form>
+            <input type="hidden" name="status" value="Rejected">
+            <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'status', 'rejectionReason'} })}"></th:block>
+            <h2 class="cl-dialog-title" id="reject-dialog-title" th:text="#{rma.detail.reject.title(${page.shortId()})}"></h2>
+            <div class="cl-dialog-body">
+                <div class="cl-field">
+                    <label class="cl-label" for="reject-reason" th:text="#{rma.detail.reject.reason}"></label>
+                    <textarea class="cl-input cl-textarea" id="reject-reason" name="rejectionReason" rows="4" required
+                              data-cl-rma-required aria-describedby="reject-reason-help reject-reason-error"
+                              th:attr="maxlength=${page.marketplace()} ? ${max} : null,
+                                       data-cl-rma-counter=${page.marketplace()} ? 'reject-reason-count' : null"
+                              th:text="${reason}"></textarea>
+                    <p class="cl-help" id="reject-reason-help">
+                        <span th:text="${market != null} ? #{rma.detail.reject.reason.help.marketplace(${market})} : #{rma.detail.reject.reason.help}"></span>
+                        <span th:if="${page.marketplace()}" id="reject-reason-count"
+                              th:attr="data-template=#{rma.detail.reject.count('{n}', ${max})}"
+                              th:text="#{rma.detail.reject.count(${reason != null ? reason.length() : 0}, ${max})}"></span>
+                    </p>
+                    <p class="cl-field-error" id="reject-reason-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+                            aria-hidden="true"></i><span th:text="#{rma.detail.reject.reason.required}"></span></p>
+                </div>
+                <p class="cl-dialog-effect">
+                    <span th:text="#{rma.detail.reject.effect}"></span>
+                    <span th:text="${page.current().notifications()} ? #{rma.detail.reject.effect.email} : #{rma.detail.reject.effect.noEmail}"></span>
+                    <span th:if="${market != null}" th:text="#{rma.detail.reject.effect.marketplace(${market})}"></span>
+                </p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-danger" data-cl-dialog-submit th:text="#{rma.detail.reject.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+
+    <!--/* POST add-item, unchanged. rma-detail.js limits the quantity to the chosen order item and works out how much the
+           insurance grows (RMA.increaseShippingInsurance adds price × quantity); the server checks both again. */-->
+    <dialog th:if="${page.items().canAdd()}" class="cl-dialog is-form is-wide" id="add-dialog" aria-labelledby="add-dialog-title"
+            th:attr="open=${page.openDialog() == 'add'} ? 'open' : null"
+            th:with="orderShort=${h.orderId() == null ? '' : (h.orderId().length() > 8 ? h.orderId().substring(0, 8) : h.orderId())}">
+        <form method="post" th:action="@{/dashboard/rma/{id}/add-item(id=${page.rmaId()})}">
+            <h2 class="cl-dialog-title" id="add-dialog-title" th:text="#{rma.detail.add.title(${orderShort})}"></h2>
+            <div class="cl-dialog-body">
+                <div class="cl-form-grid">
+                    <div class="cl-span-6 cl-field">
+                        <label class="cl-label" for="add-order-item" th:text="#{rma.detail.add.item}"></label>
+                        <select class="cl-select" id="add-order-item" name="orderItemId" required data-cl-rma-add
+                                aria-describedby="add-order-item-help">
+                            <option value="" th:text="#{rma.detail.add.choose}"></option>
+                            <option th:each="o : ${page.add().options()}" th:value="${o.itemId()}"
+                                    th:attr="data-max-qty=${o.maxQty()}, data-unit-price=${o.unitPrice()}"
+                                    th:text="${o.label()}"></option>
+                        </select>
+                        <p class="cl-help" id="add-order-item-help" th:text="#{rma.detail.add.item.help}"></p>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="add-quantity" th:text="#{rma.detail.add.qty}"></label>
+                        <input class="cl-input is-qty" id="add-quantity" name="quantity" type="number" min="1" value="1"
+                               required inputmode="numeric" aria-describedby="add-quantity-max">
+                        <p class="cl-help" id="add-quantity-max" data-cl-rma-add-max hidden
+                           th:attr="data-template=#{rma.detail.add.qty.max('{n}')}"></p>
+                    </div>
+                    <div class="cl-span-6 cl-field">
+                        <fieldset class="cl-choice-group is-row">
+                            <legend class="cl-label" th:text="#{rma.detail.add.resolution}"></legend>
+                            <label class="cl-choice" th:each="res, st : ${T(pl.commercelink.web.rma.RmaNewPage).RESOLUTIONS}"><input
+                                    type="radio" name="desiredResolution" th:value="${res.name()}" th:checked="${st.first}"><span
+                                    class="cl-choice-text"><span class="cl-choice-title"
+                                    th:text="#{|RMAResolutionType.${res.name()}|}"></span></span></label>
+                        </fieldset>
+                    </div>
+                    <div class="cl-span-6 cl-field">
+                        <label class="cl-label" for="add-reason"><span th:text="#{rma.detail.add.reason}"></span>
+                            <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <input class="cl-input" id="add-reason" name="reason" type="text" aria-describedby="add-reason-help">
+                        <p class="cl-help" id="add-reason-help" th:text="#{rma.detail.add.reason.help}"></p>
+                    </div>
+                </div>
+                <p class="cl-dialog-effect" data-cl-rma-add-effect
+                   th:attr="data-template=#{rma.detail.add.effect.sum('{sum}')}" th:text="#{rma.detail.add.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.add.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+
+    <!--/* The split without JavaScript (decision D13): ?open=split&item= names the item, so the server writes the
+           address into the form. Both quantities are typed here (the script, when it runs, fills the second); the server
+           refuses a pair that does not add up to the item's quantity. In-form #split-dialog is the JavaScript path. */-->
+    <dialog th:if="${page.split() != null}" class="cl-dialog is-form" id="split-form-dialog" aria-labelledby="split-form-dialog-title"
+            th:attr="open=${page.openDialog() == 'split'} ? 'open' : null" th:with="t=${page.split()}">
+        <form method="post" th:action="@{${t.action()}}" data-cl-rma-split-form th:attr="data-qty=${t.qty()}">
+            <h2 class="cl-dialog-title" id="split-form-dialog-title" th:text="#{rma.detail.dialog.split.title}"></h2>
+            <div class="cl-dialog-body">
+                <p class="cl-dialog-message" th:text="|${t.name()} · #{rma.detail.dialog.qty(${t.qty()})}|"></p>
+                <div class="cl-form-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="split-form-qty1" th:text="#{rma.detail.dialog.split.qty1}"></label>
+                        <input class="cl-input is-qty" type="number" id="split-form-qty1" name="qty1" min="1"
+                               th:max="${t.qty() - 1}" value="1" required inputmode="numeric" aria-describedby="split-form-help">
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="split-form-qty2" th:text="#{rma.detail.split.form.qty2}"></label>
+                        <input class="cl-input is-qty" type="number" id="split-form-qty2" name="qty2" min="1"
+                               th:max="${t.qty() - 1}" th:value="${t.qty() - 1}" required inputmode="numeric"
+                               aria-describedby="split-form-help">
+                    </div>
+                </div>
+                <p class="cl-help" id="split-form-help" th:text="#{rma.detail.split.form.help(${t.qty()})}"></p>
+                <p class="cl-dialog-effect" th:text="#{rma.detail.dialog.split.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.dialog.split.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+</th:block>
 </body>
 </html>

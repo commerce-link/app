@@ -406,3 +406,139 @@
         init();
     }
 })();
+
+// The single dialogs outside #rmaItemsForm (rma/detail/dialogs :: single), each with its own form:
+// - "Odrzuć RMA": the reason is required on every RMA; a blank one shows the field error instead of posting, and on a
+//   marketplace RMA the characters typed are counted against the limit (the counter's data-template);
+// - "Dodaj pozycję": the quantity is limited to the chosen order item (data-max-qty) and the effect names how much the
+//   insurance grows (data-unit-price × quantity, the server's own sum);
+// - the split without the items form (?open=split): the second quantity follows the first.
+// Every text comes from the templates' data attributes.
+(function () {
+    'use strict';
+
+    function fill(template, placeholder, value) {
+        return template.replace(placeholder, function () {
+            return value;
+        });
+    }
+
+    function initReject() {
+        document.querySelectorAll('textarea[data-cl-rma-required]').forEach(function (field) {
+            var dialog = field.closest('dialog');
+            var error = field.closest('.cl-field').querySelector('[data-cl-field-error]');
+            var counter = document.getElementById(field.getAttribute('data-cl-rma-counter') || '');
+            var hideError = function () {
+                if (error) {
+                    error.hidden = true;
+                }
+                field.removeAttribute('aria-invalid');
+            };
+            var count = function () {
+                if (counter) {
+                    counter.textContent = fill(counter.getAttribute('data-template') || '', '{n}', String(field.value.length));
+                }
+            };
+            field.addEventListener('input', function () {
+                count();
+                if (field.value.trim()) {
+                    hideError();
+                }
+            });
+            if (dialog) {
+                dialog.addEventListener('cl:dialog-open', hideError);
+            }
+            var submit = dialog && dialog.querySelector('[data-cl-dialog-submit]');
+            if (submit) {
+                submit.addEventListener('click', function (event) {
+                    if (field.value.trim()) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (error) {
+                        error.hidden = false;
+                    }
+                    field.setAttribute('aria-invalid', 'true');
+                    field.focus();
+                });
+            }
+            count();
+        });
+    }
+
+    function initAdd() {
+        var select = document.querySelector('select[data-cl-rma-add]');
+        if (!select) {
+            return;
+        }
+        var form = select.form;
+        var quantity = form.querySelector('input[name="quantity"]');
+        var max = form.querySelector('[data-cl-rma-add-max]');
+        var effect = form.querySelector('[data-cl-rma-add-effect]');
+        var initialEffect = effect ? effect.textContent : '';
+        var formatMoney = function (value) {
+            return typeof window.CL_formatMoney === 'function' ? window.CL_formatMoney(value) : value.toFixed(2);
+        };
+        var refresh = function () {
+            var option = select.options[select.selectedIndex];
+            var maxQty = option && option.value ? parseInt(option.getAttribute('data-max-qty'), 10) : NaN;
+            if (isNaN(maxQty)) {
+                quantity.removeAttribute('max');
+                if (max) {
+                    max.hidden = true;
+                }
+                if (effect) {
+                    effect.textContent = initialEffect;
+                }
+                return;
+            }
+            quantity.max = String(maxQty);
+            var qty = parseInt(quantity.value, 10);
+            if (!isNaN(qty) && qty > maxQty) {
+                quantity.value = String(maxQty);
+                qty = maxQty;
+            }
+            if (max) {
+                max.textContent = fill(max.getAttribute('data-template') || '', '{n}', String(maxQty));
+                max.hidden = false;
+            }
+            if (effect) {
+                var unitPrice = parseFloat(option.getAttribute('data-unit-price')) || 0;
+                effect.textContent = isNaN(qty) || qty < 1 ? initialEffect
+                    : fill(effect.getAttribute('data-template') || '', '{sum}', formatMoney(unitPrice * qty));
+            }
+        };
+        select.addEventListener('change', refresh);
+        quantity.addEventListener('input', refresh);
+        refresh();
+    }
+
+    function initSplitForm() {
+        document.querySelectorAll('form[data-cl-rma-split-form]').forEach(function (form) {
+            var total = parseInt(form.getAttribute('data-qty'), 10) || 0;
+            var first = form.querySelector('input[name="qty1"]');
+            var second = form.querySelector('input[name="qty2"]');
+            if (!first || !second) {
+                return;
+            }
+            first.addEventListener('input', function () {
+                var qty1 = parseInt(first.value, 10);
+                if (!isNaN(qty1)) {
+                    second.value = String(total - qty1);
+                }
+            });
+        });
+    }
+
+    function init() {
+        initReject();
+        initAdd();
+        initSplitForm();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
