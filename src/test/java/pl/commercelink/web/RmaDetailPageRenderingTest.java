@@ -559,6 +559,28 @@ class RmaDetailPageRenderingTest {
     }
 
     @Test
+    void finishingTheRmaStartsOnCancelWhileAnOrdinaryStepStartsOnItsAction() {
+        // given: completing closes the RMA for good, approving is an ordinary step
+        String finishing = render("rma-detail :: body", page(rma(RMAStatus.Processing)), null);
+        String approving = render("rma-detail :: body", page(rma(RMAStatus.New)), null);
+
+        // when
+        String finish = dialog(finishing, "next-dialog");
+        String approve = dialog(approving, "next-dialog");
+
+        // then
+        assertThat(finish).contains("name=\"status\" value=\"Completed\"")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" data-cl-dialog-close autofocus");
+        assertThat(approve).doesNotContain("value=\"Completed\"").doesNotContain("autofocus");
+        // the rejection starts on its reason: the first field of the dialog, which dialog.js focuses
+        String reject = dialog(approving, "reject-dialog");
+        assertThat(reject).doesNotContain("autofocus");
+        assertThat(reject.indexOf("<textarea")).isLessThan(reject.indexOf("<button"));
+        assertThat(reject.substring(0, reject.indexOf("<textarea"))).doesNotContainPattern("<input(?![^>]*type=\"hidden\")")
+                .doesNotContain("<select");
+    }
+
+    @Test
     void aClosedRmaRendersNoSingleDialogs() {
         // given
         RmaDetailPage page = page(rma(RMAStatus.Rejected), twoItems(), List.of(orderItem()), false);
@@ -618,7 +640,7 @@ class RmaDetailPageRenderingTest {
 
         // then
         String card = html.substring(html.indexOf("id=\"przesylki\""), html.indexOf("</section>", html.indexOf("id=\"przesylki\"")));
-        assertThat(card).contains("class=\"cl-list\"").contains("class=\"cl-list-item\"")
+        assertThat(card).contains("class=\"cl-list is-rma-detail\"").contains("class=\"cl-list-item\"")
                 .contains("data-cl-cancellation-poll=\"/dashboard/rma/rma-1/shipments/state\"")
                 .doesNotContain("table is-narrow").doesNotContain("??");
         assertThat(card).containsPattern("<a[^>]*data-cl-confirm[^>]*href=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\"")
@@ -630,6 +652,8 @@ class RmaDetailPageRenderingTest {
                 .contains("href=\"?open=shipment-2\" data-cl-dialog-open=\"shipment-dialog-2\"")
                 .doesNotContain("?open=shipment-1\"")
                 .contains("href=\"?open=shipment-new\" data-cl-dialog-open=\"shipment-dialog-new\"");
+        // the type and the carrier are one text with a single separator
+        assertThat(card).contains("<span>Courier · DPD</span>").doesNotContainPattern("Courier\\s{2,}·");
     }
 
     @Test
@@ -700,7 +724,7 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(html).containsPattern("<a class=\"cl-link-button\" href=\"/dashboard/rma/" + RMA_ID
-                + "/shipping\" data-cl-dialog-open=\"address-dialog\">Edit</a>");
+                + "/shipping\" data-cl-dialog-open=\"address-dialog\"\\s+aria-label=\"Edit the return address to the customer\">Edit</a>");
         assertThat(html).contains("<dd class=\"cl-kv-text\"><span>Jan Kowalski</span><br><span>Main 1</span><br><span>60-243 Poznan</span></dd>")
                 .contains("+48 601 234 567");
         String dialog = dialog(html, "address-dialog");
@@ -725,7 +749,7 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(none).contains("cl-alert is-warn").contains("No address. Without it you cannot ship the items to the customer.")
-                .contains("data-cl-dialog-open=\"address-dialog\">Fill in</a>");
+                .containsPattern("data-cl-dialog-open=\"address-dialog\"\\s+aria-label=\"Fill in the return address to the customer\">Fill in</a>");
         assertThat(partial).contains("The address is incomplete. Without a complete address you cannot ship the items to the customer.")
                 .contains("<span>Jan Kowalski</span>");
         assertThat(closed).doesNotContain("data-cl-dialog-open=\"address-dialog\"").doesNotContain("id=\"address-dialog\"");
@@ -757,6 +781,10 @@ class RmaDetailPageRenderingTest {
         assertThat(html).contains("cl-file-row").contains("Save files");
         assertThat(html).containsPattern("data-cl-rma-media-alert[^>]*hidden|hidden[^>]*data-cl-rma-media-alert");
         assertThat(empty).contains("No files.").contains("name=\"rmaMedia\"");
+        // the empty state stands right under the card head, outside the inset of the upload field
+        assertThat(empty).containsPattern("(?s)<h2[^>]*id=\"media-title\"[^>]*>[^<]*</h2>\\s*</div>\\s*(<!--.*?-->\\s*)?<p class=\"cl-list-empty\">No files.</p>");
+        String closedEmpty = section(render("rma-detail :: body", page(rma(RMAStatus.Completed)), null), "pliki");
+        assertThat(closedEmpty).contains("No files.").doesNotContain("cl-card-inset");
         assertThat(readOnly).contains("cl-media-tile").doesNotContain("name=\"existingMedia\"")
                 .doesNotContain("name=\"rmaMedia\"").doesNotContain("Save files");
     }

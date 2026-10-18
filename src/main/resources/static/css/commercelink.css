@@ -13586,7 +13586,7 @@ a.cl-link-button:hover {
 .cl-page .cl-media-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-    gap: 12px;
+    gap: var(--cl-gap-fields);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -13624,15 +13624,24 @@ a.cl-link-button:hover {
     display: grid;
     justify-items: start;
     gap: 2px;
-    padding: 6px 8px 8px;
+    padding: var(--cl-gap-attached) var(--cl-gap-related) var(--cl-gap-related);
     font-size: 12.5px;
 }
+/* the name wraps to two lines (a long camera file name stays readable on touch, where title does not show) and only
+   then is cut */
 .cl-page .cl-media-name {
+    display: -webkit-box;
     max-width: 100%;
     overflow: hidden;
     color: var(--cl-ink);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+/* "Usuń" / "Cofnij" start where the name starts */
+.cl-page .cl-media-meta .cl-link-button {
+    padding-inline: 0;
 }
 .cl-page .cl-media-meta .cl-check {
     min-height: 28px;
@@ -13663,6 +13672,27 @@ a.cl-link-button:hover {
     max-width: 42ch;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+/* the settings form fills its card: below 1216 px the side column drops under the work column and the card is wider
+   than the form's 760 px measure, which would leave the footer short of the card's edge */
+.cl-page .cl-form.is-rma-detail { max-width: none; }
+/* a selected row's background is the info pill's own tone: the pill keeps its shape with the warehouse list's outline */
+.cl-page .cl-table.is-rma-detail tr.is-selected .cl-status.is-info {
+    background: var(--cl-surface);
+    box-shadow: inset 0 0 0 1px var(--cl-accent);
+}
+@media screen and (max-width: 719px) {
+    /* in card rows "Klient chce: … · zastosowano: …" stays one line under the pill, not run on after it */
+    .cl-page .cl-table.is-rma-detail tbody tr > td .cl-status + .cl-table-sub {
+        display: block;
+        margin-top: 4px;
+        margin-left: 0;
+    }
+    /* a shipment whose only action is the ⋯ menu keeps it in the row's top right corner */
+    .cl-page .cl-list.is-rma-detail .cl-list-item:has(> .cl-list-actions > .cl-menu:only-child) {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
 }
 /* End of RMA details page */
 

@@ -15,6 +15,7 @@ import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAItemStatus;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.web.dtos.CountryOptions;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.PluralForm;
@@ -80,7 +81,7 @@ public class RmaDetailPageFactory {
                 openDialog(open, rma, header, itemsCard, closed, split),
                 header, itemsCard, media(rma, closed), settings(rma, marketplace, locale),
                 marketplace ? marketplaceCard(rma, resendHref, locale) : null,
-                address(rma, closed, orderAddress), history(rma, locale), current(rma, status),
+                address(rma, closed, orderAddress, locale), history(rma, locale), current(rma, status),
                 new RmaDetailPage.AddDialog(left.stream().map(oi -> addOption(oi, locale)).toList()), split);
     }
 
@@ -260,12 +261,14 @@ public class RmaDetailPageFactory {
                 amount(locale, rma.getShippingInsurance()));
     }
 
-    private static RmaDetailPage.Address address(RMA rma, boolean closed, ShippingDetails orderAddress) {
+    private static RmaDetailPage.Address address(RMA rma, boolean closed, ShippingDetails orderAddress, Locale locale) {
         ShippingDetails details = rma.getShippingDetails();
         boolean missing = !RmaAddressForm.hasAnyValue(details);
         List<String> lines = missing ? List.of() : Stream.of(joined(details.getName(), details.getSurname()),
                         details.getCompanyName(), details.getStreetAndNumber(),
-                        joined(details.getPostalCode(), details.getCity()), details.getCountry())
+                        Stream.of(joined(details.getPostalCode(), details.getCity()),
+                                        CountryOptions.displayName(StringUtils.trimToNull(details.getCountry()), locale))
+                                .filter(StringUtils::isNotBlank).collect(Collectors.joining(", ")))
                 .map(StringUtils::trimToNull)
                 .filter(Objects::nonNull)
                 .toList();

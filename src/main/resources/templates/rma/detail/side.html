@@ -8,7 +8,7 @@
 <section th:fragment="settings" class="cl-card" aria-labelledby="settings-title"
          th:with="s=${page.settings()}, market=${page.marketplaceCard() != null ? page.marketplaceCard().name() : null}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="settings-title" th:text="#{rma.detail.settings.title}"></h2></div>
-    <form th:unless="${page.closed()}" class="cl-form" method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}"
+    <form th:unless="${page.closed()}" class="cl-form is-rma-detail" method="post" th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}"
           data-cl-rma-details-form>
         <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'email', 'emailNotificationsEnabled', 'shippingInsurance'} })}"></th:block>
         <div class="cl-form-grid cl-card-grid">
@@ -127,6 +127,7 @@
         <h2 class="cl-card-title" id="address-title" th:text="#{rma.address.page.title}"></h2>
         <div class="cl-card-actions" th:if="${a.dialogPage() != null}">
             <a class="cl-link-button" th:href="@{${a.pageHref()}}" data-cl-dialog-open="address-dialog"
+               th:attr="aria-label=${a.missing()} ? #{rma.detail.address.fill.label} : #{rma.detail.address.edit.label}"
                th:text="${a.missing()} ? #{rma.detail.address.fill} : #{general.edit}"></a>
         </div>
     </div>

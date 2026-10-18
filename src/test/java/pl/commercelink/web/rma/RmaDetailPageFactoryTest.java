@@ -363,6 +363,25 @@ class RmaDetailPageFactoryTest {
     }
 
     @Test
+    void theReturnAddressNamesTheCountryOnTheCityLine() {
+        // given
+        RMA rma = rma(RMAStatus.Approved);
+        rma.getShippingDetails().setStreetAndNumber("ul. Długa 5");
+        rma.getShippingDetails().setPostalCode("60-243");
+        rma.getShippingDetails().setCountry("PL");
+        RMA abroad = rma(RMAStatus.Approved);
+        abroad.getShippingDetails().setCountry("DE");
+
+        // when
+        RmaDetailPage page = page(rma, List.of());
+        RmaDetailPage other = page(abroad, List.of());
+
+        // then
+        assertThat(page.address().lines()).containsExactly("Jan Kowalski", "ul. Długa 5", "60-243 Poznań, Polska");
+        assertThat(other.address().lines()).containsExactly("Jan Kowalski", "Poznań, Niemcy");
+    }
+
+    @Test
     void aBareRmaBuildsAPageWithoutFailing() {
         // given
         RMA rma = new RMA();

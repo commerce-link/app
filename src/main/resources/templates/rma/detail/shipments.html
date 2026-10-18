@@ -29,13 +29,14 @@
             </a>
         </div>
     </div>
-    <ul class="cl-list" th:unless="${view.rows().isEmpty()}">
+    <ul class="cl-list is-rma-detail" th:unless="${view.rows().isEmpty()}">
         <li class="cl-list-item" th:each="s : ${view.rows()}" th:with="sh=${s.shipment()}">
             <div>
-                <p class="cl-list-title">
-                    <span th:if="${s.typeKey() != null}" th:text="#{${s.typeKey()}}"></span>
-                    <span th:unless="${#strings.isEmpty(sh.carrier)}" th:text="${s.typeKey() != null ? '· ' : ''} + ${sh.carrier}"></span>
-                </p>
+                <!--/* one text node: the type and the carrier with a single separator between them */-->
+                <p class="cl-list-title"
+                   th:with="type=${s.typeKey() != null} ? #{${s.typeKey()}} : null,
+                            carrier=${#strings.isEmpty(sh.carrier)} ? null : ${sh.carrier}"><span
+                        th:text="${type != null and carrier != null} ? ${type + ' · ' + carrier} : (${type != null} ? ${type} : ${carrier})"></span></p>
                 <!--/* a shipment being created has no number or dates yet: its state line says what is going on; each
                        part starts lower case after a separator, the first one of the line takes a capital */-->
                 <p class="cl-list-desc" th:if="${sh.creation == null}"

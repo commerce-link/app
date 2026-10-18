@@ -145,7 +145,10 @@
             </div>
             <div class="cl-dialog-actions">
                 <button type="submit" class="cl-button is-primary" th:text="#{${n.labelKey()}}"></button>
-                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                <!--/* completing closes the RMA for good: like a destructive dialog it starts on Cancel, so two quick Enters
+                       on the header's main action do not end it; the button keeps the primary tone of a process step */-->
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"
+                        th:attr="autofocus=${n.target() == 'Completed'} ? 'autofocus' : null"></button>
             </div>
         </form>
     </dialog>
@@ -157,7 +160,7 @@
             <h2 class="cl-dialog-title" id="status-dialog-title" th:text="#{rma.detail.status.title}"></h2>
             <div class="cl-dialog-body">
                 <fieldset class="cl-choice-group">
-                    <legend class="cl-label" th:text="#{rma.detail.status.legend}"></legend>
+                    <legend class="cl-visually-hidden" th:text="#{rma.detail.status.legend}"></legend>
                     <label th:each="o : ${h.statusOptions()}" class="cl-choice"><input type="radio" name="status"
                             th:value="${o.value()}" th:checked="${o.current()}" th:disabled="${o.disabled()}"><span
                             class="cl-choice-text"><span class="cl-choice-title"

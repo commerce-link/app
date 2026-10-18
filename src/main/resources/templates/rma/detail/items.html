@@ -64,7 +64,8 @@
                    the selection row on the 680 px work column; the dialog says it in full */-->
             <button type="button" class="cl-button" data-cl-rma-action="received"
                     data-accepts="New,Received,SentForRepair,ReturnedToClient"
-                    data-cl-rma-dialog="received-dialog" data-cl-dialog-open="received-dialog">
+                    data-cl-rma-dialog="received-dialog" data-cl-dialog-open="received-dialog"
+                    th:attr="title=#{rma.detail.action.received}, aria-label=#{rma.detail.action.received}">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
                 <span th:text="#{rma.detail.action.received.short}"></span>
             </button>

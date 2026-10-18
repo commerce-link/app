@@ -368,7 +368,7 @@ class RmaShipmentsViewFactoryTest {
         assertOnlyEditable(row);
         assertThat(view.pickupHref()).isNull();
         assertThat(html).contains("href=\"https://tracking.example/0000123\"").contains(">0000123</a>")
-                .contains("<span>· DPD</span>")
+                .contains("<span>Kurier · DPD</span>")
                 .doesNotContain("cl-status")
                 .doesNotContain("Pobierz etykietę")
                 .doesNotContain("APP/CRIN/13023761");
@@ -491,7 +491,7 @@ class RmaShipmentsViewFactoryTest {
         // then
         String row = html.substring(html.indexOf("<li class=\"cl-list-item\""), html.lastIndexOf("</li>"));
         assertThat(html).doesNotContain("<table");
-        assertThat(row).contains("<span>· DPD</span>").contains("cl-status is-warn").contains(">Zamów odbiór ponownie</button>");
+        assertThat(row).contains("<span>Kurier · DPD</span>").contains("cl-status is-warn").contains(">Zamów odbiór ponownie</button>");
     }
 
     @Test

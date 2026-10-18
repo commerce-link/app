@@ -10,6 +10,8 @@
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="media-title" th:text="#{rma.detail.media.title}"></h2>
     </div>
+    <!--/* the empty state sits right under the head like the shipments card's, not in the inset of the upload field */-->
+    <p th:if="${m.tiles().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.media.empty}"></p>
     <form th:if="${m.editable()}" method="post" enctype="multipart/form-data"
           th:action="@{/dashboard/rma/{id}(id=${page.rmaId()})}" data-cl-rma-details-form>
         <th:block th:replace="~{rma/detail/dialogs :: currentFields(${ {'existingMedia'} })}"></th:block>
@@ -36,12 +38,12 @@
             <button type="submit" class="cl-button is-primary" th:text="#{rma.detail.media.save}"></button>
         </div>
     </form>
-    <div th:unless="${m.editable()}" class="cl-card-inset">
+    <div th:unless="${m.editable() or m.tiles().isEmpty()}" class="cl-card-inset">
         <ul th:replace="~{rma/detail/media :: grid(${m}, false)}"></ul>
     </div>
 </section>
 
-<!--/* th:replace outranks th:if, so the empty state is chosen inside the fragment. */-->
+<!--/* th:replace outranks th:if, so an empty list is left out inside the fragment; the card prints the empty state. */-->
 <th:block th:fragment="grid(m, editable)">
     <ul th:unless="${m.tiles().isEmpty()}" class="cl-media-grid">
         <li th:each="t, it : ${m.tiles()}" class="cl-media-tile" data-cl-rma-media-tile>
@@ -67,7 +69,6 @@
             </div>
         </li>
     </ul>
-    <p th:if="${m.tiles().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.media.empty}"></p>
 </th:block>
 </body>
 </html>
