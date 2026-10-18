@@ -109,7 +109,6 @@ public class RMAController {
         model.addAttribute("backofficeDomain", appDomain);
         model.addAttribute("isClosed", isClosed(rma));
         model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
-        model.addAttribute("shipmentTypes", ShipmentType.values());
         boolean refundDeliveryDefault = rma.isMarketplaceReturn()
                 && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems);
         model.addAttribute("page", rmaDetailPageFactory.page(getStoreId(), rma, rmaItems, remainingOrderItems,

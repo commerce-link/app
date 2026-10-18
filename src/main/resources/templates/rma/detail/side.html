@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The return address card of the RMA details page (RmaDetailPage.Address): the address "Wyślij do klienta" sends
+       the goods back to. "Edytuj" (or "Uzupełnij" without an address) opens the address form in a dialog; without
+       JavaScript it leads to the address page. A missing or incomplete address is a warning, because shipping to the
+       customer refuses it. A closed RMA shows the address without the action. */-->
+<section th:fragment="address" class="cl-card" aria-labelledby="address-title" th:with="a=${page.address()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="address-title" th:text="#{rma.address.page.title}"></h2>
+        <div class="cl-card-actions" th:if="${a.dialogPage() != null}">
+            <a class="cl-link-button" th:href="@{${a.pageHref()}}" data-cl-dialog-open="address-dialog"
+               th:text="${a.missing()} ? #{rma.detail.address.fill} : #{general.edit}"></a>
+        </div>
+    </div>
+    <dl th:unless="${a.missing()}" class="cl-kv is-column cl-card-inset">
+        <div class="cl-kv-wide" th:unless="${a.lines().isEmpty()}">
+            <dt th:text="#{rma.detail.address.recipient}"></dt>
+            <dd class="cl-kv-text"><th:block th:each="line, it : ${a.lines()}"><span th:text="${line}"></span><br th:unless="${it.last}"></th:block></dd>
+        </div>
+        <div th:if="${a.phone() != null}">
+            <dt th:text="#{order.address.phone}"></dt>
+            <dd th:text="${a.phone()}"></dd>
+        </div>
+        <div th:if="${a.email() != null}">
+            <dt th:text="#{rma.detail.address.email}"></dt>
+            <dd th:text="${a.email()}"></dd>
+        </div>
+    </dl>
+    <div class="cl-card-inset" th:if="${!page.closed() and (a.missing() or a.incomplete())}">
+        <div class="cl-alert is-warn">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="${a.missing()} ? #{rma.detail.address.missing} : #{rma.detail.address.incomplete}"></p>
+        </div>
+    </div>
+    <p th:if="${page.closed() and a.missing()}" class="cl-list-empty" th:text="#{rma.detail.address.none}"></p>
+</section>
+
+<!--/* The address form of the /shipping page in a dialog, saved the same way (PRG); a refused save renders that page
+       with the errors. Not on a closed RMA, whose address is read-only. */-->
+<dialog th:fragment="addressDialog" th:if="${page.address().dialogPage() != null}" class="cl-dialog is-form is-wide"
+        id="address-dialog" aria-labelledby="address-dialog-title">
+    <form th:replace="~{rma/address :: addressForm(${page.address().dialogPage()}, true)}"></form>
+</dialog>
+</body>
+</html>

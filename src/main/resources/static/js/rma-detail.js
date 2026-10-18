@@ -412,7 +412,9 @@
 //   marketplace RMA the characters typed are counted against the limit (the counter's data-template);
 // - "Dodaj pozycję": the quantity is limited to the chosen order item (data-max-qty) and the effect names how much the
 //   insurance grows (data-unit-price × quantity, the server's own sum);
-// - the split without the items form (?open=split): the second quantity follows the first.
+// - the split without the items form (?open=split): the second quantity follows the first;
+// - the shipments card's POST-only menu entries (rma/detail/shipments :: card): the links that go through the
+//   confirmation dialog are shown ([data-cl-rma-js-only]); without JavaScript a noscript form stands in for each.
 // Every text comes from the templates' data attributes.
 (function () {
     'use strict';
@@ -530,10 +532,17 @@
         });
     }
 
+    function showScriptedControls() {
+        document.querySelectorAll('[data-cl-rma-js-only]').forEach(function (control) {
+            control.hidden = false;
+        });
+    }
+
     function init() {
         initReject();
         initAdd();
         initSplitForm();
+        showScriptedControls();
     }
 
     if (document.readyState === 'loading') {

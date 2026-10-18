@@ -14,17 +14,19 @@
             <div class="cl-layout-aside">
                 <div class="cl-layout-main">
                     <section th:replace="~{rma/detail/items :: card}"></section>
-                    <div th:replace="~{rma/detail/legacy :: shipments}"></div>
+                    <section th:replace="~{rma/detail/shipments :: card}"></section>
                 </div>
                 <div class="cl-layout-side">
                     <div th:replace="~{rma/detail/legacy :: details}"></div>
                     <th:block th:replace="~{rma/detail/legacy :: marketplace}"></th:block>
-                    <div th:replace="~{rma/detail/legacy :: shipping}"></div>
+                    <section th:replace="~{rma/detail/side :: address}"></section>
                     <div th:replace="~{rma/detail/legacy :: events}"></div>
                 </div>
             </div>
 
             <th:block th:replace="~{rma/detail/dialogs :: single}"></th:block>
+            <th:block th:replace="~{rma/detail/shipments :: dialogs}"></th:block>
+            <dialog th:replace="~{rma/detail/side :: addressDialog}"></dialog>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>

@@ -1,0 +1,217 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The shipments card of the RMA details page (orders.rma.RmaShipmentsView, model attribute rmaShipments), a list
+       like the order's shipments card. "Zamów odbiór" in the head leads to the pickup page and comes back here; "Dodaj
+       przesyłkę" opens the new shipment's dialog. A row shows "{type} · {carrier}", the number with the dates, and the
+       state line of a shipment created through an integration (a spinner while it waits for the provider). Text actions:
+       "Pobierz etykietę"; "Spróbuj ponownie" after a failed operator shipment leads to the items card, where the items
+       are shipped again, and after a customer's failed return books it again with what the customer chose (a POST).
+       The ⋯ menu: "Edytuj" (its dialog), "Zamów odbiór ponownie" of a customer's return whose pickup was not ordered and
+       "Usuń" of a failed creation. Those two are POST-only and have no confirmation page: with JavaScript they go
+       through the confirmation dialog, without it a plain form in noscript posts them. A closed RMA keeps only the
+       label. While a command waits for the provider the card carries data-cl-cancellation-poll and
+       shipment-cancellation.js reloads the page once it is settled. The state's arguments are an array, so the text
+       goes through #messages.msgWithParams (a message expression would print the array as one value). */-->
+<section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
+         th:with="view=${rmaShipments}"
+         th:attr="data-cl-cancellation-poll=${view.pollHref() != null} ? @{${view.pollHref()}} : null">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="shipments-title" th:text="#{order.card.shipments}"></h2>
+        <div class="cl-card-actions" th:if="${view.pickupHref() != null or view.editable()}">
+            <a th:if="${view.pickupHref() != null}" class="cl-button" th:href="@{${view.pickupHref()}}">
+                <i class="fas fa-shipping-fast" aria-hidden="true"></i>
+                <span th:text="#{order.shipments.pickup.order}"></span>
+            </a>
+            <a th:if="${view.editable()}" class="cl-button" href="?open=shipment-new" data-cl-dialog-open="shipment-dialog-new">
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                <span th:text="#{order.shipments.add}"></span>
+            </a>
+        </div>
+    </div>
+    <ul class="cl-list" th:unless="${view.rows().isEmpty()}">
+        <li class="cl-list-item" th:each="s : ${view.rows()}" th:with="sh=${s.shipment()}">
+            <div>
+                <p class="cl-list-title">
+                    <span th:if="${s.typeKey() != null}" th:text="#{${s.typeKey()}}"></span>
+                    <span th:unless="${#strings.isEmpty(sh.carrier)}" th:text="${s.typeKey() != null ? '· ' : ''} + ${sh.carrier}"></span>
+                </p>
+                <!--/* a shipment being created has no number or dates yet: its state line says what is going on; each
+                       part starts lower case after a separator, the first one of the line takes a capital */-->
+                <p class="cl-list-desc" th:if="${sh.creation == null}"
+                   th:with="tracked=${!#strings.isEmpty(sh.trackingNo)}, shipped=${s.shippedAt() != null}, delivered=${s.deliveredAt() != null}">
+                    <th:block th:if="${tracked}">
+                        <span th:text="#{rma.detail.shipments.tracking}"></span>
+                        <a th:unless="${#strings.isEmpty(sh.trackingUrl)}" th:href="${sh.trackingUrl}" target="_blank" rel="noopener"
+                           th:text="${sh.trackingNo}"></a>
+                        <span th:if="${#strings.isEmpty(sh.trackingUrl)}" th:text="${sh.trackingNo}"></span>
+                        <span> · </span>
+                    </th:block>
+                    <span th:if="${shipped}" th:with="t=#{rma.detail.shipments.shipped(${s.shippedAt()})}"
+                          th:text="${tracked ? t : #strings.capitalize(t)}"></span>
+                    <span th:if="${delivered}" th:with="t=#{rma.detail.shipments.delivered(${s.deliveredAt()})}"
+                          th:text="${shipped ? ' · ' + t : (tracked ? t : #strings.capitalize(t))}"></span>
+                    <span th:if="${shipped and !delivered}" th:text="' · ' + #{rma.detail.shipments.inTransit}"></span>
+                    <span th:if="${!shipped and !delivered}" th:with="t=#{rma.detail.shipments.waiting}"
+                          th:text="${tracked ? t : #strings.capitalize(t)}"></span>
+                </p>
+                <div th:if="${s.stateInProgress()}" aria-live="polite" aria-busy="true">
+                    <p class="cl-list-desc cl-loading"><span class="cl-spinner is-compact" aria-hidden="true"></span><span
+                            th:text="${#messages.msgWithParams(s.stateKey(), s.stateArgs())}"></span></p>
+                </div>
+                <p th:if="${s.stateKey() != null and !s.stateInProgress()}" class="cl-list-desc">
+                    <span class="cl-status" th:classappend="${s.stateTone()}"
+                          th:text="${#messages.msgWithParams(s.stateKey(), s.stateArgs())}"></span>
+                </p>
+                <p th:if="${s.retryHref() != null}" class="cl-list-desc" th:text="#{rma.shipments.retry.help}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${s.hasActions()}">
+                <a th:if="${s.labelHref() != null}" class="cl-link-button" th:href="@{${s.labelHref()}}"
+                   th:attr="aria-label=#{order.shipments.label.for(${s.number()})}"><i class="fas fa-download"
+                   aria-hidden="true"></i> <span th:text="#{order.shipments.label}"></span></a>
+                <a th:if="${s.retryHref() != null}" class="cl-link-button" th:href="@{${s.retryHref()}}"
+                   th:text="#{order.shipments.retry}"></a>
+                <form th:if="${s.returnRetryAction() != null}" method="post" th:action="@{${s.returnRetryAction()}}">
+                    <button type="submit" class="cl-link-button" th:attr="aria-label=#{order.shipments.retry.for(${s.number()})}"
+                            th:text="#{order.shipments.retry}"></button>
+                </form>
+                <details class="cl-menu" th:if="${s.hasMenu()}">
+                    <summary class="cl-button is-icon" th:attr="aria-label=#{order.shipments.menu(${s.number()})}">
+                        <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
+                    </summary>
+                    <ul class="cl-menu-list" th:id="|shipment-menu-${s.number()}|">
+                        <li th:if="${s.editable()}">
+                            <a class="cl-menu-item" th:href="|?open=${s.openKey()}|" th:attr="data-cl-dialog-open=${s.dialogId()}" th:text="#{general.edit}"></a>
+                        </li>
+                        <li th:if="${s.pickupRetryAction() != null}">
+                            <a class="cl-menu-item" hidden data-cl-rma-js-only data-cl-confirm data-cl-confirm-tone="primary"
+                               th:href="@{${s.pickupRetryAction()}}"
+                               th:attr="data-cl-confirm-title=#{rma.detail.shipments.pickupRetry.confirm.title},
+                                        data-cl-confirm-message=#{rma.detail.shipments.pickupRetry.confirm.message},
+                                        data-cl-confirm-action=#{rma.detail.shipments.pickupRetry.confirm.action}"
+                               th:text="#{rma.shipments.pickup.retry}"></a>
+                            <noscript><form method="post" th:action="@{${s.pickupRetryAction()}}"><button type="submit"
+                                    class="cl-menu-item" th:text="#{rma.shipments.pickup.retry}"></button></form></noscript>
+                        </li>
+                        <li th:if="${s.removeAction() != null}">
+                            <a class="cl-menu-item is-danger" hidden data-cl-rma-js-only data-cl-confirm
+                               th:href="@{${s.removeAction()}}"
+                               th:attr="data-cl-confirm-title=#{order.shipments.remove.confirm.title(${s.number()})},
+                                        data-cl-confirm-message=#{rma.detail.shipments.remove.confirm.message},
+                                        data-cl-confirm-action=#{order.shipments.remove.confirm.action}"
+                               th:text="#{general.delete}"></a>
+                            <noscript><form method="post" th:action="@{${s.removeAction()}}"><button type="submit"
+                                    class="cl-menu-item is-danger" th:text="#{general.delete}"></button></form></noscript>
+                        </li>
+                    </ul>
+                </details>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${view.rows().isEmpty()}" class="cl-list-empty" th:text="#{${view.emptyKey()}}"></p>
+</section>
+
+<!--/* One dialog per shipment that can be edited and one for "Dodaj przesyłkę"; none on a closed RMA. Without
+       JavaScript ?open=shipment-{n} / ?open=shipment-new renders the dialog open (RmaDetailPage.openDialog). */-->
+<th:block th:fragment="dialogs" th:if="${rmaShipments.editable()}">
+    <!--/* th:replace runs before th:each and th:if on one element, so both sit on their own block. */-->
+    <th:block th:each="s : ${rmaShipments.rows()}" th:if="${s.editable()}"><dialog
+            th:replace="~{rma/detail/shipments :: shipmentDialog(${rmaShipments}, ${s})}"></dialog></th:block>
+    <dialog th:replace="~{rma/detail/shipments :: newDialog(${rmaShipments})}"></dialog>
+</th:block>
+
+<!--/* The dialog of one shipment. updateShipments replaces the whole list, so the form posts every other shipment
+       unchanged as hidden fields at its own index in RMA.getShipments() (the server matches what the form cannot show,
+       the tracking subscription and the seconds of a date, by package or by that index). A shipment being created is
+       never posted: the server keeps it as it is, and its index stays a gap. */-->
+<dialog th:fragment="shipmentDialog(view, s)" class="cl-dialog is-form is-wide" th:id="${s.dialogId()}"
+        th:attr="aria-labelledby=|${s.dialogId()}-title|, open=${page?.openDialog() == s.openKey()} ? 'open' : null">
+    <form method="post" th:action="@{${view.updateAction()}}">
+        <h2 class="cl-dialog-title" th:id="|${s.dialogId()}-title|" th:text="#{order.shipments.edit.for(${s.number()})}"></h2>
+        <th:block th:replace="~{rma/detail/shipments :: hiddenOthers(${view}, ${s.index()})}"></th:block>
+        <div class="cl-dialog-body">
+            <div th:replace="~{rma/detail/shipments :: fields(${s.dialogId()}, ${s.index()}, ${s.shipment()}, ${view.types()})}"></div>
+            <p class="cl-dialog-effect" th:text="#{rma.detail.shipments.dialog.effect}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.shipments.dialog.save}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+
+<!--/* The new shipment takes the next free index, after every stored shipment. */-->
+<dialog th:fragment="newDialog(view)" class="cl-dialog is-form is-wide" id="shipment-dialog-new"
+        aria-labelledby="shipment-dialog-new-title"
+        th:attr="open=${page?.openDialog() == 'shipment-new'} ? 'open' : null">
+    <form method="post" th:action="@{${view.updateAction()}}">
+        <h2 class="cl-dialog-title" id="shipment-dialog-new-title" th:text="#{order.shipments.dialog.title.new}"></h2>
+        <th:block th:replace="~{rma/detail/shipments :: hiddenOthers(${view}, -1)}"></th:block>
+        <div class="cl-dialog-body">
+            <div th:replace="~{rma/detail/shipments :: fields('shipment-dialog-new', ${view.rows().size()}, null, ${view.types()})}"></div>
+            <p class="cl-dialog-effect" th:text="#{rma.detail.shipments.dialog.effect}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.shipments.dialog.save.new}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+
+<!--/* Every shipment but the one at index except, as the update form has always posted them: the packages the form
+       shows (shownPackages, so one created after the page opened is kept) and the fields of each shipment not being
+       created. Dates to the minute, like the datetime-local fields. */-->
+<th:block th:fragment="hiddenOthers(view, except)">
+    <input type="hidden" name="shownPackages" th:each="o : ${view.rows()}"
+           th:if="${o.shipment().creation == null and o.shipment().externalId != null}" th:value="${o.shipment().externalId}">
+    <th:block th:each="o : ${view.rows()}" th:if="${o.shipment().creation == null and o.index() != except}"
+              th:with="i=${o.index()}, x=${o.shipment()}">
+        <input th:if="${x.externalId != null}" type="hidden" th:name="|shipments[${i}].externalId|" th:value="${x.externalId}">
+        <input type="hidden" th:name="|shipments[${i}].type|" th:value="${x.type}">
+        <input type="hidden" th:name="|shipments[${i}].trackingNo|" th:value="${x.trackingNo}">
+        <input type="hidden" th:name="|shipments[${i}].carrier|" th:value="${x.carrier}">
+        <input type="hidden" th:name="|shipments[${i}].trackingUrl|" th:value="${x.trackingUrl}">
+        <input type="hidden" th:name="|shipments[${i}].shippedAt|" th:value="${x.shippedAt != null} ? ${#temporals.format(x.shippedAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+        <input type="hidden" th:name="|shipments[${i}].deliveredAt|" th:value="${x.deliveredAt != null} ? ${#temporals.format(x.deliveredAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+    </th:block>
+</th:block>
+
+<!--/* The fields of the shipment at index i (sh: null for a new one, which starts as a courier shipment). The ids carry
+       the dialog's id (several dialogs on one page), the names the index. */-->
+<div th:fragment="fields(prefix, i, sh, types)" class="cl-form-grid">
+    <input th:if="${sh != null and sh.externalId != null}" type="hidden" th:name="|shipments[${i}].externalId|" th:value="${sh.externalId}">
+    <div class="cl-span-3 cl-field">
+        <label class="cl-label" th:for="|${prefix}-type|" th:text="#{order.shipments.dialog.type}"></label>
+        <select class="cl-select" th:id="|${prefix}-type|" th:name="|shipments[${i}].type|">
+            <option th:each="t : ${types}" th:value="${t.name()}"
+                    th:selected="${sh != null ? sh.type == t : t.name() == 'Courier'}" th:text="#{|ShipmentType.${t.name()}|}"></option>
+        </select>
+    </div>
+    <div class="cl-span-3 cl-field">
+        <label class="cl-label" th:for="|${prefix}-carrier|" th:text="#{order.shipments.dialog.carrier}"></label>
+        <input class="cl-input" type="text" autocomplete="off" th:id="|${prefix}-carrier|" th:name="|shipments[${i}].carrier|"
+               th:value="${sh?.carrier}">
+    </div>
+    <div class="cl-field">
+        <label class="cl-label" th:for="|${prefix}-tracking|" th:text="#{order.shipments.dialog.tracking}"></label>
+        <input class="cl-input" type="text" autocomplete="off" th:id="|${prefix}-tracking|" th:name="|shipments[${i}].trackingNo|"
+               th:value="${sh?.trackingNo}">
+    </div>
+    <div class="cl-field">
+        <label class="cl-label" th:for="|${prefix}-url|"><span th:text="#{order.shipments.dialog.url}"></span>
+            <span class="cl-optional" th:text="#{form.optional}"></span></label>
+        <input class="cl-input" type="url" autocomplete="off" th:id="|${prefix}-url|" th:name="|shipments[${i}].trackingUrl|"
+               th:value="${sh?.trackingUrl}">
+    </div>
+    <div class="cl-span-3 cl-field">
+        <label class="cl-label" th:for="|${prefix}-shipped|" th:text="#{order.shipments.dialog.shipped}"></label>
+        <input class="cl-input" type="datetime-local" th:id="|${prefix}-shipped|" th:name="|shipments[${i}].shippedAt|" th:value="${sh != null and sh.shippedAt != null} ? ${#temporals.format(sh.shippedAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+    </div>
+    <div class="cl-span-3 cl-field">
+        <label class="cl-label" th:for="|${prefix}-delivered|"><span th:text="#{order.shipments.dialog.delivered}"></span>
+            <span class="cl-optional" th:text="#{form.optional}"></span></label>
+        <input class="cl-input" type="datetime-local" th:id="|${prefix}-delivered|" th:name="|shipments[${i}].deliveredAt|" th:value="${sh != null and sh.deliveredAt != null} ? ${#temporals.format(sh.deliveredAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+    </div>
+</div>
+</body>
+</html>

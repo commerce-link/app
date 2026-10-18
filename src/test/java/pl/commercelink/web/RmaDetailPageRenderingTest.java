@@ -8,6 +8,9 @@ import org.thymeleaf.context.Context;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.DefaultTemplateResolver;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
@@ -16,6 +19,7 @@ import pl.commercelink.orders.rma.RMAItemStatus;
 import pl.commercelink.orders.rma.RMAItemsForm;
 import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.orders.rma.RmaShipmentsView;
 import pl.commercelink.web.rma.RmaDetailPage;
 import pl.commercelink.web.rma.RmaDetailPageFactory;
 import pl.commercelink.web.rma.RmaNotice;
@@ -44,8 +48,6 @@ class RmaDetailPageRenderingTest {
             <div th:fragment="details">LEGACY-DETAILS</div>
             <div th:fragment="events">LEGACY-EVENTS</div>
             <div th:fragment="marketplace">LEGACY-MARKETPLACE</div>
-            <div th:fragment="shipping">LEGACY-SHIPPING</div>
-            <div th:fragment="shipments">LEGACY-SHIPMENTS</div>
             <th:block th:fragment="scripts">LEGACY-SCRIPTS</th:block>
             </body></html>""";
 
@@ -116,6 +118,11 @@ class RmaDetailPageRenderingTest {
     }
 
     private static String render(String template, RmaDetailPage page, RmaNotice notice, RMAItemsForm form) {
+        return render(template, page, notice, form, shipments(page.closed()));
+    }
+
+    private static String render(String template, RmaDetailPage page, RmaNotice notice, RMAItemsForm form,
+                                 RmaShipmentsView shipments) {
         TemplateEngine engine = EnglishFragmentTemplateEngine.create();
         DefaultTemplateResolver legacy = new DefaultTemplateResolver();
         legacy.setOrder(0);
@@ -127,6 +134,7 @@ class RmaDetailPageRenderingTest {
         context.setVariable("page", page);
         context.setVariable("rmaNotice", notice);
         context.setVariable("rmaItemsForm", form);
+        context.setVariable("rmaShipments", shipments);
         return engine.process("<div th:replace=\"~{" + template + "}\"></div>", context);
     }
 
@@ -219,8 +227,8 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??").doesNotContain("style=").doesNotContain("onclick");
-        assertThat(html).contains("LEGACY-DETAILS").contains("LEGACY-EVENTS").contains("LEGACY-SHIPPING")
-                .contains("LEGACY-SHIPMENTS");
+        assertThat(html).contains("LEGACY-DETAILS").contains("LEGACY-EVENTS").contains("id=\"przesylki\"")
+                .contains("id=\"address-title\"");
         assertThat(html).contains("class=\"cl-list-empty\"").doesNotContain("LEGACY-ITEMS");
     }
 
@@ -551,6 +559,165 @@ class RmaDetailPageRenderingTest {
         assertThat(html).doesNotContain("id=\"next-dialog\"").doesNotContain("id=\"status-dialog\"")
                 .doesNotContain("id=\"reject-dialog\"").doesNotContain("id=\"add-dialog\"")
                 .doesNotContain("data-cl-rma-details-form");
+    }
+
+    private static RmaShipmentsView shipments(boolean closed, RmaShipmentsView.Row... rows) {
+        return new RmaShipmentsView(List.of(rows), null, null, !closed, "/dashboard/rma/" + RMA_ID + "/updateShipments",
+                List.of(ShipmentType.values()));
+    }
+
+    private static Shipment typedShipment(String externalId, String trackingNo, LocalDateTime shippedAt) {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setExternalId(externalId);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo(trackingNo);
+        shipment.setTrackingUrl("https://tracking.example/" + trackingNo);
+        shipment.setShippedAt(shippedAt);
+        return shipment;
+    }
+
+    private static RmaShipmentsView.Row plainRow(Shipment shipment, int number, boolean editable, String labelHref) {
+        return new RmaShipmentsView.Row(shipment, number, "ShipmentType." + shipment.getType().name(),
+                shipment.getShippedAt() == null ? null : "13.10.2026", null, editable, null, null, null, false,
+                labelHref, null, null, null, null);
+    }
+
+    private static Shipment creation() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failed("No funds"));
+        return shipment;
+    }
+
+    @Test
+    void shipmentsCardIsAListWithThePollAndConfirmedActions() {
+        // given
+        Shipment pickupFailed = typedShipment("21480004", "0000124", null);
+        RmaShipmentsView.Row failed = new RmaShipmentsView.Row(creation(), 1, "ShipmentType.Courier", null, null, false,
+                "order.shipments.state.creation.failed", new Object[]{"No funds"}, "is-warn", false, null,
+                "/dashboard/rma/rma-1#pozycje", "/dashboard/rma/rma-1/shipments/creations/cmd-1/remove", null, null);
+        RmaShipmentsView.Row pickup = new RmaShipmentsView.Row(pickupFailed, 2, "ShipmentType.Courier", null, null, true,
+                "order.shipments.state.pickup.failed", new Object[]{"No courier"}, "is-warn", false, null, null, null,
+                "/dashboard/rma/rma-1/shipments/21480004/pickup", null);
+        RmaShipmentsView view = new RmaShipmentsView(List.of(failed, pickup), null, "/dashboard/rma/rma-1/shipments/state",
+                true, "/dashboard/rma/" + RMA_ID + "/updateShipments", List.of(ShipmentType.values()));
+
+        // when
+        String html = render("rma-detail :: body", page(rma(RMAStatus.Processing)), null, new RMAItemsForm(new ArrayList<>()), view);
+
+        // then
+        String card = html.substring(html.indexOf("id=\"przesylki\""), html.indexOf("</section>", html.indexOf("id=\"przesylki\"")));
+        assertThat(card).contains("class=\"cl-list\"").contains("class=\"cl-list-item\"")
+                .contains("data-cl-cancellation-poll=\"/dashboard/rma/rma-1/shipments/state\"")
+                .doesNotContain("table is-narrow").doesNotContain("??");
+        assertThat(card).containsPattern("<a[^>]*data-cl-confirm[^>]*href=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\"")
+                .containsPattern("<a[^>]*data-cl-confirm-tone=\"primary\"[^>]*href=\"/dashboard/rma/rma-1/shipments/21480004/pickup\"");
+        // without JavaScript the POST-only actions are plain forms
+        assertThat(card).contains("<noscript><form method=\"post\" action=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\">")
+                .contains("<noscript><form method=\"post\" action=\"/dashboard/rma/rma-1/shipments/21480004/pickup\">");
+        assertThat(card).contains("href=\"/dashboard/rma/rma-1#pozycje\"")
+                .contains("href=\"?open=shipment-2\" data-cl-dialog-open=\"shipment-dialog-2\"")
+                .doesNotContain("?open=shipment-1\"")
+                .contains("href=\"?open=shipment-new\" data-cl-dialog-open=\"shipment-dialog-new\"");
+    }
+
+    @Test
+    void aShipmentDialogPostsTheOtherShipmentsUnchanged() {
+        // given: the first shipment typed in by hand, the second a package, the third still being created
+        Shipment first = typedShipment(null, "1111", LocalDateTime.of(2026, 10, 13, 8, 31, 45));
+        Shipment second = typedShipment("pkg-2", "2222", null);
+        RMA rma = rma(RMAStatus.Processing);
+        rma.setShipments(new ArrayList<>(List.of(first, second, creation())));
+        RmaDetailPage page = factory.page("store-1", rma, List.of(), List.of(), null, false, CLIENT_LINK, "shipment-2",
+                null, Locale.ENGLISH);
+        RmaShipmentsView view = shipments(false, plainRow(first, 1, true, null), plainRow(second, 2, true, null),
+                plainRow(rma.getShipments().get(2), 3, false, null));
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(new ArrayList<>()), view);
+
+        // then
+        String dialog = dialog(html, "shipment-dialog-2");
+        assertThat(dialog).contains("open=\"open\"")
+                .contains("action=\"/dashboard/rma/" + RMA_ID + "/updateShipments\"")
+                .contains("<input type=\"hidden\" name=\"shipments[0].trackingNo\" value=\"1111\">")
+                .contains("<input type=\"hidden\" name=\"shipments[0].carrier\" value=\"DPD\">")
+                .contains("<input type=\"hidden\" name=\"shipments[0].type\" value=\"Courier\">")
+                .contains("<input type=\"hidden\" name=\"shipments[0].shippedAt\" value=\"2026-10-13T08:31\">")
+                .contains("<input type=\"hidden\" name=\"shownPackages\" value=\"pkg-2\">")
+                .contains("<input type=\"hidden\" name=\"shipments[1].externalId\" value=\"pkg-2\">")
+                .containsPattern("<input class=\"cl-input\"[^>]*name=\"shipments\\[1\\]\\.trackingNo\"[^>]*value=\"2222\"")
+                .doesNotContain("shipments[2].");
+        assertThat(inputs(dialog, "shipments\\[1\\]\\.trackingNo")).hasSize(1);
+        assertThat(dialog(html, "shipment-dialog-1")).doesNotContain("open=\"open\"")
+                .contains("<input type=\"hidden\" name=\"shipments[1].trackingNo\" value=\"2222\">");
+        assertThat(html).doesNotContain("id=\"shipment-dialog-3\"");
+        String added = dialog(html, "shipment-dialog-new");
+        assertThat(added).contains("name=\"shipments[3].trackingNo\"")
+                .contains("<input type=\"hidden\" name=\"shipments[0].trackingNo\" value=\"1111\">")
+                .contains("<input type=\"hidden\" name=\"shipments[1].trackingNo\" value=\"2222\">")
+                .doesNotContain("shipments[2].");
+    }
+
+    @Test
+    void aClosedRmaKeepsTheLabelButNoShipmentMenus() {
+        // given
+        Shipment sent = typedShipment("pkg-1", "1111", LocalDateTime.of(2026, 10, 13, 8, 31));
+        RmaShipmentsView view = shipments(true, plainRow(sent, 1, false,
+                "/dashboard/shipping/labels/furgonetka/pkg-1?back=/dashboard/rma/" + RMA_ID));
+
+        // when
+        String html = render("rma-detail :: body", page(rma(RMAStatus.Completed)), null, new RMAItemsForm(new ArrayList<>()), view);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/shipping/labels/furgonetka/pkg-1?back=/dashboard/rma/" + RMA_ID + "\"")
+                .doesNotContain("shipment-menu-").doesNotContain("shipment-dialog")
+                .doesNotContain("?open=shipment-new").doesNotContain("address-dialog");
+    }
+
+    @Test
+    void addressCardOpensTheAddressFormInADialogAndLinksThePageWithoutJs() {
+        // given
+        RMA rma = rma(RMAStatus.Processing);
+        rma.getShippingDetails().setStreetAndNumber("Main 1");
+        rma.getShippingDetails().setPostalCode("60-243");
+        rma.getShippingDetails().setCity("Poznan");
+        rma.getShippingDetails().setPhone("+48 601 234 567");
+
+        // when
+        String html = render("rma-detail :: body", page(rma), null);
+
+        // then
+        assertThat(html).containsPattern("<a class=\"cl-link-button\" href=\"/dashboard/rma/" + RMA_ID
+                + "/shipping\" data-cl-dialog-open=\"address-dialog\">Edit</a>");
+        assertThat(html).contains("<dd class=\"cl-kv-text\"><span>Jan Kowalski</span><br><span>Main 1</span><br><span>60-243 Poznan</span></dd>")
+                .contains("+48 601 234 567");
+        String dialog = dialog(html, "address-dialog");
+        assertThat(dialog).contains("class=\"cl-dialog is-form is-wide\"").contains("id=\"rma-address-form\"")
+                .contains("action=\"/dashboard/rma/" + RMA_ID + "/updateShippingDetails\"")
+                .contains("class=\"cl-dialog-title\"").contains("data-cl-dialog-close").doesNotContain("cl-card-footer")
+                // the page form's 760 px cap would leave the wide dialog half empty
+                .doesNotContain("class=\"cl-form\"");
+        assertThat(html).doesNotContain("LEGACY-SHIPPING");
+    }
+
+    @Test
+    void aMissingAddressShowsTheWarning() {
+        // given
+        RMA missing = rma(RMAStatus.Processing);
+        missing.setShippingDetails(null);
+        RMA incomplete = rma(RMAStatus.Processing);
+
+        // when
+        String none = render("rma-detail :: body", page(missing), null);
+        String partial = render("rma-detail :: body", page(incomplete), null);
+        String closed = render("rma-detail :: body", page(rma(RMAStatus.Completed)), null);
+
+        // then
+        assertThat(none).contains("cl-alert is-warn").contains("No address. Without it you cannot ship the items to the customer.")
+                .contains("data-cl-dialog-open=\"address-dialog\">Fill in</a>");
+        assertThat(partial).contains("The address is incomplete. Without a complete address you cannot ship the items to the customer.")
+                .contains("<span>Jan Kowalski</span>");
+        assertThat(closed).doesNotContain("data-cl-dialog-open=\"address-dialog\"").doesNotContain("id=\"address-dialog\"");
     }
 
     private static String textarea(String html, String name) {

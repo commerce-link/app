@@ -22,7 +22,8 @@ class RmaDetailScriptContractTest {
     void theScriptUsesTheTemplatesHooksAndNoAlert() throws IOException {
         // given
         String js = read("static/js/rma-detail.js");
-        String templates = read("templates/rma/detail/items.html") + read("templates/rma/detail/dialogs.html");
+        String templates = read("templates/rma/detail/items.html") + read("templates/rma/detail/dialogs.html")
+                + read("templates/rma/detail/shipments.html") + read("templates/rma/detail/side.html");
 
         // then
         for (String hook : new String[]{"rmaItemsForm", "data-rma-id", "data-cl-select-row", "data-status", "data-qty",
@@ -32,7 +33,7 @@ class RmaDetailScriptContractTest {
                 "data-cl-field-error", "split-qty1", "data-cl-rma-qty2", "data-cl-rma-split-name", "data-cl-rma-sum",
                 "data-cl-rma-enable", "data-skip-", "data-qty-template", "data-skipped-template", "data-cl-enter-guard",
                 "data-cl-rma-required", "data-cl-rma-counter", "data-cl-rma-add", "data-max-qty", "data-unit-price",
-                "data-cl-rma-add-max", "data-cl-rma-add-effect", "data-cl-rma-split-form"}) {
+                "data-cl-rma-add-max", "data-cl-rma-add-effect", "data-cl-rma-split-form", "data-cl-rma-js-only"}) {
             assertThat(js).as("script: " + hook).contains(hook);
             assertThat(templates).as("templates: " + hook).contains(hook);
         }
