@@ -533,6 +533,10 @@
     }
 
     function showScriptedControls() {
+        // confirm-dialog.js gives up without dialog support; the link would then GET an address that only takes a POST
+        if (typeof HTMLDialogElement === 'undefined' || typeof HTMLDialogElement.prototype.showModal !== 'function') {
+            return;
+        }
         document.querySelectorAll('[data-cl-rma-js-only]').forEach(function (control) {
             control.hidden = false;
         });

@@ -578,7 +578,7 @@ class RmaDetailPageRenderingTest {
 
     private static RmaShipmentsView.Row plainRow(Shipment shipment, int number, boolean editable, String labelHref) {
         return new RmaShipmentsView.Row(shipment, number, "ShipmentType." + shipment.getType().name(),
-                shipment.getShippedAt() == null ? null : "13.10.2026", null, editable, null, null, null, false,
+                shipment.getShippedAt() == null ? null : "13.10.2026", null, shipment.getTrackingUrl(), editable, null, null, null, false,
                 labelHref, null, null, null, null);
     }
 
@@ -592,10 +592,11 @@ class RmaDetailPageRenderingTest {
     void shipmentsCardIsAListWithThePollAndConfirmedActions() {
         // given
         Shipment pickupFailed = typedShipment("21480004", "0000124", null);
-        RmaShipmentsView.Row failed = new RmaShipmentsView.Row(creation(), 1, "ShipmentType.Courier", null, null, false,
+        RmaShipmentsView.Row failed = new RmaShipmentsView.Row(creation(), 1, "ShipmentType.Courier", null, null, null, false,
                 "order.shipments.state.creation.failed", new Object[]{"No funds"}, "is-warn", false, null,
                 "/dashboard/rma/rma-1#pozycje", "/dashboard/rma/rma-1/shipments/creations/cmd-1/remove", null, null);
-        RmaShipmentsView.Row pickup = new RmaShipmentsView.Row(pickupFailed, 2, "ShipmentType.Courier", null, null, true,
+        RmaShipmentsView.Row pickup = new RmaShipmentsView.Row(pickupFailed, 2, "ShipmentType.Courier", null, null,
+                "https://tracking.example/0000124", true,
                 "order.shipments.state.pickup.failed", new Object[]{"No courier"}, "is-warn", false, null, null, null,
                 "/dashboard/rma/rma-1/shipments/21480004/pickup", null);
         RmaShipmentsView view = new RmaShipmentsView(List.of(failed, pickup), null, "/dashboard/rma/rma-1/shipments/state",

@@ -22,7 +22,8 @@ public record RmaShipmentsView(List<Row> rows, String pickupHref, String pollHre
 
     /**
      * number: 1-based position in RMA.getShipments(), the n of ?open=shipment-{n}. typeKey: the message key of the type,
-     * null without one. shippedAt/deliveredAt: "dd.MM.yyyy" or null. editable: "Edytuj" (an open RMA, a shipment not
+     * null without one. shippedAt/deliveredAt: "dd.MM.yyyy" or null. trackingHref: the tracking link, only an http(s)
+     * address (a stored javascript: URL is shown as text, never as a link), null otherwise. editable: "Edytuj" (an open RMA, a shipment not
      * being created). stateKey with stateArgs and stateTone: the state line (OrderLabels#shipmentState), null for a
      * shipment typed in by hand or a customer's return that needs nothing (RmaShipmentsViewFactory); stateInProgress: it
      * waits for the provider (a spinner). labelHref: "Pobierz etykietę", never for a customer's return, whose label the
@@ -33,7 +34,7 @@ public record RmaShipmentsView(List<Row> rows, String pickupHref, String pollHre
      * (CustomerReturnRetry); null when that cannot be done, "Usuń" stays.
      */
     public record Row(Shipment shipment, int number, String typeKey, String shippedAt, String deliveredAt,
-                      boolean editable, String stateKey, Object[] stateArgs, String stateTone, boolean stateInProgress,
+                      String trackingHref, boolean editable, String stateKey, Object[] stateArgs, String stateTone, boolean stateInProgress,
                       String labelHref, String retryHref, String removeAction, String pickupRetryAction,
                       String returnRetryAction) {
 

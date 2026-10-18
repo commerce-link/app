@@ -42,9 +42,9 @@
                    th:with="tracked=${!#strings.isEmpty(sh.trackingNo)}, shipped=${s.shippedAt() != null}, delivered=${s.deliveredAt() != null}">
                     <th:block th:if="${tracked}">
                         <span th:text="#{rma.detail.shipments.tracking}"></span>
-                        <a th:unless="${#strings.isEmpty(sh.trackingUrl)}" th:href="${sh.trackingUrl}" target="_blank" rel="noopener"
+                        <a th:if="${s.trackingHref() != null}" th:href="${s.trackingHref()}" target="_blank" rel="noopener"
                            th:text="${sh.trackingNo}"></a>
-                        <span th:if="${#strings.isEmpty(sh.trackingUrl)}" th:text="${sh.trackingNo}"></span>
+                        <span th:unless="${s.trackingHref() != null}" th:text="${sh.trackingNo}"></span>
                         <span> · </span>
                     </th:block>
                     <span th:if="${shipped}" th:with="t=#{rma.detail.shipments.shipped(${s.shippedAt()})}"

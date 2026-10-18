@@ -11,6 +11,7 @@ import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderPageModelFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -46,7 +47,7 @@ public class RmaShipmentsViewFactory {
                     shippingIntegrationNames.of(s.getProvider(), store, locale));
             rows.add(new RmaShipmentsView.Row(s, i + 1,
                     s.getType() == null ? null : "ShipmentType." + s.getType().name(),
-                    date(s.getShippedAt()), date(s.getDeliveredAt()),
+                    date(s.getShippedAt()), date(s.getDeliveredAt()), OrderPageModelFactory.safeWebUrl(s.getTrackingUrl()),
                     // a shipment being created has nothing the form could show; the server keeps it as it is
                     !closed && s.getCreation() == null,
                     state == null ? null : state.key(), state == null ? null : state.args(),

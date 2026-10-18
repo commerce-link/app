@@ -526,4 +526,26 @@ class RmaShipmentsViewFactoryTest {
         assertThat(closed.rows().get(0).editable()).isFalse();
         assertThat(closed.editable()).isFalse();
     }
+
+    @Test
+    void aTrackingLinkIsOnlyAWebAddress() {
+        // given: the URL is typed by the operator or comes from an integration; a javascript: one would run on click
+        Shipment scripted = new Shipment(ShipmentType.Courier);
+        scripted.setTrackingNo("T-1");
+        scripted.setTrackingUrl("javascript:alert(document.cookie)");
+        Shipment web = new Shipment(ShipmentType.Courier);
+        web.setTrackingNo("T-2");
+        web.setTrackingUrl("https://tracking.example/T-2");
+        RmaShipmentsView view = factory.build(rmaWith(scripted, web), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
+
+        // then
+        assertThat(view.rows().get(0).trackingHref()).isNull();
+        assertThat(view.rows().get(1).trackingHref()).isEqualTo("https://tracking.example/T-2");
+        assertThat(html).doesNotContain("href=\"javascript:").contains("<span>T-1</span>")
+                .contains("href=\"https://tracking.example/T-2\"");
+    }
 }

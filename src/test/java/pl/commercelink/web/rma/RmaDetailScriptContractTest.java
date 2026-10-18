@@ -39,6 +39,8 @@ class RmaDetailScriptContractTest {
         }
         assertThat(templates).contains("name=\"qty2\"").contains("name=\"qty1\"").contains("checkSerialNumbers");
         assertThat(js).contains("/items/").contains("/split");
+        // the POST-only links are shown only where confirm-dialog.js can open its dialog
+        assertThat(js).contains("HTMLDialogElement.prototype.showModal");
         assertThat(js).doesNotContain("alert(").doesNotContain("innerHTML").doesNotContain("onclick");
         // a string replacement would read "$&" in an item name as a pattern; placeholders go through a function
         assertThat(js).doesNotContainPattern("\\.replace\\('\\{");
