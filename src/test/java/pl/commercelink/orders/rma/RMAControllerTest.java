@@ -835,6 +835,63 @@ class RMAControllerTest {
     }
 
     @Test
+    void aRowAfterAShipmentBeingCreatedKeepsItsOwnTrackingAndSeconds() {
+        // given: the row being created holds index 0, so the form posts the typed shipment as shipments[1] and Spring
+        // fills index 0 with an empty row
+        LocalDateTime shipped = LocalDateTime.of(2026, 10, 6, 9, 31, 17);
+        LocalDateTime delivered = LocalDateTime.of(2026, 10, 8, 12, 4, 51);
+        Shipment inFlight = new Shipment(ShipmentType.Courier);
+        inFlight.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        Shipment typedByHand = tracked("T-1", shipped);
+        typedByHand.setDeliveredAt(delivered);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(inFlight, typedByHand)));
+        Shipment row = formRow("T-1", shipped.truncatedTo(ChronoUnit.MINUTES));
+        row.setDeliveredAt(delivered.truncatedTo(ChronoUnit.MINUTES));
+
+        // when
+        RMA saved = saveShipments(existing, new Shipment(ShipmentType.Courier), row);
+
+        // then
+        assertThat(saved.getShipments()).hasSize(2);
+        Shipment kept = saved.getShipments().get(0);
+        assertThat(kept.getTrackingNo()).isEqualTo("T-1");
+        assertThat(kept.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(kept.getTrackingSubscriptionId()).isEqualTo("sub-T-1");
+        assertThat(kept.getShippedAt()).isEqualTo(shipped);
+        assertThat(kept.getDeliveredAt()).isEqualTo(delivered);
+        assertThat(saved.getShipments().get(1)).isSameAs(inFlight);
+    }
+
+    @Test
+    void aPackageMatchedByItsIdKeepsTrackingAndSecondsWhenItsDateIsEdited() {
+        // given: a package of the shipping integration, followed by its tracking
+        LocalDateTime shipped = LocalDateTime.of(2026, 10, 6, 9, 31, 17);
+        LocalDateTime delivered = LocalDateTime.of(2026, 10, 8, 12, 4, 51);
+        Shipment manual = tracked("T-0", shipped);
+        Shipment fromIntegration = tracked("T-1", shipped);
+        fromIntegration.setExternalId("EXT-1");
+        fromIntegration.setDeliveredAt(delivered);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(manual, fromIntegration)));
+
+        // when: the shipping date of the package is moved, its delivery date shown as it was
+        Shipment packageRow = typed("T-1", "EXT-1");
+        packageRow.setShippedAt(LocalDateTime.of(2026, 10, 7, 8, 0));
+        packageRow.setDeliveredAt(delivered.truncatedTo(ChronoUnit.MINUTES));
+        RMA saved = saveShipments(existing, formRow("T-0", shipped.truncatedTo(ChronoUnit.MINUTES)), packageRow);
+
+        // then
+        Shipment kept = saved.getShipments().get(1);
+        assertThat(kept.getExternalId()).isEqualTo("EXT-1");
+        assertThat(kept.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(kept.getTrackingSubscriptionId()).isEqualTo("sub-T-1");
+        assertThat(kept.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 10, 7, 8, 0));
+        assertThat(kept.getDeliveredAt()).isEqualTo(delivered);
+        assertThat(saved.getShipments().get(0).getTrackingSubscriptionId()).isEqualTo("sub-T-0");
+    }
+
+    @Test
     void aShipmentBeingCreatedSurvivesAnEditOfTheOthers() {
         // given: it has no shipping data yet, and losing it would drop the label its command pays for
         Shipment inFlight = new Shipment(ShipmentType.Courier);
@@ -1193,6 +1250,41 @@ class RMAControllerTest {
         assertThat(notice.lines()).containsExactly("Pominięto 1: B — jeszcze nie odebrana.");
         assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void deleteItemsRemovesTheDeletableOnesLowersTheInsuranceAndNamesTheSkippedOnes() {
+        // given
+        RMAItem received = selectedItem("a", "A", RMAItemStatus.Received);
+        received.setPrice(100.0);
+        received.setQty(2);
+        RMAItem inRepair = selectedItem("b", "B", RMAItemStatus.SentForRepair);
+        inRepair.setPrice(50.0);
+        inRepair.setQty(1);
+        RMA rma = rmaWithStatus(RMAStatus.ItemsReceived);
+        rma.setShippingInsurance(250.0);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(received, inRepair));
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(received);
+        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(inRepair);
+        answerMessagesFromTheRealBundles();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.deleteRMAItems(RMA_ID, new RMAItemsForm(List.of(received, inRepair)), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        verify(rmaItemsRepository).delete(List.of(received));
+        verify(rmaRepository).save(rma);
+        assertThat(rma.getShippingInsurance()).isEqualTo(50.0);
+        RmaNotice notice = flashedNotice();
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        assertThat(notice.text()).isEqualTo("Pozycje usunięte: 1.");
+        assertThat(notice.lines()).containsExactly("Pominięto 1: B — w naprawie.");
+        assertThat(notice.scope()).isEqualTo(RmaNotice.Scope.ITEMS);
     }
 
     @Test
