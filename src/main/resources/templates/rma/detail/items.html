@@ -163,7 +163,7 @@
 <!--/* One item. Its hidden fields (rmaItems[i].*) bind to RMAItemsForm exactly as before the redesign; the checkbox carries
        what rma-detail.js needs to decide the actions and fill the dialogs. */-->
 <tr th:fragment="row(r, selectable)" class="cl-row-main">
-    <td th:if="${selectable}" class="cl-table-check" th:with="f=${rmaItemsForm.rmaItems.get(r.index())}">
+    <td th:if="${selectable}" class="cl-table-check">
         <label class="cl-check-target"><input class="cl-check-input" type="checkbox" value="true" data-cl-select-row
                                               th:name="|rmaItems[${r.index()}].selected|"
                                               th:attr="data-status=${r.status()}, data-qty=${r.qty()}, data-name=${r.name()},
@@ -171,8 +171,6 @@
                                                        aria-label=#{rma.detail.items.select(${r.name()})}"></label>
         <input type="hidden" th:name="|rmaItems[${r.index()}].rmaId|" th:value="${page.rmaId()}">
         <input type="hidden" th:name="|rmaItems[${r.index()}].rmaItemId|" th:value="${r.rmaItemId()}">
-        <input type="hidden" th:name="|rmaItems[${r.index()}].itemId|" th:value="${f.itemId}">
-        <input type="hidden" th:name="|rmaItems[${r.index()}].tax|" th:value="${f.tax}">
     </td>
     <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.detail.items.column.item}">
         <a th:href="@{${r.href()}}" th:text="${r.name()}"></a>

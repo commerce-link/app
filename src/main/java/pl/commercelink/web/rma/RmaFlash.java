@@ -21,10 +21,6 @@ public final class RmaFlash {
         redirectAttributes.addFlashAttribute(ATTRIBUTE, notice.inScope(RmaNotice.Scope.ITEMS));
     }
 
-    public static void page(RedirectAttributes redirectAttributes, RmaNotice notice) {
-        redirectAttributes.addFlashAttribute(ATTRIBUTE, notice.inScope(RmaNotice.Scope.PAGE));
-    }
-
     /** Turns a legacy successMessage / errorMessage in the model into a page notice, unless one is already there. */
     public static void adoptLegacy(Model model) {
         Map<String, Object> attributes = model.asMap();

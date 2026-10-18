@@ -242,7 +242,7 @@ class RmaDetailPageRenderingTest {
                 .contains("data-cl-selection-bar").contains("data-cl-select-clear").contains("data-cl-enter-guard");
         assertThat(html).contains("name=\"rmaItems[0].selected\"").contains("name=\"rmaItems[0].rmaItemId\" value=\"i-1\"")
                 .contains("name=\"rmaItems[0].rmaId\" value=\"" + RMA_ID + "\"")
-                .contains("name=\"rmaItems[1].itemId\" value=\"order-item-i-2\"").contains("name=\"rmaItems[1].tax\" value=\"0.23\"");
+                .doesNotContain("name=\"rmaItems[1].itemId\"").doesNotContain("name=\"rmaItems[1].tax\"");
         assertThat(html).contains("data-status=\"Received\"").contains("data-status=\"New\"").contains("data-qty=\"2\"")
                 .contains("data-total=\"200.0\"").contains("data-id=\"i-2\"").contains("data-name=\"Mouse\"");
         assertThat(html).contains("data-cl-rma-action=\"accept\"").contains("data-accepts=\"Received\"")
