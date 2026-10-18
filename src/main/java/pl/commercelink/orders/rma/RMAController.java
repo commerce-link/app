@@ -474,10 +474,7 @@ public class RMAController {
 
     private String addressPage(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
                                boolean incomplete, boolean shipToClient, Model model) {
-        boolean fillAvailable = !filled && orderAddress != null && form.differsFrom(orderAddress);
-        model.addAttribute("page", new RmaAddressPage(rma.getRmaId(), RmaAddressPage.shortId(rma.getRmaId()),
-                RmaAddressPage.shortId(rma.getOrderId()), form, fillAvailable, filled,
-                !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete, shipToClient));
+        model.addAttribute("page", RmaAddressPage.of(rma, form, orderAddress, filled, incomplete, shipToClient));
         return "rma/address";
     }
 

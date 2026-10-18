@@ -42,8 +42,7 @@ public class RmaRowMapper {
         RMAStatus status = rma.getStatus() == null ? RMAStatus.New : rma.getStatus();
         boolean marketplace = rma.isMarketplaceReturn();
         ShippingDetails details = rma.getShippingDetails();
-        String person = details == null ? null : firstNonBlank(details.getCompanyName(),
-                Stream.of(details.getName(), details.getSurname()).filter(StringUtils::isNotBlank).collect(Collectors.joining(" ")));
+        String person = person(details);
         String clientName = person != null ? person : StringUtils.trimToNull(rma.getEmail());
         String email = person != null ? StringUtils.trimToNull(rma.getEmail()) : null;
         Long age = rma.getCreatedAt() == null || status.isClosed() ? null
@@ -92,9 +91,23 @@ public class RmaRowMapper {
         }
         String status = text("MarketplaceReturnStatus." + rma.getExternalReturnStatus().name());
         String line = StringUtils.isBlank(rma.getMarketplace()) ? status : text("rma.list.marketplace.status", rma.getMarketplace(), status);
-        Shipment last = last(rma.getShipments());
-        return last == null || isTracked(last) || StringUtils.isBlank(last.getCarrier()) ? line
-                : text("rma.list.marketplace.withCarrier", line, last.getCarrier());
+        String carrier = untrackedCarrier(rma.getShipments());
+        return carrier == null ? line : text("rma.list.marketplace.withCarrier", line, carrier);
+    }
+
+    /** The company, else the first and last name of an address; null when it names nobody. */
+    static String person(ShippingDetails details) {
+        return details == null ? null : firstNonBlank(details.getCompanyName(),
+                Stream.of(details.getName(), details.getSurname()).filter(StringUtils::isNotBlank).collect(Collectors.joining(" ")));
+    }
+
+    /**
+     * The carrier of a marketplace return's last parcel that nothing tracks (no shipped or delivered date), which joins
+     * the marketplace's status as the parcel's only state; null when the parcel is tracked or names no carrier.
+     */
+    static String untrackedCarrier(List<Shipment> shipments) {
+        Shipment last = last(shipments);
+        return last == null || isTracked(last) || StringUtils.isBlank(last.getCarrier()) ? null : last.getCarrier();
     }
 
     /** A return shipment of a marketplace return, shown only when the store booked it and so knows its dates. */
