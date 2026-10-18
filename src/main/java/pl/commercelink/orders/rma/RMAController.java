@@ -593,27 +593,35 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
-        List<String> errorMessages = new ArrayList<>();
+        // the form never carries serial numbers, so the check reads the stored items
+        List<String> problems = new ArrayList<>();
 
         for (String rmaItemId : selectedRMAItemIds) {
-            RMAItem rmaItem = form.getRmaItemBy(rmaItemId);
-            OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
+            RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
+            if (rmaItem == null || SerialNumbers.parse(rmaItem.getSerialNo()).isEmpty()) {
+                continue;
+            }
+
+            OrderItem orderItem = rma.getOrderId() == null ? null
+                    : orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
+            if (orderItem == null) {
+                problems.add(messageSource.getMessage("rma.check.serial.order.item.not.found",
+                        new Object[]{rmaItem.getName()}, locale));
+                continue;
+            }
 
             List<String> invalidSerialNumbers = orderItem.getInvalidSerialNumbers(rmaItem.getSerialNo());
-
             if (!invalidSerialNumbers.isEmpty()) {
-                String invalidSNs = String.join(", ", invalidSerialNumbers);
-                errorMessages.add(messageSource.getMessage("rma.check.serial.no.mismatch",
-                        new Object[]{rmaItem.getName(), invalidSNs}, locale));
+                problems.add(rmaItem.getName() + " \u2014 " + String.join(", ", invalidSerialNumbers));
             }
         }
 
-        if (errorMessages.isEmpty()) {
-            redirectAttributes.addFlashAttribute("successMessage",
-                    messageSource.getMessage("rma.check.serial.no.all.valid", null, locale));
-        } else {
-            redirectAttributes.addFlashAttribute("errorMessage", String.join("<br>", errorMessages));
-        }
+        RmaNotice notice = problems.isEmpty()
+                ? new RmaNotice(RmaNotice.OK, messageSource.getMessage("rma.detail.serial.ok", null, locale),
+                        List.of(), RmaNotice.Scope.ITEMS)
+                : new RmaNotice(RmaNotice.BAD, messageSource.getMessage("rma.detail.serial.mismatch.title", null, locale),
+                        List.copyOf(problems), RmaNotice.Scope.ITEMS);
+        RmaFlash.items(redirectAttributes, notice);
 
         return "redirect:/dashboard/rma/" + rmaId;
     }

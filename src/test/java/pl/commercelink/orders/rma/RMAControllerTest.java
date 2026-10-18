@@ -931,6 +931,117 @@ class RMAControllerTest {
         return (RmaNotice) captor.getValue();
     }
 
+    // ------------------------------------------------------------------
+    // checkSerialNumbers compares the stored numbers
+    // ------------------------------------------------------------------
+
+    private RmaNotice checkSerialNumbersOf(RMA rma, RMAItem posted) {
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        answerMessagesFromTheRealBundles();
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.checkSerialNumbers(RMA_ID, new RMAItemsForm(List.of(posted)), redirectAttributes,
+                    Locale.forLanguageTag("pl"));
+        }
+        return flashedNotice();
+    }
+
+    private static RMAItem storedItem(String id, String name, String serialNo) {
+        RMAItem item = new RMAItem();
+        item.setRmaItemId(id);
+        item.setItemId("oi-" + id);
+        item.setName(name);
+        item.setSerialNo(serialNo);
+        return item;
+    }
+
+    private static OrderItem orderItemWithSerial(String itemId, String serialNo) {
+        OrderItem orderItem = new OrderItem();
+        orderItem.setOrderId(ORDER_ID);
+        orderItem.setItemId(itemId);
+        orderItem.setSerialNo(serialNo);
+        return orderItem;
+    }
+
+    @Test
+    void checkSerialNumbersReadsTheSerialFromTheStoredItemNotTheForm() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
+        assertThat(notice.text()).isEqualTo("Numery seryjne nie zgadzają się z zamówieniem:");
+        assertThat(notice.lines()).containsExactly("Laptop — X9");
+        assertThat(notice.scope()).isEqualTo(RmaNotice.Scope.ITEMS);
+    }
+
+    @Test
+    void checkSerialNumbersAcceptsANumberFromTheOrder() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A2"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1, A2"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        assertThat(notice.text()).isEqualTo("Wszystkie numery seryjne zgadzają się z zamówieniem.");
+        assertThat(notice.lines()).isEmpty();
+    }
+
+    @Test
+    void checkSerialNumbersSkipsAnItemWithoutASerialNumber() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", " "));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        verify(orderItemsRepository, never()).findById(any(), any());
+    }
+
+    @Test
+    void checkSerialNumbersWithoutTheOrderItemReportsItInsteadOfFailing() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(null);
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
+        assertThat(notice.lines()).containsExactly("Nie znaleziono pozycji zamówienia dla: Laptop");
+    }
+
+    @Test
+    void checkSerialNumbersOnAnRmaWithoutAnOrderReportsEveryItem() {
+        // given
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        rma.setOrderId(null);
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rma, posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
+        assertThat(notice.lines()).containsExactly("Nie znaleziono pozycji zamówienia dla: Laptop");
+        verify(orderItemsRepository, never()).findById(any(), any());
+    }
+
     @Test
     void markItemsAsSentToDistributorReportsTheSkippedItems() {
         // given
