@@ -1,0 +1,114 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The dialogs of the selection row's actions (spec §5.2). They sit inside #rmaItemsForm, so their fields post with the
+       checked rows and each dialog's button only names its address (formaction). rma-detail.js fills the list of what
+       the action processes and what it skips, the count in the title and the computed texts; the required choices are
+       checked by the script (no required attribute: every dialog shares one form). Without JavaScript they never open,
+       which is why a field that would post a value of its own is rendered disabled until the script runs. */-->
+<th:block th:fragment="selection" th:with="id=${page.rmaId()}, items=${page.items()},
+          noAddress=${page.address() != null and (page.address().missing() or page.address().incomplete())}">
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('received', @{/dashboard/rma/{id}/markItemsAsReceived(id=${id})},
+            #{rma.detail.dialog.received.effect}, 'rma.detail.action.received', false, ~{})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('accept', @{/dashboard/rma/{id}/acceptReturn(id=${id})},
+            ${items.marketplace()} ? #{rma.detail.dialog.accept.effect.marketplace(${page.marketplaceCard() != null ? page.marketplaceCard().name() : ''})} : #{rma.detail.dialog.accept.effect},
+            'rma.detail.action.accept', false, ~{rma/detail/dialogs :: acceptFields})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('replace-working', @{/dashboard/rma/{id}/replaceItems(id=${id}, broken=false)},
+            #{rma.detail.dialog.replace.effect}, 'rma.detail.dialog.replace.submit', false, ~{rma/detail/dialogs :: condition('replace-working')})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('replace-broken', @{/dashboard/rma/{id}/replaceItems(id=${id}, broken=true)},
+            #{rma.detail.dialog.replace.effect}, 'rma.detail.dialog.replace.submit', false, ~{rma/detail/dialogs :: condition('replace-broken')})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('ship-distributor', @{/dashboard/rma/{id}/shipping/shipItemsToDistributor(id=${id})},
+            #{rma.detail.dialog.ship.effect}, 'rma.detail.dialog.ship.submit', false, ~{})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('ship-client', @{/dashboard/rma/{id}/shipping/shipItemsToClient(id=${id})},
+            ${noAddress} ? #{rma.detail.dialog.ship-client.effect.noAddress} : #{rma.detail.dialog.ship.effect},
+            'rma.detail.dialog.ship.submit', false, ~{})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('mark-distributor', @{/dashboard/rma/{id}/markItemsAsSentToDistributor(id=${id})},
+            #{rma.detail.dialog.mark-distributor.effect}, 'rma.detail.dialog.mark-distributor.submit', false, ~{})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('mark-client', @{/dashboard/rma/{id}/markItemsAsReturnedToClient(id=${id})},
+            #{rma.detail.dialog.mark-client.effect}, 'rma.detail.dialog.mark-client.submit', false, ~{})}"></dialog>
+    <dialog th:replace="~{rma/detail/dialogs :: bulk('delete', @{/dashboard/rma/{id}/deleteItems(id=${id})},
+            null, 'rma.detail.dialog.delete.submit', true, ~{rma/detail/dialogs :: deleteEffect})}"></dialog>
+
+    <!--/* The split's address names the item (items/{id}/split): rma-detail.js sets the button's formaction from the
+           one checked item and the form's data-rma-id. Until it does, the button posts to the form's own read-only
+           action. */-->
+    <dialog class="cl-dialog is-form" id="split-dialog" aria-labelledby="split-dialog-title">
+        <h2 class="cl-dialog-title" id="split-dialog-title" th:text="#{rma.detail.dialog.split.title}"></h2>
+        <div class="cl-dialog-body">
+            <p class="cl-dialog-message" data-cl-rma-split-name></p>
+            <div class="cl-form-grid cl-card-grid">
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" for="split-qty1" th:text="#{rma.detail.dialog.split.qty1}"></label>
+                    <input class="cl-input is-qty" type="number" id="split-qty1" name="qty1" min="1" value="1" inputmode="numeric"
+                           aria-describedby="split-qty1-error">
+                    <p class="cl-field-error" id="split-qty1-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+                            aria-hidden="true"></i><span th:attr="data-template=#{rma.detail.dialog.split.error('{max}')}"></span></p>
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <span class="cl-label" th:text="#{rma.detail.dialog.split.qty2}"></span>
+                    <p class="cl-dialog-message"><strong data-cl-rma-qty2></strong></p>
+                    <input type="hidden" name="qty2" value="1">
+                </div>
+            </div>
+            <p class="cl-dialog-effect" th:text="#{rma.detail.dialog.split.effect}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" data-cl-dialog-submit
+                    th:text="#{rma.detail.dialog.split.submit}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </dialog>
+</th:block>
+
+<!--/* One bulk action: its title counts the items it processes (data-template-one/-few/-many with {n}), the list names
+       them and the skipped ones, fields (a fragment, ~{} for none) come between the list and the effect. */-->
+<dialog th:fragment="bulk(name, formaction, effect, submitKey, danger, fields)" class="cl-dialog is-form"
+        th:id="|${name}-dialog|" th:attr="aria-labelledby=|${name}-dialog-title|">
+    <h2 class="cl-dialog-title" th:id="|${name}-dialog-title|" data-cl-rma-title
+        th:attr="data-template-one=${#messages.msg('rma.detail.dialog.' + name + '.title.one', '{n}')},
+                 data-template-few=${#messages.msg('rma.detail.dialog.' + name + '.title.few', '{n}')},
+                 data-template-many=${#messages.msg('rma.detail.dialog.' + name + '.title.many', '{n}')}"
+        th:text="${#messages.msg('rma.detail.action.' + name)}"></h2>
+    <div class="cl-dialog-body">
+        <ul class="cl-dialog-list" data-cl-selection-list></ul>
+        <th:block th:replace="${fields}"></th:block>
+        <p th:if="${effect != null}" class="cl-dialog-effect" th:text="${effect}"></p>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button" th:classappend="${danger} ? 'is-danger' : 'is-primary'" data-cl-dialog-submit
+                th:formaction="${formaction}" th:text="#{${submitKey}}"></button>
+        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+    </div>
+</dialog>
+
+<!--/* The condition the accepted or replaced pieces go to the warehouse in; the server refuses the action without it
+       (rma.item.condition.required). The three dialogs share one radio group: rma-detail.js clears it on every open. */-->
+<fieldset th:fragment="condition(name)" class="cl-choice-group" data-cl-rma-condition
+          th:attr="aria-describedby=|${name}-condition-error|">
+    <legend class="cl-label" th:text="#{rma.detail.condition.legend}"></legend>
+    <label th:each="c : ${ {'Sealed', 'OpenBox', 'Damaged'} }" class="cl-choice"><input type="radio" name="condition"
+            th:value="${c}"><span class="cl-choice-text"><span class="cl-choice-title"
+            th:text="${#messages.msg('ItemCondition.' + c)}"></span><span class="cl-choice-description"
+            th:text="${#messages.msg('rma.detail.condition.' + c)}"></span></span></label>
+    <p class="cl-field-error" th:id="|${name}-condition-error|" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
+            aria-hidden="true"></i><span th:text="#{rma.item.condition.required}"></span></p>
+</fieldset>
+
+<!--/* Whether the delivery cost is refunded is worked out by the server on the items it actually accepts (decision D12):
+       the box only asks for it, its description says when it counts, and the outcome notice says what happened. */-->
+<th:block th:fragment="acceptFields">
+    <fieldset th:replace="~{rma/detail/dialogs :: condition('accept')}"></fieldset>
+    <div th:if="${page.items().marketplace()}" class="cl-check-field">
+        <label class="cl-check"><input type="checkbox" name="refundDelivery" value="true" disabled data-cl-rma-enable
+                                       aria-describedby="accept-refund-delivery-help"
+                                       th:checked="${page.items().refundDeliveryDefault()}"><span
+                th:text="#{rma.detail.dialog.accept.refundDelivery}"></span></label>
+        <p class="cl-check-description" id="accept-refund-delivery-help" th:text="#{rma.detail.dialog.accept.refundDelivery.help}"></p>
+    </div>
+</th:block>
+
+<!--/* the sum of the deleted items' values, computed by rma-detail.js from the checked rows */-->
+<p th:fragment="deleteEffect" class="cl-dialog-effect" data-cl-rma-sum
+   th:attr="data-template=#{rma.detail.dialog.delete.effect('{sum}')}"></p>
+</body>
+</html>

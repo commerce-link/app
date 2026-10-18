@@ -13580,6 +13580,23 @@ a.cl-link-button:hover {
     min-height: 72px;
 }
 
+/* RMA details page (spec docs/active/rma-detail-redesign/2026-10-17-rma-detail-design.md §9): only what the shared
+   components have no counterpart for. */
+
+/* the items table: the state column fits the pill and "Klient chce: zwrot · zastosowano: naprawa", the value column a
+   five-digit amount with its "2 × …" line */
+.cl-page .cl-table.is-rma-detail col.cl-col-status { width: 14rem; }
+.cl-page .cl-table.is-rma-detail col.cl-col-value { width: 8.5rem; }
+.cl-page .cl-table.is-rma-detail td .cl-status + .cl-table-sub { margin-top: 4px; }
+/* the client's reason is one line under the item, cut with an ellipsis; the whole text is in its title */
+.cl-page .cl-table.is-rma-detail .cl-table-sub.is-reason {
+    overflow: hidden;
+    max-width: 42ch;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* End of RMA details page */
+
 /* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
    reconciliation of an uploaded statement on the Payments page (payments-statement.html). The pages are built from the
    shared components; only what has no counterpart among them is here. */

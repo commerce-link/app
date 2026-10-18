@@ -7,9 +7,14 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.DefaultTemplateResolver;
+import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.MarketplaceDecision;
 import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemStatus;
+import pl.commercelink.orders.rma.RMAItemsForm;
+import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.web.rma.RmaDetailPage;
 import pl.commercelink.web.rma.RmaDetailPageFactory;
@@ -20,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +44,7 @@ class RmaDetailPageRenderingTest {
             <div th:fragment="details">LEGACY-DETAILS</div>
             <div th:fragment="events">LEGACY-EVENTS</div>
             <div th:fragment="marketplace">LEGACY-MARKETPLACE</div>
-            <div th:fragment="items">LEGACY-ITEMS</div>
+            <div th:fragment="addItem">LEGACY-ADD-ITEM</div>
             <div th:fragment="shipping">LEGACY-SHIPPING</div>
             <div th:fragment="shipments">LEGACY-SHIPMENTS</div>
             <th:block th:fragment="scripts">LEGACY-SCRIPTS</th:block>
@@ -72,7 +79,44 @@ class RmaDetailPageRenderingTest {
         return factory.page("store-1", rma, List.of(), List.of(), null, false, CLIENT_LINK, null, null, Locale.ENGLISH);
     }
 
+    private RmaDetailPage page(RMA rma, List<RMAItem> items, List<OrderItem> remaining, boolean refundDeliveryDefault) {
+        return factory.page("store-1", rma, items, remaining, null, refundDeliveryDefault, CLIENT_LINK, null, null,
+                Locale.ENGLISH);
+    }
+
+    private static RMAItem item(String id, String name, RMAItemStatus status, int qty) {
+        RMAItem item = new RMAItem();
+        item.setRmaId(RMA_ID);
+        item.setRmaItemId(id);
+        item.setItemId("order-item-" + id);
+        item.setName(name);
+        item.setStatus(status);
+        item.setQty(qty);
+        item.setPrice(100);
+        item.setTax(0.23);
+        item.setEan("5901234123457");
+        item.setReason("Does not work");
+        item.setDesiredResolution(RMAResolutionType.Return);
+        return item;
+    }
+
+    private static List<RMAItem> twoItems() {
+        return List.of(item("i-1", "Headset", RMAItemStatus.Received, 1), item("i-2", "Mouse", RMAItemStatus.New, 2));
+    }
+
+    private static OrderItem orderItem() {
+        OrderItem orderItem = new OrderItem();
+        orderItem.setItemId("left-1");
+        orderItem.setName("Cable");
+        orderItem.setQty(1);
+        return orderItem;
+    }
+
     private static String render(String template, RmaDetailPage page, RmaNotice notice) {
+        return render(template, page, notice, new RMAItemsForm(new ArrayList<>()));
+    }
+
+    private static String render(String template, RmaDetailPage page, RmaNotice notice, RMAItemsForm form) {
         TemplateEngine engine = EnglishFragmentTemplateEngine.create();
         DefaultTemplateResolver legacy = new DefaultTemplateResolver();
         legacy.setOrder(0);
@@ -83,6 +127,7 @@ class RmaDetailPageRenderingTest {
         Context context = new Context(Locale.ENGLISH);
         context.setVariable("page", page);
         context.setVariable("rmaNotice", notice);
+        context.setVariable("rmaItemsForm", form);
         return engine.process("<div th:replace=\"~{" + template + "}\"></div>", context);
     }
 
@@ -160,8 +205,7 @@ class RmaDetailPageRenderingTest {
         assertThat(withPageNotice.indexOf("PAGE-NOTICE")).isPositive()
                 .isLessThan(withPageNotice.indexOf("cl-layout-aside"));
         assertThat(withPageNotice).contains("cl-alert is-ok");
-        assertThat(withItemsNotice.indexOf("ITEMS-NOTICE")).isGreaterThan(withItemsNotice.indexOf("cl-layout-aside"))
-                .isLessThan(withItemsNotice.indexOf("LEGACY-ITEMS"));
+        assertThat(withItemsNotice.indexOf("ITEMS-NOTICE")).isGreaterThan(withItemsNotice.indexOf("cl-layout-aside"));
         assertThat(withItemsNotice).contains("<li>Skipped 1: X</li>");
     }
 
@@ -176,7 +220,163 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??").doesNotContain("style=").doesNotContain("onclick");
-        assertThat(html).contains("LEGACY-DETAILS").contains("LEGACY-EVENTS").contains("LEGACY-ITEMS")
-                .contains("LEGACY-SHIPPING").contains("LEGACY-SHIPMENTS");
+        assertThat(html).contains("LEGACY-DETAILS").contains("LEGACY-EVENTS").contains("LEGACY-SHIPPING")
+                .contains("LEGACY-SHIPMENTS");
+        assertThat(html).contains("class=\"cl-list-empty\"").doesNotContain("LEGACY-ITEMS");
+    }
+
+    @Test
+    void itemsTableHasTheSelectionContractAndHiddenFormFields() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        assertThat(html).contains("id=\"rmaItemsForm\"").contains("data-cl-select-table=\"true\"")
+                .contains("data-cl-selection-bar").contains("data-cl-select-clear").contains("data-cl-enter-guard");
+        assertThat(html).contains("name=\"rmaItems[0].selected\"").contains("name=\"rmaItems[0].rmaItemId\" value=\"i-1\"")
+                .contains("name=\"rmaItems[0].rmaId\" value=\"" + RMA_ID + "\"")
+                .contains("name=\"rmaItems[1].itemId\" value=\"order-item-i-2\"").contains("name=\"rmaItems[1].tax\" value=\"0.23\"");
+        assertThat(html).contains("data-status=\"Received\"").contains("data-status=\"New\"").contains("data-qty=\"2\"")
+                .contains("data-total=\"200.0\"").contains("data-id=\"i-2\"").contains("data-name=\"Mouse\"");
+        assertThat(html).contains("data-cl-rma-action=\"accept\"").contains("data-accepts=\"Received\"")
+                .contains("data-single-min-qty=\"2\"").contains("data-skip-New=\"not received yet\"");
+        assertThat(html).contains("Items (2)").contains("Client wants: return · unresolved").contains("2 × 100,00 PLN");
+        assertThat(html).doesNotContain("??").doesNotContain("LEGACY-ITEMS");
+    }
+
+    @Test
+    void everyBulkActionPostsToItsUnchangedAddress() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+        String base = "formaction=\"/dashboard/rma/" + RMA_ID + "/";
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        assertThat(html).contains(base + "markItemsAsReceived\"").contains(base + "acceptReturn\"")
+                .contains(base + "replaceItems?broken=false\"").contains(base + "replaceItems?broken=true\"")
+                .contains(base + "shipping/shipItemsToDistributor\"").contains(base + "shipping/shipItemsToClient\"")
+                .contains(base + "markItemsAsSentToDistributor\"").contains(base + "markItemsAsReturnedToClient\"")
+                .contains(base + "checkSerialNumbers\"").contains(base + "deleteItems\"");
+        for (String name : new String[]{"received", "accept", "replace-working", "replace-broken", "ship-distributor",
+                "ship-client", "mark-distributor", "mark-client", "split", "delete"}) {
+            assertThat(html).as(name).contains("id=\"" + name + "-dialog\"").contains("data-cl-dialog-open=\"" + name + "-dialog\"");
+        }
+    }
+
+    @Test
+    void refundDeliveryIsOfferedOnlyOnAMarketplaceRma() {
+        // given
+        List<RMAItem> items = twoItems();
+        RMA marketplace = rma(RMAStatus.Processing);
+        marketplace.setMarketplace("Allegro");
+        marketplace.setExternalReturnId("ret-1");
+
+        // when
+        String shop = render("rma-detail :: body", page(rma(RMAStatus.Processing), items, List.of(), false), null,
+                new RMAItemsForm(items));
+        String refunded = render("rma-detail :: body", page(marketplace, items, List.of(), true), null, new RMAItemsForm(items));
+        String notRefunded = render("rma-detail :: body", page(marketplace, items, List.of(), false), null, new RMAItemsForm(items));
+
+        // then
+        assertThat(shop).doesNotContain("name=\"refundDelivery\"");
+        assertThat(inputs(refunded, "refundDelivery")).hasSize(2).allMatch(input -> input.contains("checked"));
+        assertThat(inputs(notRefunded, "refundDelivery")).hasSize(2).noneMatch(input -> input.contains("checked"));
+        assertThat(refunded).contains("Allegro will refund the buyer");
+    }
+
+    @Test
+    void aClosedRmaHasNoCheckboxesNoBarAndNoAdd() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Completed), items, List.of(orderItem()), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        assertThat(html).contains("Headset").contains("Mouse").contains("cl-table is-compact is-wrap is-rma-detail");
+        assertThat(html).doesNotContain("data-cl-select-row").doesNotContain("data-cl-selection-bar")
+                .doesNotContain("rmaItemsForm").doesNotContain("?open=add").doesNotContain("data-cl-select-table")
+                .doesNotContain("<noscript");
+    }
+
+    @Test
+    void anOpenRmaWithOrderItemsLeftOffersAdd() {
+        // given
+        RmaDetailPage page = page(rma(RMAStatus.Processing), twoItems(), List.of(orderItem()), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(twoItems()));
+
+        // then
+        assertThat(html).contains("href=\"?open=add\"").contains("data-cl-rma-legacy-add").contains("LEGACY-ADD-ITEM");
+    }
+
+    @Test
+    void itemNamesWithMarkupAreEscapedInRowsAndDataAttributes() {
+        // given
+        List<RMAItem> items = List.of(item("i-1", "<b>\"x\"</b>", RMAItemStatus.Received, 1));
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        assertThat(html).doesNotContain("<b>\"x\"</b>");
+        assertThat(html).contains(">&lt;b&gt;&quot;x&quot;&lt;/b&gt;<").contains("data-name=\"&lt;b&gt;&quot;x&quot;&lt;/b&gt;\"");
+    }
+
+    @Test
+    void itemsNoticeRendersInsideTheItemsCard() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+        RmaNotice notice = new RmaNotice(RmaNotice.WARN, "ITEMS-NOTICE", List.of("Skipped 1: X"), RmaNotice.Scope.ITEMS);
+
+        // when
+        String html = render("rma-detail :: body", page, notice, new RMAItemsForm(items));
+
+        // then
+        assertThat(html.indexOf("ITEMS-NOTICE")).isGreaterThan(html.indexOf("id=\"items-title\""))
+                .isLessThan(html.indexOf("<table"));
+        assertThat(html.indexOf("ITEMS-NOTICE")).isEqualTo(html.lastIndexOf("ITEMS-NOTICE"));
+    }
+
+    @Test
+    void noscriptOffersEveryActionAndSplitLinks() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        Matcher bar = Pattern.compile("(?s)<noscript>\\s*<div class=\"cl-selection-actions is-static\">.*?</noscript>").matcher(html);
+        assertThat(bar.find()).isTrue();
+        String noscript = bar.group();
+        for (String action : new String[]{"markItemsAsReceived", "acceptReturn", "replaceItems?broken=false",
+                "replaceItems?broken=true", "shipping/shipItemsToDistributor", "shipping/shipItemsToClient",
+                "markItemsAsSentToDistributor", "markItemsAsReturnedToClient", "checkSerialNumbers", "deleteItems"}) {
+            assertThat(noscript).as(action).contains("formaction=\"/dashboard/rma/" + RMA_ID + "/" + action + "\"");
+        }
+        assertThat(noscript).contains("<select").contains("name=\"condition\"");
+        assertThat(html).contains("href=\"?open=split&amp;item=i-2\"").doesNotContain("item=i-1\"");
+    }
+
+    private static List<String> inputs(String html, String name) {
+        Matcher matcher = Pattern.compile("<input[^>]*name=\"" + name + "\"[^>]*>").matcher(html);
+        List<String> found = new ArrayList<>();
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        return found;
     }
 }

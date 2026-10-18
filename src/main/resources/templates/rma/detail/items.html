@@ -1,0 +1,242 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Items card (spec §4.1-4.2). On an open RMA one form (#rmaItemsForm) carries every row's fields under its index in
+       RMAItemsForm (rmaItems[i]); the selection row covers the table header while something is checked
+       (table-select.js) and rma-detail.js leaves in it only the actions that would process at least one checked item
+       (decision D4). The dialogs of those actions sit inside the form, so their fields post with the checked rows.
+       Without JavaScript the noscript row posts every action straight away and the server skips what does not qualify;
+       a split, whose address names the item, goes through ?open=split&item= (decision D13). A closed RMA shows the
+       table only. */-->
+<section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title" th:with="items=${page.items()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="items-title" th:text="#{rma.detail.items.title(${items.rows().size()})}"></h2>
+        <!--/* the add dialog is still the old modal (rma/detail/legacy :: addItem) until it is redesigned */-->
+        <div th:if="${items.canAdd()}" class="cl-card-actions">
+            <a class="cl-button" href="?open=add" data-cl-rma-legacy-add>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{rma.detail.items.add}"></span>
+            </a>
+        </div>
+    </div>
+    <div th:if="${rmaNotice != null and rmaNotice.scope().name() == 'ITEMS'}" class="cl-card-inset">
+        <div th:replace="~{rma/detail/parts :: notice('ITEMS')}"></div>
+    </div>
+
+    <!--/* the form's own action is the read-only serial check: a submit that escaped every guard changes nothing */-->
+    <form th:if="${items.selectable()}" id="rmaItemsForm" class="cl-card-section cl-selection-host" method="post" novalidate
+          th:action="@{/dashboard/rma/{id}/checkSerialNumbers(id=${page.rmaId()})}"
+          th:attr="data-rma-id=${page.rmaId()},
+                   data-qty-template=#{rma.detail.dialog.qty('{n}')},
+                   data-skipped-template=#{rma.detail.dialog.skipped('{reason}')},
+                   data-skip-New=#{rma.detail.skip.New},
+                   data-skip-Received=#{rma.detail.skip.Received},
+                   data-skip-SentForRepair=#{rma.detail.skip.SentForRepair},
+                   data-skip-ReturnedToClient=#{rma.detail.skip.ReturnedToClient},
+                   data-skip-MovedToWarehouse=#{rma.detail.skip.MovedToWarehouse}">
+        <!--/* implicit submission (Enter) uses the first submit button; a disabled one submits nothing, and
+               rma-detail.js clicks the open dialog's own button instead */-->
+        <button type="submit" class="cl-visually-hidden" disabled tabindex="-1" aria-hidden="true" data-cl-enter-guard></button>
+        <th:block th:replace="~{rma/detail/items :: bar}"></th:block>
+        <th:block th:replace="~{rma/detail/items :: itemsTable}"></th:block>
+        <th:block th:replace="~{rma/detail/items :: staticActions}"></th:block>
+        <th:block th:replace="~{rma/detail/dialogs :: selection}"></th:block>
+    </form>
+    <div th:unless="${items.selectable()}" class="cl-card-section">
+        <th:block th:replace="~{rma/detail/items :: itemsTable}"></th:block>
+    </div>
+</section>
+
+<!--/* The selection row. Every action names the item statuses it processes (data-accepts, the same rules as RMAManager
+       and the controllers) or, for the split, the single item it needs (data-single-min-qty); rma-detail.js hides an
+       action that would process none of the checked items, greys a menu entry with its data-reason instead, and hides a
+       menu whose entries all do not apply. */-->
+<th:block th:fragment="bar" th:with="id=${page.rmaId()}">
+    <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+    <div class="cl-selection-row is-docked" data-cl-selection-bar hidden>
+        <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                                              th:attr="aria-label=#{rma.detail.items.select.all}, data-cl-label-select=#{rma.detail.items.select.all}, data-cl-label-clear=#{rma.detail.items.select.none}"></label>
+        <span class="cl-selection-count" data-cl-selection-count
+              th:attr="data-template=#{rma.detail.items.selected('{k}', '{n}')}"></span>
+        <div class="cl-selection-actions">
+            <!--/* RMAManager.markItemsAsReceived takes every item but MovedToWarehouse: marking a received one again
+                   re-checks whether the whole RMA is received (decision D11) */-->
+            <!--/* "Odbierz", as on the delivery page: with every group of actions shown, the full wording would not fit
+                   the selection row on the 680 px work column; the dialog says it in full */-->
+            <button type="button" class="cl-button" data-cl-rma-action="received"
+                    data-accepts="New,Received,SentForRepair,ReturnedToClient"
+                    data-cl-rma-dialog="received-dialog" data-cl-dialog-open="received-dialog">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
+                <span th:text="#{rma.detail.action.received.short}"></span>
+            </button>
+            <details class="cl-menu">
+                <summary class="cl-button">
+                    <span th:text="#{rma.detail.action.resolve}"></span>
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </summary>
+                <ul class="cl-menu-list" id="rma-resolve-menu">
+                    <li th:replace="~{rma/detail/items :: entry('accept', 'Received')}"></li>
+                    <li th:replace="~{rma/detail/items :: entry('replace-working', 'Received')}"></li>
+                    <li th:replace="~{rma/detail/items :: entry('replace-broken', 'Received')}"></li>
+                </ul>
+            </details>
+            <details class="cl-menu">
+                <summary class="cl-button">
+                    <span th:text="#{rma.detail.action.ship}"></span>
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </summary>
+                <ul class="cl-menu-list" id="rma-ship-menu">
+                    <li th:replace="~{rma/detail/items :: entry('ship-distributor', 'Received')}"></li>
+                    <li th:replace="~{rma/detail/items :: entry('ship-client', 'Received')}"></li>
+                    <li class="cl-menu-sep" aria-hidden="true"></li>
+                    <li th:replace="~{rma/detail/items :: entry('mark-distributor', 'Received')}"></li>
+                    <li th:replace="~{rma/detail/items :: entry('mark-client', 'Received')}"></li>
+                </ul>
+            </details>
+            <details class="cl-menu">
+                <summary class="cl-button">
+                    <span th:text="#{rma.detail.more}"></span>
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </summary>
+                <ul class="cl-menu-list" id="rma-selection-more-menu">
+                    <li>
+                        <button type="button" class="cl-menu-item" data-cl-rma-action="split" data-single-min-qty="2"
+                                data-cl-rma-dialog="split-dialog" data-cl-dialog-open="split-dialog"
+                                th:attr="data-reason=#{rma.detail.reason.split}">
+                            <span th:text="#{rma.detail.action.split} + '…'"></span>
+                            <span class="cl-menu-reason" hidden></span>
+                        </button>
+                    </li>
+                    <!--/* a read: sent straight away, without a dialog */-->
+                    <li>
+                        <button type="submit" class="cl-menu-item" data-cl-rma-action="serials"
+                                th:formaction="@{/dashboard/rma/{id}/checkSerialNumbers(id=${id})}"
+                                th:text="#{rma.detail.action.serials}"></button>
+                    </li>
+                </ul>
+            </details>
+            <button type="button" class="cl-link-button is-danger cl-selection-remove" data-cl-rma-action="delete"
+                    data-accepts="New,Received" data-cl-rma-dialog="delete-dialog" data-cl-dialog-open="delete-dialog"
+                    th:text="#{rma.detail.action.delete}"></button>
+            <button type="button" class="cl-link-button" data-cl-select-clear th:text="#{rma.detail.items.clear}"></button>
+        </div>
+    </div>
+</th:block>
+
+<!--/* A menu entry opening the dialog of the same name. */-->
+<li th:fragment="entry(name, accepts)">
+    <button type="button" class="cl-menu-item" th:attr="data-cl-rma-action=${name}, data-accepts=${accepts},
+            data-cl-rma-dialog=|${name}-dialog|, data-cl-dialog-open=|${name}-dialog|">
+        <span th:text="${#messages.msg('rma.detail.action.' + name)} + '…'"></span>
+    </button>
+</li>
+
+<th:block th:fragment="itemsTable" th:with="items=${page.items()}">
+    <table th:if="${!items.rows().isEmpty()}" class="cl-table is-compact is-wrap is-rma-detail"
+           th:attr="data-cl-select-table=${items.selectable()} ? 'true' : null">
+        <caption class="cl-visually-hidden" th:text="#{rma.detail.items.caption}"></caption>
+        <colgroup>
+            <col th:if="${items.selectable()}" class="cl-col-check">
+            <col>
+            <col class="cl-col-status">
+            <col class="cl-col-value">
+        </colgroup>
+        <thead>
+        <tr>
+            <th th:if="${items.selectable()}" scope="col" class="cl-table-check">
+                <!--/* hidden until table-select.js runs: without it the box would do nothing */-->
+                <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all hidden
+                                                      th:attr="aria-label=#{rma.detail.items.select.all}, data-cl-label-select=#{rma.detail.items.select.all}, data-cl-label-clear=#{rma.detail.items.select.none}"></label>
+            </th>
+            <th scope="col" th:text="#{rma.detail.items.column.item}"></th>
+            <th scope="col" th:text="#{rma.detail.items.column.state}"></th>
+            <th scope="col" class="is-numeric" th:text="#{rma.detail.items.column.value}"></th>
+        </tr>
+        </thead>
+        <tbody>
+        <th:block th:each="r : ${items.rows()}"><tr th:replace="~{rma/detail/items :: row(${r}, ${items.selectable()})}"></tr></th:block>
+        </tbody>
+    </table>
+    <p th:if="${items.rows().isEmpty()}" class="cl-list-empty" th:text="#{rma.detail.items.empty}"></p>
+    <p th:if="${!items.rows().isEmpty()}" class="cl-list-summary"><span th:text="#{rma.detail.items.total(${items.total()})}"></span></p>
+</th:block>
+
+<!--/* One item. Its hidden fields (rmaItems[i].*) bind to RMAItemsForm exactly as before the redesign; the checkbox carries
+       what rma-detail.js needs to decide the actions and fill the dialogs. */-->
+<tr th:fragment="row(r, selectable)" class="cl-row-main">
+    <td th:if="${selectable}" class="cl-table-check" th:with="f=${rmaItemsForm.rmaItems.get(r.index())}">
+        <label class="cl-check-target"><input class="cl-check-input" type="checkbox" value="true" data-cl-select-row
+                                              th:name="|rmaItems[${r.index()}].selected|"
+                                              th:attr="data-status=${r.status()}, data-qty=${r.qty()}, data-name=${r.name()},
+                                                       data-total=${r.totalValue()}, data-id=${r.rmaItemId()},
+                                                       aria-label=#{rma.detail.items.select(${r.name()})}"></label>
+        <input type="hidden" th:name="|rmaItems[${r.index()}].rmaId|" th:value="${page.rmaId()}">
+        <input type="hidden" th:name="|rmaItems[${r.index()}].rmaItemId|" th:value="${r.rmaItemId()}">
+        <input type="hidden" th:name="|rmaItems[${r.index()}].itemId|" th:value="${f.itemId}">
+        <input type="hidden" th:name="|rmaItems[${r.index()}].tax|" th:value="${f.tax}">
+    </td>
+    <th scope="row" class="cl-table-key" th:attr="data-label=#{rma.detail.items.column.item}">
+        <a th:href="@{${r.href()}}" th:text="${r.name()}"></a>
+        <span class="cl-table-sub">
+            <a class="cl-table-code" th:href="@{${r.href()}}" th:title="${r.rmaItemId()}" th:text="${r.shortId()}"></a>
+            <th:block th:if="${r.ean() != null}"><span class="cl-table-sep"> · </span><span th:text="#{rma.detail.items.ean(${r.ean()})}"></span></th:block>
+            <th:block th:if="${r.serialNo() != null}"><span class="cl-table-sep"> · </span><span th:text="#{rma.detail.items.serial(${r.serialNo()})}"></span></th:block>
+        </span>
+        <span th:if="${r.reason() != null}" class="cl-table-sub is-reason" th:title="${r.reason()}"
+              th:text="#{rma.detail.items.reason(${r.reason()})}"></span>
+        <noscript th:if="${selectable and r.qty() >= 2}"><a class="cl-link-button" th:href="|?open=split&item=${r.rmaItemId()}|"
+                th:attr="aria-label=#{rma.detail.items.split.label(${r.name()})}" th:text="#{rma.detail.items.split}"></a></noscript>
+    </th>
+    <td th:attr="data-label=#{rma.detail.items.column.state}"
+        th:with="desired=${r.desired() != null ? #strings.toLowerCase(r.desired()) : '—'}">
+        <span class="cl-status" th:classappend="${r.statusTone()}" th:text="${r.statusLabel()}"></span>
+        <span class="cl-table-sub" th:text="${r.actual() != null}
+                ? #{rma.detail.items.resolution(${desired}, ${#strings.toLowerCase(r.actual())})}
+                : #{rma.detail.items.resolution.open(${desired})}"></span>
+    </td>
+    <td class="is-numeric" th:attr="data-label=#{rma.detail.items.column.value}">
+        <span th:text="${r.total()}"></span>
+        <span class="cl-table-sub" th:text="#{rma.detail.items.qtyTimesPrice(${r.qty()}, ${r.unitPrice()})}"></span>
+    </td>
+</tr>
+
+<!--/* Without JavaScript the selection row never shows: every action is a plain submit of the checked rows, with the
+       fields the server needs; the server skips the items an action does not apply to and says so. The split is a
+       link in its row instead, because its address names the item. */-->
+<noscript th:fragment="staticActions" th:with="id=${page.rmaId()}">
+    <div class="cl-selection-actions is-static">
+        <div class="cl-field">
+            <label class="cl-label" for="rma-noscript-condition" th:text="#{rma.detail.condition.legend}"></label>
+            <select class="cl-select" id="rma-noscript-condition" name="condition">
+                <option value="" th:text="#{rma.detail.condition.choose}"></option>
+                <option th:each="c : ${ {'Sealed', 'OpenBox', 'Damaged'} }" th:value="${c}" th:text="${#messages.msg('ItemCondition.' + c)}"></option>
+            </select>
+        </div>
+        <label th:if="${page.items().marketplace()}" class="cl-check">
+            <input type="checkbox" name="refundDelivery" value="true" th:checked="${page.items().refundDeliveryDefault()}">
+            <span th:text="#{rma.detail.dialog.accept.refundDelivery}"></span>
+        </label>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/markItemsAsReceived(id=${id})}"
+                th:text="#{rma.detail.action.received}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/acceptReturn(id=${id})}"
+                th:text="#{rma.detail.action.accept}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/replaceItems(id=${id}, broken=false)}"
+                th:text="#{rma.detail.action.replace-working}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/replaceItems(id=${id}, broken=true)}"
+                th:text="#{rma.detail.action.replace-broken}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/shipping/shipItemsToDistributor(id=${id})}"
+                th:text="#{rma.detail.action.ship-distributor}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/shipping/shipItemsToClient(id=${id})}"
+                th:text="#{rma.detail.action.ship-client}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/markItemsAsSentToDistributor(id=${id})}"
+                th:text="#{rma.detail.action.mark-distributor}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/markItemsAsReturnedToClient(id=${id})}"
+                th:text="#{rma.detail.action.mark-client}"></button>
+        <button type="submit" class="cl-button" th:formaction="@{/dashboard/rma/{id}/checkSerialNumbers(id=${id})}"
+                th:text="#{rma.detail.action.serials}"></button>
+        <button type="submit" class="cl-button is-danger" th:formaction="@{/dashboard/rma/{id}/deleteItems(id=${id})}"
+                th:text="#{rma.detail.action.delete}"></button>
+    </div>
+</noscript>
+</body>
+</html>

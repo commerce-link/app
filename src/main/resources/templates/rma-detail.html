@@ -13,8 +13,7 @@
 
             <div class="cl-layout-aside">
                 <div class="cl-layout-main">
-                    <div th:replace="~{rma/detail/parts :: notice('ITEMS')}"></div>
-                    <div th:replace="~{rma/detail/legacy :: items}"></div>
+                    <section th:replace="~{rma/detail/items :: card}"></section>
                     <div th:replace="~{rma/detail/legacy :: shipments}"></div>
                 </div>
                 <div class="cl-layout-side">
@@ -25,15 +24,19 @@
                 </div>
             </div>
 
+            <div th:replace="~{rma/detail/legacy :: addItem}"></div>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
     <th:block th:replace="~{rma/detail/legacy :: scripts}"></th:block>
     <script th:src="@{/js/menu.js}" defer></script>
     <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/table-select.js}" defer></script>
+    <script th:src="@{/js/money.js}" defer></script>
     <script th:src="@{/js/copy-field.js}" defer></script>
     <script th:src="@{/js/confirm-dialog.js}" defer></script>
     <script th:src="@{/js/shipment-cancellation.js}" defer></script>
+    <script th:src="@{/js/rma-detail.js}" defer></script>
 </div>
 </body>
 </html>

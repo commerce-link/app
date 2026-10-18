@@ -209,138 +209,10 @@
             </div>
 </th:block>
 
-<div th:fragment="items">
-    <form id="rmaItemsForm" method="post" th:object="${rmaItemsForm}" th:attr="data-rma-id=${rma.rmaId}">
-        <h2 class="subtitle" th:text="#{rma.items}"></h2>
-        <div class="box">
-            <div class="table-container mb-4">
-                <table class="table is-fullwidth is-striped is-hoverable">
-                    <thead>
-                    <tr>
-                        <th th:text="#{order.item.select}"></th>
-                        <th></th>
-                        <th>ID</th>
-                        <th th:text="#{rma.item.name}"></th>
-                        <th th:text="#{rma.quantity}"></th>
-                        <th th:text="#{rma.desired.resolution}"></th>
-                        <th th:text="#{rma.actual.resolution}"></th>
-                        <th th:text="#{rma.status}"></th>
-                        <th th:text="#{rma.reason}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <th:block th:each="item, iterStat : *{rmaItems}">
-                        <tr th:attr="data-qty=${item.qty}">
-                            <td>
-                                <input type="checkbox" th:field="*{rmaItems[__${iterStat.index}__].selected}" th:disabled="${isClosed}" />
-                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaId}" readonly />
-                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].rmaItemId}" readonly />
-                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].itemId}" readonly />
-                                <input type="hidden" th:field="*{rmaItems[__${iterStat.index}__].tax}" readonly />
-                            </td>
-                            <td>
-                                <button type="button" class="rma-item-toggle"
-                                        th:attr="data-target='rma-item-detail-' + ${iterStat.index}">
-                                    <i class="fas fa-chevron-right"></i>
-                                </button>
-                            </td>
-                            <td>
-                                <a th:href="@{/dashboard/rma/{rmaId}/items/{rmaItemId}(rmaId=${item.rmaId}, rmaItemId=${item.rmaItemId})}"
-                                   th:text="${#strings.substring(item.rmaItemId, 0, 8)}"></a>
-                            </td>
-                            <td th:text="${item.name}"></td>
-                            <td th:text="${item.qty}"></td>
-                            <td th:text="${item.desiredResolution != null ? enumI18n.localize(item.desiredResolution) : ''}"></td>
-                            <td th:text="${item.actualResolution != null ? enumI18n.localize(item.actualResolution) : ''}"></td>
-                            <td>
-                                <span th:if="${item.status != null}"
-                                      class="tag"
-                                      th:classappend="${item.status.tagClass()}"
-                                      th:text="${enumI18n.localize(item.status)}"></span>
-                            </td>
-                            <td th:text="${item.reason}"></td>
-                        </tr>
-                        <tr class="rma-item-detail-row" th:attr="id='rma-item-detail-' + ${iterStat.index}" style="display:none;">
-                            <td colspan="9">
-                                <div class="rma-item-detail-grid">
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{fulfilment.ean}"></span>
-                                        <span class="mono" th:text="${item.ean}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{product.manufacturer.code}"></span>
-                                        <span class="mono" th:text="${item.mfn}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{order.item.serial.no}"></span>
-                                        <span class="mono" th:text="${item.serialNo}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{order.item.price}"></span>
-                                        <span th:text="${item.price}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{order.item.cost}"></span>
-                                        <span th:text="${item.unitCost.grossValue}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{general.delivery.id}"></span>
-                                        <span th:text="${item.shortenedDeliveryId}"></span>
-                                    </div>
-                                    <div>
-                                        <span class="rma-item-detail-label" th:text="#{order.item.comment}"></span>
-                                        <span th:text="${item.comment}"></span>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </th:block>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="field is-grouped">
-                <div class="control">
-                    <div class="select is-small">
-                        <select id="action-select" th:disabled="${isClosed}">
-                            <option value="markItemsAsReceived" th:text="#{rma.items.mark.as.received}" ></option>
-                            <option value="markItemsAsSentToDistributor" th:text="#{rma.items.mark.as.sent.to.distributor}"></option>
-                            <option value="markItemsAsReturnedToClient" th:text="#{rma.items.mark.as.returned.to.client}"></option>
-                            <option value="shipping/shipItemsToDistributor" th:text="#{rma.ship.to.distributor}"></option>
-                            <option value="shipping/shipItemsToClient" th:text="#{rma.ship.to.client}"></option>
-                            <option value="replaceItems?broken=false" th:text="#{rma.accept.working.items.replacement}"></option>
-                            <option value="replaceItems?broken=true" th:text="#{rma.accept.broken.items.replacement}"></option>
-                            <option value="acceptReturn" th:text="#{rma.accept.return}"></option>
-                            <option value="checkSerialNumbers" th:text="#{rma.check.serial.numbers}"></option>
-                            <option value="split" th:text="#{rma.split}">Split</option>
-                            <option value="deleteItems" th:text="#{general.delete}"></option>
-                        </select>
-                    </div>
-                    <div class="select is-small ml-2" id="condition-select-wrapper" style="display: none;"
-                         th:data-required-message="#{rma.item.condition.required}">
-                        <select id="condition-select" name="condition" th:disabled="${isClosed}">
-                            <option value="" th:text="#{rma.item.condition.select}"></option>
-                            <option th:each="condition : ${itemConditions}" th:value="${condition}"
-                                    th:text="${enumI18n.localize(condition)}"></option>
-                        </select>
-                    </div>
-                    <div class="control ml-2" id="refund-delivery-wrapper" style="display: none;" th:if="${rma.marketplaceReturn}">
-                        <label class="checkbox is-size-7">
-                            <input type="checkbox" name="refundDelivery" value="true" th:checked="${refundDeliveryDefault}" th:disabled="${isClosed}">
-                            <span th:text="#{rma.refund.delivery}"></span>
-                        </label>
-                    </div>
-                    <button class="button is-primary is-small" type="button" onclick="handleRMAAction(this)" th:text="#{general.submit}" th:disabled="${isClosed}"></button>
-                </div>
-                <div class="control">
-                    <button class="button is-info is-small" type="button" onclick="toggleRmaAddItemModal(true)" th:text="#{general.add}" th:disabled="${isClosed}"></button>
-                </div>
-            </div>
-
-        </div>
-    </form>
-
-    <div id="rmaItemAddModalId" class="modal">
+<!--/* The "Dodaj pozycję" modal, opened by the items card's head button (data-cl-rma-legacy-add) or, without JavaScript,
+       by its ?open=add link; it goes away when its dialog is redesigned. */-->
+<div th:fragment="addItem">
+    <div id="rmaItemAddModalId" class="modal" th:classappend="${page.openDialog() == 'add'} ? 'is-active' : ''">
         <div class="modal-background" onclick="toggleRmaAddItemModal(false)"></div>
         <div class="modal-card" style="width:auto; max-width:90vw;">
             <header class="modal-card-head is-align-items-start">
@@ -384,40 +256,6 @@
         </div>
     </div>
 
-    <div id="splitModal" class="modal">
-        <div class="modal-background" onclick="hideSplitModal()"></div>
-        <div class="modal-card">
-            <header class="modal-card-head">
-                <p class="modal-card-title" th:text="#{rma.split.title}">Split RMA Item</p>
-                <button class="delete" aria-label="close" onclick="hideSplitModal()"></button>
-            </header>
-            <section class="modal-card-body">
-                <form id="splitForm" method="post">
-                    <div class="field">
-                        <label class="label" th:text="#{rma.split.qty1}">Quantity for first item</label>
-                        <div class="control">
-                            <input class="input" type="number" name="qty1" min="1" value="1" required oninput="updateQty2()" id="qty1Input" />
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label class="label" th:text="#{rma.split.qty2}">Quantity for second item</label>
-                        <div class="control">
-                            <input class="input" type="number" name="qty2" min="1" value="1" required readonly id="qty2Input" />
-                        </div>
-                    </div>
-                    <input type="hidden" id="originalQtyInput" value="2" />
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-link" type="submit" th:text="#{rma.split}">Split</button>
-                        </div>
-                        <div class="control">
-                            <button class="button is-light" type="button" onclick="hideSplitModal()" th:text="#{rma.split.cancel}">Cancel</button>
-                        </div>
-                    </div>
-                </form>
-            </section>
-        </div>
-    </div>
 </div>
 
 <div th:fragment="shipping">
@@ -593,12 +431,6 @@
             box-shadow: none;
         }
 
-        .mono {
-            font-family: monospace;
-            font-size: .82rem;
-            white-space: nowrap;
-        }
-
         .events-scroll {
             max-height: 300px;
             overflow-y: auto;
@@ -654,32 +486,6 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
         }
 
-        .rma-item-detail-row td {
-            background: #f6f8fc;
-        }
-        .rma-item-detail-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: .6rem 1.4rem;
-        }
-        .rma-item-detail-label {
-            display: block;
-            font-size: .65rem;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            color: #9aa1ab;
-            margin-bottom: 2px;
-        }
-        .rma-item-toggle {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #9aa1ab;
-            padding: 0 .3rem;
-        }
-        .rma-item-toggle:hover {
-            color: #485fc7;
-        }
     </style>
     <script>
         function toggleRejectionReasonRequired(statusSelect) {
@@ -697,18 +503,6 @@
                 });
             });
 
-            document.querySelectorAll(".rma-item-toggle").forEach(btn => {
-                btn.addEventListener("click", function() {
-                    const detailRow = document.getElementById(this.getAttribute("data-target"));
-                    if (!detailRow) return;
-                    const isHidden = detailRow.style.display === "none";
-                    detailRow.style.display = isHidden ? "" : "none";
-                    const icon = this.querySelector("i");
-                    icon.classList.toggle("fa-chevron-right", !isHidden);
-                    icon.classList.toggle("fa-chevron-down", isHidden);
-                });
-            });
-
             const statusSelect = document.getElementById("status");
             if (statusSelect) {
                 toggleRejectionReasonRequired(statusSelect);
@@ -717,106 +511,6 @@
                 });
             }
         });
-
-        const actionsRequiringCondition = ['replaceItems?broken=false', 'replaceItems?broken=true', 'acceptReturn'];
-
-        function actionRequiresCondition() {
-            return actionsRequiringCondition.includes(document.getElementById('action-select').value);
-        }
-
-        function toggleConditionSelect() {
-            document.getElementById('condition-select-wrapper').style.display = actionRequiresCondition() ? '' : 'none';
-            const refundDelivery = document.getElementById('refund-delivery-wrapper');
-            if (refundDelivery) {
-                refundDelivery.style.display = document.getElementById('action-select').value === 'acceptReturn' ? '' : 'none';
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('action-select').addEventListener('change', toggleConditionSelect);
-            toggleConditionSelect();
-        });
-
-        function handleRMAAction(button) {
-            const actionSelect = document.getElementById('action-select');
-            const selectedAction = actionSelect.value;
-
-            if (actionRequiresCondition() && !document.getElementById('condition-select').value) {
-                alert(document.getElementById('condition-select-wrapper').dataset.requiredMessage);
-                return;
-            }
-
-            if (selectedAction === 'split') {
-                submitSplitAction();
-            } else {
-                confirmSave(button, () => {
-                    button.disabled = true;
-                    submitRMAItemsForm();
-                });
-            }
-        }
-
-        function submitRMAItemsForm() {
-            const form = document.getElementById('rmaItemsForm');
-            const actionSelect = document.getElementById('action-select');
-            const selectedAction = actionSelect.value;
-            const rmaId = form.getAttribute('data-rma-id');
-
-            form.action = `/dashboard/rma/${rmaId}/${selectedAction}`;
-            form.method = 'POST';
-            form.submit();
-        }
-
-        function submitSplitAction() {
-            const form = document.getElementById('rmaItemsForm');
-            // Restrict the selector to the item checkboxes (rmaItems[<i>].selected): the
-            // refundDelivery checkbox lives in the same form and is checked by default, so a
-            // broad input[type="checkbox"]:checked selector miscounts the selected items.
-            const selectedItems = form.querySelectorAll('input[type="checkbox"][name^="rmaItems"]:checked');
-
-            if (selectedItems.length !== 1) {
-                alert('Only one item can be split at a time.');
-                return;
-            }
-
-            const selectedRow = selectedItems[0].closest('tr');
-            const rmaItemIdInput = selectedRow.querySelector('input[name*=".rmaItemId"]');
-            const qty = parseInt(selectedRow.dataset.qty);
-            const rmaItemId = rmaItemIdInput.value;
-
-            if (qty < 2) {
-                alert('Item quantity must be at least 2 to split.');
-                return;
-            }
-
-            showSplitModal(rmaItemId, qty);
-        }
-
-        function showSplitModal(rmaItemId, originalQty) {
-            const form = document.getElementById('rmaItemsForm');
-            const rmaId = form.getAttribute('data-rma-id');
-            const splitForm = document.getElementById('splitForm');
-
-            splitForm.action = `/dashboard/rma/${rmaId}/items/${rmaItemId}/split`;
-            document.getElementById('originalQtyInput').value = originalQty;
-            document.getElementById('qty1Input').setAttribute('max', originalQty - 1);
-            document.getElementById('qty1Input').value = 1;
-            document.getElementById('qty2Input').setAttribute('max', originalQty - 1);
-            document.getElementById('splitModal').classList.add('is-active');
-            updateQty2();
-        }
-
-        function hideSplitModal() {
-            document.getElementById('splitModal').classList.remove('is-active');
-        }
-
-        function updateQty2() {
-            var qty1 = parseInt(document.getElementById('qty1Input').value) || 1;
-            var originalQty = parseInt(document.getElementById('originalQtyInput').value);
-            var qty2 = originalQty - qty1;
-            if(qty2 < 1) qty2 = 1;
-            document.getElementById('qty2Input').value = qty2;
-        }
 
         function toggleRmaAddItemModal(show) {
             const modal = document.getElementById('rmaItemAddModalId');
@@ -832,8 +526,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const shouldOpenModal = /*[[${openModal}]]*/ false;
-            if (shouldOpenModal) toggleRmaAddItemModal(true);
+            document.querySelectorAll('[data-cl-rma-legacy-add]').forEach(link => {
+                link.addEventListener('click', event => {
+                    event.preventDefault();
+                    toggleRmaAddItemModal(true);
+                });
+            });
         });
 
         function updateRmaQtyMax() {
