@@ -1011,6 +1011,62 @@ class RMAControllerTest {
     }
 
     @Test
+    void checkSerialNumbersWithAnOrderItemWithoutSerialsIsNotAMismatch() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", null));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+    }
+
+    @Test
+    void checkSerialNumbersListsADuplicatedWrongNumberOnce() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9, X9"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.lines()).containsExactly("Laptop \u2014 X9");
+    }
+
+    @Test
+    void checkSerialNumbersReportsOnlyTheNumbersOutsideTheOrder() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A1, X9"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1, A2"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.lines()).containsExactly("Laptop \u2014 X9");
+    }
+
+    @Test
+    void checkSerialNumbersSkipsAnItemWithANullSerialNumber() {
+        // given
+        RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", null));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        verify(orderItemsRepository, never()).findById(any(), any());
+    }
+
+    @Test
     void checkSerialNumbersWithoutTheOrderItemReportsItInsteadOfFailing() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);

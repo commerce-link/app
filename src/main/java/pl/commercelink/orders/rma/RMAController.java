@@ -610,9 +610,12 @@ public class RMAController {
                 continue;
             }
 
-            List<String> invalidSerialNumbers = orderItem.getInvalidSerialNumbers(rmaItem.getSerialNo());
-            if (!invalidSerialNumbers.isEmpty()) {
-                problems.add(rmaItem.getName() + " \u2014 " + String.join(", ", invalidSerialNumbers));
+            // same rule as the item page hint: an order item without numbers leaves nothing to compare against
+            List<String> inOrder = SerialNumbers.parse(orderItem.getSerialNo());
+            List<String> outside = inOrder.isEmpty() ? List.of()
+                    : SerialNumbers.parse(rmaItem.getSerialNo()).stream().filter(sn -> !inOrder.contains(sn)).toList();
+            if (!outside.isEmpty()) {
+                problems.add(rmaItem.getName() + " \u2014 " + String.join(", ", outside));
             }
         }
 
