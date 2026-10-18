@@ -504,14 +504,27 @@ public class RMAController {
             // the form carries only what the operator edits and the package id: the courier order, its cancellation
             // and pickup are taken from the shipment of that package, never from the form
             Map<Shipment, String> packages = new IdentityHashMap<>();
-            updatedRma.getShipments().forEach(s -> {
-                packages.put(s, s.getExternalId());
-                s.setExternalId(null);
-            });
+            // what the form does not show (tracking subscription, seconds of a date) comes from the stored shipment:
+            // the one of the posted package or, for a row without a package, the one at the row's index (the form
+            // numbers rows by their position in the stored list, rows being created included)
+            Map<Shipment, Shipment> stored = new IdentityHashMap<>();
+            List<Shipment> posted = updatedRma.getShipments();
+            for (int i = 0; i < posted.size(); i++) {
+                Shipment row = posted.get(i);
+                Shipment match = shipmentOfPackage(previous, row.getExternalId());
+                if (match == null && row.getExternalId() == null && i < previous.size()
+                        && previous.get(i).getExternalId() == null && previous.get(i).getCreation() == null) {
+                    match = previous.get(i);
+                }
+                stored.put(row, match);
+                packages.put(row, row.getExternalId());
+                row.setExternalId(null);
+            }
             List<Shipment> shipments = updatedRma.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
                     .collect(Collectors.toList());
             shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            shipments.forEach(s -> s.inheritTrackingFrom(stored.get(s)));
             // a shipment being created has no data the form could show; dropping it would lose its label
             List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
             // nor could the form show a package created after it was opened: only packages it showed may be removed

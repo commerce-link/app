@@ -37,6 +37,7 @@ import pl.commercelink.orders.OrdersRMAManager;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentPickup;
+import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -50,6 +51,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -813,6 +815,76 @@ class RMAControllerTest {
         ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
         verify(rmaRepository).save(saved.capture());
         return saved.getValue();
+    }
+
+    /** A row as the form posts it: no subscription, dates to the minute. */
+    private static Shipment formRow(String trackingNo, LocalDateTime shippedAt) {
+        Shipment shipment = typed(trackingNo, null);
+        shipment.setShippedAt(shippedAt);
+        return shipment;
+    }
+
+    private static Shipment tracked(String trackingNo, LocalDateTime shippedAt) {
+        Shipment shipment = typed(trackingNo, null);
+        shipment.setShippedAt(shippedAt);
+        shipment.setTrackingSubscriptionStatus(ShipmentTrackingStatus.ACTIVE);
+        shipment.setTrackingSubscriptionId("sub-" + trackingNo);
+        shipment.setTrackingExternalId("ext-" + trackingNo);
+        return shipment;
+    }
+
+    @Test
+    void aSaveWithoutChangesKeepsTheTrackingSubscriptionAndSeconds() {
+        // given: the form shows the date to the minute
+        LocalDateTime stored = LocalDateTime.of(2026, 10, 6, 9, 31, 17);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-1", stored))));
+
+        // when
+        RMA saved = saveShipments(existing, formRow("T-1", stored.truncatedTo(ChronoUnit.MINUTES)));
+
+        // then
+        Shipment shipment = saved.getShipments().get(0);
+        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(shipment.getTrackingSubscriptionId()).isEqualTo("sub-T-1");
+        assertThat(shipment.getTrackingExternalId()).isEqualTo("ext-T-1");
+        assertThat(shipment.getShippedAt()).isEqualTo(stored);
+    }
+
+    @Test
+    void editingOneShipmentLeavesTheOthersTracking() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 31, 17);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-1", at), tracked("T-2", at))));
+
+        // when: only the second number is corrected
+        RMA saved = saveShipments(existing,
+                formRow("T-1", at.truncatedTo(ChronoUnit.MINUTES)),
+                formRow("T-2-fixed", at.truncatedTo(ChronoUnit.MINUTES)));
+
+        // then
+        assertThat(saved.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(saved.getShipments().get(0).getShippedAt()).isEqualTo(at);
+        assertThat(saved.getShipments().get(1).getTrackingNo()).isEqualTo("T-2-fixed");
+        assertThat(saved.getShipments().get(1).getTrackingSubscriptionStatus()).isNull();
+    }
+
+    @Test
+    void aChangedShippedAtIsTakenFromTheForm() {
+        // given
+        LocalDateTime stored = LocalDateTime.of(2026, 10, 6, 9, 31, 17);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-1", stored))));
+
+        // when: another minute, and a delivery date typed in
+        Shipment posted = formRow("T-1", LocalDateTime.of(2026, 10, 6, 9, 45));
+        posted.setDeliveredAt(LocalDateTime.of(2026, 10, 8, 12, 0));
+        RMA saved = saveShipments(existing, posted);
+
+        // then
+        assertThat(saved.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 10, 6, 9, 45));
+        assertThat(saved.getShipments().get(0).getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 10, 8, 12, 0));
     }
 
     @Test
