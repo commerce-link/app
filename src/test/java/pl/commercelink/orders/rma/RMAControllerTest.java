@@ -56,12 +56,14 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -519,7 +521,7 @@ class RMAControllerTest {
 
     @FunctionalInterface
     private interface ClosedRmaEndpoint {
-        void call(RMAController controller, RedirectAttributes redirectAttributes);
+        String call(RMAController controller, RedirectAttributes redirectAttributes);
     }
 
     static Stream<Arguments> endpointsGuardedAgainstAClosedRma() {
@@ -535,13 +537,21 @@ class RMAControllerTest {
                 endpoint("updateShippingDetails", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShippingDetails(new ShippingDetails());
-                    c.updateShippingDetails(RMA_ID, postedRma, false, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
+                    return c.updateShippingDetails(RMA_ID, postedRma, false, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
                 }),
                 endpoint("updateShipments", (c, ra) -> {
                     RMA postedRma = new RMA(STORE_ID);
                     postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
-                    c.updateShipments(RMA_ID, postedRma, List.of(), ra, Locale.ENGLISH);
-                }));
+                    return c.updateShipments(RMA_ID, postedRma, List.of(), ra, Locale.ENGLISH);
+                }),
+                endpoint("markItemsAsReturnedToClient", (c, ra) ->
+                        c.markItemsAsReturnedToClient(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
+                endpoint("markItemsAsSentToDistributor", (c, ra) ->
+                        c.markItemsAsSentToDistributor(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
+                endpoint("checkSerialNumbers", (c, ra) ->
+                        c.checkSerialNumbers(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
+                endpoint("deleteItems", (c, ra) ->
+                        c.deleteRMAItems(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)));
     }
 
     private static Arguments endpoint(String name, ClosedRmaEndpoint endpoint) {
@@ -556,19 +566,68 @@ class RMAControllerTest {
         when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
 
         // when
+        String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            endpoint.call(controller, redirectAttributes);
+            view = endpoint.call(controller, redirectAttributes);
         }
 
         // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verifyNoInteractions(rmaManager);
+        verify(rmaItemsRepository, never()).delete(anyList());
+        verify(rmaItemsRepository, never()).delete(any(RMAItem.class));
         verify(orderItemsRepository, never()).findById(any(), any());
         verify(rmaItemsRepository, never()).findById(any(), any());
         verify(rmaItemsRepository, never()).save(any());
         verify(rmaItemsRepository, never()).batchSave(any());
         verify(rmaManager, never()).markItemsAsReceived(any(), any(), any());
         verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void splitWithInvalidQuantitiesUsesTheLocalizedMessage() {
+        // given
+        RMAItem item = new RMAItem();
+        item.setQty(3);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.WaitingForItems));
+        when(rmaItemsRepository.findById(RMA_ID, "rma-item-1")).thenReturn(item);
+        when(messageSource.getMessage(eq("rma.detail.error.split.quantities"), any(), any())).thenReturn("bad split");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "bad split");
+        verify(rmaItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void deletingOnlyShippedItemsUsesTheLocalizedMessage() {
+        // given
+        RMAItem shipped = new RMAItem();
+        shipped.setStatus(RMAItemStatus.SentForRepair);
+        shipped.setRmaItemId("rma-item-1");
+        shipped.setSelected(true);
+        RMAItemsForm form = new RMAItemsForm(List.of(shipped));
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.WaitingForItems));
+        when(rmaItemsRepository.findById(RMA_ID, "rma-item-1")).thenReturn(shipped);
+        when(messageSource.getMessage(eq("rma.detail.error.delete.status"), any(), any())).thenReturn("only new");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.deleteRMAItems(RMA_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "only new");
+        verify(rmaItemsRepository, never()).delete(anyList());
+        verify(rmaItemsRepository, never()).delete(any(RMAItem.class));
     }
 
     @Test

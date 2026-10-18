@@ -356,6 +356,11 @@ public class RMAController {
     }
 
     private Optional<String> rejectIfClosedOrMissing(RMA rma, String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
+        return closedOrMissing(rma, rmaId, redirectAttributes, messageSource, locale);
+    }
+
+    /** The single refusal for an RMA that does not exist or is closed; shared with the shipping controller. */
+    static Optional<String> closedOrMissing(RMA rma, String rmaId, RedirectAttributes redirectAttributes, MessageSource messageSource, Locale locale) {
         if (rma == null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.not.found", null, locale));
             return Optional.of("redirect:/dashboard/rma");
@@ -373,6 +378,12 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/markItemsAsReturnedToClient")
     public String markItemsAsReturnedToClient(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
         RMAManager.OperationResult op = rmaManager.markItemsAsReturnedToClient(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -386,6 +397,12 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/markItemsAsSentToDistributor")
     public String markItemsAsSentToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
         RMAManager.OperationResult op = rmaManager.markItemsAsSentToDistributor(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -501,14 +518,14 @@ public class RMAController {
         RMAItem original = rmaItemsRepository.findById(rmaId, rmaItemId);
 
         if (original == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "RMA item not found.");
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.item.not.found", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
         int originalQty = original.getQty();
 
         if (qty1 < 1 || qty2 < 1 || qty1 + qty2 != originalQty) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Invalid split quantities.");
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.split.quantities", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -526,6 +543,12 @@ public class RMAController {
                                       @ModelAttribute RMAItemsForm form,
                                       RedirectAttributes redirectAttributes,
                                       Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
         List<String> selectedRMAItemIds = form.getSelectedRMAItemIds();
 
         if (selectedRMAItemIds.isEmpty()) {
@@ -533,8 +556,6 @@ public class RMAController {
                     messageSource.getMessage("rma.check.serial.no.items.selected", null, locale));
             return "redirect:/dashboard/rma/" + rmaId;
         }
-
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
 
         List<String> errorMessages = new ArrayList<>();
 
@@ -563,13 +584,19 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/deleteItems")
     public String deleteRMAItems(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
         List<RMAItem> rmaItemsToDelete = form.getSelectedRMAItemIds().stream()
                 .map(rmaItemId -> rmaItemsRepository.findById(rmaId, rmaItemId))
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.New, RMAItemStatus.Received))
                 .collect(Collectors.toList());
 
         if  (rmaItemsToDelete.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", "You are allowed to delete only New or Received RMA items.");
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.delete.status", null, locale));
             return  "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -577,7 +604,6 @@ public class RMAController {
 
         double totalAmount = rmaItemsToDelete.stream().mapToDouble(RMAItem::getTotalPrice).sum();
 
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         rma.decreaseShippingInsurance(totalAmount);
         rmaRepository.save(rma);
 
