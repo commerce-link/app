@@ -959,7 +959,7 @@ class RMAControllerTest {
     // checkSerialNumbers compares the stored numbers
     // ------------------------------------------------------------------
 
-    private RmaNotice checkSerialNumbersOf(RMA rma, RMAItem posted) {
+    private RmaNotice checkSerialNumbersOf(RMA rma, RMAItem... posted) {
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         answerMessagesFromTheRealBundles();
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
@@ -1030,12 +1030,14 @@ class RMAControllerTest {
         RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
 
         // then
-        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        assertThat(notice.tone()).isEqualTo(RmaNotice.WARN);
+        assertThat(notice.text()).isEqualTo("Nie było czego porównać.");
+        assertThat(notice.lines()).containsExactly("Nie sprawdzono: Laptop — pozycja RMA nie ma numeru seryjnego.");
         verify(orderItemsRepository, never()).findById(any(), any());
     }
 
     @Test
-    void checkSerialNumbersWithAnOrderItemWithoutSerialsIsNotAMismatch() {
+    void checkSerialNumbersWithAnOrderItemWithoutSerialsIsNotAMismatchButNothingWasCompared() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
         when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
@@ -1045,7 +1047,51 @@ class RMAControllerTest {
         RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
 
         // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.WARN);
+        assertThat(notice.text()).isEqualTo("Nie było czego porównać.");
+        assertThat(notice.lines()).containsExactly(
+                "Nie sprawdzono: Laptop — zamówienie nie ma zapisanych numerów seryjnych tej pozycji.");
+    }
+
+    @Test
+    void checkSerialNumbersSaysAllMatchOnlyForTheComparedItemsAndNamesTheSkippedOnes() {
+        // given
+        RMAItem laptop = selectedItem("a", "Laptop", RMAItemStatus.New);
+        RMAItem cable = selectedItem("b", "Kabel", RMAItemStatus.New);
+        RMAItem mouse = selectedItem("c", "Mysz", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A1"));
+        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(storedItem("b", "Kabel", null));
+        when(rmaItemsRepository.findById(RMA_ID, "c")).thenReturn(storedItem("c", "Mysz", "M1"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-c")).thenReturn(orderItemWithSerial("oi-c", " "));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), laptop, cable, mouse);
+
+        // then
         assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        assertThat(notice.text()).isEqualTo("Wszystkie numery seryjne zgadzają się z zamówieniem.");
+        assertThat(notice.lines()).containsExactly(
+                "Nie sprawdzono: Kabel — pozycja RMA nie ma numeru seryjnego.",
+                "Nie sprawdzono: Mysz — zamówienie nie ma zapisanych numerów seryjnych tej pozycji.");
+    }
+
+    @Test
+    void checkSerialNumbersListsTheMismatchesBeforeTheSkippedItems() {
+        // given
+        RMAItem laptop = selectedItem("a", "Laptop", RMAItemStatus.New);
+        RMAItem cable = selectedItem("b", "Kabel", RMAItemStatus.New);
+        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(storedItem("b", "Kabel", ""));
+        when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
+
+        // when
+        RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), cable, laptop);
+
+        // then
+        assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
+        assertThat(notice.lines()).containsExactly("Laptop — X9",
+                "Nie sprawdzono: Kabel — pozycja RMA nie ma numeru seryjnego.");
     }
 
     @Test
@@ -1086,7 +1132,8 @@ class RMAControllerTest {
         RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
 
         // then
-        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        assertThat(notice.tone()).isEqualTo(RmaNotice.WARN);
+        assertThat(notice.lines()).containsExactly("Nie sprawdzono: Laptop — pozycja RMA nie ma numeru seryjnego.");
         verify(orderItemsRepository, never()).findById(any(), any());
     }
 

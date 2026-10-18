@@ -606,10 +606,17 @@ public class RMAController {
 
         // the form never carries serial numbers, so the check reads the stored items
         List<String> problems = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        int compared = 0;
 
         for (String rmaItemId : selectedRMAItemIds) {
             RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
-            if (rmaItem == null || SerialNumbers.parse(rmaItem.getSerialNo()).isEmpty()) {
+            if (rmaItem == null) {
+                continue;
+            }
+            if (SerialNumbers.parse(rmaItem.getSerialNo()).isEmpty()) {
+                skipped.add(messageSource.getMessage("rma.detail.serial.skip.no.serial",
+                        new Object[]{rmaItem.getName()}, locale));
                 continue;
             }
 
@@ -621,20 +628,34 @@ public class RMAController {
                 continue;
             }
 
-            // same rule as the item page hint: an order item without numbers leaves nothing to compare against
+            // same rule as the item page hint: an order item without numbers is not a mismatch, only not compared
             List<String> inOrder = SerialNumbers.parse(orderItem.getSerialNo());
-            List<String> outside = inOrder.isEmpty() ? List.of()
-                    : SerialNumbers.parse(rmaItem.getSerialNo()).stream().filter(sn -> !inOrder.contains(sn)).toList();
+            if (inOrder.isEmpty()) {
+                skipped.add(messageSource.getMessage("rma.detail.serial.skip.order.empty",
+                        new Object[]{rmaItem.getName()}, locale));
+                continue;
+            }
+            compared++;
+            List<String> outside = SerialNumbers.parse(rmaItem.getSerialNo()).stream()
+                    .filter(sn -> !inOrder.contains(sn)).toList();
             if (!outside.isEmpty()) {
                 problems.add(rmaItem.getName() + " \u2014 " + String.join(", ", outside));
             }
         }
 
-        RmaNotice notice = problems.isEmpty()
-                ? new RmaNotice(RmaNotice.OK, messageSource.getMessage("rma.detail.serial.ok", null, locale),
-                        List.of(), RmaNotice.Scope.ITEMS)
-                : new RmaNotice(RmaNotice.BAD, messageSource.getMessage("rma.detail.serial.mismatch.title", null, locale),
-                        List.copyOf(problems), RmaNotice.Scope.ITEMS);
+        List<String> lines = new ArrayList<>(problems);
+        lines.addAll(skipped);
+        RmaNotice notice;
+        if (!problems.isEmpty()) {
+            notice = new RmaNotice(RmaNotice.BAD, messageSource.getMessage("rma.detail.serial.mismatch.title", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
+        } else if (compared == 0) {
+            notice = new RmaNotice(RmaNotice.WARN, messageSource.getMessage("rma.detail.serial.nothing", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
+        } else {
+            notice = new RmaNotice(RmaNotice.OK, messageSource.getMessage("rma.detail.serial.ok", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
+        }
         RmaFlash.items(redirectAttributes, notice);
 
         return "redirect:/dashboard/rma/" + rmaId;
