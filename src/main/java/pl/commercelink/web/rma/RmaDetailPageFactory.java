@@ -256,7 +256,7 @@ public class RmaDetailPageFactory {
 
     private RmaDetailPage.Settings settings(RMA rma, boolean marketplace, Locale locale) {
         return new RmaDetailPage.Settings(StringUtils.trimToNull(rma.getEmail()), !marketplace,
-                rma.isEmailNotificationsEnabled(), Money.input(rma.getShippingInsurance()),
+                rma.isEmailNotificationsEnabled(), Money.inputRounded(rma.getShippingInsurance()),
                 amount(locale, rma.getShippingInsurance()));
     }
 

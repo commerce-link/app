@@ -348,6 +348,21 @@ class RmaDetailPageFactoryTest {
     }
 
     @Test
+    void theInsuranceFieldShowsWholeGroszeWhileTheCarriedCopyStaysExact() {
+        // given: a sum of increases kept as a double (199.99 + 49.99)
+        RMA rma = rma(RMAStatus.Approved);
+        rma.setShippingInsurance(199.99 + 49.99);
+
+        // when
+        RmaDetailPage page = page(rma, List.of());
+
+        // then: step=0.01 refuses "249.98000000000002", so the visible field is rounded; the other forms carry the
+        // stored value so that saving them does not change it
+        assertThat(page.settings().insurance()).isEqualTo("249.98");
+        assertThat(page.current().insurance()).isEqualTo("249.98000000000002");
+    }
+
+    @Test
     void aBareRmaBuildsAPageWithoutFailing() {
         // given
         RMA rma = new RMA();
