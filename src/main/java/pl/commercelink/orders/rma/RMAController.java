@@ -20,7 +20,10 @@ import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.rma.RmaAddressForm;
+import pl.commercelink.web.rma.RmaActionNotices;
 import pl.commercelink.web.rma.RmaAddressPage;
+import pl.commercelink.web.rma.RmaFlash;
+import pl.commercelink.web.rma.RmaNotice;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
@@ -83,6 +86,7 @@ public class RMAController {
 
     @GetMapping("/dashboard/rma/{rmaId}")
     public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
+        RmaFlash.adoptLegacy(model);
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
         RMAItemsForm rmaItemsForm = new RMAItemsForm(rmaItems);
@@ -262,7 +266,9 @@ public class RMAController {
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        rmaManager.markItemsAsReceived(getStoreId(), rmaId, form.getSelectedRMAItemIds());
+        List<RMAItem> selected = selectedItems(rmaId, form);
+        RMAManager.OperationResult op = rmaManager.markItemsAsReceived(getStoreId(), rmaId, form.getSelectedRMAItemIds());
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.received", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
@@ -280,6 +286,7 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.replaceSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -299,6 +306,8 @@ public class RMAController {
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+        } else {
+            RmaFlash.items(redirectAttributes, done("rma.detail.done.replaced", selected, op, locale));
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
@@ -318,6 +327,7 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.returnSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -344,9 +354,31 @@ public class RMAController {
         } else if (!marketplaceReturnDecisions.publishAcceptance(op.getRma(), op.getRmaItems(), deliveryCovered)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.marketplace.decision.not.sent", null, locale));
+        } else {
+            RmaNotice notice = done("rma.detail.done.accepted", selected, op, locale);
+            if (op.getRma().isMarketplaceReturn() && refundDelivery) {
+                notice = notice.withLine(messageSource.getMessage(
+                        deliveryCovered ? "rma.detail.delivery.refunded" : "rma.detail.delivery.notRefunded", null, locale));
+            }
+            RmaFlash.items(redirectAttributes, notice);
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    /** The items the operator ticked, read before the action changes their statuses so that skipped ones can be explained. */
+    private List<RMAItem> selectedItems(String rmaId, RMAItemsForm form) {
+        List<String> ids = form.getSelectedRMAItemIds();
+        return rmaItemsRepository.findByRmaId(rmaId).stream()
+                .filter(item -> ids.contains(item.getRmaItemId()))
+                .toList();
+    }
+
+    private RmaNotice done(String doneKey, List<RMAItem> selected, RMAManager.OperationResult op, Locale locale) {
+        List<String> processed = op.isSuccess()
+                ? op.getRmaItems().stream().map(RMAItem::getRmaItemId).toList()
+                : List.of();
+        return new RmaActionNotices(messageSource).done(doneKey, selected, processed, locale);
     }
 
     private String redirectWithMissingCondition(String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
@@ -384,6 +416,7 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.markItemsAsReturnedToClient(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -392,6 +425,7 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.returnedToClient", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
@@ -403,6 +437,7 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.markItemsAsSentToDistributor(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
@@ -411,6 +446,7 @@ public class RMAController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.sentToDistributor", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
@@ -590,6 +626,7 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         List<RMAItem> rmaItemsToDelete = form.getSelectedRMAItemIds().stream()
                 .map(rmaItemId -> rmaItemsRepository.findById(rmaId, rmaItemId))
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.New, RMAItemStatus.Received))
@@ -607,7 +644,8 @@ public class RMAController {
         rma.decreaseShippingInsurance(totalAmount);
         rmaRepository.save(rma);
 
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.items.delete.success", new Object[]{rmaItemsToDelete.size()}, locale));
+        RmaFlash.items(redirectAttributes, new RmaActionNotices(messageSource).done("rma.detail.done.deleted", selected,
+                rmaItemsToDelete.stream().map(RMAItem::getRmaItemId).toList(), locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 

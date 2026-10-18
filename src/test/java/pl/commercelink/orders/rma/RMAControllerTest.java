@@ -14,6 +14,11 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.ui.ExtendedModelMap;
+import org.springframework.ui.Model;
+import pl.commercelink.web.rma.RmaFlash;
+import pl.commercelink.web.rma.RmaNotice;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.WebDataBinder;
@@ -99,6 +104,9 @@ class RMAControllerTest {
     private OpenRmaCoverage openRmaCoverage;
     @Mock
     private pl.commercelink.orders.OrdersRepository ordersRepository;
+
+    @Mock
+    private RmaShipmentsViewFactory rmaShipmentsViewFactory;
 
     @InjectMocks
     private RMAController controller;
@@ -893,5 +901,106 @@ class RMAControllerTest {
 
         // then
         assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
+    }
+
+    // ------------------------------------------------------------------
+    // action outcomes are shown in the page, with the skipped items named
+    // ------------------------------------------------------------------
+
+    private void answerMessagesFromTheRealBundles() {
+        ResourceBundleMessageSource real = new ResourceBundleMessageSource();
+        real.setBasename("messages");
+        real.setDefaultEncoding("UTF-8");
+        real.setFallbackToSystemLocale(false);
+        when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
+                .thenAnswer(inv -> real.getMessage(inv.getArgument(0), inv.getArgument(1), inv.getArgument(2)));
+    }
+
+    private static RMAItem selectedItem(String id, String name, RMAItemStatus status) {
+        RMAItem item = new RMAItem();
+        item.setRmaItemId(id);
+        item.setName(name);
+        item.setStatus(status);
+        item.setSelected(true);
+        return item;
+    }
+
+    private RmaNotice flashedNotice() {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(redirectAttributes).addFlashAttribute(eq(RmaFlash.ATTRIBUTE), captor.capture());
+        return (RmaNotice) captor.getValue();
+    }
+
+    @Test
+    void markItemsAsSentToDistributorReportsTheSkippedItems() {
+        // given
+        RMAItem received = selectedItem("a", "A", RMAItemStatus.Received);
+        RMAItem fresh = selectedItem("b", "B", RMAItemStatus.New);
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(received, fresh));
+        when(rmaManager.markItemsAsSentToDistributor(any(), any(), any()))
+                .thenReturn(RMAManager.OperationResult.success(rma, List.of(received)));
+        answerMessagesFromTheRealBundles();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.markItemsAsSentToDistributor(RMA_ID, new RMAItemsForm(List.of(received, fresh)),
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        RmaNotice notice = flashedNotice();
+        assertThat(notice.lines()).containsExactly("Pominięto 1: B — jeszcze nie odebrana.");
+        assertThat(notice.tone()).isEqualTo(RmaNotice.OK);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void acceptReturnOnAMarketplaceRmaSaysWhetherTheDeliveryWasRefunded() {
+        // given
+        RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
+        rma.setExternalReturnId("ext-1");
+        RMAItem item = selectedItem("a", "A", RMAItemStatus.Received);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(item));
+        when(rmaManager.returnSelectedItems(any(), any(), any()))
+                .thenReturn(RMAManager.OperationResult.success(rma, List.of(item)));
+        when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
+        when(marketplaceReturnDecisions.coversEveryReturnableItem(any(), any())).thenReturn(false);
+        when(marketplaceReturnDecisions.publishAcceptance(any(), any(), anyBoolean())).thenReturn(true);
+        answerMessagesFromTheRealBundles();
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.acceptReturn(RMA_ID, ItemCondition.Sealed, true, new RMAItemsForm(List.of(item)),
+                    redirectAttributes, Locale.forLanguageTag("pl"));
+        }
+
+        // then
+        assertThat(rma.isMarketplaceReturn()).isTrue();
+        assertThat(flashedNotice().lines()).hasSize(1).allMatch(line -> line.startsWith("Koszt dostawy nie zosta"));
+    }
+
+    @Test
+    void aLegacyFlashMessageIsShownInThePageNotInTheLayout() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.WaitingForItems));
+        Model model = new ExtendedModelMap();
+        model.addAttribute("errorMessage", "X");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.showRmaDetail(RMA_ID, model, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(model.asMap()).doesNotContainKeys("errorMessage", "successMessage");
+        RmaNotice notice = (RmaNotice) model.getAttribute(RmaFlash.ATTRIBUTE);
+        assertThat(notice.text()).isEqualTo("X");
+        assertThat(notice.tone()).isEqualTo(RmaNotice.BAD);
     }
 }
