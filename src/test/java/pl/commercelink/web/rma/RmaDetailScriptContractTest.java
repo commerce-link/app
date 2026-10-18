@@ -37,6 +37,8 @@ class RmaDetailScriptContractTest {
         assertThat(templates).contains("name=\"qty2\"").contains("name=\"qty1\"").contains("checkSerialNumbers");
         assertThat(js).contains("/items/").contains("/split");
         assertThat(js).doesNotContain("alert(").doesNotContain("innerHTML").doesNotContain("onclick");
+        // a string replacement would read "$&" in an item name as a pattern; placeholders go through a function
+        assertThat(js).doesNotContainPattern("\\.replace\\('\\{");
         assertThat(templates).doesNotContain("onclick").doesNotContain("onchange").doesNotContain("style=")
                 .doesNotContain("<script");
     }

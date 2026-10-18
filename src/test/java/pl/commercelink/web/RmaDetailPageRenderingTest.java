@@ -371,6 +371,28 @@ class RmaDetailPageRenderingTest {
         assertThat(html).contains("href=\"?open=split&amp;item=i-2\"").doesNotContain("item=i-1\"");
     }
 
+    @Test
+    void theDeleteDialogStartsOnCancelAndOtherDialogsDoNot() {
+        // given
+        List<RMAItem> items = twoItems();
+        RmaDetailPage page = page(rma(RMAStatus.Processing), items, List.of(), false);
+
+        // when
+        String html = render("rma-detail :: body", page, null, new RMAItemsForm(items));
+
+        // then
+        String delete = dialog(html, "delete-dialog");
+        assertThat(delete).containsPattern("<button type=\"button\" class=\"cl-button\" data-cl-dialog-close autofocus=\"autofocus\">");
+        assertThat(delete).doesNotContainPattern("<button type=\"submit\"[^>]*autofocus");
+        assertThat(dialog(html, "accept-dialog")).doesNotContain("autofocus");
+    }
+
+    private static String dialog(String html, String id) {
+        Matcher matcher = Pattern.compile("(?s)<dialog[^>]*id=\"" + id + "\".*?</dialog>").matcher(html);
+        assertThat(matcher.find()).as(id).isTrue();
+        return matcher.group();
+    }
+
     private static List<String> inputs(String html, String name) {
         Matcher matcher = Pattern.compile("<input[^>]*name=\"" + name + "\"[^>]*>").matcher(html);
         List<String> found = new ArrayList<>();

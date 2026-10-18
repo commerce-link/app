@@ -30,8 +30,8 @@
             null, 'rma.detail.dialog.delete.submit', true, ~{rma/detail/dialogs :: deleteEffect})}"></dialog>
 
     <!--/* The split's address names the item (items/{id}/split): rma-detail.js sets the button's formaction from the
-           one checked item and the form's data-rma-id. Until it does, the button posts to the form's own read-only
-           action. */-->
+           one checked item and the form's data-rma-id; without one the script refuses the submit (and without JavaScript
+           the dialog never opens). */-->
     <dialog class="cl-dialog is-form" id="split-dialog" aria-labelledby="split-dialog-title">
         <h2 class="cl-dialog-title" id="split-dialog-title" th:text="#{rma.detail.dialog.split.title}"></h2>
         <div class="cl-dialog-body">
@@ -77,7 +77,9 @@
     <div class="cl-dialog-actions">
         <button type="submit" class="cl-button" th:classappend="${danger} ? 'is-danger' : 'is-primary'" data-cl-dialog-submit
                 th:formaction="${formaction}" th:text="#{${submitKey}}"></button>
-        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <!--/* a destructive dialog has no field to start in: the focus starts on Cancel, so Enter twice deletes nothing */-->
+        <button type="button" class="cl-button" data-cl-dialog-close th:attr="autofocus=${danger} ? 'autofocus' : null"
+                th:text="#{general.cancel}"></button>
     </div>
 </dialog>
 

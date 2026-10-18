@@ -123,6 +123,13 @@
         return ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? 'few' : 'many';
     }
 
+    // a function replacement: a name or reason containing "$&" or "$'" must come out as typed
+    function fill(template, placeholder, value) {
+        return template.replace(placeholder, function () {
+            return value;
+        });
+    }
+
     function formatMoney(value) {
         return typeof window.CL_formatMoney === 'function' ? window.CL_formatMoney(value) : value.toFixed(2);
     }
@@ -148,12 +155,12 @@
         checkedBoxes().forEach(function (box) {
             if (done.indexOf(box) >= 0) {
                 list.appendChild(listItem(box.getAttribute('data-name'),
-                    qtyTemplate.replace('{n}', String(qty(box))), 'is-numeric'));
+                    fill(qtyTemplate, '{n}', String(qty(box))), 'is-numeric'));
                 return;
             }
             var reason = form.getAttribute('data-skip-' + box.getAttribute('data-status')) || '';
             list.appendChild(listItem(box.getAttribute('data-name'),
-                skippedTemplate.replace('{reason}', reason), 'cl-dialog-list-sub'));
+                fill(skippedTemplate, '{reason}', reason), 'cl-dialog-list-sub'));
         });
     }
 
@@ -164,7 +171,7 @@
         }
         var attribute = { one: 'data-template-one', few: 'data-template-few', many: 'data-template-many' }[pluralForm(count)];
         var template = title.getAttribute(attribute) || title.getAttribute('data-template-many') || '';
-        title.textContent = template.replace('{n}', String(count));
+        title.textContent = fill(template, '{n}', String(count));
     }
 
     function fillSum(dialog, done) {
@@ -175,7 +182,7 @@
         var total = done.reduce(function (acc, box) {
             return acc + (parseFloat(box.getAttribute('data-total')) || 0);
         }, 0);
-        sum.textContent = (sum.getAttribute('data-template') || '').replace('{sum}', formatMoney(total));
+        sum.textContent = fill(sum.getAttribute('data-template') || '', '{sum}', formatMoney(total));
     }
 
     function splitFields(dialog) {
@@ -195,7 +202,7 @@
         var second = isNaN(first) ? 0 : total - first;
         var qtyTemplate = form.getAttribute('data-qty-template') || '{n}';
         f.qty2.value = String(second);
-        f.qty2Text.textContent = qtyTemplate.replace('{n}', String(Math.max(second, 0)));
+        f.qty2Text.textContent = fill(qtyTemplate, '{n}', String(Math.max(second, 0)));
     }
 
     // the split's address names the item: /dashboard/rma/{rmaId}/items/{id}/split
@@ -216,7 +223,7 @@
         f.submit.setAttribute('formaction', '/dashboard/rma/' + encodeURIComponent(form.getAttribute('data-rma-id'))
             + '/items/' + encodeURIComponent(box.getAttribute('data-id')) + '/split');
         if (f.name) {
-            f.name.textContent = box.getAttribute('data-name') + ' · ' + qtyTemplate.replace('{n}', String(total));
+            f.name.textContent = box.getAttribute('data-name') + ' · ' + fill(qtyTemplate, '{n}', String(total));
         }
         f.qty1.min = '1';
         f.qty1.max = String(total - 1);
@@ -295,7 +302,7 @@
         var error = qty1.parentElement.querySelector('[data-cl-field-error]');
         var text = error && error.querySelector('[data-template]');
         if (text) {
-            text.textContent = text.getAttribute('data-template').replace('{max}', String(Math.max(total - 1, 1)));
+            text.textContent = fill(text.getAttribute('data-template'), '{max}', String(Math.max(total - 1, 1)));
         }
         showError(error, qty1);
         return false;
