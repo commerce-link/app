@@ -2,6 +2,7 @@ package pl.commercelink.web.rma;
 
 import org.springframework.context.MessageSource;
 import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemStatus;
 
 import java.util.Collection;
 import java.util.List;
@@ -34,6 +35,8 @@ public class RmaActionNotices {
     }
 
     private String reason(RMAItem item, Locale locale) {
-        return messageSource.getMessage("rma.detail.skip." + item.getStatus().name(), null, locale);
+        // as on the page: an item stored without a status is New
+        RMAItemStatus status = item.getStatus() == null ? RMAItemStatus.New : item.getStatus();
+        return messageSource.getMessage("rma.detail.skip." + status.name(), null, locale);
     }
 }

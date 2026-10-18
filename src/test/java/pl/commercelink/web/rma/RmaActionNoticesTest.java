@@ -49,6 +49,18 @@ class RmaActionNoticesTest {
     }
 
     @Test
+    void anItemStoredWithoutAStatusIsSkippedAsNew() {
+        // given
+        List<RMAItem> selected = List.of(item("a", "A", RMAItemStatus.Received), item("b", "B", null));
+
+        // when
+        RmaNotice notice = notices.done("rma.detail.done.received", selected, List.of("a"), PL);
+
+        // then
+        assertThat(notice.lines()).containsExactly("Pominięto 1: B — jeszcze nie odebrana.");
+    }
+
+    @Test
     void nothingProcessedIsAWarning() {
         // given
         List<RMAItem> selected = List.of(item("b", "B", RMAItemStatus.New));
