@@ -21,6 +21,7 @@ class DeliveryCreateLinksTest {
         assertThat(links.save()).isEqualTo("/dashboard/deliveries/create/Acme/manual/save");
         assertThat(links.back()).isEqualTo("/dashboard/deliveries/create/Acme/back");
         assertThat(links.fulfilment()).isEqualTo("/dashboard/deliveries/create/Acme/fulfilment");
+        assertThat(links.releaseAll()).isEqualTo("/dashboard/deliveries/create/Acme/release-all");
         assertThat(links.backHref()).isEqualTo("/dashboard/deliveries/preview");
         assertThat(links.deliveryDetails("d-1")).isEqualTo("/dashboard/deliveries/details?deliveryId=d-1");
     }
@@ -33,6 +34,7 @@ class DeliveryCreateLinksTest {
         // then
         assertThat(links.items()).isEqualTo("/dashboard/store/store-9/deliveries/create/Acme?order=o-1&from=order");
         assertThat(links.save()).isEqualTo("/dashboard/store/store-9/deliveries/create/Acme/manual/save");
+        assertThat(links.releaseAll()).isEqualTo("/dashboard/store/store-9/deliveries/create/Acme/release-all?order=o-1&from=order");
         assertThat(links.order()).isEqualTo("/dashboard/store/store-9/orders/o-1");
         assertThat(links.backHref()).isEqualTo("/dashboard/store/store-9/orders/o-1");
         assertThat(links.preview()).isEqualTo("/dashboard/store/store-9/deliveries/preview");

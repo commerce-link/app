@@ -206,10 +206,12 @@
 </section>
 
 <!--/* Unticks every source and releases them without creating a delivery (the footer pushes it to the end). */-->
-<button th:fragment="releaseAllButton" type="submit" class="cl-button is-danger-outline" formnovalidate
-        th:formaction="@{${page.links().releaseAll()}}">
+<a th:fragment="releaseAllButton" class="cl-button is-danger-outline" th:href="@{${page.links().releaseAll()}}" data-cl-confirm
+   th:attr="data-cl-confirm-title=#{deliveries.create.releaseAll.title},
+            data-cl-confirm-message=${page.dropship()} ? #{deliveries.create.releaseAll.message.dropship} : #{deliveries.create.releaseAll.message.warehouse},
+            data-cl-confirm-action=#{deliveries.create.releaseAll.action}">
     <i class="fas fa-undo-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.action.releaseAll}"></span>
-</button>
+</a>
 
 <!--/* Step 1, dropship: one row per product; a product with one order line is ticked as a whole, a product on
        several lines of the order opens its lines like the warehouse sources. Quantities follow the ticks. */-->

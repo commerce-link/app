@@ -219,7 +219,7 @@ class DeliveryCreateControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         assertThat(allocation.isSelected()).isFalse();
         verify(scope).releaseUnselected(planned);
-        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:orders.dropship.unselectedReleased");
+        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:deliveries.create.allReleased");
     }
 
     @Test
@@ -239,7 +239,7 @@ class DeliveryCreateControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
         assertThat(allocation.isSelected()).isFalse();
         verify(scope).releaseUnselected(planned);
-        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:orders.dropship.unselectedReleased");
+        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:deliveries.create.allReleased");
     }
 
     @Test

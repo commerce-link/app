@@ -423,7 +423,7 @@ public class DeliveryCreateController {
             if (planned != null) {
                 planned.getItems().forEach(item -> item.getAllocations().forEach(allocation -> allocation.setSelected(false)));
                 scope.releaseUnselected(planned);
-                flash.addFlashAttribute("successMessage", message("orders.dropship.unselectedReleased", locale));
+                flash.addFlashAttribute("successMessage", message("deliveries.create.allReleased", locale));
             }
             return "redirect:" + (links.dropship() ? links.order() : links.preview());
         });
