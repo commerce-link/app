@@ -979,6 +979,72 @@ class RMAControllerTest {
         assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
     }
 
+    /** A package of a dispatch with several parcels: they all share the dispatch's externalId. */
+    private static Shipment parcelOfDispatch(String trackingNo, ShipmentPickup pickup, Boolean cancellable) {
+        Shipment shipment = courierOrder(trackingNo, "EXT-1");
+        shipment.setPickup(pickup);
+        shipment.setCancellable(cancellable);
+        shipment.setTrackingSubscriptionStatus(ShipmentTrackingStatus.ACTIVE);
+        shipment.setTrackingSubscriptionId("sub-" + trackingNo);
+        shipment.setTrackingExternalId("ext-" + trackingNo);
+        return shipment;
+    }
+
+    @Test
+    void editingAnotherShipmentKeepsEachParcelOfOneDispatchItsOwnTrackingAndPickup() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(
+                tracked("T-0", at),
+                parcelOfDispatch("P-1", ShipmentPickup.awaiting(), true),
+                parcelOfDispatch("P-2", ShipmentPickup.bookedByCarrier("pickup-2"), false))));
+
+        // when: the manual shipment is edited, both parcels are posted as hidden fields
+        RMA saved = saveShipments(existing, formRow("T-0-fixed", at), typed("P-1", "EXT-1"), typed("P-2", "EXT-1"));
+
+        // then
+        assertThat(saved.getShipments()).hasSize(3);
+        Shipment first = saved.getShipments().get(1);
+        Shipment second = saved.getShipments().get(2);
+        assertThat(first.getTrackingNo()).isEqualTo("P-1");
+        assertThat(first.getTrackingSubscriptionId()).isEqualTo("sub-P-1");
+        assertThat(first.getTrackingExternalId()).isEqualTo("ext-P-1");
+        assertThat(first.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(first.awaitsPickup()).isTrue();
+        assertThat(first.getCancellable()).isTrue();
+        assertThat(second.getTrackingNo()).isEqualTo("P-2");
+        assertThat(second.getTrackingSubscriptionId()).isEqualTo("sub-P-2");
+        assertThat(second.getTrackingExternalId()).isEqualTo("ext-P-2");
+        assertThat(second.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+        assertThat(second.getPickup().getPickupId()).isEqualTo("pickup-2");
+        assertThat(second.getCancellable()).isFalse();
+        assertThat(second.getExternalId()).isEqualTo("EXT-1");
+    }
+
+    @Test
+    void aParcelWhoseNumberWasEditedKeepsItsOwnCourierOrderNotTheOtherParcels() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(
+                parcelOfDispatch("P-1", ShipmentPickup.awaiting(), true),
+                parcelOfDispatch("P-2", ShipmentPickup.bookedByCarrier("pickup-2"), false))));
+
+        // when: the second parcel's number is corrected
+        RMA saved = saveShipments(existing, typed("P-1", "EXT-1"), typed("P-2-fixed", "EXT-1"));
+
+        // then
+        Shipment first = saved.getShipments().get(0);
+        Shipment second = saved.getShipments().get(1);
+        assertThat(first.getTrackingSubscriptionId()).isEqualTo("sub-P-1");
+        assertThat(first.getCancellable()).isTrue();
+        assertThat(second.getTrackingNo()).isEqualTo("P-2-fixed");
+        assertThat(second.getExternalId()).isEqualTo("EXT-1");
+        assertThat(second.getPickup().getPickupId()).isEqualTo("pickup-2");
+        assertThat(second.getCancellable()).isFalse();
+    }
+
     // ------------------------------------------------------------------
     // action outcomes are shown in the page, with the skipped items named
     // ------------------------------------------------------------------

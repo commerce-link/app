@@ -499,29 +499,20 @@ public class RMAController {
         }
         if (updatedRma.getShipments() != null) {
             List<Shipment> previous = existingRma.getShipments();
-            // the form carries only what the operator edits and the package id: the courier order, its cancellation
-            // and pickup are taken from the shipment of that package, never from the form
-            Map<Shipment, String> packages = new IdentityHashMap<>();
-            // what the form does not show (tracking subscription, seconds of a date) comes from the stored shipment:
-            // the one of the posted package or, for a row without a package, the one at the row's index (the form
-            // numbers rows by their position in the stored list, rows being created included)
-            Map<Shipment, Shipment> stored = new IdentityHashMap<>();
             List<Shipment> posted = updatedRma.getShipments();
-            for (int i = 0; i < posted.size(); i++) {
-                Shipment row = posted.get(i);
-                Shipment match = shipmentOfPackage(previous, row.getExternalId());
-                if (match == null && row.getExternalId() == null && i < previous.size()
-                        && previous.get(i).getExternalId() == null && previous.get(i).getCreation() == null) {
-                    match = previous.get(i);
-                }
-                stored.put(row, match);
+            // the form carries only what the operator edits and the package id: the courier order, its cancellation,
+            // pickup and what the form does not show (tracking subscription, seconds of a date) come from the stored
+            // shipment the row stands for
+            Map<Shipment, Shipment> stored = storedShipmentsOf(posted, previous);
+            Map<Shipment, String> packages = new IdentityHashMap<>();
+            for (Shipment row : posted) {
                 packages.put(row, row.getExternalId());
                 row.setExternalId(null);
             }
             List<Shipment> shipments = updatedRma.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
                     .collect(Collectors.toList());
-            shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            shipments.forEach(s -> s.inheritCourierOrderFrom(stored.get(s)));
             shipments.forEach(s -> s.inheritTrackingFrom(stored.get(s)));
             // a shipment being created has no data the form could show; dropping it would lose its label
             List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
@@ -546,9 +537,53 @@ public class RMAController {
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
-    private static Shipment shipmentOfPackage(List<Shipment> shipments, String externalId) {
-        return externalId == null ? null
-                : shipments.stream().filter(s -> externalId.equals(s.getExternalId())).findFirst().orElse(null);
+    /**
+     * The stored shipment each posted row stands for, or null for a new row. The packages of one dispatch share their
+     * externalId, so a package is matched by its externalId and tracking number first; a row whose number was edited
+     * then takes the package of its externalId left over, preferring the one at its own index (the form numbers rows
+     * by their position in the stored list), and only when that leaves no doubt. A row without a package takes the
+     * stored shipment at its index, when that one has no package and is not being created either.
+     */
+    private static Map<Shipment, Shipment> storedShipmentsOf(List<Shipment> posted, List<Shipment> previous) {
+        Map<Shipment, Shipment> stored = new IdentityHashMap<>();
+        Set<Shipment> claimed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Shipment row : posted) {
+            if (row.getExternalId() == null) {
+                continue;
+            }
+            previous.stream()
+                    .filter(s -> !claimed.contains(s) && row.getExternalId().equals(s.getExternalId())
+                            && (Objects.equals(row.getTrackingNo(), s.getTrackingNo()) || s.hasTrackingNo(row.getTrackingNo())))
+                    .findFirst()
+                    .ifPresent(s -> {
+                        stored.put(row, s);
+                        claimed.add(s);
+                    });
+        }
+        for (int i = 0; i < posted.size(); i++) {
+            Shipment row = posted.get(i);
+            if (row.getExternalId() == null || stored.containsKey(row)) {
+                continue;
+            }
+            List<Shipment> left = previous.stream()
+                    .filter(s -> !claimed.contains(s) && row.getExternalId().equals(s.getExternalId()))
+                    .toList();
+            Shipment atIndex = i < previous.size() ? previous.get(i) : null;
+            Shipment match = left.stream().anyMatch(s -> s == atIndex) ? atIndex
+                    : left.size() == 1 ? left.get(0) : null;
+            if (match != null) {
+                stored.put(row, match);
+                claimed.add(match);
+            }
+        }
+        for (int i = 0; i < posted.size(); i++) {
+            Shipment row = posted.get(i);
+            if (row.getExternalId() == null && i < previous.size() && previous.get(i).getExternalId() == null
+                    && previous.get(i).getCreation() == null) {
+                stored.put(row, previous.get(i));
+            }
+        }
+        return stored;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/split")
