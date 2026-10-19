@@ -56,7 +56,7 @@ public class OfferRowMapper {
         ContactDetails contact = basket.getContactDetails();
         OfferValidity validity = OfferValidity.of(basket.getExpiresAt(), now);
         double gross = value(basket);
-        return new OfferListPage.OfferRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
+        return new OfferListPage.OfferRow(offerHref(id), name, basket.getShortenedBasketId(), id,
                 itemsText(basket),
                 client(contact), contact == null ? null : StringUtils.trimToNull(contact.getEmail()),
                 date(basket.getCreatedAt()), author(basket),
@@ -72,7 +72,7 @@ public class OfferRowMapper {
     public OfferListPage.TemplateRow template(Basket basket) {
         String id = basket.getBasketId();
         String name = name(basket);
-        return new OfferListPage.TemplateRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
+        return new OfferListPage.TemplateRow(offerHref(id), name, basket.getShortenedBasketId(), id,
                 itemsText(basket), itemsCount(basket), date(basket.getCreatedAt()), author(basket),
                 money(value(basket)), "/dashboard/offer/new?intent=template&sourceId=" + id, text("offers.list.createFromTemplate.aria", name),
                 deleteHref(id), text("offers.delete.confirm.titleTemplate", name), text("offers.delete.confirm.messageTemplate"),
@@ -87,6 +87,11 @@ public class OfferRowMapper {
                 client != null ? client : text("offers.list.client.guest"),
                 created == null ? null : date(created) + ", " + TIME.format(created),
                 itemsText(basket), itemsCount(basket), money(value(basket)));
+    }
+
+    /** The offer page carries the list's address, so its back link returns to the same segment, search and page. */
+    private String offerHref(String id) {
+        return "/dashboard/offer/" + id + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
     }
 
     /** The preview carries the list's address, so its back link returns to the same search and page. */

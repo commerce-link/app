@@ -76,7 +76,7 @@ class OfferRowMapperTest {
         OfferListPage.OfferRow row = mapper(storeWithoutCheckout()).offer(offer());
 
         // then
-        assertThat(row.href()).isEqualTo("/dashboard/offer/" + ID);
+        assertThat(row.href()).isEqualTo("/dashboard/offer/" + ID + "?returnTo=%2Fdashboard%2Foffers%3Fq%3DCAD");
         assertThat(row.name()).isEqualTo("Stacje CAD");
         assertThat(row.shortId()).isEqualTo("8f3a21c7");
         assertThat(row.itemsText()).isEqualTo("pozycje: 2");
@@ -301,5 +301,23 @@ class OfferRowMapperTest {
         basket.setCreatedAt(LocalDateTime.of(2026, 10, 2, 9, 30));
         basket.setBasketItems(new java.util.LinkedList<>(List.of(item(1, 449.00))));
         return basket;
+    }
+
+    @Test
+    void offerRowLinkCarriesReturnTo() {
+        // given
+        Basket template = offer();
+        template.setType(BasketType.OfferTemplate);
+        OfferRowMapper mapper = new OfferRowMapper(messages(), Locale.forLanguageTag("pl"), storeWithoutCheckout(), "https://app.example", NOW,
+                "/dashboard/offers?segment=templates&q=abc");
+
+        // when
+        OfferListPage.TemplateRow row = mapper.template(template);
+        OfferListPage.OfferRow offerRow = mapper.offer(offer());
+
+        // then
+        String expected = "/dashboard/offer/" + ID + "?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dtemplates%26q%3Dabc";
+        assertThat(row.href()).isEqualTo(expected);
+        assertThat(offerRow.href()).isEqualTo(expected);
     }
 }
