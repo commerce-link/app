@@ -22,7 +22,9 @@
         <div th:replace="~{rma/detail/parts :: notice('ITEMS')}"></div>
     </div>
 
-    <!--/* the form's own action is the read-only serial check: a submit that escaped every guard changes nothing */-->
+    <!--/* the form's own action is the read-only serial check: a submit that escaped every guard changes nothing.
+           rma-detail.js stops Enter in the form's fields from submitting it (a dialog's text field runs the dialog's
+           action); without JavaScript the form has no text field and its first submit button is the serial check */-->
     <form th:if="${items.selectable()}" id="rmaItemsForm" class="cl-card-section cl-selection-host is-rma-detail" method="post" novalidate
           th:action="@{/dashboard/rma/{id}/checkSerialNumbers(id=${page.rmaId()})}"
           th:attr="data-rma-id=${page.rmaId()},
@@ -33,9 +35,6 @@
                    data-skip-SentForRepair=#{rma.detail.skip.SentForRepair},
                    data-skip-ReturnedToClient=#{rma.detail.skip.ReturnedToClient},
                    data-skip-MovedToWarehouse=#{rma.detail.skip.MovedToWarehouse}">
-        <!--/* implicit submission (Enter) uses the first submit button; a disabled one submits nothing, and
-               rma-detail.js clicks the open dialog's own button instead */-->
-        <button type="submit" class="cl-visually-hidden" disabled tabindex="-1" aria-hidden="true" data-cl-enter-guard></button>
         <th:block th:replace="~{rma/detail/items :: bar}"></th:block>
         <th:block th:replace="~{rma/detail/items :: itemsTable}"></th:block>
         <th:block th:replace="~{rma/detail/items :: staticActions}"></th:block>

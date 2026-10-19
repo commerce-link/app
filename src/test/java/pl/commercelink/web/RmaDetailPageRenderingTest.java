@@ -239,7 +239,7 @@ class RmaDetailPageRenderingTest {
 
         // then
         assertThat(html).contains("id=\"rmaItemsForm\"").contains("data-cl-select-table=\"true\"")
-                .contains("data-cl-selection-bar").contains("data-cl-select-clear").contains("data-cl-enter-guard");
+                .contains("data-cl-selection-bar").contains("data-cl-select-clear");
         assertThat(html).contains("name=\"rmaItems[0].selected\"").contains("name=\"rmaItems[0].rmaItemId\" value=\"i-1\"")
                 .contains("name=\"rmaItems[0].rmaId\" value=\"" + RMA_ID + "\"")
                 .doesNotContain("name=\"rmaItems[1].itemId\"").doesNotContain("name=\"rmaItems[1].tax\"");

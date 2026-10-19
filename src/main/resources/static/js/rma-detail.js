@@ -321,17 +321,20 @@
             });
         }
 
+        // Enter in a field of the form never submits it implicitly: Chromium submits on Enter even from a row checkbox
+        // or a dialog's radio, which would reload the page (the form's action is the read-only serial check) and drop
+        // the selection and the open dialog. Enter in a dialog's text field runs that dialog's action instead; on a
+        // checkbox, a radio or a select it does nothing. Buttons, menu summaries and textareas keep their own Enter.
         function initEnter() {
             form.addEventListener('keydown', function (event) {
-                // a radio or checkbox keeps its own keys; Enter in a text field runs the dialog's action
-                if (event.key !== 'Enter' || !event.target.matches(TEXT_INPUT)) {
-                    return;
-                }
-                var dialog = event.target.closest('dialog');
-                if (!dialog) {
+                if (event.key !== 'Enter' || !event.target.matches('input, select')) {
                     return;
                 }
                 event.preventDefault();
+                var dialog = event.target.closest('dialog');
+                if (!dialog || !event.target.matches(TEXT_INPUT)) {
+                    return;
+                }
                 var submit = dialog.querySelector('[data-cl-dialog-submit]');
                 if (submit && !submit.disabled) {
                     submit.click();
@@ -344,7 +347,7 @@
         function initSubmitOnce() {
             form.addEventListener('submit', function (event) {
                 var button = event.submitter;
-                if (event.defaultPrevented || !button || button.hasAttribute('data-cl-enter-guard')) {
+                if (event.defaultPrevented || !button) {
                     return;
                 }
                 button.disabled = true;
