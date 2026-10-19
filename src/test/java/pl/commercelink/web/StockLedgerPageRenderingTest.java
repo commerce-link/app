@@ -8,9 +8,11 @@ import pl.commercelink.web.reports.StockLedgerClosingBlocker;
 import pl.commercelink.web.reports.StockLedgerClosingView;
 import pl.commercelink.web.reports.StockLedgerClosingWarning;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -177,5 +179,21 @@ class StockLedgerPageRenderingTest {
 
         // then
         assertThat(html).doesNotContain("cl-ledger-older").contains("January 2026").contains("June 2026");
+    }
+
+    @Test
+    void aClosedPeriodShowsWhenItWasGeneratedAndADashWhenThatIsUnknown() {
+        // given
+        StockLedgerPeriod july = new StockLedgerPeriod(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+        StockLedgerClosingView closing = StockLedgerClosingView.of(List.of(july, AUGUST),
+                Map.of(AUGUST, Instant.parse("2026-10-14T08:05:00Z")), FROM, TO, Locale.ENGLISH);
+
+        // when
+        String html = render(closing, null, null);
+
+        // then
+        assertThat(html).doesNotContain("??").contains(">Generated<").contains("14.10.2026 10:05");
+        assertThat(closing.closedPeriods()).extracting(StockLedgerClosingView.ClosedPeriod::generatedAt)
+                .containsExactly("14.10.2026 10:05", null);
     }
 }

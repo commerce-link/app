@@ -35,7 +35,9 @@ class PriceDataFanOut {
                 continue;
             }
             try {
-                sqsTemplate.send(queue, PriceDataMessage.forStore(store.getStoreId(), date));
+                // An object is sent with a JavaType attribute that turns it into that class on receipt, which the
+                // String listeners cannot take: every message would end in the DLQ
+                sqsTemplate.send(queue, PriceDataMessage.forStore(store.getStoreId(), date).toJson());
             } catch (Exception e) {
                 log.error("Price data of store {} was not queued on {}", store.getStoreId(), queue, e);
             }
