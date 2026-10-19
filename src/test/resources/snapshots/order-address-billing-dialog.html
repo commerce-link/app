@@ -1,0 +1,76 @@
+<dialog class="cl-dialog is-form" id="address-dialog-billing" aria-labelledby="address-billing-title">
+<form id="address-form-billing" class="cl-form" method="post" novalidate data-cl-async action="/dashboard/orders/o1/updateAddressDetails?type=billing" data-error-message="Changes could not be saved. Check your connection and try again." data-cl-dialog-close-on-success="true">
+<h2 class="cl-dialog-title" id="address-billing-title">Edit billing details</h2>
+<div class="cl-dialog-body">
+<div class="cl-form-grid cl-card-grid">
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.name">
+<span>Name</span>
+</label>
+<input class="cl-input" id="billingDetails.name" name="billingDetails.name" type="text" value="Jan" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.surname">
+<span>Surname</span>
+</label>
+<input class="cl-input" id="billingDetails.surname" name="billingDetails.surname" type="text" value="Kowalski" autocomplete="off" required="required"/>
+</div></div>
+<div><div class="cl-field">
+<label class="cl-label" for="billingDetails.streetAndNumber">
+<span>Street and Number</span>
+</label>
+<input class="cl-input" id="billingDetails.streetAndNumber" name="billingDetails.streetAndNumber" type="text" value="Dluga 1/2" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="billingDetails.postalCode">
+<span>Postal Code</span>
+</label>
+<input class="cl-input" id="billingDetails.postalCode" name="billingDetails.postalCode" type="text" value="00-001" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="billingDetails.city">
+<span>City</span>
+</label>
+<input class="cl-input" id="billingDetails.city" name="billingDetails.city" type="text" value="Warszawa" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="billingDetails.country">
+<span>Country</span>
+</label>
+<input class="cl-input" id="billingDetails.country" name="billingDetails.country" type="text" value="PL" autocomplete="off" aria-describedby="billingDetails.country-help" required="required"/>
+<p class="cl-help" id="billingDetails.country-help">Two-letter code, e.g. PL.</p>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.email">
+<span>Email</span>
+</label>
+<input class="cl-input" id="billingDetails.email" name="billingDetails.email" type="email" value="jan@example.com" autocomplete="off" inputmode="email" required="required"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.phone">
+<span>Phone</span>
+</label>
+<input class="cl-input" id="billingDetails.phone" name="billingDetails.phone" type="tel" value="+48 600 700 800" autocomplete="off" inputmode="tel" required="required"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.companyName">
+<span>Company Name</span>
+<span class="cl-optional">optional</span>
+</label>
+<input class="cl-input" id="billingDetails.companyName" name="billingDetails.companyName" type="text" value="Acme Sp. z o.o." autocomplete="off"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="billingDetails.taxId">
+<span>Tax ID</span>
+<span class="cl-optional">optional</span>
+</label>
+<input class="cl-input" id="billingDetails.taxId" name="billingDetails.taxId" type="text" value="1234567890" autocomplete="off"/>
+</div></div>
+</div>
+</div>
+<div class="cl-dialog-actions">
+<button type="submit" class="cl-button is-primary">Save changes</button>
+<button type="button" class="cl-button" data-cl-dialog-close>Cancel</button>
+</div>
+</form>
+</dialog>
