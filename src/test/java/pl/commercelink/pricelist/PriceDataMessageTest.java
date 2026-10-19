@@ -1,6 +1,5 @@
 package pl.commercelink.pricelist;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -81,12 +80,12 @@ class PriceDataMessageTest {
     }
 
     @Test
-    void storeMessageSurvivesSerializationToTheQueue() throws Exception {
+    void storeMessageSurvivesSerializationToTheQueue() {
         // given
         PriceDataMessage sent = PriceDataMessage.forStore("store-1", LocalDate.of(2026, 10, 7));
 
         // when
-        PriceDataMessage received = PriceDataMessage.parse(new ObjectMapper().writeValueAsString(sent));
+        PriceDataMessage received = PriceDataMessage.parse(sent.toJson());
 
         // then
         assertEquals(sent, received);
