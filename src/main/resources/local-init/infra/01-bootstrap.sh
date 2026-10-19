@@ -97,9 +97,10 @@ awslocal sqs create-queue --queue-name shipment-tracking-poll-queue \
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,
 # PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
+# scopeKey must equal PIM pim.index.scope-all-key (localdev: local-scope-key); the adapter sends it as x-pim-scope-key.
 awslocal secretsmanager create-secret \
   --name commercelink-pim \
-  --secret-string '{"apiDomain":"http://localhost:8081","apiKey":""}'
+  --secret-string '{"apiDomain":"http://localhost:8081","apiKey":"","scopeKey":"local-scope-key"}'
 
 # Secrets Manager - global supplier configuration for the dev-profile test suppliers.
 # A supplier connected in GLOBAL mode builds its provider from a secret named exactly like the
