@@ -13907,6 +13907,27 @@ a.cl-link-button:hover {
         flex-wrap: wrap;
     }
 }
+/* touch targets of the selection row at 720-1023 px (DS §9: 44 px below 1024 px): the buttons and the menus' summaries
+   are drawn 44 px tall, as in the docked row below 720 px, instead of 30 px with an invisible hit area; the link buttons
+   lose the negative margin that let their 44 px overlap the line above once the actions wrap. The row takes no padding
+   of its own here, so on one line it is 44 px and the table moves down by only 4 px under a 40 px header */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-button {
+        height: 44px;
+        padding: 0 10px;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row :is(.cl-menu > summary, .cl-button)::after {
+        content: none;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-link-button {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+}
 /* End of RMA details page */
 
 /* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
