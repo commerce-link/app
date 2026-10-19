@@ -434,7 +434,23 @@
             form.appendChild(input);
         });
         document.body.appendChild(form);
-        form.submit();
+        // A page with unsaved changes of its own (the offer's items table) cancels this, saves them, then proceeds;
+        // abort hands the dialog back when that save fails. Without a listener the post goes on as before.
+        const submitting = new CustomEvent('cl:item-add-submit', {
+            bubbles: true,
+            cancelable: true,
+            detail: {
+                proceed: () => form.submit(),
+                abort: () => {
+                    form.remove();
+                    itemAdd.pending = false;
+                    renderItemAddBasket();
+                }
+            }
+        });
+        if (itemAddModalRoot().dispatchEvent(submitting)) {
+            form.submit();
+        }
     }
 
     function bind() {

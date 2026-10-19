@@ -8,7 +8,8 @@
 <!--/* Today's figures and formulas (OfferDetailsPageFactory.summary); offer-lines.js recounts the outputs from the table
        with the same formula, the delivery price coming from data-cl-delivery-price. */-->
 <section th:fragment="summary(p)" class="cl-card" id="summary" aria-labelledby="summary-title"
-         th:with="s=${p.summary()}" th:attr="data-cl-delivery-price=${p.template()} ? ${s.deliveryPriceValue()} : null">
+         th:with="s=${p.summary()}, vatRate=${T(pl.commercelink.invoicing.api.Price).DEFAULT_VAT_RATE}"
+         th:attr="data-cl-delivery-price=${p.template()} ? ${s.deliveryPriceValue()} : null, data-cl-vat-rate=${vatRate}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{offers.details.summary.title}"></h2></div>
     <dl class="cl-kv is-column cl-card-inset">
         <div><dt th:text="#{offers.details.summary.items}"></dt>
@@ -112,6 +113,7 @@
                 <span th:text="#{offers.details.client.open}"></span>
             </a>
         </div>
+        <p class="cl-help" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></p>
     </div>
     <div class="cl-address">
         <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.billing}"></span></div>

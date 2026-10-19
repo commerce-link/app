@@ -34,7 +34,22 @@
                th:attr="data-msg-group-required=#{offers.details.group.required},
                         data-msg-group-duplicate=#{offers.details.group.duplicate},
                         data-msg-group-new=#{offers.details.group.new},
-                        data-msg-group-picks=#{offers.details.group.picks('{n}')}">
+                        data-msg-group-picks=#{offers.details.group.picks('{n}')},
+                        data-msg-group-drag=#{offers.details.group.drag},
+                        data-msg-group-menu=#{offers.details.group.menu},
+                        data-msg-line-drag=#{offers.details.line.drag},
+                        data-msg-line-edit=#{offers.details.line.edit},
+                        data-msg-line-qty=#{offers.details.line.qty},
+                        data-msg-line-price=#{offers.details.line.price},
+                        data-msg-line-menu=#{offers.details.line.menu},
+                        data-msg-line-cost=#{offers.details.line.cost},
+                        data-msg-line-no-cost=#{offers.details.line.noCost},
+                        data-msg-line-margin=#{offers.details.line.margin},
+                        data-msg-line-margin-unknown=#{offers.details.line.marginUnknown},
+                        data-msg-margin-ok=#{offers.details.margin.ok},
+                        data-msg-margin-loss=#{offers.details.margin.loss},
+                        data-msg-margin-unknown=#{offers.details.margin.unknown},
+                        data-msg-mfn-prefix=#{order.items.mfn.prefix}">
             <caption class="cl-visually-hidden" th:text="${p.template()} ? #{offers.details.items.caption.template} : #{offers.details.items.caption.offer}"></caption>
             <colgroup><col class="cl-col-drag"><col><col class="cl-col-qty-in"><col class="cl-col-money-in"><col class="cl-col-value"><col class="cl-col-menu"></colgroup>
             <thead>
@@ -60,6 +75,14 @@
         <template data-cl-group-template>
             <tr th:replace="~{offers/details/items :: group(${null}, 'new')}"></tr>
         </template>
+        <!--/* The end of a group, added by offer-lines.js under its last item: the drop zone that keeps an item dragged
+               above it inside the group. Without JavaScript groups cannot change, so the server renders none. */-->
+        <template data-cl-group-foot-template>
+            <tr class="cl-line-group-foot" data-cl-group-foot>
+                <td colspan="6"><span class="cl-group-drop is-empty" th:text="#{offers.details.group.drop.empty}"></span><span
+                    class="cl-group-drop is-end" th:text="#{offers.details.group.drop.end}"></span></td>
+            </tr>
+        </template>
     </div>
 </section>
 
@@ -70,24 +93,34 @@
         <button type="button" class="cl-drag" hidden data-cl-lines-reveal data-cl-drag
                 th:attr="aria-label=#{offers.details.group.drag(${g != null} ? ${g.name()} : '')}"><i class="fas fa-arrows-alt" aria-hidden="true"></i></button>
     </td>
-    <td colspan="5">
+    <td colspan="4">
         <div class="cl-group-bar">
             <label class="cl-group-label" th:for="|offer-group-${key}|" th:text="#{offers.details.group.label}"></label>
             <input class="cl-input" type="text" th:id="|offer-group-${key}|" th:value="${g != null} ? ${g.name()} : ''"
                    data-cl-group-name autocomplete="off"
                    th:attr="aria-describedby=|offer-group-${key}-help offer-group-${key}-error|">
-            <span class="cl-group-meta" th:id="|offer-group-${key}-help|" data-cl-group-count
+            <span class="cl-group-count" th:id="|offer-group-${key}-help|" data-cl-group-count
                   th:text="#{offers.details.group.picks(${g != null} ? ${g.size()} : 0)}"></span>
             <button type="button" class="cl-link-button" hidden data-cl-lines-reveal data-cl-ungroup
                     th:text="#{offers.details.group.ungroup}"></button>
             <p class="cl-field-error" th:id="|offer-group-${key}-error|" hidden data-cl-group-error></p>
         </div>
     </td>
+    <!--/* the keyboard's way to move the whole group, like dragging its handle */-->
+    <td class="cl-table-actions cl-cell-menu">
+        <details class="cl-menu" hidden data-cl-lines-reveal>
+            <summary class="cl-button is-icon" th:attr="aria-label=#{offers.details.group.menu(${g != null} ? ${g.name()} : '')}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
+            <ul class="cl-menu-list">
+                <li><button type="button" class="cl-menu-item" data-cl-group-move="up" th:text="#{offers.details.line.menu.up}"></button></li>
+                <li><button type="button" class="cl-menu-item" data-cl-group-move="down" th:text="#{offers.details.line.menu.down}"></button></li>
+            </ul>
+        </details>
+    </td>
 </tr>
 
 <!--/* One item. Hidden fields carry what the row does not edit, so a table save posts the whole item as before; the
        "Edit item" dialog writes into them (data-cl-field). count = items in the offer: the last one cannot be removed. */-->
-<tr th:fragment="row(p, it, count)" class="cl-line" data-cl-line
+<tr th:fragment="row(p, it, count)" class="cl-line" data-cl-line data-cl-dirty-row
     th:with="i=${it.index()}, grouped=${it.variantGroupId() != null}, money=${T(pl.commercelink.web.orders.Money)},
              rt=${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}"
     th:classappend="${grouped} ? (${it.variantSelected()} ? 'is-variant' : 'is-variant is-unpicked')"
@@ -117,7 +150,8 @@
            th:attr="aria-label=#{offers.details.line.edit(${it.name()})}"><i class="fas fa-pencil-alt" aria-hidden="true"></i></a>
         <span class="cl-table-marks">
             <span th:if="${it.service()}" class="cl-status is-neutral" th:text="#{offers.details.line.mark.service}"></span>
-            <span th:if="${grouped and it.variantSelected()}" class="cl-status is-info" th:text="#{offers.details.line.mark.selected}"></span>
+            <span class="cl-status is-info" data-cl-mark-selected th:hidden="${!(grouped and it.variantSelected())}"
+                  th:text="#{offers.details.line.mark.selected}"></span>
             <span class="cl-status is-neutral" data-cl-mark-consolidated th:hidden="${!it.consolidated()}"
                   th:text="#{offers.details.line.mark.consolidated}"></span>
             <span th:if="${it.market() != null and it.market().missing()}" class="cl-status is-warn" th:text="#{offers.details.line.mark.missing}"></span>
@@ -131,7 +165,7 @@
         </span>
     </th>
     <td class="cl-cell-qty" th:attr="data-label=#{offers.details.items.column.qty}">
-        <input class="cl-input is-qty" type="number" min="0" step="1" inputmode="numeric"
+        <input class="cl-input is-qty" type="number" min="0" step="1" inputmode="numeric" required
                th:name="|basketItems[${i}].qty|" th:value="${it.qty()}" th:id="|offer-line-${i}-qty|"
                th:attr="aria-label=#{offers.details.line.qty(${it.name()})}, aria-describedby=|offer-line-${i}-warn|">
         <p class="cl-help is-warn cl-line-warn" th:id="|offer-line-${i}-warn|" data-cl-line-warn th:hidden="${!it.incomplete()}"
@@ -139,7 +173,7 @@
     </td>
     <td class="cl-cell-price" th:attr="data-label=#{offers.details.items.column.price}">
         <!--/* type=number keeps the posted value a plain decimal the form binding reads ("6899.00"), as before */-->
-        <input class="cl-input is-money" type="number" min="0" step="0.01" inputmode="decimal"
+        <input class="cl-input is-money" type="number" min="0" step="0.01" inputmode="decimal" required
                th:name="|basketItems[${i}].unitPrice|" th:value="${it.unitPriceInput()}"
                th:attr="aria-label=#{offers.details.line.price(${it.name()})}">
         <th:block th:unless="${it.service()}">
@@ -206,7 +240,7 @@
                        + (#strings.isEmpty(it.otherProviders()) ? '' : nl + #messages.msg('offers.details.margin.otherProviders', it.otherProviders()))},
                text=${marginText + nl + marketText}"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
-      th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
+      th:attr="data-tooltip=${text}, aria-label=${text}, data-cl-market-text=${marketText}"><i aria-hidden="true" class="fas"
       th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
 
 <!--/* The fields of one item, shared by the "Edit item" dialog (empty, filled by offer-lines.js from the row) and the
@@ -272,7 +306,9 @@
 
 <!--/* "Apply" changes the row only (method=dialog): the item is saved with the table. */-->
 <dialog th:fragment="editDialog(p)" class="cl-dialog is-form" id="item-edit-dialog" aria-labelledby="item-edit-title">
-    <form method="dialog" data-cl-item-edit-form th:with="market=${null}, marketStock=${null}">
+    <form method="dialog" data-cl-item-edit-form th:with="market=${null}, marketStock=${null}"
+          th:attr="data-msg-name-required=#{offers.details.item.name.required},
+                   data-msg-mfn-required=#{offers.details.item.mfn.required}">
         <h2 class="cl-dialog-title" id="item-edit-title" th:text="#{offers.details.item.title}"></h2>
         <div class="cl-dialog-body">
             <th:block th:replace="~{offers/details/items :: itemFields(${null}, ${ {:} }, ${p}, 'item-edit')}"></th:block>

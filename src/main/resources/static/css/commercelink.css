@@ -13872,9 +13872,18 @@ a.cl-link-button:hover {
 .cl-page .cl-group-bar .cl-link-button { margin-left: auto; }
 .cl-page .cl-group-bar .cl-field-error { flex-basis: 100%; margin: 0; }
 .cl-page .cl-group-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--cl-ink-2); }
-.cl-page .cl-group-meta { font-size: 13px; color: var(--cl-ink-2); }
+.cl-page .cl-group-count { font-size: 13px; color: var(--cl-ink-2); }
+/* the end of a group (offer-lines.js): a thin line, the drop zone of an empty group, a hint while a row is dragged */
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot > td { height: 4px; padding: 0 12px; background: var(--cl-surface-2); border-bottom: 2px solid var(--cl-line); font-size: 12px; line-height: 1.4; color: var(--cl-accent-ink); }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot .cl-group-drop { display: none; }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty > td,
+.cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot > td { height: auto; padding: 4px 12px; }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty .cl-group-drop.is-empty,
+.cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot:not(.is-empty) .cl-group-drop.is-end { display: inline; }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); }
+.cl-page .cl-table.is-line-editor.is-dragging .cl-drag { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
-.cl-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
+.cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
 .cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
 .cl-page .cl-item-market { margin: 0; font-variant-numeric: tabular-nums; }
 /* the save state above "Zapisz pozycje": the dot and the warning tone once the table has unsaved changes */
@@ -13905,8 +13914,10 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(td.cl-cell-qty, td.cl-cell-price)::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 12.5px; color: var(--cl-ink-2); }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-value { justify-items: start; padding-top: 0; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-hint { margin-left: 0; text-align: left; }
-    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group { display: block; padding: 12px 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 10px; padding: 12px 0; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td { display: block; padding: 0; border: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group-foot { display: block; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group-foot > td { display: block; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td.cl-cell-drag { display: none; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td::before { content: none; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-input { width: 100%; }

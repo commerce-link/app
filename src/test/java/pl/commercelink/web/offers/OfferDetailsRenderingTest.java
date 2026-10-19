@@ -222,10 +222,12 @@ class OfferDetailsRenderingTest {
         // then
         assertThat(html).contains("data-cl-line-group").contains("data-cl-group-name").contains("value=\"Monitor\"")
                 .contains("klient wybiera 1 z 2").contains("Rozgrupuj");
-        assertThat(count(html, "wybrany — w sumie")).isEqualTo(1);
-        assertThat(row(html, 2)).contains("wybrany — w sumie").contains("data-group=\"Monitor\"")
+        // every row carries the marker for offer-lines.js, shown only on the chosen variant
+        assertThat(count(html, "data-cl-mark-selected>wybrany — w sumie")).isEqualTo(1);
+        assertThat(row(html, 2)).contains("data-cl-mark-selected>wybrany — w sumie").contains("data-group=\"Monitor\"")
                 .contains("data-selected=\"true\"");
-        assertThat(row(html, 3)).contains("poza sumą").contains("data-selected=\"false\"");
+        assertThat(row(html, 3)).contains("poza sumą").contains("data-selected=\"false\"")
+                .contains("data-cl-mark-selected hidden=\"hidden\">");
         assertThat(html).contains("class=\"cl-line is-variant is-unpicked\"");
         assertThat(row(html, 4)).contains("Usługa").doesNotContain("cl-line-hint");
     }

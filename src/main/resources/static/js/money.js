@@ -9,16 +9,22 @@
 (function () {
     'use strict';
 
-    function formatMoney(value) {
+    function formatAmount(value) {
         var amount = Number(value || 0);
         var digits = Math.abs(amount).toFixed(2).replace('.', ',');
         var parts = digits.split(',');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
         var joined = parts.join(',');
-        var number = amount < 0 ? '−' + joined : joined;
+        return amount < 0 ? '−' + joined : joined;
+    }
+
+    function formatMoney(value) {
+        var number = formatAmount(value);
         var pattern = document.body.getAttribute('data-cl-amount-format');
         return pattern ? pattern.replace('{0}', number) : number;
     }
 
     window.CL_formatMoney = formatMoney;
+    // the number alone, for a text that carries its own words around it ("koszt 5 810,00")
+    window.CL_formatAmount = formatAmount;
 })();

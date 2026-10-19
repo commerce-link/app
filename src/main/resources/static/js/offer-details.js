@@ -1,0 +1,276 @@
+// The offer details page around its items table (offers/details.html, spec docs/active/offer-details-redesign-v2 §4).
+// - Actions on the saved offer ([data-cl-offer-action]: create the order, proforma, recalculation, copies, removing an
+//   item) run here. With unsaved changes in the table they ask first (dialog#offer-unsaved-dialog): "Zapisz i …"
+//   posts the items form in the background, then the action runs exactly as on a clean page, with its own
+//   confirmation when it has one (data-cl-confirm-*, in fragments/confirm-dialog). A failed save stays on the page.
+// - The add-items dialog saves the table the same way before it posts its items (cl:item-add-submit), and its button
+//   says so while the table is dirty.
+// - The terms, client and note dialogs (form[data-cl-async]) close once saved. On a clean page it reloads; with unsaved
+//   items the parts the dialog changed are swapped in from the answer's template[data-cl-offer-refresh] (header, card,
+//   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept.
+// - "Kopiuj link" and "Otwórz jak klient" say that the customer sees the saved version while the table is dirty.
+(function () {
+    'use strict';
+
+    var form = document.getElementById('offer-items');
+    if (!form) {
+        return;
+    }
+    var unsaved = document.getElementById('offer-unsaved-dialog');
+    var confirmDialog = document.getElementById('cl-confirm-dialog');
+    var actionForm = document.getElementById('offer-action-form');
+    var addDialog = document.getElementById('item-add-dialog');
+    var CARD_FORMS = ['offer-terms-form', 'offer-client-form', 'offer-note-form'];
+    // the table saved by this script: the rows on screen may include items the save dropped
+    var savedHere = false;
+    var busy = false;
+    var pending = null;
+
+    function isDirty() {
+        return typeof window.CL_isDirty === 'function' && window.CL_isDirty(form);
+    }
+
+    function focusBack(element) {
+        if (!element || !document.contains(element)) {
+            return;
+        }
+        // an action from a menu sits in a closed details by now: its summary takes the focus instead
+        var menu = element.closest('details.cl-menu');
+        (menu && !menu.open ? menu.querySelector(':scope > summary') : element).focus();
+    }
+
+    function closeOpenDialogs() {
+        document.querySelectorAll('dialog[open]').forEach(function (dialog) {
+            dialog.close();
+        });
+    }
+
+    // Resolves true once the items are saved. A field to fix (a group name, a quantity the browser refuses) is shown
+    // with every dialog closed, since a modal dialog would keep it out of reach.
+    function saveItems() {
+        var invalid = window.CL_offerLines ? window.CL_offerLines.prepare() : null;
+        if (invalid || !form.checkValidity()) {
+            closeOpenDialogs();
+            if (invalid) {
+                invalid.focus();
+            } else {
+                form.reportValidity();
+            }
+            return Promise.resolve(false);
+        }
+        busy = true;
+        form.setAttribute('aria-busy', 'true');
+        return fetch(form.action, {
+            method: 'POST',
+            body: new URLSearchParams(new FormData(form)),
+            // the save answers with a redirect to this page: following it would only load the page again
+            redirect: 'manual'
+        }).then(function (response) {
+            if (response.type !== 'opaqueredirect' && !response.ok) {
+                throw new Error('items not saved: ' + response.status);
+            }
+            savedHere = true;
+            window.CL_markClean(form);
+            return true;
+        }).catch(function () {
+            showToast(unsaved.getAttribute('data-failed'), 'danger');
+            return false;
+        }).finally(function () {
+            busy = false;
+            form.removeAttribute('aria-busy');
+        });
+    }
+
+    // The address of the action. Removing an item names it by its position in the saved offer; once this script has
+    // saved the table that position is counted from the screen, and null means the save already dropped the item.
+    function actionUrl(element) {
+        var url = element.getAttribute('data-action-url');
+        var row = element.closest('tr[data-cl-line]');
+        if (!row || !savedHere || !window.CL_offerLines) {
+            return url;
+        }
+        var index = window.CL_offerLines.savedIndex(row);
+        return index < 0 ? null : url.replace(/\/remove-item\/\d+/, '/remove-item/' + index);
+    }
+
+    function confirmThen(element, url) {
+        var confirmForm = confirmDialog.querySelector('form');
+        var submit = confirmDialog.querySelector('[data-cl-confirm-submit]');
+        var primary = element.getAttribute('data-cl-confirm-tone') === 'primary';
+        confirmForm.action = url;
+        confirmDialog.querySelector('#cl-confirm-title').textContent = element.getAttribute('data-cl-confirm-title');
+        confirmDialog.querySelector('#cl-confirm-message').textContent = element.getAttribute('data-cl-confirm-message');
+        submit.textContent = element.getAttribute('data-cl-confirm-action');
+        submit.classList.toggle('is-danger', !primary);
+        submit.classList.toggle('is-primary', primary);
+        submit.disabled = false;
+        confirmDialog.addEventListener('close', function () {
+            focusBack(element);
+        }, { once: true });
+        confirmDialog.showModal();
+        confirmDialog.querySelector('[data-cl-confirm-cancel]').focus();
+    }
+
+    function run(element) {
+        var url = actionUrl(element);
+        if (url === null) {
+            window.location.reload();
+        } else if (element.hasAttribute('data-cl-confirm-title') && confirmDialog && typeof confirmDialog.showModal === 'function') {
+            confirmThen(element, url);
+        } else if (element.getAttribute('data-action-method') === 'get') {
+            window.location.assign(url);
+        } else {
+            actionForm.action = url;
+            actionForm.submit();
+        }
+    }
+
+    function ask(element) {
+        pending = element;
+        unsaved.querySelector('[data-cl-unsaved-save]').textContent =
+            unsaved.getAttribute('data-save-label').replace('{0}', element.getAttribute('data-label') || '');
+        unsaved.showModal();
+        unsaved.querySelector('[data-cl-dialog-close]').focus();
+    }
+
+    // Before confirm-dialog.js and the browser: an action always goes through run() (or the question first).
+    document.addEventListener('click', function (event) {
+        var element = event.target.closest && event.target.closest('[data-cl-offer-action]');
+        if (!element || element.getAttribute('aria-disabled') === 'true' || typeof unsaved.showModal !== 'function') {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (busy) {
+            return;
+        }
+        if (isDirty()) {
+            ask(element);
+        } else {
+            run(element);
+        }
+    }, true);
+
+    unsaved.querySelector('form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var element = pending;
+        pending = null;
+        unsaved.close();
+        if (!element || busy) {
+            return;
+        }
+        focusBack(element);
+        saveItems().then(function (saved) {
+            if (saved) {
+                run(element);
+            }
+        });
+    });
+
+    unsaved.addEventListener('close', function () {
+        if (pending) {
+            focusBack(pending);
+            pending = null;
+        }
+    });
+
+    // as the other dialogs: a press that both starts and ends on the backdrop closes it
+    var pressStart = null;
+    unsaved.addEventListener('pointerdown', function (event) {
+        pressStart = event.target;
+    });
+    unsaved.addEventListener('click', function (event) {
+        if (event.target === unsaved && pressStart === unsaved) {
+            unsaved.close();
+        }
+        pressStart = null;
+    });
+
+    // --- the add-items dialog
+
+    document.addEventListener('cl:item-add-submit', function (event) {
+        if (!isDirty()) {
+            return;
+        }
+        event.preventDefault();
+        var detail = event.detail;
+        saveItems().then(function (saved) {
+            if (saved) {
+                detail.proceed();
+            } else {
+                detail.abort();
+            }
+        });
+    });
+
+    var addLabels = addDialog && {
+        label: addDialog.getAttribute('data-submit-label'),
+        count: addDialog.getAttribute('data-submit-count')
+    };
+
+    function showDirtyState(dirty) {
+        document.querySelectorAll('[data-cl-saved-version-note]').forEach(function (note) {
+            note.hidden = !dirty;
+        });
+        if (addDialog) {
+            addDialog.setAttribute('data-submit-label', dirty ? unsaved.getAttribute('data-add-label') : addLabels.label);
+            addDialog.setAttribute('data-submit-count', dirty ? unsaved.getAttribute('data-add-count') : addLabels.count);
+        }
+    }
+
+    form.addEventListener('cl:dirty-changed', function (event) {
+        showDirtyState(event.detail.dirty);
+    });
+
+    // --- the terms, client and note dialogs
+
+    function swapRefreshed(template) {
+        Array.prototype.forEach.call(template.content.children, function (fresh) {
+            var current = fresh.id && document.getElementById(fresh.id);
+            if (!current) {
+                return;
+            }
+            var copy = document.importNode(fresh, true);
+            if (navigator.clipboard) {
+                copy.querySelectorAll('[data-cl-copy-reveal][hidden]').forEach(function (control) {
+                    control.hidden = false;
+                });
+            }
+            current.replaceWith(copy);
+        });
+    }
+
+    document.addEventListener('cl:form-replaced', function (event) {
+        var saved = event.target;
+        if (!(saved instanceof HTMLFormElement) || CARD_FORMS.indexOf(saved.id) < 0
+            || saved.getAttribute('data-cl-saved') !== 'true' || saved.querySelector('[data-cl-error-summary]')) {
+            return;
+        }
+        var dialog = saved.closest('dialog');
+        if (!isDirty()) {
+            if (dialog) {
+                dialog.close();
+            }
+            window.location.reload();
+            return;
+        }
+        var template = saved.querySelector('template[data-cl-offer-refresh]');
+        if (template) {
+            swapRefreshed(template);
+            showDirtyState(true);
+            if (window.CL_offerLines) {
+                window.CL_offerLines.recount();
+            }
+        }
+        if (dialog) {
+            // the card's "Edytuj" that opened the dialog was swapped too: its new copy takes the focus
+            dialog.addEventListener('close', function () {
+                var opener = document.querySelector('[data-cl-dialog-open="' + dialog.id + '"]');
+                if (opener) {
+                    opener.focus();
+                }
+            }, { once: true });
+            dialog.close();
+        }
+    });
+})();
