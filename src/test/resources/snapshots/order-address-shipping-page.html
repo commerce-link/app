@@ -1,0 +1,81 @@
+<form id="address-form-shipping" class="cl-form" method="post" novalidate data-cl-async action="/dashboard/orders/o1/updateAddressDetails?type=shipping" data-error-message="Changes could not be saved. Check your connection and try again.">
+<div class="cl-card-inset">
+<div id="address-shipping-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+<i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+<div>
+<p class="cl-alert-title">Changes were not saved. Correct the highlighted fields:</p>
+<ul class="cl-alert-list">
+<li>
+<a href="#shippingDetails.city">City is required</a>
+</li>
+</ul>
+</div>
+</div>
+<div class="cl-form-grid cl-card-grid">
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.name">
+<span>Name</span>
+</label>
+<input class="cl-input" id="shippingDetails.name" name="shippingDetails.name" type="text" value="Anna" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.surname">
+<span>Surname</span>
+</label>
+<input class="cl-input" id="shippingDetails.surname" name="shippingDetails.surname" type="text" value="Nowak" autocomplete="off" required="required"/>
+</div></div>
+<div><div class="cl-field">
+<label class="cl-label" for="shippingDetails.streetAndNumber">
+<span>Street and Number</span>
+</label>
+<input class="cl-input" id="shippingDetails.streetAndNumber" name="shippingDetails.streetAndNumber" type="text" value="Krotka 3" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.postalCode">
+<span>Postal Code</span>
+</label>
+<input class="cl-input" id="shippingDetails.postalCode" name="shippingDetails.postalCode" type="text" value="30-002" autocomplete="off" required="required"/>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.city">
+<span>City</span>
+</label>
+<input class="cl-input is-invalid" id="shippingDetails.city" name="shippingDetails.city" type="text" value="" autocomplete="off" aria-invalid="true" aria-describedby="shippingDetails.city-error" required="required"/>
+<p class="cl-field-error" id="shippingDetails.city-error">
+<i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+<span>City is required</span>
+</p>
+</div></div>
+<div class="cl-span-2"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.country">
+<span>Country</span>
+</label>
+<input class="cl-input" id="shippingDetails.country" name="shippingDetails.country" type="text" value="PL" autocomplete="off" aria-describedby="shippingDetails.country-help" required="required"/>
+<p class="cl-help" id="shippingDetails.country-help">Two-letter code, e.g. PL.</p>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.email">
+<span>Email</span>
+</label>
+<input class="cl-input" id="shippingDetails.email" name="shippingDetails.email" type="email" value="anna@example.com" autocomplete="off" inputmode="email" required="required"/>
+</div></div>
+<div class="cl-span-3"><div class="cl-field">
+<label class="cl-label" for="shippingDetails.phone">
+<span>Phone</span>
+</label>
+<input class="cl-input" id="shippingDetails.phone" name="shippingDetails.phone" type="tel" value="600700800" autocomplete="off" inputmode="tel" required="required"/>
+</div></div>
+<div><div class="cl-field">
+<label class="cl-label" for="shippingDetails.companyName">
+<span>Company Name</span>
+<span class="cl-optional">optional</span>
+</label>
+<input class="cl-input" id="shippingDetails.companyName" name="shippingDetails.companyName" type="text" value="Beta" autocomplete="off"/>
+</div></div>
+</div>
+</div>
+<div class="cl-card-footer">
+<button type="submit" class="cl-button is-primary">Save changes</button>
+<a class="cl-button" href="/dashboard/orders/o1">Cancel</a>
+</div>
+</form>

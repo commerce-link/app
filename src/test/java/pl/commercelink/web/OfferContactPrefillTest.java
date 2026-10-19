@@ -11,7 +11,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.BasketsRepository;
@@ -24,6 +26,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -113,19 +116,14 @@ class OfferContactPrefillTest {
     }
 
     @Test
-    void contactStepFromAnUnknownSourceStaysEmpty() {
+    void contactStepFromAnUnknownSourceAnswersNotFound() {
         // given
         when(basketsRepository.findById("store-1", "missing")).thenReturn(Optional.empty());
-        ExtendedModelMap model = new ExtendedModelMap();
 
-        // when
-        controller.showContactDetailsForm("copy", "missing", model, PL);
-
-        // then
-        ContactDetails contact = (ContactDetails) model.get("contactDetails");
-        assertThat(contact.getName()).isNull();
-        assertThat(contact.getEmail()).isNull();
-        assertThat(model.get("offerName")).isNull();
+        // when / then
+        assertThatThrownBy(() -> controller.showContactDetailsForm("copy", "missing", new ExtendedModelMap(), PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test

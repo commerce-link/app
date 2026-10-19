@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,6 +12,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.baskets.*;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
@@ -46,6 +48,8 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 public class OfferController {
 
+    private static final int MAX_SOURCE_ID_LENGTH = 200;
+
     @Autowired
     private StoresRepository storesRepository;
 
@@ -76,6 +80,9 @@ public class OfferController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private MultipartProperties multipartProperties;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -84,6 +91,7 @@ public class OfferController {
         OfferCreationDto form = new OfferCreationDto();
         form.setType("CSV");
         model.addAttribute("form", form);
+        model.addAttribute("uploadLimit", multipartProperties.getMaxFileSize());
         return "newOffer_from_csv";
     }
 
@@ -91,11 +99,10 @@ public class OfferController {
     public String showContactDetailsForm(@RequestParam String intent,
                                          @RequestParam(required = false) String sourceId,
                                          Model model, Locale locale) {
+        Optional<Basket> source = sourceOf(intent, sourceId);
         ContactDetails contact = new ContactDetails();
         String offerName = null;
-        Optional<Basket> storeBasket = "copy".equals(intent) && sourceId != null
-                ? basketsRepository.findById(getStoreId(), sourceId).filter(b -> b.hasType(BasketType.Basket))
-                : Optional.empty();
+        Optional<Basket> storeBasket = source.filter(b -> b.hasType(BasketType.Basket));
         if (storeBasket.isPresent()) {
             // a shop basket carries the customer's billing and shipping details, the offer's contact starts from them
             fillFrom(contact, storeBasket.get());
@@ -106,7 +113,41 @@ public class OfferController {
         model.addAttribute("offerName", offerName);
         model.addAttribute("intent", intent);
         model.addAttribute("sourceId", sourceId);
+        model.addAttribute("source", source.map(OfferController::sourceKind).orElse(null));
         return "offerContact";
+    }
+
+    /**
+     * What a new offer starts from: nothing for an empty offer, a template for intent=template, a shop basket, an offer or
+     * a template for intent=copy. An unknown intent or a source that is missing, of another store or of the wrong type
+     * answers 404 on the page and on its POST, instead of a 500 when the copy is made.
+     */
+    private Optional<Basket> sourceOf(String intent, String sourceId) {
+        return switch (intent) {
+            case "manual" -> Optional.empty();
+            case "template" -> Optional.of(requireSource(sourceId, EnumSet.of(BasketType.OfferTemplate)));
+            case "copy" -> Optional.of(requireSource(sourceId, EnumSet.allOf(BasketType.class)));
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        };
+    }
+
+    private Basket requireSource(String sourceId, Set<BasketType> types) {
+        // ids are UUIDs; a key longer than DynamoDB accepts would fail the lookup itself
+        if (StringUtils.isBlank(sourceId) || sourceId.length() > MAX_SOURCE_ID_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return basketsRepository.findById(getStoreId(), sourceId)
+                .filter(b -> b.getType() != null && types.contains(b.getType()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    /** The page's way back and lead: "basket", "offer" or "template". */
+    private static String sourceKind(Basket source) {
+        return switch (source.getType()) {
+            case Basket -> "basket";
+            case Offer -> "offer";
+            case OfferTemplate -> "template";
+        };
     }
 
     /** Billing first, shipping fills what billing left empty. */
@@ -132,18 +173,18 @@ public class OfferController {
                                          @RequestParam(required = false) String offerName,
                                          RedirectAttributes redirectAttributes,
                                          Locale locale) {
+        Optional<Basket> source = sourceOf(intent, sourceId);
         if (!contactDetails.isProperlyFilled()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("offers.contact.invalid", null, locale));
-            return "redirect:/dashboard/offer/new?intent=" + intent
-                    + (sourceId != null ? "&sourceId=" + sourceId : "");
+            return "redirect:" + UriComponentsBuilder.fromPath("/dashboard/offer/new")
+                    .queryParam("intent", intent)
+                    .queryParamIfPresent("sourceId", Optional.ofNullable(sourceId))
+                    .encode().build().toUriString();
         }
 
-        Basket basket = switch (intent) {
-            case "manual" -> offerBuilder().build();
-            case "copy", "template" -> copyOf(sourceId);
-            default -> throw new IllegalArgumentException("Unknown intent: " + intent);
-        };
+        Basket basket = source.map(s -> s.deepCopy(" - Copy", BasketType.Offer))
+                .orElseGet(() -> offerBuilder().build());
         basket.setName(offerName);
         basket.setContactDetails(contactDetails);
         basket.setGclid(gclid);
@@ -409,11 +450,6 @@ public class OfferController {
     public OfferImporter getImporter(String type) {
         return offerImporters.stream().filter(i -> i.getType().equals(type)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown order reference type: " + type));
-    }
-
-    private Basket copyOf(String basketId) {
-        Basket sourceBasket = basketsRepository.findById(getStoreId(), basketId).get();
-        return sourceBasket.deepCopy(" - Copy", BasketType.Offer);
     }
 
     private Basket save(Basket basket) {
