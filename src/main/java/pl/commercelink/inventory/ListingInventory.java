@@ -18,7 +18,7 @@ class ListingInventory {
         }
         Stream<InventoryKey> ownOnlyKeys = ownIndex.all().stream()
                 .map(MatchedInventory::getInventoryKey)
-                .filter(key -> !globalIndex.contains(key));
+                .filter(key -> !globalIndex.covers(key));
         return Stream.concat(globalKeys, ownOnlyKeys);
     }
 }

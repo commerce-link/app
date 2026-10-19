@@ -47,6 +47,19 @@ class InventoryIndex {
         return List.copyOf(matches);
     }
 
+    boolean containsId(String id) {
+        return id != null && byId.containsKey(id);
+    }
+
+    /**
+     * Whether a group of the other (own) index is already represented here. A key carrying a PIM id is covered
+     * only by that id, so a store's own product never disappears behind a global group that merely shares a code;
+     * a key without one is covered by any EAN or code.
+     */
+    boolean covers(InventoryKey ownKey) {
+        return ownKey.getId() != null ? containsId(ownKey.getId()) : contains(ownKey);
+    }
+
     boolean contains(InventoryKey key) {
         if (key.getId() != null && byId.containsKey(key.getId())) {
             return true;

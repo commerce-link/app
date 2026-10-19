@@ -45,4 +45,35 @@ class ListingInventoryTest {
         // when / then
         assertThat(listing.keys()).containsExactly(globalKey, ownOnlyKey);
     }
+
+    private InventoryKey pimKey(String id, String ean, String code) {
+        InventoryKey key = new InventoryKey(id);
+        key.addEan(ean);
+        key.addManufacturerCode(code);
+        return key;
+    }
+
+    @Test
+    void ownKeyOfAStoreEntryIsListedEvenWhenAGlobalRowSharesItsMpn() {
+        // given
+        InventoryKey globalKey = pimKey("e3-g-c", "5900000000031", "E3-C-S");
+        InventoryKey ownKey = pimKey("e3-s-c", "5900000000032", "E3-C-S");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(ownKey))));
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey, ownKey);
+    }
+
+    @Test
+    void ownKeyWithTheGlobalPimIdIsStillDeduplicated() {
+        // given
+        InventoryKey globalKey = pimKey("g1", "5900000000031", "G1");
+        InventoryKey ownKey = pimKey("g1", "5900000000031", "G1");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(ownKey))));
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey);
+    }
 }

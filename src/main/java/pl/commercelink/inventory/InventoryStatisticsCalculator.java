@@ -32,7 +32,7 @@ final class InventoryStatisticsCalculator {
             }
             if (hasOwn) {
                 for (MatchedInventory own : ownIndex.findMatching(group.getInventoryKey())) {
-                    if (claimedOwnGroups.add(own)) {
+                    if (sharesPimEntry(group, own) && claimedOwnGroups.add(own)) {
                         items.addAll(own.getInventoryItems());
                     }
                 }
@@ -40,11 +40,17 @@ final class InventoryStatisticsCalculator {
             tally.add(items);
         }
         for (MatchedInventory own : ownIndex.all()) {
-            if (!globalIndex.contains(own.getInventoryKey())) {
+            if (!globalIndex.covers(own.getInventoryKey())) {
                 tally.add(own.getInventoryItems());
             }
         }
         return tally.toStatistics();
+    }
+
+    // An own group with a PIM id belongs only to the global group of that same entry (see InventoryIndex.covers).
+    private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own) {
+        String ownId = own.getInventoryKey().getId();
+        return ownId == null || ownId.equals(global.getInventoryKey().getId());
     }
 
     private static final class Tally {

@@ -25,6 +25,13 @@ class InventoryStatisticsCalculatorTest {
         return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), taxonomyCache, supplierRegistry);
     }
 
+    private MatchedInventory pimGroup(String id, String ean, String mfn, InventoryItem... items) {
+        InventoryKey key = new InventoryKey(id);
+        key.addEan(ean);
+        key.addManufacturerCode(mfn);
+        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+    }
+
     private InventoryItem item(String ean, String mfn, String supplier, int qty) {
         return new InventoryItem(ean, mfn, 100.0, "PLN", qty, 1, supplier);
     }
@@ -89,5 +96,20 @@ class InventoryStatisticsCalculatorTest {
         // then
         assertThat(stats).isEqualTo(InventoryStatistics.EMPTY);
         assertThat(stats.inStockPercent()).isZero();
+    }
+
+    @Test
+    void storeEntryGroupCountsAsADistinctProduct() {
+        // given
+        MatchedInventory globalGroup = pimGroup("e3-g-c", "5900000000031", "E3-C-S", item("5900000000031", "E3-C-S", "Elko", 5));
+        MatchedInventory ownGroup = pimGroup("e3-s-c", "5900000000032", "E3-C-S", item("5900000000032", "E3-C-S", "Kosatec", 3));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(globalGroup)),
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)));
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(2);
+        assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
     }
 }
