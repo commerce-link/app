@@ -1045,6 +1045,63 @@ class RMAControllerTest {
         assertThat(second.getCancellable()).isFalse();
     }
 
+    /** A parcel of a marketplace return as the import stores it: number and carrier, no shipping date. */
+    private static Shipment importedParcel(String trackingNo) {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setTrackingNo(trackingNo);
+        shipment.setCarrier("ALLEGRO");
+        return shipment;
+    }
+
+    @Test
+    void addingAShipmentKeepsTheParcelsImportedWithAMarketplaceReturn() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(importedParcel("A-1"), importedParcel("A-2"))));
+
+        // when: "add shipment" posts both parcels as hidden fields and the new one at the next index
+        RMA saved = saveShipments(existing, importedParcel("A-1"), importedParcel("A-2"),
+                formRow("T-new", LocalDateTime.of(2026, 10, 7, 10, 0)));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("A-1", "A-2", "T-new");
+        assertThat(saved.getShipments().get(0).getShippedAt()).isNull();
+        assertThat(saved.getShipments().get(0).getCarrier()).isEqualTo("ALLEGRO");
+    }
+
+    @Test
+    void editingAnotherShipmentLeavesTheImportedParcelsAsTheyWere() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(importedParcel("A-1"), tracked("T-0", at), importedParcel("A-2"))));
+
+        // when
+        RMA saved = saveShipments(existing, importedParcel("A-1"), formRow("T-0-fixed", at), importedParcel("A-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("A-1", "T-0-fixed", "A-2");
+        assertThat(saved.getShipments().get(2).getCarrier()).isEqualTo("ALLEGRO");
+        assertThat(saved.getShipments().get(2).getShippedAt()).isNull();
+    }
+
+    @Test
+    void anEmptyNewRowIsStillDropped() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-0", at))));
+        Shipment empty = new Shipment(ShipmentType.Courier);
+        empty.setCarrier(" ");
+        empty.setTrackingNo("");
+
+        // when
+        RMA saved = saveShipments(existing, formRow("T-0", at), empty);
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("T-0");
+    }
+
     // ------------------------------------------------------------------
     // action outcomes are shown in the page, with the skipped items named
     // ------------------------------------------------------------------

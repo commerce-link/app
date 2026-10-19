@@ -510,7 +510,7 @@ public class RMAController {
                 row.setExternalId(null);
             }
             List<Shipment> shipments = updatedRma.getShipments().stream()
-                    .filter(s -> s.hasShippingData() || s.hasCollectionData())
+                    .filter(RMAController::isWorthKeeping)
                     .collect(Collectors.toList());
             shipments.forEach(s -> s.inheritCourierOrderFrom(stored.get(s)));
             shipments.forEach(s -> s.inheritTrackingFrom(stored.get(s)));
@@ -535,6 +535,15 @@ public class RMAController {
         }
         rmaRepository.save(existingRma);
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    /**
+     * A parcel imported with a marketplace return has a number and a carrier but no shipping date; it stays like any
+     * shipment with data. Only a row with nothing typed in (an empty "add shipment" form) is dropped.
+     */
+    private static boolean isWorthKeeping(Shipment shipment) {
+        return shipment.hasShippingData() || shipment.hasCollectionData()
+                || StringUtils.isNotBlank(shipment.getTrackingNo()) || StringUtils.isNotBlank(shipment.getCarrier());
     }
 
     /**
