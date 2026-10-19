@@ -102,17 +102,26 @@ public class RmaShipmentsController {
         } catch (RuntimeException e) {
             // no command was sent (no carrier or template in the settings any more, no integration): the row stays
             log.warn("Return of RMA {} in store {} could not be booked again", rmaId, storeId(), e);
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", retryFailed(locale));
             return back;
         }
         switch (start.outcome()) {
             case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage("shipping.create.started", null, locale));
-            case REFUSED -> redirectAttributes.addFlashAttribute("errorMessage", start.error());
+            case REFUSED -> {
+                log.warn("Return of RMA {} in store {} was refused again (provider's answer: {}): {}",
+                        rmaId, storeId(), start.providerAnswer(), start.error());
+                redirectAttributes.addFlashAttribute("errorMessage", retryFailed(locale));
+            }
             case GONE -> redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("rma.shipments.return.retry.gone", null, locale));
         }
         return back;
+    }
+
+    /** The provider's or adapter's own words are often raw English ("Invalid packageTemplateId"): they go to the log. */
+    private String retryFailed(Locale locale) {
+        return messageSource.getMessage("rma.shipments.return.retry.failed", null, locale);
     }
 
     String storeId() {
