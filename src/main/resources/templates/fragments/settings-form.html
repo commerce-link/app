@@ -5,17 +5,32 @@
 <!--/* Error summary above a settings form. errors maps a field id to the message key of its error, in page order;
        labels (or null) maps a field id to a label prepended to the message, for fields whose labels are not message
        keys (provider settings). Focused after a failed save, links move to the fields. */-->
-<div th:fragment="errorSummary(id, errors, labels)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
-     tabindex="-1" data-cl-error-summary>
+<div th:fragment="errorSummary(id, errors, labels)"
+     th:replace="~{fragments/settings-form :: errorSummaryTitled(${id}, ${errors}, ${labels}, 'form.errors.title')}"></div>
+
+<!--/* errorSummary with its own title key, for a page that shows errors nobody submitted (an RMA address that "Ship to
+       client" refused): form.errors.title would say changes were not saved. */-->
+<div th:fragment="errorSummaryTitled(id, errors, labels, titleKey)" th:if="${!errors.isEmpty()}" th:id="${id}"
+     class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
     <div>
-        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
         <ul class="cl-alert-list">
             <li th:each="error : ${errors}">
                 <a th:href="'#' + ${error.key}"
                    th:text="${labels != null and labels[error.key] != null} ? ${labels[error.key] + ': ' + #messages.msg(error.value)} : #{${error.value}}"></a>
             </li>
         </ul>
+    </div>
+</div>
+
+<!--/* The summary static/js/form-check.js fills when the browser stops a submit ([data-cl-form-check]); hidden and empty
+       until then, so it stays out of the page without JavaScript. titleKey says what the form is for. */-->
+<div th:fragment="formCheckSummary(titleKey)" class="cl-alert is-bad" tabindex="-1" hidden data-cl-form-check-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
+        <ul class="cl-alert-list"></ul>
     </div>
 </div>
 
@@ -78,6 +93,30 @@
            th:attr="autocomplete=${autocomplete}, maxlength=${maxlength},
                     inputmode=${inputmode != null ? inputmode : (type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null))},
                     aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
+    <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+<!--/* textFieldLimited for a field that is required only under a condition the browser evaluates (variant-fields.js,
+       e.g. shipment!=Courier): the "optional" note is shown by that script while the condition holds. The input is never
+       marked required, because the server validates it and the form is novalidate; aria-required tells a screen reader
+       instead, set while the note is hidden (here for the rendered choice, then by variant-fields.js). hidden: the
+       condition fails for the choice the page was rendered with (the script recomputes it on load). */-->
+<div th:fragment="textFieldOptionalWhen(name, labelKey, value, type, autocomplete, errorKey, help, condition, hidden)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span class="cl-optional" th:attr="data-cl-variant-when=${condition}" th:hidden="${hidden}" th:text="#{form.optional}"></span>
+    </label>
+    <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
+           th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}"
+           th:attr="autocomplete=${autocomplete},
+                    inputmode=${type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null)},
+                    aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-required=${hidden ? 'true' : null},
                     aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
     <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
     <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">

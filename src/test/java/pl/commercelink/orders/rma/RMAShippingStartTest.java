@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -86,6 +87,27 @@ class RMAShippingStartTest {
         assertThat(shippingForm.isToClient()).isTrue();
         assertThat(shippingForm.getOrderItemIds()).containsExactly("order-item-1");
         assertThat(shippingForm.getShippingDetails()).isSameAs(rma.getShippingDetails());
+    }
+
+    @Test
+    void shipToClientWithAnIncompleteAddressOpensTheAddressPageInsteadOfAGenericError() {
+        // given
+        RMA rma = rmaWithClientAddress();
+        rma.getShippingDetails().setPhone(null);
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(
+                storedItem("rma-item-1", "order-item-1", RMAItemStatus.Received)));
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = controller.initiateShippingToClient(RMA_ID, postedRmaPageForm(), redirectAttributes, new ExtendedModelMap(), Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID + "/shipping");
+        verify(redirectAttributes).addFlashAttribute(RMAController.ADDRESS_INCOMPLETE_FLASH, true);
     }
 
     @Test

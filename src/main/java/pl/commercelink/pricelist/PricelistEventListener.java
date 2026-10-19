@@ -44,7 +44,7 @@ class PricelistEventListener {
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(payload.getStoreId(), SupplierScope.PRICING);
 
         List<AvailabilityAndPrice> pricelist = availabilityAndPriceListFactory
-                .create(enrichedInventory)
+                .create(enrichedInventory, payload.getStoreId())
                 .generate(payload.getStoreId(), payload.getCatalogId());
 
         String pricelistId = pricelistRepository.save(payload.getStoreId(), payload.getCatalogId(), pricelist);

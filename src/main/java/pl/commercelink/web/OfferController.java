@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,14 +12,17 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.baskets.*;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.offer.imports.OfferImporter;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
@@ -43,6 +47,8 @@ import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 public class OfferController {
+
+    private static final int MAX_SOURCE_ID_LENGTH = 200;
 
     @Autowired
     private StoresRepository storesRepository;
@@ -74,6 +80,9 @@ public class OfferController {
     @Autowired
     private MessageSource messageSource;
 
+    @Autowired
+    private MultipartProperties multipartProperties;
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -82,17 +91,78 @@ public class OfferController {
         OfferCreationDto form = new OfferCreationDto();
         form.setType("CSV");
         model.addAttribute("form", form);
+        model.addAttribute("uploadLimit", multipartProperties.getMaxFileSize());
         return "newOffer_from_csv";
     }
 
     @GetMapping("/dashboard/offer/new")
     public String showContactDetailsForm(@RequestParam String intent,
                                          @RequestParam(required = false) String sourceId,
-                                         Model model) {
-        model.addAttribute("contactDetails", new ContactDetails());
+                                         Model model, Locale locale) {
+        Optional<Basket> source = sourceOf(intent, sourceId);
+        ContactDetails contact = new ContactDetails();
+        String offerName = null;
+        Optional<Basket> storeBasket = source.filter(b -> b.hasType(BasketType.Basket));
+        if (storeBasket.isPresent()) {
+            // a shop basket carries the customer's billing and shipping details, the offer's contact starts from them
+            fillFrom(contact, storeBasket.get());
+            offerName = messageSource.getMessage("offers.basket.offerName",
+                    new Object[]{storeBasket.get().getShortenedBasketId()}, locale);
+        }
+        model.addAttribute("contactDetails", contact);
+        model.addAttribute("offerName", offerName);
         model.addAttribute("intent", intent);
         model.addAttribute("sourceId", sourceId);
+        model.addAttribute("source", source.map(OfferController::sourceKind).orElse(null));
         return "offerContact";
+    }
+
+    /**
+     * What a new offer starts from: nothing for an empty offer, a template for intent=template, a shop basket, an offer or
+     * a template for intent=copy. An unknown intent or a source that is missing, of another store or of the wrong type
+     * answers 404 on the page and on its POST, instead of a 500 when the copy is made.
+     */
+    private Optional<Basket> sourceOf(String intent, String sourceId) {
+        return switch (intent) {
+            case "manual" -> Optional.empty();
+            case "template" -> Optional.of(requireSource(sourceId, EnumSet.of(BasketType.OfferTemplate)));
+            case "copy" -> Optional.of(requireSource(sourceId, EnumSet.allOf(BasketType.class)));
+            default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        };
+    }
+
+    private Basket requireSource(String sourceId, Set<BasketType> types) {
+        // ids are UUIDs; a key longer than DynamoDB accepts would fail the lookup itself
+        if (StringUtils.isBlank(sourceId) || sourceId.length() > MAX_SOURCE_ID_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return basketsRepository.findById(getStoreId(), sourceId)
+                .filter(b -> b.getType() != null && types.contains(b.getType()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    /** The page's way back and lead: "basket", "offer" or "template". */
+    private static String sourceKind(Basket source) {
+        return switch (source.getType()) {
+            case Basket -> "basket";
+            case Offer -> "offer";
+            case OfferTemplate -> "template";
+        };
+    }
+
+    /** Billing first, shipping fills what billing left empty. */
+    private static void fillFrom(ContactDetails contact, Basket basket) {
+        BillingDetails b = basket.getBillingDetails();
+        ShippingDetails s = basket.getShippingDetails();
+        contact.setName(firstNonBlank(b == null ? null : b.getName(), s == null ? null : s.getName()));
+        contact.setSurname(firstNonBlank(b == null ? null : b.getSurname(), s == null ? null : s.getSurname()));
+        contact.setCompanyName(firstNonBlank(b == null ? null : b.getCompanyName(), s == null ? null : s.getCompanyName()));
+        contact.setEmail(firstNonBlank(b == null ? null : b.getEmail(), s == null ? null : s.getEmail()));
+        contact.setPhone(firstNonBlank(b == null ? null : b.getPhone(), s == null ? null : s.getPhone()));
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return StringUtils.isNotBlank(first) ? first.trim() : StringUtils.trimToNull(second);
     }
 
     @PostMapping("/dashboard/offer/new")
@@ -103,18 +173,18 @@ public class OfferController {
                                          @RequestParam(required = false) String offerName,
                                          RedirectAttributes redirectAttributes,
                                          Locale locale) {
+        Optional<Basket> source = sourceOf(intent, sourceId);
         if (!contactDetails.isProperlyFilled()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("offers.contact.invalid", null, locale));
-            return "redirect:/dashboard/offer/new?intent=" + intent
-                    + (sourceId != null ? "&sourceId=" + sourceId : "");
+            return "redirect:" + UriComponentsBuilder.fromPath("/dashboard/offer/new")
+                    .queryParam("intent", intent)
+                    .queryParamIfPresent("sourceId", Optional.ofNullable(sourceId))
+                    .encode().build().toUriString();
         }
 
-        Basket basket = switch (intent) {
-            case "manual" -> offerBuilder().build();
-            case "copy", "template" -> copyOf(sourceId);
-            default -> throw new IllegalArgumentException("Unknown intent: " + intent);
-        };
+        Basket basket = source.map(s -> s.deepCopy(" - Copy", BasketType.Offer))
+                .orElseGet(() -> offerBuilder().build());
         basket.setName(offerName);
         basket.setContactDetails(contactDetails);
         basket.setGclid(gclid);
@@ -252,7 +322,7 @@ public class OfferController {
     }
 
     /** Back to the list the delete came from, never to another address (no open redirect, no header injection). */
-    static String safeReturnTo(String returnTo) {
+    public static String safeReturnTo(String returnTo) {
         if (returnTo == null || returnTo.contains("\r") || returnTo.contains("\n")
                 // RedirectView expands {…} as URI templates, which would fail after the delete already happened
                 || returnTo.contains("{") || returnTo.contains("}")) {
@@ -339,35 +409,6 @@ public class OfferController {
         return "redirect:/dashboard/offer/" + offerId;
     }
 
-@GetMapping("/dashboard/basket/view/{basketId}")
-    public String viewBasket(@PathVariable String basketId, Model model) {
-        Optional<Basket> existingBasketOpt = basketsRepository.findById(getStoreId(), basketId);
-        if (!existingBasketOpt.isPresent()) {
-            model.addAttribute("error", "Basket not found");
-            return "error";
-        }
-        Basket basket = existingBasketOpt.get();
-
-        List<BasketItem> basketItems = basket.getBasketItems();
-        double totalPrice = basketItems.stream()
-                .mapToDouble(BasketItem::getTotalPrice)
-                .sum();
-        double totalCost = basketItems.stream()
-                .mapToDouble(BasketItem::getTotalCost)
-                .sum();
-        double totalProfitGross = totalPrice - totalCost;
-        double totalProfitNet = totalProfitGross / DEFAULT_VAT_RATE;
-
-        model.addAttribute("basket", basket);
-        model.addAttribute("basketItems", basketItems);
-        model.addAttribute("totalPrice", totalPrice);
-        model.addAttribute("totalCost", totalCost);
-        model.addAttribute("totalProfitGross", Math.round(totalProfitGross * 100.0) / 100.0);
-        model.addAttribute("totalProfitNet", Math.round(totalProfitNet * 100.0) / 100.0);
-
-        return "basketView";
-    }
-
     @PostMapping("/dashboard/offer/new/csv")
     public String createOfferFromImport(@ModelAttribute OfferCreationDto dto,
                                         RedirectAttributes redirectAttributes,
@@ -409,11 +450,6 @@ public class OfferController {
     public OfferImporter getImporter(String type) {
         return offerImporters.stream().filter(i -> i.getType().equals(type)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown order reference type: " + type));
-    }
-
-    private Basket copyOf(String basketId) {
-        Basket sourceBasket = basketsRepository.findById(getStoreId(), basketId).get();
-        return sourceBasket.deepCopy(" - Copy", BasketType.Offer);
     }
 
     private Basket save(Basket basket) {

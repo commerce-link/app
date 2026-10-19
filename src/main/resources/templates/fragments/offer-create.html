@@ -1,0 +1,111 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Parts shared by the two "new offer" pages (offerContact.html, newOffer_from_csv.html). */-->
+
+<!--/* The refusal the controller sends back as the errorMessage flash (missing contact details, unreadable CSV). The pages
+       decorate the layout with ownsErrorMessage=true, so the frame does not show it a second time as a Bulma banner. */-->
+<div th:fragment="serverError" th:if="${errorMessage != null}" id="offer-new-server-error" class="cl-alert is-bad"
+     tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-text" th:text="${errorMessage}"></p>
+</div>
+
+<!--/* The customer the offer is for. prefix is '' when the form object is ContactDetails itself and 'contactDetails.' when
+       it is OfferCreationDto, so both pages post the same fields the controller binds today. The rule "a name or a company,
+       and an e-mail or a phone" is ContactDetails.isProperlyFilled; the browser checks it first (form-check.js) because a
+       refused POST comes back as a redirect that empties the form. Autofill is off: these are the customer's details,
+       not the signed-in user's. */-->
+<fieldset th:fragment="contact(prefix, contact)" class="cl-fieldset">
+    <legend class="cl-fieldset-title" th:text="#{offers.new.contact}"></legend>
+    <p class="cl-help" id="offer-contact-rule" th:text="#{offers.new.contact.rule}" data-cl-any-of-note></p>
+    <p class="cl-field-error" id="offer-contact-identity-error" hidden data-cl-any-of="contact-name contact-company">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{offers.new.contact.identity.missing}"></span>
+    </p>
+    <p class="cl-field-error" id="offer-contact-channel-error" hidden data-cl-any-of="contact-email contact-phone">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{offers.new.contact.channel.missing}"></span>
+    </p>
+    <div class="cl-form-grid">
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" for="contact-name"><span th:text="#{offers.contact.name}"></span></label>
+                <input class="cl-input" id="contact-name" type="text" autocomplete="off"
+                       th:name="${prefix + 'name'}" th:value="${contact?.name}"
+                       aria-describedby="offer-contact-rule offer-contact-identity-error">
+            </div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" for="contact-surname">
+                    <span th:text="#{offers.contact.surname}"></span>
+                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                </label>
+                <input class="cl-input" id="contact-surname" type="text" autocomplete="off"
+                       th:name="${prefix + 'surname'}" th:value="${contact?.surname}">
+            </div>
+        </div>
+        <div class="cl-span-6">
+            <div class="cl-field">
+                <label class="cl-label" for="contact-company"><span th:text="#{offers.contact.company}"></span></label>
+                <input class="cl-input" id="contact-company" type="text" autocomplete="off"
+                       th:name="${prefix + 'companyName'}" th:value="${contact?.companyName}"
+                       aria-describedby="offer-contact-rule offer-contact-identity-error">
+            </div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" for="contact-email"><span th:text="#{offers.new.contact.email}"></span></label>
+                <input class="cl-input" id="contact-email" type="email" inputmode="email" autocomplete="off"
+                       th:name="${prefix + 'email'}" th:value="${contact?.email}"
+                       th:attr="data-cl-type-message=#{offers.new.contact.email.invalid}"
+                       aria-describedby="offer-contact-rule offer-contact-channel-error">
+            </div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" for="contact-phone"><span th:text="#{offers.contact.phone}"></span></label>
+                <input class="cl-input" id="contact-phone" type="tel" inputmode="tel" autocomplete="off"
+                       th:name="${prefix + 'phone'}" th:value="${contact?.phone}"
+                       aria-describedby="offer-contact-rule offer-contact-channel-error">
+            </div>
+        </div>
+    </div>
+</fieldset>
+
+<!--/* The offer name, required as before: the controller stores whatever comes, so the browser is the only check. */-->
+<div th:fragment="offerName(value, autofocus)" class="cl-field">
+    <label class="cl-label" for="offerName"><span th:text="#{offers.new.name}"></span></label>
+    <input class="cl-input" id="offerName" name="offerName" type="text" autocomplete="off" required
+           th:value="${value}" th:autofocus="${autofocus}"
+           th:attr="data-cl-required-message=#{offers.new.name.required}">
+</div>
+
+<!--/* Rarely used, the same place on both pages: folded at the bottom of the card, open when it carries a value. */-->
+<details th:fragment="gclid(value)" class="cl-disclosure cl-card-extras" id="offer-new-extras"
+         th:open="${value != null and !#strings.isEmpty(value)}">
+    <summary th:text="#{offers.new.extras}"></summary>
+    <div class="cl-disclosure-body">
+        <div class="cl-form-grid">
+            <div class="cl-field">
+                <label class="cl-label" for="gclid">
+                    <span th:text="#{offers.new.gclid}"></span>
+                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                </label>
+                <input class="cl-input" id="gclid" name="gclid" type="text" autocomplete="off" th:value="${value}"
+                       aria-describedby="gclid-help">
+                <p class="cl-help" id="gclid-help" th:text="#{offers.new.gclid.help}"></p>
+            </div>
+        </div>
+    </div>
+</details>
+
+<div th:fragment="footer(cancelHref)" class="cl-card-footer">
+    <button class="cl-button is-primary" type="submit" th:text="#{offers.new.submit}"></button>
+    <a class="cl-button" th:href="@{${cancelHref}}" th:text="#{general.cancel}"></a>
+</div>
+
+</body>
+</html>

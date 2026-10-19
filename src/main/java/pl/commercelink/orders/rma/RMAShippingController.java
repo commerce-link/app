@@ -87,9 +87,10 @@ public class RMAShippingController extends AbstractShippingController {
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        // the address page names each missing field; the item selection is lost, its notice says to select again
         if (rma.getShippingDetails() == null || !rma.getShippingDetails().isProperlyFilled()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.missing.shipping.details", null, locale));
-            return "redirect:/dashboard/rma/" + rma.getRmaId();
+            redirectAttributes.addFlashAttribute(RMAController.ADDRESS_INCOMPLETE_FLASH, true);
+            return "redirect:/dashboard/rma/" + rma.getRmaId() + "/shipping";
         }
 
         ShippingForm shippingForm = new ShippingForm(rma.getRmaId(), "rma");

@@ -42,6 +42,8 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -5648,6 +5650,82 @@ class OrdersControllerTest {
             assertThat(item.getName()).isEqualTo("Ryzen 9");
             assertThat(item.getQty()).isEqualTo(2);
             assertThat(item.getTax()).isEqualTo(1.08);
+        }
+
+        private Order rmaReplacement() {
+            Order order = order(OrderStatus.New);
+            order.setSource(new OrderSource("RMA", OrderSourceType.Other));
+            return order;
+        }
+
+        @Test
+        void anRmaReplacementOrderSavesAChangedNameQuantityAndVatRateThoughItCountsAsInvoiced() {
+            // given
+            Order order = rmaReplacement();
+            OrderItem item = storedNewItem(order);
+            OrderItem posted = postedUnchanged(item);
+            posted.setName("Ryzen 9");
+            posted.setQty(2);
+            posted.setTax(1.08);
+            posted.setConsolidated(true);
+            ExtendedModelMap pageModel = new ExtendedModelMap();
+
+            // when
+            ordersController.getOrderItem(ORDER_ID, "i1", pageModel);
+            String view = ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, new ExtendedModelMap());
+
+            // then
+            assertThat(order.isInvoiced()).isTrue();
+            assertThat(pageModel.getAttribute("saleLock")).isNull();
+            assertThat(pageModel.getAttribute("consolidationLocked")).isEqualTo(false);
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getName()).isEqualTo("Ryzen 9");
+            assertThat(item.getQty()).isEqualTo(2);
+            assertThat(item.getTax()).isEqualTo(1.08);
+            assertThat(item.isConsolidated()).isTrue();
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void itemsOfAnRmaReplacementOrderAreRemovedAndMergedOnInvoice() {
+            // given
+            OrderItem item = storedNewItem(rmaReplacement());
+            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a")))
+                    .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 1, 1));
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+
+            // then
+            assertThat(flash(remove)).doesNotContainKey("errorMessage");
+            assertThat(flash(consolidate)).doesNotContainKey("errorMessage");
+            verify(ordersManager).removeFromOrder(STORE_ID, ORDER_ID, List.of("a"));
+            assertThat(item.isConsolidated()).isTrue();
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void itemsOfAClosedRmaReplacementOrderAreNeitherRemovedNorMergedEvenFromAStalePage() {
+            // given
+            Order order = rmaReplacement();
+            order.setStatus(OrderStatus.Completed);
+            OrderItem item = storedNewItem(order);
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("i1"), remove, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+
+            // then
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.item.error.closed");
+            assertThat(flash(consolidate)).containsEntry("errorMessage", "order.item.error.closed");
+            assertThat(item.isConsolidated()).isFalse();
+            verifyNoInteractions(ordersManager);
+            verify(orderItemsRepository, never()).save(any());
         }
 
         @Test

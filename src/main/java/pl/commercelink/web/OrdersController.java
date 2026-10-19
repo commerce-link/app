@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,7 +65,6 @@ import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
-import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -77,6 +77,7 @@ import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.orders.BulkAction;
@@ -86,6 +87,8 @@ import pl.commercelink.web.orders.CustomerView;
 import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.MoveTargetView;
+import pl.commercelink.web.orders.NewOrderForm;
+import pl.commercelink.web.orders.NewOrderPage;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
@@ -532,43 +535,62 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/new/from-basket")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model) {
-        Optional<Basket> basketOpt = basketsRepository.findById(getStoreId(), basketId);
-        if (!basketOpt.isPresent()) {
-            model.addAttribute("error", "Basket not found");
-            return "error";
-        }
-
-        Basket basket = basketOpt.get();
-        BillingDetails billingDetails = Optional.ofNullable(basket.getBillingDetails())
-                .orElseGet(BillingDetails::_default);
-        ShippingDetails shippingDetails = Optional.ofNullable(basket.getShippingDetails())
-                .orElseGet(ShippingDetails::_default);
-
+    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model, Locale locale) {
+        Basket basket = basketsRepository.findById(getStoreId(), basketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Store store = storesRepository.findById(getStoreId());
-        ShipmentType shipmentType = basket.resolveDeliveryOption(store)
-                .map(DeliveryOption::getType)
-                .orElse(ShipmentType.Courier);
-
-        ClientDataDto form = new ClientDataDto();
-        form.setOrderReference(basketId);
-        form.setShipmentType(shipmentType);
-        form.setBillingDetails(billingDetails);
-        form.setShippingDetails(shippingDetails);
-
-        model.addAttribute("form", form);
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("orderSourceTypes", OrderSourceType.values());
-        model.addAttribute("paymentSources", PaymentSource.values());
-
-        return "newOrder_clientDataCollection";
+        NewOrderPage page = NewOrderPage.of(basket, store);
+        // initialForm hands over the basket's own address objects; the basket is never saved here.
+        NewOrderForm form = NewOrderForm.of(NewOrderPage.initialForm(basket, store), NewOrderPage.initialShippingAddress(basket));
+        return newOrderPage(page, form, Map.of(), model, locale);
     }
 
+    /**
+     * The binding result keeps a tampered choice (shipmentType=xyz) from ending in 400: the field stays empty and the
+     * page asks for it like for a missing one. Address fields are plain strings and are checked by {@link NewOrderForm}.
+     */
     @PostMapping("/dashboard/orders/new/fulfilment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrder(@ModelAttribute ClientDataDto dto) {
-        Order order = basketOrderImporter._import(getStoreId(), dto);
+    public String submitOrder(@ModelAttribute("form") ClientDataDto dto, BindingResult bindingResult,
+                              @RequestParam(value = "shippingAddress", required = false) String shippingAddress,
+                              Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<Basket> basket = StringUtils.isBlank(dto.getOrderReference())
+                ? Optional.empty()
+                : basketsRepository.findById(getStoreId(), dto.getOrderReference());
+        // A second submit or a page restored with Back: the first one already turned the basket into an order.
+        if (basket.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.new.basket.gone", null, locale));
+            return "redirect:/dashboard/orders";
+        }
+        Store store = storesRepository.findById(getStoreId());
+        NewOrderPage page = NewOrderPage.of(basket.get(), store);
+        NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
+        Map<String, String> errors = new LinkedHashMap<>();
+        // The importer would fail on the missing option; the page answers with its notice instead of an error page.
+        if (page.deliveryUnknown()) {
+            errors.put(NewOrderPage.DELIVERY_FIELD, "order.new.delivery.unknown");
+        }
+        errors.putAll(form.validate());
+        if (!errors.isEmpty()) {
+            NewOrderForm shown = dto.getShippingDetails() == null ? form.withShippingOf(basket.get()) : form;
+            return newOrderPage(page, shown, errors, model, locale);
+        }
+        Order order = basketOrderImporter._import(getStoreId(), form.toImport(basket.get()));
         return "redirect:/dashboard/orders/" + order.getOrderId();
+    }
+
+    private String newOrderPage(NewOrderPage page, NewOrderForm form, Map<String, String> errors, Model model, Locale locale) {
+        model.addAttribute("page", page);
+        model.addAttribute("form", form.dto());
+        model.addAttribute("shippingAddress", form.shippingAddress());
+        model.addAttribute("billing", form.billing().withErrors(errors));
+        model.addAttribute("shipping", form.shipping().withErrors(errors));
+        model.addAttribute("errors", errors);
+        model.addAttribute("paymentOptions", Arrays.stream(PaymentSource.values())
+                .map(source -> new PickerOption(source.name(),
+                        messageSource.getMessage("PaymentSource." + source.name(), null, source.name(), locale)))
+                .toList());
+        return "newOrder_clientDataCollection";
     }
 
     @PostMapping("/dashboard/orders/new/pos")
@@ -1084,7 +1106,7 @@ public class OrdersController extends BaseController {
             }
             // Same lock as the item menu's toggle: the flag is only read when the closing invoice is issued, so after
             // that a change would silently not apply; the page shows the box disabled and the stored value stays.
-            if (order.isInvoiced() || receiptLock.locks()) {
+            if (order.hasClosingDocument() || receiptLock.locks()) {
                 updatedItem.setConsolidated(orderItem.isConsolidated());
             }
             orderItem.update(updatedItem);
@@ -1298,8 +1320,12 @@ public class OrdersController extends BaseController {
     public String toggleConsolidation(@PathVariable String orderId, @RequestParam String itemId,
                                       RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order has no item menu; a stale page or a hand-made request must not change it either
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // The flag is only read when the closing invoice is issued; after that a change would silently not apply.
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.item.consolidation.locked", locale);
         }
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
@@ -1322,7 +1348,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
         boolean priceLocked = !order.getDocuments().isEmpty() || receiptLock.locks();
-        boolean consolidationLocked = order.isInvoiced() || receiptLock.locks();
+        boolean consolidationLocked = order.hasClosingDocument() || receiptLock.locks();
         // name, quantity and VAT rate are read-only with the reason; saveOrderItem refuses a post that changes them
         ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
         model.addAttribute("saleLock", saleLock);
@@ -1332,7 +1358,7 @@ public class OrdersController extends BaseController {
                 : saleLock != null ? saleLock.priceKey() : "order.item.form.price.locked");
         model.addAttribute("consolidationLocked", consolidationLocked);
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
-                : order.isInvoiced() ? "order.item.consolidation.locked"
+                : order.hasClosingDocument() ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
         // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
         model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
@@ -1418,9 +1444,14 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String removeSelectedItemsFromOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
                                                RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order selects no items; removeFromOrder itself would still delete its services
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // the page leaves "Usuń" out of an invoiced order (its invoice or receipt lists the items); a stale page or a
         // hand-made request must not get past that either
-        if (requireOrder(ordersRepository, getStoreId(), orderId).isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.items.remove.locked.invoiced", locale);
         }
         String locked = receiptLockedKey(orderId);
