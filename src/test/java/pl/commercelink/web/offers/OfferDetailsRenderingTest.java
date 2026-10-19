@@ -414,7 +414,11 @@ class OfferDetailsRenderingTest {
         assertThat(html).contains("action=\"/dashboard/offer/" + ID + "/items/1\"").contains("Edytuj pozycję")
                 .contains("value=\"Stacja dokująca\"").contains("<option value=\"Spoza katalogu\" selected")
                 .contains("Podaj kod producenta.").contains("Zapisz pozycję").contains("Rynek: 611,00 PLN → 642,00 PLN")
-                .contains("href=\"/dashboard/offer/" + ID + "\"");
+                .contains("href=\"/dashboard/offer/" + ID + "\"")
+                .containsPattern("<input class=\"cl-input is-money\"[^>]*id=\"offer-item-cost\"[^>]*required");
+        // the dialog counts a cleared cost as 0, as the table does
+        assertThat(html(fullOffer())).containsPattern("id=\"item-edit-cost\"")
+                .doesNotContainPattern("<input[^>]*id=\"item-edit-cost\"[^>]*required");
     }
 
     @Test

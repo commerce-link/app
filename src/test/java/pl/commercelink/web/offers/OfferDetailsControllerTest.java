@@ -11,10 +11,12 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.MutablePropertyValues;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
@@ -439,6 +441,33 @@ class OfferDetailsControllerTest {
         assertThat(items.get(0).getName()).isEqualTo("name");
         assertThat(items.get(0).getUnitCost()).isEqualTo(0);
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+    }
+
+    @Test
+    void itemEditWithClearedCostSavesZeroInsteadOfRefusingTheForm() {
+        // given: the page posts "" for a cleared cost; a primitive double made the binding fail with a 400
+        Basket stored = fullOffer(BasketType.Offer);
+        BasketItem costed = item("MFN-A", 1);
+        costed.setUnitCost(80.0);
+        stored.setBasketItems(List.of(costed));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        OfferItemForm form = new OfferItemForm();
+        WebDataBinder binder = new WebDataBinder(form, "form");
+        MutablePropertyValues posted = new MutablePropertyValues();
+        posted.add("name", "Laptop");
+        posted.add("mfn", "MFN-A");
+        posted.add("unitCost", "");
+
+        // when
+        binder.bind(posted);
+        String view = controller.saveItem(OFFER_ID, 0, form, null, new ExtendedModelMap(), LOCALE,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertThat(binder.getBindingResult().hasErrors()).isFalse();
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+        assertThat(savedBasket().getBasketItems()).singleElement()
+                .satisfies(i -> assertThat(i.getUnitCost()).isZero());
     }
 
     @Test

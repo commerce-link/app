@@ -16,8 +16,13 @@ public class OfferItemForm {
     private String name;
     private String category;
     private String mfn;
-    private double unitCost;
+    private Double unitCost = 0.0;
     private boolean consolidated;
+
+    /** A cleared cost posts "", which a primitive would refuse with a 400; the table counts it as 0 as well. */
+    public void setUnitCost(Double unitCost) {
+        this.unitCost = unitCost == null ? 0.0 : unitCost;
+    }
 
     public static OfferItemForm from(BasketItem item) {
         OfferItemForm form = new OfferItemForm();
