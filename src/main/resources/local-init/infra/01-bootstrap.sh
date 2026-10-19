@@ -98,6 +98,11 @@ awslocal sqs create-queue --queue-name shipment-tracking-poll-queue \
 # When PIM is up locally, App fetches its index from there. When PIM is down,
 # PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
 # scopeKey must equal PIM pim.index.scope-all-key (localdev: local-scope-key); the adapter sends it as x-pim-scope-key.
+# create-secret fails on an existing secret, so a persistent LocalStack volume keeps an older commercelink-pim
+# secret without scopeKey: PIM localdev then answers 403 (logged by the adapter) and the app runs with an empty
+# PIM catalog. Reseed (drop the volume) or update the secret in place:
+#   awslocal secretsmanager update-secret --secret-id commercelink-pim \
+#     --secret-string '{"apiDomain":"http://localhost:8081","apiKey":"","scopeKey":"local-scope-key"}'
 awslocal secretsmanager create-secret \
   --name commercelink-pim \
   --secret-string '{"apiDomain":"http://localhost:8081","apiKey":"","scopeKey":"local-scope-key"}'

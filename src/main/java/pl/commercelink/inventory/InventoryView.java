@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,14 +17,16 @@ public class InventoryView {
 
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
+    private final Predicate<String> isStoreEntry;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
-    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
+    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex, Predicate<String> isStoreEntry,
                   TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
+        this.isStoreEntry = isStoreEntry;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
@@ -66,7 +69,7 @@ public class InventoryView {
     }
 
     private Stream<InventoryKey> listedKeys() {
-        return new ListingInventory(globalIndex, ownIndex).keys();
+        return new ListingInventory(globalIndex, ownIndex, isStoreEntry).keys();
     }
 
     private MatchedInventory assemble(InventoryKey lookupKey) {

@@ -17,7 +17,8 @@ final class InventoryStatisticsCalculator {
     private InventoryStatisticsCalculator() {
     }
 
-    static InventoryStatistics calculate(InventoryIndex globalIndex, Predicate<String> enabledGlobalSupplier, InventoryIndex ownIndex) {
+    static InventoryStatistics calculate(InventoryIndex globalIndex, Predicate<String> enabledGlobalSupplier, InventoryIndex ownIndex,
+                                         Predicate<String> isStoreEntry) {
         Tally tally = new Tally();
         boolean hasOwn = !ownIndex.all().isEmpty();
         // an own group's key unions the eans/mfns of all its items, so it can match several global groups;
@@ -32,7 +33,7 @@ final class InventoryStatisticsCalculator {
             }
             if (hasOwn) {
                 for (MatchedInventory own : ownIndex.findMatching(group.getInventoryKey())) {
-                    if (sharesPimEntry(group, own) && claimedOwnGroups.add(own)) {
+                    if (sharesPimEntry(group, own, isStoreEntry) && claimedOwnGroups.add(own)) {
                         items.addAll(own.getInventoryItems());
                     }
                 }
@@ -40,17 +41,18 @@ final class InventoryStatisticsCalculator {
             tally.add(items);
         }
         for (MatchedInventory own : ownIndex.all()) {
-            if (!globalIndex.covers(own.getInventoryKey())) {
+            if (!globalIndex.covers(own.getInventoryKey(), isStoreEntry)) {
                 tally.add(own.getInventoryItems());
             }
         }
         return tally.toStatistics();
     }
 
-    // An own group with a PIM id belongs only to the global group of that same entry (see InventoryIndex.covers).
-    private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own) {
-        String ownId = own.getInventoryKey().getId();
-        return ownId == null || ownId.equals(global.getInventoryKey().getId());
+    // An own group of a store entry belongs only to the global group of that same entry (see InventoryIndex.covers);
+    // any other own group joins the global group it matches by id, EAN or code.
+    private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own, Predicate<String> isStoreEntry) {
+        InventoryKey ownKey = own.getInventoryKey();
+        return !InventoryIndex.isStoreEntryKey(ownKey, isStoreEntry) || ownKey.getId().equals(global.getInventoryKey().getId());
     }
 
     private static final class Tally {

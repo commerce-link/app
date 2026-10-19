@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -38,6 +39,7 @@ public class Inventory {
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
+    private final PimCatalog pimCatalog;
 
     // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
     // held inventory; drives the scheduler's "is there a newer feed to load?" check.
@@ -85,13 +87,13 @@ public class Inventory {
 
     public InventoryView withGlobalData() {
         InventoryIndex globalIndex = globalInventory.index();
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), this::isStoreEntry, taxonomyCache, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
         InventoryIndex globalIndex = InventoryIndex.of(List.of());
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), this::isStoreEntry, taxonomyCache, supplierRegistry,
                 new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
@@ -133,7 +135,7 @@ public class Inventory {
                                InventorySource global, InventorySource own, InventorySource... additionalSources) {
         InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
                 .toArray(InventorySource[]::new);
-        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry, sources);
+        return new InventoryView(globalIndex, ownIndex, this::isStoreEntry, taxonomyCache, supplierRegistry, sources);
     }
 
     private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {
@@ -164,8 +166,13 @@ public class Inventory {
         // ownInventory() decodes the whole Redis-cached own feed, so it must run only on a cache miss
         return statisticsCache.get(key, k -> {
             StoreInventory own = storeInventoryProvider.ownInventory(store);
-            return InventoryStatisticsCalculator.calculate(globalInventory.index(), enabledGlobal::contains, own.index());
+            return InventoryStatisticsCalculator.calculate(globalInventory.index(), enabledGlobal::contains, own.index(), this::isStoreEntry);
         });
+    }
+
+    // The global catalog holds global entries only, so a PIM id it does not know belongs to a store entry (spec 4.3).
+    private boolean isStoreEntry(String pimId) {
+        return pimCatalog.findByPimId(pimId).isEmpty();
     }
 
     static List<String> ownConnectionFingerprint(Store store) {
