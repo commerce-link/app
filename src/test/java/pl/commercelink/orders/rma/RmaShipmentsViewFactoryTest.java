@@ -514,8 +514,8 @@ class RmaShipmentsViewFactoryTest {
         assertThat(first.index()).isZero();
         assertThat(first.dialogId()).isEqualTo("shipment-dialog-1");
         assertThat(first.typeKey()).isEqualTo("ShipmentType.Courier");
-        assertThat(first.shippedAt()).isEqualTo("13.10.2026");
-        assertThat(first.deliveredAt()).isEqualTo("14.10.2026");
+        assertThat(first.shippedAt()).isEqualTo("13.10.2026 08:31");
+        assertThat(first.deliveredAt()).isEqualTo("14.10.2026 09:55");
         assertThat(first.editable()).isTrue();
         assertThat(open.rows().get(1).number()).isEqualTo(2);
         assertThat(open.rows().get(1).shippedAt()).isNull();

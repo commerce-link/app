@@ -24,7 +24,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RmaShipmentsViewFactory {
 
-    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     private final ShippingService shippingService;
     private final StoresRepository storesRepository;
