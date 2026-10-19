@@ -13916,6 +13916,7 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(td.cl-cell-qty, td.cl-cell-price)::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 12.5px; color: var(--cl-ink-2); }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-value { justify-items: start; padding-top: 0; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-hint { margin-left: 0; text-align: left; }
+    .cl-page.cl-offer-page .cl-visibility { white-space: normal; }
     /* two fields side by side on a 320 px screen: a narrower inset keeps "99 999,00" inside the field */
     .cl-page .cl-table.is-wrap.is-line-editor :is(.cl-input.is-qty, .cl-input.is-money) { padding-left: 6px; padding-right: 6px; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 10px; padding: 12px 16px; }

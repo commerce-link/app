@@ -53,4 +53,13 @@ class OfferDetailsStylesContractTest {
                 .contains("tr.is-variant { box-shadow: inset 3px 0 0 var(--cl-accent); }")
                 .contains(":is(.cl-input.is-qty, .cl-input.is-money) { padding-left: 6px; padding-right: 6px; }");
     }
+
+    @Test
+    void visibilitySentenceWrapsOnAPhone() throws Exception {
+        // when
+        String phone = block().substring(block().indexOf("@media screen and (max-width: 719px)"));
+
+        // then — kept on one line from 720 px, at 320 px the sentence is wider than the card
+        assertThat(phone).contains(".cl-visibility { white-space: normal; }");
+    }
 }
