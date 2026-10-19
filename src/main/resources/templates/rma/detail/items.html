@@ -23,7 +23,7 @@
     </div>
 
     <!--/* the form's own action is the read-only serial check: a submit that escaped every guard changes nothing */-->
-    <form th:if="${items.selectable()}" id="rmaItemsForm" class="cl-card-section cl-selection-host" method="post" novalidate
+    <form th:if="${items.selectable()}" id="rmaItemsForm" class="cl-card-section cl-selection-host is-rma-detail" method="post" novalidate
           th:action="@{/dashboard/rma/{id}/checkSerialNumbers(id=${page.rmaId()})}"
           th:attr="data-rma-id=${page.rmaId()},
                    data-qty-template=#{rma.detail.dialog.qty('{n}')},

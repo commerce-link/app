@@ -13893,6 +13893,20 @@ a.cl-link-button:hover {
         align-items: start;
     }
 }
+/* the selection row: with every group of actions shown (a new and a received item checked) the actions are wider than
+   the items card in Polish at 720-800 px and 1366-1440 px and in English at 720 and 1366-1400 px, so from 720 px they
+   wrap onto a second line inside the row instead of running past the card ("Usuń" and "Wyczyść" then stand at the end of
+   the second line). The row grows by that line and pushes the table down by the difference; it still covers the header.
+   Below 720 px the row already wraps (and is docked to the bottom edge). */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row {
+        padding-top: 5px;
+        padding-bottom: 5px;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-actions {
+        flex-wrap: wrap;
+    }
+}
 /* End of RMA details page */
 
 /* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
