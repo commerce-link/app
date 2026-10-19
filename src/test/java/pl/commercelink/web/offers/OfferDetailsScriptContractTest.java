@@ -110,12 +110,13 @@ class OfferDetailsScriptContractTest {
         String js = read("static/js/offer-details.js");
         String css = read("static/css/commercelink.css");
 
-        // then — shown while the summary's button is out of view, kept in the flow, CSS alone below 1366 px without JS
+        // then — shown once the summary's button leaves the screen, hidden (not rendered) once it is clear of the edges, CSS alone below 1366 px without JS
         assertThat(js).contains("new IntersectionObserver(").contains("'#summary [data-cl-save-items]'")
-                .contains("'data-cl-peek-state'").contains("'hidden' : 'shown'").contains("--cl-topbar-height");
-        assertThat(css).contains(".cl-summary-peek.is-action[data-cl-peek-state] { display: flex;")
-                .contains(".cl-summary-peek.is-action[data-cl-peek-state=\"hidden\"] { visibility: hidden; opacity: 0; }")
-                .contains("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }")
-                .containsPattern("prefers-reduced-motion: reduce\\) \\{\\s*\\.cl-page \\.cl-summary-peek\\.is-action\\[data-cl-peek-state\\] \\{ transition: none; \\}");
+                .contains("'data-cl-peek-state'").contains("set('shown');").contains("--cl-topbar-height");
+        assertThat(js).contains("set('hidden');").contains("var BAND = 100;")
+                .contains("rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px'");
+        assertThat(css).contains(".cl-summary-peek.is-action[data-cl-peek-state=\"shown\"] { display: flex; }")
+                .contains(".cl-summary-peek.is-action[data-cl-peek-state=\"hidden\"] { display: none; }")
+                .contains("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }");
     }
 }

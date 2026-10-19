@@ -345,10 +345,24 @@
         }
         // the sticky top bar covers the top of the viewport
         var topbar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cl-topbar-height'), 10) || 0;
-        peek.setAttribute('data-cl-peek-state', 'shown');
+        // Showing or hiding the peek changes the main column's height by its box and the gap, which moves the summary
+        // (below the table, or the sticky side column whose run ends with the form) by as much. So it shows once the
+        // button leaves the screen, but hides only once the button is clear of the edges by more than that, or the two
+        // would trade places on every frame near the end of the table.
+        var BAND = 100;
+        function set(state) {
+            peek.setAttribute('data-cl-peek-state', state);
+        }
+        set('hidden');
         new IntersectionObserver(function (entries) {
-            var entry = entries[entries.length - 1];
-            peek.setAttribute('data-cl-peek-state', entry.intersectionRatio >= 0.99 ? 'hidden' : 'shown');
+            if (entries[entries.length - 1].intersectionRatio < 0.99) {
+                set('shown');
+            }
         }, { rootMargin: '-' + topbar + 'px 0px 0px 0px', threshold: [0, 0.99] }).observe(summarySave);
+        new IntersectionObserver(function (entries) {
+            if (entries[entries.length - 1].intersectionRatio >= 0.99) {
+                set('hidden');
+            }
+        }, { rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px', threshold: [0, 0.99] }).observe(summarySave);
     })();
 })();

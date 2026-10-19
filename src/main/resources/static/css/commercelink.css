@@ -13898,15 +13898,13 @@ a.cl-link-button:hover {
     html:has(.cl-summary-peek.is-action) { scroll-padding-bottom: 80px; }
 }
 /* With the page script the peek follows the summary's own save button at any width (offer-details.js sets
-   data-cl-peek-state): shown while that button is out of view, so "Zapisz pozycje" is always in sight, also past the end
-   of a sticky side column at 1366 px and wider. It keeps its place in the flow (visibility, not display), so showing it
-   moves nothing. Without the script it stays as above: shown below 1366 px only. */
-.cl-page .cl-summary-peek.is-action[data-cl-peek-state] { display: flex; transition: opacity 0.15s, visibility 0.15s; }
-.cl-page .cl-summary-peek.is-action[data-cl-peek-state="hidden"] { visibility: hidden; opacity: 0; }
+   data-cl-peek-state): shown once that button leaves the screen, so "Zapisz pozycje" is always in sight, also past the end
+   of a sticky side column at 1366 px and wider. Hidden it is not rendered, so the card stack keeps its usual 16 px gap;
+   it is sticky at the bottom of the screen, so the room it takes when shown opens below what is in view. Without the
+   script it stays as above: shown below 1366 px only. It appears without a transition, so there is no motion to reduce. */
+.cl-page .cl-summary-peek.is-action[data-cl-peek-state="shown"] { display: flex; }
+.cl-page .cl-summary-peek.is-action[data-cl-peek-state="hidden"] { display: none; }
 html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-padding-bottom: 80px; }
-@media (prefers-reduced-motion: reduce) {
-    .cl-page .cl-summary-peek.is-action[data-cl-peek-state] { transition: none; }
-}
 @media screen and (max-width: 1023px) {
     .cl-page .cl-table.is-line-editor :is(.cl-drag, .cl-table-edit) { width: 44px; height: 44px; }
     .cl-page .cl-table.is-line-editor .cl-table-edit { margin: -8px -8px -8px 0; }
