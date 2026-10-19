@@ -314,6 +314,20 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void blankEmailAndPhoneLeaveNoEmptyLinks() {
+        // given
+        Customer blanks = new Customer("Marta", "", "", "", "", true, null, null, false);
+        OfferDetailsPage page = offer(List.of(laptop(0)), summary(false), blanks, false);
+
+        // when
+        String html = render("<section th:replace=\"~{offers/details/side :: client(${page})}\"></section>", model(page));
+
+        // then
+        assertThat(html).contains("<strong>Marta</strong>").doesNotContain("mailto:").doesNotContain("tel:")
+                .doesNotContain("Brak danych kontaktowych klienta");
+    }
+
+    @Test
     void lastItemCannotBeRemovedAndOthersPostToRemoveItem() {
         // when
         String single = html(offer(List.of(laptop(0)), summary(false), customer(true, true), true));

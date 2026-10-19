@@ -61,8 +61,9 @@ public class OfferTermsForm {
         }
         if (!basket.hasType(BasketType.OfferTemplate)) {
             basket.setExpiresAt(expiresAt);
-            basket.setDeliveryOptionId(deliveryOptionId);
-            basket.setGclid(gclid);
+            // DynamoDB stores "" as null; the async refresh renders this object before any reload, so it has to match
+            basket.setDeliveryOptionId(StringUtils.defaultIfBlank(deliveryOptionId, null));
+            basket.setGclid(StringUtils.defaultIfBlank(gclid, null));
         }
     }
 }

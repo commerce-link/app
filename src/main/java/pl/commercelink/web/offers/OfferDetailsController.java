@@ -120,7 +120,7 @@ public class OfferDetailsController {
             return rejected(offer, "client", Map.of("contact", "offers.contact.invalid"), "offers/details :: clientForm",
                     SettingsPaths.isAsync(requestedWith), returnTo, model, locale, response, null, form, null);
         }
-        offer.setContactDetails(form);
+        offer.setContactDetails(withoutBlanks(form));
         save(offer);
         return saved(offer, "client", "offers/details :: clientForm", "offers.details.saved.client",
                 SettingsPaths.isAsync(requestedWith), returnTo, model, locale, redirectAttributes);
@@ -262,6 +262,16 @@ public class OfferDetailsController {
 
     private static ContactDetails contactOf(Basket offer) {
         return offer.getContactDetails() != null ? offer.getContactDetails() : new ContactDetails();
+    }
+
+    /** DynamoDB stores "" as null; the async refresh renders the record before any reload, so it has to match. */
+    private static ContactDetails withoutBlanks(ContactDetails form) {
+        form.setName(StringUtils.defaultIfBlank(form.getName(), null));
+        form.setSurname(StringUtils.defaultIfBlank(form.getSurname(), null));
+        form.setCompanyName(StringUtils.defaultIfBlank(form.getCompanyName(), null));
+        form.setEmail(StringUtils.defaultIfBlank(form.getEmail(), null));
+        form.setPhone(StringUtils.defaultIfBlank(form.getPhone(), null));
+        return form;
     }
 
     private static OfferNoteForm noteOf(Basket offer) {

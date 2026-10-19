@@ -313,6 +313,55 @@ class OfferDetailsControllerTest {
     }
 
     @Test
+    void asyncTermsSaveStoresBlankDeliveryAndGclidAsNone() {
+        // given: "— bez dostawy —" and an emptied GCLID post "", which the refreshed card would otherwise show as values
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(fullOffer(BasketType.Offer)));
+        OfferTermsForm form = new OfferTermsForm();
+        form.setName("Gaming PC");
+        form.setDeliveryOptionId("");
+        form.setGclid("  ");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.saveTerms(OFFER_ID, form, null, "fetch", model, LOCALE, new RedirectAttributesModelMap(),
+                new MockHttpServletResponse());
+
+        // then
+        Basket saved = savedBasket();
+        assertThat(saved.getDeliveryOptionId()).isNull();
+        assertThat(saved.getGclid()).isNull();
+        OfferTermsForm refreshed = (OfferTermsForm) model.getAttribute("termsForm");
+        assertThat(refreshed.getDeliveryOptionId()).isNull();
+        assertThat(refreshed.getGclid()).isNull();
+    }
+
+    @Test
+    void asyncClientSaveStoresBlankContactFieldsAsNone() {
+        // given
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(fullOffer(BasketType.Offer)));
+        ContactDetails contact = new ContactDetails();
+        contact.setName("Jan");
+        contact.setSurname("");
+        contact.setCompanyName(" ");
+        contact.setEmail("jan@test.local");
+        contact.setPhone("");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.saveClient(OFFER_ID, contact, null, "fetch", model, LOCALE, new RedirectAttributesModelMap(),
+                new MockHttpServletResponse());
+
+        // then
+        ContactDetails saved = savedBasket().getContactDetails();
+        assertThat(saved.getName()).isEqualTo("Jan");
+        assertThat(saved.getEmail()).isEqualTo("jan@test.local");
+        assertThat(saved.getSurname()).isNull();
+        assertThat(saved.getCompanyName()).isNull();
+        assertThat(saved.getPhone()).isNull();
+        assertThat(((ContactDetails) model.getAttribute("clientForm")).getPhone()).isNull();
+    }
+
+    @Test
     void noteSaveChangesOnlyTheComment() {
         // given
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(fullOffer(BasketType.Offer)));

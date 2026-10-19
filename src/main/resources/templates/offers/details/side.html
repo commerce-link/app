@@ -92,13 +92,13 @@
            th:text="#{offers.details.edit}"></a>
     </div>
     <div class="cl-address" th:with="person=${#strings.trim((c.name() ?: '') + ' ' + (c.surname() ?: ''))}">
-        <th:block th:unless="${#strings.isEmpty(person) and c.company() == null and c.email() == null and c.phone() == null}">
+        <th:block th:unless="${#strings.isEmpty(person) and #strings.isEmpty(c.company()) and #strings.isEmpty(c.email()) and #strings.isEmpty(c.phone())}">
             <th:block th:unless="${#strings.isEmpty(person)}"><strong th:text="${person}"></strong><br></th:block>
-            <th:block th:if="${c.company() != null}"><span th:text="${c.company()}"></span><br></th:block>
-            <div th:if="${c.email() != null}"><a th:href="'mailto:' + ${c.email()}" th:text="${c.email()}"></a></div>
-            <div th:if="${c.phone() != null}"><a th:href="'tel:' + ${c.phone()}" th:text="${c.phone()}"></a></div>
+            <th:block th:unless="${#strings.isEmpty(c.company())}"><span th:text="${c.company()}"></span><br></th:block>
+            <div th:unless="${#strings.isEmpty(c.email())}"><a th:href="'mailto:' + ${c.email()}" th:text="${c.email()}"></a></div>
+            <div th:unless="${#strings.isEmpty(c.phone())}"><a th:href="'tel:' + ${c.phone()}" th:text="${c.phone()}"></a></div>
         </th:block>
-        <p th:if="${#strings.isEmpty(person) and c.company() == null and c.email() == null and c.phone() == null}"
+        <p th:if="${#strings.isEmpty(person) and #strings.isEmpty(c.company()) and #strings.isEmpty(c.email()) and #strings.isEmpty(c.phone())}"
            class="cl-help" th:text="#{offers.details.client.empty}"></p>
     </div>
     <div class="cl-address">
