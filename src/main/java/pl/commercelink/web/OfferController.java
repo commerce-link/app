@@ -2,7 +2,6 @@ package pl.commercelink.web;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
@@ -23,26 +22,21 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.OfferCreationDto;
-import pl.commercelink.web.dtos.OfferTableRow;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -58,9 +52,6 @@ public class OfferController {
 
     @Autowired
     private ProductCatalogRepository productCatalogRepository;
-
-    @Autowired
-    private StoreCategories storeCategories;
 
     @Autowired
     private PricelistFinder pricelistFinder;
@@ -82,9 +73,6 @@ public class OfferController {
 
     @Autowired
     private MultipartProperties multipartProperties;
-
-    @Value("${app.domain}")
-    private String appDomain;
 
     @GetMapping("/dashboard/offer/new/csv")
     public String showOfferImportSelection(Model model) {
@@ -190,73 +178,6 @@ public class OfferController {
         basket.setGclid(gclid);
         save(basket);
         return "redirect:/dashboard/offer/" + basket.getBasketId();
-    }
-
-    @GetMapping("/dashboard/offer/{offerId}")
-    public String showOfferDetails(@PathVariable String offerId, Model model) {
-        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
-        return showEditOfferForm(model, basket, Mode.EDIT, basket.hasType(BasketType.OfferTemplate));
-    }
-
-    private String showEditOfferForm(Model model, Basket basket, Mode mode, boolean recalculate) {
-        List<OfferItem> offerItems = recalculate ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket);
-
-        Store store = storesRepository.findById(getStoreId());
-        if (Mode.CREATE == mode) {
-            basket.setFulfilmentType(store.getDefaultFulfilmentType());
-        }
-        if (basket.getContactDetails() == null) {
-            basket.setContactDetails(new ContactDetails());
-        }
-
-        List<ProductCatalog> catalogs = productCatalogRepository.findAll(getStoreId());
-
-        double deliveryPrice = basket.getDeliveryPrice(store);
-        double totalPrice = basket.getTotalPrice() + deliveryPrice;
-        double totalCost = basket.getTotalCost();
-        double totalProfitGross = totalPrice - totalCost;
-        double totalProfitNet = totalProfitGross / DEFAULT_VAT_RATE; // Assuming 23% VAT
-
-        model.addAttribute("mode", mode.name());
-        model.addAttribute("offer", basket);
-        model.addAttribute("offerItems", offerItems);
-        model.addAttribute("offerRows", OfferTableRow.from(offerItems));
-        model.addAttribute("hasVariantGroups", basket.hasVariantGroups());
-        model.addAttribute("productCategories", storeCategories.names(catalogs));
-        model.addAttribute("productCategoryGroups", storeCategories.groups(catalogs));
-        model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("totalPrice", totalPrice);
-        model.addAttribute("totalCost", totalCost);
-        model.addAttribute("totalProfitGross", Math.round(totalProfitGross * 100.0) / 100.0);
-        model.addAttribute("totalProfitNet", Math.round(totalProfitNet * 100.0) / 100.0);
-        model.addAttribute("storeId", getStoreId());
-        model.addAttribute("backofficeDomain", appDomain);
-
-        model.addAttribute("catalogs", catalogs);
-        model.addAttribute("deliveryOptions", store.getCheckoutConfiguration() != null
-                ? store.getCheckoutConfiguration().deliveryOptionsFor(basket.getDeliveryOptionId())
-                : List.of());
-
-        return "offerDetails";
-    }
-
-    @PostMapping("/dashboard/offer/{offerId}")
-    public String updateOffer(@PathVariable String offerId, @ModelAttribute Basket basket) {
-        Basket existingBasket = basketsRepository.findById(getStoreId(), offerId).get();
-        existingBasket.setName(basket.getName());
-        existingBasket.setFulfilmentType(basket.getFulfilmentType());
-        existingBasket.setBasketItems(normalizeBlankCategories(basket.getBasketItems().stream()
-                .filter(BasketItem::isComplete)
-                .collect(Collectors.toList())));
-        existingBasket.setComment(basket.getComment());
-        existingBasket.setShowPrices(basket.isShowPrices());
-        existingBasket.setExpiresAt(basket.getExpiresAt());
-        existingBasket.setDeliveryOptionId(basket.getDeliveryOptionId());
-        existingBasket.setContactDetails(basket.getContactDetails());
-        existingBasket.setGclid(basket.getGclid());
-
-        save(existingBasket);
-        return "redirect:/dashboard/offer/" + offerId;
     }
 
     @PostMapping("/dashboard/offer/{offerId}/saveAsTemplate")
@@ -462,7 +383,7 @@ public class OfferController {
         return basket;
     }
 
-    private List<BasketItem> normalizeBlankCategories(List<BasketItem> items) {
+    public static List<BasketItem> normalizeBlankCategories(List<BasketItem> items) {
         items.forEach(item -> {
             if (StringUtils.isBlank(item.getCategory())) {
                 item.setCategory(null);
@@ -478,10 +399,5 @@ public class OfferController {
 
     private String getStoreId() {
         return CustomSecurityContext.getStoreId();
-    }
-
-    private enum Mode {
-        CREATE,
-        EDIT
     }
 }

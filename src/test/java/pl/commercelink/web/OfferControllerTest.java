@@ -111,97 +111,6 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("updateOffer applies all settable fields from request payload to the existing basket and persists")
-    void updateOfferAppliesAllSettersFromRequestPayloadToExistingBasket() {
-        // given
-        Basket existing = basketBase();
-        Basket payload = new Basket();
-        payload.setName("Updated Name");
-        payload.setComment("Updated comment");
-        payload.setShowPrices(true);
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        Basket saved = basketCaptor.getValue();
-        assertThat(saved.getName()).isEqualTo("Updated Name");
-        assertThat(saved.getComment()).isEqualTo("Updated comment");
-        assertThat(saved.isShowPrices()).isTrue();
-    }
-
-    @Test
-    @DisplayName("updateOffer persists basket items in submitted order and reindexes positions band-aware")
-    void updateOfferPersistsSubmittedItemOrderAndReindexesPositions() {
-        // given
-        Basket existing = basketBase();
-        existing.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(basketItem("MFN-B"), basketItem("MFN-A"), basketItem("MFN-C")));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
-        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
-    }
-
-    @Test
-    @DisplayName("updateOffer keeps a migrated service item without a category and normalizes blank to null")
-    void updateOfferKeepsMigratedServiceItemWithoutCategory() {
-        // given
-        Basket existing = basketBase();
-        BasketItem migratedService = basketItem("MONTAZ-1", "");
-        migratedService.setService(true);
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(migratedService));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).hasSize(1);
-        assertThat(savedItems.get(0).isService()).isTrue();
-        assertThat(savedItems.get(0).getCategory()).isNull();
-    }
-
-    @Test
-    @DisplayName("updateOffer keeps the service flag posted from the offer edit form")
-    void updateOfferKeepsPostedServiceFlag() {
-        // given
-        Basket existing = basketBase();
-        BasketItem serviceItem = basketItem("MFN-S", "");
-        serviceItem.setService(true);
-        BasketItem productItem = basketItem("MFN-P", "Obudowa");
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(serviceItem, productItem));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(BasketItem::isService);
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(i -> i.getCategory() == null);
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-P")).noneMatch(BasketItem::isService);
-    }
-
-    @Test
     @DisplayName("saveAsTemplate keeps the service flag posted from the offer edit form")
     void saveAsTemplateKeepsPostedServiceFlag() {
         // given
@@ -439,24 +348,6 @@ class OfferControllerTest {
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems())
                 .extracting(BasketItem::getMfn).containsExactly("MFN-B");
-    }
-
-    @Test
-    void showsOfferDetailsForAStoreThatHasNeverSavedCheckoutSettings() {
-        // given
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basketBase()));
-        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
-        Model model = new ExtendedModelMap();
-
-        // when
-        String view = offerController.showOfferDetails(OFFER_ID, model);
-
-        // then
-        assertThat(view).isEqualTo("offerDetails");
-        assertThat((List<?>) model.getAttribute("deliveryOptions")).isEmpty();
     }
 
     @Test
