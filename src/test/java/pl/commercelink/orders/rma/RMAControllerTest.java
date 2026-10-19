@@ -1481,9 +1481,7 @@ class RMAControllerTest {
         assertThat(notice.scope()).isEqualTo(RmaNotice.Scope.ITEMS);
     }
 
-    @Test
-    void acceptReturnOnAMarketplaceRmaSaysWhetherTheDeliveryWasRefunded() {
-        // given
+    private RmaNotice acceptOnMarketplace(boolean refundDelivery, boolean coversWholeOrder) {
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         rma.setExternalReturnId("ext-1");
         RMAItem item = selectedItem("a", "A", RMAItemStatus.Received);
@@ -1492,20 +1490,45 @@ class RMAControllerTest {
         when(rmaManager.returnSelectedItems(any(), any(), any()))
                 .thenReturn(RMAManager.OperationResult.success(rma, List.of(item)));
         when(ordersRMAManager.acceptReturn(any(), any(), any(), any())).thenReturn(OperationResult.success());
-        when(marketplaceReturnDecisions.coversEveryReturnableItem(any(), any())).thenReturn(false);
+        if (refundDelivery) {
+            when(marketplaceReturnDecisions.coversEveryReturnableItem(any(), any())).thenReturn(coversWholeOrder);
+        }
         when(marketplaceReturnDecisions.publishAcceptance(any(), any(), anyBoolean())).thenReturn(true);
         answerMessagesFromTheRealBundles();
-
-        // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.acceptReturn(RMA_ID, ItemCondition.Sealed, true, new RMAItemsForm(List.of(item)),
+            controller.acceptReturn(RMA_ID, ItemCondition.Sealed, refundDelivery, new RMAItemsForm(List.of(item)),
                     redirectAttributes, Locale.forLanguageTag("pl"));
         }
+        return flashedNotice();
+    }
+
+    @Test
+    void acceptReturnOnAMarketplaceRmaSaysTheDeliveryRefundWasRequested() {
+        // when
+        RmaNotice notice = acceptOnMarketplace(true, true);
 
         // then
-        assertThat(rma.isMarketplaceReturn()).isTrue();
-        assertThat(flashedNotice().lines()).hasSize(1).allMatch(line -> line.startsWith("Koszt dostawy nie zosta"));
+        assertThat(notice.lines()).containsExactly("Zlecono zwrot kosztu dostawy.");
+    }
+
+    @Test
+    void acceptReturnOnAMarketplaceRmaSaysThereIsNoDeliveryRefundWhenTheOperatorUntickedIt() {
+        // when
+        RmaNotice notice = acceptOnMarketplace(false, true);
+
+        // then
+        assertThat(notice.lines()).containsExactly("Bez zwrotu kosztu dostawy.");
+    }
+
+    @Test
+    void acceptReturnOnAMarketplaceRmaSaysTheDeliveryWasNotRefundedWhenTheReturnIsPartial() {
+        // when
+        RmaNotice notice = acceptOnMarketplace(true, false);
+
+        // then
+        assertThat(notice.lines()).containsExactly(
+                "Koszt dostawy nie został zwrócony: zwrot nie obejmuje wszystkich pozycji zamówienia.");
     }
 
     @Test

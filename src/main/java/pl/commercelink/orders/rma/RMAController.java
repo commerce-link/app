@@ -349,9 +349,11 @@ public class RMAController {
             refuseItemAction(redirectAttributes, "rma.marketplace.decision.not.sent", locale);
         } else {
             RmaNotice notice = done("rma.detail.done.accepted", selected, op, locale);
-            if (op.getRma().isMarketplaceReturn() && refundDelivery) {
-                notice = notice.withLine(messageSource.getMessage(
-                        deliveryCovered ? "rma.detail.delivery.refunded" : "rma.detail.delivery.notRefunded", null, locale));
+            if (op.getRma().isMarketplaceReturn()) {
+                // the marketplace carries out the refund later: the page can only say it was requested
+                String deliveryKey = !refundDelivery ? "rma.detail.delivery.notRequested"
+                        : deliveryCovered ? "rma.detail.delivery.refunded" : "rma.detail.delivery.notRefunded";
+                notice = notice.withLine(messageSource.getMessage(deliveryKey, null, locale));
             }
             RmaFlash.items(redirectAttributes, notice);
         }
