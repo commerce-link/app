@@ -13912,6 +13912,13 @@ a.cl-link-button:hover {
     .cl-page .cl-selection-host.is-rma-detail .cl-selection-actions {
         flex-wrap: wrap;
     }
+    /* "Więcej", the last menu, opens leftwards from its toggle's right edge: from its start (the selection row's rule)
+       its 240 px list reached past the right edge of a 720 px window. menu.js still turns it to .is-start when that
+       would leave the window on the left */
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-menu:last-of-type > .cl-menu-list:not(.is-start) {
+        left: auto;
+        right: 0;
+    }
 }
 /* touch targets of the selection row at 720-1023 px (DS §9: 44 px below 1024 px): the buttons and the menus' summaries
    are drawn 44 px tall, as in the docked row below 720 px, instead of 30 px with an invisible hit area; the link buttons
