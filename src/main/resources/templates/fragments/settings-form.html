@@ -101,6 +101,30 @@
     </p>
 </div>
 
+<!--/* textFieldLimited for a field that is required only under a condition the browser evaluates (variant-fields.js,
+       e.g. shipment!=Courier): the "optional" note is shown by that script while the condition holds. The input is never
+       marked required, because the server validates it and the form is novalidate; aria-required tells a screen reader
+       instead, set while the note is hidden (here for the rendered choice, then by variant-fields.js). hidden: the
+       condition fails for the choice the page was rendered with (the script recomputes it on load). */-->
+<div th:fragment="textFieldOptionalWhen(name, labelKey, value, type, autocomplete, errorKey, help, condition, hidden)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span class="cl-optional" th:attr="data-cl-variant-when=${condition}" th:hidden="${hidden}" th:text="#{form.optional}"></span>
+    </label>
+    <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
+           th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}"
+           th:attr="autocomplete=${autocomplete},
+                    inputmode=${type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null)},
+                    aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-required=${hidden ? 'true' : null},
+                    aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
+    <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
 <!--/* Labelled select with an optional help text (already resolved, or null), like textField; options are PickerOptions.
        The only select implementation: form-field :: select delegates here. */-->
 <div th:fragment="selectField(name, labelKey, value, options, autocomplete, required, errorKey, help)" class="cl-field">
