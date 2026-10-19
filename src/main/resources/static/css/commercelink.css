@@ -13903,8 +13903,21 @@ a.cl-link-button:hover {
    the items card in Polish at 720-800 px and 1366-1440 px and in English at 720 and 1366-1400 px, so from 720 px they
    wrap onto a second line inside the row instead of running past the card ("Usuń" and "Wyczyść" then stand at the end of
    the second line). The row grows by that line and pushes the table down by the difference; it still covers the header.
-   Below 720 px the row already wraps (and is docked to the bottom edge). */
+   Below 720 px the row already wraps (and is docked to the bottom edge); there the wrapper of "Usuń" and "Wyczyść"
+   (cl-selection-end) is not a box of its own, so the docked row lays them out as before. */
+.cl-page .cl-selection-host.is-rma-detail .cl-selection-end {
+    display: contents;
+}
 @media screen and (min-width: 720px) {
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-end {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: auto;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-end > .cl-selection-remove {
+        margin-left: 0;
+    }
     .cl-page .cl-selection-host.is-rma-detail .cl-selection-row {
         padding-top: 5px;
         padding-bottom: 5px;

@@ -115,10 +115,13 @@
                     </li>
                 </ul>
             </details>
-            <button type="button" class="cl-link-button is-danger cl-selection-remove" data-cl-rma-action="delete"
-                    data-accepts="New,Received" data-cl-rma-dialog="delete-dialog" data-cl-dialog-open="delete-dialog"
-                    th:text="#{rma.detail.action.delete}"></button>
-            <button type="button" class="cl-link-button" data-cl-select-clear th:text="#{rma.detail.items.clear}"></button>
+            <!--/* "Usuń" and "Wyczyść" stay together at the row's end when the actions wrap onto a second line */-->
+            <span class="cl-selection-end">
+                <button type="button" class="cl-link-button is-danger cl-selection-remove" data-cl-rma-action="delete"
+                        data-accepts="New,Received" data-cl-rma-dialog="delete-dialog" data-cl-dialog-open="delete-dialog"
+                        th:text="#{rma.detail.action.delete}"></button>
+                <button type="button" class="cl-link-button" data-cl-select-clear th:text="#{rma.detail.items.clear}"></button>
+            </span>
         </div>
     </div>
 </th:block>
