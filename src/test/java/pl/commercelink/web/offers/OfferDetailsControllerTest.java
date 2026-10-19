@@ -163,6 +163,64 @@ class OfferDetailsControllerTest {
     }
 
     @Test
+    void itemsSaveKeepsThePostedServiceFlag() {
+        // given: successor of OfferControllerTest.updateOfferKeepsPostedServiceFlag
+        Basket stored = fullOffer(BasketType.Offer);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        BasketItem service = new BasketItem("pim", "Montaż", "MFN-S", "Usługi", 100.0, 0, 1, null, 3, false);
+        service.setService(true);
+        BasketItem product = new BasketItem("pim", "Obudowa", "MFN-P", "Obudowy", 100.0, 0, 1, null, 3, false);
+        Basket form = new Basket();
+        form.setBasketItems(List.of(service, product));
+
+        // when
+        controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        List<BasketItem> saved = savedBasket().getBasketItems();
+        assertThat(saved).filteredOn(i -> i.getMfn().equals("MFN-S")).singleElement().satisfies(i -> assertThat(i.isService()).isTrue());
+        assertThat(saved).filteredOn(i -> i.getMfn().equals("MFN-P")).singleElement().satisfies(i -> assertThat(i.isService()).isFalse());
+    }
+
+    @Test
+    void hostileReturnToIsDroppedFromEveryPostRedirect() {
+        // given: the page is then opened without returnTo, so its back link is the list path
+        BasketItem only = item("MFN-A", 1);
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setBasketItems(List.of(only));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket itemsForm = new Basket();
+        itemsForm.setBasketItems(List.of(item("MFN-A", 1)));
+        OfferTermsForm terms = new OfferTermsForm();
+        terms.setName("Gaming PC");
+        ContactDetails contact = new ContactDetails();
+        contact.setName("Jan");
+        contact.setEmail("jan@test.local");
+        OfferItemForm itemForm = new OfferItemForm();
+        itemForm.setName("Laptop");
+        itemForm.setCategory("Laptops");
+        itemForm.setMfn("MFN-A");
+
+        for (String hostile : List.of("https://evil.example", "//evil", "/dashboard/offers\r\nSet-Cookie: x=1",
+                "/dashboard/offers?q=a\r\nLocation: https://evil.example")) {
+            // when
+            List<String> views = List.of(
+                    controller.saveItems(OFFER_ID, itemsForm, hostile, new RedirectAttributesModelMap(), LOCALE),
+                    controller.saveTerms(OFFER_ID, terms, hostile, null, new ExtendedModelMap(), LOCALE,
+                            new RedirectAttributesModelMap(), new MockHttpServletResponse()),
+                    controller.saveClient(OFFER_ID, contact, hostile, null, new ExtendedModelMap(), LOCALE,
+                            new RedirectAttributesModelMap(), new MockHttpServletResponse()),
+                    controller.saveNote(OFFER_ID, new OfferNoteForm(), hostile, null, new ExtendedModelMap(), LOCALE,
+                            new RedirectAttributesModelMap(), new MockHttpServletResponse()),
+                    controller.saveItem(OFFER_ID, 0, itemForm, hostile, new ExtendedModelMap(), LOCALE,
+                            new RedirectAttributesModelMap()));
+
+            // then
+            assertThat(views).as(hostile).containsOnly("redirect:/dashboard/offer/offer-1");
+        }
+    }
+
+    @Test
     void termsSaveChangesOnlyTerms() {
         // given
         Basket stored = fullOffer(BasketType.Offer);

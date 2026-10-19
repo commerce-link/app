@@ -295,4 +295,23 @@ class OfferDetailsPageFactoryTest {
         assertThat(build(expired).terms().expiresAtText()).isEqualTo("17.10.2026, 10:00 (minęła)");
         assertThat(build(basket(item("A", 1, 100, 50))).terms().expiresAtText()).isNull();
     }
+
+    @Test
+    void storeThatNeverSavedCheckoutSettingsShowsTheOffer() {
+        // given: successor of OfferControllerTest.showsOfferDetailsForAStoreThatHasNeverSavedCheckoutSettings
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        Basket offer = basket(item("A", 1, 100, 50));
+        offer.setDeliveryOptionId("inpost");
+
+        // when
+        OfferDetailsPage page = build(offer);
+
+        // then
+        assertThat(store.getCheckoutConfiguration()).isNull();
+        assertThat(page.terms().deliveryChoices()).isEmpty();
+        assertThat(page.summary().deliveryName()).isNull();
+        assertThat(page.summary().total()).isEqualTo(Money.format(100));
+    }
 }
