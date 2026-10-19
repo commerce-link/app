@@ -413,7 +413,8 @@
 
     // The single dialogs outside #rmaItemsForm (rma/detail/dialogs :: single), each with its own form:
     // - "Odrzuć RMA": the reason is required on every RMA; a blank one shows the field error instead of posting, and on a
-    //   marketplace RMA the characters typed are counted against the limit (the counter's data-template);
+    //   marketplace RMA the characters are counted against the limit (the counter's data-template) as the server counts
+    //   them, a line break as two (CRLF), and a reason over the limit shows its error at the field instead of posting;
     // - "Dodaj pozycję": the quantity is limited to the chosen order item (data-max-qty) and the effect names how much the
     //   insurance grows (data-unit-price × quantity, the server's own sum);
     // - the split without the items form (?open=split): the second quantity follows the first and is no longer typed;
@@ -429,20 +430,32 @@
                 var dialog = field.closest('dialog');
                 var error = field.closest('.cl-field').querySelector('[data-cl-field-error]');
                 var counter = document.getElementById(field.getAttribute('data-cl-rma-counter') || '');
+                var tooLong = field.closest('.cl-field').querySelector('[data-cl-rma-too-long]');
+                var max = parseInt(field.getAttribute('maxlength'), 10);
+                // the length the server sees: the browser posts every line break as CRLF
+                var sentLength = function () {
+                    return field.value.replace(/\r?\n/g, '\r\n').length;
+                };
+                var fits = function () {
+                    return !tooLong || !(max > 0) || sentLength() <= max;
+                };
                 var hideError = function () {
                     if (error) {
                         error.hidden = true;
+                    }
+                    if (tooLong) {
+                        tooLong.hidden = true;
                     }
                     field.removeAttribute('aria-invalid');
                 };
                 var count = function () {
                     if (counter) {
-                        counter.textContent = fill(counter.getAttribute('data-template') || '', '{n}', String(field.value.length));
+                        counter.textContent = fill(counter.getAttribute('data-template') || '', '{n}', String(sentLength()));
                     }
                 };
                 field.addEventListener('input', function () {
                     count();
-                    if (field.value.trim()) {
+                    if (field.value.trim() && fits()) {
                         hideError();
                     }
                 });
@@ -452,12 +465,15 @@
                 var submit = dialog && dialog.querySelector('[data-cl-dialog-submit]');
                 if (submit) {
                     submit.addEventListener('click', function (event) {
-                        if (field.value.trim()) {
+                        var blank = !field.value.trim();
+                        if (!blank && fits()) {
                             return;
                         }
                         event.preventDefault();
-                        if (error) {
-                            error.hidden = false;
+                        hideError();
+                        var shown = blank ? error : tooLong;
+                        if (shown) {
+                            shown.hidden = false;
                         }
                         field.setAttribute('aria-invalid', 'true');
                         field.focus();

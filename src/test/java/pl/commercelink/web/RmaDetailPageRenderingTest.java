@@ -485,6 +485,10 @@ class RmaDetailPageRenderingTest {
         assertThat(textarea(market, "rejectionReason")).contains("maxlength=\"250\"").contains("data-cl-rma-counter")
                 .contains("required");
         assertThat(market).contains("Allegro");
+        // a line break is posted as CRLF and counted twice by the server; the field says so when the script stops the post
+        assertThat(market).contains("data-cl-rma-too-long")
+                .contains("at most 250 characters (a line break counts as 2)").contains("reject-reason-too-long\"");
+        assertThat(store).doesNotContain("data-cl-rma-too-long").doesNotContain("reject-reason-too-long");
         assertThat(store).contains("class=\"cl-button is-danger\"");
     }
 

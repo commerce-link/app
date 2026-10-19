@@ -191,8 +191,9 @@
                 <div class="cl-field">
                     <label class="cl-label" for="reject-reason" th:text="#{rma.detail.reject.reason}"></label>
                     <textarea class="cl-input cl-textarea" id="reject-reason" name="rejectionReason" rows="4" required
-                              data-cl-rma-required aria-describedby="reject-reason-help reject-reason-error"
-                              th:attr="maxlength=${page.marketplace()} ? ${max} : null,
+                              data-cl-rma-required
+                              th:attr="aria-describedby=${page.marketplace()} ? 'reject-reason-help reject-reason-error reject-reason-too-long' : 'reject-reason-help reject-reason-error',
+                                       maxlength=${page.marketplace()} ? ${max} : null,
                                        data-cl-rma-counter=${page.marketplace()} ? 'reject-reason-count' : null"
                               th:text="${reason}"></textarea>
                     <p class="cl-help" id="reject-reason-help">
@@ -203,6 +204,11 @@
                     </p>
                     <p class="cl-field-error" id="reject-reason-error" data-cl-field-error hidden><i class="fas fa-exclamation-circle"
                             aria-hidden="true"></i><span th:text="#{rma.detail.reject.reason.required}"></span></p>
+                    <!--/* the browser posts a line break as CRLF and the server counts both characters, while maxlength
+                           counts one: rma-detail.js counts two and stops a reason the server would refuse */-->
+                    <p th:if="${page.marketplace()}" class="cl-field-error" id="reject-reason-too-long" data-cl-rma-too-long
+                       hidden><i class="fas fa-exclamation-circle" aria-hidden="true"></i><span
+                            th:text="#{rma.detail.reject.reason.tooLong(${max})}"></span></p>
                 </div>
                 <p class="cl-dialog-effect">
                     <span th:text="#{rma.detail.reject.effect}"></span>
