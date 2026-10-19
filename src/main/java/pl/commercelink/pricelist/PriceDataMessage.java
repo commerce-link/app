@@ -1,5 +1,6 @@
 package pl.commercelink.pricelist;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -17,6 +18,14 @@ public record PriceDataMessage(String storeId, String date) {
 
     static PriceDataMessage forStore(String storeId, LocalDate date) {
         return new PriceDataMessage(storeId, date.toString());
+    }
+
+    String toJson() {
+        try {
+            return MAPPER.writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Price data message cannot be written: " + this, e);
+        }
     }
 
     static PriceDataMessage parse(String body) {
