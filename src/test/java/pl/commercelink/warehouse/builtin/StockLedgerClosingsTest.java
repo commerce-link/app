@@ -8,9 +8,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.warehouse.builtin.StockLedgerClosings.ClosingBalance;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -98,5 +100,18 @@ class StockLedgerClosingsTest {
 
         // then
         verify(fileStorage).put(BUCKET, SEPTEMBER_KEY, report);
+    }
+
+    @Test
+    void thePeriodWasGeneratedWhenItsFileWasLastWritten() {
+        // given
+        Instant written = Instant.parse("2026-10-14T08:00:00Z");
+        when(fileStorage.findLastModified(BUCKET, SEPTEMBER_KEY)).thenReturn(Optional.of(written));
+
+        // when
+        Optional<Instant> generatedAt = closings.generatedAt(STORE_ID, SEPTEMBER);
+
+        // then
+        assertThat(generatedAt).contains(written);
     }
 }
