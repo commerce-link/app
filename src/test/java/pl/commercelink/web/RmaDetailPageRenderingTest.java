@@ -247,6 +247,8 @@ class RmaDetailPageRenderingTest {
                 .contains("data-total=\"200.0\"").contains("data-id=\"i-2\"").contains("data-name=\"Mouse\"");
         assertThat(html).contains("data-cl-rma-action=\"accept\"").contains("data-accepts=\"Received\"")
                 .contains("data-single-min-qty=\"2\"").contains("data-skip-New=\"not received yet\"");
+        // the short "Receive" is the accessible name too (WCAG 2.5.3); the full wording is only the title
+        assertThat(html).contains("title=\"Mark as received\"").doesNotContain("aria-label=\"Mark as received\"");
         assertThat(html).contains("Items (2)").contains("Client wants: return · unresolved").contains("2 × 100,00 PLN");
         assertThat(html).doesNotContain("??");
     }
