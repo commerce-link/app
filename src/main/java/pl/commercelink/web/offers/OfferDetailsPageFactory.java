@@ -87,7 +87,7 @@ public class OfferDetailsPageFactory {
                         : new Pill("offers.list.pill." + validity.param(), null, OfferRowMapper.tone(validity)),
                 meta(basket, template, validity, summary, contact, locale, now),
                 lines(basket, offerItems), storeCategories.groups(catalogs), catalogs, summary,
-                terms(basket, store, template, locale),
+                terms(basket, store, template, validity, locale, now),
                 new Customer(contact == null ? null : contact.getName(), contact == null ? null : contact.getSurname(),
                         contact == null ? null : contact.getCompanyName(), contact == null ? null : contact.getEmail(),
                         contact == null ? null : contact.getPhone(), contactFilled,
@@ -207,14 +207,16 @@ public class OfferDetailsPageFactory {
                 .findFirst();
     }
 
-    private Terms terms(Basket basket, Store store, boolean template, Locale locale) {
+    private Terms terms(Basket basket, Store store, boolean template, OfferValidity validity, Locale locale,
+                        LocalDateTime now) {
         List<DeliveryChoice> choices = store == null || store.getCheckoutConfiguration() == null ? List.of()
                 : store.getCheckoutConfiguration().deliveryOptionsFor(basket.getDeliveryOptionId()).stream()
                 .map(o -> new DeliveryChoice(o.getId(), o.getName() + " (" + messages.getMessage("general.currency.amount",
                         new Object[]{Money.format(o.getPrice())}, locale) + ")"))
                 .collect(Collectors.toList());
         LocalDateTime expiresAt = template ? null : basket.getExpiresAt();
-        return new Terms(expiresAt == null ? null : DATE_TIME.format(expiresAt),
+        return new Terms(expiresAt == null ? null : OfferRowMapper.expiresAtWithDays(validity,
+                        DATE_TIME.format(expiresAt), expiresAt, now, messages, locale),
                 expiresAt == null ? null : INPUT.format(expiresAt), basket.getDeliveryOptionId(), choices,
                 basket.isShowPrices(), OrderLabels.fulfilmentType(basket.getFulfilmentType()), basket.getGclid());
     }

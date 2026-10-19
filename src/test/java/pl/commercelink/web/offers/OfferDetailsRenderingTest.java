@@ -67,7 +67,7 @@ class OfferDetailsRenderingTest {
     }
 
     private static Terms terms() {
-        return new Terms("24.10.2026, 23:59", "2026-10-24T23:59", "courier",
+        return new Terms("24.10.2026, 23:59 (5 dni)", "2026-10-24T23:59", "courier",
                 List.of(new DeliveryChoice("courier", "Kurier InPost (19,99 PLN)")), true,
                 "store.fulfilment.type.WarehouseFulfilment", null);
     }
@@ -311,6 +311,15 @@ class OfferDetailsRenderingTest {
         assertThat(html).doesNotContain("Duplikuj z danymi klienta").contains("Duplikuj")
                 .contains("Brak danych kontaktowych klienta").contains("bez danych klienta");
         assertThat(html(fullOffer())).contains("formaction=\"/dashboard/offer/" + ID + "/copy?withContact=true\"");
+    }
+
+    @Test
+    void termsCardShowsTheDeadlineWithItsDayCount() {
+        // when
+        String html = render("<section th:replace=\"~{offers/details/side :: terms(${page})}\"></section>", model(fullOffer()));
+
+        // then
+        assertThat(html).containsPattern("<dt>Ważna do</dt>\\s*<dd>24.10.2026, 23:59 \\(5 dni\\)</dd>");
     }
 
     @Test

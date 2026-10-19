@@ -274,4 +274,25 @@ class OfferDetailsPageFactoryTest {
         assertThat(pill.tone()).isEqualTo("is-warn");
         assertThat(build(basket).meta().dueNote()).contains("22.10");
     }
+
+    @Test
+    void termsShowTheDeadlineWithTheDayCountOfTheHeader() {
+        // given
+        Basket inFiveDays = basket(item("A", 1, 100, 50));
+        inFiveDays.setExpiresAt(LocalDateTime.of(2026, 10, 24, 23, 59));
+        Basket tomorrow = basket(item("A", 1, 100, 50));
+        tomorrow.setExpiresAt(NOW.plusDays(1));
+        Basket expired = basket(item("A", 1, 100, 50));
+        expired.setExpiresAt(NOW.minusDays(2));
+
+        // when
+        OfferDetailsPage page = build(inFiveDays);
+
+        // then
+        assertThat(page.terms().expiresAtText()).isEqualTo("24.10.2026, 23:59 (5 dni)");
+        assertThat(page.meta().dueNote()).isEqualTo("do 24.10 (5 dni)");
+        assertThat(build(tomorrow).terms().expiresAtText()).isEqualTo("20.10.2026, 10:00 (jutro)");
+        assertThat(build(expired).terms().expiresAtText()).isEqualTo("17.10.2026, 10:00 (minęła)");
+        assertThat(build(basket(item("A", 1, 100, 50))).terms().expiresAtText()).isNull();
+    }
 }

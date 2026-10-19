@@ -156,12 +156,34 @@ public class OfferRowMapper {
             case NO_EXPIRY -> null;
             case EXPIRED -> messages.getMessage("offers.list.note.expired", new Object[]{date(expiresAt, now)}, locale);
             case ACTIVE, EXPIRING -> {
-                long days = ChronoUnit.DAYS.between(now.toLocalDate(), expiresAt.toLocalDate());
+                long days = daysLeft(expiresAt, now);
                 if (days == 0) yield messages.getMessage("offers.list.note.today", new Object[]{TIME.format(expiresAt)}, locale);
                 if (days == 1) yield messages.getMessage("offers.list.note.tomorrow", new Object[]{date(expiresAt, now)}, locale);
                 yield messages.getMessage("offers.list.note.until", new Object[]{date(expiresAt, now), String.valueOf(days)}, locale);
             }
         };
+    }
+
+    /**
+     * The terms card's "Ważna do": the full date and time the record holds, with the same day count as the list row
+     * and the header ({@link #validityNote}).
+     */
+    static String expiresAtWithDays(OfferValidity validity, String expiresAtText, LocalDateTime expiresAt,
+                                    LocalDateTime now, MessageSource messages, Locale locale) {
+        return switch (validity) {
+            case NO_EXPIRY -> null;
+            case EXPIRED -> messages.getMessage("offers.details.terms.expired", new Object[]{expiresAtText}, locale);
+            case ACTIVE, EXPIRING -> {
+                long days = daysLeft(expiresAt, now);
+                if (days == 0) yield messages.getMessage("offers.details.terms.expiresToday", new Object[]{expiresAtText}, locale);
+                if (days == 1) yield messages.getMessage("offers.details.terms.expiresTomorrow", new Object[]{expiresAtText}, locale);
+                yield messages.getMessage("offers.details.terms.expiresIn", new Object[]{expiresAtText, String.valueOf(days)}, locale);
+            }
+        };
+    }
+
+    private static long daysLeft(LocalDateTime expiresAt, LocalDateTime now) {
+        return ChronoUnit.DAYS.between(now.toLocalDate(), expiresAt.toLocalDate());
     }
 
     static String tone(OfferValidity validity) {
