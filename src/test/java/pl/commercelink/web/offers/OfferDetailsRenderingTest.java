@@ -314,6 +314,27 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void onlyTheSummaryTotalIsAnnouncedWhileTyping() {
+        // when
+        String html = html(fullOffer());
+        String summary = html.substring(html.indexOf("id=\"summary\""));
+
+        // then: an output is a polite live region by default, so every recount would read all six
+        Matcher outputs = Pattern.compile("<output data-cl-sum=\"(\\w+)\"([^>]*)>").matcher(summary);
+        int checked = 0;
+        while (outputs.find()) {
+            if (outputs.group(1).equals("total")) {
+                continue;
+            }
+            assertThat(outputs.group(2)).as(outputs.group(1)).contains("aria-live=\"off\"");
+            checked++;
+        }
+        assertThat(checked).isEqualTo(5);
+        assertThat(summary).contains("<output data-cl-sum=\"total\">");
+        assertThat(html).contains("data-cl-dirty-status");
+    }
+
+    @Test
     void termsCardShowsTheDeadlineWithItsDayCount() {
         // when
         String html = render("<section th:replace=\"~{offers/details/side :: terms(${page})}\"></section>", model(fullOffer()));
