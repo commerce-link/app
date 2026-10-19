@@ -605,12 +605,14 @@ public class RMAController {
         }
 
         // the form never carries serial numbers, so the check reads the stored items
+        Map<String, RMAItem> storedItems = rmaItemsRepository.findByRmaId(rmaId).stream()
+                .collect(Collectors.toMap(RMAItem::getRmaItemId, item -> item, (first, second) -> first));
         List<String> problems = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         int compared = 0;
 
         for (String rmaItemId : selectedRMAItemIds) {
-            RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
+            RMAItem rmaItem = storedItems.get(rmaItemId);
             if (rmaItem == null) {
                 continue;
             }
@@ -670,8 +672,7 @@ public class RMAController {
         }
 
         List<RMAItem> selected = selectedItems(rmaId, form);
-        List<RMAItem> rmaItemsToDelete = form.getSelectedRMAItemIds().stream()
-                .map(rmaItemId -> rmaItemsRepository.findById(rmaId, rmaItemId))
+        List<RMAItem> rmaItemsToDelete = selected.stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.New, RMAItemStatus.Received))
                 .collect(Collectors.toList());
 

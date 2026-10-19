@@ -661,7 +661,7 @@ class RMAControllerTest {
         shipped.setSelected(true);
         RMAItemsForm form = new RMAItemsForm(List.of(shipped));
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.WaitingForItems));
-        when(rmaItemsRepository.findById(RMA_ID, "rma-item-1")).thenReturn(shipped);
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(shipped));
         when(messageSource.getMessage(eq("rma.detail.error.delete.status"), any(), any())).thenReturn("only new");
 
         // when
@@ -1048,7 +1048,7 @@ class RMAControllerTest {
     void checkSerialNumbersReadsTheSerialFromTheStoredItemNotTheForm() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "X9")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
 
         // when
@@ -1065,7 +1065,7 @@ class RMAControllerTest {
     void checkSerialNumbersAcceptsANumberFromTheOrder() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A2"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "A2")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1, A2"));
 
         // when
@@ -1081,7 +1081,7 @@ class RMAControllerTest {
     void checkSerialNumbersSkipsAnItemWithoutASerialNumber() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", " "));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", " ")));
 
         // when
         RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
@@ -1097,7 +1097,7 @@ class RMAControllerTest {
     void checkSerialNumbersWithAnOrderItemWithoutSerialsIsNotAMismatchButNothingWasCompared() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "X9")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", null));
 
         // when
@@ -1116,9 +1116,10 @@ class RMAControllerTest {
         RMAItem laptop = selectedItem("a", "Laptop", RMAItemStatus.New);
         RMAItem cable = selectedItem("b", "Kabel", RMAItemStatus.New);
         RMAItem mouse = selectedItem("c", "Mysz", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A1"));
-        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(storedItem("b", "Kabel", null));
-        when(rmaItemsRepository.findById(RMA_ID, "c")).thenReturn(storedItem("c", "Mysz", "M1"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(
+                storedItem("a", "Laptop", "A1"),
+                storedItem("b", "Kabel", null),
+                storedItem("c", "Mysz", "M1")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
         when(orderItemsRepository.findById(ORDER_ID, "oi-c")).thenReturn(orderItemWithSerial("oi-c", " "));
 
@@ -1131,6 +1132,8 @@ class RMAControllerTest {
         assertThat(notice.lines()).containsExactly(
                 "Nie sprawdzono: Kabel — pozycja RMA nie ma numeru seryjnego.",
                 "Nie sprawdzono: Mysz — zamówienie nie ma zapisanych numerów seryjnych tej pozycji.");
+        verify(rmaItemsRepository).findByRmaId(RMA_ID);
+        verify(rmaItemsRepository, never()).findById(any(), any());
     }
 
     @Test
@@ -1138,8 +1141,9 @@ class RMAControllerTest {
         // given
         RMAItem laptop = selectedItem("a", "Laptop", RMAItemStatus.New);
         RMAItem cable = selectedItem("b", "Kabel", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
-        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(storedItem("b", "Kabel", ""));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(
+                storedItem("a", "Laptop", "X9"),
+                storedItem("b", "Kabel", "")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
 
         // when
@@ -1155,7 +1159,7 @@ class RMAControllerTest {
     void checkSerialNumbersListsADuplicatedWrongNumberOnce() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9, X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "X9, X9")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1"));
 
         // when
@@ -1169,7 +1173,7 @@ class RMAControllerTest {
     void checkSerialNumbersReportsOnlyTheNumbersOutsideTheOrder() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "A1, X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "A1, X9")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(orderItemWithSerial("oi-a", "A1, A2"));
 
         // when
@@ -1183,7 +1187,7 @@ class RMAControllerTest {
     void checkSerialNumbersSkipsAnItemWithANullSerialNumber() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", null));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", null)));
 
         // when
         RmaNotice notice = checkSerialNumbersOf(rmaWithStatus(RMAStatus.WaitingForItems), posted);
@@ -1198,7 +1202,7 @@ class RMAControllerTest {
     void checkSerialNumbersWithoutTheOrderItemReportsItInsteadOfFailing() {
         // given
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "X9")));
         when(orderItemsRepository.findById(ORDER_ID, "oi-a")).thenReturn(null);
 
         // when
@@ -1215,7 +1219,7 @@ class RMAControllerTest {
         RMA rma = rmaWithStatus(RMAStatus.WaitingForItems);
         rma.setOrderId(null);
         RMAItem posted = selectedItem("a", "Laptop", RMAItemStatus.New);
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(storedItem("a", "Laptop", "X9"));
+        when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(storedItem("a", "Laptop", "X9")));
 
         // when
         RmaNotice notice = checkSerialNumbersOf(rma, posted);
@@ -1265,8 +1269,6 @@ class RMAControllerTest {
         rma.setShippingInsurance(250.0);
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
         when(rmaItemsRepository.findByRmaId(RMA_ID)).thenReturn(List.of(received, inRepair));
-        when(rmaItemsRepository.findById(RMA_ID, "a")).thenReturn(received);
-        when(rmaItemsRepository.findById(RMA_ID, "b")).thenReturn(inRepair);
         answerMessagesFromTheRealBundles();
 
         // when
