@@ -197,12 +197,14 @@ Shipping runs on its own queues, each message naming the integration (`provider`
 
 **Scheduled tasks** (`@Scheduled`):
 - Every 5 min: `FeedReloaderScheduler` — reload global inventory feeds
-- Every 5 min: `TaxonomyCategoryMatchScheduler` — taxonomy category match sweep
+- Every 5 min: `TaxonomyCategoryMatchSweepScheduler` — local-only trigger for the taxonomy category match sweep (`TaxonomyCategoryMatchSweep`); in prod the trigger is instead `taxonomy-category-match-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `TaxonomyCategoryMatchSweepListener`
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
-- Hourly: `DemoStoreCleanupJob` — clean up demo stores
+- Hourly: `DemoStoreCleanupScheduler` — local-only trigger for the expired demo store cleanup (`DemoStoreCleanup`); in prod the trigger is instead `demo-store-cleanup-queue`, sent by EventBridge Scheduler with no payload and consumed by `DemoStoreCleanupListener`. All three exist only with `app.registration.demo=true`, so the schedule is set up only for the demo environment
 - Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
 - Hourly: `ShipmentTrackingSweepScheduler` — local-only trigger for the shipment tracking sweep (parcels of integrations without webhooks, e.g. Wysyłam z Allegro); in prod the trigger is `shipment-tracking-sweep-queue` (EventBridge Scheduler, no payload) consumed by `ShipmentTrackingSweepListener`. The sweep sends one message per due parcel to `shipment-tracking-poll-queue`, handled by `ShipmentTrackingPollListener` → `ShipmentTrackingPoller`
 - Hourly: `StoreLifecycleSweepScheduler` — local-only trigger for the store lifecycle sweep (every minute in `localdev`); in prod the trigger is `store-lifecycle-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `StoreLifecycleSweepListener`
+
+Every running instance executes every `@Scheduled` method, so as soon as an environment runs more than one instance, a job scheduled that way runs once per instance. A periodic job with effects outside its own instance (calls to the PIM, deletions, supplier polling) therefore gets a local `@Scheduled` trigger conditional on `application.env=localhost` (a missing value counts as local) plus a prod `@SqsListener` on a payload-less queue fed by EventBridge Scheduler, so exactly one instance runs each tick however many are up; the queue and its schedule live in the terraform repositories. `FeedReloaderScheduler` and `PimCatalogRegistry` stay per instance on purpose: they only refill that instance's in-memory caches.
 
 ### Report Queue
 
