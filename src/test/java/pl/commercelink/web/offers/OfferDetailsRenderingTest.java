@@ -431,4 +431,22 @@ class OfferDetailsRenderingTest {
                 .containsPattern("<p class=\"cl-dialog-effect\"><i class=\"fas fa-eye-slash\" aria-hidden=\"true\"></i>\\s*<span>Klient nie widzi tych danych");
         assertThat(removed).contains("<p class=\"cl-card-desc is-warn cl-card-foot-note\">Tego sposobu dostawy nie ma już");
     }
+
+    @Test
+    void emptyClientAndNoteSitAtTheEdgeOfTheirCard() {
+        // given — cl-card-desc brings its own side padding, which inside an inset block doubled the card's
+        String html = html(offer(List.of(laptop(0)), summary(false), customer(false, false), false));
+
+        // then
+        assertThat(html).contains("<p class=\"cl-help\">Brak danych kontaktowych klienta.</p>");
+        assertThat(render("<section th:replace=\"~{offers/details/side :: note(${page})}\"></section>", model(withoutNote())))
+                .contains("<p class=\"cl-help\">Brak notatki</p>");
+    }
+
+    private static OfferDetailsPage withoutNote() {
+        OfferDetailsPage p = offer(List.of(laptop(0)), summary(false), customer(false, false), false);
+        return new OfferDetailsPage(p.offerId(), p.storeId(), p.shortId(), p.template(), p.title(), p.backHref(), p.backLabelKey(),
+                p.validity(), p.meta(), p.lines(), p.categoryGroups(), p.catalogs(), p.summary(), p.terms(), p.customer(), null,
+                p.clientUrl(), p.proformaAvailable(), p.copyWithContactAvailable(), p.recordName(), p.fulfilmentType());
+    }
 }

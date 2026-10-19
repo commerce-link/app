@@ -13886,6 +13886,8 @@ a.cl-link-button:hover {
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
 .cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
 .cl-page .cl-item-market { margin: 0; font-size: 14px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+/* the internal note reads like the values of the cards above it */
+.cl-page.cl-offer-page .cl-card-inset > .cl-note-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
 /* the save state above "Zapisz pozycje": the dot and the warning tone once the table has unsaved changes */
 .cl-page .cl-save-state { margin: 0; font-size: 13px; color: var(--cl-ink-2); }
 .cl-page .cl-unsaved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cl-warn); }
