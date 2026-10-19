@@ -12,6 +12,8 @@ import java.util.stream.Collectors;
 /** Builds the outcome of a bulk item action: how many items it processed and which selected ones it skipped and why. */
 public class RmaActionNotices {
 
+    private static final int MAX_SKIPPED_IN_ONE_LINE = 2;
+
     private final MessageSource messageSource;
 
     public RmaActionNotices(MessageSource messageSource) {
@@ -24,7 +26,13 @@ public class RmaActionNotices {
                 .filter(item -> !processedIds.contains(item.getRmaItemId()))
                 .toList();
         List<String> lines = List.of();
-        if (!skipped.isEmpty()) {
+        if (skipped.size() > MAX_SKIPPED_IN_ONE_LINE) {
+            // a longer list joined into one sentence is hard to read: each skipped item gets its own line
+            lines = skipped.stream()
+                    .map(item -> messageSource.getMessage("rma.detail.skipped.item",
+                            new Object[]{item.getName(), reason(item, locale)}, locale))
+                    .toList();
+        } else if (!skipped.isEmpty()) {
             String items = skipped.stream()
                     .map(item -> item.getName() + " — " + reason(item, locale))
                     .collect(Collectors.joining("; "));

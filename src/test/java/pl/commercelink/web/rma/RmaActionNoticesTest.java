@@ -94,6 +94,23 @@ class RmaActionNoticesTest {
         RmaNotice notice = notices.done("rma.detail.done.deleted", selected, List.of(), Locale.ENGLISH);
 
         // then
-        assertThat(notice.lines().get(0)).startsWith("Skipped 5:").doesNotContain("rma.detail");
+        assertThat(notice.lines()).hasSize(5)
+                .allSatisfy(line -> assertThat(line).startsWith("Skipped: ").doesNotContain("rma.detail"));
+    }
+
+    @Test
+    void moreThanTwoSkippedItemsAreListedOnePerLine() {
+        // given
+        List<RMAItem> selected = List.of(item("a", "A", RMAItemStatus.New), item("b", "B", RMAItemStatus.SentForRepair),
+                item("c", "C", RMAItemStatus.MovedToWarehouse), item("d", "D", RMAItemStatus.Received));
+
+        // when
+        RmaNotice notice = notices.done("rma.detail.done.sentToDistributor", selected, List.of("d"), PL);
+
+        // then
+        assertThat(notice.lines()).containsExactly(
+                "Pominięto: A — jeszcze nie odebrana.",
+                "Pominięto: B — w naprawie.",
+                "Pominięto: C — jest już w magazynie.");
     }
 }
