@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 class InventoryIndex {
@@ -52,12 +53,18 @@ class InventoryIndex {
     }
 
     /**
-     * Whether a group of the other (own) index is already represented here. A key carrying a PIM id is covered
-     * only by that id, so a store's own product never disappears behind a global group that merely shares a code;
-     * a key without one is covered by any EAN or code.
+     * Whether a group of the other (own) index is already represented here. A key resolved to a store entry (a PIM
+     * entry owned by the store, never present in the global catalog) is covered only by that id, so a store's own
+     * product never disappears behind a global group that merely shares a code. Any other key, including one with
+     * a global PIM id, is covered by its id, EAN or code: a global group split by price loses its id and keeps
+     * only codes, and the own copy of that product must still be deduplicated against it.
      */
-    boolean covers(InventoryKey ownKey) {
-        return ownKey.getId() != null ? containsId(ownKey.getId()) : contains(ownKey);
+    boolean covers(InventoryKey ownKey, Predicate<String> isStoreEntry) {
+        return isStoreEntryKey(ownKey, isStoreEntry) ? containsId(ownKey.getId()) : contains(ownKey);
+    }
+
+    static boolean isStoreEntryKey(InventoryKey key, Predicate<String> isStoreEntry) {
+        return key.getId() != null && isStoreEntry.test(key.getId());
     }
 
     boolean contains(InventoryKey key) {

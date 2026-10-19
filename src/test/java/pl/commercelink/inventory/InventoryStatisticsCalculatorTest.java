@@ -21,6 +21,9 @@ class InventoryStatisticsCalculatorTest {
     @Mock
     private SupplierRegistry supplierRegistry;
 
+    // store entries in these tests carry an "-s-" id; every other id is a global PIM entry
+    private static final java.util.function.Predicate<String> STORE_ENTRY = id -> id.contains("-s-");
+
     private MatchedInventory group(String ean, String mfn, InventoryItem... items) {
         return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), taxonomyCache, supplierRegistry);
     }
@@ -44,7 +47,7 @@ class InventoryStatisticsCalculatorTest {
                 group("5900000000002", "B", item("5900000000002", "B", "Disabled", 5))));
 
         // when
-        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, InventoryIndex.of(List.of()));
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, InventoryIndex.of(List.of()), STORE_ENTRY);
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(1);
@@ -61,7 +64,7 @@ class InventoryStatisticsCalculatorTest {
                 group("5900000000009", "Z", item("5900000000009", "Z", "Kosatec", 0))));
 
         // when
-        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, own);
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, own, STORE_ENTRY);
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(2);
@@ -80,7 +83,7 @@ class InventoryStatisticsCalculatorTest {
                 group("5900000000001", "B", item("5900000000001", "B", "Kosatec", 3))));
 
         // when
-        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, own);
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, own, STORE_ENTRY);
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(2);
@@ -91,7 +94,7 @@ class InventoryStatisticsCalculatorTest {
     void emptyIndexesGiveZeroes() {
         // when
         InventoryStatistics stats = InventoryStatisticsCalculator.calculate(
-                InventoryIndex.of(List.of()), supplier -> true, InventoryIndex.of(List.of()));
+                InventoryIndex.of(List.of()), supplier -> true, InventoryIndex.of(List.of()), STORE_ENTRY);
 
         // then
         assertThat(stats).isEqualTo(InventoryStatistics.EMPTY);
@@ -106,10 +109,42 @@ class InventoryStatisticsCalculatorTest {
 
         // when
         InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(globalGroup)),
-                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)));
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)), STORE_ENTRY);
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(2);
+        assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
+
+    @Test
+    void ownGroupWithAGlobalPimIdJoinsAGlobalGroupThatLostItsIdByPriceSplit() {
+        // given
+        MatchedInventory splitGlobalGroup = group("5900000000041", "G4", item("5900000000041", "G4", "Elko", 5));
+        MatchedInventory ownGroup = pimGroup("g4", "5900000000041", "G4", item("5900000000041", "G4", "Kosatec", 3));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(splitGlobalGroup)),
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)), STORE_ENTRY);
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
+        assertThat(stats.bySupplier().get("Elko")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
+
+    @Test
+    void ownGroupWithTheGlobalPimIdIsMergedIntoTheGlobalGroup() {
+        // given
+        MatchedInventory globalGroup = pimGroup("g1", "5900000000031", "G1", item("5900000000031", "G1", "Elko", 0));
+        MatchedInventory ownGroup = pimGroup("g1", "5900000000031", "G1", item("5900000000031", "G1", "Kosatec", 3));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(globalGroup)),
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)), STORE_ENTRY);
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.productsInStock()).isEqualTo(1);
         assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
     }
 }

@@ -9,6 +9,10 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -19,6 +23,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -47,6 +52,8 @@ class InventoryStoreStatisticsTest {
     private StoreInventoryProvider storeInventoryProvider;
     @Mock
     private GlobalMatchedInventory globalInventory;
+    @Mock
+    private PimCatalog pimCatalog;
 
     @InjectMocks
     private Inventory inventory;
@@ -151,5 +158,50 @@ class InventoryStoreStatisticsTest {
 
         // then
         assertThat(stats).isEqualTo(InventoryStatistics.EMPTY);
+    }
+
+    // the global PIM catalog decides whether an own group's id is a store entry (matched by id alone) or a global
+    // entry (deduplicated by code, as before): a global group split by price has no id, only the codes
+    private InventoryStatistics statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId(String ownPimId) {
+        store = mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("Elko"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        InventoryKey ownKey = new InventoryKey(ownPimId);
+        ownKey.addEan("5900000000041");
+        ownKey.addManufacturerCode("G4");
+        MatchedInventory own = new MatchedInventory(ownKey,
+                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 3, 1, "Kosatec")), taxonomyCache, supplierRegistry);
+        when(storeInventoryProvider.ownInventory(store))
+                .thenReturn(new StoreInventory(InventoryIndex.of(List.of(own)), LocalDateTime.of(2026, 9, 14, 10, 0)));
+        MatchedInventory splitGlobal = new MatchedInventory(new InventoryKey("5900000000041", "G4"),
+                List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 5, 1, "Elko")), taxonomyCache, supplierRegistry);
+        when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(splitGlobal)));
+        when(globalInventory.version()).thenReturn(1L);
+        return inventory.storeStatistics(STORE_ID);
+    }
+
+    @Test
+    void ownGroupOfAGlobalEntryIsCountedWithThePriceSplitGlobalGroup() {
+        // given
+        when(pimCatalog.findByPimId("g4")).thenReturn(Optional.of(new PimEntry("g4",
+                List.of(new PimIdentifier("5900000000041", PimIdentifierType.GTIN)), "B", "G4", "CPU", null, true, null, null)));
+
+        // when
+        InventoryStatistics stats = statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId("g4");
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+    }
+
+    @Test
+    void ownGroupOfAStoreEntryIsCountedApart() {
+        // given
+        when(pimCatalog.findByPimId("s1-g4")).thenReturn(Optional.empty());
+
+        // when
+        InventoryStatistics stats = statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId("s1-g4");
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(2);
     }
 }

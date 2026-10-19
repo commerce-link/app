@@ -456,7 +456,7 @@ class InventoryViewStoreListingsTest {
                 realCache, supplierRegistry);
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
-        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
+        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()), pimId -> false,
                 realCache, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
