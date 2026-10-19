@@ -73,7 +73,7 @@
                 <a th:if="${s.retryHref() != null}" class="cl-link-button" th:href="@{${s.retryHref()}}"
                    th:text="#{order.shipments.retry}"></a>
                 <form th:if="${s.returnRetryAction() != null}" method="post" th:action="@{${s.returnRetryAction()}}">
-                    <button type="submit" class="cl-link-button" th:attr="aria-label=#{order.shipments.retry.for(${s.number()})}"
+                    <button type="submit" class="cl-link-button" th:attr="aria-label=#{rma.detail.shipments.retry.for(${s.number()})}"
                             th:text="#{order.shipments.retry}"></button>
                 </form>
                 <details class="cl-menu" th:if="${s.hasMenu()}">

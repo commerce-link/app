@@ -657,6 +657,22 @@ class RmaDetailPageRenderingTest {
     }
 
     @Test
+    void theRetryOfACustomersReturnIsNamedByItsVisibleText() {
+        // given
+        RmaShipmentsView.Row failedReturn = new RmaShipmentsView.Row(creation(), 1, "ShipmentType.Courier", null, null,
+                null, false, "order.shipments.state.creation.failed", new Object[]{"No funds"}, "is-warn", false, null,
+                null, null, null, "/dashboard/rma/rma-1/return-shipment/retry");
+
+        // when
+        String html = render("rma-detail :: body", page(rma(RMAStatus.WaitingForItems)), null,
+                new RMAItemsForm(new ArrayList<>()), shipments(false, failedReturn));
+
+        // then: WCAG 2.5.3, the accessible name starts with the label a voice command would use
+        assertThat(html).containsPattern(
+                "<button type=\"submit\" class=\"cl-link-button\" aria-label=\"Try again: shipment 1\">Try again</button>");
+    }
+
+    @Test
     void aShipmentDialogPostsTheOtherShipmentsUnchanged() {
         // given: the first shipment typed in by hand, the second a package, the third still being created
         Shipment first = typedShipment(null, "1111", LocalDateTime.of(2026, 10, 13, 8, 31, 45));
