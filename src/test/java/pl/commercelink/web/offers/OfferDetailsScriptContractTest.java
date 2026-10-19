@@ -86,6 +86,21 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
+    void saveAsTemplateAsksForTheOfferNameFirst() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String header = read("templates/offers/details/header.html");
+
+        // then — the old form refused it with offers.name.required; the template is named after the offer
+        assertThat(header).contains("data-name-required=#{offers.details.action.saveAsTemplate.nameRequired}");
+        assertThat(js).contains("event.target.closest('[data-cl-save-as-template]')")
+                .contains("form.querySelector('input[type=hidden][name=\"name\"]')")
+                .contains("name.value.trim() !== ''")
+                .contains("showToast(button.getAttribute('data-name-required'), 'danger');")
+                .contains("'#offer-terms-card [data-cl-dialog-open=\"offer-terms-dialog\"]'");
+    }
+
+    @Test
     void backgroundSaveCountsOnlyALandingBackOnTheOfferPage() throws Exception {
         // when
         String js = read("static/js/offer-details.js");

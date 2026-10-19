@@ -327,6 +327,23 @@
         });
     }
 
+    // "Zapisz jako szablon" names the template after the offer, so like the old form it asks for the name first; the
+    // name is edited in the terms dialog, whose "Edytuj" takes the focus
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('[data-cl-save-as-template]');
+        var name = button && form.querySelector('input[type=hidden][name="name"]');
+        if (!name || name.value.trim() !== '') {
+            return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showToast(button.getAttribute('data-name-required'), 'danger');
+        var edit = document.querySelector('#offer-terms-card [data-cl-dialog-open="offer-terms-dialog"]');
+        if (edit) {
+            edit.focus();
+        }
+    }, true);
+
     // "Zapisz jako szablon" posts the items form, whose copies of the name and the fulfilment type would otherwise keep
     // the values from before the terms dialog until the page reloads
     function keepTermsForTemplate(saved) {

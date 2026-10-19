@@ -115,7 +115,7 @@
                         <!--/* Takes the items as they are in the table, saved or not, and leaves the offer unsaved: the
                                old behaviour, so it posts the items form itself and is not a save-then-act action. */-->
                         <li><button type="submit" class="cl-menu-item" form="offer-items" data-cl-save-as-template
-                                th:attr="formaction=@{|${base}/saveAsTemplate|}">
+                                th:attr="formaction=@{|${base}/saveAsTemplate|}, data-name-required=#{offers.details.action.saveAsTemplate.nameRequired}">
                             <span th:text="#{offers.details.action.saveAsTemplate}"></span>
                             <span class="cl-menu-desc" th:text="#{offers.details.action.saveAsTemplate.desc}"></span>
                         </button></li>
