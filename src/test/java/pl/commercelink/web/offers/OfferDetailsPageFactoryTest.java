@@ -179,6 +179,20 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
+    void productWithoutCategoryIsNotFlaggedBecauseTheTableKeepsIt() {
+        // given
+        BasketItem noCategory = item("A", 1, 10, 5);
+        noCategory.setCategory(null);
+        Basket basket = basket(noCategory);
+
+        // when
+        List<OfferDetailsPage.Line> lines = build(basket).lines();
+
+        // then
+        assertThat(((Item) lines.get(0)).incomplete()).isFalse();
+    }
+
+    @Test
     void removedDeliveryOptionDoesNotThrow() {
         // given
         Basket basket = basket(item("A", 1, 100, 50));

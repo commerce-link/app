@@ -414,6 +414,49 @@ class OfferDetailsControllerTest {
     }
 
     @Test
+    void itemEditKeepsAProductWithABlankCategory() {
+        // given: a table save keeps such a product too (a blank category is not null when isComplete checks it)
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setBasketItems(List.of(item("MFN-A", 1)));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        OfferItemForm form = new OfferItemForm();
+        form.setName("Laptop");
+        form.setCategory(" ");
+        form.setMfn("MFN-A");
+
+        // when
+        String view = controller.saveItem(OFFER_ID, 0, form, null, new ExtendedModelMap(), LOCALE,
+                new RedirectAttributesModelMap());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+        assertThat(savedBasket().getBasketItems()).singleElement().satisfies(i -> {
+            assertThat(i.getName()).isEqualTo("Laptop");
+            assertThat(i.getCategory()).isNull();
+        });
+    }
+
+    @Test
+    void itemEditWithBlankManufacturerCodeIsRejected() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setBasketItems(List.of(item("MFN-A", 1)));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        OfferItemForm form = new OfferItemForm();
+        form.setName("Laptop");
+        form.setMfn("");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.saveItem(OFFER_ID, 0, form, null, model, LOCALE, new RedirectAttributesModelMap());
+
+        // then
+        assertThat(view).isEqualTo("offers/item-edit");
+        assertThat((Map<String, String>) model.getAttribute("errors")).containsOnlyKeys("mfn");
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
     void itemEditOutsideTheListIsNotFound() {
         // given
         Basket stored = fullOffer(BasketType.Offer);

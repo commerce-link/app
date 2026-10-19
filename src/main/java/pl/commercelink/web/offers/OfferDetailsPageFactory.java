@@ -80,13 +80,13 @@ public class OfferDetailsPageFactory {
         BasketViewPage.Customer addresses = BasketViewPageFactory.customer(basket, locale);
         OfferValidity validity = OfferValidity.of(basket.getExpiresAt(), now);
 
-        return new OfferDetailsPage(basket.getBasketId(), basket.getShortenedBasketId(), template,
+        return new OfferDetailsPage(basket.getBasketId(), basket.getStoreId(), basket.getShortenedBasketId(), template,
                 title(basket, template, locale), backHref(returnTo, template),
                 template ? "offers.details.back.templates" : "offers.details.back.offers",
                 template ? new Pill("offers.details.pill.template", null, "is-neutral")
                         : new Pill("offers.list.pill." + validity.param(), null, OfferRowMapper.tone(validity)),
                 meta(basket, template, validity, summary, contact, locale, now),
-                lines(basket, offerItems), storeCategories.groups(catalogs), summary,
+                lines(basket, offerItems), storeCategories.groups(catalogs), catalogs, summary,
                 terms(basket, store, template, locale),
                 new Customer(contact == null ? null : contact.getName(), contact == null ? null : contact.getSurname(),
                         contact == null ? null : contact.getCompanyName(), contact == null ? null : contact.getEmail(),
@@ -163,10 +163,19 @@ public class OfferDetailsPageFactory {
         return new Item(index, item.getId(), item.getCatalogId(), item.getName(), item.getCategory(), item.getMfn(),
                 item.getQty(), Money.inputRounded(item.getUnitPrice()), Money.inputRounded(item.getUnitCost()),
                 item.getUnitPrice(), item.getUnitCost(), item.isConsolidated(), item.getVariantGroupId(),
-                item.isVariantSelected(), service, item.getEstimatedDeliveryDays(), !item.isComplete(),
+                item.isVariantSelected(), service, item.getEstimatedDeliveryDays(), droppedOnSave(item),
                 service ? null : ItemMargin.of(item.getUnitPrice(), item.getUnitCost(), DEFAULT_VAT_RATE), market,
                 known ? offer.getMedianCostProviders() : null, known ? offer.getRemainingProviders() : null,
                 known ? offer.getLowestCostQty() : 0, known ? offer.getMedianCostQty() : 0);
+    }
+
+    /**
+     * BasketItem.isComplete on what the row posts: a product without a category posts it as "" and is kept, so only
+     * the name, the code, the quantity and the price can make the save drop it.
+     */
+    private static boolean droppedOnSave(BasketItem item) {
+        return StringUtils.isBlank(item.getName()) || StringUtils.isBlank(item.getMfn()) || item.getQty() <= 0
+                || item.getUnitPrice() < 0;
     }
 
     /** The formulas of OfferController.showEditOfferForm, unchanged: chosen variants plus delivery, and the profit from it. */

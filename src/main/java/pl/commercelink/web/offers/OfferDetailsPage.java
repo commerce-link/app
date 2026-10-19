@@ -1,5 +1,6 @@
 package pl.commercelink.web.offers;
 
+import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.offers.BasketViewPage.Market;
 import pl.commercelink.web.orders.AddressBlock;
@@ -9,14 +10,19 @@ import java.util.List;
 
 /**
  * The offer details page (/dashboard/offer/{id}): every text resolved, amounts formatted without the currency (the
- * template adds it through general.currency.amount). recordName and fulfilmentType are the raw record values for the
- * hidden fields of the items form.
+ * template adds it through general.currency.amount). storeId, recordName and fulfilmentType are the raw record values
+ * for the hidden fields of the items form; catalogs feed the shared add-items dialog.
  */
-public record OfferDetailsPage(String offerId, String shortId, boolean template, String title, String backHref,
+public record OfferDetailsPage(String offerId, String storeId, String shortId, boolean template, String title, String backHref,
                                String backLabelKey, Pill validity, Meta meta, List<Line> lines,
-                               List<StoreCategories.Group> categoryGroups, Summary summary, Terms terms,
+                               List<StoreCategories.Group> categoryGroups, List<ProductCatalog> catalogs, Summary summary, Terms terms,
                                Customer customer, String note, String clientUrl, boolean proformaAvailable,
                                boolean copyWithContactAvailable, String recordName, String fulfilmentType) {
+
+    /** A category of none of the catalogs (an old item, an import) stays selectable as an extra option. */
+    public boolean knownCategory(String category) {
+        return categoryGroups.stream().anyMatch(group -> group.names().contains(category));
+    }
 
     /** A message key, its one argument (null when the key has none) and the pill tone. */
     public record Pill(String key, Object arg, String tone) {
@@ -33,7 +39,10 @@ public record OfferDetailsPage(String offerId, String shortId, boolean template,
     public record GroupHead(String name, int size) implements Line {
     }
 
-    /** market null = a service; margin null = a service. index is the position in the record's item list (the form binding). */
+    /**
+     * market null = a service; margin null = a service. index is the position in the record's item list (the form
+     * binding). incomplete = the table save would drop it (BasketItem.isComplete on what the row posts).
+     */
     public record Item(int index, String id, String catalogId, String name, String category, String mfn, long qty,
                        String unitPriceInput, String unitCostInput, double unitPrice, double unitCost,
                        boolean consolidated, String variantGroupId, boolean variantSelected, boolean service,

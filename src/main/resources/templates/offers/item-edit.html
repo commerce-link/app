@@ -1,0 +1,39 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+<!--/* One item of an offer, the page of the row's pencil without JavaScript: the fields of the "Edit item" dialog, saved
+       for this one item (OfferDetailsController.saveItem); quantity and price stay in the table. */-->
+<section th:fragment="page" class="cl-page"
+         th:with="p=${page}, it=${page.lines().^[#this instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item) and index() == __${index}__]},
+                  mk=${it?.market()},
+                  market=${mk != null and !mk.missing()} ? #{offers.details.margin.market(#{general.currency.amount(${mk.low()})}, #{general.currency.amount(${mk.median()})})}
+                      : (${mk != null} ? #{offers.details.margin.noMarket} : null),
+                  marketStock=${mk != null and !mk.missing()} ? #{offers.details.margin.stock(${it.lowestQty()}, ${it.medianQty()}, ${mk.stock()})} : null">
+    <div class="cl-page-body is-form">
+        <div th:replace="~{fragments/settings-header :: subpageWithActions(${pageHref}, ${p.title()}, #{offers.details.item.title},
+                ${it != null and !#strings.isEmpty(it.name())} ? ${it.name()} : null, null)}"></div>
+        <form id="offer-item-form" class="cl-form" method="post" th:action="@{${formAction}}">
+            <div th:if="${!errors.isEmpty()}" class="cl-alert is-bad" tabindex="-1" role="alert" data-cl-error-summary>
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="#{offers.details.item.errors}"></p>
+            </div>
+            <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+            <section class="cl-card" aria-labelledby="offer-item-title">
+                <div class="cl-card-head"><h2 class="cl-card-title" id="offer-item-title" th:text="#{offers.details.item.title}"></h2></div>
+                <div class="cl-card-inset">
+                    <th:block th:replace="~{offers/details/items :: itemFields(${form}, ${errors}, ${p}, 'offer-item')}"></th:block>
+                </div>
+                <div class="cl-card-footer">
+                    <button type="submit" class="cl-button is-primary" th:text="#{offers.details.item.save}"></button>
+                    <a class="cl-button" th:href="@{${pageHref}}" th:text="#{general.cancel}"></a>
+                </div>
+            </section>
+        </form>
+    </div>
+</section>
+</div>
+</body>
+</html>

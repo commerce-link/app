@@ -154,7 +154,7 @@ public class OfferDetailsController {
                     RedirectAttributes redirectAttributes) {
         Basket offer = requireOffer(offerId);
         BasketItem item = requireItem(offer, index);
-        Map<String, String> errors = form.validate(item);
+        Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
             renderItem(model, offer, index, form, errors, returnTo, locale);
             return ITEM_VIEW;

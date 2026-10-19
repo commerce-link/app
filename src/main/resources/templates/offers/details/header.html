@@ -1,0 +1,130 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The record header of the offer details page (Nagłówek rekordu z jedną akcją główną). Wrapped in #offer-header so a
+       dialog saved while the table has unsaved changes can swap it from the refresh template (name, client, total).
+       Every action that works on the saved offer carries data-cl-offer-action: offer-details.js asks "Save and …"
+       first when the table has unsaved changes. Without JavaScript the links and buttons work on their own: order and
+       recalculation through their confirmation pages, the rest as plain posts of the empty form#offer-action-form. */-->
+<div th:fragment="header(p)" id="offer-header"
+     th:with="base=|/dashboard/offer/${p.offerId()}|, author=${p.meta().author()}, created=${p.meta().createdAt()}">
+    <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, #{${p.backLabelKey()}}, ${p.title()},
+             ~{offers/details/header :: offerCopy}, ~{offers/details/header :: offerStatus},
+             ~{offers/details/header :: offerMeta}, ~{offers/details/header :: offerActions})}">
+        <th:block th:fragment="offerCopy">
+            <button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                    th:attr="data-cl-copy=${p.offerId()}, aria-label=#{offers.details.copyId}, title=${p.offerId()}">
+                <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+            </button>
+        </th:block>
+        <th:block th:fragment="offerStatus">
+            <span class="cl-status" th:classappend="${p.validity().tone()}"
+                  th:text="${p.validity().arg() != null} ? #{${p.validity().key()}(${p.validity().arg()})} : #{${p.validity().key()}}"></span>
+        </th:block>
+        <th:block th:fragment="offerMeta">
+            <p class="cl-record-meta">
+                <span th:unless="${p.template()}"><strong th:text="${p.meta().client() ?: #messages.msg('offers.details.meta.noClient')}"></strong></span>
+                <span th:if="${p.meta().dueNote() != null}" th:text="${p.meta().dueNote()}"></span>
+                <span th:if="${created != null}" th:text="${author != null}
+                        ? #{${p.template() ? 'offers.details.meta.createdBy.template' : 'offers.details.meta.createdBy'}(${created}, ${author})}
+                        : #{${p.template() ? 'offers.details.meta.created.template' : 'offers.details.meta.created'}(${created})}"></span>
+                <span th:unless="${p.template()}"><strong th:text="#{general.currency.amount(${p.meta().total()})}"></strong></span>
+                <span th:text="#{offers.list.items(${p.meta().itemsCount()})}"></span>
+            </p>
+        </th:block>
+        <th:block th:fragment="offerActions">
+            <th:block th:if="${p.template()}">
+                <a class="cl-button is-primary" th:href="@{/dashboard/offer/new(intent='template',sourceId=${p.offerId()})}"
+                   data-cl-offer-action data-action-method="get"
+                   th:attr="data-action-url=@{/dashboard/offer/new(intent='template',sourceId=${p.offerId()})},
+                            data-label=#{offers.details.action.fromTemplate.then}">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                    <span th:text="#{offers.details.action.fromTemplate}"></span>
+                </a>
+            </th:block>
+            <th:block th:unless="${p.template()}">
+                <!--/* Creating the order deletes the offer, so it is confirmed; a change, not a removal: primary tone */-->
+                <a class="cl-button is-primary" th:href="@{|${base}/order|}" data-cl-confirm data-cl-confirm-tone="primary"
+                   data-cl-offer-action data-action-method="post"
+                   th:attr="data-cl-confirm-title=#{offers.details.order.confirm.title(${p.title()})},
+                            data-cl-confirm-message=#{offers.details.order.confirm.message},
+                            data-cl-confirm-action=#{offers.details.order.confirm.action},
+                            data-action-url=@{|${base}/order|}, data-label=#{offers.details.action.order.then}">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-shopping-cart"></i></span>
+                    <span th:text="#{offers.details.action.order}"></span>
+                </a>
+                <details class="cl-menu">
+                    <summary class="cl-button">
+                        <span th:text="#{offers.details.more}"></span>
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                    </summary>
+                    <ul class="cl-menu-list" id="offer-more-menu">
+                        <li hidden data-cl-copy-reveal><button type="button" class="cl-menu-item" th:attr="data-cl-copy=${p.clientUrl()}">
+                            <span th:text="#{offers.details.action.copyLink}"></span>
+                            <span class="cl-menu-desc" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></span>
+                        </button></li>
+                        <li><a class="cl-menu-item" th:href="${p.clientUrl()}" target="_blank" rel="noopener">
+                            <span th:text="#{offers.details.action.openAsClient}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.openAsClient.desc}"></span>
+                            <span class="cl-menu-desc" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></span>
+                        </a></li>
+                        <li class="cl-menu-sep" aria-hidden="true"></li>
+                        <!--/* Without the customer's invoice details the invoicing system refuses the proforma: said here
+                               instead. Each click makes a new proforma, so offer-details.js confirms it (data-cl-confirm-*
+                               without data-cl-confirm: confirm-dialog.js needs a link address, this is a post). */-->
+                        <li th:if="${p.proformaAvailable()}"><button type="submit" class="cl-menu-item" form="offer-action-form"
+                                data-cl-offer-action data-action-method="post" data-cl-confirm-tone="primary"
+                                th:attr="formaction=@{|${base}/createProformaInvoice|}, data-action-url=@{|${base}/createProformaInvoice|},
+                                         data-label=#{offers.details.action.proforma.then},
+                                         data-cl-confirm-title=#{offers.details.proforma.confirm.title(${p.title()})},
+                                         data-cl-confirm-message=#{offers.details.proforma.confirm.message},
+                                         data-cl-confirm-action=#{offers.details.proforma.confirm.action}">
+                            <span th:text="#{offers.details.action.proforma}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.proforma.desc}"></span>
+                        </button></li>
+                        <li th:unless="${p.proformaAvailable()}"><button type="button" class="cl-menu-item" aria-disabled="true"
+                                aria-describedby="offer-proforma-reason">
+                            <span th:text="#{offers.details.action.proforma}"></span>
+                            <span class="cl-menu-reason" id="offer-proforma-reason" th:text="#{offers.details.action.proforma.reason}"></span>
+                        </button></li>
+                        <li><a class="cl-menu-item" th:href="@{|${base}/recalculate|}" data-cl-confirm data-cl-confirm-tone="primary"
+                               data-cl-offer-action data-action-method="post"
+                               th:attr="data-cl-confirm-title=#{offers.details.recalculate.confirm.title(${p.title()})},
+                                        data-cl-confirm-message=#{offers.details.recalculate.confirm.message},
+                                        data-cl-confirm-action=#{offers.details.recalculate.confirm.action},
+                                        data-action-url=@{|${base}/recalculate|}, data-label=#{offers.details.action.recalculate.then}">
+                            <span th:text="#{offers.details.action.recalculate}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.recalculate.desc}"></span>
+                        </a></li>
+                        <li class="cl-menu-sep" aria-hidden="true"></li>
+                        <li><button type="submit" class="cl-menu-item" form="offer-action-form"
+                                data-cl-offer-action data-action-method="post"
+                                th:attr="formaction=@{|${base}/copy|}, data-action-url=@{|${base}/copy|},
+                                         data-label=#{offers.details.action.copy.then}">
+                            <span th:text="#{offers.details.action.copy}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.copy.desc}"></span>
+                        </button></li>
+                        <li th:if="${p.copyWithContactAvailable()}"><button type="submit" class="cl-menu-item" form="offer-action-form"
+                                data-cl-offer-action data-action-method="post"
+                                th:attr="formaction=@{|${base}/copy?withContact=true|}, data-action-url=@{|${base}/copy?withContact=true|},
+                                         data-label=#{offers.details.action.copyWithContact.then}">
+                            <span th:text="#{offers.details.action.copyWithContact}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.copyWithContact.desc}"></span>
+                        </button></li>
+                        <!--/* Takes the items as they are in the table, saved or not, and leaves the offer unsaved: the
+                               old behaviour, so it posts the items form itself and is not a save-then-act action. */-->
+                        <li><button type="submit" class="cl-menu-item" form="offer-items" data-cl-save-as-template
+                                th:attr="formaction=@{|${base}/saveAsTemplate|}">
+                            <span th:text="#{offers.details.action.saveAsTemplate}"></span>
+                            <span class="cl-menu-desc" th:text="#{offers.details.action.saveAsTemplate.desc}"></span>
+                        </button></li>
+                    </ul>
+                </details>
+            </th:block>
+        </th:block>
+    </div>
+</div>
+
+</body>
+</html>

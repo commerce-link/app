@@ -29,17 +29,17 @@ public class OfferItemForm {
         return form;
     }
 
-    /** The same completeness the table save enforces by dropping an item; here the user is told instead. */
-    public Map<String, String> validate(BasketItem item) {
+    /**
+     * What the table save would drop as incomplete, told to the user instead. A blank category is not among it: the
+     * table posts it as "", which passes BasketItem.isComplete before it is stored as null.
+     */
+    public Map<String, String> validate() {
         Map<String, String> errors = new LinkedHashMap<>();
         if (StringUtils.isBlank(name)) {
             errors.put("name", "offers.details.item.name.required");
         }
         if (StringUtils.isBlank(mfn)) {
             errors.put("mfn", "offers.details.item.mfn.required");
-        }
-        if (!item.isService() && StringUtils.isBlank(category)) {
-            errors.put("category", "offers.details.item.category.required");
         }
         return errors;
     }
