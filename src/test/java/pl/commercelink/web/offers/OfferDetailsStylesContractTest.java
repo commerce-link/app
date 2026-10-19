@@ -62,4 +62,14 @@ class OfferDetailsStylesContractTest {
         // then — kept on one line from 720 px, at 320 px the sentence is wider than the card
         assertThat(phone).contains(".cl-visibility { white-space: normal; }");
     }
+
+    @Test
+    void touchSizedHandleAndMenuGetColumnsThatHoldThemBelow1024() throws Exception {
+        // when
+        String tablet = block().substring(block().indexOf("@media screen and (max-width: 1023px)"));
+
+        // then — 44 px controls in the 36 / 52 px desktop columns overlapped the name and the card border
+        assertThat(tablet.substring(0, tablet.indexOf('}', tablet.indexOf("col.cl-col-menu")) + 1))
+                .contains("col.cl-col-drag { width: 64px; }").contains("col.cl-col-menu { width: 76px; }");
+    }
 }

@@ -13900,6 +13900,9 @@ a.cl-link-button:hover {
 @media screen and (max-width: 1023px) {
     .cl-page .cl-table.is-line-editor :is(.cl-drag, .cl-table-edit) { width: 44px; height: 44px; }
     .cl-page .cl-table.is-line-editor .cl-table-edit { margin: -8px -8px -8px 0; }
+    /* the 44 px handle and menu button with their cell padding */
+    .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 64px; }
+    .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 76px; }
 }
 /* < 720 px a row is a card: the name and its menu, quantity | price side by side, the value under them; the drag
    handle goes (the order is kept with "Przenieś" in the menu). The two :not() outweigh the shared card rules of
