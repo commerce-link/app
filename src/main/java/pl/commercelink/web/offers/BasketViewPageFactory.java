@@ -207,7 +207,7 @@ public class BasketViewPageFactory {
         return new DecimalFormat("0.0", symbols).format(BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP));
     }
 
-    private Customer customer(Basket basket, Locale locale) {
+    static Customer customer(Basket basket, Locale locale) {
         AddressBlock billing = AddressBlock.of(basket.getBillingDetails(), locale);
         AddressBlock shipping = AddressBlock.of(basket.getShippingDetails(), locale);
         boolean same = hasAny(billing) && hasAny(shipping)

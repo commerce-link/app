@@ -98,6 +98,8 @@ public class OfferItem {
     public boolean isExistInInventory() { return existInInventory; }
 
     public double getLowestCost() { return lowestCost; }
+    public int getLowestCostQty() { return lowestCostQty; }
+    public int getMedianCostQty() { return medianCostQty; }
 
     public double getMedianCost() { return medianCost; }
 

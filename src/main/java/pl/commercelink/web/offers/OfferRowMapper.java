@@ -142,19 +142,24 @@ public class OfferRowMapper {
     }
 
     private String validityNote(OfferValidity validity, LocalDateTime expiresAt) {
+        return validityNote(validity, expiresAt, now, messages, locale);
+    }
+
+    /** Shared with the offer details page, so the header says what the list row says. */
+    static String validityNote(OfferValidity validity, LocalDateTime expiresAt, LocalDateTime now, MessageSource messages, Locale locale) {
         return switch (validity) {
             case NO_EXPIRY -> null;
-            case EXPIRED -> text("offers.list.note.expired", date(expiresAt));
+            case EXPIRED -> messages.getMessage("offers.list.note.expired", new Object[]{date(expiresAt, now)}, locale);
             case ACTIVE, EXPIRING -> {
                 long days = ChronoUnit.DAYS.between(now.toLocalDate(), expiresAt.toLocalDate());
-                if (days == 0) yield text("offers.list.note.today", TIME.format(expiresAt));
-                if (days == 1) yield text("offers.list.note.tomorrow", date(expiresAt));
-                yield text("offers.list.note.until", date(expiresAt), String.valueOf(days));
+                if (days == 0) yield messages.getMessage("offers.list.note.today", new Object[]{TIME.format(expiresAt)}, locale);
+                if (days == 1) yield messages.getMessage("offers.list.note.tomorrow", new Object[]{date(expiresAt, now)}, locale);
+                yield messages.getMessage("offers.list.note.until", new Object[]{date(expiresAt, now), String.valueOf(days)}, locale);
             }
         };
     }
 
-    private static String tone(OfferValidity validity) {
+    static String tone(OfferValidity validity) {
         return switch (validity) {
             case ACTIVE -> "is-ok";
             case EXPIRING -> "is-warn";
@@ -167,6 +172,10 @@ public class OfferRowMapper {
     }
 
     private String date(LocalDateTime value) {
+        return date(value, now);
+    }
+
+    static String date(LocalDateTime value, LocalDateTime now) {
         if (value == null) {
             return null;
         }
