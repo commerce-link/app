@@ -1,85 +1,42 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{layout(ownsErrorMessage=true)}">
 <body>
 
-<div layout:fragment="content" class="container">
+<!--/* source is what the offer starts from, decided by the controller: null (empty offer), "template", "offer" or "basket"
+       (a shop basket; the controller filled the contact and offerName from it). It picks the way back and the lead. */-->
+<div layout:fragment="content"
+     th:with="sourcePath=${sourceId == null ? null : #uris.escapePathSegment(sourceId)},
+              backHref=${source == 'basket' ? '/dashboard/basket/view/' + sourcePath : (source != null ? '/dashboard/offer/' + sourcePath : '/dashboard/offers')},
+              backLabel=${#messages.msg('offers.new.back.' + (source ?: 'offers'))},
+              lead=${#messages.msg('offers.new.lead.' + (source ?: 'manual'))}">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{offers.new.title}, ${lead}, null)}"></div>
 
-    <h1 class="title" th:text="#{offers.contact.title}"></h1>
-    <p class="subtitle is-6" th:text="#{offers.contact.subtitle}"></p>
-
-    <form th:action="@{/dashboard/offer/new}" th:object="${contactDetails}" method="post">
-        <input type="hidden" name="intent" th:value="${intent}">
-        <input type="hidden" name="sourceId" th:value="${sourceId}">
-
-        <fieldset class="box">
-            <legend class="label" th:text="#{offers.details}"></legend>
-            <div class="field">
-                <label class="label" th:text="#{offers.name}"></label>
-                <div class="control">
-                    <input class="input" type="text" name="offerName" th:value="${offerName}" th:placeholder="#{offers.name.placeholder}" required>
+            <form id="offer-new-form" class="cl-form" th:action="@{/dashboard/offer/new}" th:object="${contactDetails}" method="post"
+                  data-cl-form-check>
+                <div th:replace="~{fragments/offer-create :: serverError}"></div>
+                <div th:replace="~{fragments/settings-form :: formCheckSummary('offers.new.errors.title')}"></div>
+                <input type="hidden" name="intent" th:value="${intent}">
+                <input type="hidden" name="sourceId" th:value="${sourceId}">
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{offers.new.offer}"></legend>
+                        <div class="cl-form-grid">
+                            <div th:replace="~{fragments/offer-create :: offerName(${offerName}, ${errorMessage == null and offerName == null})}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset th:replace="~{fragments/offer-create :: contact('', ${contactDetails})}"></fieldset>
+                    <details th:replace="~{fragments/offer-create :: gclid(null)}"></details>
+                    <div th:replace="~{fragments/offer-create :: footer(${backHref})}"></div>
                 </div>
-            </div>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.gclid}"></label>
-                <div class="control">
-                    <input class="input" type="text" name="gclid">
-                </div>
-                <p class="help" th:text="#{offers.contact.gclid.help}"></p>
-            </div>
-        </fieldset>
-
-        <fieldset class="box">
-            <legend class="label" th:text="#{offers.contact.section}"></legend>
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.name}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{name}">
-                </div>
-            </div>
-
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.surname}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{surname}">
-                </div>
-            </div>
-
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.company}"></label>
-                <div class="control">
-                    <input class="input" type="text" th:field="*{companyName}">
-                </div>
-            </div>
-
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.email}"></label>
-                <div class="control">
-                    <input class="input" type="email" th:field="*{email}">
-                </div>
-            </div>
-
-            <div class="field">
-                <label class="label" th:text="#{offers.contact.phone}"></label>
-                <div class="control">
-                    <input class="input" type="tel" th:field="*{phone}">
-                </div>
-            </div>
-
-            <p class="help" th:text="#{offers.contact.requirement}"></p>
-        </fieldset>
-
-        <div class="field is-grouped" style="margin-top: 20px">
-            <div class="control">
-                <button class="button is-primary" type="submit" th:text="#{offers.contact.submit}"></button>
-            </div>
-            <div class="control">
-                <a th:href="@{/dashboard/offers}" class="button is-light" th:text="#{general.cancel}"></a>
-            </div>
+            </form>
         </div>
-    </form>
-
+    </section>
+    <script th:src="@{/js/form-check.js}" defer></script>
+    <script th:src="@{/js/error-summary.js}" defer></script>
 </div>
 
 </body>

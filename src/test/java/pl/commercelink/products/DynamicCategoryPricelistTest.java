@@ -73,7 +73,7 @@ class DynamicCategoryPricelistTest {
         recommendationEngine = new ProductRecommendationEngine(productRepository);
         when(pimCatalog.forStore(any())).thenReturn(pimCatalog);
 
-        when(rollingPriceAggregateRepository.loadAll()).thenReturn(Map.of());
+        when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
@@ -114,7 +114,8 @@ class DynamicCategoryPricelistTest {
                 productRepository,
                 recommendationEngine,
                 rollingPriceAggregateRepository,
-                sellingPriceHistoryRepository
+                sellingPriceHistoryRepository,
+                STORE_ID
         );
 
         return availabilityAndPriceList.generate(STORE_ID, CATALOG_ID);

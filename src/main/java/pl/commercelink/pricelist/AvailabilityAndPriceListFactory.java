@@ -34,7 +34,7 @@ public class AvailabilityAndPriceListFactory {
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
     }
 
-    public AvailabilityAndPriceList create(InventoryView inventory) {
+    public AvailabilityAndPriceList create(InventoryView inventory, String storeId) {
         return new AvailabilityAndPriceList(
                 inventory,
                 pimCatalog,
@@ -42,7 +42,8 @@ public class AvailabilityAndPriceListFactory {
                 productRepository,
                 recommendationEngine,
                 rollingPriceAggregateRepository,
-                sellingPriceHistoryRepository
+                sellingPriceHistoryRepository,
+                storeId
         );
     }
 }

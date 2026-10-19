@@ -26,7 +26,8 @@ public class AvailabilityAndPriceList {
             ProductRepository productRepository,
             ProductRecommendationEngine recommendationEngine,
             RollingPriceAggregateRepository rollingPriceAggregateRepository,
-            SellingPriceHistoryRepository sellingPriceHistoryRepository
+            SellingPriceHistoryRepository sellingPriceHistoryRepository,
+            String storeId
     ) {
         this.inventory = inventory;
         this.pimCatalog = pimCatalog;
@@ -35,7 +36,7 @@ public class AvailabilityAndPriceList {
         this.recommendationEngine = recommendationEngine;
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
 
-        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
+        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadForStore(storeId);
         this.pricing = new ProductPricingStrategy(inventory, priceAggregates);
     }
 
