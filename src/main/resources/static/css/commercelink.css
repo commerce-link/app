@@ -6476,6 +6476,8 @@ a.cl-link-button:hover {
    the fieldset already pads its content, so the dl drops the padding it has as a card child */
 .cl-page .cl-fieldset > dl.cl-kv { padding: 0; }
 .cl-page .cl-fieldset > dl.cl-kv + .cl-help { margin: var(--cl-gap-fields) 0 0; }
+/* The fields under the record's facts (the payment method under the summary of a new order) */
+.cl-page .cl-fieldset > .cl-kv + .cl-form-grid { margin-top: 16px; }
 @media screen and (max-width: 719px) {
   .cl-page .cl-fieldset > dl.cl-kv { grid-template-columns: minmax(0, 1fr); }
   .cl-page .cl-fieldset > dl.cl-kv > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
@@ -7479,6 +7481,13 @@ a.cl-link-button:hover {
 
 .cl-page .cl-card-grid.is-last {
     padding: 12px 20px 16px;
+}
+
+/* An address grid inside a fieldset section (new order page) sits in the section's own padding, not in the card's. */
+.cl-page .cl-fieldset > .cl-card-grid,
+.cl-page .cl-fieldset > .cl-choice-group > .cl-card-grid {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .cl-page .cl-card-inset {
