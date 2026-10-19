@@ -30,8 +30,8 @@
         <form id="offer-items" class="cl-layout-aside" method="post" data-cl-dirty-form
               th:action="@{|/dashboard/offer/${p.offerId()}|}"
               th:attr="data-discard-confirm=#{offers.details.save.discard.confirm}">
-            <input type="hidden" name="name" th:value="${p.recordName() ?: ''}">
-            <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}">
+            <input type="hidden" name="name" th:value="${p.recordName() ?: ''}" data-cl-dirty-ignore>
+            <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}" data-cl-dirty-ignore>
             <input type="hidden" name="storeId" th:value="${p.storeId()}">
             <input type="hidden" name="type" th:value="${p.template()} ? 'OfferTemplate' : 'Offer'">
             <input type="hidden" name="basketId" th:value="${p.offerId()}">

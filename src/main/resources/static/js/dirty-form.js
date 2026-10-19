@@ -9,7 +9,8 @@
 // A dirty form makes the browser ask before the page is left; a submit nobody prevented lets the page go. A page
 // script that saves the form itself calls window.CL_markClean(form). window.CL_isDirty(form) answers the state, and
 // the form receives cl:dirty-changed (detail: dirty, count) whenever it changes. A script that changes the form without
-// an input or change event (reordering rows) dispatches cl:lines-changed on it.
+// an input or change event (reordering rows) dispatches cl:lines-changed on it. A field marked data-cl-dirty-ignore is
+// not compared: a copy of a value saved elsewhere, which a page script keeps up to date.
 (function () {
     'use strict';
 
@@ -33,7 +34,7 @@
     function otherValues(form) {
         return Array.prototype.filter.call(form.elements, function (control) {
             return control.name && control.type !== 'submit' && control.type !== 'button'
-                && !control.closest('[data-cl-dirty-row]');
+                && !control.closest('[data-cl-dirty-row]') && !control.hasAttribute('data-cl-dirty-ignore');
         }).map(function (control) {
             return control.name + '=' + valueOf(control);
         }).join(SEPARATOR);

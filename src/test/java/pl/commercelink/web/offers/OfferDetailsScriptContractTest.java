@@ -88,4 +88,19 @@ class OfferDetailsScriptContractTest {
                 .contains("confirmForm.removeEventListener('submit', saveThenSend)")
                 .contains("HTMLFormElement.prototype.submit.call(confirmForm)");
     }
+
+    @Test
+    void termsSavedWhileTheTableIsDirtyUpdateTheNameSaveAsTemplatePosts() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String page = read("templates/offers/details.html");
+        String guard = read("static/js/dirty-form.js");
+
+        // then — the hidden copies follow the terms dialog and do not count as an unsaved change of the table
+        assertThat(js).contains("saved.id === 'offer-terms-form'").contains("['name', 'fulfilmentType']")
+                .contains("copy.value = source.value");
+        assertThat(page).contains("name=\"name\" th:value=\"${p.recordName() ?: ''}\" data-cl-dirty-ignore")
+                .contains("name=\"fulfilmentType\" th:value=\"${p.fulfilmentType() ?: ''}\" data-cl-dirty-ignore");
+        assertThat(guard).contains("!control.hasAttribute('data-cl-dirty-ignore')");
+    }
 }

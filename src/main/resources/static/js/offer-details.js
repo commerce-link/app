@@ -286,6 +286,18 @@
         });
     }
 
+    // "Zapisz jako szablon" posts the items form, whose copies of the name and the fulfilment type would otherwise keep
+    // the values from before the terms dialog until the page reloads
+    function keepTermsForTemplate(saved) {
+        ['name', 'fulfilmentType'].forEach(function (name) {
+            var source = saved.elements.namedItem(name);
+            var copy = form.querySelector('input[type=hidden][name="' + name + '"]');
+            if (source && copy) {
+                copy.value = source.value;
+            }
+        });
+    }
+
     document.addEventListener('cl:form-replaced', function (event) {
         var saved = event.target;
         if (!(saved instanceof HTMLFormElement) || CARD_FORMS.indexOf(saved.id) < 0
@@ -301,6 +313,9 @@
             return;
         }
         var template = saved.querySelector('template[data-cl-offer-refresh]');
+        if (saved.id === 'offer-terms-form') {
+            keepTermsForTemplate(saved);
+        }
         if (template) {
             swapRefreshed(template);
             showDirtyState(true);
