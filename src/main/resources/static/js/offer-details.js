@@ -11,7 +11,8 @@
 //   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept.
 // - "Kopiuj link" and "Otwórz jak klient" say that the customer sees the saved version while the table is dirty.
 // - The peek ([data-cl-peek]) follows the summary's own "Zapisz pozycje" at any width: shown while that button is out of
-//   view (a long table under a sticky side column, or the summary below the table), hidden while it is fully in view.
+//   view (a long table under a sticky side column, or the summary below the table), hidden while it is fully in view,
+//   but never while the focus is inside the peek.
 (function () {
     'use strict';
 
@@ -350,19 +351,30 @@
         // button leaves the screen, but hides only once the button is clear of the edges by more than that, or the two
         // would trade places on every frame near the end of the table.
         var BAND = 100;
+        // the summary's button is clear of the band: the peek may go, but never from under the focus, which would
+        // drop to the page body; it goes once the focus leaves it
+        var clear = true;
         function set(state) {
             peek.setAttribute('data-cl-peek-state', state);
+        }
+        function hideUnless(focused) {
+            if (clear && !peek.contains(focused)) {
+                set('hidden');
+            }
         }
         set('hidden');
         new IntersectionObserver(function (entries) {
             if (entries[entries.length - 1].intersectionRatio < 0.99) {
+                clear = false;
                 set('shown');
             }
         }, { rootMargin: '-' + topbar + 'px 0px 0px 0px', threshold: [0, 0.99] }).observe(summarySave);
         new IntersectionObserver(function (entries) {
-            if (entries[entries.length - 1].intersectionRatio >= 0.99) {
-                set('hidden');
-            }
+            clear = entries[entries.length - 1].intersectionRatio >= 0.99;
+            hideUnless(document.activeElement);
         }, { rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px', threshold: [0, 0.99] }).observe(summarySave);
+        peek.addEventListener('focusout', function (event) {
+            hideUnless(event.relatedTarget);
+        });
     })();
 })();

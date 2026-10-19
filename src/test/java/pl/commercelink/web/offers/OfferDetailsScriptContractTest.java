@@ -115,6 +115,9 @@ class OfferDetailsScriptContractTest {
                 .contains("'data-cl-peek-state'").contains("set('shown');").contains("--cl-topbar-height");
         assertThat(js).contains("set('hidden');").contains("var BAND = 100;")
                 .contains("rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px'");
+        // never hidden from under the focus (a display:none peek drops it to the body); re-checked when it leaves
+        assertThat(js).contains("if (clear && !peek.contains(focused))").contains("hideUnless(document.activeElement);")
+                .contains("peek.addEventListener('focusout'").contains("hideUnless(event.relatedTarget);");
         assertThat(css).contains(".cl-summary-peek.is-action[data-cl-peek-state=\"shown\"] { display: flex; }")
                 .contains(".cl-summary-peek.is-action[data-cl-peek-state=\"hidden\"] { display: none; }")
                 .contains("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }");
