@@ -469,7 +469,7 @@ class RMAControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "invalid");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("invalid"));
         verify(rmaItemsRepository, never()).save(any());
     }
 
@@ -491,7 +491,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "service");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("service"));
         verify(rmaItemsRepository, never()).save(any());
     }
 
@@ -512,7 +512,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "claimed");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("claimed"));
         verify(rmaItemsRepository, never()).save(any());
     }
 
@@ -562,7 +562,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "not sent");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("not sent"));
     }
 
     @FunctionalInterface
@@ -648,7 +648,7 @@ class RMAControllerTest {
         }
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "bad split");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("bad split"));
         verify(rmaItemsRepository, never()).save(any());
     }
 
@@ -671,9 +671,74 @@ class RMAControllerTest {
         }
 
         // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "only new");
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("only new"));
         verify(rmaItemsRepository, never()).delete(anyList());
         verify(rmaItemsRepository, never()).delete(any(RMAItem.class));
+    }
+
+    @Test
+    void acceptingWithoutTheConditionOfTheItemsIsRefusedInTheItemsCard() {
+        // given
+        when(messageSource.getMessage(eq("rma.item.condition.required"), any(), any())).thenReturn("condition");
+
+        // when
+        controller.acceptReturn(RMA_ID, null, true, new RMAItemsForm(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("condition"));
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        verifyNoInteractions(rmaManager);
+    }
+
+    @Test
+    void markingAsSentToDistributorWithNothingToMarkIsRefusedInTheItemsCard() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Processing));
+        when(rmaManager.markItemsAsSentToDistributor(any(), any(), any())).thenReturn(RMAManager.OperationResult.failure());
+        when(messageSource.getMessage(eq("rma.cannot.mark.as.sent.to.distributor.invalid.status"), any(), any()))
+                .thenReturn("nothing to send");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.markItemsAsSentToDistributor(RMA_ID, new RMAItemsForm(), redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("nothing to send"));
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void checkingSerialNumbersWithNothingSelectedIsRefusedInTheItemsCard() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Processing));
+        when(messageSource.getMessage(eq("rma.check.serial.no.items.selected"), any(), any())).thenReturn("select");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.checkSerialNumbers(RMA_ID, new RMAItemsForm(), redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("select"));
+    }
+
+    @Test
+    void splittingAnItemThatIsGoneIsRefusedInTheItemsCard() {
+        // given
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Processing));
+        when(messageSource.getMessage(eq("rma.detail.error.item.not.found"), any(), any())).thenReturn("gone");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(flashedNotice()).isEqualTo(itemsRefusal("gone"));
     }
 
     @Test
@@ -1127,6 +1192,10 @@ class RMAControllerTest {
         item.setStatus(status);
         item.setSelected(true);
         return item;
+    }
+
+    private static RmaNotice itemsRefusal(String text) {
+        return new RmaNotice(RmaNotice.BAD, text, List.of(), RmaNotice.Scope.ITEMS);
     }
 
     private RmaNotice flashedNotice() {

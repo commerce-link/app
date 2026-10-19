@@ -228,18 +228,15 @@ public class RMAController {
         OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), orderItemId);
         if (orderItem == null || orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)
                 || quantity <= 0 || quantity > orderItem.getQty()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.invalid.quantity", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.invalid.quantity", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
         if (rma.isMarketplaceReturn() && orderItem.isService()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.service.not.returnable", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.service.not.returnable", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
         if (openRmaCoverage.coveredByAnotherOpenRma(storeId, orderItemId, rmaId)) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.already.in.open.rma", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.already.in.open.rma", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -291,8 +288,7 @@ public class RMAController {
         RMAManager.OperationResult op = rmaManager.replaceSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.replace.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.replace.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -305,8 +301,7 @@ public class RMAController {
         );
 
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+            refuseItemAction(redirectAttributes, "rma.warehouse.document.generation.failed", locale);
         } else {
             RmaFlash.items(redirectAttributes, done("rma.detail.done.replaced", selected, op, locale));
         }
@@ -332,8 +327,7 @@ public class RMAController {
         RMAManager.OperationResult op = rmaManager.returnSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.move.to.warehouse.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.move.to.warehouse.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -350,11 +344,9 @@ public class RMAController {
         );
 
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+            refuseItemAction(redirectAttributes, "rma.warehouse.document.generation.failed", locale);
         } else if (!marketplaceReturnDecisions.publishAcceptance(op.getRma(), op.getRmaItems(), deliveryCovered)) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.marketplace.decision.not.sent", null, locale));
+            refuseItemAction(redirectAttributes, "rma.marketplace.decision.not.sent", locale);
         } else {
             RmaNotice notice = done("rma.detail.done.accepted", selected, op, locale);
             if (op.getRma().isMarketplaceReturn() && refundDelivery) {
@@ -382,9 +374,14 @@ public class RMAController {
         return new RmaActionNotices(messageSource).done(doneKey, selected, processed, locale);
     }
 
+    /** A refused action on the items is shown in the Items card next to the selection it refused, not under the header. */
+    private void refuseItemAction(RedirectAttributes redirectAttributes, String key, Locale locale) {
+        RmaFlash.items(redirectAttributes, new RmaNotice(RmaNotice.BAD, messageSource.getMessage(key, null, locale),
+                List.of(), RmaNotice.Scope.ITEMS));
+    }
+
     private String redirectWithMissingCondition(String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
-        redirectAttributes.addFlashAttribute("errorMessage",
-                messageSource.getMessage("rma.item.condition.required", null, locale));
+        refuseItemAction(redirectAttributes, "rma.item.condition.required", locale);
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
@@ -421,8 +418,7 @@ public class RMAController {
         RMAManager.OperationResult op = rmaManager.markItemsAsReturnedToClient(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.mark.as.returned.to.client.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.mark.as.returned.to.client.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -442,8 +438,7 @@ public class RMAController {
         RMAManager.OperationResult op = rmaManager.markItemsAsSentToDistributor(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.mark.as.sent.to.distributor.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.mark.as.sent.to.distributor.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -609,14 +604,14 @@ public class RMAController {
         RMAItem original = rmaItemsRepository.findById(rmaId, rmaItemId);
 
         if (original == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.item.not.found", null, locale));
+            refuseItemAction(redirectAttributes, "rma.detail.error.item.not.found", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
         int originalQty = original.getQty();
 
         if (qty1 < 1 || qty2 < 1 || qty1 + qty2 != originalQty) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.split.quantities", null, locale));
+            refuseItemAction(redirectAttributes, "rma.detail.error.split.quantities", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -643,8 +638,7 @@ public class RMAController {
         List<String> selectedRMAItemIds = form.getSelectedRMAItemIds();
 
         if (selectedRMAItemIds.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.check.serial.no.items.selected", null, locale));
+            refuseItemAction(redirectAttributes, "rma.check.serial.no.items.selected", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -721,7 +715,7 @@ public class RMAController {
                 .collect(Collectors.toList());
 
         if  (rmaItemsToDelete.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.detail.error.delete.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.detail.error.delete.status", locale);
             return  "redirect:/dashboard/rma/" + rmaId;
         }
 
