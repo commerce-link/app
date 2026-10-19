@@ -1,7 +1,7 @@
 // Add-items dialog shared by the order details and the offer details (fragments/item-add-modal.html): pricelist tab
 // (catalog, category, label, search, sortable name and price), inventory tab (EAN and/or manufacturer code), the list of
-// picked entries with quantities, and a submit that posts items[i].* to data-add-items-url. The offer page opens it with
-// the public toggleAddItemModal(show); the order page with data-cl-dialog-open (dialog.js), which fires cl:dialog-open.
+// picked entries with quantities, and a submit that posts items[i].* to data-add-items-url. Both pages open it with
+// data-cl-dialog-open (dialog.js), which fires cl:dialog-open.
 (function () {
     'use strict';
 
@@ -522,6 +522,4 @@
     }
 
     bind();
-
-    window.toggleAddItemModal = toggleAddItemModal;
 })();
