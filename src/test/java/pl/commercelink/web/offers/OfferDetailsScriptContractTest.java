@@ -67,6 +67,25 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
+    void tableThatCannotBeSavedShowsItsFieldBeforeAnyDialogOpens() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then — the confirmation, the unsaved question and the add-items dialog open only for a table that can be
+        // saved; a dialog closed after a refused save would hand the focus back to its opener and drop the message
+        assertThat(js).contains("var field = isDirty() ? fieldToFix() : null;")
+                .contains("[data-cl-dialog-open=\"item-add-dialog\"]")
+                .contains("form.checkValidity() ? null : form.querySelector(':invalid')")
+                .contains("form.reportValidity();");
+        int click = js.indexOf("var field = isDirty() ? fieldToFix() : null;");
+        assertThat(js.indexOf("confirmThen(element, actionUrl(element), true)", click)).isGreaterThan(click);
+        assertThat(js.indexOf("ask(element);", click)).isGreaterThan(click);
+        // a refusal after a dialog is open still shows the field, from the last dialog's close event
+        assertThat(js).contains("open[open.length - 1].addEventListener('close', function () {")
+                .doesNotContain("closeOpenDialogs");
+    }
+
+    @Test
     void backgroundSaveCountsOnlyALandingBackOnTheOfferPage() throws Exception {
         // when
         String js = read("static/js/offer-details.js");

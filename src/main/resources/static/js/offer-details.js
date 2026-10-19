@@ -3,7 +3,8 @@
 //   item) run here. An action with its own confirmation (data-cl-confirm-*, fragments/confirm-dialog) asks only that;
 //   with unsaved changes in the table the confirmation says so and its "Zapisz i …" saves the items first. The others
 //   ask first only when the table has unsaved changes (dialog#offer-unsaved-dialog). The items form is posted in the
-//   background, then the action runs exactly as on a clean page. A failed save stays on the page, still unsaved.
+//   background, then the action runs exactly as on a clean page. A failed save stays on the page, still unsaved. A table
+//   that cannot be saved (a group name, a quantity the browser refuses) opens no dialog: its field is shown instead.
 // - The add-items dialog saves the table the same way before it posts its items (cl:item-add-submit), and its button
 //   says so while the table is dirty.
 // - The terms, client and note dialogs (form[data-cl-async]) close once saved. On a clean page it reloads; with unsaved
@@ -43,23 +44,46 @@
         (menu && !menu.open ? menu.querySelector(':scope > summary') : element).focus();
     }
 
-    function closeOpenDialogs() {
-        document.querySelectorAll('dialog[open]').forEach(function (dialog) {
+    // The field to fix before the table can be saved (a group name, a quantity the browser refuses), or null. Asked
+    // before any dialog opens: a dialog closed afterwards hands the focus back to its opener and takes the browser's
+    // message with it.
+    function fieldToFix() {
+        var invalid = window.CL_offerLines ? window.CL_offerLines.prepare() : null;
+        if (invalid) {
+            return invalid;
+        }
+        return form.checkValidity() ? null : form.querySelector(':invalid');
+    }
+
+    function showFieldToFix(field) {
+        if (field.matches(':invalid')) {
+            form.reportValidity();
+        } else {
+            field.focus();
+        }
+    }
+
+    // A modal dialog keeps the field out of reach, so it is shown once the last dialog has closed: its close event
+    // comes later, after confirm-dialog's and dialog.js's focus restore, which would otherwise win.
+    function showFieldAfterDialogs(field) {
+        var open = document.querySelectorAll('dialog[open]');
+        if (!open.length) {
+            showFieldToFix(field);
+            return;
+        }
+        open[open.length - 1].addEventListener('close', function () {
+            showFieldToFix(field);
+        }, { once: true });
+        open.forEach(function (dialog) {
             dialog.close();
         });
     }
 
-    // Resolves true once the items are saved. A field to fix (a group name, a quantity the browser refuses) is shown
-    // with every dialog closed, since a modal dialog would keep it out of reach.
+    // Resolves true once the items are saved.
     function saveItems() {
-        var invalid = window.CL_offerLines ? window.CL_offerLines.prepare() : null;
-        if (invalid || !form.checkValidity()) {
-            closeOpenDialogs();
-            if (invalid) {
-                invalid.focus();
-            } else {
-                form.reportValidity();
-            }
+        var field = fieldToFix();
+        if (field) {
+            showFieldAfterDialogs(field);
             return Promise.resolve(false);
         }
         busy = true;
@@ -191,7 +215,10 @@
         if (busy) {
             return;
         }
-        if (isDirty() && hasOwnConfirm(element)) {
+        var field = isDirty() ? fieldToFix() : null;
+        if (field) {
+            showFieldToFix(field);
+        } else if (isDirty() && hasOwnConfirm(element)) {
             confirmThen(element, actionUrl(element), true);
         } else if (isDirty()) {
             ask(element);
@@ -236,6 +263,17 @@
     });
 
     // --- the add-items dialog
+
+    // its "Zapisz i dodaj" saves the table first, which a field to fix would refuse behind the modal dialog
+    document.addEventListener('click', function (event) {
+        var opener = event.target.closest && event.target.closest('[data-cl-dialog-open="item-add-dialog"]');
+        var field = opener && isDirty() ? fieldToFix() : null;
+        if (field) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showFieldToFix(field);
+        }
+    }, true);
 
     document.addEventListener('cl:item-add-submit', function (event) {
         if (!isDirty()) {
