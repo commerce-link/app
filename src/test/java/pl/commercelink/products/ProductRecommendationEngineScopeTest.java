@@ -128,4 +128,35 @@ class ProductRecommendationEngineScopeTest {
             assertThat(r.getLowestGrossPrice()).isEqualTo(Price.fromNet(80.0).grossValue());
         });
     }
+
+    @Test
+    void twoPriceGroupsOfOneGlobalEntryStayTwoRecommendationsAsBeforeStageTwo() {
+        // given: InventoryAutoDiscovery split one global entry's offers into two price groups without a pim id;
+        // both resolve to the entry through its two EANs
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
+        definition.setPimCategoryIds(new LinkedList<>(List.of("989")));
+        PimEntry globalEntry = new PimEntry("global-pim-1",
+                List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier("5900000000999", PimIdentifierType.GTIN)),
+                "Intel", "Core i7", "CPU", null, true, null, null);
+        PimEntryIndex index = new PimEntryIndex(List.of(globalEntry), UnaryOperator.identity(), UnaryOperator.identity());
+        MatchedInventory cheaper = org.mockito.Mockito.mock(MatchedInventory.class);
+        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
+        when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory, cheaper)));
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
+        when(matchedInventory.getLowestPrice()).thenReturn(Price.fromNet(1000.0));
+        when(matchedInventory.getTaxonomy()).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
+        when(cheaper.hasAnyOffers()).thenReturn(true);
+        when(cheaper.getInventoryKey()).thenReturn(new InventoryKey("5900000000999", "MFN-2"));
+        when(cheaper.getLowestPrice()).thenReturn(Price.fromNet(100.0));
+        when(cheaper.getTaxonomy()).thenReturn(new Taxonomy("5900000000999", "MFN-2", "Intel", "i7", "CPU", 1, null, null, null, "989"));
+
+        // when
+        List<ProductRecommendation> global = engine.getRecommendations(index.global(), definition, inventory);
+        List<ProductRecommendation> storeView = engine.getRecommendations(index.forStore("s1"), definition, inventory);
+
+        // then
+        assertThat(global).extracting(ProductRecommendation::getPimId).containsExactly("global-pim-1", "global-pim-1");
+        assertThat(storeView).extracting(ProductRecommendation::getPimId).containsExactly("global-pim-1", "global-pim-1");
+    }
 }

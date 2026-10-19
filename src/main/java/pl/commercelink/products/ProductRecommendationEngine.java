@@ -50,15 +50,16 @@ public class ProductRecommendationEngine {
                 .map(i -> createRecommendation(pim, categoryDefinition, i))
                 .filter(r -> StringUtils.isNotBlank(r.getBrand()))
                 .sorted(Comparator.comparing(ProductRecommendation::getBrand).thenComparingDouble(ProductRecommendation::getLowestGrossPrice))
-                .filter(oncePerPimId())
+                .filter(oncePerStoreEntry())
                 .collect(Collectors.toList());
     }
 
-    // two inventory groups can resolve to one PIM entry (a store entry next to global ones); the category and the
-    // pricelist list a product once, at its lowest price, which the sort above puts first
-    private static Predicate<ProductRecommendation> oncePerPimId() {
+    // a store entry shadowing two global entries pulls both of their inventory groups onto one pim id: list it once,
+    // at its lowest price, which the sort above puts first. Global entries are left as they were: two price groups of
+    // one global entry (InventoryAutoDiscovery splits suspicious prices) stay two rows, as before stage 2
+    private static Predicate<ProductRecommendation> oncePerStoreEntry() {
         Set<String> seen = new HashSet<>();
-        return r -> !r.hasPimId() || seen.add(r.getPimId());
+        return r -> !r.hasStoreEntry() || seen.add(r.getPimId());
     }
 
     public List<ProductRecommendation> getRecommendationsForMappedProducts(PimLookup pim, CategoryDefinition categoryDefinition, InventoryView inventory) {
