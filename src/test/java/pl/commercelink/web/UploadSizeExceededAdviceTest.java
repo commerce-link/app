@@ -5,9 +5,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.FlashMap;
@@ -27,6 +29,9 @@ class UploadSizeExceededAdviceTest {
 
     @Mock
     private MessageSource messageSource;
+
+    @Mock
+    private MultipartProperties multipartProperties;
 
     @InjectMocks
     private UploadSizeExceededAdvice advice;
@@ -55,9 +60,27 @@ class UploadSizeExceededAdviceTest {
     }
 
     @Test
-    void keepsThePlainPayloadTooLargeAnswerForOtherUploads() throws IOException {
+    void sendsANewOfferFromCsvBackToItsPageWithTheLimit() throws IOException {
         // given
         MockHttpServletRequest request = post("/dashboard/offer/new/csv");
+        when(multipartProperties.getMaxFileSize()).thenReturn(DataSize.ofMegabytes(10));
+        when(messageSource.getMessage(eq("offers.new.csv.file.too.large"), eq(new Object[]{10L}), any(Locale.class)))
+                .thenReturn("Plik jest za duży: limit to 10 MB.");
+
+        // when
+        ModelAndView view = advice.handle(new MaxUploadSizeExceededException(10), request, new MockHttpServletResponse());
+
+        // then
+        assertThat(view.getView()).isInstanceOfSatisfying(RedirectView.class,
+                redirect -> assertThat(redirect.getUrl()).isEqualTo("/dashboard/offer/new/csv"));
+        FlashMap flash = (FlashMap) request.getAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE);
+        assertThat(flash.get("errorMessage")).isEqualTo("Plik jest za duży: limit to 10 MB.");
+    }
+
+    @Test
+    void keepsThePlainPayloadTooLargeAnswerForOtherUploads() throws IOException {
+        // given
+        MockHttpServletRequest request = post("/dashboard/store/documents/upload");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
