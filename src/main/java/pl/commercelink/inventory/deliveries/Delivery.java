@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.Shipment;
@@ -85,6 +86,11 @@ public class Delivery {
     @DynamoDBTypeConvertedEnum
     private DeliveryType type;
 
+    // Sort key of StoreIdDeliveryListSortKeyIndex, recomputed from the delivery on every save (DeliveryListKey); the mapper reads
+    // it through the getter, like the defaulted type above.
+    @DynamoDBAttribute(attributeName = "deliveryListSortKey")
+    private String deliveryListSortKey;
+
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
     @DynamoDBAttribute(attributeName = "paymentCost")
@@ -115,6 +121,8 @@ public class Delivery {
     private boolean paid;
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
+    @DynamoDBAttribute(attributeName = "awaitingSupplierConfirmation")
+    private boolean awaitingSupplierConfirmation;
 
     @DynamoDBAttribute(attributeName = "tracking")
     private DeliveryTracking tracking;
@@ -540,6 +548,14 @@ public class Delivery {
         this.type = type;
     }
 
+    public String getDeliveryListSortKey() {
+        return DeliveryListKey.of(this);
+    }
+
+    public void setDeliveryListSortKey(String deliveryListSortKey) {
+        this.deliveryListSortKey = deliveryListSortKey;
+    }
+
     @DynamoDBIgnore
     public boolean isOrderPending() {
         return orderStatus == DeliveryOrderStatus.ORDER_PENDING;
@@ -603,6 +619,14 @@ public class Delivery {
 
     public void setExternalDeliveryIdProvisional(boolean externalDeliveryIdProvisional) {
         this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
+    }
+
+    public boolean isAwaitingSupplierConfirmation() {
+        return awaitingSupplierConfirmation;
+    }
+
+    public void setAwaitingSupplierConfirmation(boolean awaitingSupplierConfirmation) {
+        this.awaitingSupplierConfirmation = awaitingSupplierConfirmation;
     }
 
     public int getPurchaseAttempts() {
@@ -752,6 +776,22 @@ public class Delivery {
 
     public void setSynced(boolean synced) {
         this.synced = synced;
+    }
+
+    // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
+    @DynamoDBIgnore
+    public boolean isMissingInvoice() {
+        return !invoiced && !isOwnWarehouse();
+    }
+
+    // only the sync flag counts (client's decision): a delivery still waiting for its invoice is unsynced too
+    @DynamoDBIgnore
+    public boolean isMissingInvoiceSync() {
+        return !synced && !isOwnWarehouse();
+    }
+
+    private boolean isOwnWarehouse() {
+        return SupplierRegistry.WAREHOUSE.equals(provider);
     }
 
     public Long getVersion() {

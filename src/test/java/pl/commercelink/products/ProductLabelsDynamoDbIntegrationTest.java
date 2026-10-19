@@ -17,7 +17,7 @@ import org.mockito.Mockito;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.util.List;
 
@@ -36,7 +36,7 @@ class ProductLabelsDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static AmazonDynamoDB client;
     static ProductRepository products;
@@ -105,6 +105,28 @@ class ProductLabelsDynamoDbIntegrationTest {
         verify(spy, atLeast(1)).query(request.capture());
         assertThat(request.getValue().getProjectionExpression()).isEqualTo("label");
         assertThat(labels).containsExactly("RTX 5060");
+    }
+
+    @Test
+    void codesOfReadsBothCodesConsistentlyAcrossEveryPage() {
+        // given
+        save("cat-codes", "A", "B", "C");
+        AmazonDynamoDB spy = Mockito.mock(AmazonDynamoDB.class, AdditionalAnswers.delegatesTo(client));
+
+        // when: two items a page, so two pages
+        List<ProductRepository.ProductCodes> codes = new ProductRepository(spy).codesOf("cat-codes", 2);
+
+        // then
+        assertThat(codes).hasSize(3).allSatisfy(product -> {
+            assertThat(product.ean()).isEqualTo("5900000000008");
+            assertThat(product.manufacturerCode()).isEqualTo("MFN");
+        });
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(spy, times(2)).query(request.capture());
+        assertThat(request.getAllValues()).allSatisfy(query -> {
+            assertThat(query.getProjectionExpression()).isEqualTo("ean, mfn");
+            assertThat(query.getConsistentRead()).isTrue();
+        });
     }
 
     @Test

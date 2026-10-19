@@ -43,10 +43,13 @@ public class EmailClient {
         if (settings == null || !settings.supports(type)) {
             return false;
         }
+        if (!settings.hasSender()) {
+            log.warn("Store {} has no sender name or reply-to address, {} email not sent", storeId, type);
+            return false;
+        }
 
         String templateName = settings.configuration().getTemplateName(type);
-        String replyToEmail = settings.replyToEmail() != null ? settings.replyToEmail() : defaultSenderEmail;
-        return sendInternal(storeId, templateName, msg, defaultSenderEmail, settings.senderName(), replyToEmail);
+        return sendInternal(storeId, templateName, msg, defaultSenderEmail, settings.senderName(), settings.replyToEmail());
     }
 
     private boolean sendInternal(String storeId, String templateName, EmailNotification msg, String senderEmail, String senderName, String replyToEmail) {

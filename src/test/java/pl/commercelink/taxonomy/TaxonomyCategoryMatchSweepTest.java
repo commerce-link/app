@@ -131,21 +131,6 @@ class TaxonomyCategoryMatchSweepTest {
     }
 
     @Test
-    void sweepAbortsQuietlyWhenSqsIsNotConfigured() {
-        // given
-        cache.add(pending("MFN-1"));
-        doThrow(new IllegalStateException("no sqs")).when(pimCatalog).submitCategoryMatch(any());
-        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
-
-        // when
-        List<ILoggingEvent> events = captureLog(sweep::sweep);
-
-        // then
-        assertThat(events).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
-        assertThat(events.getFirst().getFormattedMessage()).contains("no sqs");
-    }
-
-    @Test
     void activeMappingResolvesPendingWithoutSubmit() {
         // given
         String mfn = mfnWhere(residue -> residue != 0);

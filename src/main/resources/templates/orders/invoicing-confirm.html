@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The issue dialog of the order page as its own page, for a browser without JavaScript: same texts, same fields. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage('/dashboard/orders/' + ${orderId}, ${backLabel},
+                    #{order.documents.issue.title(${#messages.msg(documentLabelKey)})})}"></div>
+            <form class="cl-form" method="post" th:action="@{/dashboard/orders/{o}/invoicing(o=${orderId})}">
+                <input type="hidden" name="documentType" th:value="${documentType}">
+                <div class="cl-card">
+                    <div class="cl-card-body">
+                        <p th:text="#{order.documents.issue.effect}"></p>
+                        <label class="cl-check">
+                            <input type="checkbox" name="send" value="true">
+                            <span th:text="#{order.action.send.invoice.email}"></span>
+                        </label>
+                        <p class="cl-help" th:text="#{order.documents.issue.send.help}"></p>
+                    </div>
+                    <div class="cl-card-footer">
+                        <button type="submit" class="cl-button is-primary" th:text="#{order.documents.issue.confirm}"></button>
+                        <a class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

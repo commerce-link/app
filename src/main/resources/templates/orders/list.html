@@ -13,6 +13,19 @@
                 <h1 class="cl-page-title" th:text="#{orders.list.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
+                    <a class="cl-button" th:href="@{/dashboard/orders/archive}">
+                        <i class="fas fa-archive" aria-hidden="true"></i>
+                        <span th:text="#{orders.archive.button}"></span>
+                    </a>
+                    <!--/* "Zamów odbiór" for every package of the store waiting for a courier (orders and RMAs), with their
+                           number; back to this list as it is narrowed now, which list-page.js keeps up to date after an
+                           in-place change (data-cl-list-back) */-->
+                    <a th:if="${page.pickup() != null}" class="cl-button is-page-action" th:href="@{${page.pickup().href()}}" data-cl-list-back>
+                        <i class="fas fa-shipping-fast" aria-hidden="true"></i>
+                        <span th:text="#{shipping.pickup.title}"></span>
+                        <span th:if="${page.pickup().waiting() != null}" class="cl-button-count"><span class="cl-visually-hidden"
+                              th:text="#{orders.list.pickup.waiting}"></span><span th:text="${page.pickup().waiting()}"></span></span>
+                    </a>
                     <form method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-page-action-form">
                         <button type="submit" class="cl-button is-primary">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
@@ -30,14 +43,14 @@
             <p class="cl-alert-text" th:text="${filterError}"></p>
         </div>
 
-        <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
+        <div data-cl-list-results data-cl-list-path="/dashboard/orders" data-cl-list-fragment="/dashboard/orders/list" th:fragment="results" th:with="q=${page.query()}">
 
             <!--/* Four figures of the whole store in the design system's cl-stat tile, as Asortyment uses it (label, number,
                    short hint), each a link that narrows the list to the orders it counts; at rest it looks the same, the
                    hover and the pressed tile show it can be clicked (design system "Kafelek liczbowy jako filtr"). */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-orders-nav>
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.count()}"></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
@@ -52,7 +65,7 @@
                 <!--/* The table toolbar (design system "Tabela danych"): two filter menus on the left — Status (checkboxes
                        with counts of the open statuses) and the custom filter — and search on the right. The menus look like the
                        toolbar's compact select ("Podkategoria: wszystkie ⌄" on a catalog category) and open a popover. Both menus are native <details>, so they open without
-                       JavaScript; the Status menu is a GET form (its "Zastosuj" button is hidden once orders-list.js
+                       JavaScript; the Status menu is a GET form (its "Zastosuj" button is hidden once list-page.js
                        applies each tick at once). */-->
                 <div class="cl-table-toolbar">
                     <div class="cl-toolbar-filters">
@@ -61,7 +74,7 @@
                                 <span class="cl-filter-menu-key" th:text="#{orders.list.status.menu}"></span>
                                 <span class="cl-filter-menu-value" th:text="${page.statusSummary()}"></span>
                             </summary>
-                            <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-menu-panel" data-cl-orders-form data-cl-autosubmit>
+                            <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
                                 <input type="hidden" name="filterId" th:value="${q.filterId()}"/>
                                 <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
                                 <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
@@ -77,7 +90,7 @@
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{orders.list.status.apply}"></button>
                                     <a th:if="${!q.isOpen()}" class="cl-link-button" th:href="@{${q.withStatus(null).href()}}"
-                                       th:text="#{orders.list.status.reset}" data-cl-orders-nav></a>
+                                       th:text="#{orders.list.status.reset}" data-cl-list-nav></a>
                                 </div>
                             </form>
                         </details>
@@ -94,7 +107,7 @@
                                     <li th:if="${page.filterOptions().isEmpty()}" class="cl-filter-menu-empty" th:text="#{orders.list.filter.empty}"></li>
                                     <li th:each="o : ${page.filterOptions()}">
                                         <a class="cl-filter-menu-item" th:href="@{${o.href()}}"
-                                           th:attr="aria-current=${o.selected()} ? 'true' : null" data-cl-orders-nav>
+                                           th:attr="aria-current=${o.selected()} ? 'true' : null" data-cl-list-nav>
                                             <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
                                             <span class="cl-filter-menu-meta" th:with="scope=${o.shared()} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"
                                                   th:text="${o.isDefault()} ? #{orders.list.filter.scopeDefault(${scope})} : ${scope}"></span>
@@ -112,10 +125,10 @@
                         <!--/* Clears every narrowing at once (statuses, filter, search) — switching a filter off alone
                                would leave the statuses it ticked; the chips' "×" still drops one. Shown when a chip is. */-->
                         <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
-                           th:text="#{general.clear.filters}" data-cl-orders-nav></a>
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                     </div>
 
-                    <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
+                    <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-list-form>
                         <input type="hidden" name="status" th:each="s : ${q.statuses()}" th:value="${s.name()}"/>
                         <input type="hidden" name="filterId" th:value="${q.filterId()}"/>
                         <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
@@ -126,7 +139,7 @@
                             <input class="cl-input cl-table-search" type="search" id="orders-search" name="q" autocomplete="off"
                                    th:value="${q.q()}" th:attr="placeholder=#{orders.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
                             <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
-                               th:attr="aria-label=#{orders.list.search.clear}" data-cl-orders-nav>
+                               th:attr="aria-label=#{orders.list.search.clear}" data-cl-list-nav>
                                 <i class="fas fa-times" aria-hidden="true"></i>
                             </a>
                         </div>
@@ -141,13 +154,13 @@
 
                 <!--/* What narrows the list right now, and how many orders that leaves. With nothing narrowed the row is
                        not drawn: the count repeats the Status menu, so it stays only for screen readers (the status
-                       region orders-list.js focuses after each swap). */-->
+                       region list-page.js focuses after each swap). */-->
                 <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
-                               data-cl-orders-nav><span aria-hidden="true">×</span></a>
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
                     <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
@@ -162,46 +175,87 @@
                 <nav class="cl-table-sortbar" th:attr="aria-label=#{orders.list.sort.label}">
                     <span class="cl-eyebrow" th:text="#{orders.list.sort.label}"></span>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
-                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
                         <span th:text="#{orders.list.sort.due}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(amountSort)}" th:href="@{${h.href()}}"
-                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
                         <span th:text="#{orders.list.sort.amount}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(statusSort)}" th:href="@{${h.href()}}"
-                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
                         <span th:text="#{orders.list.sort.status}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
-                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>
                         <span th:text="#{orders.list.sort.number}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                 </nav>
-                <table class="cl-table is-orders">
+                <!--/* Printing several order cards (design system "Pasek zaznaczenia"): while rows are checked, this row stands
+                       in for the table header (table-select.js) and is the only place that prints more than one card —
+                       the toolbar above keeps filtering and search only. Its button loads the checked orders' cards into
+                       print.js's hidden frame, asking first above ten cards. Never shown below 720 px (card mode) nor
+                       without JavaScript (the checkbox column is not drawn then either). */-->
+                <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                <div class="cl-selection-row is-wide-only" hidden data-cl-selection-bar>
+                    <label class="cl-check-target">
+                        <input type="checkbox" class="cl-check-input" data-cl-select-all autocomplete="off"
+                               th:attr="aria-label=#{orders.list.select.all}, data-cl-label-select=#{orders.list.select.all}, data-cl-label-clear=#{orders.list.select.none}">
+                    </label>
+                    <span class="cl-selection-count" data-cl-selection-count
+                          th:attr="data-template=#{orders.list.selected('{k}', '{n}')}"></span>
+                    <div class="cl-selection-actions">
+                        <button type="button" class="cl-button is-primary" data-cl-select-confirm-above="10"
+                                th:attr="data-cl-select-print=@{/dashboard/orders/cards},
+                                         data-cl-select-confirm-title-few=#{orders.list.cards.confirm.title.few('{n}')},
+                                         data-cl-select-confirm-title-many=#{orders.list.cards.confirm.title.many('{n}')},
+                                         data-cl-select-confirm-message=#{orders.list.cards.confirm.message},
+                                         data-cl-select-confirm-action-few=#{orders.list.cards.confirm.action.few('{n}')},
+                                         data-cl-select-confirm-action-many=#{orders.list.cards.confirm.action.many('{n}')}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-print"></i></span>
+                            <span data-cl-selection-text th:attr="data-template=#{orders.list.cards.print('{k}')}"></span>
+                        </button>
+                        <button type="button" class="cl-link-button" data-cl-select-clear th:text="#{orders.list.selection.clear}"></button>
+                    </div>
+                </div>
+                <table class="cl-table is-orders" data-cl-select-table="true">
                     <thead>
                     <tr>
+                        <th scope="col" class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-all hidden autocomplete="off"
+                                       th:attr="aria-label=#{orders.list.select.all}, data-cl-label-select=#{orders.list.select.all}, data-cl-label-clear=#{orders.list.select.none}">
+                            </label>
+                        </th>
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(numberSort).ariaSort()}">
-                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(numberSort).href()}}" th:text="#{orders.list.column.order}" data-cl-orders-nav></a>
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(numberSort).href()}}" th:text="#{orders.list.column.order}" data-cl-list-nav></a>
                         </th>
                         <th scope="col" th:text="#{orders.list.column.client}"></th>
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(dueSort).ariaSort()}">
-                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(dueSort).href()}}" th:text="#{orders.list.column.due}" data-cl-orders-nav></a>
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(dueSort).href()}}" th:text="#{orders.list.column.due}" data-cl-list-nav></a>
                         </th>
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(statusSort).ariaSort()}">
-                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(statusSort).href()}}" th:text="#{orders.list.column.status}" data-cl-orders-nav></a>
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(statusSort).href()}}" th:text="#{orders.list.column.status}" data-cl-list-nav></a>
                         </th>
                         <th scope="col" class="is-numeric" th:attr="aria-sort=${page.sortHeaders().get(amountSort).ariaSort()}">
-                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(amountSort).href()}}" th:text="#{orders.list.column.amount}" data-cl-orders-nav></a>
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(amountSort).href()}}" th:text="#{orders.list.column.amount}" data-cl-list-nav></a>
                         </th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="row : ${page.rows()}">
+                        <!--/* the 44 px label is the box's target; the cell lies above the row link (commercelink.css), so a
+                               tick never opens the order */-->
+                        <td class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-row hidden autocomplete="off"
+                                       th:value="${row.orderId()}" th:attr="aria-label=#{orders.list.select.row(${row.number()})}">
+                            </label>
+                        </td>
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{orders.list.column.order}">
                             <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
                             <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}" th:title="${row.externalId()}"></span></th:block></span>
@@ -238,8 +292,10 @@
 
                 <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
                     <span th:text="${es.text()}"></span>
+                    <a th:if="${es.archiveHref() != null}" class="cl-link-button" th:href="@{${es.archiveHref()}}"
+                       th:text="${es.archiveLabel()} + ' ›'"></a>
                     <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
-                       th:text="${es.actionLabel()}" data-cl-orders-nav></a>
+                       th:text="${es.actionLabel()}" data-cl-list-nav></a>
                     <form th:if="${es.actionHref() == null}" method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-list-empty-action">
                         <button type="submit" class="cl-button is-primary" th:text="#{orders.new.pos.button}"></button>
                     </form>
@@ -249,9 +305,17 @@
             </section>
         </div>
     </div>
+
+    <!--/* inside .cl-page (its dialog styles are scoped there) but outside the results block list-page.js swaps, so it
+           survives every swap: the confirmation above ten cards */-->
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
 </section>
 
-<script th:src="@{/js/orders-list.js}" defer></script>
+<!--/* the scripts of the selection row (print.js prints in a hidden frame) */-->
+<script th:src="@{/js/table-select.js}" defer></script>
+<script th:src="@{/js/print.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/list-page.js}" defer></script>
 </div>
 
 </body>

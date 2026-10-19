@@ -6,7 +6,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -40,9 +39,6 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 @Component
 @RequiredArgsConstructor
 public class InventorySearch {
-
-    // The rest of the application quotes supplier shipping for Poland; the page must not disagree with it.
-    private static final String DESTINATION = "PL";
 
     private final Inventory inventory;
     private final StoresRepository storesRepository;
@@ -129,7 +125,7 @@ public class InventorySearch {
                 return item.qty() > 0 && item.netPrice() > 0;
             }
         }
-        List<Quoted> quoted = items.stream().map(item -> new Quoted(item, shippingFor(item))).toList();
+        List<Quoted> quoted = items.stream().map(item -> new Quoted(item, OfferShipping.forItem(supplierRegistry, item))).toList();
         // two connections of one supplier, or one feed listing a product twice, both render the same name
         Set<String> repeatedLabels = quoted.stream()
                 .collect(Collectors.groupingBy(row -> labels.of(row.item().supplier()), Collectors.counting()))
@@ -158,20 +154,6 @@ public class InventorySearch {
                         repeatedLabels.contains(labels.of(row.item().supplier())),
                         CodeMatch.of(product, row.item().ean(), row.item().mfn())))
                 .toList();
-    }
-
-    /**
-     * Shipping terms come from the supplier plugin, the same source the fulfilment planner quotes.
-     * A supplier the registry does not know falls back to a placeholder policy there, so rather than
-     * print an invented cost the row reports that shipping is simply unknown.
-     */
-    private OfferShipping shippingFor(InventoryItem item) {
-        String supplier = item.supplier();
-        if (!supplierRegistry.exists(supplier) && !SupplierIdentity.isManual(supplier)) {
-            return OfferShipping.UNKNOWN;
-        }
-        return OfferShipping.of(supplierRegistry.get(supplier).shippingTermsFor(DESTINATION),
-                item.netPrice(), item.leadTimeDays());
     }
 
     private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items, ProductCodes product) {

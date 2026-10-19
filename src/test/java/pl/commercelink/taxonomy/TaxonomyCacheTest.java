@@ -3,6 +3,8 @@ package pl.commercelink.taxonomy;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import pl.commercelink.inventory.InventoryKey;
 
@@ -33,13 +35,6 @@ class TaxonomyCacheTest {
     }
 
     @Test
-    void singleAddStoresWeight() {
-        cache.add(taxonomy("MFN-1", 5, 1300));
-
-        assertEquals(1300, cache.findByMfn("MFN-1").netWeightInGrams());
-    }
-
-    @Test
     void betterScoreRecordWithoutWeightKeepsPreviousWeight() {
         cache.add(taxonomy("MFN-1", 10, 1300));
         cache.add(taxonomyNamed("MFN-1", 1, null, "BetterName"));
@@ -67,14 +62,6 @@ class TaxonomyCacheTest {
         Taxonomy result = cache.findByMfn("MFN-1");
         assertEquals("BestName", result.name());
         assertEquals(1300, result.netWeightInGrams());
-    }
-
-    @Test
-    void twoSourcesWithWeightLowerScoreWins() {
-        cache.add(taxonomy("MFN-1", 10, 1500));
-        cache.add(taxonomy("MFN-1", 5, 1300));
-
-        assertEquals(1300, cache.findByMfn("MFN-1").netWeightInGrams());
     }
 
     @Test
@@ -301,16 +288,11 @@ class TaxonomyCacheTest {
         assertEquals(7, result.dataAccuracyScore());
         assertEquals(100, result.netWeightInGrams());
         assertEquals(200, result.grossWeightInGrams());
-    }
 
-    @Test
-    void updateCategoryAcceptsArbitraryCategory() {
-        // given
-        cache.add(uncategorized("MFN-1", 7));
-
-        // when / then
-        assertTrue(cache.updateCategory("MFN-1", "Cokolwiek", "999"));
-        assertEquals("Cokolwiek", cache.findByMfn("MFN-1").category());
+        // free-text categories are accepted, not limited to a whitelist
+        cache.add(uncategorized("MFN-2", 7));
+        assertTrue(cache.updateCategory("MFN-2", "Cokolwiek", "999"));
+        assertEquals("Cokolwiek", cache.findByMfn("MFN-2").category());
     }
 
     @Test
@@ -423,43 +405,35 @@ class TaxonomyCacheTest {
         assertEquals(1, loaded.pendingCount());
     }
 
-    @Test
-    void addInternsBrandCategoryAndCategoryIdAcrossEntries() {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "add, 1111111111111, 2222222222222, MFN-1, MFN-2, false",
+            "onStartUp snapshot rows, 1111111111111, 2222222222222, MFN-1, MFN-2, true",
+            "leading-zero EAN, 0012345678905, 1234567890123, MFN-ZERO-1, MFN-NORMAL, false"
+    })
+    void internsBrandCategoryAndCategoryIdAcrossEntries(String path, String firstEan, String secondEan,
+                                                        String firstMfn, String secondMfn, boolean viaStartUp) {
         // given
-        Taxonomy first = new Taxonomy("1111111111111", "MFN-1", new String("Brand"), "Name",
+        Taxonomy first = new Taxonomy(firstEan, firstMfn, new String("Brand"), "Name",
                 new String("Laptops"), 5, null, null, null, new String("301"));
-        Taxonomy second = new Taxonomy("2222222222222", "MFN-2", new String("Brand"), "Name2",
+        Taxonomy second = new Taxonomy(secondEan, secondMfn, new String("Brand"), "Name2",
                 new String("Laptops"), 5, null, null, null, new String("301"));
+        TaxonomyCache target = cache;
 
         // when
-        cache.add(first);
-        cache.add(second);
+        if (viaStartUp) {
+            TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
+            Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv", List.of(first, second)));
+            target = new TaxonomyCache(repo);
+            target.onStartUp();
+        } else {
+            cache.add(first);
+            cache.add(second);
+        }
 
         // then
-        Taxonomy stored1 = cache.findByMfn("MFN-1");
-        Taxonomy stored2 = cache.findByMfn("MFN-2");
-        assertThat(stored1.brand()).isSameAs(stored2.brand());
-        assertThat(stored1.category()).isSameAs(stored2.category());
-        assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
-    }
-
-    @Test
-    void onStartUpInternsBrandCategoryAndCategoryIdAcrossSnapshotRows() {
-        // given
-        Taxonomy first = new Taxonomy("1111111111111", "MFN-1", new String("Brand"), "Name",
-                new String("Laptops"), 5, null, null, null, new String("301"));
-        Taxonomy second = new Taxonomy("2222222222222", "MFN-2", new String("Brand"), "Name2",
-                new String("Laptops"), 5, null, null, null, new String("301"));
-        TaxonomyRepository repo = Mockito.mock(TaxonomyRepository.class);
-        Mockito.when(repo.loadNewest()).thenReturn(Pair.of("snapshot.csv", List.of(first, second)));
-        TaxonomyCache loaded = new TaxonomyCache(repo);
-
-        // when
-        loaded.onStartUp();
-
-        // then
-        Taxonomy stored1 = loaded.findByMfn("MFN-1");
-        Taxonomy stored2 = loaded.findByMfn("MFN-2");
+        Taxonomy stored1 = target.findByMfn(firstMfn);
+        Taxonomy stored2 = target.findByMfn(secondMfn);
         assertThat(stored1.brand()).isSameAs(stored2.brand());
         assertThat(stored1.category()).isSameAs(stored2.category());
         assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
@@ -522,26 +496,6 @@ class TaxonomyCacheTest {
         Taxonomy result = cache.findByMfn("MFN-ZERO");
         assertThat(result.ean()).isEqualTo("0012345678905");
         assertThat(result).isEqualTo(input);
-    }
-
-    @Test
-    void leadingZeroEanRowsAreInternedTooOnceNormalizationMovesToTheBoundary() {
-        // given
-        Taxonomy first = new Taxonomy("0012345678905", "MFN-ZERO-1", new String("Brand"), "Name",
-                new String("Laptops"), 5, null, null, null, new String("301"));
-        Taxonomy second = new Taxonomy("1234567890123", "MFN-NORMAL", new String("Brand"), "Name2",
-                new String("Laptops"), 5, null, null, null, new String("301"));
-
-        // when
-        cache.add(first);
-        cache.add(second);
-
-        // then
-        Taxonomy stored1 = cache.findByMfn("MFN-ZERO-1");
-        Taxonomy stored2 = cache.findByMfn("MFN-NORMAL");
-        assertThat(stored1.brand()).isSameAs(stored2.brand());
-        assertThat(stored1.category()).isSameAs(stored2.category());
-        assertThat(stored1.categoryId()).isSameAs(stored2.categoryId());
     }
 
     private static Taxonomy taxonomy(String mfn, int score, Integer weight) {

@@ -1,6 +1,7 @@
 package pl.commercelink.marketplace;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,6 +15,7 @@ import pl.commercelink.marketplace.api.MarketplaceReturns;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
@@ -21,6 +23,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,9 +43,15 @@ class MarketplaceReturnsImportEventListenerTest {
     @Mock private MarketplaceProvider provider;
     @Mock private MarketplaceReturns returns;
     @Mock private ScheduledExecutionCounter scheduledExecutionCounter;
+    @Mock private StoreActivity storeActivity;
 
     @InjectMocks
     private MarketplaceReturnsImportEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
+    }
 
     private final MarketplaceReturn aReturn = new MarketplaceReturn("r-1", "cf-1", null,
             MarketplaceReturnStatus.DECLARED, LocalDateTime.now(), List.of(), List.of());
@@ -150,5 +160,19 @@ class MarketplaceReturnsImportEventListenerTest {
         // then
         verifyNoInteractions(storesRepository);
         verify(returns, never()).fetchReturns();
+    }
+
+    @Test
+    void skipsInactiveStore() throws Exception {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when
+        listener.handleMessage(addressedPayload());
+
+        // then
+        verifyNoInteractions(providerFactory, marketplaceReturnImporter, scheduledExecutionCounter);
     }
 }

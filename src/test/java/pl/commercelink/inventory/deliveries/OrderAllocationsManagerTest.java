@@ -450,11 +450,32 @@ class OrderAllocationsManagerTest {
                 .thenReturn(List.of(free, claimed));
 
         // when
-        List<Allocation> allocations = orderAllocationsManager.fetchAll(STORE_ID);
+        List<Allocation> allocations = orderAllocationsManager.fetchAllWithOrders(STORE_ID).allocations();
 
         // then
         assertThat(allocations).hasSize(1);
         assertThat(allocations.get(0).getKey().getItemId()).isEqualTo("item-1");
+    }
+
+    @Test
+    @DisplayName("fetchAllWithOrders keeps only the orders that have an allocation")
+    void fetchAllWithOrdersKeepsOnlyOrdersThatHaveAnAllocation() {
+        // given
+        Order withItem = orderWithStatus(OrderStatus.New);
+        Order withoutItem = orderWithStatus(OrderStatus.New);
+        withoutItem.setOrderId("order-2");
+        OrderItem item = orderItemInStatus("item-1", FulfilmentStatus.Allocation);
+        when(ordersRepository.findAllByStoreIdAndStatus(STORE_ID, OrderStatus.New, OrderStatus.Assembly))
+                .thenReturn(List.of(withItem, withoutItem));
+        when(orderItemsRepository.findByOrderIdAndStatus(ORDER_ID, FulfilmentStatus.Allocation)).thenReturn(List.of(item));
+        when(orderItemsRepository.findByOrderIdAndStatus("order-2", FulfilmentStatus.Allocation)).thenReturn(List.of());
+
+        // when
+        OrderAllocations result = orderAllocationsManager.fetchAllWithOrders(STORE_ID);
+
+        // then
+        assertThat(result.allocations()).hasSize(1);
+        assertThat(result.orders()).containsOnlyKeys(ORDER_ID);
     }
 
     private DeliveryItem deliveryItemWithSelectedOrderAllocation(String itemId, double unitCost) {

@@ -86,6 +86,7 @@
                                     <span th:text="${account.title()}"></span>
                                     <span th:if="${account.isDefault()}" class="cl-status is-info" th:text="#{store.payments.accounts.default}"></span>
                                     <span th:unless="${account.ibanValid()}" class="cl-status is-warn" th:text="#{store.payments.accounts.ibanInvalid}"></span>
+                                    <span th:if="${account.statementReady()}" class="cl-status is-ok" th:text="#{store.payments.accounts.statementReady}"></span>
                                     <form th:if="${!account.isDefault() and account.ibanValid()}" class="cl-list-title-action" method="post"
                                           th:action="@{${account.defaultHref()}}">
                                         <button type="submit" class="cl-link-button" th:text="#{store.payments.accounts.makeDefault}"
@@ -96,6 +97,8 @@
                                 <p th:if="${account.detailLine() != null}" class="cl-list-desc" th:text="${account.detailLine()}"></p>
                             </div>
                             <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${account.statementHref()}}" th:text="#{store.payments.accounts.statement}"
+                                   th:attr="aria-label=#{store.payments.accounts.statement.for(${account.title()})}"></a>
                                 <a class="cl-link-button" th:href="@{${account.editHref()}}"
                                    th:text="${account.ibanValid()} ? #{settings.list.edit} : #{settings.list.fix}"
                                    th:attr="aria-label=${account.ibanValid()} ? #{settings.list.edit.for(${account.title()})} : #{settings.list.fix.for(${account.title()})}"></a>

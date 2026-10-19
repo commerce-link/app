@@ -37,24 +37,6 @@ class CategoryFiltersTemplateTest {
                 .contains("errorSummaryText('category-filters-errors', ${errorSummary})");
     }
 
-    @Test
-    void theFiltersAreRepeatedFieldsetsAndTheirFieldsFollowTheChosenKind() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-repeat=\"filters\"").contains("data-cl-repeat-id=\"filter\"")
-                .contains("data-cl-repeat-min=\"0\"").contains("data-cl-repeat-template").contains("data-cl-repeat-status")
-                .contains("@{/js/repeat-fields.js}").contains("@{/js/variant-fields.js}")
-                .contains("data-cl-variant-select").contains("data-cl-variant-group").contains("data-cl-variant-when");
-    }
-
-    @Test
-    void carriesNoTableNoInlineStyleAndNoDeveloperHelpText() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("<table").doesNotContain("style=").doesNotContain("Comma separated");
-    }
-
     /** The form as the controller renders it for a category with a brand filter, a price range and a by-brand filter. */
     private static String rendered(Map<String, String> errors) {
         CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
@@ -120,14 +102,6 @@ class CategoryFiltersTemplateTest {
                 .doesNotContain("type=\"hidden\"");
     }
 
-    /** The rows are renumbered by repeat-fields.js like any other repeated row, so a removal leaves no gap. */
-    @Test
-    void theUnknownRowsAreTheirOwnRepeatedGroup() throws Exception {
-        // when / then
-        assertThat(page()).contains("data-cl-repeat=\"unknown\"").contains("data-cl-repeat-id=\"unknown\"")
-                .contains("data-cl-repeat-min=\"0\"");
-    }
-
     @Test
     void anErrorIsShownAtItsFieldAndLinkedFromTheSummary() {
         // when
@@ -139,31 +113,8 @@ class CategoryFiltersTemplateTest {
         assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
     }
 
-    /** Each repeated filter carries its own variant group, so one filter's kind does not switch another one's fields. */
-    @Test
-    void eachFilterHasItsOwnVariantGroupAndTheBlankRowCarriesTheIndexPlaceholder() throws Exception {
-        // when
-        String html = rendered(Map.of());
-
-        // then
-        assertThat(html).contains("data-cl-variant-select=\"filter-0-kind\"").contains("data-cl-variant-select=\"filter-2-kind\"")
-                .contains("data-cl-variant-group=\"filter-1-kind\"").contains("data-cl-variant=\"PRICE_RANGE\"")
-                .contains("data-cl-variant-when=\"filter-0-kind=BRAND_NAME|PRODUCT_TITLE_CONTAINS|PRODUCT_TITLE_DOES_NOT_CONTAIN|EAN_NOT_EQ\"");
-        assertThat(page()).contains("filter-' + index + '-kind").contains("'@INDEX@'");
-    }
-
-    /** repeat-fields.js renumbers ids and names of a moved group; the variant group names must move with them. */
-    @Test
-    void theRepeatScriptRenumbersTheVariantAttributesToo() throws Exception {
-        // given
-        String script = Files.readString(Path.of("src/main/resources/static/js/repeat-fields.js"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(script).contains("data-cl-variant-select").contains("data-cl-variant-group").contains("data-cl-variant-when");
-    }
-
     /** The page as the controller renders it, header included, for a category with the given name. */
-    private static String renderedPage(String categoryName, Integer matchingProducts) {
+    private static String renderedPage(String categoryName) {
         CategoryDefinition category = new CategoryDefinition().withName(categoryName).withGeneratedId();
         Context context = new Context();
         context.setVariable("form", RecommendationFiltersForm.from(category));
@@ -176,37 +127,23 @@ class CategoryFiltersTemplateTest {
         context.setVariable("formAction", "/dashboard/catalogs/c1/category/k1/settings/filters");
         context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/settings");
         context.setVariable("backLabel", "Category settings");
-        context.setVariable("productsAddHref", "/dashboard/catalogs/c1/category/k1/products/add");
-        if (matchingProducts != null) {
-            context.setVariable("matchingProducts", matchingProducts);
-        }
         context.setVariable("redirectTo", null);
         return EnglishFragmentTemplateEngine.create().process("catalog/category-filters", context);
     }
 
     /**
      * The lead is a block of the template, not HTML put together in the controller and printed unescaped: a category
-     * name with markup is shown as text, and the count links to the page that adds the products (D-M50, D-C3).
+     * name with markup is shown as text (D-M50). It carries no count of products to add: counting them read the whole
+     * inventory on every render of the page.
      */
     @Test
-    void theLeadShowsTheCategoryNameAsTextAndLinksTheCountToAddingProducts() {
+    void theLeadShowsTheCategoryNameAsTextAndNoCount() {
         // when
-        String html = renderedPage("<b>GPU</b>", 8);
+        String html = renderedPage("<b>GPU</b>");
 
         // then
         String lead = html.substring(html.indexOf("<p class=\"cl-page-lead\">"), html.indexOf("</p>", html.indexOf("<p class=\"cl-page-lead\">")));
         assertThat(lead).contains("&lt;b&gt;GPU&lt;/b&gt; · narrow down the products suggested from the inventory.")
-                .doesNotContain("<b>")
-                .contains("<a href=\"/dashboard/catalogs/c1/category/k1/products/add\">Not yet added today: 8</a>");
-    }
-
-    @Test
-    void theLeadLeavesTheCountOutWhenItIsUnknown() {
-        // when
-        String html = renderedPage("GPU", null);
-
-        // then
-        assertThat(html).contains("GPU · narrow down the products suggested from the inventory.")
-                .doesNotContain("Not yet added today");
+                .doesNotContain("<b>").doesNotContain("<a").doesNotContain("Not yet added today");
     }
 }

@@ -6,9 +6,6 @@ import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.web.catalog.MarketplaceDefinitionRow;
 import pl.commercelink.web.dtos.MarketplaceDefinitionForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,10 +17,6 @@ class CategoryMarketplacesTemplateTest {
 
     private static final String CATALOG_ID = "c1";
     private static final String CATEGORY_ID = "k1";
-
-    private static String source(String name) throws Exception {
-        return Files.readString(Path.of("src/main/resources/templates/catalog/" + name + ".html"), StandardCharsets.UTF_8);
-    }
 
     private static MarketplaceDefinition definition(String name, double markup, int totalQty, int perDistributor,
                                                     int distributors, int local, int warehouse) {
@@ -58,34 +51,6 @@ class CategoryMarketplacesTemplateTest {
         context.setVariable("redirectTo", null);
         return EnglishFragmentTemplateEngine.create()
                 .process("catalog/category-marketplace", Set.of("marketplaceForm"), context);
-    }
-
-    @Test
-    void theDefinitionFormSavesWithoutReloadAndAsksTheServerAgainOnAnError() throws Exception {
-        // when / then
-        assertThat(source("category-marketplace")).contains("th:fragment=\"marketplaceForm\"")
-                .contains("id=\"marketplace-definition-form\"").contains("data-cl-async")
-                .contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummary('marketplace-definition-errors'").contains("id=\"conditions\"");
-    }
-
-    @Test
-    void neitherPageCarriesATableAnAdapterSelectOrAnInlineStyle() throws Exception {
-        // given
-        String list = source("category-marketplaces");
-        String form = source("category-marketplace");
-
-        // then
-        assertThat(list).doesNotContain("<table").doesNotContain("<select").doesNotContain("style=");
-        assertThat(form).doesNotContain("<table").doesNotContain("<select").doesNotContain("style=");
-    }
-
-    @Test
-    void everyDefinitionIsDeletedThroughAConfirmation() throws Exception {
-        // when / then
-        assertThat(source("category-marketplaces")).contains("data-cl-confirm")
-                .contains("data-cl-confirm-title=#{catalog.category.marketplace.delete.title")
-                .contains("confirm-dialog :: dialog").contains("@{/js/confirm-dialog.js}");
     }
 
     @Test

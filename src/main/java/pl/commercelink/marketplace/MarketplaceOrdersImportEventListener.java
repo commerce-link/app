@@ -11,6 +11,7 @@ import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class MarketplaceOrdersImportEventListener {
     private final MarketplaceOrderImporter marketplaceOrderImporter;
     private final MarketplaceProviderFactory providerFactory;
     private final ScheduledExecutionCounter scheduledExecutionCounter;
+    private final StoreActivity storeActivity;
 
     @SqsListener(
             value = "marketplace-orders-import-queue",
@@ -53,6 +55,10 @@ public class MarketplaceOrdersImportEventListener {
         Store store = storesRepository.findById(storeId);
         if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
             log.warn("Marketplace {} orders import skipped store {}: no active integration", marketplace, storeId);
+            return List.of();
+        }
+        if (!storeActivity.isActive(store)) {
+            log.warn("Marketplace {} orders import skipped store {}: the store is inactive", marketplace, storeId);
             return List.of();
         }
         return List.of(store);

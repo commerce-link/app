@@ -75,6 +75,9 @@ class SupplierLabelsTest {
         // then
         assertThat(map.of("s1", "Kosatec-aaaaaaaa")).isEqualTo("A");
         assertThat(map.of("s2", "Kosatec-aaaaaaaa")).isEqualTo("B");
+        assertThat(map.has("s1", "Kosatec-aaaaaaaa")).isTrue();
+        assertThat(map.has("s1", "Kosatec-bbbbbbbb")).isFalse();
+        assertThat(map.has("s3", "Kosatec-aaaaaaaa")).isFalse();
     }
 
     @Test

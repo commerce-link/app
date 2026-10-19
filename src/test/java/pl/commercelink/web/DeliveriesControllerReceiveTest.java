@@ -10,6 +10,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipDeliveryCompletion;
@@ -71,6 +72,7 @@ class DeliveriesControllerReceiveTest {
         DeliveryAllocationsForm form = formFor(delivery);
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
             security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
@@ -92,12 +94,39 @@ class DeliveriesControllerReceiveTest {
                 .thenReturn(OperationResult.success(null));
         DeliveryAllocationsForm form = formFor(delivery);
 
-        // when
-        String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
 
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
-        verify(deliveryReceptionService).receive(any(), any(), any(), any(), any(), any());
-        verifyNoInteractions(dropshipDeliveryCompletion);
+            // when
+            String view = controller.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+            verify(deliveryReceptionService).receive(any(), any(), any(), any(), any(), any());
+            verifyNoInteractions(dropshipDeliveryCompletion);
+        }
+    }
+
+    @Test
+    void receiveIsRefusedWhileTheSupplierConfirmsTheReservation() {
+        // given
+        Delivery delivery = new Delivery("store-1", null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setAwaitingSupplierConfirmation(true);
+        when(deliveriesRepository.findById("store-1", delivery.getDeliveryId())).thenReturn(delivery);
+        when(messageSource.getMessage(eq("deliveries.purchase.awaitingSupplier.locked"), any(), any()))
+                .thenReturn("waiting for the supplier");
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+
+            // when
+            String view = controller.markSelectedAllocationsAsReceived(formFor(delivery), redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+            verify(redirectAttributes).addFlashAttribute("errorMessage", "waiting for the supplier");
+            verifyNoInteractions(deliveryReceptionService, dropshipDeliveryCompletion);
+        }
     }
 }

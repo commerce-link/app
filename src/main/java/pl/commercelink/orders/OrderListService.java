@@ -1,5 +1,6 @@
 package pl.commercelink.orders;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.filters.FilterActor;
@@ -7,8 +8,11 @@ import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.shipping.PickupCandidates;
+import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.orders.OrderArchiveQuery;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrderListQuery.Direction;
 import pl.commercelink.web.orders.OrderListQuery.Sort;
@@ -18,11 +22,14 @@ import pl.commercelink.web.orders.OrdersPageModel;
 import pl.commercelink.web.orders.OrdersPageModel.Chip;
 import pl.commercelink.web.orders.OrdersPageModel.EmptyState;
 import pl.commercelink.web.orders.OrdersPageModel.FilterOption;
+import pl.commercelink.web.orders.OrdersPageModel.PickupAction;
 import pl.commercelink.web.orders.OrdersPageModel.StatusOption;
 import pl.commercelink.web.orders.OrdersPageModel.SortHeader;
 import pl.commercelink.web.orders.OrdersPageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +47,7 @@ import java.util.stream.Stream;
  * Builds the orders list page from one query of the store's open orders (spec §8.2, §23): tiles from all open orders,
  * status counts within the custom filter and the search, rows within the ticked statuses, then sort and page.
  */
+@Slf4j
 @Service
 public class OrderListService {
 
@@ -50,16 +58,29 @@ public class OrderListService {
     private final OrderFiltersService orderFilters;
     private final MessageSource messages;
     private final StoresRepository storesRepository;
+    private final PickupCandidates pickupCandidates;
 
     public OrderListService(OrdersRepository ordersRepository, OrderFiltersService orderFilters, MessageSource messages,
-                            StoresRepository storesRepository) {
+                            StoresRepository storesRepository, PickupCandidates pickupCandidates) {
         this.ordersRepository = ordersRepository;
         this.orderFilters = orderFilters;
         this.messages = messages;
         this.storesRepository = storesRepository;
+        this.pickupCandidates = pickupCandidates;
     }
 
+    /** The results block alone, as list-page.js swaps it: no header, so no "Zamów odbiór" to count for. */
     public OrdersPageModel page(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale) {
+        return build(actor, query, today, locale, false);
+    }
+
+    /** The whole page, with "Zamów odbiór" in its header. */
+    public OrdersPageModel fullPage(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale) {
+        return build(actor, query, today, locale, true);
+    }
+
+    private OrdersPageModel build(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale,
+                                  boolean withHeader) {
         // Only open orders are read (StoreIdStatusIndex): Completed and Cancelled are not part of this list, so a store's
         // growing history costs nothing here.
         List<Order> open = ordersRepository.findByStoreAndStatuses(actor.storeId(), OPEN);
@@ -80,7 +101,7 @@ public class OrderListService {
         Store store = storesRepository.findById(actor.storeId());
         OrderRowMapper mapper = new OrderRowMapper(messages, locale, store != null && store.hasDocumentsGenerationEnabled());
         List<OrderRow> rows = inStatus.subList(pagination.fromIndex(), pagination.toIndex()).stream()
-                .map(order -> mapper.map(order, today)).toList();
+                .map(order -> mapper.map(order, today, query.returnTo())).toList();
 
         return new OrdersPageModel(
                 query,
@@ -94,7 +115,21 @@ public class OrderListService {
                 sortHeaders(query),
                 rows,
                 pagination,
-                rows.isEmpty() ? emptyState(query, activeFilter, locale) : null);
+                rows.isEmpty() ? emptyState(query, activeFilter, locale) : null,
+                withHeader ? pickupAction(actor.storeId(), open, query) : null);
+    }
+
+    // the open orders are the ones the pickup page reads too, so only the store's RMAs cost an extra query
+    private PickupAction pickupAction(String storeId, List<Order> open, OrderListQuery query) {
+        Integer waiting;
+        try {
+            int count = pickupCandidates.count(storeId, open);
+            waiting = count > 0 ? count : null;
+        } catch (RuntimeException e) {
+            log.warn("Packages waiting for a pickup in store {} could not be counted; the list shows no number", storeId, e);
+            waiting = null;
+        }
+        return new PickupAction(ShipmentLinks.pickupPage(query.returnTo()), waiting);
     }
 
     private static Comparator<Order> comparator(Sort sort, Direction dir) {
@@ -229,8 +264,11 @@ public class OrderListService {
 
     private EmptyState emptyState(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         if (query.q() != null) {
+            // closed orders are not read here; the archive searches them with the same text
             return new EmptyState(text("orders.list.empty.search", locale, query.q()),
-                    text("orders.list.empty.search.clear", locale), query.withQ(null).href());
+                    text("orders.list.empty.search.clear", locale), query.withQ(null).href(),
+                    text("orders.list.empty.archive", locale, query.q()),
+                    OrderArchiveQuery.PATH + "?q=" + URLEncoder.encode(query.q(), StandardCharsets.UTF_8));
         }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),

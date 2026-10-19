@@ -1,0 +1,17 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<!--/* "Zamknij ręcznie" of an e-receipt attempt as its own page, for a browser without JavaScript: the dialog's form. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(|/dashboard/orders/${close.orderId()}|, #{order.page.title(${shortId})}, #{receipts.action.close.title})}"></div>
+            <section class="cl-card" aria-labelledby="receipt-close-page-title">
+                <h2 class="cl-visually-hidden" id="receipt-close-page-title" th:text="#{receipts.action.close.title}"></h2>
+                <form th:replace="~{orders/details/documents :: receiptCloseForm(${close}, false)}"></form>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

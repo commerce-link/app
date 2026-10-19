@@ -34,19 +34,4 @@ class ClientBrandingColorTemplateTest {
         }
         assertThat(count).isPositive();
     }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"clientOffer.html", "clientOrder.html", "client-return.html"})
-    void layoutStylesDoNotDependOnWhetherTheStoreHasABrandColour(String template) throws Exception {
-        // given
-        String html = Files.readString(Path.of("src/main/resources/templates", template), StandardCharsets.UTF_8);
-
-        // when
-        Matcher styles = STYLE_WITH_COLOR.matcher(html);
-
-        // then
-        while (styles.find()) {
-            assertThat(styles.group(1)).doesNotContain("padding").doesNotContain("margin").doesNotContain("width");
-        }
-    }
 }

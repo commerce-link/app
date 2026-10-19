@@ -1,8 +1,9 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -38,33 +39,15 @@ class StoreSupplierControllerRoutingTest {
     }
 
     /** The store is not stubbed, so the handler answers 404; what matters here is that it is reached at all. */
-    private void assertReaches(String identity) throws Exception {
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {
+            "manual-k7f3a9c2",
+            "Kosatec-a1b2c3d4",
+            "manual:Hurtownia",
+            "manual:Cennik%20hurtowy",
+            "manual:%C5%BBywno%C5%9B%C4%87"})
+    void routesEveryKindOfSupplierIdentityToTheSupplierPage(String identity) throws Exception {
         mockMvc.perform(get("/dashboard/store/suppliers/" + identity))
                 .andExpect(handler().handlerType(StoreSupplierController.class));
-    }
-
-    @Test
-    void routesAGeneratedIdentityToTheSupplierPage() throws Exception {
-        assertReaches("manual-k7f3a9c2");
-    }
-
-    @Test
-    void routesATypeNameWithATokenToTheSupplierPage() throws Exception {
-        assertReaches("Kosatec-a1b2c3d4");
-    }
-
-    @Test
-    void routesALegacyPriceListIdentityToTheSupplierPage() throws Exception {
-        assertReaches("manual:Hurtownia");
-    }
-
-    @Test
-    void routesALegacyPriceListIdentityWithASpaceToTheSupplierPage() throws Exception {
-        assertReaches("manual:Cennik%20hurtowy");
-    }
-
-    @Test
-    void routesALegacyPriceListIdentityWithPolishLettersToTheSupplierPage() throws Exception {
-        assertReaches("manual:%C5%BBywno%C5%9B%C4%87");
     }
 }

@@ -8,10 +8,10 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -19,125 +19,172 @@ import static pl.commercelink.receipts.ReceiptFixtures.*;
 
 class ReceiptTriggerTest {
 
-    private final StoresRepository stores = mock(StoresRepository.class);
     private final ReceiptEligibility eligibility = mock(ReceiptEligibility.class);
     private final ReceiptAttemptService service = mock(ReceiptAttemptService.class);
-    private final ReceiptTrigger trigger = new ReceiptTrigger(stores, eligibility, service);
+    private final ReceiptTrigger trigger = new ReceiptTrigger(eligibility, service);
+
+    /** A store with a receipt system chosen, whose orders may have attempts. */
+    private static Store receiptStore() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, FakeReceiptProviderDescriptor.NAME);
+        return store;
+    }
 
     @Test
     void startsAnAttemptForACandidate() {
-        Store store = new Store();
+        // given
+        Store store = receiptStore();
         Order order = b2cOrder(100);
-        when(stores.findById(STORE_ID)).thenReturn(store);
         when(eligibility.automaticCandidate(store, order)).thenReturn(true);
 
-        trigger.onOrderSaved(order);
+        // when
+        trigger.onOrderSaved(order, store);
 
+        // then
         verify(service).startAutomatic(store, order);
     }
 
     @Test
     void neverBreaksTheOrderUpdate() {
+        // given
+        Store store = receiptStore();
         Order order = b2cOrder(100);
-        when(stores.findById(STORE_ID)).thenThrow(new RuntimeException("dynamo down"));
+        when(eligibility.automaticCandidate(store, order)).thenThrow(new RuntimeException("dynamo down"));
 
-        trigger.onOrderSaved(order);
-
+        // when / then
+        assertThatCode(() -> trigger.onOrderSaved(order, store)).doesNotThrowAnyException();
         verify(service, never()).startAutomatic(any(), any());
     }
 
     @Test
     void ignoresOrdersThatAreNotDelivered() {
-        Order order = b2cOrder(100);
-        order.setStatus(pl.commercelink.orders.OrderStatus.Shipping);
-
-        trigger.onOrderSaved(order);
-
-        verifyNoInteractions(stores, service);
-    }
-
-    @Test
-    void deliveredUnpaidOrderStartsTheAttemptWithoutWaitingForThePayment() {
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, FakeReceiptProviderDescriptor.NAME);
-        store.getReceiptConfiguration().enable(DELIVERED_AT.minusDays(1));
-        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
-        when(factory.getDescriptor(FakeReceiptProviderDescriptor.NAME)).thenReturn(new FakeReceiptProviderDescriptor());
-        ReceiptTrigger realTrigger = new ReceiptTrigger(stores, new ReceiptEligibility(factory), service);
-        when(stores.findById(STORE_ID)).thenReturn(store);
-        Order order = order(100.0, payment(PaymentSource.CashOnDelivery, 0.0));
-
-        realTrigger.onOrderSaved(order);
-
-        verify(service).startAutomatic(store, order);
-    }
-
-    @Test
-    void aDeliveredOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
         // given
         Order order = b2cOrder(100);
-        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-        when(stores.findById(STORE_ID)).thenReturn(new Store());
+        order.setStatus(OrderStatus.Shipping);
 
         // when
-        trigger.onOrderSaved(order);
+        trigger.onOrderSaved(order, receiptStore());
 
         // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
-    }
-
-    @Test
-    void aCompletedOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
-        // given
-        Order order = b2cOrder(100);
-        order.setStatus(OrderStatus.Completed);
-        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-
-        // when
-        trigger.onOrderSaved(order);
-
-        // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verifyNoInteractions(eligibility);
         verify(service, never()).startAutomatic(any(), any());
     }
 
     @Test
-    void anOrderWithoutAClosingDocumentLeavesTheAlertsAlone() {
+    void deliveredUnpaidOrderStartsTheAttemptWithoutWaitingForThePayment() {
         // given
-        Order order = b2cOrder(100);
-        when(stores.findById(STORE_ID)).thenReturn(new Store());
+        Store store = receiptStore();
+        store.getReceiptConfiguration().enable(DELIVERED_AT.minusDays(1));
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor(FakeReceiptProviderDescriptor.NAME)).thenReturn(new FakeReceiptProviderDescriptor());
+        ReceiptTrigger realTrigger = new ReceiptTrigger(new ReceiptEligibility(factory), service);
+        Order order = order(100.0, payment(PaymentSource.CashOnDelivery, 0.0));
 
         // when
-        trigger.onOrderSaved(order);
+        realTrigger.onOrderSaved(order, store);
 
         // then
-        verify(service, never()).resolveDeadAttemptAlerts(any(), any());
+        verify(service).startAutomatic(store, order);
     }
 
     @Test
-    void failingToResolveAlertsNeverBreaksTheOrderUpdate() {
+    void orderSavedReconcilesTheDeadAttemptAlerts() {
         // given
         Order order = b2cOrder(100);
         order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-        doThrow(new RuntimeException("dynamo down")).when(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
 
-        // when / then
-        assertThatCode(() -> trigger.onOrderSaved(order)).doesNotThrowAnyException();
+        // when
+        trigger.onOrderSaved(order, receiptStore());
+
+        // then
+        verify(service).reconcileDeadAttemptAlerts(order);
     }
 
     @Test
-    void anOrderRecordingItsReceiptBeforeDeliveryResolvesTheAlertsOfDeadAttempts() {
+    void aStoreWithoutAReceiptSystemStillReconciles() {
+        // given: the alerts follow the order whatever the store's current receipt settings (a disconnected system
+        // leaves its attempts and alerts behind)
+        Order order = b2cOrder(100);
+
+        // when
+        trigger.onOrderSaved(order, new Store());
+
+        // then
+        verify(service).reconcileDeadAttemptAlerts(order);
+    }
+
+    @Test
+    void anUnknownStoreStillReconciles() {
+        // given
+        Order order = b2cOrder(100);
+
+        // when
+        trigger.onOrderSaved(order, null);
+
+        // then
+        verify(service).reconcileDeadAttemptAlerts(order);
+        verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
+    void anOrderNotYetDeliveredReconcilesTheAlertsWithoutStartingAnAttempt() {
         // given: a manual e-receipt blocked while the sale was still Assembled, then the cash register receipt
         Order order = b2cOrder(100);
         order.setStatus(OrderStatus.Assembled);
         order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
 
         // when
-        trigger.onOrderSaved(order);
+        trigger.onOrderSaved(order, receiptStore());
 
         // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verify(service).reconcileDeadAttemptAlerts(order);
+        verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
+    void failingToReconcileAlertsNeverBreaksTheOrderUpdate() {
+        // given
+        Order order = b2cOrder(100);
+        doThrow(new RuntimeException("dynamo down")).when(service).reconcileDeadAttemptAlerts(order);
+
+        // when / then
+        assertThatCode(() -> trigger.onOrderSaved(order, receiptStore())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void anOrderWithItsClosingDocumentSettlesDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Completed);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+
+        // when / then
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isTrue();
+    }
+
+    @Test
+    void anOrderWithoutAClosingDocumentDoesNotSettleDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+
+        // when / then
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isFalse();
+    }
+
+    @Test
+    void cancellingResolvesTheDeadAttemptAlerts() {
+        // given: the lifecycle cancelled a fully returned order and saved it
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        trigger.onOrderSaved(order, receiptStore());
+
+        // then: a cancelled order settles its dead attempts, so the reconcile resolves their alerts (the resolving
+        // itself: ReceiptAttemptServiceTest#reconcileResolvesDeadAttemptAlertsOfACancelledOrder)
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isTrue();
+        verify(service).reconcileDeadAttemptAlerts(order);
         verify(service, never()).startAutomatic(any(), any());
     }
 }

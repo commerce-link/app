@@ -3,10 +3,13 @@ package pl.commercelink.receipts;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import pl.commercelink.notifications.StoreNotificationService;
+import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -21,10 +24,13 @@ public class ReceiptAlerts {
 
     private final StoreNotificationService notifications;
     private final MessageSource messageSource;
+    private final ReceiptProviderFactory providerFactory;
 
-    public ReceiptAlerts(StoreNotificationService notifications, MessageSource messageSource) {
+    public ReceiptAlerts(StoreNotificationService notifications, MessageSource messageSource,
+                         ReceiptProviderFactory providerFactory) {
         this.notifications = notifications;
         this.messageSource = messageSource;
+        this.providerFactory = providerFactory;
     }
 
     /** Returns whether the attempt's stored reason changed (the caller saves the attempt). */
@@ -43,6 +49,24 @@ public class ReceiptAlerts {
     }
 
     /**
+     * Raises the attempt's bell notification again although its stored reason may be unchanged: {@link #sync} would
+     * publish nothing then, yet the notification may have been resolved meanwhile (the order got its closing
+     * document, which was later unpinned). Publishing keeps an existing record as it is, read or not, so repeating
+     * this on every order save never brings a read alert back as unread; only a changed reason replaces the record,
+     * as in {@link #sync}. Returns whether the stored reason changed (the caller saves the attempt).
+     */
+    public boolean republish(ReceiptAttempt attempt, ReceiptAttention attention) {
+        boolean changed = !Objects.equals(attention.name(), attempt.getAttention());
+        if (changed) {
+            notifications.resolve(attempt.getStoreId(), StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey());
+        }
+        notifications.publish(attempt.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey(), message(attempt, attention)));
+        attempt.setAttention(attention.name());
+        return changed;
+    }
+
+    /**
      * Resolves this attempt's bell notification, e.g. because a later attempt of the same order fiscalised and the
      * old FAILED/BLOCKED alert no longer needs the operator's attention. The attempt's stored {@code attention} is
      * left as-is: the order page still shows why that dead attempt needed correcting.
@@ -54,6 +78,104 @@ public class ReceiptAlerts {
     /** Bell notifications always read in the fixed operator locale, whatever the caller's own request locale is. */
     public String message(ReceiptAttempt attempt, ReceiptAttention attention) {
         return message(attempt, attention, OPERATOR_LOCALE);
+    }
+
+    /**
+     * Why a dead attempt fiscalised nothing, in a few words and without advice (the advice of {@link #message} is
+     * about the newest attempt only): the blocked reason with its detail, or the provider's refusal. Null when the
+     * attempt carries neither.
+     */
+    public String outcome(ReceiptAttempt attempt, Locale locale) {
+        if (attempt.getState() == ReceiptAttemptState.BLOCKED && attempt.getBlockedReason() != null) {
+            String blocked = messageSource.getMessage("receipts.blocked." + attempt.getBlockedReason(), null,
+                    attempt.getBlockedReason(), locale);
+            return blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")");
+        }
+        if (attempt.getState() == ReceiptAttemptState.FAILED) {
+            return attempt.getFailureMessage();
+        }
+        return null;
+    }
+
+    /**
+     * The problem as the order page shows it in the e-receipt row: unlike the bell {@link #message}, it names no
+     * receipt key or order id (the row is the receipt), points at a button of the same row and keeps the provider's
+     * technical hints apart, under a disclosure. Each text may be overridden per provider with a key suffixed by the
+     * provider id (e.g. {@code .fakturownia}), because those hints (fiscal_status, the print marker) are specific to
+     * one provider and would mislead the operator of another.
+     */
+    public ReceiptPageProblem pageProblem(ReceiptAttempt attempt, ReceiptAttention attention, Locale locale) {
+        String providerName = providerName(attempt.getProvider(), locale);
+        Object[] args = {
+                providerName,
+                clause(attempt.getLastError(), locale),
+                clause(attempt.getFailureMessage(), locale),
+                blockedText(attempt, locale),
+                attempt.getIssueCalls(),
+                attempt.getReceiptKey()
+        };
+        String base = "receipts.page." + pageKey(attempt, attention) + ".";
+        String cause = pageText(base + "cause", attempt.getProvider(), args, locale);
+        List<String> actions = pageLines(base + "action", attempt.getProvider(), args, locale);
+        String details = pageText(base + "details", attempt.getProvider(), args, locale);
+        String summary = details == null ? null : messageSource.getMessage("receipts.page.details.summary",
+                new Object[]{providerName}, locale);
+        return ReceiptPageProblem.ofLines(cause == null ? attention.name() : cause, actions, summary, details);
+    }
+
+    /**
+     * The action as its lines: the one text under {@code key}, or, for advice that offers alternatives, the numbered
+     * lines {@code key.1}, {@code key.2}, ... (each may be overridden per provider like any page text).
+     */
+    private List<String> pageLines(String key, String providerId, Object[] args, Locale locale) {
+        String single = pageText(key, providerId, args, locale);
+        if (single != null) {
+            return List.of(single);
+        }
+        List<String> lines = new ArrayList<>();
+        for (int n = 1; ; n++) {
+            String line = pageText(key + "." + n, providerId, args, locale);
+            if (line == null) {
+                return lines;
+            }
+            lines.add(line);
+        }
+    }
+
+    /** The provider-specific text when the provider has one, the generic one otherwise; null when neither exists. */
+    private String pageText(String key, String providerId, Object[] args, Locale locale) {
+        String specific = providerId == null ? null : messageSource.getMessage(key + "." + providerId, args, null, locale);
+        return specific != null ? specific : messageSource.getMessage(key, args, null, locale);
+    }
+
+    /**
+     * The attempt's provider (stored when it was created, so a later switch of the store's system does not rename
+     * old attempts) by its display name; the stored id when its adapter is no longer installed.
+     */
+    private String providerName(String providerId, Locale locale) {
+        if (providerId == null || providerId.isBlank()) {
+            return messageSource.getMessage("receipts.page.provider.unknown", null, locale);
+        }
+        ReceiptProviderDescriptor descriptor = providerFactory.getDescriptor(providerId);
+        return descriptor == null || descriptor.displayName() == null ? providerId : descriptor.displayName();
+    }
+
+    /** Free provider text dropped into a sentence that ends with its own full stop. */
+    private String clause(String text, Locale locale) {
+        if (text == null || text.isBlank()) {
+            return messageSource.getMessage("receipts.page.noDetail", null, locale);
+        }
+        String trimmed = text.strip();
+        return trimmed.endsWith(".") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+
+    private String blockedText(ReceiptAttempt attempt, Locale locale) {
+        if (attempt.getBlockedReason() == null) {
+            return messageSource.getMessage("receipts.page.noDetail", null, locale);
+        }
+        String blocked = messageSource.getMessage("receipts.blocked." + attempt.getBlockedReason(), null,
+                attempt.getBlockedReason(), locale);
+        return blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")");
     }
 
     /** Same message, in the given locale: the order page shows it to the operator viewing it in their own language. */
@@ -73,10 +195,16 @@ public class ReceiptAlerts {
 
     /** A point-of-sale sale blocked for want of the customer's e-mail needs the cash register advice, not "Reissue". */
     private static String messageKey(ReceiptAttempt attempt, ReceiptAttention attention) {
-        if (attention == ReceiptAttention.BLOCKED
-                && ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name().equals(attempt.getBlockedReason())) {
-            return "receipts.attention.BLOCKED_POS";
-        }
-        return attention.messageKey();
+        return isPosWithoutCustomerEmail(attempt, attention) ? "receipts.attention.BLOCKED_POS" : attention.messageKey();
+    }
+
+    /** The order page's texts follow the bell: the point-of-sale block has its own cause and advice. */
+    private static String pageKey(ReceiptAttempt attempt, ReceiptAttention attention) {
+        return isPosWithoutCustomerEmail(attempt, attention) ? "BLOCKED_POS" : attention.name();
+    }
+
+    private static boolean isPosWithoutCustomerEmail(ReceiptAttempt attempt, ReceiptAttention attention) {
+        return attention == ReceiptAttention.BLOCKED
+                && ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name().equals(attempt.getBlockedReason());
     }
 }

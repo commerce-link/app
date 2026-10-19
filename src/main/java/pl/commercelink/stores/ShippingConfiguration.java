@@ -27,6 +27,15 @@ public class ShippingConfiguration {
     @DynamoDBAttribute(attributeName = "authorizedCarriers")
     private List<AuthorizedCarrier> authorizedCarriers = new LinkedList<>();
 
+    /**
+     * Shipping integrations next to the default one (Store integrations, SHIPPING_PROVIDER), e.g. "allegro". A list of
+     * plain names in the shipping settings on purpose: an older version reading the store ignores this attribute (the
+     * DynamoDB mapper skips attributes it has no field for), so a rollback keeps every store readable. An enum value in
+     * Store#integrations would not be: the older IntegrationType could not convert it and the store would not load.
+     */
+    @DynamoDBAttribute(attributeName = "additionalIntegrations")
+    private List<String> additionalIntegrations = new LinkedList<>();
+
     public ShippingConfiguration() {
     }
 
@@ -60,6 +69,14 @@ public class ShippingConfiguration {
 
     public void setAuthorizedCarriers(List<AuthorizedCarrier> authorizedCarriers) {
         this.authorizedCarriers = authorizedCarriers;
+    }
+
+    public List<String> getAdditionalIntegrations() {
+        return additionalIntegrations;
+    }
+
+    public void setAdditionalIntegrations(List<String> additionalIntegrations) {
+        this.additionalIntegrations = additionalIntegrations;
     }
 
     @DynamoDBIgnore

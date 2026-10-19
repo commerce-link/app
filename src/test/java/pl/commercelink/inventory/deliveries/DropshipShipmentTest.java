@@ -1,10 +1,14 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -23,58 +27,27 @@ class DropshipShipmentTest {
         assertThat(courier().validationError()).isNull();
     }
 
-    @Test
-    void personalCollectionIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.PersonalCollection, "DPD", "PKG-1", null, SHIPPED_AT);
-
-        // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.type");
+    static Stream<Arguments> invalidShipments() {
+        return Stream.of(
+                Arguments.of("personalCollection", new DropshipShipment(ShipmentType.PersonalCollection, "DPD", "PKG-1", null, SHIPPED_AT),
+                        "deliveries.dropship.shipment.error.type"),
+                Arguments.of("missingType", new DropshipShipment(null, "DPD", "PKG-1", null, SHIPPED_AT),
+                        "deliveries.dropship.shipment.error.type"),
+                Arguments.of("blankCarrier", new DropshipShipment(ShipmentType.Courier, "  ", "PKG-1", null, SHIPPED_AT),
+                        "deliveries.dropship.shipment.error.carrier"),
+                Arguments.of("blankTrackingNumber", new DropshipShipment(ShipmentType.Courier, "DPD", null, null, SHIPPED_AT),
+                        "deliveries.dropship.shipment.error.trackingNo"),
+                Arguments.of("pickupPointWithoutCollectionPoint", new DropshipShipment(ShipmentType.PickupPoint, "InPost", "PKG-1", " ", SHIPPED_AT),
+                        "deliveries.dropship.shipment.error.collectionPoint"),
+                Arguments.of("missingShippedAt", new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, null),
+                        "deliveries.dropship.shipment.error.shippedAt"));
     }
 
-    @Test
-    void missingTypeIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(null, "DPD", "PKG-1", null, SHIPPED_AT);
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidShipments")
+    void invalidShipmentIsRejectedWithTheMessageKeyOfTheBrokenField(String caseName, DropshipShipment shipment, String expectedKey) {
         // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.type");
-    }
-
-    @Test
-    void blankCarrierIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, "  ", "PKG-1", null, SHIPPED_AT);
-
-        // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.carrier");
-    }
-
-    @Test
-    void blankTrackingNumberIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, "DPD", null, null, SHIPPED_AT);
-
-        // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.trackingNo");
-    }
-
-    @Test
-    void pickupPointWithoutCollectionPointIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.PickupPoint, "InPost", "PKG-1", " ", SHIPPED_AT);
-
-        // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.collectionPoint");
-    }
-
-    @Test
-    void missingShippedAtIsRejected() {
-        // given
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, null);
-
-        // when / then
-        assertThat(shipment.validationError()).isEqualTo("deliveries.dropship.shipment.error.shippedAt");
+        assertThat(shipment.validationError()).isEqualTo(expectedKey);
     }
 
     @Test
@@ -123,15 +96,6 @@ class DropshipShipmentTest {
         // then
         assertThat(shipment.getCarrier()).isNull();
         assertThat(shipment.getTrackingNo()).isNull();
-    }
-
-    @Test
-    void fiveArgumentConstructorLeavesTrackingUrlEmpty() {
-        // when
-        DropshipShipment shipment = new DropshipShipment(ShipmentType.Courier, "DPD", "PKG-1", null, SHIPPED_AT);
-
-        // then
-        assertThat(shipment.trackingUrl()).isNull();
     }
 
     @Test

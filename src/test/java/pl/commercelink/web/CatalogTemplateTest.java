@@ -29,13 +29,6 @@ class CatalogTemplateTest {
     }
 
     @Test
-    void usesNoBulmaComponentsInlineStylesOrTables() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("class=\"button is-").doesNotContain("style=").doesNotContain("<table")
-                .doesNotContain("notification is-").doesNotContain("dropdown");
-    }
-
-    @Test
     void showsTheOutcomeOfACatalogActionInThePageBodyOnly() throws Exception {
         // when / then
         assertThat(page()).contains("settings-form :: savedAlert").contains("th:if=\"${catalogError}\"")

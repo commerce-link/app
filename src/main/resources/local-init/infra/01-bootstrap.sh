@@ -64,6 +64,11 @@ awslocal sqs create-queue --queue-name supplier-order-refresh-queue-dlq
 awslocal sqs create-queue --queue-name supplier-order-refresh-queue \
   --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-refresh-queue-dlq\",\"maxReceiveCount\":\"6\"}"}'
 
+## Completion queue for purchases the supplier confirms asynchronously (first check after 60 s, 12 receives)
+awslocal sqs create-queue --queue-name supplier-purchase-completion-queue-dlq
+awslocal sqs create-queue --queue-name supplier-purchase-completion-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-purchase-completion-queue-dlq\",\"maxReceiveCount\":\"12\"}"}'
+
 ## Tracking queue with a DLQ + redrive mirroring prod (visibility short for local E2E)
 awslocal sqs create-queue --queue-name supplier-order-tracking-queue-dlq
 awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
@@ -73,6 +78,21 @@ awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
 awslocal sqs create-queue --queue-name shipment-tracking-queue-dlq
 awslocal sqs create-queue --queue-name shipment-tracking-queue \
   --attributes '{"VisibilityTimeout":"120","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-queue-dlq\",\"maxReceiveCount\":\"5\"}"}'
+awslocal sqs create-queue --queue-name shipment-cancellation-queue-dlq
+awslocal sqs create-queue --queue-name shipment-cancellation-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-cancellation-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-creation-queue-dlq
+awslocal sqs create-queue --queue-name shipment-creation-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-creation-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-pickup-queue-dlq
+awslocal sqs create-queue --queue-name shipment-pickup-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-pickup-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-tracking-sweep-queue-dlq
+awslocal sqs create-queue --queue-name shipment-tracking-sweep-queue \
+  --attributes '{"VisibilityTimeout":"300","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-sweep-queue-dlq\",\"maxReceiveCount\":\"1\"}"}'
+awslocal sqs create-queue --queue-name shipment-tracking-poll-queue-dlq
+awslocal sqs create-queue --queue-name shipment-tracking-poll-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-poll-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
 
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,

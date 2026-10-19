@@ -1,6 +1,8 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.thymeleaf.TemplateSpec;
 import org.thymeleaf.context.Context;
 import pl.commercelink.web.dtos.ReceiptSettingsForm;
@@ -17,25 +19,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  *  action. */
 class StoreReceiptsTemplateTest {
 
-    @Test
-    void theFormIsHiddenWithoutAConfiguredSystem() {
-        String html = render(new IntegrationStatus(null, null, false, false));
+    @ParameterizedTest(name = "chosen={2}, configured={3} -> form shown={4}")
+    @CsvSource({
+            ",,false,false,false",
+            "test-receipts,Test receipts,true,false,false",
+            "test-receipts,Test receipts,true,true,true"
+    })
+    void theFormIsShownOnlyOnceTheSystemIsConfigured(String systemId, String systemName, boolean chosen,
+                                                     boolean configured, boolean formShown) {
+        String html = render(new IntegrationStatus(systemId, systemName, chosen, configured));
 
-        assertThat(html).doesNotContain("id=\"receipts-form\"");
-    }
-
-    @Test
-    void theFormIsHiddenWhenTheSystemIsChosenButNotConfigured() {
-        String html = render(new IntegrationStatus("test-receipts", "Test receipts", true, false));
-
-        assertThat(html).doesNotContain("id=\"receipts-form\"");
-    }
-
-    @Test
-    void theFormIsShownOnceTheSystemIsConfigured() {
-        String html = render(new IntegrationStatus("test-receipts", "Test receipts", true, true));
-
-        assertThat(html).contains("id=\"receipts-form\"");
+        if (formShown) {
+            assertThat(html).contains("id=\"receipts-form\"");
+        } else {
+            assertThat(html).doesNotContain("id=\"receipts-form\"");
+        }
     }
 
     /** The async save (both the settings page's own POST and the system subpage's redirect-with-flash) re-renders

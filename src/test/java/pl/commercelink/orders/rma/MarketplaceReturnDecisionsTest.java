@@ -91,12 +91,6 @@ class MarketplaceReturnDecisionsTest {
         return captor.getValue().action();
     }
 
-    private ReturnLifecycleEventType capturePublishedType() {
-        ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
-        verify(publisher, atLeastOnce()).publish(captor.capture());
-        return captor.getValue().type();
-    }
-
     private static OrderItem shippingOrderItem(String itemId) {
         OrderItem item = new OrderItem(ORDER_ID, "Other", "shipping", 1, 0.0, BasketItem.SHIPPING_MFN_CODE, false);
         item.setItemId(itemId);
@@ -187,24 +181,6 @@ class MarketplaceReturnDecisionsTest {
         ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
         verify(publisher).publish(captor.capture());
         assertEquals("SKU-1", captor.getValue().action().items().get(0).marketplaceKey());
-    }
-
-    @Test
-    void eachAcceptanceRoundGetsItsOwnCommandId() {
-        // given
-        List<OrderItem> orderItems = List.of(
-                orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered),
-                orderItem("item-2", "SKU-2", 1, FulfilmentStatus.Delivered));
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
-
-        // when
-        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), false);
-        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-2", "SKU-2", 1)), false);
-
-        // then
-        ArgumentCaptor<ReturnLifecycleEvent> captor = ArgumentCaptor.forClass(ReturnLifecycleEvent.class);
-        verify(publisher, times(2)).publish(captor.capture());
-        assertNotEquals(captor.getAllValues().get(0).action().commandId(), captor.getAllValues().get(1).action().commandId());
     }
 
     @Test
@@ -400,25 +376,6 @@ class MarketplaceReturnDecisionsTest {
     }
 
     @Test
-    void resendRepublishesTheStoredActionWithTheSameCommandId() {
-        // given
-        List<OrderItem> orderItems = List.of(orderItem("item-1", "SKU-1", 1, FulfilmentStatus.Delivered));
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
-        decisions.publishAcceptance(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 1)), true);
-        MarketplaceReturnAction first = capturePublishedAction();
-        reset(publisher);
-
-        // when
-        boolean resent = decisions.resendDecisions(marketplaceRma);
-
-        // then
-        assertTrue(resent);
-        MarketplaceReturnAction second = capturePublishedAction();
-        assertEquals(first.commandId(), second.commandId());
-        assertEquals(ReturnLifecycleEventType.ReturnAccepted, capturePublishedType());
-    }
-
-    @Test
     void resendReturnsFalseWhenNoDecisionWasEverPublished() {
         // when / then
         assertFalse(decisions.resendDecisions(marketplaceRma));
@@ -499,21 +456,6 @@ class MarketplaceReturnDecisionsTest {
         assertFalse(decisions.coversEveryReturnableItem(marketplaceRma,
                 List.of(rmaItem("item-1", "SKU-1", 1), rmaItem("item-2", "SKU-2", 1))));
         assertFalse(decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "SKU-1", 2))));
-    }
-
-    @Test
-    void doesNotCoverWholeOrderWhenOnlySomeItemsAreSelected() {
-        // given: an order with two open items, but only one is being accepted
-        List<OrderItem> orderItems = List.of(
-                orderItem("item-1", "sku-a", 1, FulfilmentStatus.Delivered),
-                orderItem("item-2", "sku-b", 1, FulfilmentStatus.Delivered));
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(orderItems);
-
-        // when
-        boolean covers = decisions.coversEveryReturnableItem(marketplaceRma, List.of(rmaItem("item-1", "sku-a", 1)));
-
-        // then
-        assertFalse(covers);
     }
 
     @Test

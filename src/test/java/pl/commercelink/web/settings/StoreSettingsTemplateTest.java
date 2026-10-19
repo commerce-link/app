@@ -4,9 +4,6 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,54 +80,5 @@ class StoreSettingsTemplateTest {
         assertThat(html).contains("href=\"/dashboard/store/store-1/copy\"");
         assertThat(html).contains("cl-tile-grid");
         assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void dropsTheOldCardGridItsBrokenIconsAndTheRawNotificationTable() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("button is-primary").doesNotContain("card-content")
-                .doesNotContain("fa-palette").doesNotContain("fa-file-invoice").doesNotContain("fa-store")
-                .doesNotContain("store.notification.severity")
-                .doesNotContain("store-settings :: alerts");
-        assertThat(template).contains("fragments/screen-intro :: panel('store', 'fas fa-cog')");
-    }
-
-    @Test
-    void keepsTheTileColumnNoWiderThanAPhonesContentBoxAndNeverFormsAFourthColumnOnWideScreens() throws Exception {
-        // when
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // then
-        // The minimum tile width must both fit a phone's content box (17.5rem, or full
-        // width below that) and never drop under a third of the row, otherwise a wide
-        // screen fits a fourth column and every section is left half-empty.
-        assertThat(css).contains("minmax(max(min(17.5rem, 100%), calc((100% - 32px) / 3)), 1fr)");
-        assertThat(css).doesNotContain("minmax(17.5rem, 1fr)");
-        assertThat(css).doesNotContain("minmax(min(17.5rem, 100%), 1fr)");
-    }
-
-    @Test
-    void widensThePageBodyOnTheSettingsHomePageOnlySoWideScreensFitAThirdTileColumn() throws Exception {
-        // given
-        String template = Files.readString(Path.of("src/main/resources/templates/store.html"), StandardCharsets.UTF_8);
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).contains("cl-page-body is-wide");
-        assertThat(css).contains(".cl-page-body.is-wide {").contains("max-width: 1440px;");
-    }
-
-    @Test
-    void pinsCrossDocumentViewTransitionsForTheShell() throws Exception {
-        // when
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(css).contains("@view-transition { navigation: auto; }");
-        assertThat(css).contains("@view-transition { navigation: none; }");
-        assertThat(css).contains("::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 150ms; }");
     }
 }

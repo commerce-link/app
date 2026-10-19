@@ -296,6 +296,23 @@ class OrderIdRefreshServiceTest {
     }
 
     @Test
+    void manualRefreshUnavailableWhileAwaitingSupplierConfirmation() {
+        // given
+        Delivery delivery = delivery();
+        delivery.setExternalDeliveryIdProvisional(true);
+        delivery.setAwaitingSupplierConfirmation(true);
+        when(deliveriesRepository.findById("s1", "d1")).thenReturn(delivery);
+
+        // when
+        OrderIdRefreshService.ManualRefreshOutcome outcome = service.refreshManually("s1", "d1");
+
+        // then
+        assertEquals(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE, outcome);
+        verifyNoInteractions(providerResolver, supplierProvider);
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void manualRefreshUnavailableWhenRepositoryThrows() {
         // given
         when(deliveriesRepository.findById("s1", "d1")).thenThrow(new RuntimeException("boom"));

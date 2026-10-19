@@ -13,7 +13,8 @@ class WarehouseItemUpdateService {
 
     private final WarehouseRepository warehouseRepository;
 
-    void update(String storeId, WarehouseItem existingItem, WarehouseItem updatedItem) {
+    /** Returns the id of the item that holds the data after the save: the joined one when a condition change merged them. */
+    String update(String storeId, WarehouseItem existingItem, WarehouseItem updatedItem) {
         boolean conditionChanged = existingItem.getCondition() != updatedItem.getCondition();
         existingItem.update(updatedItem);
 
@@ -24,11 +25,12 @@ class WarehouseItemUpdateService {
                 target.absorb(existingItem);
                 warehouseRepository.save(target);
                 warehouseRepository.delete(existingItem);
-                return;
+                return target.getItemId();
             }
         }
 
         warehouseRepository.save(existingItem);
+        return existingItem.getItemId();
     }
 
     private Optional<WarehouseItem> findJoinable(String storeId, WarehouseItem item) {

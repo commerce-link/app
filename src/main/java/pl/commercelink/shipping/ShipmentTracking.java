@@ -8,6 +8,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pl.commercelink.shipping.tracking.ShipmentTrackingState;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
@@ -29,6 +30,18 @@ public class ShipmentTracking {
     @DynamoDBAttribute(attributeName = "createdAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime createdAt;
+    /** Integration that tracks the parcel (descriptor name); null on rows written before several integrations. */
+    @DynamoDBAttribute(attributeName = "provider")
+    private String provider;
+    /** The integration's id of a shipment it created; null for a number typed in or reported by a supplier. */
+    @DynamoDBAttribute(attributeName = "externalId")
+    private String externalId;
+    /** {@link ShipmentTrackingState} reached by the parcel; null = not collected yet. Written conditionally. */
+    @DynamoDBAttribute(attributeName = "state")
+    private String state;
+    @DynamoDBAttribute(attributeName = "lastPolledAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime lastPolledAt;
 
     public ShipmentTracking(String storeId, String trackingNo, String orderId, String rmaId, LocalDateTime createdAt) {
         this.storeId = storeId;
@@ -36,5 +49,21 @@ public class ShipmentTracking {
         this.orderId = orderId;
         this.rmaId = rmaId;
         this.createdAt = createdAt;
+    }
+
+    public ShipmentTracking(String storeId, String trackingNo, String orderId, String rmaId, LocalDateTime createdAt,
+                            String provider, String externalId) {
+        this(storeId, trackingNo, orderId, rmaId, createdAt);
+        this.provider = provider;
+        this.externalId = externalId;
+    }
+
+    public ShipmentTrackingState currentState() {
+        return ShipmentTrackingState.parse(state);
+    }
+
+    /** A state written by a newer version: this one neither polls nor advances the parcel, so it cannot undo it. */
+    public boolean hasUnknownState() {
+        return state != null && currentState() == null;
     }
 }

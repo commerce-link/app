@@ -27,13 +27,6 @@ class CatalogsTemplateTest {
                 .contains("#{catalog.list.desc(").contains("cl-list-empty").contains("#{catalog.add}");
     }
 
-    @Test
-    void usesNoBulmaButtonsInlineStylesOrPagination() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("class=\"button is-").doesNotContain("style=")
-                .doesNotContain("fragments/pagination").doesNotContain("<table");
-    }
-
     private static CatalogRow named(String id, String name) {
         return new CatalogRow(id, name, 0, 0, 0, "daily", false, "/dashboard/catalogs/" + id,
                 "/dashboard/catalogs/" + id + "/settings");

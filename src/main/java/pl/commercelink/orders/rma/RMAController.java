@@ -1,10 +1,10 @@
 package pl.commercelink.orders.rma;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,16 +19,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.web.rma.RmaAddressForm;
+import pl.commercelink.web.rma.RmaAddressPage;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
 @Controller
@@ -46,8 +45,6 @@ public class RMAController {
 
     private final RMAManager rmaManager;
 
-    private final OrdersRepository orderRepository;
-
     private final OrderItemsRepository orderItemsRepository;
 
     private final OrdersRMAManager ordersRMAManager;
@@ -58,13 +55,18 @@ public class RMAController {
 
     private final OpenRmaCoverage openRmaCoverage;
 
+    private final RmaShipmentsViewFactory rmaShipmentsViewFactory;
+
+    private final OrdersRepository ordersRepository;
+
+    /** Set by "Ship to client" when the RMA's address is incomplete: the address page then shows every missing field. */
+    public static final String ADDRESS_INCOMPLETE_FLASH = "rmaAddressIncomplete";
+
     @Value("${app.domain}")
     private String appDomain;
 
     @Value("${s3.bucket.stores}")
     private String bucketName;
-
-    private final int RMA_PAGE_SIZE = 25;
 
     /**
      * RMA is bound straight from the form. The marketplace-decision fields (externalReturnId,
@@ -79,99 +81,8 @@ public class RMAController {
         }
     }
 
-    @GetMapping("/dashboard/rma")
-    public String rma(@RequestParam(required = false) String rmaId,
-                      @RequestParam(required = false) String orderId,
-                      @RequestParam(required = false) String email,
-                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtStart,
-                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdAtEnd,
-                      @RequestParam(required = false) List<RMAStatus> statuses,
-                      @RequestParam(required = false, defaultValue = "1") int page,
-                      Model model) {
-        RMAFilter filter = new RMAFilter(rmaId, orderId, email, createdAtStart, createdAtEnd, statuses);
-        List<RMA> paginatedRmaEntries = rmaRepository.searchRMAEntries(getStoreId(), filter, page, RMA_PAGE_SIZE);
-
-        HashMap<String, Object> searchParams = new HashMap<>();
-        searchParams.put("rmaId", rmaId);
-        searchParams.put("orderId", orderId);
-        searchParams.put("email", email);
-        searchParams.put("createdAtStart", createdAtStart);
-        searchParams.put("createdAtEnd", createdAtEnd);
-        if (filter.hasStatuses()) {
-            searchParams.put("statuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.joining(",")));
-        }
-
-        model.addAttribute("rmaEntries", paginatedRmaEntries.subList(0, Math.min(paginatedRmaEntries.size(), RMA_PAGE_SIZE)));
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", paginatedRmaEntries.size() > RMA_PAGE_SIZE);
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("activeStatuses", Arrays.stream(RMAStatus.values())
-                .filter(status -> !status.isClosed())
-                .collect(Collectors.toList()));
-        model.addAttribute("closedStatusNames", Arrays.stream(RMAStatus.values())
-                .filter(RMAStatus::isClosed)
-                .map(Enum::name)
-                .collect(Collectors.toList()));
-        model.addAttribute("selectedStatuses", filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()));
-        model.addAttribute("closedSelected", filter.getStatuses().stream().anyMatch(RMAStatus::isClosed));
-        model.addAttribute("countsByStatus", rmaRepository.countActiveByStatus(getStoreId()));
-
-        return "rma";
-    }
-
-    @GetMapping("/dashboard/rma/new")
-    public String showCreateRma(@RequestParam(value = "orderId", required = false) String orderId,
-                                @RequestParam(value = "serialNo", required = false) String serialNo,
-                                @RequestParam(value = "byEmail", required = false) String email,
-                                Model model, Locale locale) {
-        List<OrderItem> orderItems = new ArrayList<>();
-        RMA rma = new RMA(getStoreId());
-        RmaCreateMode mode = RmaCreateMode.BY_ORDER_LINE;
-
-        if (isNotBlank(orderId)) {
-            rma.setOrderId(orderId);
-            Order order = orderRepository.findById(getStoreId(), orderId);
-            if (order != null) {
-                if (!order.isEligibleForRMACreation()) {
-                    model.addAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-                } else {
-                    orderItems = orderItemsRepository.findByOrderIdAndStatuses(orderId, Arrays.asList(FulfilmentStatus.Delivered, FulfilmentStatus.Reserved));
-                    rma.setEmail(order.getEmail());
-                }
-            }
-        } else if (isNotBlank(serialNo)) {
-            mode = RmaCreateMode.BY_SERIAL_NO;
-            OrderItem orderItem = orderItemsRepository.findBySerialNoAndStatuses(serialNo, Arrays.asList(FulfilmentStatus.Delivered, FulfilmentStatus.Reserved));
-            if (orderItem != null) {
-                orderItems = Collections.singletonList(orderItem);
-
-                Order order = orderRepository.findById(getStoreId(), orderItem.getOrderId());
-                if (!order.isEligibleForRMACreation()) {
-                    model.addAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-                    orderItems = new ArrayList<>();
-                } else {
-                    rma.setOrderId(order.getOrderId());
-                    rma.setEmail(order.getEmail());
-                }
-            }
-        } else if (isNotBlank(email)) {
-            mode = RmaCreateMode.BY_EMAIL;
-            List<Order> emailOrders = orderRepository.findByEmail(getStoreId(), email);
-            if (!emailOrders.isEmpty()) {
-                model.addAttribute("emailOrders", emailOrders);
-            }
-        }
-
-        model.addAttribute("rma", rma);
-        model.addAttribute("orderItems", orderItems);
-        model.addAttribute("mode", mode.name());
-        model.addAttribute("rmaResolutionTypes", RMAResolutionType.values());
-
-        return "rma-new";
-    }
-
     @GetMapping("/dashboard/rma/{rmaId}")
-    public String showRmaDetail(@PathVariable String rmaId, Model model) {
+    public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
         RMAItemsForm rmaItemsForm = new RMAItemsForm(rmaItems);
@@ -189,6 +100,7 @@ public class RMAController {
         model.addAttribute("rmaItemsForm", rmaItemsForm);
         model.addAttribute("backofficeDomain", appDomain);
         model.addAttribute("isClosed", isClosed(rma));
+        model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("remainingOrderItems", remainingOrderItems);
         model.addAttribute("refundDeliveryDefault",
@@ -197,62 +109,25 @@ public class RMAController {
         return "rma-detail";
     }
 
-    @GetMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId, Model model) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        RMAItem rmaItem = rmaItemsRepository.findById(rmaId, rmaItemId);
-
-        model.addAttribute("rma", rma);
-        model.addAttribute("rmaId", rmaId);
-        model.addAttribute("rmaItem", rmaItem);
-        model.addAttribute("isClosed", isClosed(rma));
-        model.addAttribute("rmaStatusTypes", RMAStatus.values());
-        model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
-
-        return "rma-item";
-    }
-
+    /** The address "Ship to client" sends the goods back to; ?fill=order puts the order's address in the form, unsaved. */
     @GetMapping("/dashboard/rma/{rmaId}/shipping")
-    public String editRmaShipping(@PathVariable String rmaId, Model model) {
+    public String editRmaShipping(@PathVariable String rmaId, @RequestParam(required = false) String fill, Model model,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        model.addAttribute("rma", rma);
-        model.addAttribute("isClosed", isClosed(rma));
-
-        return "rma-shipping";
-    }
-
-    @PostMapping("/dashboard/rma/new")
-    public String createRma(@ModelAttribute RMA rma, RedirectAttributes redirectAttributes, Locale locale) {
-        Order order = orderRepository.findById(getStoreId(), rma.getOrderId());
-        if (order == null || !order.isEligibleForRMACreation()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.order.must.be.delivered.completed", null, locale));
-            return "redirect:/dashboard/rma/new";
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
         }
-        rma.setStoreId(getStoreId());
-
-        List<RMAItem> draftRmaItems = rma.getDraftRmaItems().stream()
-                .filter(RMAItem::isComplete)
-                .map(rmaItem -> {
-                    OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
-                    return new RMAItem(rma.getRmaId(), orderItem, rmaItem);
-                })
-                .collect(Collectors.toList());
-
-        if (draftRmaItems.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.no.items.selected", null, locale));
-            return "redirect:/dashboard/rma/new";
+        ShippingDetails orderAddress = orderAddressOf(rma);
+        boolean filled = "order".equals(fill) && orderAddress != null;
+        RmaAddressForm form = filled ? RmaAddressForm.of(orderAddress).withCountryCode() : RmaAddressForm.of(rma.getShippingDetails());
+        boolean incomplete = Boolean.TRUE.equals(model.getAttribute(ADDRESS_INCOMPLETE_FLASH));
+        if (incomplete && RmaAddressForm.hasAnyValue(rma.getShippingDetails())) {
+            // against the saved address only the missing fields are reported; passing null would also flag the format of values nobody touched
+            form = form.withErrors(form.validate(rma.getShippingDetails()));
         }
-
-        rma.setCreatedAt(LocalDateTime.now());
-        rma.setEmailNotificationsEnabled(true);
-        rma.setShippingInsurance(RMAItem.computeTotalPrice(draftRmaItems));
-        rmaRepository.save(rma);
-
-        rmaItemsRepository.batchSave(draftRmaItems);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.create.success", null, locale));
-        return "redirect:/dashboard/rma/" + rma.getRmaId();
+        // an RMA with no address at all gets one notice instead of an error on every field nobody has touched yet
+        return addressPage(rma, form, orderAddress, filled, incomplete, incomplete, model);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}")
@@ -375,34 +250,6 @@ public class RMAController {
 
         rma.increaseShippingInsurance(newRMAItem.getTotalPrice());
         rmaRepository.save(rma);
-
-        return "redirect:/dashboard/rma/" + rmaId;
-    }
-
-    @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/save")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateRmaItem(@PathVariable String rmaId, @PathVariable String rmaItemId,
-                                @ModelAttribute("rmaItem") RMAItem formItem,
-                                RedirectAttributes redirectAttributes, Locale locale) {
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
-        if (blocked.isPresent()) {
-            return blocked.get();
-        }
-        RMAItem existing = rmaItemsRepository.findById(rmaId, rmaItemId);
-        if (existing == null) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.not.found", null, locale));
-            return "redirect:/dashboard/rma/" + rmaId;
-        }
-
-        existing.setSerialNo(formItem.getSerialNo());
-        existing.setReason(formItem.getReason());
-        existing.setComment(formItem.getComment());
-
-        rmaItemsRepository.save(existing);
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("rma.item.update.success", null, locale));
 
         return "redirect:/dashboard/rma/" + rmaId;
     }
@@ -552,22 +399,47 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShippingDetails")
     public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
-                                        RedirectAttributes redirectAttributes, Locale locale) {
+                                        @RequestParam(name = RmaAddressPage.SHIP_TO_CLIENT_PARAM, required = false) boolean shipToClient,
+                                        Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        if (updatedRma.getShippingDetails() != null) {
-            existingRma.setShippingDetails(updatedRma.getShippingDetails());
+        RmaAddressForm form = RmaAddressForm.of(updatedRma.getShippingDetails());
+        Map<String, String> errors = form.validate(existingRma.getShippingDetails());
+        if (!errors.isEmpty()) {
+            return addressPage(existingRma, form.withErrors(errors), orderAddressOf(existingRma), false, false, shipToClient, model);
         }
-
+        existingRma.setShippingDetails(form.applyTo(existingRma.getShippingDetails()));
         rmaRepository.save(existingRma);
+        // the item selection was lost on the way here from "Ship to client": the details page is where it is made again
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage(shipToClient ? "rma.address.saved.ship.again" : "rma.address.saved", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private String addressPage(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
+                               boolean incomplete, boolean shipToClient, Model model) {
+        boolean fillAvailable = !filled && orderAddress != null && form.differsFrom(orderAddress);
+        model.addAttribute("page", new RmaAddressPage(rma.getRmaId(), RmaAddressPage.shortId(rma.getRmaId()),
+                RmaAddressPage.shortId(rma.getOrderId()), form, fillAvailable, filled,
+                !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete, shipToClient));
+        return "rma/address";
+    }
+
+    /** The order's shipping address when the order exists and has one, else null. */
+    private ShippingDetails orderAddressOf(RMA rma) {
+        if (StringUtils.isBlank(rma.getOrderId())) {
+            return null;
+        }
+        Order order = ordersRepository.findById(getStoreId(), rma.getOrderId());
+        return order != null && RmaAddressForm.hasAnyValue(order.getShippingDetails()) ? order.getShippingDetails() : null;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShipments")
     public String updateShipments(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
+                                  @RequestParam(name = "shownPackages", required = false) List<String> shownPackages,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
@@ -575,18 +447,44 @@ public class RMAController {
             return blocked.get();
         }
         if (updatedRma.getShipments() != null) {
+            List<Shipment> previous = existingRma.getShipments();
+            // the form carries only what the operator edits and the package id: the courier order, its cancellation
+            // and pickup are taken from the shipment of that package, never from the form
+            Map<Shipment, String> packages = new IdentityHashMap<>();
+            updatedRma.getShipments().forEach(s -> {
+                packages.put(s, s.getExternalId());
+                s.setExternalId(null);
+            });
             List<Shipment> shipments = updatedRma.getShipments().stream()
                     .filter(s -> s.hasShippingData() || s.hasCollectionData())
                     .collect(Collectors.toList());
+            shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            // a shipment being created has no data the form could show; dropping it would lose its label
+            List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
+            // nor could the form show a package created after it was opened: only packages it showed may be removed
+            Set<String> shown = new HashSet<>(packages.values().stream().filter(Objects::nonNull).toList());
+            if (shownPackages != null) {
+                shown.addAll(shownPackages);
+            }
+            List<Shipment> createdMeanwhile = previous.stream()
+                    .filter(s -> s.getCreation() == null && s.getExternalId() != null && !shown.contains(s.getExternalId()))
+                    .toList();
 
-            if (shipments.isEmpty()) {
+            if (shipments.isEmpty() && creations.isEmpty() && createdMeanwhile.isEmpty()) {
                 shipments.add(updatedRma.getShipments().get(0));
             }
+            shipments.addAll(createdMeanwhile);
+            shipments.addAll(creations);
 
             existingRma.setShipments(shipments);
         }
         rmaRepository.save(existingRma);
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private static Shipment shipmentOfPackage(List<Shipment> shipments, String externalId) {
+        return externalId == null ? null
+                : shipments.stream().filter(s -> externalId.equals(s.getExternalId())).findFirst().orElse(null);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/split")
@@ -701,12 +599,6 @@ public class RMAController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
-    }
-
-    public enum RmaCreateMode {
-        BY_ORDER_LINE,
-        BY_SERIAL_NO,
-        BY_EMAIL
     }
 
     private MediaType getContentType(String fileName) {

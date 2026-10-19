@@ -1,6 +1,7 @@
 package pl.commercelink.web.settings;
 
 import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
@@ -81,7 +82,18 @@ public final class SettingsTemplateRenderer {
             String message = messages.getString(key);
             return parameters == null || parameters.length == 0
                     ? message
-                    : new MessageFormat(message, POLISH).format(parameters);
+                    : new MessageFormat(message, POLISH).format(resolved(context, origin, parameters));
+        }
+
+        // as Spring's message source does: an argument that is itself a message is resolved in the same language
+        private Object[] resolved(ITemplateContext context, Class<?> origin, Object[] parameters) {
+            Object[] resolved = parameters.clone();
+            for (int i = 0; i < resolved.length; i++) {
+                if (resolved[i] instanceof MessageSourceResolvable argument && argument.getCodes() != null) {
+                    resolved[i] = resolveMessage(context, origin, argument.getCodes()[0], argument.getArguments());
+                }
+            }
+            return resolved;
         }
 
         @Override

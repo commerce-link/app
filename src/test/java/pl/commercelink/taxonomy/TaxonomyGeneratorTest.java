@@ -2,6 +2,9 @@ package pl.commercelink.taxonomy;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -9,6 +12,7 @@ import pl.commercelink.pim.api.PimCatalog;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -64,13 +68,9 @@ class TaxonomyGeneratorTest {
         assertThat(refreshed.rawCategory()).isEqualTo("Raw category");
     }
 
-    @Test
-    void keepsTheSameTaxonomyWhenIdIsAbsentFromTheMap() {
-        // given
-        Taxonomy taxonomy = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Stara nazwa", 5, 100, 200,
-                "Raw category", "CAT-UNKNOWN");
-        Map<String, String> idToName = Map.of("CAT-1", "Nowa nazwa");
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("noOpRefreshes")
+    void keepsTheSameTaxonomyWhenThereIsNothingToRefresh(String reason, Taxonomy taxonomy, Map<String, String> idToName) {
         // when
         Taxonomy refreshed = TaxonomyGenerator.refreshCategoryName(taxonomy, idToName);
 
@@ -78,31 +78,19 @@ class TaxonomyGeneratorTest {
         assertThat(refreshed).isSameAs(taxonomy);
     }
 
-    @Test
-    void keepsTheSameTaxonomyWhenCategoryIdIsNull() {
-        // given
-        Taxonomy taxonomy = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Stara nazwa", 5, 100, 200,
-                "Raw category", null);
-        Map<String, String> idToName = Map.of("CAT-1", "Nowa nazwa");
-
-        // when
-        Taxonomy refreshed = TaxonomyGenerator.refreshCategoryName(taxonomy, idToName);
-
-        // then
-        assertThat(refreshed).isSameAs(taxonomy);
-    }
-
-    @Test
-    void keepsTheSameTaxonomyWhenTheMappedNameIsAlreadyCurrent() {
-        // given
-        Taxonomy taxonomy = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Aktualna nazwa", 5, 100, 200,
-                "Raw category", "CAT-1");
-        Map<String, String> idToName = Map.of("CAT-1", "Aktualna nazwa");
-
-        // when
-        Taxonomy refreshed = TaxonomyGenerator.refreshCategoryName(taxonomy, idToName);
-
-        // then
-        assertThat(refreshed).isSameAs(taxonomy);
+    static Stream<Arguments> noOpRefreshes() {
+        return Stream.of(
+                Arguments.of("id is absent from the map",
+                        new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Stara nazwa", 5, 100, 200,
+                                "Raw category", "CAT-UNKNOWN"),
+                        Map.of("CAT-1", "Nowa nazwa")),
+                Arguments.of("category id is null",
+                        new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Stara nazwa", 5, 100, 200,
+                                "Raw category", null),
+                        Map.of("CAT-1", "Nowa nazwa")),
+                Arguments.of("mapped name is already current",
+                        new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "Aktualna nazwa", 5, 100, 200,
+                                "Raw category", "CAT-1"),
+                        Map.of("CAT-1", "Aktualna nazwa")));
     }
 }

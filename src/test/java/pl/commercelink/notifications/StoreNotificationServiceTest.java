@@ -92,11 +92,24 @@ class StoreNotificationServiceTest {
         when(repository.putIfAbsent(any())).thenReturn(false);
 
         // when
-        service.publish(STORE_ID, expiredAllegroConnection());
+        boolean isNew = service.publish(STORE_ID, expiredAllegroConnection());
 
         // then
+        assertThat(isNew).isFalse();
         verify(repository).putIfAbsent(any());
         verifyNoMoreInteractions(repository);
+    }
+
+    @Test
+    void publishSaysANotificationIsNew() {
+        // given
+        when(repository.putIfAbsent(any())).thenReturn(true);
+
+        // when
+        boolean isNew = service.publish(STORE_ID, expiredAllegroConnection());
+
+        // then
+        assertThat(isNew).isTrue();
     }
 
     @Test

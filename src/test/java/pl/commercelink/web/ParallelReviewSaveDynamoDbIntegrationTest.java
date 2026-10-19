@@ -21,13 +21,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -38,7 +38,9 @@ import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 import pl.commercelink.web.catalog.CatalogAccess;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
@@ -68,7 +70,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static AmazonDynamoDB client;
 
@@ -160,7 +162,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         try {
-            return controller.saveProducts("c1", "cat-parallel", form, new ExtendedModelMap(), Locale.ENGLISH,
+            return controller.saveProducts("c1", "cat-parallel", form, null, 0, new ExtendedModelMap(), Locale.ENGLISH,
                     new RedirectAttributesModelMap(), new MockHttpServletResponse());
         } finally {
             SecurityContextHolder.clearContext();
@@ -178,9 +180,14 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         when(view.findByInventoryKey(any())).thenReturn(nothing);
         Inventory inventory = mock(Inventory.class);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
+        PimCatalog pimCatalog = mock(PimCatalog.class);
+        BrandMapper brandMapper = mock(BrandMapper.class);
+        MessageSource messageSource = mock(MessageSource.class);
+        CatalogPlacement placement = mock(CatalogPlacement.class);
         return new CatalogProductsController(access, products, mock(StoresRepository.class),
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
-                mock(PimCategoryOptions.class), mock(SupplierLabels.class), mock(PimCatalog.class), mock(BrandMapper.class),
-                mock(MessageSource.class), mock(OptimisticLockingExecutor.class));
+                mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
+                messageSource, mock(OptimisticLockingExecutor.class), placement,
+                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement));
     }
 }

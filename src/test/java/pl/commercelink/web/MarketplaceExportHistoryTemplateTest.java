@@ -13,10 +13,12 @@ import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
+import pl.commercelink.marketplace.MarketplaceExportOfferSearch;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.web.settings.MarketplaceExportRunView;
+import pl.commercelink.web.settings.MarketplaceExportSearchView;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -31,6 +33,7 @@ class MarketplaceExportHistoryTemplateTest {
 
     private static final String RUN_ID = "8213415334_2026-08-13_01-31-05";
     private static final String LEGACY_RUN_ID = "2026-08-13_01-31-05";
+    private static final String OLDER_RUN_ID = "8213589999_2026-08-11_01-00-00";
 
     @Test
     void rendersEveryColumnOfARunRow() {
@@ -98,20 +101,6 @@ class MarketplaceExportHistoryTemplateTest {
         // then
         assertThat(countRows(html)).isEqualTo(1200);
         assertThat(html).contains("pim-1199");
-        assertThat(html).doesNotContain("Pokazano");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void rendersEveryRowOfASmallRun() {
-        // given
-        WebContext context = runDetailsContext(rows(12), false);
-
-        // when
-        String html = templateEngine().process("store-marketplace-export-run", context);
-
-        // then
-        assertThat(countRows(html)).isEqualTo(12);
         assertThat(html).doesNotContain("Pokazano");
         assertThat(html).doesNotContain("??");
     }
@@ -275,6 +264,160 @@ class MarketplaceExportHistoryTemplateTest {
         assertThat(html).doesNotContain("??");
     }
 
+    @Test
+    void offersTheProductSearchAboveTheRunsOfTheMarketplace() {
+        // given
+        WebContext context = historyContext(headers(3));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("class=\"cl-card cl-search-card\"").contains("Znajdź produkt w eksportach");
+        assertThat(html).contains("Przeszukamy do 500 ostatnich przebiegów i pokażemy 10 najnowszych wystąpień produktu.");
+        assertThat(html).contains("action=\"/dashboard/store/marketplaces/exports/allegro\"");
+        assertThat(html).contains("name=\"pimId\"");
+        assertThat(html).contains("data-cl-submit-once").contains("/js/submit-once.js");
+        assertThat(html.indexOf("Znajdź produkt w eksportach")).isLessThan(html.indexOf("Przebiegi eksportu ofert"));
+        assertThat(html).doesNotContain("Wyniki dla").doesNotContain("cl-search-clear");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void hidesTheProductSearchWhenThereAreNoRuns() {
+        // when
+        String html = renderHistoryPage(historyContext(List.of()));
+
+        // then
+        assertThat(html).doesNotContain("Znajdź produkt w eksportach").doesNotContain("name=\"pimId\"");
+    }
+
+    @Test
+    void listsEveryRunThatHasTheSearchedProductWithItsOutcomePriceAndReason() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-A", List.of(
+                hit(RUN_ID, false, MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L)
+                        .rejected("MISSING_PARAMETER", "no warranty")),
+                hit(OLDER_RUN_ID, false, MarketplaceOfferSnapshot.published("pim-A", 2049L, 20L))), 20, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("value=\"pim-A\"");
+        assertThat(html).contains("id=\"marketplace-export-search-results\"").contains("Wyniki dla");
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "\"");
+        assertThat(html).contains(">2026-08-13 01:31:05</a>").contains(">2026-08-11 01:00:00</a>");
+        assertThat(html).contains("Główny");
+        assertThat(html).contains("3 503").contains("2 049");
+        assertThat(html).contains("Odrzucona").contains("Wystawiona");
+        assertThat(html).contains("no warranty").contains("MISSING_PARAMETER");
+        assertThat(html).contains("Wystąpienia: 2.").contains("Przejrzane przebiegi: 20, od 2026-08-11 01:00:00.");
+        assertThat(html).doesNotContain("starszych przebiegów nie przeszukiwano");
+        assertThat(html).doesNotContain("Nieudany");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void marksAHitFromAFailedRun() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-A", List.of(
+                hit(RUN_ID, true, MarketplaceOfferSnapshot.published("pim-A", 3503L, 7L))), 1, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-warn\">Nieudany</span>");
+    }
+
+    @Test
+    void tellsThatOlderRunsWereNotSearchedOnceTheHitLimitIsReached() {
+        // given
+        List<MarketplaceExportOfferSearch.Hit> hits = new ArrayList<>();
+        for (MarketplaceExportRunHeader run : headers(10)) {
+            hits.add(new MarketplaceExportOfferSearch.Hit(run, MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L)));
+        }
+        WebContext context = historyContext(headers(25));
+        context.setVariable("search", searchView("pim-A", hits, 10, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("Pokazano 10 najnowszych wystąpień, starszych przebiegów nie przeszukiwano.");
+        assertThat(html).doesNotContain("Wystąpienia:");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void tellsThatTheProductIsInNoSearchedRun() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-X", List.of(), 500, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("Produktu pim-X nie ma w żadnym z przejrzanych przebiegów eksportu na Allegro.");
+        assertThat(html).contains("Przejrzane przebiegi: 500, od 2026-08-11 01:00:00.");
+        assertThat(html).doesNotContain("<table").doesNotContain("Wystąpienia:");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void warnsAboutRunFilesThatCouldNotBeRead() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-X", List.of(), 500, 2));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("Pominięte nieczytelne pliki przebiegów: 2.");
+    }
+
+    @Test
+    void staysSilentAboutUnreadableRunFilesWhenEveryFileWasRead() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-X", List.of(), 500, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).doesNotContain("Pominięte nieczytelne pliki przebiegów");
+    }
+
+    @Test
+    void clearsTheSearchedProductWithALinkToThePageWithoutIt() {
+        // given
+        WebContext context = historyContext(headers(3));
+        context.setVariable("search", searchView("pim-X", List.of(), 500, 0));
+
+        // when
+        String html = renderHistoryPage(context);
+
+        // then
+        assertThat(html).contains("class=\"cl-search-clear\" href=\"/dashboard/store/marketplaces/exports/allegro\"");
+    }
+
+    private MarketplaceExportSearchView searchView(String pimId, List<MarketplaceExportOfferSearch.Hit> hits,
+                                                   int searchedRuns, int unreadableRuns) {
+        return MarketplaceExportSearchView.of(pimId,
+                new MarketplaceExportOfferSearch(hits, searchedRuns, unreadableRuns, OLDER_RUN_ID), 10);
+    }
+
+    private MarketplaceExportOfferSearch.Hit hit(String runId, boolean failed, MarketplaceOfferSnapshot offer) {
+        return new MarketplaceExportOfferSearch.Hit(
+                new MarketplaceExportRunHeader("allegro", "catalog-1", runId, failed), offer);
+    }
+
     private WebContext webContext() {
         JakartaServletWebApplication application =
                 JakartaServletWebApplication.buildApplication(new MockServletContext());
@@ -293,6 +436,9 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("displayName", "Allegro");
         context.setVariable("catalogNames", Map.of("catalog-1", "Główny"));
         context.setVariable("marketplacesHref", "/dashboard/store/marketplaces");
+        context.setVariable("historyHref", "/dashboard/store/marketplaces/exports/allegro");
+        context.setVariable("searchRunLimit", 500);
+        context.setVariable("searchHitLimit", 10);
         context.setVariable("backLabel", "Marketplaces");
         context.setVariable("pageTitle", "Historia eksportu · Allegro");
         return context;
@@ -328,7 +474,6 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("historyLabel", "Historia eksportu · Allegro");
         return context;
     }
-
 
     private List<MarketplaceOfferSnapshot> rows(int count) {
         List<MarketplaceOfferSnapshot> rows = new ArrayList<>();

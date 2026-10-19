@@ -1,8 +1,12 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.LocalDateTime;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -167,32 +171,20 @@ class DeliveryTrackingTest {
         assertThat(tracking.getLastError()).hasSize(DeliveryTracking.MAX_ERROR_LENGTH);
     }
 
-    @Test
-    void isDueWhenNeverScheduled() {
-        assertThat(new DeliveryTracking().isDue(NOW)).isTrue();
+    static Stream<Arguments> nextCheckCases() {
+        return Stream.of(
+                Arguments.of("neverScheduled", null, true),
+                Arguments.of("nextCheckInThePast", NOW.minusMinutes(1), true),
+                Arguments.of("nextCheckExactlyNow", NOW, true),
+                Arguments.of("nextCheckInTheFuture", NOW.plusMinutes(1), false));
     }
 
-    @Test
-    void isDueWhenTheNextCheckIsInThePast() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("nextCheckCases")
+    void isDueOnlyWhenNeverScheduledOrTheNextCheckHasArrived(String caseName, LocalDateTime nextCheckAt, boolean expectedDue) {
         DeliveryTracking tracking = new DeliveryTracking();
-        tracking.setNextCheckAt(NOW.minusMinutes(1));
+        tracking.setNextCheckAt(nextCheckAt);
 
-        assertThat(tracking.isDue(NOW)).isTrue();
-    }
-
-    @Test
-    void isDueWhenTheNextCheckIsExactlyNow() {
-        DeliveryTracking tracking = new DeliveryTracking();
-        tracking.setNextCheckAt(NOW);
-
-        assertThat(tracking.isDue(NOW)).isTrue();
-    }
-
-    @Test
-    void isNotDueWhenTheNextCheckIsInTheFuture() {
-        DeliveryTracking tracking = new DeliveryTracking();
-        tracking.setNextCheckAt(NOW.plusMinutes(1));
-
-        assertThat(tracking.isDue(NOW)).isFalse();
+        assertThat(tracking.isDue(NOW)).isEqualTo(expectedDue);
     }
 }

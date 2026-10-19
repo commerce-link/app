@@ -1,10 +1,13 @@
 package pl.commercelink.web.notifications;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,21 +37,17 @@ class NotificationsMessagesTest {
         }
     }
 
-    @Test
-    void translatesTheBulkActionMessagesInBothLanguages() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("keyGroups")
+    void translatesTheKeysInBothLanguages(String group, List<String> keys) {
         // when / then
-        assertTranslated(FLASH_KEYS);
+        assertTranslated(keys);
     }
 
-    @Test
-    void translatesThePageAndDropdownTextsInBothLanguages() {
-        // when / then
-        assertTranslated(PAGE_KEYS);
-    }
-
-    @Test
-    void translatesTheBellTextsInBothLanguages() {
-        // when / then
-        assertTranslated(BELL_KEYS);
+    static Stream<Arguments> keyGroups() {
+        return Stream.of(
+                Arguments.of("bulk action messages", FLASH_KEYS),
+                Arguments.of("page and dropdown texts", PAGE_KEYS),
+                Arguments.of("bell texts", BELL_KEYS));
     }
 }

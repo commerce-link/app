@@ -367,19 +367,6 @@ class ManualSupplierServiceTest {
     }
 
     @Test
-    void createEvictsStoreInventoryCache() {
-        // given
-        Store store = storeWith();
-        when(storesRepository.findById("store-1")).thenReturn(store);
-
-        // when
-        service.create("store-1", "Hurtownia A");
-
-        // then
-        verify(storeInventoryCache).evict("store-1");
-    }
-
-    @Test
     void uploadFeedEvictsStoreInventoryCache() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));

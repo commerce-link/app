@@ -1,0 +1,72 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The shipments table of an RMA (orders.rma.RmaShipmentsView), in the page's older Bulma look. A shipment created
+       through an integration has its state as a pill under its number (OrderLabels#shipmentState), its actions below
+       that; a customer's return has a pill only when it failed or waits for the provider, and no label; the state's arguments are an array, so the text goes through #messages.msgWithParams (a message expression would print the array as
+       one value). "Zamów odbiór" above the table leads to the pickup page and comes back here; "Zamów odbiór ponownie"
+       orders the pickup of a customer's return again at once (its package is not on the pickup page); "Spróbuj
+       ponownie" after a failed operator shipment points to the item list, where the items are shipped again, and after
+       a customer's failed return books it again with what the customer chose (a POST); "Usuń"
+       drops the record of a failed creation. While a command waits for the provider the table's box carries
+       data-cl-cancellation-poll (rma-detail.html) and shipment-cancellation.js reloads the page once it is settled. */-->
+<th:block th:fragment="table(view)">
+    <div th:if="${view.pickupHref() != null}" class="mb-3">
+        <a class="button is-small" th:href="@{${view.pickupHref()}}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-shipping-fast"></i></span>
+            <span th:text="#{order.shipments.pickup.order}"></span>
+        </a>
+    </div>
+    <div class="table-container">
+        <table class="table is-fullwidth is-narrow">
+            <thead>
+            <tr>
+                <th th:text="#{order.shipment.type}"></th>
+                <th th:text="#{order.shipment.tracking.no}"></th>
+                <th th:text="#{order.shipment.shipped.at}"></th>
+                <th th:text="#{order.shipment.delivered.at}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${view.rows()}" th:with="shipment=${row.shipment()}">
+                <td th:text="${shipment.type}"></td>
+                <td>
+                    <a th:if="${shipment.trackingUrl}" th:href="${shipment.trackingUrl}" th:text="${shipment.trackingNo}" target="_blank" rel="noopener"></a>
+                    <span th:unless="${shipment.trackingUrl}" th:text="${shipment.trackingNo}"></span>
+                    <p th:if="${shipment.carrier}" class="is-size-7 has-text-grey">
+                        <span th:text="#{order.shipment.carrier}"></span>: <span th:text="${shipment.carrier}"></span>
+                    </p>
+                    <!--/* the carrier, the state and the actions sit under the number, not in columns of their own: the
+                           table lives in a half-width column, and separate columns pushed the page sideways at 1440 px */-->
+                    <div th:if="${row.stateKey() != null}" class="mt-1">
+                        <span class="cl-status" th:classappend="${row.stateTone()}"
+                              th:text="${#messages.msgWithParams(row.stateKey(), row.stateArgs())}"></span>
+                    </div>
+                    <p th:if="${row.retryHref() != null}" class="help" th:text="#{rma.shipments.retry.help}"></p>
+                    <div th:if="${row.hasActions()}" class="buttons are-small mt-2">
+                        <a th:if="${row.labelHref() != null}" class="button is-small" th:href="@{${row.labelHref()}}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-download"></i></span>
+                            <span th:text="#{order.shipments.label}"></span>
+                        </a>
+                        <a th:if="${row.retryHref() != null}" class="button is-small" th:href="@{${row.retryHref()}}"
+                           th:text="#{order.shipments.retry}"></a>
+                        <form th:if="${row.returnRetryAction() != null}" method="post" th:action="@{${row.returnRetryAction()}}">
+                            <button type="submit" class="button is-small is-primary" th:text="#{order.shipments.retry}"></button>
+                        </form>
+                        <form th:if="${row.pickupRetryAction() != null}" method="post" th:action="@{${row.pickupRetryAction()}}">
+                            <button type="submit" class="button is-small is-primary" th:text="#{rma.shipments.pickup.retry}"></button>
+                        </form>
+                        <form th:if="${row.removeAction() != null}" method="post" th:action="@{${row.removeAction()}}">
+                            <button type="submit" class="button is-small is-danger is-outlined" th:text="#{general.delete}"></button>
+                        </form>
+                    </div>
+                </td>
+                <td th:text="${shipment.shippedAt != null ? #temporals.format(shipment.shippedAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+                <td th:text="${shipment.deliveredAt != null ? #temporals.format(shipment.deliveredAt, 'yyyy-MM-dd HH:mm') : '-'}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</th:block>
+</body>
+</html>

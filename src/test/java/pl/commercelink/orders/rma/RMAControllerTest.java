@@ -1,7 +1,11 @@
 package pl.commercelink.orders.rma;
 
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -25,8 +29,9 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRMAManager;
-import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.event.Event;
@@ -40,11 +45,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,8 +84,6 @@ class RMAControllerTest {
     @Mock
     private RMAManager rmaManager;
     @Mock
-    private OrdersRepository orderRepository;
-    @Mock
     private OrderItemsRepository orderItemsRepository;
     @Mock
     private OrdersRMAManager ordersRMAManager;
@@ -90,6 +95,8 @@ class RMAControllerTest {
     private RedirectAttributes redirectAttributes;
     @Mock
     private OpenRmaCoverage openRmaCoverage;
+    @Mock
+    private pl.commercelink.orders.OrdersRepository ordersRepository;
 
     @InjectMocks
     private RMAController controller;
@@ -384,88 +391,31 @@ class RMAControllerTest {
     // a bad quantity through and must never mutate on rejection.
     // ------------------------------------------------------------------
 
-    @Test
-    void addRmaItemFromOrderRejectsWhenTheOrderItemIsMissing() {
-        // given
-        RMA rma = rmaWithStatus(RMAStatus.New);
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
-        when(orderItemsRepository.findById(ORDER_ID, "item-missing")).thenReturn(null);
-        when(messageSource.getMessage(eq("rma.item.invalid.quantity"), any(), any())).thenReturn("invalid");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.addRmaItemFromOrder(RMA_ID, "item-missing", 1, "Return", null,
-                    redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "invalid");
-        verify(rmaItemsRepository, never()).save(any());
+    static Stream<Arguments> invalidOrderItemQuantities() {
+        return Stream.of(
+                Arguments.of(Named.of("order item is missing", null), "item-missing", 1),
+                Arguments.of(Named.of("order item already returned",
+                        orderItemWithQtyAndStatus("item-1", 3, FulfilmentStatus.Returned)), "item-1", 1),
+                Arguments.of(Named.of("non-positive quantity",
+                        orderItemWithQtyAndStatus("item-1", 3, FulfilmentStatus.Delivered)), "item-1", 0),
+                Arguments.of(Named.of("quantity exceeds the order item qty",
+                        orderItemWithQtyAndStatus("item-1", 2, FulfilmentStatus.Delivered)), "item-1", 3));
     }
 
-    @Test
-    void addRmaItemFromOrderRejectsAnOrderItemAlreadyReturned() {
+    @ParameterizedTest
+    @MethodSource("invalidOrderItemQuantities")
+    void addRmaItemFromOrderRejectsAnInvalidOrderItemOrQuantity(OrderItem orderItem, String itemId, int qty) {
         // given
         RMA rma = rmaWithStatus(RMAStatus.New);
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
-        OrderItem orderItem = orderItemWithQtyAndStatus("item-1", 3, FulfilmentStatus.Returned);
-        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
+        when(orderItemsRepository.findById(ORDER_ID, itemId)).thenReturn(orderItem);
         when(messageSource.getMessage(eq("rma.item.invalid.quantity"), any(), any())).thenReturn("invalid");
 
         // when
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null,
-                    redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "invalid");
-        verify(rmaItemsRepository, never()).save(any());
-    }
-
-    @Test
-    void addRmaItemFromOrderRejectsNonPositiveQuantity() {
-        // given
-        RMA rma = rmaWithStatus(RMAStatus.New);
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
-        OrderItem orderItem = orderItemWithQtyAndStatus("item-1", 3, FulfilmentStatus.Delivered);
-        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
-        when(messageSource.getMessage(eq("rma.item.invalid.quantity"), any(), any())).thenReturn("invalid");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.addRmaItemFromOrder(RMA_ID, "item-1", 0, "Return", null,
-                    redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/rma/" + RMA_ID);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "invalid");
-        verify(rmaItemsRepository, never()).save(any());
-    }
-
-    @Test
-    void addRmaItemFromOrderRejectsQuantityExceedingTheOrderItemQty() {
-        // given
-        RMA rma = rmaWithStatus(RMAStatus.New);
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rma);
-        OrderItem orderItem = orderItemWithQtyAndStatus("item-1", 2, FulfilmentStatus.Delivered);
-        when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
-        when(messageSource.getMessage(eq("rma.item.invalid.quantity"), any(), any())).thenReturn("invalid");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.addRmaItemFromOrder(RMA_ID, "item-1", 3, "Return", null,
+            view = controller.addRmaItemFromOrder(RMA_ID, itemId, qty, "Return", null,
                     redirectAttributes, Locale.ENGLISH);
         }
 
@@ -567,8 +517,40 @@ class RMAControllerTest {
         verify(redirectAttributes).addFlashAttribute("errorMessage", "not sent");
     }
 
-    @Test
-    void addRmaItemFromOrderOnAClosedRmaIsBlocked() {
+    @FunctionalInterface
+    private interface ClosedRmaEndpoint {
+        void call(RMAController controller, RedirectAttributes redirectAttributes);
+    }
+
+    static Stream<Arguments> endpointsGuardedAgainstAClosedRma() {
+        return Stream.of(
+                endpoint("addRmaItemFromOrder", (c, ra) ->
+                        c.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, ra, Locale.ENGLISH)),
+                endpoint("markItemsAsReceived", (c, ra) ->
+                        c.markItemsAsReceived(RMA_ID, new RMAItemsForm(), ra, Locale.ENGLISH)),
+                endpoint("splitRmaItem", (c, ra) ->
+                        c.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, ra, Locale.ENGLISH)),
+                endpoint("editRmaShipping", (c, ra) ->
+                        c.editRmaShipping(RMA_ID, null, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH)),
+                endpoint("updateShippingDetails", (c, ra) -> {
+                    RMA postedRma = new RMA(STORE_ID);
+                    postedRma.setShippingDetails(new ShippingDetails());
+                    c.updateShippingDetails(RMA_ID, postedRma, false, new org.springframework.ui.ExtendedModelMap(), ra, Locale.ENGLISH);
+                }),
+                endpoint("updateShipments", (c, ra) -> {
+                    RMA postedRma = new RMA(STORE_ID);
+                    postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
+                    c.updateShipments(RMA_ID, postedRma, List.of(), ra, Locale.ENGLISH);
+                }));
+    }
+
+    private static Arguments endpoint(String name, ClosedRmaEndpoint endpoint) {
+        return Arguments.of(Named.of(name, endpoint));
+    }
+
+    @ParameterizedTest
+    @MethodSource("endpointsGuardedAgainstAClosedRma")
+    void mutatingEndpointsOnAClosedRmaAreBlocked(ClosedRmaEndpoint endpoint) {
         // given
         when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
         when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
@@ -576,104 +558,16 @@ class RMAControllerTest {
         // when
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.addRmaItemFromOrder(RMA_ID, "item-1", 1, "Return", null, redirectAttributes, Locale.ENGLISH);
+            endpoint.call(controller, redirectAttributes);
         }
 
         // then
         verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
         verify(orderItemsRepository, never()).findById(any(), any());
-        verify(rmaItemsRepository, never()).save(any());
-    }
-
-    @Test
-    void updateRmaItemOnAClosedRmaIsBlocked() {
-        // given
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
-        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.updateRmaItem(RMA_ID, "rma-item-1", rmaItemWithQty("item-1", 1), redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
         verify(rmaItemsRepository, never()).findById(any(), any());
         verify(rmaItemsRepository, never()).save(any());
-    }
-
-    @Test
-    void markItemsAsReceivedOnAClosedRmaIsBlocked() {
-        // given
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
-        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.markItemsAsReceived(RMA_ID, new RMAItemsForm(), redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
-        verify(rmaManager, never()).markItemsAsReceived(any(), any(), any());
-    }
-
-    @Test
-    void splitRmaItemOnAClosedRmaIsBlocked() {
-        // given
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
-        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.splitRmaItem(RMA_ID, "rma-item-1", 1, 1, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
-        verify(rmaItemsRepository, never()).findById(any(), any());
         verify(rmaItemsRepository, never()).batchSave(any());
-        verify(rmaItemsRepository, never()).save(any());
-    }
-
-    @Test
-    void updateShippingDetailsOnAClosedRmaIsBlocked() {
-        // given
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
-        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
-        RMA postedRma = new RMA(STORE_ID);
-        postedRma.setShippingDetails(new ShippingDetails());
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.updateShippingDetails(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
-        verify(rmaRepository, never()).save(any());
-    }
-
-    @Test
-    void updateShipmentsOnAClosedRmaIsBlocked() {
-        // given
-        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(rmaWithStatus(RMAStatus.Completed));
-        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
-        RMA postedRma = new RMA(STORE_ID);
-        postedRma.setShipments(List.of(new Shipment(ShipmentType.Courier)));
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.updateShipments(RMA_ID, postedRma, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verify(rmaManager, never()).markItemsAsReceived(any(), any(), any());
         verify(rmaRepository, never()).save(any());
     }
 
@@ -721,32 +615,6 @@ class RMAControllerTest {
         assertThat(target.getStoreId()).isEqualTo(STORE_ID);
         assertThat(target.getExternalReturnId()).isNull();
         assertThat(target.getMarketplaceDecisions()).isEmpty();
-    }
-
-    @Test
-    void createRmaStoresTheRmaUnderTheSessionStoreRegardlessOfTheSubmittedOne() {
-        // given
-        RMA posted = new RMA("victim-store");
-        posted.setOrderId(ORDER_ID);
-        RMAItem draft = rmaItemWithQty("item-1", 1);
-        draft.setDesiredResolution(RMAResolutionType.Return);
-        posted.setDraftRmaItems(List.of(draft));
-        Order order = mock(Order.class);
-        when(order.isEligibleForRMACreation()).thenReturn(true);
-        when(orderRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findById(ORDER_ID, "item-1"))
-                .thenReturn(orderItemWithQtyAndStatus("item-1", 1, FulfilmentStatus.Delivered));
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.createRma(posted, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
-        verify(rmaRepository).save(saved.capture());
-        assertThat(saved.getValue().getStoreId()).isEqualTo(STORE_ID);
     }
 
     // ------------------------------------------------------------------
@@ -797,6 +665,35 @@ class RMAControllerTest {
         return templateEngine.process(tag, context);
     }
 
+    @Test
+    void aNewShipmentRowTakesAnIndexPastTheHiddenCreationRows() {
+        // given: the failed creation is not shown, yet the shipment after it keeps index 1
+        Shipment failedCreation = new Shipment(ShipmentType.Courier);
+        failedCreation.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()).failed("Błąd"));
+        RMA rma = rmaWithStatus(RMAStatus.Processing);
+        rma.setShipments(new ArrayList<>(List.of(failedCreation, new Shipment(ShipmentType.Courier))));
+        String template = readTemplate("templates/rma-detail.html");
+        Matcher tbody = Pattern.compile("<tbody\\b[^>]*id=\"editRmaShipmentsBody\"[^>]*>").matcher(template);
+        assertThat(tbody.find()).withFailMessage("no editRmaShipmentsBody in rma-detail.html").isTrue();
+
+        // when
+        String html = render(tbody.group() + "</tbody>", rma);
+
+        // then: two shipments, so the added row is shipments[2], not shipments[1] (which would merge into the second)
+        assertThat(html).contains("data-next-index=\"2\"");
+    }
+
+    private static String render(String fragment, RMA rma) {
+        StringTemplateResolver resolver = new StringTemplateResolver();
+        resolver.setTemplateMode(TemplateMode.HTML);
+        TemplateEngine templateEngine = new TemplateEngine();
+        templateEngine.setDialect(new SpringStandardDialect());
+        templateEngine.setTemplateResolver(resolver);
+        Context context = new Context();
+        context.setVariable("rma", rma);
+        return templateEngine.process(fragment, context);
+    }
+
     private static String readTemplate(String classpathLocation) {
         try (InputStream template = RMAControllerTest.class.getClassLoader()
                 .getResourceAsStream(classpathLocation)) {
@@ -807,5 +704,135 @@ class RMAControllerTest {
         } catch (IOException e) {
             throw new IllegalStateException("cannot read " + classpathLocation, e);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // updateShipments: the form edits what it shows, the courier order stays
+    // ------------------------------------------------------------------
+
+    private static Shipment typed(String trackingNo, String externalId) {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo(trackingNo);
+        shipment.setShippedAt(LocalDateTime.of(2026, 10, 6, 9, 0));
+        shipment.setExternalId(externalId);
+        return shipment;
+    }
+
+    private static Shipment courierOrder(String trackingNo, String externalId) {
+        Shipment shipment = typed(trackingNo, externalId);
+        shipment.setProvider("furgonetka");
+        shipment.setPickUpAddressId("addr-1");
+        shipment.setPickup(ShipmentPickup.awaiting());
+        return shipment;
+    }
+
+    /** Posts the form as the page renders it: it shows every package of the RMA that is not being created. */
+    private RMA saveShipments(RMA existing, Shipment... posted) {
+        List<String> shown = existing.getShipments().stream()
+                .filter(s -> s.getCreation() == null && s.getExternalId() != null)
+                .map(Shipment::getExternalId).toList();
+        return saveShipments(existing, shown, posted);
+    }
+
+    private RMA saveShipments(RMA existing, List<String> shownPackages, Shipment... posted) {
+        when(rmaRepository.findById(STORE_ID, RMA_ID)).thenReturn(existing);
+        RMA postedRma = new RMA(STORE_ID);
+        postedRma.setShipments(new ArrayList<>(List.of(posted)));
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            controller.updateShipments(RMA_ID, postedRma, shownPackages, redirectAttributes, Locale.ENGLISH);
+        }
+        ArgumentCaptor<RMA> saved = ArgumentCaptor.forClass(RMA.class);
+        verify(rmaRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    @Test
+    void aShipmentBeingCreatedSurvivesAnEditOfTheOthers() {
+        // given: it has no shipping data yet, and losing it would drop the label its command pays for
+        Shipment inFlight = new Shipment(ShipmentType.Courier);
+        inFlight.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null), inFlight)));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1-fixed", null), new Shipment(ShipmentType.Courier));
+
+        // then
+        assertThat(saved.getShipments()).hasSize(2);
+        assertThat(saved.getShipments().get(0).getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(saved.getShipments().get(1)).isSameAs(inFlight);
+    }
+
+    @Test
+    void theCourierOrderAndItsPickupStayWithTheirPackage() {
+        // given: the form carries the package id, not the courier order
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"))));
+
+        // when: the operator corrects the tracking number
+        RMA saved = saveShipments(existing, typed("T-1-fixed", "EXT-1"));
+
+        // then
+        Shipment shipment = saved.getShipments().get(0);
+        assertThat(shipment.getTrackingNo()).isEqualTo("T-1-fixed");
+        assertThat(shipment.getProvider()).isEqualTo("furgonetka");
+        assertThat(shipment.getPickUpAddressId()).isEqualTo("addr-1");
+        assertThat(shipment.awaitsPickup()).isTrue();
+    }
+
+    @Test
+    void aPackageIdTheRmaNeverHadIsNotTakenFromTheForm() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(typed("T-1", null))));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-1", "FORGED"));
+
+        // then
+        assertThat(saved.getShipments().get(0).getExternalId()).isNull();
+    }
+
+    @Test
+    void aRemovedPackageLeavesThePickupList() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when
+        RMA saved = saveShipments(existing, typed("T-2", "EXT-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
+    }
+
+    @Test
+    void aPackageCreatedAfterTheFormWasOpenedSurvivesItsSave() {
+        // given: the form was rendered while EXT-2 was still being created, so it neither shows nor posts it;
+        // the creation settled in the background before the operator saved
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: the operator saves the form as it was, showing only EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1"), typed("T-1", "EXT-1"));
+
+        // then: the paid package stays, still waiting for its pickup
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-1", "EXT-2");
+        assertThat(saved.getShipments().get(1).awaitsPickup()).isTrue();
+    }
+
+    @Test
+    void aPackageTheFormShowedCanStillBeRemoved() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.Processing);
+        existing.setShipments(new ArrayList<>(List.of(courierOrder("T-1", "EXT-1"), courierOrder("T-2", "EXT-2"))));
+
+        // when: both were shown, the operator removed EXT-1
+        RMA saved = saveShipments(existing, List.of("EXT-1", "EXT-2"), typed("T-2", "EXT-2"));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getExternalId).containsExactly("EXT-2");
     }
 }

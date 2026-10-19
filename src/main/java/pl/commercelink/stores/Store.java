@@ -5,6 +5,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import lombok.Getter;
+import lombok.Setter;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -63,6 +65,19 @@ public class Store {
     private ShippingConfiguration shippingConfiguration;
     @DynamoDBAttribute(attributeName = "demo")
     private DemoStoreMetadata demo;
+    @DynamoDBAttribute(attributeName = "trial")
+    @Getter
+    @Setter
+    private TrialPeriod trial;
+    // No value means active: the stores created before the flag existed never got one.
+    @DynamoDBAttribute(attributeName = "active")
+    @Getter
+    @Setter
+    private Boolean active;
+    @DynamoDBAttribute(attributeName = "deactivation")
+    @Getter
+    @Setter
+    private StoreDeactivation deactivation;
     @DynamoDBAttribute(attributeName = "createdAt")
     private String createdAt;
     @DynamoDBVersionAttribute
@@ -207,11 +222,17 @@ public class Store {
         return removed;
     }
 
+    /**
+     * The name configured for the integration type, or null. A provider that lost its authorisation is stored with a
+     * null name (ShippingProviderFactory#onAuthorizationLost) and reads as not configured: findFirst on a null element
+     * would throw, taking down every page that asks (the order page, the courier page).
+     */
     @DynamoDBIgnore
     public String getConfigurationValue(IntegrationType type) {
         return integrations.stream()
                 .filter(config -> config.getType() == type)
                 .map(Integration::getName)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
@@ -219,6 +240,65 @@ public class Store {
     @DynamoDBIgnore
     public void removeIntegration(IntegrationType type) {
         integrations.removeIf(config -> config.getType() == type);
+    }
+
+    /** The integration the store-wide shipping settings belong to (carrier dictionary, carriers, webhook), or null. */
+    @DynamoDBIgnore
+    public String defaultShippingIntegration() {
+        return getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    /** The shipping integrations next to the default one (ShippingConfiguration#additionalIntegrations). */
+    @DynamoDBIgnore
+    public List<String> additionalShippingIntegrations() {
+        if (shippingConfiguration == null || shippingConfiguration.getAdditionalIntegrations() == null) {
+            return List.of();
+        }
+        return shippingConfiguration.getAdditionalIntegrations().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /** Adds an additional shipping integration once; a store without shipping settings gets them. */
+    @DynamoDBIgnore
+    public void addAdditionalShippingIntegration(String name) {
+        if (name == null || additionalShippingIntegrations().contains(name)) {
+            return;
+        }
+        if (shippingConfiguration == null) {
+            shippingConfiguration = new ShippingConfiguration();
+        }
+        if (shippingConfiguration.getAdditionalIntegrations() == null) {
+            shippingConfiguration.setAdditionalIntegrations(new LinkedList<>());
+        }
+        shippingConfiguration.getAdditionalIntegrations().add(name);
+    }
+
+    @DynamoDBIgnore
+    public void removeAdditionalShippingIntegration(String name) {
+        if (shippingConfiguration != null && shippingConfiguration.getAdditionalIntegrations() != null) {
+            shippingConfiguration.getAdditionalIntegrations().removeIf(existing -> Objects.equals(existing, name));
+        }
+    }
+
+    /** The default integration first, then the additional ones; a lost default (null name) is left out. */
+    @DynamoDBIgnore
+    public List<String> shippingIntegrationNames() {
+        List<String> names = new ArrayList<>();
+        String defaultName = defaultShippingIntegration();
+        if (defaultName != null) {
+            names.add(defaultName);
+        }
+        additionalShippingIntegrations().stream()
+                .filter(name -> !names.contains(name))
+                .forEach(names::add);
+        return List.copyOf(names);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasShippingIntegration(String name) {
+        return name != null && shippingIntegrationNames().contains(name);
     }
 
     @DynamoDBIgnore
@@ -496,6 +576,17 @@ public class Store {
         return demo != null && demo.getExpiresAt() != null && Instant.parse(demo.getExpiresAt()).isBefore(now);
     }
 
+    /** A trial store stops being active the moment its trial ends, before anything marks it as deactivated. */
+    @DynamoDBIgnore
+    public boolean isActive(Instant now) {
+        return !Boolean.FALSE.equals(active) && !isTrialExpired(now);
+    }
+
+    @DynamoDBIgnore
+    public boolean isTrialExpired(Instant now) {
+        return trial != null && trial.isExpired(now);
+    }
+
     @DynamoDBIgnore
     public boolean isGoogleAdsConversionsEnabled(String token) {
         if (reportingConfiguration == null
@@ -523,6 +614,11 @@ public class Store {
     @DynamoDBIgnore
     public boolean supportsNotification(EmailNotificationType type) {
         return clientNotificationsConfiguration != null && clientNotificationsConfiguration.supports(type);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasNotificationSender() {
+        return clientNotificationsConfiguration != null && clientNotificationsConfiguration.hasSender();
     }
 
     /**

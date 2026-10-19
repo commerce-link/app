@@ -2,6 +2,8 @@ package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
@@ -17,6 +19,7 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.web.orders.OrderRow.DocMark;
+import pl.commercelink.web.warehousedocuments.TestMessages;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -68,6 +71,8 @@ class OrderRowMapperTest {
     void marketplaceOrderOverdueAndUnpaid() {
         OrderRow row = mapper.map(order(), TODAY);
         assertThat(row.href()).isEqualTo("/dashboard/orders/ab58c563-9f1e-4d2a-b0c1-000000000000");
+        assertThat(mapper.map(order(), TODAY, "/dashboard/orders?status=New").href())
+                .isEqualTo("/dashboard/orders/ab58c563-9f1e-4d2a-b0c1-000000000000?returnTo=%2Fdashboard%2Forders%3Fstatus%3DNew");
         assertThat(row.number()).isEqualTo(order().getShortenedOrderId());
         assertThat(row.sourceText()).isEqualTo("Allegro");
         assertThat(row.externalId()).isEqualTo("nr 5749922740");
@@ -214,5 +219,241 @@ class OrderRowMapperTest {
 
         order.setReview(null);
         assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind).containsExactly("invoice");
+    }
+
+    private static Order companyOrderWithAdvanceInvoice(OrderStatus status) {
+        Order order = order();
+        order.setStatus(status);
+        order.getBillingDetails().setCompanyName("Nowak IT sp. z o.o.");
+        order.getBillingDetails().setTaxId("6762461234");
+        order.addDocument(new Document("d1", "ZAM/2/2026", null, DocumentType.Order));
+        order.addDocument(new Document("d2", "FZ/3/2026", null, DocumentType.InvoiceAdvance));
+        return order;
+    }
+
+    /** An advance invoice is information, not a gap: a green FZ before delivery, nothing that holds the order open. */
+    @Test
+    void advanceInvoiceBeforeDeliveryShowsDoneAdvanceMarkOnly() {
+        // given
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Realization);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
+                .containsExactly(tuple("advance", "FZ", "is-done"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura zaliczkowa: wystawiono FZ/3/2026");
+        assertThat(row.hasTodo()).as("the phone card shows nothing for a lone FZ").isFalse();
+    }
+
+    @Test
+    void deliveredOrderWithAdvanceInvoiceAwaitsFinalInvoice() {
+        // given
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state).containsExactly(
+                tuple("advance", "FZ", "is-done"), tuple("invoice", "FK", "is-todo"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly(
+                "Faktura zaliczkowa: wystawiono FZ/3/2026",
+                "Faktura końcowa: do wystawienia — blokuje zakończenie zamówienia");
+        assertThat(row.hasTodo()).isTrue();
+    }
+
+    /** The final invoice always settles the advance one, so FK alone says both were issued and the row does not grow. */
+    @Test
+    void finalInvoiceReplacesAdvanceMark() {
+        // given
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
+        order.addDocument(new Document("d3", "FK/12/2026", null, DocumentType.InvoiceFinal));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
+                .containsExactly(tuple("invoice", "FK", "is-done"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura końcowa: wystawiono FK/12/2026");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"New", "Blocked", "Cancelled"})
+    void advanceInvoiceIsShownInAnyStatusAndNeverBlocks(OrderStatus status) {
+        // given
+        Order order = companyOrderWithAdvanceInvoice(status);
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::state)
+                .containsExactly(tuple("advance", "is-done"));
+    }
+
+    @Test
+    void personalInvoiceKeepsInvoiceCode() {
+        // given
+        Order order = order();
+        order.addDocument(new Document("d1", "FV/8/2026", null, DocumentType.InvoicePersonal));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("FV");
+    }
+
+    @Test
+    void receiptKeepsReceiptCode() {
+        // given
+        Order order = order();
+        order.addDocument(new Document("d1", "PAR/9/2026", null, DocumentType.Receipt));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("PAR");
+    }
+
+    @Test
+    void advanceInvoiceWithoutNumberStillShowsItsMark() {
+        // given
+        Order order = order();
+        order.addDocument(new Document("d1", null, null, DocumentType.InvoiceAdvance));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code)
+                .containsExactly(tuple("advance", "FZ"));
+    }
+
+    @Test
+    void englishCodesForAdvanceAndFinalInvoice() {
+        // given
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        OrderRowMapper english = new OrderRowMapper(messages, Locale.ENGLISH, false);
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
+
+        // when
+        OrderRow row = english.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("ADV", "FIN");
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly(
+                "Advance invoice: issued FZ/3/2026",
+                "Final invoice: to be issued — blocks closing the order");
+    }
+
+    @Test
+    void theRowCarriesTheBareOrderIdForTheSelection() {
+        // when
+        OrderRow row = mapper.map(order(), TODAY, "/dashboard/orders?status=New");
+
+        // then: the checkbox value is the id itself, never the link with its returnTo
+        assertThat(row.orderId()).isEqualTo("ab58c563-9f1e-4d2a-b0c1-000000000000");
+    }
+
+    @Test
+    void archivedRowShowsTheOrderDayWithYearAndTime() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setOrderedAt(LocalDateTime.of(2026, 10, 8, 18, 42, 11));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), false);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, "/dashboard/orders/archive?q=x");
+
+        // then
+        assertThat(row.dueText()).isEqualTo("08.10.2026");
+        assertThat(row.dueNote()).isEqualTo("18:42");
+        assertThat(row.dueTone()).isEmpty();
+        assertThat(row.unpaidText()).isNull();
+        assertThat(row.href()).isEqualTo("/dashboard/orders/" + order.getOrderId() + "?returnTo=%2Fdashboard%2Forders%2Farchive%3Fq%3Dx");
+    }
+
+    @Test
+    void completedOrderWithoutClosingDocumentShowsItAsToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), false);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).anyMatch(m -> m.kind().equals("invoice") && m.todo());
+    }
+
+    @Test
+    void completedWarehouseOrderWithoutWzShowsItAsToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).anyMatch(m -> m.kind().equals("wz") && m.todo());
+    }
+
+    @Test
+    void cancelledOrderNeverShowsAToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Cancelled);
+        order.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).noneMatch(OrderRow.DocMark::todo);
+    }
+
+    @Test
+    void archivedToDoDoesNotClaimItBlocksClosingAnOrderThatIsAlreadyClosed() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).filteredOn(OrderRow.DocMark::todo).extracting(OrderRow.DocMark::label)
+                .containsExactly("WZ: do wystawienia", "Paragon: do wystawienia");
+    }
+
+    @Test
+    void archivedOrderNeverShowsTheReviewToDo() {
+        // given
+        Order order = new Order("s1");
+        order.setStatus(OrderStatus.Completed);
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        OrderRowMapper mapper = new OrderRowMapper(TestMessages.polish(), Locale.forLanguageTag("pl"), true);
+
+        // when
+        OrderRow row = mapper.mapArchived(order, OrderArchiveQuery.PATH);
+
+        // then
+        assertThat(row.marks()).noneMatch(m -> m.kind().equals("review"));
     }
 }

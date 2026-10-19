@@ -6,12 +6,16 @@ import pl.commercelink.stores.ClientNotificationsConfiguration;
 /**
  * What sending one customer email needs from the store, read once per email.
  *
- * @param senderName   display name in the From header, or null to send from the bare address
- * @param replyToEmail address customer replies go to, or null when the store has none
+ * @param senderName   display name in the From header, or null when the store has not set it
+ * @param replyToEmail address customer replies go to, or null when the store has not set it
  */
 public record NotificationSettings(ClientNotificationsConfiguration configuration, String senderName, String replyToEmail) {
 
     public boolean supports(EmailNotificationType type) {
         return configuration != null && configuration.supports(type);
+    }
+
+    public boolean hasSender() {
+        return senderName != null && replyToEmail != null;
     }
 }

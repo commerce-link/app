@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.SerialNumbers;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.StockSummary;
@@ -55,12 +56,11 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
-    public WarehouseItemView findBySerialNo(String storeId, String serialNo) {
-        WarehouseItem warehouseItem = warehouseRepository.findBySerialNo(storeId, serialNo);
-        if (warehouseItem == null) {
-            return null;
-        }
-        return fromInternal(warehouseItem);
+    public List<WarehouseItemView> findAllBySerialNo(String storeId, String serialNo) {
+        return warehouseRepository.findBySerialNoCandidates(storeId, serialNo).stream()
+                .filter(item -> SerialNumbers.contains(item.getSerialNo(), serialNo))
+                .map(this::fromInternal)
+                .toList();
     }
 
     @Override
@@ -81,9 +81,15 @@ class BuiltInStockQueryService implements StockQueryService {
     }
 
     @Override
+    public List<WarehouseItemView> searchAllAvailable(String storeId) {
+        return findAllAvailable(storeId).stream()
+                .map(this::fromInternal)
+                .toList();
+    }
+
+    @Override
     public StockSummary summarizeAvailable(String storeId) {
-        List<WarehouseItem> items = warehouseRepository.findAllFiltered(storeId, null,
-                List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
+        List<WarehouseItem> items = findAllAvailable(storeId);
         Set<String> products = new HashSet<>();
         int inStockQty = 0;
         int inDeliveryQty = 0;
@@ -100,10 +106,16 @@ class BuiltInStockQueryService implements StockQueryService {
         return new StockSummary(products.size(), inStockQty, inDeliveryQty);
     }
 
+    private List<WarehouseItem> findAllAvailable(String storeId) {
+        return warehouseRepository.findAllFiltered(storeId, null,
+                List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
+    }
+
     private WarehouseItemView fromInternal(WarehouseItem warehouseItem) {
         return new WarehouseItemView(
                 warehouseItem.getStoreId(),
                 warehouseItem.getItemId(),
+                warehouseItem.getName(),
                 warehouseItem.getEan(),
                 warehouseItem.getManufacturerCode(),
                 Price.fromNet(warehouseItem.getEffectiveUnitSystemCost(), warehouseItem.getTax()),

@@ -35,9 +35,10 @@ public class StoreNotificationService {
         this.clock = clock;
     }
 
-    public void publish(String storeId, StoreNotification notification) {
+    /** False when the same event was published before: the existing record is kept, so it can guard a side effect. */
+    public boolean publish(String storeId, StoreNotification notification) {
         // an existing record wins even when it was read, so a repeated event never comes back as unread
-        repository.putIfAbsent(StoreNotificationRecord.unread(storeId, notification, now()));
+        return repository.putIfAbsent(StoreNotificationRecord.unread(storeId, notification, now()));
     }
 
     public void resolve(String storeId, StoreNotificationType type, String object) {

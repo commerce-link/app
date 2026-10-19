@@ -77,6 +77,7 @@ public class CategoryDefinitions {
     private final ProductCatalogRepository catalogs;
     private final ProductRepository products;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
+    private final CatalogPlacement placement;
 
     public CategoryDefinition create(ProductCatalog catalog, Basics basics) {
         // Built once, outside the retried closure: a retry adds the same category, under the same id, to the fresh read.
@@ -246,8 +247,8 @@ public class CategoryDefinitions {
         switch (outcome.get()) {
             case CATEGORY_GONE -> throw new CategoryNotFoundException(catalogId, categoryId);
             case PROTECTED -> throw new IllegalStateException("Category " + categoryId + " is protected from deletion");
-            case APPLIED -> {
-            }
+            // The inventory's "W katalogu" and its add dialog show the manual categories and their PIM categories.
+            case APPLIED -> placement.evict(storeId);
         }
     }
 

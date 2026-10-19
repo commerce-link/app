@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.Locale;
+import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -25,30 +26,33 @@ public class RegistrationController {
 
     private final RegistrationService registrationService;
     private final RegistrationAutoLoginService autoLoginService;
-    private final EmailVerificationService emailVerificationService;
     private final CaptchaVerifier captchaVerifier;
     private final MessageSource messageSource;
     private final boolean demoMode;
     private final int ttlDays;
+    private final int trialDays;
+    private final int trialRetentionDays;
     private final String termsUrl;
     private final String homeUrl;
 
     public RegistrationController(RegistrationService registrationService,
                                   RegistrationAutoLoginService autoLoginService,
-                                  EmailVerificationService emailVerificationService,
                                   CaptchaVerifier captchaVerifier,
                                   MessageSource messageSource,
                                   @Value("${app.registration.demo:false}") boolean demoMode,
                                   @Value("${app.registration.ttl-days}") int ttlDays,
+                                  @Value("${app.registration.trial-days}") int trialDays,
+                                  @Value("${app.registration.trial-retention-days}") int trialRetentionDays,
                                   @Value("${app.terms-url:}") String termsUrl,
                                   @Value("${application.home}") String homeUrl) {
         this.registrationService = registrationService;
         this.autoLoginService = autoLoginService;
-        this.emailVerificationService = emailVerificationService;
         this.captchaVerifier = captchaVerifier;
         this.messageSource = messageSource;
         this.demoMode = demoMode;
         this.ttlDays = ttlDays;
+        this.trialDays = trialDays;
+        this.trialRetentionDays = trialRetentionDays;
         this.termsUrl = termsUrl;
         this.homeUrl = homeUrl;
     }
@@ -56,6 +60,7 @@ public class RegistrationController {
     @GetMapping("/register")
     public String registerPage(Model model) {
         addFormAttributes(model);
+        RegistrationErrors.prepare(model, "email");
         return "register";
     }
 
@@ -72,17 +77,17 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addFormAttributes(model);
+        RegistrationErrors.prepare(model, "email");
         model.addAttribute("email", email);
         model.addAttribute("storeName", storeName);
+        model.addAttribute("termsConsent", termsConsent != null);
 
         if (!captchaVerifier.verify(captchaResponse, clientIp(request))) {
-            model.addAttribute("errorMessage",
-                    messageSource.getMessage("registration.error.captcha-failed", null, locale));
+            rejectRegistration(model, "registration.error.captcha-failed", locale);
             return "register";
         }
         if (termsConsent == null) {
-            model.addAttribute("errorMessage",
-                    messageSource.getMessage("registration.error.terms-consent-required", null, locale));
+            rejectRegistration(model, "registration.error.terms-consent-required", locale);
             return "register";
         }
 
@@ -95,7 +100,7 @@ public class RegistrationController {
                     .setAttribute(PENDING_REGISTRATION, new PendingRegistration(normalizedEmail, resolvedName));
             return "redirect:" + PASSWORD_PATH;
         } catch (RegistrationException e) {
-            model.addAttribute("errorMessage", messageSource.getMessage(e.messageKey(), null, locale));
+            rejectRegistration(model, e.messageKey(), locale);
             return "register";
         }
     }
@@ -107,6 +112,7 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addFormAttributes(model);
+        RegistrationErrors.prepare(model, "password");
         model.addAttribute("email", pending.email());
         return "register-password";
     }
@@ -122,11 +128,11 @@ public class RegistrationController {
             return "redirect:/register";
         }
         addFormAttributes(model);
+        RegistrationErrors.prepare(model, "password");
         model.addAttribute("email", pending.email());
 
         if (!PasswordPolicy.isValid(password)) {
-            model.addAttribute("errorMessage",
-                    messageSource.getMessage("registration.error.weak-password", null, locale));
+            rejectPassword(model, "registration.error.weak-password", locale);
             return "register-password";
         }
 
@@ -140,7 +146,7 @@ public class RegistrationController {
             result = registrationService.register(claimed.email(), claimed.storeName(), clientIp(request), password);
         } catch (RegistrationException e) {
             request.getSession().setAttribute(PENDING_REGISTRATION, claimed);
-            model.addAttribute("errorMessage", messageSource.getMessage(e.messageKey(), null, locale));
+            rejectPassword(model, e.messageKey(), locale);
             return "register-password";
         }
 
@@ -148,7 +154,6 @@ public class RegistrationController {
             return "register-success";
         }
         if (!registrationService.isEmailVerifiedOnCreation()) {
-            emailVerificationService.sendCodeQuietly(claimed.email());
             return "redirect:" + EmailVerificationController.VERIFY_EMAIL_PATH;
         }
         return "redirect:" + homeUrl;
@@ -181,9 +186,22 @@ public class RegistrationController {
         return (PendingRegistration) session.getAttribute(PENDING_REGISTRATION);
     }
 
+    private void rejectRegistration(Model model, String messageKey, Locale locale) {
+        Set<String> fields = demoMode ? Set.of("email", "termsConsent") : Set.of("email", "storeName", "termsConsent");
+        RegistrationErrors.reject(model, messageKey, fields, messageSource, locale);
+    }
+
+    private void rejectPassword(Model model, String messageKey, Locale locale) {
+        RegistrationErrors.reject(model, messageKey, Set.of("password"), messageSource, locale);
+    }
+
     private void addFormAttributes(Model model) {
         model.addAttribute("demoMode", demoMode);
+        model.addAttribute("stepTotal", demoMode ? 2 : 3);
+        model.addAttribute("storeNameMaxLength", RegistrationService.STORE_NAME_MAX);
         model.addAttribute("ttlDays", ttlDays);
+        model.addAttribute("trialDays", trialDays);
+        model.addAttribute("trialRetentionDays", trialRetentionDays);
         model.addAttribute("termsUrl", termsUrl.isBlank() ? null : termsUrl);
         model.addAttribute("captchaSiteKey", captchaVerifier.siteKey());
     }

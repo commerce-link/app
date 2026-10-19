@@ -3,6 +3,7 @@ package pl.commercelink.registration;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -14,11 +15,13 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.VerifyUserA
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailVerificationService {
 
     static final String VERIFIED_SESSION_ATTRIBUTE = "emailVerified";
+    static final String CODE_SENT_SESSION_ATTRIBUTE = "emailVerificationCodeSent";
     private static final String EMAIL_ATTRIBUTE = "email";
     private static final String EMAIL_VERIFIED_CLAIM = "email_verified";
 
@@ -34,18 +37,29 @@ public class EmailVerificationService {
                 .orElse(true);
     }
 
-    public void sendCode() {
+    public void sendCode(HttpServletRequest request) {
         cognitoClient.getUserAttributeVerificationCode(GetUserAttributeVerificationCodeRequest.builder()
                 .accessToken(accessToken())
                 .attributeName(EMAIL_ATTRIBUTE)
                 .build());
+        request.getSession(true).setAttribute(CODE_SENT_SESSION_ATTRIBUTE, Boolean.TRUE);
     }
 
-    public void sendCodeQuietly(String email) {
+    /**
+     * Sends a code unless this session already got one. A user the pool could not sign in right after registration
+     * (MFA required) reaches the confirmation screen only after the hosted UI, and nothing has sent a code by then.
+     */
+    public boolean sendCodeOnce(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null && Boolean.TRUE.equals(session.getAttribute(CODE_SENT_SESSION_ATTRIBUTE))) {
+            return true;
+        }
         try {
-            sendCode();
+            sendCode(request);
+            return true;
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Could not send verification code to " + email + ": " + e.getMessage());
+            log.error("Could not send an e-mail verification code", e);
+            return false;
         }
     }
 
@@ -62,7 +76,7 @@ public class EmailVerificationService {
         } catch (CodeMismatchException | ExpiredCodeException e) {
             throw new RegistrationException(RegistrationException.Reason.INVALID_CODE);
         } catch (RuntimeException e) {
-            System.err.println("[Registration] E-mail verification failed: " + e.getMessage());
+            log.error("E-mail verification failed", e);
             throw new RegistrationException(RegistrationException.Reason.VERIFICATION_FAILED);
         }
         request.getSession(true).setAttribute(VERIFIED_SESSION_ATTRIBUTE, Boolean.TRUE);

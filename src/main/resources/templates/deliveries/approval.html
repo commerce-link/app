@@ -1,0 +1,165 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The platform administrator's approval of a delivery request at a supplier connected globally: the layout of step 2
+       of a new delivery (live availability, the platform account's address book, supplier options) with the decision in
+       the side column. delivery-purchase.js asks for availability and enables "Order" only when every condition holds;
+       "Reject" opens #reject-dialog (dialog.js), or the page again with ?open=reject without script. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: record(${page.detailsHref()}, #{deliveries.approval.back.label(${page.shortDeliveryId()})},
+                    #{deliveries.approval.title(${page.supplierLabel()})}, ${null}, ~{::approvalStatus}, ~{::approvalMeta}, ${null})}">
+                <th:block th:fragment="approvalStatus"><span class="cl-status is-info" th:text="#{deliveries.list.state.awaitingApproval}"></span></th:block>
+                <th:block th:fragment="approvalMeta">
+                    <p class="cl-record-meta">
+                        <span><strong><a th:href="@{${page.storeHref()}}" th:text="${page.storeName()}"></a></strong></span>
+                        <span th:if="${page.requestedAt() != null}" th:text="#{deliveries.approval.meta.requested(${page.requestedAt()})}"></span>
+                        <span th:text="${page.dropship()} ? #{deliveries.approval.meta.dropship} : #{deliveries.approval.meta.warehouse}"></span>
+                        <span th:text="#{deliveries.approval.meta.global}"></span>
+                    </p>
+                </th:block>
+            </div>
+
+            <div class="cl-alert is-warn" th:each="routed : ${routedOrders}">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text">
+                    <span th:if="${routed.supplier().matched}" th:text="#{deliveries.approval.routed(${routed.orderId()}, ${routed.supplier().supplierName()})}"></span>
+                    <span th:unless="${routed.supplier().matched}" th:text="#{deliveries.approval.routed.unmatched(${routed.orderId()}, ${routed.supplier().externalSupplierId()})}"></span>
+                    <strong th:text="#{deliveries.approval.routed.mismatch}"></strong>
+                </p>
+            </div>
+            <div class="cl-alert is-warn" th:if="${delivery.hasDirectToConsumerAllocations()}">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></p>
+            </div>
+            <div class="cl-alert is-bad" id="dropship-order-missing" th:if="${dropshipOrderMissing == true}">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{deliveries.approval.dropshipOrderMissing}"></p>
+            </div>
+            <div class="cl-alert is-bad" id="order-options-blocked" th:if="${orderOptionsError != null}">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="|(${orderOptionsError})|"></span></p>
+            </div>
+
+            <form method="post" id="approval-form" class="cl-layout-aside" data-cl-delivery-purchase
+                  th:action="@{${page.approveHref()}}" th:attr="data-validate-url=@{${page.validateHref()}}">
+                <div class="cl-layout-main">
+                    <section th:replace="~{deliveries/create/parts :: availabilityCard}"></section>
+
+                    <section th:if="${!page.dropship()}" class="cl-card" aria-labelledby="address-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="address-title" th:text="#{deliveries.create.purchase.address.title}"></h2></div>
+                        <div th:if="${approvalAddressError != null}" class="cl-card-inset">
+                            <div class="cl-alert is-bad" id="address-blocked">
+                                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text"><span th:text="#{deliveries.purchase.confirm.addressUnavailable}"></span> <span th:text="|(${approvalAddressError})|"></span></p>
+                            </div>
+                        </div>
+                        <p th:if="${approvalAddressError == null and #lists.isEmpty(approvalAddresses)}" class="cl-card-desc"
+                           th:text="#{deliveries.purchase.confirm.addressFromSupplier}"></p>
+                        <th:block th:if="${!#lists.isEmpty(approvalAddresses)}">
+                            <p class="cl-card-desc" th:with="place=${suggestedAddress == null ? null : #strings.trim((suggestedAddress.postalCode ?: '') + ' ' + (suggestedAddress.city ?: ''))},
+                                    storeAddress=${suggestedAddress == null ? null : (#strings.isEmpty(suggestedAddress.streetAndNumber) ? place : (#strings.isEmpty(place) ? suggestedAddress.streetAndNumber : suggestedAddress.streetAndNumber + ', ' + place))}">
+                                <span th:text="#{deliveries.approval.address.desc(${page.supplierLabel()})}"></span>
+                                <span th:if="${suggestedAddressId != null}"
+                                      th:text="#{deliveries.approval.address.matched(${page.storeName()}, ${storeAddress})}"></span>
+                                <span th:if="${suggestedAddressId == null and suggestedAddress == null}" class="is-warn"
+                                      th:text="#{deliveries.approval.address.noStoreDefault(${page.storeName()})}"></span>
+                                <span th:if="${suggestedAddressId == null and suggestedAddress != null}" class="is-warn"
+                                      th:text="#{deliveries.approval.address.noMatch(${page.storeName()}, ${storeAddress})}"></span>
+                            </p>
+                            <th:block th:replace="~{deliveries/create/parts :: addressChoices(${approvalAddresses}, ${suggestedAddressId}, ${suggestedAddressId})}"></th:block>
+                        </th:block>
+                    </section>
+
+                    <th:block th:if="${orderOptions != null and !orderOptions.isEmpty()}">
+                        <section th:replace="~{deliveries/create/parts :: optionsCard(${orderOptions}, ${selectedOptions})}"></section>
+                    </th:block>
+                </div>
+
+                <aside class="cl-layout-side is-sticky">
+                    <section class="cl-card" aria-labelledby="request-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="request-title" th:text="#{deliveries.approval.requestFor}"></h2></div>
+                        <ul class="cl-request-for">
+                            <li th:each="line : ${page.requestFor()}">
+                                <span><a th:href="@{${line.href()}}" th:text="#{deliveries.approval.requestFor.order(${line.orderLabel()})}"></a>
+                                    <span class="cl-table-sub" th:if="${line.customer() != null or line.source() != null}"
+                                          th:text="${line.source() == null} ? ${line.customer()} : (${line.customer() == null} ? ${line.source()} : ${line.customer() + ' · ' + line.source()})"></span></span>
+                                <span th:text="#{deliveries.approval.pieces(${line.qty()})}"></span>
+                            </li>
+                            <li th:if="${page.warehousePieces() > 0}">
+                                <span th:text="#{deliveries.approval.requestFor.warehouse}"></span>
+                                <span th:text="#{deliveries.approval.pieces(${page.warehousePieces()})}"></span>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <th:block th:if="${!page.dropship() or page.consignee() != null}">
+                        <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.approval.recipient.help')}"></th:block>
+                    </th:block>
+                    <section th:if="${page.dropship() and page.consignee() == null}" class="cl-card" aria-labelledby="consignee-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="consignee-title" th:text="#{orders.dropship.consignee.address}"></h2></div>
+                        <div class="cl-address"><span th:text="${delivery.deliveryAddress}"></span></div>
+                    </section>
+
+                    <section class="cl-card" aria-labelledby="summary-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{deliveries.approval.decision}"></h2></div>
+                        <dl class="cl-kv is-column cl-card-inset">
+                            <div class="cl-kv-total"><dt th:text="#{deliveries.create.summary.total}"></dt>
+                                <dd class="is-numeric"><output data-cl-live-total aria-live="polite">—</output></dd></div>
+                        </dl>
+                        <div class="cl-card-footer is-stacked">
+                            <button id="purchase-confirm-submit" type="submit" class="cl-button is-primary" disabled
+                                    aria-describedby="confirm-reasons confirm-help"
+                                    th:attr="data-blocked=${approvalAddressError != null or orderOptionsError != null or dropshipOrderMissing == true}"
+                                    th:text="#{deliveries.approval.submit(${page.supplierLabel()})}"></button>
+                            <div class="cl-help is-warn" id="confirm-reasons">
+                                <span th:text="#{deliveries.create.purchase.reasons}"></span>
+                                <ul class="cl-reasons">
+                                    <li data-reason="checking" th:text="#{deliveries.create.purchase.reason.checking}"></li>
+                                    <li data-reason="checkFailed" hidden th:text="#{deliveries.create.purchase.reason.checkFailed}"></li>
+                                    <li data-reason="availability" hidden th:text="#{deliveries.create.purchase.reason.availability}"></li>
+                                    <li data-reason="address" hidden th:text="#{deliveries.create.purchase.reason.address}"></li>
+                                    <li data-reason="options" hidden th:text="#{deliveries.create.purchase.reason.options}"></li>
+                                    <li data-reason="blocked" hidden th:text="#{deliveries.create.purchase.reason.blocked}"></li>
+                                </ul>
+                            </div>
+                            <p class="cl-help" id="confirm-help" th:text="#{deliveries.approval.submit.help(${page.supplierLabel()})}"></p>
+                            <a class="cl-button is-danger-outline" href="?open=reject" data-cl-dialog-open="reject-dialog" data-cl-locked-while-ordering aria-describedby="reject-help">
+                                <i class="fas fa-times" aria-hidden="true"></i> <span th:text="#{deliveries.approval.reject.open}"></span>
+                            </a>
+                            <p class="cl-help" id="reject-help" th:text="#{deliveries.approval.reject.help}"></p>
+                        </div>
+                    </section>
+                </aside>
+            </form>
+
+            <dialog class="cl-dialog is-form" id="reject-dialog" aria-labelledby="reject-title" th:attr="open=${page.openReject()} ? 'open' : null">
+                <form method="post" th:action="@{${page.rejectHref()}}">
+                    <h2 class="cl-dialog-title" id="reject-title" th:text="#{deliveries.approval.reject.title(${page.shortDeliveryId()})}"></h2>
+                    <div class="cl-dialog-body">
+                        <p class="cl-dialog-effect" th:text="#{deliveries.approval.reject.effect(${page.storeName()}, ${page.supplierLabel()}, ${'' + page.pieces()}, ${page.net()})}"></p>
+                        <div class="cl-field">
+                            <label class="cl-label" for="reject-reason" th:text="#{deliveries.approval.reason.optional}"></label>
+                            <textarea class="cl-input cl-textarea" id="reject-reason" name="reason" rows="3" maxlength="500"
+                                      aria-describedby="reject-reason-help" th:placeholder="#{deliveries.approval.reason.placeholder}"></textarea>
+                            <p class="cl-help" id="reject-reason-help" th:text="#{deliveries.approval.reason.help}"></p>
+                        </div>
+                    </div>
+                    <div class="cl-dialog-actions">
+                        <button class="cl-button is-danger" type="submit" th:text="#{deliveries.approval.reject.open}"></button>
+                        <a class="cl-button" data-cl-dialog-close th:href="@{|/dashboard/store/${page.storeId()}/deliveries/${page.deliveryId()}/approval|}" th:text="#{general.cancel}"></a>
+                    </div>
+                </form>
+            </dialog>
+
+            <th:block th:replace="~{deliveries/create/parts :: validationTemplates}"></th:block>
+        </div>
+    </section>
+    <script th:src="@{/js/delivery-purchase.js}" defer></script>
+    <script th:src="@{/js/dialog.js}" defer></script>
+</div>
+</body>
+</html>

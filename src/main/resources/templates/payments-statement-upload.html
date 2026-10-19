@@ -1,0 +1,50 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage('/dashboard/payments', #{payments.title}, #{payments.statement.upload.title})}"></div>
+            <div class="cl-card">
+                <p th:if="${statementAccounts.isEmpty()}" class="cl-list-empty">
+                    <a th:href="@{/dashboard/store/payments}" th:text="#{payments.statement.upload.unavailable}"></a>
+                </p>
+                <th:block th:unless="${statementAccounts.isEmpty()}">
+                    <form th:replace="~{payments-statement-upload :: uploadForm(false)}"></form>
+                </th:block>
+            </div>
+        </div>
+    </section>
+    <script th:src="@{/js/submit-once.js}" defer></script>
+</div>
+
+<!--/* The upload of one account's statement, in the Payments page's dialog (inDialog) and on this page without
+       JavaScript. Only accounts with a statement format are offered (StatementAccounts). */-->
+<form th:fragment="uploadForm(inDialog)" class="cl-form" method="post" th:action="@{/dashboard/payments/statement}"
+      enctype="multipart/form-data" data-cl-submit-once>
+    <h2 th:if="${inDialog}" class="cl-dialog-title" id="statement-upload-title" th:text="#{payments.statement.upload.title}"></h2>
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <div class="cl-form-grid">
+            <div th:replace="~{fragments/settings-form :: selectField('accountId', 'payments.statement.upload.account', null, ${statementAccounts}, 'off', true, null, #{payments.statement.upload.account.help})}"></div>
+            <div class="cl-field">
+                <label class="cl-label" for="statement-file" th:text="#{payments.statement.upload.file}"></label>
+                <div class="cl-file-row">
+                    <input class="cl-file" id="statement-file" name="file" type="file" accept=".csv,.txt,text/csv,text/plain" required
+                           aria-describedby="statement-file-help"/>
+                </div>
+                <p class="cl-help" id="statement-file-help" th:text="#{payments.statement.upload.file.help}"></p>
+            </div>
+        </div>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button class="cl-button is-primary" type="submit" th:text="#{payments.statement.upload.submit}"></button>
+        <button th:if="${inDialog}" class="cl-button" type="button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/payments}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+</body>
+</html>

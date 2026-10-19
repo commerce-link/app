@@ -5,6 +5,7 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.filters.OrderFilterField;
+import pl.commercelink.orders.filters.CustomerType;
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 
@@ -35,6 +36,7 @@ public final class FilterConditionLabels {
             case ShippingDue -> "shipping.due";
             case SourceName -> "marketplace";
             case ShippingPostalCode -> "postal.code";
+            case CustomerType -> "customer.type";
         };
     }
 
@@ -43,7 +45,7 @@ public final class FilterConditionLabels {
         return value(condition, messages::msg);
     }
 
-    /** The display value of a condition: the enum's human label for Status/ShipmentType/PaymentSource/ShippingDue
+    /** The display value of a condition: the enum's human label for Status/ShipmentType/PaymentSource/ShippingDue/CustomerType
      * (resolved case-insensitively, since stored values may differ in case from the enum name), the raw value
      * otherwise. */
     public static String value(OrderFilterCondition condition, Function<String, String> lookup) {
@@ -53,6 +55,7 @@ public final class FilterConditionLabels {
             case ShipmentType -> enumLabel(ShipmentType.class, raw, "ShipmentType.", lookup);
             case PaymentSource -> enumLabel(PaymentSource.class, raw, "PaymentSource.", lookup);
             case ShippingDue -> enumLabel(ShippingDue.class, raw, "ShippingDue.", lookup);
+            case CustomerType -> enumLabel(CustomerType.class, raw, "CustomerType.", lookup);
             default -> raw;
         };
     }

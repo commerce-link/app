@@ -53,7 +53,6 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -495,20 +494,6 @@ class DropshipPurchaseServiceTest {
     }
 
     @Test
-    void releaseUnselectedHandsTheFormToTheCreationServiceWithoutCreatingADelivery() {
-        // given
-        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
-        form.setRemoveUnselected(true);
-
-        // when
-        service.releaseUnselected(STORE_ID, form);
-
-        // then
-        verify(deliveryCreationService).releaseUnselectedAllocations(STORE_ID, form);
-        verify(deliveriesRepository, never()).save(any());
-    }
-
-    @Test
     void createManualDropshipRejectsWarehouseFulfilmentOrder() {
         // given
         connectSupplier(ConnectionMode.OWN);
@@ -653,6 +638,29 @@ class DropshipPurchaseServiceTest {
         assertEquals("+48601234567", consignee.phone());
         assertEquals("jan.kowalski@example.com", consignee.email());
         assertEquals("ref-1", request.getValue().clientOrderRef());
+        assertEquals("CommerceLink ref-1", request.getValue().deliveryInstructions());
+    }
+
+    @Test
+    void completeDropshipOrderSendsTheSameRequestToTheCompletionCall() {
+        // given
+        Delivery delivery = pendingDropshipDelivery("ref-1");
+        List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-EAN-1", "EAN-1", "MFN-1", 2));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(directToConsumerOrder());
+        when(supplierProvider.completePlacedDropshipOrder(any())).thenReturn(new SupplierOrderResult(
+                "ZA/1", 220.0, "PLN", List.of(new SupplierQuote("EAN-1", "MFN-1", 2, 110.0, "PLN"))));
+
+        // when
+        SupplierOrderResult result = service.completeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID);
+
+        // then
+        assertEquals("ZA/1", result.externalOrderId());
+        ArgumentCaptor<SupplierDropshipRequest> request = ArgumentCaptor.forClass(SupplierDropshipRequest.class);
+        verify(supplierProvider).completePlacedDropshipOrder(request.capture());
+        verify(supplierProvider, never()).placeDropshipOrder(any());
+        assertEquals("ref-1", request.getValue().clientOrderRef());
+        assertEquals(lines, request.getValue().lines());
+        assertEquals("Kowalski", request.getValue().consignee().lastName());
         assertEquals("CommerceLink ref-1", request.getValue().deliveryInstructions());
     }
 

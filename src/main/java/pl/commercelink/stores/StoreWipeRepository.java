@@ -6,7 +6,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.notifications.StoreNotificationRecord;
+import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import pl.commercelink.orders.rma.RMA;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.scheduling.DailyScheduleExecutionCount;
+import pl.commercelink.shipping.ShipmentTracking;
 import pl.commercelink.templates.EmailTemplate;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
@@ -71,6 +76,36 @@ public class StoreWipeRepository {
         EmailTemplate key = new EmailTemplate();
         key.setStoreId(storeId);
         return query(EmailTemplate.class, key);
+    }
+
+    public List<ReceiptAttempt> findReceiptAttempts(String storeId) {
+        ReceiptAttempt key = new ReceiptAttempt();
+        key.setStoreId(storeId);
+        return query(ReceiptAttempt.class, key);
+    }
+
+    public List<StoreNotificationRecord> findStoreNotifications(String storeId) {
+        StoreNotificationRecord key = new StoreNotificationRecord();
+        key.setStoreId(storeId);
+        return query(StoreNotificationRecord.class, key);
+    }
+
+    public List<OwnedOrderFilters> findOrderFilters(String storeId) {
+        OwnedOrderFilters key = new OwnedOrderFilters();
+        key.setStoreId(storeId);
+        return query(OwnedOrderFilters.class, key);
+    }
+
+    public List<ShipmentTracking> findShipmentTrackings(String storeId) {
+        ShipmentTracking key = new ShipmentTracking();
+        key.setStoreId(storeId);
+        return query(ShipmentTracking.class, key);
+    }
+
+    public List<DailyScheduleExecutionCount> findScheduleExecutionCounts(String storeId) {
+        DailyScheduleExecutionCount key = new DailyScheduleExecutionCount();
+        key.setStoreId(storeId);
+        return query(DailyScheduleExecutionCount.class, key);
     }
 
     public void deleteAll(List<?> entities) {

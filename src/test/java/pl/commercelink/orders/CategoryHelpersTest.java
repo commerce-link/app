@@ -1,70 +1,55 @@
 package pl.commercelink.orders;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.fulfilment.FulfilmentSource;
+
+import java.util.function.BiFunction;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryHelpersTest {
 
-    @Test
-    void serviceFlagAloneMarksOrderItemAsService() {
-        // given
-        OrderItem item = orderItemWithCategory("Laptops");
-        item.setService(true);
-
-        // when / then
-        assertThat(item.isService()).isTrue();
+    /** Maps (category, service flag) to isService() of each class that carries the flag. */
+    static Stream<Arguments> serviceCarriers() {
+        BiFunction<String, Boolean, Boolean> orderItem = (category, service) -> {
+            OrderItem item = orderItemWithCategory(category);
+            item.setService(service);
+            return item.isService();
+        };
+        BiFunction<String, Boolean, Boolean> basketItem = (category, service) -> {
+            BasketItem item = basketItemWithCategory(category);
+            item.setService(service);
+            return item.isService();
+        };
+        BiFunction<String, Boolean, Boolean> fulfilmentSource = (category, service) -> {
+            FulfilmentSource source = new FulfilmentSource();
+            source.setCategory(category);
+            source.setService(service);
+            return source.isService();
+        };
+        return Stream.of(
+                Arguments.of("OrderItem", orderItem),
+                Arguments.of("BasketItem", basketItem),
+                Arguments.of("FulfilmentSource", fulfilmentSource));
     }
 
-    @Test
-    void legacyServicesCategoryStringAloneDoesNotMarkOrderItemAsService() {
-        // given
-        OrderItem item = orderItemWithCategory("Services");
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("serviceCarriers")
+    void serviceFlagAloneMarksItemAsService(String type, BiFunction<String, Boolean, Boolean> isService) {
         // when / then
-        assertThat(item.isService()).isFalse();
+        assertThat(isService.apply("Laptops", true)).isTrue();
     }
 
-    @Test
-    void serviceFlagAloneMarksBasketItemAsService() {
-        // given
-        BasketItem item = basketItemWithCategory("Laptops");
-        item.setService(true);
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("serviceCarriers")
+    void legacyServicesCategoryStringAloneDoesNotMarkItemAsService(String type, BiFunction<String, Boolean, Boolean> isService) {
         // when / then
-        assertThat(item.isService()).isTrue();
-    }
-
-    @Test
-    void legacyServicesCategoryStringAloneDoesNotMarkBasketItemAsService() {
-        // given
-        BasketItem item = basketItemWithCategory("Services");
-
-        // when / then
-        assertThat(item.isService()).isFalse();
-    }
-
-    @Test
-    void serviceFlagAloneMarksFulfilmentSourceAsService() {
-        // given
-        FulfilmentSource source = new FulfilmentSource();
-        source.setCategory("Laptops");
-        source.setService(true);
-
-        // when / then
-        assertThat(source.isService()).isTrue();
-    }
-
-    @Test
-    void legacyServicesCategoryStringAloneDoesNotMarkFulfilmentSourceAsService() {
-        // given
-        FulfilmentSource source = new FulfilmentSource();
-        source.setCategory("Services");
-
-        // when / then
-        assertThat(source.isService()).isFalse();
+        assertThat(isService.apply("Services", false)).isFalse();
     }
 
     @Test
@@ -130,13 +115,13 @@ class CategoryHelpersTest {
         assertThat(item.getCategory()).isEqualTo("Montaż");
     }
 
-    private OrderItem orderItemWithCategory(String category) {
+    private static OrderItem orderItemWithCategory(String category) {
         OrderItem item = new OrderItem();
         item.setCategory(category);
         return item;
     }
 
-    private BasketItem basketItemWithCategory(String category) {
+    private static BasketItem basketItemWithCategory(String category) {
         BasketItem item = new BasketItem();
         item.setCategory(category);
         return item;

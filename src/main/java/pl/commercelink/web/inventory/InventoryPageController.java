@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryStatistics;
 import pl.commercelink.inventory.search.InventorySearch;
+import pl.commercelink.inventory.search.InventorySearchResult;
+import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -30,6 +32,7 @@ public class InventoryPageController {
     static final String CONNECTION_URL_PREFIX = MANAGE_SUPPLIERS_URL + "/";
     static final String WAREHOUSE_URL = "/dashboard/warehouse";
     private static final String PAGE_PATH = "/dashboard/inventory";
+    static final String PRICES_PATH = PAGE_PATH + "/prices";
 
     private final Inventory inventory;
     private final InventorySearch inventorySearch;
@@ -37,16 +40,26 @@ public class InventoryPageController {
     private final InventorySourcesViewFactory sourcesViewFactory;
     private final WarehouseSummaryService warehouseSummaryService;
     private final TechnicalInventoryViewFactory technicalViewFactory;
+    private final ProductCategoryLineFactory productCategoryLines;
 
-    @GetMapping(PAGE_PATH)
-    public String page(@RequestParam(value = "q", required = false) String q, Model model) {
+    @GetMapping(PRICES_PATH)
+    public String page(@RequestParam(value = "q", required = false) String q,
+                       @RequestParam(value = "from", required = false) String from, Model model) {
         addCommonAttributes(model);
+        // Only the supplier assortment list is a place to go back to; anything else is dropped.
+        InventoryReturnTo.safe(from).ifPresent(target -> model.addAttribute("backToBrowse", target));
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!query.isEmpty()) {
             addSearchResult(query, model);
         }
-        return "inventory";
+        return "inventory-prices";
+    }
+
+    /** The address of the prices and availability page for a code, keeping the way back to a browse list when there is one. */
+    static String pricesHref(String query, String from) {
+        String href = PRICES_PATH + "?q=" + encode(normalize(query));
+        return from == null || from.isBlank() ? href : href + "&from=" + encode(from.strip());
     }
 
     @GetMapping(PAGE_PATH + "/summary")
@@ -94,15 +107,17 @@ public class InventoryPageController {
     @GetMapping(PAGE_PATH + "/check-price")
     public String legacyCheckPrice(@RequestParam(value = "mfn", required = false) String mfn,
                                    @RequestParam(value = "ean", required = false) String ean,
-                                   @RequestParam(value = "pimId", required = false) String pimId) {
+                                   @RequestParam(value = "pimId", required = false) String pimId,
+                                   @RequestParam(value = "from", required = false) String from) {
+        String back = InventoryReturnTo.safe(from).orElse(null);
         return Stream.of(pimId, mfn, ean)
                 .map(InventoryPageController::normalize)
                 .filter(value -> !value.isEmpty())
                 .findFirst()
                 // UriComponentsBuilder#encode() leaves '+' unencoded (decoded as a space) and turns "{x}" into
                 // a URI template variable that RedirectView then fails to resolve
-                .map(query -> "redirect:" + PAGE_PATH + "?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
-                .orElse("redirect:" + PAGE_PATH);
+                .map(query -> "redirect:" + pricesHref(query, back))
+                .orElse("redirect:" + PRICES_PATH + (back == null ? "" : "?from=" + encode(back)));
     }
 
     private boolean addSearchResult(String query, Model model) {
@@ -110,13 +125,22 @@ public class InventoryPageController {
             model.addAttribute("validationError", true);
             return false;
         }
-        model.addAttribute("result", isSuperAdmin()
+        InventorySearchResult result = isSuperAdmin()
                 ? inventorySearch.searchGlobal(query)
-                : inventorySearch.search(CustomSecurityContext.getStoreId(), query));
+                : inventorySearch.search(CustomSecurityContext.getStoreId(), query);
+        model.addAttribute("result", result);
+        ProductHeader header = switch (result) {
+            case InventorySearchResult.Found found -> found.product();
+            case InventorySearchResult.KnownWithoutOffers known -> known.product();
+            case null, default -> null;
+        };
+        if (header != null) {
+            productCategoryLines.build(header).ifPresent(line -> model.addAttribute("productCategory", line));
+        }
         return true;
     }
 
-    private void addCommonAttributes(Model model) {
+    static void addCommonAttributes(Model model) {
         model.addAttribute("superAdmin", isSuperAdmin());
         model.addAttribute("canManageSuppliers", CustomSecurityContext.hasRole("ADMIN"));
         model.addAttribute("manageSuppliersUrl", MANAGE_SUPPLIERS_URL);
@@ -130,5 +154,9 @@ public class InventoryPageController {
 
     private static String normalize(String value) {
         return value == null ? "" : value.strip();
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

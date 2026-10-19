@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The delivery's events, newest first (spec §9): three visible, the rest behind a node on the axis (timeline.js);
+       without JavaScript every event stays visible. Collapsed to its header on phones. */-->
+<section th:fragment="card" class="cl-card" id="historia" aria-labelledby="history-title" data-cl-collapse
+         th:with="h=${page.history()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="history-title" th:text="#{deliveries.details.history.title}"></h2></div>
+    <div class="cl-collapse-body" id="history-body">
+        <ol class="cl-timeline" id="history-events"
+            th:attr="data-cl-timeline-limit=${h.rest().isEmpty()} ? null : ${h.visible()}">
+            <li class="cl-timeline-item" th:each="e : ${h.events()}"><time th:text="${e.at()}"></time><p
+                    class="cl-timeline-title" th:text="#{${e.labelKey()}}"></p></li>
+        </ol>
+        <th:block th:if="${!h.rest().isEmpty()}">
+            <div class="cl-timeline-more" hidden data-cl-timeline-more
+                 th:attr="data-shown-text=#{deliveries.details.history.shown(${h.rest().size()})},
+                          data-hidden-text=#{deliveries.details.history.hidden(${h.rest().size()})}">
+                <button type="button" class="cl-link-button cl-timeline-node" aria-controls="history-events" aria-expanded="false"
+                        data-cl-timeline-toggle="expand"><span class="cl-timeline-node-dot" aria-hidden="true"></span><span
+                        th:text="#{deliveries.details.history.more(${h.rest().size()})}"></span></button>
+                <button type="button" class="cl-link-button cl-timeline-less" aria-controls="history-events" aria-expanded="true"
+                        data-cl-timeline-toggle="collapse" hidden th:text="#{deliveries.details.history.less}"></button>
+            </div>
+            <p class="cl-visually-hidden" role="status" data-cl-timeline-status></p>
+        </th:block>
+    </div>
+</section>
+</body>
+</html>

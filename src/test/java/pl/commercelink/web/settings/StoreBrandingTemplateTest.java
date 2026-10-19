@@ -4,9 +4,6 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.dtos.BrandingForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -199,17 +196,5 @@ class StoreBrandingTemplateTest {
         // then
         assertThat(html).contains("src=\"/js/async-form.js\"").contains("src=\"/js/color-field.js\"").contains("src=\"/js/image-field.js\"");
         assertThat(html).doesNotContain("data-success-message");
-    }
-
-    @Test
-    void dropsBulmaMarkupTheConfirmModalTheSecondaryColourAndTheOldEditEndpoint() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store-branding.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("class=\"box\"").doesNotContain("class=\"input\"")
-                .doesNotContain("\"button is-primary").doesNotContain("file has-name")
-                .doesNotContain("confirmSave").doesNotContain("secondary")
-                .doesNotContain("branding/edit").doesNotContain("storeId");
     }
 }

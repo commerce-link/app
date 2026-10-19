@@ -47,7 +47,7 @@ public enum OrderAttention {
 
     public abstract boolean matches(Order order, LocalDate today);
 
-    /** Not Completed and not Cancelled — the same definition as OrdersRepository.findAllActiveOrders. */
+    /** Neither Completed nor Cancelled. */
     public static boolean isOpen(Order order) {
         return order.getStatus() != null && !order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled);
     }

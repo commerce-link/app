@@ -2,6 +2,7 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.LinkedList;
@@ -24,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
@@ -36,6 +39,7 @@ public class MarketplaceOfferExportEventListener {
     private final Inventory inventory;
     private final MarketplaceProviderFactory providerFactory;
     private final MarketplaceExportRunService marketplaceExportRunService;
+    private final StoreActivity storeActivity;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -48,6 +52,12 @@ public class MarketplaceOfferExportEventListener {
     )
     public void handleMessage(MarketplaceOfferExportRequest payload) {
         Store store = storesRepository.findById(payload.getStoreId());
+        // an export reaching an inactive store would put back the offers its deactivation withdrew
+        if (!storeActivity.isActive(store)) {
+            log.warn("Marketplace {} offer export skipped for store {}: the store is inactive",
+                    payload.getMarketplace(), payload.getStoreId());
+            return;
+        }
         if (!store.hasActiveMarketplaceIntegration(payload.getMarketplace())) {
             return;
         }

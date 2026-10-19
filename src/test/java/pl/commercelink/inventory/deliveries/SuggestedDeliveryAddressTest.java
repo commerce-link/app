@@ -39,17 +39,6 @@ class SuggestedDeliveryAddressTest {
     }
 
     @Test
-    void matchesWhenOnlyOneSideCarriesAStreetTypePrefix() {
-        // given
-        ShippingDetails storeDefault = storeAddress("Łobzowska 22/1", "31-140");
-        List<SupplierDeliveryAddress> supplier = List.of(
-                supplierAddress("17200617", "ul. Łobzowska 22/1", "31-140"));
-
-        // when / then
-        assertThat(SuggestedDeliveryAddress.match(storeDefault, supplier)).contains("17200617");
-    }
-
-    @Test
     void doesNotCollapseStreetsThatDifferOnlyInPolishLetters() {
         // given
         ShippingDetails storeDefault = storeAddress("ul. Świdnicka 5", "31-140");

@@ -42,6 +42,7 @@ public class ClientShippingAddressChangeService {
 
     public boolean isEditable(Order order, Store store) {
         return store.isClientShippingAddressChangeEnabled()
+                && store.hasNotificationSender()
                 && store.supportsNotification(EmailNotificationType.CLIENT_VERIFICATION_CODE)
                 && store.supportsNotification(EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED)
                 && order.canChangeShippingAddress()

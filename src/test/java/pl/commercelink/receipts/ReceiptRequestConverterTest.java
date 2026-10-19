@@ -41,19 +41,6 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
-    void posOrderWithTheStoresEmailIsBlockedForTheCashRegisterReceipt() {
-        // given
-        Order order = posOrder(100.00);
-
-        // when
-        ReceiptConversion conversion = convertWithStoreEmail(order);
-
-        // then
-        assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
-        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
-    }
-
-    @Test
     void posOrderWithoutCustomerEmailIsBlockedEvenWhenTheProviderNeedsNoEmail() {
         // given
         provider.requiresEmail = false;
@@ -297,5 +284,24 @@ class ReceiptRequestConverterTest {
     void quantityIsCarriedAsDecimal() {
         assertThat(converted(b2cOrder(30.00), items(item("Kabel", 3, 10.00, 1.23))).lines().get(0).quantity())
                 .isEqualByComparingTo(new BigDecimal("3"));
+    }
+
+    @Test
+    void posSaleWithoutTheCustomersEmailIsReportedByTheSharedPredicate() {
+        // given
+        Order walkIn = posOrder(100.00);
+        Order withEmail = posOrder(100.00);
+        withEmail.getBillingDetails().setEmail("klient@example.com");
+        Order webStore = b2cOrder(100.00);
+        webStore.getBillingDetails().setEmail(null);
+        pl.commercelink.stores.Store store = withStoreEmail(new pl.commercelink.stores.Store());
+
+        // when / then: the page, the service and the converter ask the same question
+        assertThat(ReceiptRequestConverter.blocksPosWithoutCustomerEmail(walkIn, STORE_EMAIL)).isTrue();
+        assertThat(ReceiptRequestConverter.blocksPosWithoutCustomerEmail(walkIn, store)).isTrue();
+        assertThat(ReceiptRequestConverter.blocksPosWithoutCustomerEmail(withEmail, store)).isFalse();
+        assertThat(ReceiptRequestConverter.blocksPosWithoutCustomerEmail(webStore, store)).isFalse();
+        assertThat(blocked(walkIn, items(item("Mysz", 1, 100.00, 1.23))).reason())
+                .isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
     }
 }

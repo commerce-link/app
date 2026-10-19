@@ -1,0 +1,224 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<!--/* One item of an order: the "Edit" entry of the item menu, the item dialogs' page without JavaScript, and a read-only
+       view from the item name of a closed order. Field names are the OrderItem properties the controller binds. */-->
+<div layout:fragment="content">
+    <section class="cl-page" th:with="item=${orderItem}, fullEdit=${orderItem.isNew()}">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(|/dashboard/orders/${orderId}|, #{order.page.title(${shortId})},
+                    ${#strings.isEmpty(orderItem.name)} ? #{order.item.page.form} : ${orderItem.name}, ~{::itemLead},
+                    ${serialHistory == null or serialHistory.isEmpty()} ? null : ~{::itemHistory})}">
+                <th:block th:fragment="itemLead">
+                    <span th:if="${statusKey != null}" class="cl-status is-leading" th:classappend="${statusTone}" th:text="#{${statusKey}}"></span>
+                    <!--/* as the item's row in the items table: a supplier label, or a supplier delivery's short id with its link */-->
+                    <th:block th:if="${delivery != null}">
+                        <span th:if="${statusKey != null}" aria-hidden="true">·</span>
+                        <span th:text="${delivery.delivery() or deliveryHeld} ? #{order.item.page.lead.delivery} : #{order.item.page.lead.supplier}"></span>
+                        <a th:if="${delivery.href() != null}" th:href="@{${delivery.href()}}" th:text="${delivery.label()}"></a>
+                        <span th:unless="${delivery.href() != null}" th:text="${delivery.label()}"></span>
+                    </th:block>
+                </th:block>
+                <!--/* the history of the physical item, by its serial number: one link, or a menu of the item's serial
+                       numbers when it has several (qty > 1); a native details, so it opens without JavaScript too */-->
+                <th:block th:fragment="itemHistory">
+                    <a th:if="${serialHistory.size() == 1}" class="cl-button" id="item-history-link"
+                       th:href="@{${serialHistory[0].href()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-history"></i></span>
+                        <span th:text="#{item.history}"></span>
+                    </a>
+                    <details th:if="${serialHistory.size() > 1}" class="cl-menu" id="item-history-menu">
+                        <summary class="cl-button">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-history"></i></span>
+                            <span th:text="#{item.history}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list">
+                            <li th:each="h : ${serialHistory}">
+                                <a class="cl-menu-item" th:href="@{${h.href()}}"
+                                   th:text="#{order.item.page.history.serial(${h.serialNo()})}"></a>
+                            </li>
+                        </ul>
+                    </details>
+                </th:block>
+            </div>
+
+            <!--/* one 760 px column under the header, like the form itself, for the alerts and the closed view too */-->
+            <div class="cl-form">
+                <div th:if="${itemError != null}" class="cl-alert is-bad" id="item-error" tabindex="-1" role="alert" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-title" th:text="${itemError}"></p>
+                </div>
+
+                <!--/* A closed order: the item is only shown, as a description list instead of a form of disabled fields. */-->
+                <th:block th:if="${isCompletedOrder}">
+                    <div class="cl-alert is-info" role="status">
+                        <i class="fas fa-lock cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-title" th:text="#{order.item.page.closed}"></p>
+                    </div>
+                    <section class="cl-card" aria-labelledby="item-details-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="item-details-title" th:text="#{order.item.page.details}"></h2></div>
+                        <div class="cl-card-section">
+                            <dl class="cl-kv" id="item-details">
+                                <div><dt th:text="#{order.item.category}"></dt><dd th:text="${#strings.isEmpty(item.category)} ? '—' : ${item.category}"></dd></div>
+                                <div><dt th:text="#{product.service}"></dt><dd th:text="${item.service} ? #{order.settings.yes} : #{order.settings.no}"></dd></div>
+                                <div><dt th:text="#{order.item.sku}"></dt><dd th:text="${#strings.isEmpty(item.sku)} ? '—' : ${item.sku}"></dd></div>
+                                <div><dt th:text="#{general.ean}"></dt><dd th:text="${#strings.isEmpty(item.ean)} ? '—' : ${item.ean}"></dd></div>
+                                <div><dt th:text="#{general.manufacturer.code}"></dt><dd th:text="${#strings.isEmpty(item.manufacturerCode)} ? '—' : ${item.manufacturerCode}"></dd></div>
+                                <div><dt th:text="#{order.item.quantity}"></dt><dd class="is-numeric" th:text="${item.qty}"></dd></div>
+                                <div><dt th:text="#{order.item.form.price}"></dt>
+                                    <dd class="is-numeric" th:text="#{general.currency.amount(${#numbers.formatDecimal(item.price, 1, 'WHITESPACE', 2, 'COMMA')})}"></dd></div>
+                                <div><dt th:text="#{order.item.form.cost}"></dt>
+                                    <dd class="is-numeric" th:text="#{general.currency.amount(${#numbers.formatDecimal(item.cost, 1, 'WHITESPACE', 2, 'COMMA')})}"></dd></div>
+                                <div><dt th:text="#{order.item.form.tax}"></dt>
+                                    <dd class="is-numeric" th:text="#{order.item.page.tax.percent(${#numbers.formatDecimal((item.tax - 1) * 100, 1, 'NONE', 0, 'COMMA')})}"></dd></div>
+                                <div><dt th:text="${delivery != null and (delivery.delivery() or deliveryHeld)} ? #{order.item.page.delivery} : #{order.item.supplier}"></dt>
+                                    <dd th:if="${delivery == null}">—</dd>
+                                    <dd th:if="${delivery != null and delivery.href() != null}"><a th:href="@{${delivery.href()}}" th:text="${delivery.label()}"></a></dd>
+                                    <dd th:if="${delivery != null and delivery.href() == null}" th:text="${delivery.label()}"></dd></div>
+                                <div><dt th:text="#{order.item.serial.no}"></dt><dd th:text="${#strings.isEmpty(item.serialNo)} ? '—' : ${item.serialNo}"></dd></div>
+                                <div><dt th:text="#{order.item.consolidated}"></dt><dd th:text="${item.consolidated} ? #{order.settings.yes} : #{order.settings.no}"></dd></div>
+                                <div th:if="${!#strings.isEmpty(item.comment)}" class="cl-kv-wide"><dt th:text="#{order.item.comment}"></dt>
+                                    <dd class="cl-kv-text" th:text="${item.comment}"></dd></div>
+                            </dl>
+                        </div>
+                        <div class="cl-card-footer">
+                            <a class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{order.item.page.back}"></a>
+                        </div>
+                    </section>
+                </th:block>
+
+                <form th:unless="${isCompletedOrder}" id="order-item-form" method="post"
+                      th:action="@{/dashboard/orders/{orderId}/items/{itemId}/save(orderId=${orderId}, itemId=${orderItem.itemId})}">
+                    <div th:if="${!fullEdit}" class="cl-alert is-info" id="item-locked-note">
+                        <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-title" th:text="#{order.item.page.locked}"></p>
+                    </div>
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{order.item.page.section.product}"></legend>
+                            <div class="cl-form-grid">
+                                <div class="cl-span-6 cl-field">
+                                    <label class="cl-label" for="item-name" th:text="#{order.item.name}"></label>
+                                    <!--/* read-only, not disabled: the value is posted and the server checks it is unchanged */-->
+                                    <input class="cl-input" id="item-name" type="text" name="name" th:value="${item.name}" th:readonly="${saleLock != null}"
+                                           th:attr="aria-describedby=${saleLock != null} ? 'item-name-help' : null">
+                                    <p th:if="${saleLock != null}" class="cl-help" id="item-name-help" th:text="#{${saleLock.nameKey()}}"></p>
+                                </div>
+                                <div class="cl-span-3 cl-field">
+                                    <label class="cl-label" for="item-category" th:text="#{order.item.category}"></label>
+                                    <select class="cl-select" id="item-category" name="category">
+                                        <option th:if="${#strings.isEmpty(orderItem.category)}" value="" th:text="#{catalog.category.unset}"></option>
+                                        <option th:if="${!#strings.isEmpty(orderItem.category) && !categories.contains(orderItem.category)}"
+                                                th:value="${orderItem.category}" selected th:text="${orderItem.category}"></option>
+                                        <optgroup th:each="group : ${categoryGroups}" th:label="${group.catalog}">
+                                            <option th:each="category : ${group.names}" th:value="${category}" th:selected="${category == orderItem.category}" th:text="${category}"></option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div class="cl-span-3 cl-field">
+                                    <label class="cl-label" for="item-sku" th:text="#{order.item.sku}"></label>
+                                    <input class="cl-input" id="item-sku" type="text" autocomplete="off" name="sku" th:value="${item.sku}" th:disabled="${!fullEdit}">
+                                </div>
+                                <div class="cl-span-3 cl-field">
+                                    <label class="cl-label" for="item-ean" th:text="#{general.ean}"></label>
+                                    <input class="cl-input" id="item-ean" type="text" inputmode="numeric" autocomplete="off" name="ean" th:value="${item.ean}" th:disabled="${!fullEdit}">
+                                </div>
+                                <div class="cl-span-3 cl-field">
+                                    <label class="cl-label" for="item-mfn" th:text="#{general.manufacturer.code}"></label>
+                                    <input class="cl-input" id="item-mfn" type="text" autocomplete="off" name="manufacturerCode" th:value="${item.manufacturerCode}" th:disabled="${!fullEdit}">
+                                </div>
+                                <div class="cl-span-6 cl-check-field">
+                                    <label class="cl-check">
+                                        <input type="checkbox" id="item-service" name="service" value="true" th:checked="${item.service}" th:disabled="${serviceFlagLocked}"
+                                               aria-describedby="item-service-help">
+                                        <span th:text="#{product.service}"></span>
+                                    </label>
+                                    <p class="cl-check-description" id="item-service-help"
+                                       th:text="${serviceFlagLocked} ? #{order.item.form.service.locked} : #{order.item.form.service.help}"></p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!--/* the entry hint only where an amount can be typed: the price until a document locks it, the cost and
+                               the VAT multiplier while the item is new (the multiplier read-only under a sale lock) */-->
+                        <fieldset class="cl-fieldset" th:with="amountEditable=${!priceLocked or fullEdit}">
+                            <legend class="cl-fieldset-title" th:text="#{order.item.page.section.price}"></legend>
+                            <div class="cl-form-grid">
+                                <div class="cl-span-1 cl-field">
+                                    <label class="cl-label" for="item-qty" th:text="#{order.item.quantity}"></label>
+                                    <input class="cl-input" id="item-qty" type="text" inputmode="numeric" name="qty" th:value="${item.qty}" th:disabled="${!fullEdit}"
+                                           th:readonly="${fullEdit and saleLock != null}"
+                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help' : null">
+                                </div>
+                                <div class="cl-span-2 cl-field">
+                                    <label class="cl-label" for="item-price" th:text="#{order.item.form.price}"></label>
+                                    <input class="cl-input" id="item-price" type="text" name="price" th:value="${T(pl.commercelink.web.orders.Money).input(item.price)}" th:disabled="${priceLocked}"
+                                           th:attr="aria-describedby=${priceLocked} ? 'item-price-help' : null">
+                                    <p th:if="${priceLocked}" class="cl-help" id="item-price-help" th:text="#{${priceLockedKey != null ? priceLockedKey : 'order.item.form.price.locked'}}"></p>
+                                </div>
+                                <div class="cl-span-2 cl-field">
+                                    <label class="cl-label" for="item-cost" th:text="#{order.item.form.cost}"></label>
+                                    <input class="cl-input" id="item-cost" type="text" name="cost" th:value="${T(pl.commercelink.web.orders.Money).input(item.cost)}" th:disabled="${!fullEdit}">
+                                </div>
+                                <div class="cl-span-1 cl-field">
+                                    <label class="cl-label" for="item-tax" th:text="#{order.item.page.tax}"></label>
+                                    <input class="cl-input" id="item-tax" type="text" name="tax" th:value="${item.tax}" th:disabled="${!fullEdit}"
+                                           th:readonly="${fullEdit and saleLock != null}"
+                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help item-numbers-help' : (${amountEditable} ? 'item-numbers-help' : null)">
+                                </div>
+                            </div>
+                            <p th:if="${fullEdit and saleLock != null}" class="cl-help" id="item-sale-help" th:text="#{${saleLock.numbersKey()}}"></p>
+                            <p th:if="${amountEditable}" class="cl-help" id="item-numbers-help" th:text="#{order.item.page.numbers.help}"></p>
+                        </fieldset>
+
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{order.item.page.section.fulfilment}"></legend>
+                            <div class="cl-form-grid">
+                                <!--/* the assign-supplier dialog's field, posted as deliveryId; only a new item changes its supplier */-->
+                                <div th:if="${fullEdit and !deliveryHeld}" class="cl-span-6" th:with="supplierOptional=true, supplierFieldName='deliveryId'">
+                                    <div th:replace="~{fragments/supplier-choice :: clField('item-supplier', ${suppliers}, ${supplierCurrent}, ${supplierCustom})}"></div>
+                                </div>
+                                <!--/* a supplier delivery's id is kept as it is, never offered as a typed supplier name to overwrite */-->
+                                <div th:if="${fullEdit and deliveryHeld}" class="cl-span-6 cl-field" id="item-delivery">
+                                    <span class="cl-label" th:text="#{order.item.page.delivery}"></span>
+                                    <p class="cl-help">
+                                        <a th:if="${delivery != null and delivery.href() != null}" th:href="@{${delivery.href()}}" th:text="${delivery.label()}"></a>
+                                        <span th:if="${delivery != null and delivery.href() == null}" th:text="${delivery.label()}"></span>
+                                        <span th:text="#{order.item.page.delivery.kept}"></span>
+                                    </p>
+                                    <input type="hidden" name="deliveryId" th:value="${item.deliveryId}">
+                                </div>
+                                <div class="cl-span-3 cl-field">
+                                    <label class="cl-label" for="item-serial" th:text="#{order.item.serial.no}"></label>
+                                    <input class="cl-input" id="item-serial" type="text" autocomplete="off" name="serialNo" th:value="${item.serialNo}">
+                                </div>
+                                <div class="cl-span-3 cl-check-field">
+                                    <label class="cl-check">
+                                        <input type="checkbox" id="item-consolidated" name="consolidated" value="true" th:checked="${item.consolidated}" th:disabled="${consolidationLocked}"
+                                               th:attr="aria-describedby=${consolidationLocked} ? 'item-consolidated-help' : null">
+                                        <span th:text="#{order.item.consolidated}"></span>
+                                    </label>
+                                    <p th:if="${consolidationLocked}" class="cl-check-description" id="item-consolidated-help"
+                                       th:text="#{${consolidationLockedKey != null ? consolidationLockedKey : 'order.item.consolidation.locked'}}"></p>
+                                </div>
+                                <div class="cl-span-6 cl-field">
+                                    <label class="cl-label" for="item-comment"><span th:text="#{order.item.comment}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                                    <textarea class="cl-input cl-textarea" id="item-comment" rows="3" name="comment" th:text="${item.comment}"></textarea>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="cl-card-footer">
+                            <button class="cl-button is-primary" type="submit" th:text="#{order.item.form.save}"></button>
+                            <a class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{general.cancel}"></a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+    <script th:src="@{/js/supplier-choice.js}" defer></script>
+</div>
+</body>
+</html>

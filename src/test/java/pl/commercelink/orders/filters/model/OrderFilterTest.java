@@ -3,6 +3,7 @@ package pl.commercelink.orders.filters.model;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
@@ -151,6 +152,34 @@ class OrderFilterTest {
 
             assertThat(late.matches(overdue, TODAY)).isTrue();
             assertThat(late.matches(dueToday, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("a company order is one whose billing details carry a tax id")
+        void customerTypeIsDecidedByTheTaxId() {
+            Order company = order();
+            BillingDetails companyBilling = new BillingDetails();
+            companyBilling.setTaxId("5252344078");
+            company.setBillingDetails(companyBilling);
+            Order consumer = order();
+            consumer.setBillingDetails(new BillingDetails());
+            Order withoutBilling = order();
+
+            OrderFilter b2b = filter(condition(OrderFilterField.CustomerType, "B2B"));
+            OrderFilter b2c = filter(condition(OrderFilterField.CustomerType, "b2c"));
+
+            assertThat(b2b.matches(company, TODAY)).isTrue();
+            assertThat(b2b.matches(consumer, TODAY)).isFalse();
+            assertThat(b2b.matches(withoutBilling, TODAY)).isFalse();
+            assertThat(b2c.matches(company, TODAY)).isFalse();
+            assertThat(b2c.matches(consumer, TODAY)).isTrue();
+            assertThat(b2c.matches(withoutBilling, TODAY)).isTrue();
+        }
+
+        @Test
+        @DisplayName("an unknown customer type matches nothing")
+        void unknownCustomerTypeMatchesNothing() {
+            assertThat(filter(condition(OrderFilterField.CustomerType, "B2G")).matches(order(), TODAY)).isFalse();
         }
 
         @Test

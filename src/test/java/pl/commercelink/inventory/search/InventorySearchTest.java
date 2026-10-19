@@ -127,7 +127,7 @@ class InventorySearchTest {
     }
 
     private WarehouseItemView warehouseItem(double netCost, int qty, FulfilmentStatus status, ItemCondition condition) {
-        return new WarehouseItemView(STORE_ID, "item-" + qty, EAN, MFN, Price.fromNet(netCost), qty, status, condition);
+        return new WarehouseItemView(STORE_ID, "item-" + qty, "Test item", EAN, MFN, Price.fromNet(netCost), qty, status, condition);
     }
 
     @Test

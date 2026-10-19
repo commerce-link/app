@@ -1,0 +1,13 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* A document number ("PZ/MAG-uma2dqukxr/2026/000214") with a break opportunity after every "/": a narrow column wraps it
+       between segments, never inside the sequence digits. <wbr> adds no character, so copying gives the plain number.
+       Text without "/" renders as it is; null renders nothing. */-->
+<th:block th:fragment="parts(number)"><th:block th:if="${number != null}"><th:block
+        th:each="part, s : ${number.split('/', -1)}"><th:block th:text="${part}"></th:block><th:block
+        th:unless="${s.last}">/<wbr></th:block></th:block></th:block></th:block>
+
+</body>
+</html>

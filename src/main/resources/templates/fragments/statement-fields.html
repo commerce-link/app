@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* A column of the statement format: the header text typed or picked from the sample's headers (datalist
+       statement-headers, empty without a sample). help is already resolved, or null. */-->
+<div th:fragment="columnField(name, labelKey, value, required, errorKey, help)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
+    </label>
+    <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'" type="text" autocomplete="off"
+           list="statement-headers" th:id="${name}" th:name="${name}" th:value="${value}"
+           th:attr="aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
+    <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+</body>
+</html>

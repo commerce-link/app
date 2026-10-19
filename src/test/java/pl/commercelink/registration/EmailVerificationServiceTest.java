@@ -3,6 +3,9 @@ package pl.commercelink.registration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,37 +59,27 @@ class EmailVerificationServiceTest {
                 new OAuth2AuthenticationToken(user, user.getAuthorities(), "cognito"));
     }
 
-    @Test
-    void treatsUserWithVerifiedClaimAsVerified() {
-        // given
-        loggedIn(Boolean.TRUE);
+    private static final Object ANONYMOUS = new Object();
 
-        // when / then
-        assertTrue(service().isVerified(request));
+    static Stream<Arguments> emailVerifiedClaims() {
+        return Stream.of(
+                Arguments.of("verified claim", Boolean.TRUE, true),
+                Arguments.of("unverified claim", Boolean.FALSE, false),
+                // a user without the claim is not locked out
+                Arguments.of("missing claim", null, true),
+                Arguments.of("anonymous request", ANONYMOUS, true));
     }
 
-    @Test
-    void treatsUserWithUnverifiedClaimAsUnverified() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("emailVerifiedClaims")
+    void isVerifiedFollowsTheEmailVerifiedClaim(String scenario, Object claim, boolean expected) {
         // given
-        loggedIn(Boolean.FALSE);
+        if (claim != ANONYMOUS) {
+            loggedIn(claim);
+        }
 
         // when / then
-        assertFalse(service().isVerified(request));
-    }
-
-    @Test
-    void treatsMissingClaimAsVerifiedToAvoidLockingUsersOut() {
-        // given
-        loggedIn(null);
-
-        // when / then
-        assertTrue(service().isVerified(request));
-    }
-
-    @Test
-    void treatsAnonymousRequestAsVerified() {
-        // when / then
-        assertTrue(service().isVerified(request));
+        assertEquals(expected, service().isVerified(request));
     }
 
     @Test
@@ -96,7 +90,7 @@ class EmailVerificationServiceTest {
                 ArgumentCaptor.forClass(GetUserAttributeVerificationCodeRequest.class);
 
         // when
-        service().sendCode();
+        service().sendCode(request);
 
         // then
         verify(cognitoClient).getUserAttributeVerificationCode(captor.capture());
@@ -105,14 +99,53 @@ class EmailVerificationServiceTest {
     }
 
     @Test
-    void swallowsSendFailureWhenSendingQuietly() {
+    void codeSentOnRequestCountsAsTheCodeOfTheSession() {
         // given
         loggedIn(Boolean.FALSE);
-        when(cognitoClient.getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class)))
-                .thenThrow(new RuntimeException("cognito down"));
+        EmailVerificationService service = service();
+        service.sendCode(request);
 
-        // when / then
-        assertDoesNotThrow(() -> service().sendCodeQuietly("user@example.com"));
+        // when
+        boolean sent = service.sendCodeOnce(request);
+
+        // then
+        assertTrue(sent);
+        verify(cognitoClient, times(1)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
+    }
+
+    @Test
+    void sendsCodeOnlyOncePerSession() {
+        // given
+        loggedIn(Boolean.FALSE);
+        EmailVerificationService service = service();
+
+        // when
+        boolean first = service.sendCodeOnce(request);
+        boolean second = service.sendCodeOnce(request);
+
+        // then
+        assertTrue(first);
+        assertTrue(second);
+        verify(cognitoClient, times(1)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
+    }
+
+    @Test
+    void sendsCodeAgainAfterFailedSend() {
+        // given
+        loggedIn(Boolean.FALSE);
+        EmailVerificationService service = service();
+        when(cognitoClient.getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class)))
+                .thenThrow(new RuntimeException("cognito down"))
+                .thenReturn(null);
+
+        // when
+        boolean failed = service.sendCodeOnce(request);
+        boolean retried = service.sendCodeOnce(request);
+
+        // then
+        assertFalse(failed);
+        assertTrue(retried);
+        verify(cognitoClient, times(2)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
     }
 
     @Test

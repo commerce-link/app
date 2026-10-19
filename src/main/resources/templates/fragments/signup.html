@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The brand of the app frame (fragments/navigation :: sidebar), outside the frame. */-->
+<p th:fragment="brand" class="cl-auth-brand">
+    <span class="cl-brand-mark" aria-hidden="true">CL</span>
+    <span class="cl-brand-name">CommerceLink</span>
+</p>
+
+<!--/* "Masz już konto? Zaloguj się" in the top row of a registration step. */-->
+<p th:fragment="signIn" class="cl-signup-link">
+    <span th:text="#{registration.sign-in.prompt}"></span>
+    <a href="/login" th:text="#{registration.sign-in.link}"></a>
+</p>
+
+<!--/* The panel next to the registration form: what the app does and a fragment of the orders list with example data.
+       The list reuses the labels of the real list (tiles, columns, statuses, due dates), so it reads like the app in
+       both languages; the figure is hidden from screen readers, the text above it says the same. */-->
+<aside th:fragment="panel" class="cl-signup-panel" th:attr="aria-label=#{signup.panel.label}">
+    <div class="cl-signup-panel-text">
+        <p class="cl-signup-panel-title" th:text="#{signup.panel.title}"></p>
+        <ul class="cl-signup-points">
+            <li><span class="cl-signup-points-icon" aria-hidden="true"><i class="fas fa-shopping-cart"></i></span><span th:text="#{signup.panel.orders}"></span></li>
+            <li><span class="cl-signup-points-icon" aria-hidden="true"><i class="fas fa-boxes"></i></span><span th:text="#{signup.panel.catalog}"></span></li>
+            <li><span class="cl-signup-points-icon" aria-hidden="true"><i class="fas fa-truck"></i></span><span th:text="#{signup.panel.fulfilment}"></span></li>
+            <li><span class="cl-signup-points-icon" aria-hidden="true"><i class="fas fa-plug"></i></span><span th:text="#{signup.panel.integrations}"></span></li>
+        </ul>
+    </div>
+    <figure class="cl-showcase" aria-hidden="true">
+        <div class="cl-showcase-head">
+            <span class="cl-showcase-crumbs"><span th:text="#{nav.group.sales}"></span> / <strong th:text="#{orders.list.title}"></strong></span>
+            <span class="cl-showcase-tag" th:text="#{signup.showcase.example}"></span>
+        </div>
+        <div class="cl-showcase-body">
+            <ul class="cl-showcase-stats">
+                <li class="cl-stat"><span class="cl-eyebrow" th:text="#{orders.list.attention.overdue}"></span><span class="cl-stat-value">2</span></li>
+                <li class="cl-stat"><span class="cl-eyebrow" th:text="#{orders.list.attention.today}"></span><span class="cl-stat-value">6</span></li>
+                <li class="cl-stat"><span class="cl-eyebrow" th:text="#{orders.list.attention.unpaid}"></span><span class="cl-stat-value">3</span></li>
+                <li class="cl-stat"><span class="cl-eyebrow" th:text="#{orders.list.attention.newToday}"></span><span class="cl-stat-value">14</span></li>
+            </ul>
+            <table class="cl-showcase-table">
+                <thead>
+                <tr>
+                    <th th:text="#{orders.list.column.order}"></th>
+                    <th class="is-wide-only" th:text="#{orders.list.column.due}"></th>
+                    <th th:text="#{orders.list.column.status}"></th>
+                    <th class="is-num" th:text="#{orders.list.column.amount}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td><span class="cl-showcase-key">8f3a21c4</span><span class="cl-showcase-sub" th:text="'Allegro · ' + #{orders.list.source.external('5749921406')}"></span></td>
+                    <td class="is-wide-only">12.10<span class="cl-showcase-sub is-bad" th:text="#{orders.list.due.overdue.one}"></span></td>
+                    <td><span class="cl-status is-neutral" th:text="#{OrderStatus.Realization}"></span></td>
+                    <td class="is-num">349,00 PLN</td>
+                </tr>
+                <tr>
+                    <td><span class="cl-showcase-key">b72e90d1</span><span class="cl-showcase-sub" th:text="#{order.source.WebStore}"></span></td>
+                    <td class="is-wide-only">13.10<span class="cl-showcase-sub is-warn" th:text="#{orders.list.due.today}"></span></td>
+                    <td><span class="cl-status is-info" th:text="#{OrderStatus.New}"></span></td>
+                    <td class="is-num">1 099,00 PLN<span class="cl-showcase-sub is-warn is-wide-only" th:text="#{orders.list.unpaid('1 099,00 PLN')}"></span></td>
+                </tr>
+                <tr>
+                    <td><span class="cl-showcase-key">4c1d7e55</span><span class="cl-showcase-sub" th:text="'Empik · ' + #{orders.list.source.external('7012973720')}"></span></td>
+                    <td class="is-wide-only">13.10<span class="cl-showcase-sub is-warn" th:text="#{orders.list.due.today}"></span></td>
+                    <td><span class="cl-status is-info" th:text="#{OrderStatus.Shipping}"></span></td>
+                    <td class="is-num">289,00 PLN</td>
+                </tr>
+                <tr>
+                    <td><span class="cl-showcase-key">e90b3f12</span><span class="cl-showcase-sub" th:text="'Ceneo · ' + #{orders.list.source.external('3381045')}"></span></td>
+                    <td class="is-wide-only">14.10</td>
+                    <td><span class="cl-status is-ok" th:text="#{OrderStatus.Delivered}"></span></td>
+                    <td class="is-num">129,00 PLN</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </figure>
+</aside>
+
+</body>
+</html>

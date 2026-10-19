@@ -1,0 +1,153 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Payments (spec §8): the settlement pill, what is owed and when, one row per payment with its own dialog. "Dodaj
+       wpłatę" is the shared dialog (fragments/add-payment-modal); the actions are the store admin's only. */-->
+<section th:fragment="card" class="cl-card" id="platnosci" aria-labelledby="payments-title" th:with="pay=${page.payments()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="payments-title"><span th:text="#{deliveries.details.payments.title}"></span>
+            <span class="cl-status" th:classappend="${pay.pillTone()}"
+                  th:text="${pay.pillAmount() != null} ? #{${pay.pillKey()}(${#messages.msg('general.currency.amount', pay.pillAmount())})} : #{${pay.pillKey()}}"></span></h2>
+        <div th:if="${pay.editable()}" class="cl-card-actions">
+            <button type="button" class="cl-button" data-cl-dialog-open="addPaymentModal" data-mode="delivery">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{deliveries.details.payments.add}"></span>
+            </button>
+        </div>
+    </div>
+    <!--/* "Do zapłaty" and "Pozostało" are null while the VAT is unset (Task 7 ruling): a dash, not "null PLN" */-->
+    <dl class="cl-kv cl-card-inset">
+        <div><dt th:text="#{deliveries.details.payments.toPay}"></dt><dd class="is-numeric" th:text="${pay.toPay() != null} ? #{general.currency.amount(${pay.toPay()})} : '—'"></dd></div>
+        <div><dt th:text="#{deliveries.details.payments.paidAmount}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${pay.paid()})}"></dd></div>
+        <div><dt th:text="#{deliveries.details.payments.remaining}"></dt><dd class="is-numeric"
+                th:classappend="${pay.remainingDue()} ? 'is-bad' : ''" th:text="${pay.remaining() != null} ? #{general.currency.amount(${pay.remaining()})} : '—'"></dd></div>
+        <div><dt th:text="#{deliveries.details.payments.due}"></dt><dd
+                th:text="${pay.dueDate() != null} ? #{deliveries.details.payments.due.value(${pay.dueDate()}, ${pay.paymentTerms()})} : '—'"></dd></div>
+    </dl>
+    <ul th:if="${!pay.rows().isEmpty()}" class="cl-list">
+        <li class="cl-list-item" th:each="p : ${pay.rows()}">
+            <div>
+                <p class="cl-list-title">
+                    <span th:if="${p.pending()}" th:text="#{deliveries.details.payments.pending}"></span>
+                    <span th:unless="${p.pending()}" th:text="#{general.currency.amount(${p.amount()})}"></span>
+                    <span th:if="${p.sourceKey() != null}" th:text="'· ' + #{${p.sourceKey()}}"></span>
+                    <span th:if="${p.refund()}" class="cl-status is-warn" th:text="#{deliveries.details.payments.refund}"></span>
+                </p>
+                <p th:if="${!p.details().isEmpty()}" class="cl-list-desc"><th:block th:each="d, s : ${p.details()}"><th:block
+                        th:unless="${s.first}"> · </th:block><span th:text="${d.text() != null} ? ${d.text()}
+                        : (${d.amount()} ? #{${d.key()}(${#messages.msg('general.currency.amount', d.arg())})} : #{${d.key()}(${d.arg()})})"></span><span
+                        th:if="${d.dateArg() != null}" th:text="' ' + #{deliveries.details.payments.operationDate(${d.dateArg()})}"></span></th:block></p>
+            </div>
+            <div th:if="${p.editHref() != null}" class="cl-list-actions">
+                <a class="cl-link-button" th:href="@{${p.editHref()}}"
+                   th:attr="data-cl-dialog-open=${p.dialogId()}, aria-label=#{deliveries.details.payments.edit.for(${p.number()})}"
+                   th:text="#{general.edit}"></a>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${pay.rows().isEmpty()}" class="cl-list-empty" th:text="#{deliveries.details.payments.empty}"></p>
+</section>
+
+<!--/* The shared add dialog and one edit dialog per payment, only where the store admin may change them; the guard sits
+       on its own th:block because a th:if beside th:replace would render the dialog for everybody. */-->
+<th:block th:fragment="dialogs" th:with="pay=${page.payments()}">
+    <th:block th:if="${pay.editable()}">
+        <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
+                formAction=@{${page.links().addPayment()}},
+                expectedAmount=${pay.expected()},
+                pendingPayment=${pay.pending()},
+                paymentSources=${pay.sources()},
+                loadMoneyJs=true)}"></div>
+        <th:block th:each="p : ${pay.rows()}"><dialog th:replace="~{deliveries/details/payments :: paymentDialog(${p})}"></dialog></th:block>
+    </th:block>
+</th:block>
+
+<!--/* One payment: updatePayments replaces the whole list, so the edit form carries the other payments hidden under
+       their own indexes, and "Usuń wpłatę" posts a second form with the others only, renumbered from 0. */-->
+<dialog th:fragment="paymentDialog(p)" class="cl-dialog is-form" th:id="${p.dialogId()}"
+        th:with="pay=${page.payments()}, own=${page.payments().fields().get(p.index())}, id=${p.dialogId()}"
+        th:attr="aria-labelledby=|${p.dialogId()}-title|, open=${page.openDialog() == 'payment-' + p.index()} ? 'open' : null">
+    <form method="post" th:action="@{${page.links().updatePayments()}}">
+        <h2 class="cl-dialog-title" th:id="|${id}-title|" th:text="#{deliveries.details.payment.title(${p.number()}, ${page.shortId()})}"></h2>
+        <div class="cl-dialog-body">
+            <th:block th:each="other, s : ${pay.fields()}">
+                <th:block th:if="${s.index != p.index()}"><th:block th:replace="~{deliveries/details/payments :: hiddenPayment(${other}, ${s.index})}"></th:block></th:block>
+            </th:block>
+            <input type="hidden" th:name="|payments[${p.index()}].direction|" th:value="${own.direction()}">
+            <div class="cl-form-grid cl-card-grid">
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-amount|" th:text="#{order.payment.bank.amount}"></label>
+                    <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" th:id="|${id}-amount|"
+                           th:name="|payments[${p.index()}].amount|" th:value="${own.amount()}">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-fee|"><span th:text="#{order.payment.processing.fee}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" th:id="|${id}-fee|"
+                           th:name="|payments[${p.index()}].fee|" th:value="${own.fee()}">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-source|" th:text="#{order.payment.source}"></label>
+                    <select class="cl-select" th:id="|${id}-source|" th:name="|payments[${p.index()}].source|">
+                        <option th:each="src : ${pay.sources()}" th:value="${src.value().name()}"
+                                th:selected="${src.value().name() == own.source()}" th:text="#{${src.labelKey()}}"></option>
+                    </select>
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-name|"><span th:text="#{payments.source.name}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="text" autocomplete="off" th:id="|${id}-name|"
+                           th:name="|payments[${p.index()}].name|" th:value="${own.name()}">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-reference|"><span th:text="#{order.payment.reference.no}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="text" autocomplete="off" th:id="|${id}-reference|"
+                           th:name="|payments[${p.index()}].referenceNo|" th:value="${own.referenceNo()}">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-operation|"><span th:text="#{order.payment.bank.transaction.no}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="text" autocomplete="off" th:id="|${id}-operation|"
+                           th:name="|payments[${p.index()}].bankTransactionNo|" th:value="${own.bankTransactionNo()}">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" th:for="|${id}-date|"><span th:text="#{order.payment.bank.transaction.date}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="date" th:id="|${id}-date|"
+                           th:name="|payments[${p.index()}].bankTransactionDate|" th:value="${own.bankTransactionDate()}">
+                </div>
+            </div>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{deliveries.details.payment.submit}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            <button type="submit" class="cl-link-button is-danger cl-dialog-actions-end" data-cl-remove-payment
+                    th:attr="form=|${id}-remove|,
+                             data-cl-select-confirm-title=#{deliveries.details.payment.remove.title(${p.number()})},
+                             data-cl-select-confirm-message=#{deliveries.details.payment.remove.message},
+                             data-cl-select-confirm-action=#{deliveries.details.payment.remove}"
+                    th:text="#{deliveries.details.payment.remove}"></button>
+        </div>
+    </form>
+    <form th:id="|${id}-remove|" method="post" th:action="@{${page.links().updatePayments()}}">
+        <th:block th:each="other, s : ${pay.fields()}">
+            <th:block th:if="${s.index != p.index()}"><th:block th:replace="~{deliveries/details/payments :: hiddenPayment(${other}, ${s.index < p.index() ? s.index : s.index - 1})}"></th:block></th:block>
+        </th:block>
+    </form>
+</dialog>
+
+<!--/* One payment as hidden fields under the given index: the edit form keeps the others at their own indexes, the
+       remove form renumbers them from 0 (Spring fills index gaps with empty payments). */-->
+<th:block th:fragment="hiddenPayment(other, k)">
+    <input type="hidden" th:name="|payments[${k}].source|" th:value="${other.source()}">
+    <input type="hidden" th:name="|payments[${k}].direction|" th:value="${other.direction()}">
+    <input type="hidden" th:name="|payments[${k}].name|" th:value="${other.name()}">
+    <input type="hidden" th:name="|payments[${k}].amount|" th:value="${other.amount()}">
+    <input type="hidden" th:name="|payments[${k}].fee|" th:value="${other.fee()}">
+    <input type="hidden" th:name="|payments[${k}].referenceNo|" th:value="${other.referenceNo()}">
+    <input type="hidden" th:name="|payments[${k}].bankTransactionNo|" th:value="${other.bankTransactionNo()}">
+    <input type="hidden" th:name="|payments[${k}].bankTransactionDate|" th:value="${other.bankTransactionDate()}">
+</th:block>
+</body>
+</html>

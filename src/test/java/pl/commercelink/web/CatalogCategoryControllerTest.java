@@ -21,6 +21,7 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
@@ -31,7 +32,6 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
-import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.products.filters.InventoryFilterType;
@@ -82,6 +82,8 @@ class CatalogCategoryControllerTest {
     private static final String BRAND_LINE_KEY = "catalog.filter.brandLines.line";
 
     @Mock
+    private CatalogPlacement catalogPlacement;
+    @Mock
     private CatalogAccess access;
     @Mock
     private CategoryDefinitions definitions;
@@ -93,8 +95,6 @@ class CatalogCategoryControllerTest {
     private PimCategoryOptions pimCategoryOptions;
     @Mock
     private MarketplaceConnections marketplaces;
-    @Mock
-    private ProductRecommendationEngine recommendationEngine;
     @Mock
     private Inventory inventory;
     @Mock
@@ -120,7 +120,7 @@ class CatalogCategoryControllerTest {
         lenient().when(productRepository.findAll(any(String.class))).thenReturn(List.of());
         lenient().when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, definitions, productRepository,
-                storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource)).build();
     }
 
     @AfterEach
@@ -631,32 +631,29 @@ class CatalogCategoryControllerTest {
                 .andExpect(view().name("catalog/category-filters"))
                 .andExpect(model().attribute("formAction", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
                 .andExpect(model().attribute("backHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
-                .andExpect(model().attribute("matchingProducts", 0))
-                .andExpect(model().attribute("productsAddHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/products/add"))
                 .andExpect(model().attributeDoesNotExist("lead"))
                 .andReturn();
 
         // then
         RecommendationFiltersForm form = (RecommendationFiltersForm) result.getModelAndView().getModel().get("form");
         assertThat(form.getFilters()).extracting(RecommendationFiltersForm.FilterForm::getValues).containsExactly("MSI, ASUS");
-        // a category without PIM categories has nothing to count, so the inventory is not read at all
         verify(inventory, never()).withEnabledSuppliersOnly(any());
     }
 
-    /** The count in the lead is a pass over the inventory; an inventory that cannot answer must not take the page down. */
+    /** The page counts nothing: opening it never reads the inventory, even for a category mapped to PIM categories. */
     @Test
-    void theFiltersPageOpensWhenTheRecommendationsCannotBeCounted() throws Exception {
+    void theFiltersPageDoesNotReadTheInventory() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
         gpu.setPimCategoryIds(List.of("pim-1"));
-        InventoryView view = mock(InventoryView.class);
-        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
-        when(recommendationEngine.getRecommendations(gpu, view)).thenThrow(new IllegalStateException("PIM is down"));
 
-        // when / then
+        // when
         mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
                 .andExpect(status().isOk())
                 .andExpect(model().attributeDoesNotExist("matchingProducts"));
+
+        // then
+        verify(inventory, never()).withEnabledSuppliersOnly(any());
     }
 
     @Test
@@ -1003,9 +1000,10 @@ class CatalogCategoryControllerTest {
      * the service's exception has to leave the executor as itself for the controller to answer it.
      */
     private MockMvc overTheRealExecutor(ProductCatalogRepository catalogs) {
-        CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create());
+        CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create(),
+                catalogPlacement);
         return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
-                storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, inventory, messageSource)).build();
     }
 
     @Test

@@ -138,7 +138,7 @@ public class InvoicingService {
 
         orderLifecycleEventPublisher.publish(saved, OrderLifecycleEventType.InvoiceCreated);
         // this save bypasses the order lifecycle, so the receipts hear about the new closing document here
-        receiptTrigger.settleDeadAttemptAlerts(saved);
+        receiptTrigger.reconcileDeadAttemptAlerts(saved);
 
         return op;
     }

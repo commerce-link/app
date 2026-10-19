@@ -32,6 +32,7 @@ class OrderFilterFormTest {
         form.setStatus(List.of("New", "Blocked"));
         form.setSourceName(List.of("Allegro", "Ceneo"));
         form.setShippingDue("DueToday");
+        form.setCustomerType("B2B");
 
         // when
         List<OrderFilterCondition> conditions = form.toConditions();
@@ -42,7 +43,8 @@ class OrderFilterFormTest {
                 OrderFilterCondition.of(OrderFilterField.Status, "Blocked"),
                 OrderFilterCondition.of(OrderFilterField.ShippingDue, "DueToday"),
                 OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro"),
-                OrderFilterCondition.of(OrderFilterField.SourceName, "Ceneo"));
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Ceneo"),
+                OrderFilterCondition.of(OrderFilterField.CustomerType, "B2B"));
     }
 
     @Test

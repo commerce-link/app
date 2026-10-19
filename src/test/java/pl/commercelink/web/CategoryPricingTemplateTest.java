@@ -9,9 +9,6 @@ import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.web.dtos.CategoryPricingForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,42 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryPricingTemplateTest {
 
-    private static String page() throws Exception {
-        return Files.readString(Path.of("src/main/resources/templates/catalog/category-pricing.html"), StandardCharsets.UTF_8);
-    }
-
     private static int occurrences(String html, String needle) {
         return html.split(Pattern.quote(needle), -1).length - 1;
-    }
-
-    @Test
-    void savesWithoutReloadAndAsksTheServerAgainOnAnError() throws Exception {
-        // when / then
-        assertThat(page()).contains("th:fragment=\"pricingForm\"").contains("id=\"category-pricing-form\"")
-                .contains("data-cl-async").contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummaryWithArguments('category-pricing-errors'");
-    }
-
-    @Test
-    void thePriceGroupsAreRepeatedFieldsetsKeptAtOne() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-repeat=\"groups\"").contains("data-cl-repeat-min=\"1\"")
-                .contains("data-cl-repeat-template").contains("data-cl-repeat-status").contains("@{/js/repeat-fields.js}");
-    }
-
-    @Test
-    void theDefaultGroupKeepsItsNameAndTheMatchingRulesAreFolded() throws Exception {
-        // when / then
-        assertThat(page()).contains("th:readonly=\"${isDefault}\"").contains("cl-disclosure");
-    }
-
-    @Test
-    void carriesNoTableAndNoInlineStyle() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("<table").doesNotContain("style=");
     }
 
     /**

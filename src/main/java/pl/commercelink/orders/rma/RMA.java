@@ -69,12 +69,21 @@ public class RMA {
     @Getter
     @Setter
     private MarketplaceReturnStatus externalReturnStatus;
+    /** The package template the customer chose for the return: the operator books a failed return again with it. */
+    @DynamoDBAttribute(attributeName = "returnPackageTemplateId")
+    @Getter
+    @Setter
+    private String returnPackageTemplateId;
     @DynamoDBAttribute(attributeName = "marketplaceDecisions")
     @Getter
     @Setter
     private List<MarketplaceDecision> marketplaceDecisions = new LinkedList<>();
     @DynamoDBVersionAttribute
     private Long version;
+    // Sort key of StoreIdRmaListSortKeyIndex, recomputed from the RMA on every save (RmaListSortKey); the mapper reads it
+    // through the getter, so no write path can leave it behind the status.
+    @DynamoDBAttribute(attributeName = "rmaListSortKey")
+    private String rmaListSortKey;
 
     @DynamoDBIgnore
     private List<RMAItem> draftRmaItems = new LinkedList<>();
@@ -309,5 +318,13 @@ public class RMA {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    public String getRmaListSortKey() {
+        return RmaListSortKey.of(this);
+    }
+
+    public void setRmaListSortKey(String rmaListSortKey) {
+        this.rmaListSortKey = rmaListSortKey;
     }
 }

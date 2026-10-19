@@ -72,7 +72,10 @@ class OrderNotificationsService {
             }
         }
 
-        if (qualifiesForNotification(order, OrderStatus.Realization, EmailNotificationType.ORDER_REALIZATION)) {
+        // an order stepped back from Shipping by the operator (OrderRealizationStepBack) was already announced as sent:
+        // "in realization" would tell the customer the opposite
+        if (qualifiesForNotification(order, OrderStatus.Realization, EmailNotificationType.ORDER_REALIZATION)
+                && !orderEventsRepository.hasEvent(order.getOrderId(), EventType.action, OrderRealizationStepBack.EVENT)) {
             if (sendOrderRealizationEmailNotification(order)) {
                 emailNotificationsSent.add(EmailNotificationType.ORDER_REALIZATION);
             }

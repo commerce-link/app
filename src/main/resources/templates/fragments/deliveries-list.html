@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The rest of the query as hidden fields, so a menu's form never drops what the others set; "skip" names the
+       parameter the form itself submits (state, provider, settle, dates = from/to/period, search = q). */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <input type="hidden" name="scope" th:value="${q.scope().param()}"/>
+    <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
+    <th:block th:if="${skip != 'state'}"><input type="hidden" name="state" th:each="s : ${q.states()}" th:value="${s.param()}"/></th:block>
+    <th:block th:if="${skip != 'provider'}"><input type="hidden" name="provider" th:each="p : ${q.providers()}" th:value="${p}"/></th:block>
+    <th:block th:if="${skip != 'settle'}"><input type="hidden" name="settle" th:each="s : ${q.settle()}" th:value="${s.param()}"/></th:block>
+    <th:block th:if="${skip != 'dates'}">
+        <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>
+        <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
+        <input type="hidden" name="period" th:if="${q.allHistory()}" value="all"/>
+    </th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+    <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
+    <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
+</th:block>
+
+<!--/* One group of tick boxes of a menu, the option's count on the right; an option that would leave nothing is dimmed. */-->
+<div th:fragment="checks(name, title, options)" th:if="${!options.isEmpty()}" class="cl-filter-menu-group" role="group" th:attr="aria-label=${title != null} ? #{${title}} : null">
+    <span class="cl-eyebrow cl-filter-menu-group-title" aria-hidden="true" th:if="${title != null}" th:text="#{${title}}"></span>
+    <label class="cl-filter-menu-check" th:each="o : ${options}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
+        <input type="checkbox" th:name="${name}" th:value="${o.value()}" th:checked="${o.selected()}"/>
+        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+        <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
+    </label>
+</div>
+
+</body>
+</html>
