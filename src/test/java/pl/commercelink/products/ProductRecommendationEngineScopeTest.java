@@ -97,4 +97,35 @@ class ProductRecommendationEngineScopeTest {
         assertThat(ownerView).singleElement().extracting(ProductRecommendation::getPimId).isEqualTo("store-pim-1");
         assertThat(otherStoreView).singleElement().extracting(ProductRecommendation::getPimId).isEqualTo("global-pim-1");
     }
+
+    @Test
+    void twoInventoryGroupsResolvingToOneEntryAreRecommendedOnceAtTheLowerPrice() {
+        // given: a store entry with the first group's EAN and, by bad feed data, a code of the second group
+        CategoryDefinition definition = new CategoryDefinition().withGeneratedId();
+        definition.setPimCategoryIds(new LinkedList<>(List.of("989")));
+        PimEntry storeEntry = new PimEntry("store-pim-1",
+                List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier("OWN-1", PimIdentifierType.MPN)),
+                "Intel", "Core i7 (store)", "CPU", null, true, null, null, null, "s1");
+        PimEntryIndex index = new PimEntryIndex(List.of(storeEntry), UnaryOperator.identity(), UnaryOperator.identity());
+        MatchedInventory second = org.mockito.Mockito.mock(MatchedInventory.class);
+        when(productRepository.findAll(definition.getCategoryId())).thenReturn(List.of());
+        when(inventory.findAllByProductCategoryIds(List.of("989"))).thenReturn(Map.of("989", List.of(matchedInventory, second)));
+        when(matchedInventory.hasAnyOffers()).thenReturn(true);
+        when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
+        when(matchedInventory.getLowestPrice()).thenReturn(Price.fromNet(100.0));
+        when(matchedInventory.getTaxonomy()).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
+        when(second.hasAnyOffers()).thenReturn(true);
+        when(second.getInventoryKey()).thenReturn(new InventoryKey("5900000000999", "OWN-1"));
+        when(second.getLowestPrice()).thenReturn(Price.fromNet(80.0));
+        when(second.getTaxonomy()).thenReturn(new Taxonomy("5900000000999", "OWN-1", "Intel", "i7", "CPU", 1, null, null, null, "989"));
+
+        // when
+        List<ProductRecommendation> recommendations = engine.getRecommendations(index.forStore("s1"), definition, inventory);
+
+        // then
+        assertThat(recommendations).singleElement().satisfies(r -> {
+            assertThat(r.getPimId()).isEqualTo("store-pim-1");
+            assertThat(r.getLowestGrossPrice()).isEqualTo(Price.fromNet(80.0).grossValue());
+        });
+    }
 }

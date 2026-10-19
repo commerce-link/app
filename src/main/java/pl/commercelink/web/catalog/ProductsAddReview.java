@@ -27,11 +27,14 @@ import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.InventoryBrowseController;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * "Uzupełnij dane": the review of products taken from the inventory before they are added to a manual catalog category,
@@ -151,9 +154,16 @@ public class ProductsAddReview {
      * category as it is now.
      */
     public int save(String storeId, CategoryDefinition category, ProductsBulkAddForm form) {
-        List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
+        List<Product> inCategory = productRepository.findAll(category.getCategoryId());
+        List<InventoryKey> alreadyInCategory = new ArrayList<>(inCategory.stream()
                 .map(InventoryKey::fromProduct)
                 .toList());
+        // one PIM entry, one product of the category: two rows can lead to the same entry (a store entry matching
+        // codes of two inventory groups), and the price list keys products by pim id
+        Set<String> pimIdsInCategory = inCategory.stream()
+                .map(Product::getPimId)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(HashSet::new));
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId);
         int added = 0;
         for (int index = 0; index < form.getProducts().size(); index++) {
@@ -164,9 +174,13 @@ public class ProductsAddReview {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            pimEntryOf(storeId, enabled, key, product).ifPresent(entry -> {
-                product.setPimId(entry.pimId());
-                product.setBrand(brandMapper.unifyBrand(entry.brand()));
+            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, key, product);
+            if (entry.isPresent() && pimIdsInCategory.contains(entry.get().pimId())) {
+                continue;
+            }
+            entry.ifPresent(found -> {
+                product.setPimId(found.pimId());
+                product.setBrand(brandMapper.unifyBrand(found.brand()));
             });
             try {
                 productRepository.save(product);
@@ -178,6 +192,7 @@ public class ProductsAddReview {
                 continue;
             }
             alreadyInCategory.add(key);
+            entry.ifPresent(found -> pimIdsInCategory.add(found.pimId()));
             added++;
         }
         if (added > 0) {

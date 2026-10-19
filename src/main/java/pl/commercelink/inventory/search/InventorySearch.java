@@ -205,7 +205,10 @@ public class InventorySearch {
             ProductCodes shown = codes.orElse(taxonomy.ean(), taxonomy.mfn());
             return new ProductHeader(taxonomy.name(), taxonomy.brand(), shown.ean(), shown.code());
         }
-        Optional<PimEntry> pimEntry = key.getId() == null ? Optional.empty() : pim.findByPimId(key.getId());
+        // the composite lookup, as recommendations use it: in a store whose own entry shadows the key's global entry
+        // the header names the store's entry
+        Optional<PimEntry> pimEntry = key.getId() == null ? Optional.empty()
+                : pim.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
         return new ProductHeader(pimEntry.map(PimEntry::name).orElse(null), pimEntry.map(PimEntry::brand).orElse(null), codes.ean(), codes.code());
     }
 

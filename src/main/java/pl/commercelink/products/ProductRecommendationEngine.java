@@ -10,6 +10,9 @@ import pl.commercelink.pim.api.PimLookup;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -47,7 +50,15 @@ public class ProductRecommendationEngine {
                 .map(i -> createRecommendation(pim, categoryDefinition, i))
                 .filter(r -> StringUtils.isNotBlank(r.getBrand()))
                 .sorted(Comparator.comparing(ProductRecommendation::getBrand).thenComparingDouble(ProductRecommendation::getLowestGrossPrice))
+                .filter(oncePerPimId())
                 .collect(Collectors.toList());
+    }
+
+    // two inventory groups can resolve to one PIM entry (a store entry next to global ones); the category and the
+    // pricelist list a product once, at its lowest price, which the sort above puts first
+    private static Predicate<ProductRecommendation> oncePerPimId() {
+        Set<String> seen = new HashSet<>();
+        return r -> !r.hasPimId() || seen.add(r.getPimId());
     }
 
     public List<ProductRecommendation> getRecommendationsForMappedProducts(PimLookup pim, CategoryDefinition categoryDefinition, InventoryView inventory) {

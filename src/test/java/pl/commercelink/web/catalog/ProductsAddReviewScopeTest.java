@@ -96,4 +96,25 @@ class ProductsAddReviewScopeTest {
         assertThat(owner).isPresent();
         assertThat(other).isEmpty();
     }
+
+    @Test
+    void twoRowsLeadingToOneStoreEntryAddOneProduct() {
+        // given: the second row carries another EAN but the store entry's MPN (bad feed data)
+        ProductsAddReview review = review(catalog());
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        MatchedInventory unknown = mock(MatchedInventory.class);
+        when(unknown.isEmpty()).thenReturn(true);
+        when(view.findByInventoryKey(org.mockito.ArgumentMatchers.any())).thenReturn(unknown);
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
+                new Product(null, null, EAN, "OTHER-1", "Brand", "L", "First", "Default"),
+                new Product(null, null, "5900000000999", MFN, "Brand", "L", "Second", "Default")));
+
+        // when
+        int added = review.save("s1", category, form);
+
+        // then
+        assertThat(added).isEqualTo(1);
+        org.mockito.Mockito.verify(productRepository, org.mockito.Mockito.times(1)).save(org.mockito.ArgumentMatchers.argThat(
+                p -> "s1-2".equals(p.getPimId())));
+    }
 }
