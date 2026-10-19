@@ -312,7 +312,7 @@
         <h2 class="cl-dialog-title" id="item-edit-title" th:text="#{offers.details.item.title}"></h2>
         <div class="cl-dialog-body">
             <th:block th:replace="~{offers/details/items :: itemFields(${null}, ${ {:} }, ${p}, 'item-edit')}"></th:block>
-            <p class="cl-help" th:text="#{offers.details.item.apply.help}"></p>
+            <p class="cl-dialog-effect" th:text="#{offers.details.item.apply.help}"></p>
         </div>
         <div class="cl-dialog-actions">
             <button type="submit" class="cl-button is-primary" value="apply" data-cl-item-apply th:text="#{offers.details.item.apply}"></button>

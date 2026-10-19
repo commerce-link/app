@@ -418,4 +418,17 @@ class OfferDetailsRenderingTest {
             }
         }
     }
+
+    @Test
+    void notesOutsideFieldsUseClassesThatSizeThem() {
+        // given — a bare cl-help is sized only inside a field, so sentences of a dialog or a card use their own classes
+        String offer = html(fullOffer());
+        String removed = html(offer(List.of(laptop(0)), summary(true), customer(true, true), true));
+
+        // then
+        assertThat(offer).contains("<p class=\"cl-dialog-effect\">Zapisze tylko te pola.")
+                .contains("<p class=\"cl-dialog-effect\">Zmiana trafi do oferty po")
+                .containsPattern("<p class=\"cl-dialog-effect\"><i class=\"fas fa-eye-slash\" aria-hidden=\"true\"></i>\\s*<span>Klient nie widzi tych danych");
+        assertThat(removed).contains("<p class=\"cl-card-desc is-warn cl-card-foot-note\">Tego sposobu dostawy nie ma już");
+    }
 }

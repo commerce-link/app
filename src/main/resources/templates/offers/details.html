@@ -161,7 +161,7 @@
             </div>
         </div>
         <th:block th:unless="${p.template()}"><details th:replace="~{fragments/offer-create :: gclid(${f.gclid})}"></details></th:block>
-        <p class="cl-help" th:text="#{offers.details.terms.scope}"></p>
+        <p class="cl-dialog-effect" th:text="#{offers.details.terms.scope}"></p>
         <th:block th:if="${saved == true}"><template th:replace="~{offers/details :: refresh}"></template></th:block>
     </div>
     <div class="cl-dialog-actions">
@@ -182,7 +182,7 @@
         <div th:replace="~{offers/details :: errorSummary}"></div>
         <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
         <fieldset th:replace="~{fragments/offer-create :: contact('', ${clientForm})}"></fieldset>
-        <p class="cl-help"><i class="fas fa-eye-slash" aria-hidden="true"></i> <span th:text="#{offers.details.client.hidden}"></span></p>
+        <p class="cl-dialog-effect"><i class="fas fa-eye-slash" aria-hidden="true"></i> <span th:text="#{offers.details.client.hidden}"></span></p>
         <th:block th:if="${saved == true}"><template th:replace="~{offers/details :: refresh}"></template></th:block>
     </div>
     <div class="cl-dialog-actions">

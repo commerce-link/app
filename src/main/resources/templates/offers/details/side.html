@@ -25,7 +25,7 @@
         <div><dt th:text="#{offers.details.summary.profitNet}"></dt>
             <dd class="is-numeric"><output data-cl-sum="profitNet" th:text="#{general.currency.amount(${s.profitNet()})}"></output></dd></div>
     </dl>
-    <p th:if="${s.deliveryRemoved()}" class="cl-help is-warn cl-card-foot-note" th:text="#{offers.details.summary.delivery.removed.help}"></p>
+    <p th:if="${s.deliveryRemoved()}" class="cl-card-desc is-warn cl-card-foot-note" th:text="#{offers.details.summary.delivery.removed.help}"></p>
     <p th:if="${s.variantsNote()}" class="cl-card-desc cl-card-foot-note" th:text="#{offers.summary.variants.note}"></p>
     <!--/* The record has no date of its last change, so the clean state says only that nothing is pending. */-->
     <div class="cl-card-footer is-stacked">
