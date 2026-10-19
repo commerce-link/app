@@ -13843,6 +13843,10 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor col.cl-col-value { width: 132px; }
 .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 52px; }
 .cl-page .cl-table.is-line-editor :is(td, th) { vertical-align: top; }
+/* a name without spaces breaks inside the fixed column instead of running out of the page; a code longer than the whole
+   column is cut with an ellipsis (the dialog shows it in full), a shorter one still moves to the next line unbroken */
+.cl-page .cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }
+.cl-page .cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .cl-page .cl-table.is-line-editor .cl-input.is-qty { width: 100%; text-align: right; }
 .cl-page .cl-table.is-line-editor .cl-input.is-money { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
 .cl-page .cl-table.is-line-editor .cl-line-warn { margin: 4px 0 0; font-size: 12.5px; line-height: 1.3; }

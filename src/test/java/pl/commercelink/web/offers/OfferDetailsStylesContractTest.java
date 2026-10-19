@@ -72,4 +72,14 @@ class OfferDetailsStylesContractTest {
         assertThat(tablet.substring(0, tablet.indexOf('}', tablet.indexOf("col.cl-col-menu")) + 1))
                 .contains("col.cl-col-drag { width: 64px; }").contains("col.cl-col-menu { width: 76px; }");
     }
+
+    @Test
+    void longNamesAndCodesWithoutSpacesStayInsideTheProductColumn() throws Exception {
+        // when
+        String block = block();
+
+        // then — the fixed table layout let a 200-character code or a name without spaces run past the page edge
+        assertThat(block).contains(".cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }")
+                .contains(".cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;");
+    }
 }
