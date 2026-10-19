@@ -103,4 +103,19 @@ class OfferDetailsScriptContractTest {
                 .contains("name=\"fulfilmentType\" th:value=\"${p.fulfilmentType() ?: ''}\" data-cl-dirty-ignore");
         assertThat(guard).contains("!control.hasAttribute('data-cl-dirty-ignore')");
     }
+
+    @Test
+    void peekFollowsTheSummarySaveButtonAtAnyWidth() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String css = read("static/css/commercelink.css");
+
+        // then — shown while the summary's button is out of view, kept in the flow, CSS alone below 1366 px without JS
+        assertThat(js).contains("new IntersectionObserver(").contains("'#summary [data-cl-save-items]'")
+                .contains("'data-cl-peek-state'").contains("'hidden' : 'shown'").contains("--cl-topbar-height");
+        assertThat(css).contains(".cl-summary-peek.is-action[data-cl-peek-state] { display: flex;")
+                .contains(".cl-summary-peek.is-action[data-cl-peek-state=\"hidden\"] { visibility: hidden; opacity: 0; }")
+                .contains("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }")
+                .containsPattern("prefers-reduced-motion: reduce\\) \\{\\s*\\.cl-page \\.cl-summary-peek\\.is-action\\[data-cl-peek-state\\] \\{ transition: none; \\}");
+    }
 }

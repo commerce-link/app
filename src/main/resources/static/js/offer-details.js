@@ -10,6 +10,8 @@
 //   items the parts the dialog changed are swapped in from the answer's template[data-cl-offer-refresh] (header, card,
 //   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept.
 // - "Kopiuj link" and "Otwórz jak klient" say that the customer sees the saved version while the table is dirty.
+// - The peek ([data-cl-peek]) follows the summary's own "Zapisz pozycje" at any width: shown while that button is out of
+//   view (a long table under a sticky side column, or the summary below the table), hidden while it is fully in view.
 (function () {
     'use strict';
 
@@ -334,4 +336,19 @@
             dialog.close();
         }
     });
+    // The save stays in sight at any width (spec D1): without this, CSS shows the peek below 1366 px only.
+    (function followSummarySave() {
+        var peek = form.querySelector('[data-cl-peek]');
+        var summarySave = document.querySelector('#summary [data-cl-save-items]');
+        if (!peek || !summarySave || !('IntersectionObserver' in window)) {
+            return;
+        }
+        // the sticky top bar covers the top of the viewport
+        var topbar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cl-topbar-height'), 10) || 0;
+        peek.setAttribute('data-cl-peek-state', 'shown');
+        new IntersectionObserver(function (entries) {
+            var entry = entries[entries.length - 1];
+            peek.setAttribute('data-cl-peek-state', entry.intersectionRatio >= 0.99 ? 'hidden' : 'shown');
+        }, { rootMargin: '-' + topbar + 'px 0px 0px 0px', threshold: [0, 0.99] }).observe(summarySave);
+    })();
 })();
