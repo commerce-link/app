@@ -1167,6 +1167,49 @@ class RMAControllerTest {
         assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("T-0");
     }
 
+    @Test
+    void clearingTheShippedDateOfAManualShipmentRemovesIt() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-0", at), tracked("T-1", at))));
+
+        // when: the dialog of the second shipment is saved with its shipped date cleared
+        RMA saved = saveShipments(existing, formRow("T-0", at), formRow("T-1", null));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("T-0");
+    }
+
+    @Test
+    void aNewShipmentWithoutAShippedDateIsNotSaved() {
+        // given
+        LocalDateTime at = LocalDateTime.of(2026, 10, 6, 9, 0);
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(tracked("T-0", at))));
+
+        // when: "add shipment" with a carrier and a number but no date
+        RMA saved = saveShipments(existing, formRow("T-0", at), formRow("T-new", null));
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("T-0");
+    }
+
+    @Test
+    void anImportedParcelEditedInItsDialogStaysWithoutAShippedDate() {
+        // given
+        RMA existing = rmaWithStatus(RMAStatus.WaitingForItems);
+        existing.setShipments(new ArrayList<>(List.of(importedParcel("A-1"))));
+        Shipment edited = importedParcel("A-1-fixed");
+
+        // when
+        RMA saved = saveShipments(existing, edited);
+
+        // then
+        assertThat(saved.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("A-1-fixed");
+        assertThat(saved.getShipments().get(0).getShippedAt()).isNull();
+    }
+
     // ------------------------------------------------------------------
     // action outcomes are shown in the page, with the skipped items named
     // ------------------------------------------------------------------

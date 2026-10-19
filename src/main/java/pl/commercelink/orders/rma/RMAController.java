@@ -507,7 +507,7 @@ public class RMAController {
                 row.setExternalId(null);
             }
             List<Shipment> shipments = updatedRma.getShipments().stream()
-                    .filter(RMAController::isWorthKeeping)
+                    .filter(row -> isWorthKeeping(row, stored.get(row)))
                     .collect(Collectors.toList());
             shipments.forEach(s -> s.inheritCourierOrderFrom(stored.get(s)));
             shipments.forEach(s -> s.inheritTrackingFrom(stored.get(s)));
@@ -535,12 +535,18 @@ public class RMAController {
     }
 
     /**
-     * A parcel imported with a marketplace return has a number and a carrier but no shipping date; it stays like any
-     * shipment with data. Only a row with nothing typed in (an empty "add shipment" form) is dropped.
+     * A shipment is saved with its carrier, number and shipping date (a personal collection with its date), as the
+     * dialog says; clearing the date of a shipment typed in by hand is how the operator removes it. A parcel imported
+     * with a marketplace return never had a date, only a number and a carrier, so a row standing for such a stored
+     * parcel stays with them.
      */
-    private static boolean isWorthKeeping(Shipment shipment) {
-        return shipment.hasShippingData() || shipment.hasCollectionData()
-                || StringUtils.isNotBlank(shipment.getTrackingNo()) || StringUtils.isNotBlank(shipment.getCarrier());
+    private static boolean isWorthKeeping(Shipment row, Shipment stored) {
+        if (row.hasShippingData() || row.hasCollectionData()) {
+            return true;
+        }
+        boolean storedWithoutDate = stored != null && stored.getShippedAt() == null;
+        return storedWithoutDate
+                && (StringUtils.isNotBlank(row.getTrackingNo()) || StringUtils.isNotBlank(row.getCarrier()));
     }
 
     /**
