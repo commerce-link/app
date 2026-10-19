@@ -24,6 +24,16 @@
     </div>
 </div>
 
+<!--/* The summary static/js/form-check.js fills when the browser stops a submit ([data-cl-form-check]); hidden and empty
+       until then, so it stays out of the page without JavaScript. titleKey says what the form is for. */-->
+<div th:fragment="formCheckSummary(titleKey)" class="cl-alert is-bad" tabindex="-1" hidden data-cl-form-check-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{${titleKey}}"></p>
+        <ul class="cl-alert-list"></ul>
+    </div>
+</div>
+
 <!--/* Error summary of a form whose message keys may carry arguments (e.g. the rows of a price group that disagree).
        Same markup as errorSummary; arguments maps a field id to the arguments of its message, absent when none. */-->
 <div th:fragment="errorSummaryWithArguments(id, errors, arguments)" th:if="${!errors.isEmpty()}" th:id="${id}"
