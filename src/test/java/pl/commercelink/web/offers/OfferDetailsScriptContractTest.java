@@ -61,8 +61,31 @@ class OfferDetailsScriptContractTest {
         String js = read("static/js/offer-details.js");
 
         // then — a dialog saved while the table is dirty must not reload (dialog.js would, with close-on-success)
-        assertThat(js).contains("redirect: 'manual'").contains("opaqueredirect").contains("CL_isDirty")
+        assertThat(js).contains("CL_isDirty")
                 .contains("template[data-cl-offer-refresh]").contains("'cl:form-replaced'").contains("'cl:item-add-submit'")
                 .doesNotContain("data-cl-dialog-close-on-success");
+    }
+
+    @Test
+    void backgroundSaveCountsOnlyALandingBackOnTheOfferPage() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then — an expired session redirects to the login page, which must not pass for a saved table
+        assertThat(js).contains("redirect: 'follow'").contains("new URL(response.url).pathname")
+                .contains("new URL(form.action, window.location.href).pathname").doesNotContain("opaqueredirect");
+    }
+
+    @Test
+    void actionWithItsOwnConfirmationAsksOnceAndSavesFromThatConfirmation() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String page = read("templates/offers/details.html");
+
+        // then — one dialog: the action's confirmation carries the note and the "Zapisz i …" button
+        assertThat(page).contains("data-confirm-note=#{offers.details.unsaved.confirmNote}");
+        assertThat(js).contains("getAttribute('data-confirm-note')").contains("confirmThen(element, actionUrl(element), true)")
+                .contains("confirmForm.removeEventListener('submit', saveThenSend)")
+                .contains("HTMLFormElement.prototype.submit.call(confirmForm)");
     }
 }

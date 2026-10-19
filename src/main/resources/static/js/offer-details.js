@@ -1,8 +1,9 @@
 // The offer details page around its items table (offers/details.html, spec docs/active/offer-details-redesign-v2 §4).
 // - Actions on the saved offer ([data-cl-offer-action]: create the order, proforma, recalculation, copies, removing an
-//   item) run here. With unsaved changes in the table they ask first (dialog#offer-unsaved-dialog): "Zapisz i …"
-//   posts the items form in the background, then the action runs exactly as on a clean page, with its own
-//   confirmation when it has one (data-cl-confirm-*, in fragments/confirm-dialog). A failed save stays on the page.
+//   item) run here. An action with its own confirmation (data-cl-confirm-*, fragments/confirm-dialog) asks only that;
+//   with unsaved changes in the table the confirmation says so and its "Zapisz i …" saves the items first. The others
+//   ask first only when the table has unsaved changes (dialog#offer-unsaved-dialog). The items form is posted in the
+//   background, then the action runs exactly as on a clean page. A failed save stays on the page, still unsaved.
 // - The add-items dialog saves the table the same way before it posts its items (cl:item-add-submit), and its button
 //   says so while the table is dirty.
 // - The terms, client and note dialogs (form[data-cl-async]) close once saved. On a clean page it reloads; with unsaved
@@ -63,11 +64,14 @@
         return fetch(form.action, {
             method: 'POST',
             body: new URLSearchParams(new FormData(form)),
-            // the save answers with a redirect to this page: following it would only load the page again
-            redirect: 'manual'
+            // A saved table redirects back to this offer page; an expired session redirects to the login page instead
+            // (another path, or a cross-origin answer the fetch rejects), so only a landing on this page counts. Following
+            // the redirect also takes the "items saved" message, which would otherwise show up on a later page.
+            redirect: 'follow'
         }).then(function (response) {
-            if (response.type !== 'opaqueredirect' && !response.ok) {
-                throw new Error('items not saved: ' + response.status);
+            var landed = response.url ? new URL(response.url).pathname : '';
+            if (!response.ok || landed !== new URL(form.action, window.location.href).pathname) {
+                throw new Error('items not saved: ' + response.status + ' ' + landed);
             }
             savedHere = true;
             window.CL_markClean(form);
@@ -93,18 +97,58 @@
         return index < 0 ? null : url.replace(/\/remove-item\/\d+/, '/remove-item/' + index);
     }
 
-    function confirmThen(element, url) {
+    function hasOwnConfirm(element) {
+        return element.hasAttribute('data-cl-confirm-title') && confirmDialog && typeof confirmDialog.showModal === 'function';
+    }
+
+    // The action's own confirmation. With unsaved items it is still the only question: it says the items are saved
+    // first, its button reads "Zapisz i …", and its submit saves the table before the confirmation form is sent; a
+    // cancel saves nothing. The dialog gets its usual message and button back when it closes.
+    function confirmThen(element, url, saveFirst) {
         var confirmForm = confirmDialog.querySelector('form');
+        var message = confirmDialog.querySelector('#cl-confirm-message');
         var submit = confirmDialog.querySelector('[data-cl-confirm-submit]');
         var primary = element.getAttribute('data-cl-confirm-tone') === 'primary';
+        var note = null;
         confirmForm.action = url;
         confirmDialog.querySelector('#cl-confirm-title').textContent = element.getAttribute('data-cl-confirm-title');
-        confirmDialog.querySelector('#cl-confirm-message').textContent = element.getAttribute('data-cl-confirm-message');
-        submit.textContent = element.getAttribute('data-cl-confirm-action');
+        message.textContent = element.getAttribute('data-cl-confirm-message');
+        submit.textContent = saveFirst
+            ? unsaved.getAttribute('data-save-label').replace('{0}', element.getAttribute('data-label') || '')
+            : element.getAttribute('data-cl-confirm-action');
         submit.classList.toggle('is-danger', !primary);
         submit.classList.toggle('is-primary', primary);
         submit.disabled = false;
+
+        function saveThenSend(event) {
+            event.preventDefault();
+            if (busy) {
+                return;
+            }
+            submit.disabled = true;
+            saveItems().then(function (saved) {
+                if (saved) {
+                    HTMLFormElement.prototype.submit.call(confirmForm);
+                } else if (confirmDialog.open) {
+                    confirmDialog.close();
+                }
+            });
+        }
+
+        if (saveFirst) {
+            note = document.createElement('p');
+            note.className = 'cl-dialog-message';
+            note.textContent = unsaved.getAttribute('data-confirm-note');
+            message.after(note);
+            confirmForm.addEventListener('submit', saveThenSend);
+        }
         confirmDialog.addEventListener('close', function () {
+            if (note) {
+                note.remove();
+                confirmForm.removeEventListener('submit', saveThenSend);
+                submit.textContent = element.getAttribute('data-cl-confirm-action');
+                submit.disabled = false;
+            }
             focusBack(element);
         }, { once: true });
         confirmDialog.showModal();
@@ -115,8 +159,8 @@
         var url = actionUrl(element);
         if (url === null) {
             window.location.reload();
-        } else if (element.hasAttribute('data-cl-confirm-title') && confirmDialog && typeof confirmDialog.showModal === 'function') {
-            confirmThen(element, url);
+        } else if (hasOwnConfirm(element)) {
+            confirmThen(element, url, false);
         } else if (element.getAttribute('data-action-method') === 'get') {
             window.location.assign(url);
         } else {
@@ -144,7 +188,9 @@
         if (busy) {
             return;
         }
-        if (isDirty()) {
+        if (isDirty() && hasOwnConfirm(element)) {
+            confirmThen(element, actionUrl(element), true);
+        } else if (isDirty()) {
             ask(element);
         } else {
             run(element);

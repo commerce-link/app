@@ -69,12 +69,14 @@
     </dialog>
     <dialog th:replace="~{offers/details/items :: editDialog(${p})}"></dialog>
     <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
-    <!--/* Asked by offer-details.js before an action that works on the saved offer while the table has unsaved changes:
-           "Zapisz i {action}" saves the items, then runs the action as it runs on a clean page. Also carries the texts
-           of the add-items dialog's button while the table is dirty, and of a failed save. */-->
+    <!--/* Asked by offer-details.js before an action without a confirmation of its own while the table has unsaved
+           changes: "Zapisz i {action}" saves the items, then runs the action as it runs on a clean page. Also carries the
+           texts the page script needs elsewhere: the note an action's own confirmation gets while the table is dirty,
+           the add-items dialog's button and a failed save. */-->
     <dialog class="cl-dialog" id="offer-unsaved-dialog" aria-labelledby="offer-unsaved-title" aria-describedby="offer-unsaved-message"
             th:attr="data-save-label=#{offers.details.unsaved.save}, data-failed=#{offers.details.unsaved.failed},
-                     data-add-label=#{offers.details.add.dirty}, data-add-count=#{offers.details.add.dirty.count}">
+                     data-add-label=#{offers.details.add.dirty}, data-add-count=#{offers.details.add.dirty.count},
+                     data-confirm-note=#{offers.details.unsaved.confirmNote}">
         <form method="dialog">
             <h2 class="cl-dialog-title" id="offer-unsaved-title" th:text="#{offers.details.unsaved.title}"></h2>
             <p class="cl-dialog-message" id="offer-unsaved-message" th:text="#{offers.details.unsaved.message}"></p>
