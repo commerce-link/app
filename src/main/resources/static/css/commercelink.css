@@ -13843,8 +13843,14 @@ a.cl-link-button:hover {
     padding-inline: 0;
 }
 .cl-page .cl-media-meta .cl-check {
-    min-height: 28px;
     font-size: 12.5px;
+}
+/* the "Zachowaj" box (a page without JavaScript) is a compact 28 px row only where the pointer is fine; below 1024 px
+   it keeps the 44 px touch target of every cl-check */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-media-meta .cl-check {
+        min-height: 28px;
+    }
 }
 .cl-page .cl-media-tile.is-removed {
     border-style: dashed;
