@@ -404,8 +404,12 @@
         // Showing or hiding the peek changes the main column's height by its box and the gap, which moves the summary
         // (below the table, or the sticky side column whose run ends with the form) by as much. So it shows once the
         // button leaves the screen, but hides only once the button is clear of the edges by more than that, or the two
-        // would trade places on every frame near the end of the table.
+        // would trade places on every frame near the end of the table. The band is at least BAND and grows to the shown
+        // peek's own box: on a phone the peek is taller than 100 px, and a browser without scroll anchoring (Safari)
+        // moved the button by more than the band on each swap.
         var BAND = 100;
+        var band = BAND;
+        var hideObserver = null;
         // the summary's button is clear of the band: the peek may go, but never from under the focus, which would
         // drop to the page body; it goes once the focus leaves it
         var clear = true;
@@ -417,17 +421,35 @@
                 set('hidden');
             }
         }
+        function observeHide() {
+            if (hideObserver) {
+                hideObserver.disconnect();
+            }
+            hideObserver = new IntersectionObserver(function (entries) {
+                clear = entries[entries.length - 1].intersectionRatio >= 0.99;
+                hideUnless(document.activeElement);
+            }, { rootMargin: '-' + (topbar + band) + 'px 0px -' + band + 'px 0px', threshold: [0, 0.99] });
+            hideObserver.observe(summarySave);
+        }
+        // moved: how far showing the peek just moved the button (none where the browser anchors the scroll)
+        function fitBand(moved) {
+            var gap = parseFloat(getComputedStyle(peek.parentElement).rowGap) || 0;
+            var needed = Math.ceil(Math.max(peek.getBoundingClientRect().height + gap, moved)) + 8;
+            if (needed > band) {
+                band = needed;
+                observeHide();
+            }
+        }
         set('hidden');
         new IntersectionObserver(function (entries) {
             if (entries[entries.length - 1].intersectionRatio < 0.99) {
+                var before = summarySave.getBoundingClientRect().top;
                 clear = false;
                 set('shown');
+                fitBand(Math.abs(summarySave.getBoundingClientRect().top - before));
             }
         }, { rootMargin: '-' + topbar + 'px 0px 0px 0px', threshold: [0, 0.99] }).observe(summarySave);
-        new IntersectionObserver(function (entries) {
-            clear = entries[entries.length - 1].intersectionRatio >= 0.99;
-            hideUnless(document.activeElement);
-        }, { rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px', threshold: [0, 0.99] }).observe(summarySave);
+        observeHide();
         peek.addEventListener('focusout', function (event) {
             hideUnless(event.relatedTarget);
         });

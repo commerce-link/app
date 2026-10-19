@@ -148,7 +148,9 @@ class OfferDetailsScriptContractTest {
         assertThat(js).contains("new IntersectionObserver(").contains("'#summary [data-cl-save-items]'")
                 .contains("'data-cl-peek-state'").contains("set('shown');").contains("--cl-topbar-height");
         assertThat(js).contains("set('hidden');").contains("var BAND = 100;")
-                .contains("rootMargin: '-' + (topbar + BAND) + 'px 0px -' + BAND + 'px 0px'");
+                .contains("rootMargin: '-' + (topbar + band) + 'px 0px -' + band + 'px 0px'")
+                // the band covers the shown peek's own box (taller than 100 px on a phone, where Safari has no scroll anchoring)
+                .contains("var needed = Math.ceil(Math.max(peek.getBoundingClientRect().height + gap, moved)) + 8;").contains("if (needed > band) {");
         // never hidden from under the focus (a display:none peek drops it to the body); re-checked when it leaves
         assertThat(js).contains("if (clear && !peek.contains(focused))").contains("hideUnless(document.activeElement);")
                 .contains("peek.addEventListener('focusout'").contains("hideUnless(event.relatedTarget);");
