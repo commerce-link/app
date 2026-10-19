@@ -13912,10 +13912,11 @@ a.cl-link-button:hover {
     .cl-page .cl-selection-host.is-rma-detail .cl-selection-actions {
         flex-wrap: wrap;
     }
-    /* "Więcej", the last menu, opens leftwards from its toggle's right edge: from its start (the selection row's rule)
-       its 240 px list reached past the right edge of a 720 px window. menu.js still turns it to .is-start when that
-       would leave the window on the left */
-    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-menu:last-of-type > .cl-menu-list:not(.is-start) {
+    /* "Wyślij" and "Więcej" open leftwards from their toggle's right edge: from its start (the selection row's rule)
+       the 240 px list of "Więcej" reached past the right edge of a 720 px window, and both reached past the card over
+       the side column at 1366 px. "Rozstrzygnij", the first menu, keeps opening from its start. menu.js still turns a
+       list to .is-start when it would leave the window on the left */
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-menu:not(:first-of-type) > .cl-menu-list:not(.is-start) {
         left: auto;
         right: 0;
     }
