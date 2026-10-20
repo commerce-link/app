@@ -117,7 +117,7 @@ public class Inventory {
         Store store = storesRepository.findById(storeId);
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
-        InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store));
+        InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store), this::isStoreEntry);
         InventorySource own = GroupInventorySource.own(ownIndex);
         return view(globalIndex, ownIndex, global, own, additionalSources);
     }
@@ -126,7 +126,7 @@ public class Inventory {
         Store store = storesRepository.findById(storeId);
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
-        InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope));
+        InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope), this::isStoreEntry);
         InventorySource own = GroupInventorySource.own(ownIndex, scopedOwnAndManualSupplier(store, scope));
         return view(globalIndex, ownIndex, global, own, additionalSources);
     }

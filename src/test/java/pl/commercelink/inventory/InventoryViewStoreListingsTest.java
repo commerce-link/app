@@ -535,4 +535,35 @@ class InventoryViewStoreListingsTest {
         assertThat(stats.distinctProducts()).isEqualTo(1);
         assertThat(stats.bySupplier()).containsOnlyKeys("AB Group", "Action");
     }
+
+    // c-own (spec 4.3): global entry PIM-1 (…031/MFN-G, and a global feed row …031/MFN-S), store entry st-s-1
+    // (…032/MFN-S); they share MFN-S but are different products, so the store entry keeps its own row
+    @Test
+    void storeEntrySharingAnMpnWithAnotherGlobalEntryKeepsItsOwnRowWithoutTheGlobalOffer() {
+        // given
+        InventoryKey globalKey = new InventoryKey("PIM-1");
+        globalKey.addEan("5900000000031");
+        globalKey.addManufacturerCode("MFN-G");
+        MatchedInventory globalGroup = new MatchedInventory(globalKey,
+                List.of(new InventoryItem("5900000000031", "MFN-S", 1399.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                taxonomyCache, supplierRegistry);
+        InventoryKey ownKey = new InventoryKey("st-s-1");
+        MatchedInventory ownGroup = new MatchedInventory(ownKey,
+                List.of(new InventoryItem("5900000000032", "MFN-S", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
+                taxonomyCache, supplierRegistry);
+        storeWithGlobalAbAndOwnIndex(ownGroup);
+        stubGlobalIndex(List.of(globalGroup));
+
+        // when
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+        InventoryStatistics stats = inventory.storeStatistics(STORE_ID);
+
+        // then
+        assertThat(listed).extracting(matched -> matched.getInventoryKey().getId()).containsExactly("PIM-1", "st-s-1");
+        MatchedInventory storeEntryRow = listed.stream()
+                .filter(matched -> "st-s-1".equals(matched.getInventoryKey().getId())).findFirst().orElseThrow();
+        assertThat(storeEntryRow.getSuppliers()).containsExactly("Action");
+        assertThat(stats.distinctProducts()).isEqualTo(2);
+    }
 }
