@@ -442,7 +442,7 @@ class ClientOfferControllerTest {
     }
 
     @Test
-    void failedProformaShowsTheProviderError() {
+    void failedProformaShowsAFixedNoticeInsteadOfTheProviderText() {
         // given
         Basket basket = submittedBasket();
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
@@ -456,7 +456,7 @@ class ClientOfferControllerTest {
 
         // then
         assertThat(flash.getFlashAttributes().get("clientOfferNotice"))
-                .isEqualTo(new ClientOfferNotice("bad", "Brak konfiguracji"));
+                .isEqualTo(new ClientOfferNotice("bad", "client.offer.notice.proforma.failed"));
     }
 
     @Test

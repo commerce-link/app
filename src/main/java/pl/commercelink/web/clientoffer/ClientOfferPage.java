@@ -22,8 +22,11 @@ public record ClientOfferPage(String offerId, String shortId, String offerPath, 
         }
     }
 
-    /** {@code delta} is signed against the selected option ("+ 1 000,00", "− 450,00"); null for the selected one. */
-    public record Option(int position, String name, boolean selected, String delta) {
+    /**
+     * {@code delta} is signed against the selected option ("+ 1 000,00", "− 450,00"); null for the selected one and for
+     * an option of the same price ({@code samePrice}), which would otherwise read "+ 0,00".
+     */
+    public record Option(int position, String name, boolean selected, boolean samePrice, String delta) {
     }
 
     public record Delivery(String name, String description, String price, boolean personalCollection) {

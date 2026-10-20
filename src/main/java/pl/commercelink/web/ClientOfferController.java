@@ -189,7 +189,10 @@ public class ClientOfferController {
 
         InvoicingService.OperationResult op = invoicingService.createProforma(basket, locale, true);
         if (op.hasError()) {
-            redirectAttributes.addFlashAttribute(NOTICE, ClientOfferNotice.bad(op.getErrorMessage()));
+            // the provider's text is technical and often English, so the customer gets a fixed message instead
+            log.warn("Proforma for offer {} in store {} failed: {}", offerId, storeId, op.getErrorMessage());
+            redirectAttributes.addFlashAttribute(NOTICE, ClientOfferNotice.bad(
+                    messageSource.getMessage("client.offer.notice.proforma.failed", null, locale)));
             return redirectTo(basket);
         }
 

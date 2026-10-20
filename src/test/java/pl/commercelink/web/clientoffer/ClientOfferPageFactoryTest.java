@@ -68,6 +68,21 @@ class ClientOfferPageFactoryTest {
     }
 
     @Test
+    void optionOfTheSamePriceIsMarkedInsteadOfAZeroDelta() {
+        // given
+        Basket basket = basket(item("A", "Dysk", 2899.0, 1, "Dysk"), item("B", "Dysk", 2899.0, 1, "Dysk"),
+                item("C", "Dysk", 3899.0, 1, "Dysk"));
+
+        // when
+        ClientOfferPage page = factory().build(basket, new Store(), false, PL);
+
+        // then
+        List<ClientOfferPage.Option> options = page.lines().get(0).options();
+        assertThat(options).extracting(ClientOfferPage.Option::samePrice).containsExactly(false, true, false);
+        assertThat(options).extracting(ClientOfferPage.Option::delta).containsExactly(null, null, "+ 1 000,00");
+    }
+
+    @Test
     void storeWithoutCheckoutConfigurationHasNoDelivery() {
         // given
         Basket basket = basket(item("MFN-1", "CPU", 100.0, 1, null));

@@ -82,8 +82,11 @@ public class ClientOfferPageFactory {
     private ClientOfferPage.Line toLine(ClientOfferLine line) {
         BasketItem item = line.item();
         List<ClientOfferPage.Option> options = line.options().stream()
-                .map(o -> new ClientOfferPage.Option(o.item().getPosition(), o.item().getName(), o.selected(),
-                        o.selected() ? null : signedDelta(o)))
+                .map(o -> {
+                    boolean samePrice = !o.selected() && o.isIncluded();
+                    return new ClientOfferPage.Option(o.item().getPosition(), o.item().getName(), o.selected(),
+                            samePrice, o.selected() || samePrice ? null : signedDelta(o));
+                })
                 .toList();
         return new ClientOfferPage.Line(item.getName(), item.getCategory(), (int) item.getQty(),
                 Money.format(item.getUnitPrice()), Money.format(item.getTotalPrice()),
