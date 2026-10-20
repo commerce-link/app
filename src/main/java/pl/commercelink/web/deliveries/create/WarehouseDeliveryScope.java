@@ -129,4 +129,9 @@ final class WarehouseDeliveryScope implements DeliveryScope {
     public OperationResult<String> save(DeliveryCreationForm form) {
         return OperationResult.success(deliveryCreation.run(storeId, form));
     }
+
+    @Override
+    public void releaseUnselected(DeliveryCreationForm form) {
+        deliveryCreation.releaseUnselectedAllocations(storeId, form);
+    }
 }

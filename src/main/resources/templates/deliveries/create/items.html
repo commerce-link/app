@@ -36,10 +36,12 @@
             <th:block th:if="${!page.dropship()}">
                 <dialog th:replace="~{deliveries/create/parts :: fulfilmentDialog(${page})}"></dialog>
             </th:block>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
     <script th:src="@{/js/row-toggle.js}" defer></script>
     <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
     <script th:src="@{/js/delivery-items.js}" defer></script>
     <script th:if="${!page.dropship()}" th:src="@{/js/delivery-fulfilment.js}" defer></script>
 </div>

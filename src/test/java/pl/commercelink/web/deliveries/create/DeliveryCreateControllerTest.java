@@ -203,6 +203,46 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
+    void releaseAllOfADropshipOrderReleasesThePlanAndReturnsToTheOrder() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).thenReturn(new DeliveryScopes.Resolution.Found(scope));
+        Allocation allocation = new Allocation();
+        allocation.setSelected(true);
+        DeliveryCreationForm planned = requested(1);
+        planned.getItems().get(0).setAllocations(new ArrayList<>(List.of(allocation)));
+        when(scope.plannedForm()).thenReturn(planned);
+
+        // when
+        String view = asStoreAdmin(() -> controller.releaseAll(PROVIDER, ORDER_ID, null, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(allocation.isSelected()).isFalse();
+        verify(scope).releaseUnselected(planned);
+        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:deliveries.create.allReleased");
+    }
+
+    @Test
+    void releaseAllOfAWarehouseBatchReleasesThePlanAndReturnsToThePendingDeliveries() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, null)).thenReturn(new DeliveryScopes.Resolution.Found(scope));
+        Allocation allocation = new Allocation();
+        allocation.setSelected(true);
+        DeliveryCreationForm planned = requested(1);
+        planned.getItems().get(0).setAllocations(new ArrayList<>(List.of(allocation)));
+        when(scope.plannedForm()).thenReturn(planned);
+
+        // when
+        String view = asStoreAdmin(() -> controller.releaseAll(PROVIDER, null, null, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
+        assertThat(allocation.isSelected()).isFalse();
+        verify(scope).releaseUnselected(planned);
+        assertThat(flash.getFlashAttributes().get("successMessage")).isEqualTo("msg:deliveries.create.allReleased");
+    }
+
+    @Test
     void saveWithoutTheSupplierOrderNumberShowsTheErrorsAndReleasesNothing() {
         // given
         when(scope.requiresOrderIdentity()).thenReturn(true);
