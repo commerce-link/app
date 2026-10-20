@@ -13909,6 +13909,11 @@ a.cl-link-button:hover {
 .cl-page .cl-summary-peek.is-action[data-cl-peek-state="shown"] { display: flex; }
 .cl-page .cl-summary-peek.is-action[data-cl-peek-state="hidden"] { display: none; }
 html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-padding-bottom: 80px; }
+/* on a phone the peek wraps to two rows (95 px with the unsaved state), taller than the 80 px above */
+@media screen and (max-width: 719px) {
+    html:has(.cl-summary-peek.is-action),
+    html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-padding-bottom: 112px; }
+}
 @media screen and (max-width: 1023px) {
     .cl-page .cl-table.is-line-editor :is(.cl-drag, .cl-table-edit) { width: 44px; height: 44px; }
     .cl-page .cl-table.is-line-editor .cl-table-edit { margin: -8px -8px -8px 0; }

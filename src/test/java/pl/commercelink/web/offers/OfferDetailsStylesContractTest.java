@@ -82,4 +82,15 @@ class OfferDetailsStylesContractTest {
         assertThat(block).contains(".cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }")
                 .contains(".cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;");
     }
+
+    @Test
+    void aFieldReachedWithTabClearsThePeekThatWrapsToTwoRowsOnAPhone() throws Exception {
+        // when
+        String block = block();
+        String afterShown = block.substring(block.indexOf("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }"));
+
+        // then — below 720 px the peek is 95 px tall, so the 80 px padding left a focused field partly under it
+        assertThat(afterShown).contains("@media screen and (max-width: 719px) {\n    html:has(.cl-summary-peek.is-action),\n"
+                + "    html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 112px; }");
+    }
 }
