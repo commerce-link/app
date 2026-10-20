@@ -1,8 +1,20 @@
-// Loaded without defer at the end of the content so the redirect does not wait for the rest of the page.
+// Loaded without defer inside the content; it waits for the rest of the page (logo, footer) to be parsed so the frame
+// is complete while the bridge is visible, then sends the provider form.
 (function () {
-    var auto = document.querySelector('.cl-bridge-auto');
-    if (auto) {
-        auto.hidden = false;
+    function submit() {
+        var auto = document.querySelector('.cl-bridge-auto');
+        if (auto) {
+            auto.hidden = false;
+        }
+        var form = document.getElementById('paymentForm');
+        if (form) {
+            form.submit();
+        }
     }
-    document.getElementById('paymentForm').submit();
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', submit);
+    } else {
+        submit();
+    }
 })();

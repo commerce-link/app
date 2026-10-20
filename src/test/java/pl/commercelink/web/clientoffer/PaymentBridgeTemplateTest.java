@@ -17,6 +17,8 @@ import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.stores.Store;
 import pl.commercelink.web.publicpage.PublicPageFactory;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -59,6 +61,17 @@ class PaymentBridgeTemplateTest {
 
         // then
         assertThat(html).contains("<script src=\"/js/payment-bridge.js\"></script>").contains("id=\"paymentForm\"");
+    }
+
+    @Test
+    void autoSubmitWaitsUntilTheFooterIsParsed() throws Exception {
+        // given — the script sits inside main, before the footer, and runs without defer
+        String script = Files.readString(Path.of("src/main/resources/static/js/payment-bridge.js"));
+
+        // then
+        assertThat(script).contains("document.readyState === 'loading'")
+                .contains("addEventListener('DOMContentLoaded', submit)")
+                .contains("if (form) {");
     }
 
     @Test
