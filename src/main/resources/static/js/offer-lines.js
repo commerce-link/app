@@ -558,11 +558,21 @@
             }
             return false;
         }
+        // The row itself moves through the table while it is dragged (sortable-ghost, styled as lifted): the browser's
+        // half-transparent copy at the pointer, and Sortable's copy under a finger, would show the row twice.
+        var noDragImage = new Image();
+        noDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         new Sortable(body, {
             handle: '[data-cl-drag]',
             draggable: 'tr',
             filter: '[data-cl-group-foot]',
             animation: reducedMotion.matches ? 0 : 150,
+            setData: function (dataTransfer) {
+                dataTransfer.setData('Text', '');
+                if (typeof dataTransfer.setDragImage === 'function') {
+                    dataTransfer.setDragImage(noDragImage, 0, 0);
+                }
+            },
             onStart: function (event) {
                 table.classList.add('is-dragging');
                 if (!isHead(event.item)) {

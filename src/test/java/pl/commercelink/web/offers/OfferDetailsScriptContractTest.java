@@ -211,4 +211,17 @@ class OfferDetailsScriptContractTest {
                 .contains("describedBy(control, note.id, !note.hidden && each.hidden);");
         assertThat(js).contains("if (!form.hasAttribute('data-cl-async')) {\n            window.addEventListener('pageshow'");
     }
+
+    @Test
+    void draggedRowShowsOnceAsTheRowMovingThroughTheTable() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String css = read("static/css/commercelink.css");
+
+        // then: no browser copy at the pointer, no Sortable copy under a finger; the row in the table looks lifted
+        assertThat(js).contains("setData: function (dataTransfer) {")
+                .contains("dataTransfer.setDragImage(noDragImage, 0, 0);");
+        assertThat(css).contains(".cl-page .cl-table.is-line-editor tr.sortable-fallback { visibility: hidden; }")
+                .contains(".cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow:");
+    }
 }

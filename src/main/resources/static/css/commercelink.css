@@ -13893,7 +13893,13 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot > td { height: auto; padding: 4px 12px; }
 .cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty .cl-group-drop.is-empty,
 .cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot:not(.is-empty) .cl-group-drop.is-end { display: inline; }
-.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); }
+/* the dragged row is the one in the table (offer-lines.js shows no copy at the pointer): lifted, framed in the accent */
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent); }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > :first-child { box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent), inset 2px 0 0 var(--cl-accent); }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > :last-child { box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent), inset -2px 0 0 var(--cl-accent); }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost .cl-drag { color: var(--cl-accent-ink); }
+/* Sortable's copy that follows a finger (touch; Sortable sets its opacity inline, not its visibility) */
+.cl-page .cl-table.is-line-editor tr.sortable-fallback { visibility: hidden; }
 .cl-page .cl-table.is-line-editor.is-dragging .cl-drag { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
