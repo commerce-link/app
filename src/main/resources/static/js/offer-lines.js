@@ -221,6 +221,11 @@
         if (!summary) {
             return;
         }
+        // the first recount leaves the stored totals: from now on the rows mark the variant the save will count
+        if (shownAsStored) {
+            shownAsStored = false;
+            refresh(false);
+        }
         var items = 0;
         var cost = 0;
         rows().filter(isItem).forEach(function (row) {
@@ -245,12 +250,17 @@
             profitGross: window.CL_formatMoney(Math.round(profitGross * 100) / 100),
             profitNet: window.CL_formatMoney(Math.round(profitGross / vatRate() * 100) / 100)
         };
+        var shown = summary.querySelector('output[data-cl-sum="total"]');
+        // a move or a dialog saved recounts too: only a total that changed is worth hearing
+        var changedTotal = !shown || shown.textContent !== values.total;
         Object.keys(values).forEach(function (key) {
             document.querySelectorAll('output[data-cl-sum="' + key + '"]').forEach(function (output) {
                 output.textContent = values[key];
             });
         });
-        announceTotal(values.total);
+        if (changedTotal) {
+            announceTotal(values.total);
+        }
     }
 
     var totalTimer = null;
@@ -379,9 +389,10 @@
             row.querySelector('[data-cl-line-ungroup-item]').hidden = !group;
         });
         groups.forEach(function (each) {
-            // as the save leaves it: the incomplete items go first, then a group without its marked item takes its first
-            // one (Basket.normalizeVariantSelection)
-            var kept = each.items.filter(function (row) {
+            // As the save leaves it: the incomplete items go first, then a group without its marked item takes its first
+            // one (Basket.normalizeVariantSelection). Until something changes the page shows the stored offer, whose
+            // totals the server counted with the stored choice (Basket.chosenVariant), so the rows agree with them.
+            var kept = shownAsStored ? each.items : each.items.filter(function (row) {
                 return !dropped(row);
             });
             var chosen = kept.filter(function (row) {
@@ -836,6 +847,7 @@
     });
     rows().filter(isHead).forEach(labelGroup);
     // the server rendered the totals from the stored amounts: they are recounted once something changes
+    var shownAsStored = true;
     refresh(false);
     initSortable();
     initEditDialog();

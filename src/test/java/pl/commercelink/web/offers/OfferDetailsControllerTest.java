@@ -641,6 +641,48 @@ class OfferDetailsControllerTest {
         assertThat(recalcModel.getAttribute("confirm")).hasFieldOrPropertyWithValue("actionPath", "/dashboard/offer/offer-1/recalculate");
     }
 
+    @Test
+    void itemPageOfATemplateReadsAndSavesItRecalculatedFromThePricelist() {
+        // given: the table shows a template recalculated on open and its save keeps what it shows; one item's page too
+        Basket stored = fullOffer(BasketType.OfferTemplate);
+        stored.setBasketItems(List.of(item("MFN-A", 1), item("MFN-B", 1)));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        when(offerItemReloader.recalculate(stored)).thenAnswer(i -> {
+            stored.getBasketItems().forEach(each -> each.setUnitPrice(150.0));
+            return List.of();
+        });
+        OfferItemForm form = new OfferItemForm();
+        form.setName("Renamed item");
+        form.setCategory("Laptops");
+        form.setMfn("MFN-B");
+
+        // when
+        controller.saveItem(OFFER_ID, 1, form, null, new ExtendedModelMap(), LOCALE, new RedirectAttributesModelMap());
+
+        // then
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(150.0, 150.0);
+    }
+
+    @Test
+    void itemPageOfAnOfferLeavesItsPricesAsStored() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setBasketItems(List.of(item("MFN-A", 1), item("MFN-B", 1)));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        OfferItemForm form = new OfferItemForm();
+        form.setName("Renamed item");
+        form.setCategory("Laptops");
+        form.setMfn("MFN-B");
+
+        // when
+        controller.saveItem(OFFER_ID, 1, form, null, new ExtendedModelMap(), LOCALE, new RedirectAttributesModelMap());
+        controller.showItem(OFFER_ID, 0, null, new ExtendedModelMap(), LOCALE);
+
+        // then
+        verify(offerItemReloader, never()).recalculate(any());
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(100.0, 100.0);
+    }
+
     private Basket savedBasket() {
         ArgumentCaptor<Basket> captor = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(captor.capture());

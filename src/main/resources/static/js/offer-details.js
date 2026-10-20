@@ -177,6 +177,12 @@
                     }
                     return;
                 }
+                // closed (Escape) while the save ran: the action was cancelled, but the items are saved, so the page shows
+                // them as stored (without the rows the save dropped)
+                if (!confirmDialog.open) {
+                    window.location.reload();
+                    return;
+                }
                 // an item's position is known only now that the table is saved (moved and dropped rows)
                 var savedUrl = actionUrl(element);
                 if (savedUrl === null) {
@@ -444,7 +450,7 @@
         }
         // the sticky top bar covers the top of the viewport
         var topbar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cl-topbar-height'), 10) || 0;
-        // Showing or hiding the peek changes the form's height by its box and the gap, which can move the summary (the
+        // Showing or hiding the peek changes the form's height by its box and its top margin, which can move the summary (the
         // sticky side column whose run ends with the form, or the page clamped at its bottom) by as much. So it shows once the
         // button leaves the screen, but hides only once the button is clear of the edges by more than that, or the two
         // would trade places on every frame near the end of the table. The band is at least BAND and grows to the shown
@@ -476,7 +482,7 @@
         }
         // moved: how far showing the peek just moved the button (none where the browser anchors the scroll)
         function fitBand(moved) {
-            var gap = parseFloat(getComputedStyle(peek.parentElement).rowGap) || 0;
+            var gap = parseFloat(getComputedStyle(peek).marginTop) || 0;
             var needed = Math.ceil(Math.max(peek.getBoundingClientRect().height + gap, moved)) + 8;
             if (needed > band) {
                 band = needed;

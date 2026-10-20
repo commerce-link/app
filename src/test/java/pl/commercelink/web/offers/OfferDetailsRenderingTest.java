@@ -122,6 +122,50 @@ class OfferDetailsRenderingTest {
         return html.substring(start, html.indexOf("</tr>", start));
     }
 
+    @Test
+    void refusedClientPointsEachFieldOnlyAtWhatShows() {
+        // given: a name but neither an e-mail nor a phone, refused by the server
+        Map<String, Object> model = model(fullOffer());
+        ContactDetails contact = new ContactDetails();
+        contact.setName("Jan");
+        model.put("clientForm", contact);
+        model.put("errors", Map.of("contact", "offers.new.contact.missing"));
+
+        // when
+        String refused = render("<form th:replace=\"~{offers/details :: clientForm}\"></form>", model);
+        String clean = render("<form th:replace=\"~{offers/details :: clientForm}\"></form>", model(fullOffer()));
+
+        // then
+        assertThat(field(refused, "contact-email")).contains("aria-describedby=\"offer-contact-channel-error\"");
+        assertThat(field(refused, "contact-phone")).contains("aria-describedby=\"offer-contact-channel-error\"");
+        assertThat(field(refused, "contact-name")).doesNotContain("aria-describedby");
+        assertThat(field(refused, "contact-company")).doesNotContain("aria-describedby");
+        assertThat(field(clean, "contact-email")).contains("aria-describedby=\"offer-contact-rule\"");
+        assertThat(field(clean, "contact-name")).contains("aria-describedby=\"offer-contact-rule\"");
+    }
+
+    @Test
+    void peekFollowsTheColumnsSoTheStickySideColumnEndsAboveIt() {
+        // given
+        OfferDetailsPage page = fullOffer();
+
+        // when
+        String html = html(page);
+
+        // then
+        String form = html.substring(html.indexOf("id=\"offer-items\""), html.indexOf("id=\"offer-action-form\""));
+        assertThat(form.substring(0, form.indexOf('>'))).doesNotContain("cl-layout-aside");
+        assertThat(form).contains("<div class=\"cl-layout-aside\">");
+        assertThat(form.indexOf("cl-summary-peek is-action")).isGreaterThan(form.lastIndexOf("</aside>"));
+        assertThat(form.substring(form.lastIndexOf("</aside>"), form.indexOf("cl-summary-peek is-action")))
+                .contains("</div>");
+    }
+
+    private static String field(String html, String id) {
+        int start = html.indexOf("id=\"" + id + "\"");
+        return html.substring(html.lastIndexOf("<input", start), html.indexOf(">", start));
+    }
+
     private static int count(String text, String needle) {
         return text.split(Pattern.quote(needle), -1).length - 1;
     }

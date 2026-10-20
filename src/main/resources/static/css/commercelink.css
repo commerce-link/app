@@ -13840,7 +13840,7 @@ a.cl-link-button:hover {
 /* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
 .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
 .cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }
-/* "14 999,99" whole inside the field, with the cell's and the field's insets */
+/* "99 999,99" whole inside the field, with the cell's and the field's insets */
 .cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 144px; }
 .cl-page .cl-table.is-line-editor col.cl-col-value { width: 124px; }
 .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 52px; }
@@ -13879,8 +13879,9 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor tr.cl-line-group > * { background: var(--cl-surface-2); border-top: 1px solid var(--cl-line); }
 .cl-page .cl-table.is-line-editor tr.is-variant > th.cl-table-key { box-shadow: inset 3px 0 0 var(--cl-accent); }
 .cl-page .cl-group-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cl-gap-related) var(--cl-gap-fields); }
-/* shrinks before "Rozgrupuj" goes to a second line in the narrow product column at 1366 px */
-.cl-page .cl-group-bar .cl-input { flex: 0 1 160px; min-width: 96px; font-weight: 600; }
+/* shrinks before "Rozgrupuj" goes to a second line in the narrow product column at 1366 px: a line breaks by the items'
+   flex-basis, so the field starts at its narrowest and grows to 160 px into the room the line has left */
+.cl-page .cl-group-bar .cl-input { flex: 1 1 96px; min-width: 96px; max-width: 160px; font-weight: 600; }
 .cl-page .cl-group-bar .cl-link-button { margin-left: auto; }
 .cl-page .cl-group-bar .cl-field-error { flex-basis: 100%; margin: 0; }
 .cl-page .cl-group-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--cl-ink-2); }
@@ -13907,8 +13908,12 @@ a.cl-link-button:hover {
 .cl-page .cl-unsaved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cl-warn); }
 .cl-page .cl-unsaved::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .cl-page .cl-summary-peek.is-action .cl-save-state:empty { display: none; }
-/* the peek closes the items form across both columns, so it stays at the bottom of the screen past the table too */
-.cl-page .cl-layout-aside > .cl-summary-peek.is-action { grid-column: 1 / -1; margin-top: 0; }
+/* After the columns, the peek closes the items form, so it stays at the bottom of the screen past the table too. With
+   two columns it keeps to the main one (the side column's 320 px and the gap of cl-layout-aside): the sticky side column
+   stays whole beside it. */
+@media screen and (min-width: 1366px) {
+    .cl-page .cl-layout-aside + .cl-summary-peek.is-action { margin-right: calc(320px + 16px); }
+}
 @media screen and (max-width: 1365px) {
     /* a field reached with Tab does not hide under the peek */
     html:has(.cl-summary-peek.is-action) { scroll-padding-bottom: 80px; }
@@ -13966,7 +13971,7 @@ html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-paddin
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group-foot > td { display: block; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td.cl-cell-drag { display: none; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td::before { content: none; }
-    .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-input { width: 100%; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-input { flex: 1 1 100%; max-width: none; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-link-button { margin-left: 0; }
 }
 

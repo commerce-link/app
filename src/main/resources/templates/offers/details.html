@@ -27,22 +27,26 @@
 
         <!--/* The items form spans both columns: the save buttons sit in the summary card and in the peek. It posts only
                the items (OfferDetailsController.saveItems); name and fulfilmentType are for "Save as template". */-->
-        <form id="offer-items" class="cl-layout-aside" method="post" data-cl-dirty-form
+        <form id="offer-items" method="post" data-cl-dirty-form
               th:action="@{|/dashboard/offer/${p.offerId()}|}"
               th:attr="data-discard-confirm=#{offers.details.save.discard.confirm}">
             <input type="hidden" name="name" th:value="${p.recordName() ?: ''}" data-cl-dirty-ignore>
             <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}" data-cl-dirty-ignore>
             <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
-            <div class="cl-layout-main">
-                <section th:replace="~{offers/details/items :: card(${p})}"></section>
+            <!--/* The columns have their own grid: the sticky side column stops at its end, above the peek, instead of
+                   sliding under it at the bottom of the page. */-->
+            <div class="cl-layout-aside">
+                <div class="cl-layout-main">
+                    <section th:replace="~{offers/details/items :: card(${p})}"></section>
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <section th:replace="~{offers/details/side :: summary(${p})}"></section>
+                    <section th:replace="~{offers/details/side :: terms(${p})}"></section>
+                    <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
+                    <section th:replace="~{offers/details/side :: note(${p})}"></section>
+                </aside>
             </div>
-            <aside class="cl-layout-side is-sticky">
-                <section th:replace="~{offers/details/side :: summary(${p})}"></section>
-                <section th:replace="~{offers/details/side :: terms(${p})}"></section>
-                <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
-                <section th:replace="~{offers/details/side :: note(${p})}"></section>
-            </aside>
-            <!--/* Last in the form and across both columns: sticky to the bottom of the screen for as long as any part of
+            <!--/* Last in the form and below both columns: sticky to the bottom of the screen for as long as any part of
                    the form is in view, the cards under the summary included (in the main column it ended with the table). */-->
             <div th:replace="~{offers/details/side :: peek(${p})}"></div>
         </form>

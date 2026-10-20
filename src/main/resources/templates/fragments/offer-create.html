@@ -20,10 +20,11 @@
 <fieldset th:fragment="contact(prefix, contact)" class="cl-fieldset"
           th:with="refused=${errors != null and errors.containsKey('contact')},
                    noIdentity=${refused and #strings.isEmpty(contact?.name) and #strings.isEmpty(contact?.companyName)},
-                   noChannel=${refused and #strings.isEmpty(contact?.email) and #strings.isEmpty(contact?.phone)}">
+                   noChannel=${refused and #strings.isEmpty(contact?.email) and #strings.isEmpty(contact?.phone)},
+                   rule=${noIdentity or noChannel} ? null : 'offer-contact-rule'">
     <legend class="cl-fieldset-title" th:text="#{offers.new.contact}"></legend>
-    <!--/* A hidden error still counts in a field's description, so a field names an error only while it shows: refused by
-           the server (errors['contact'], the offer details' client dialog) here, refused in the browser by form-check.js. */-->
+    <!--/* A hidden error or note still counts in a field's description, so a field names one only while it shows: refused
+           by the server (errors['contact'], the offer details' client dialog) here, refused in the browser by form-check.js. */-->
     <p class="cl-help" id="offer-contact-rule" th:text="#{offers.new.contact.rule}" data-cl-any-of-note
        th:hidden="${noIdentity or noChannel}"></p>
     <p class="cl-field-error" id="offer-contact-identity-error" th:hidden="${!noIdentity}" data-cl-any-of="contact-name contact-company">
@@ -42,7 +43,7 @@
                        th:name="${prefix + 'name'}" th:value="${contact?.name}"
                        th:classappend="${noIdentity} ? 'is-invalid'"
                        th:attr="aria-invalid=${noIdentity} ? 'true' : null,
-                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : 'offer-contact-rule'">
+                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -62,7 +63,7 @@
                        th:name="${prefix + 'companyName'}" th:value="${contact?.companyName}"
                        th:classappend="${noIdentity} ? 'is-invalid'"
                        th:attr="aria-invalid=${noIdentity} ? 'true' : null,
-                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : 'offer-contact-rule'">
+                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -73,7 +74,7 @@
                        th:classappend="${noChannel} ? 'is-invalid'"
                        th:attr="data-cl-type-message=#{offers.new.contact.email.invalid},
                                 aria-invalid=${noChannel} ? 'true' : null,
-                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : 'offer-contact-rule'">
+                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -83,7 +84,7 @@
                        th:name="${prefix + 'phone'}" th:value="${contact?.phone}"
                        th:classappend="${noChannel} ? 'is-invalid'"
                        th:attr="aria-invalid=${noChannel} ? 'true' : null,
-                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : 'offer-contact-rule'">
+                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : ${rule}">
             </div>
         </div>
     </div>

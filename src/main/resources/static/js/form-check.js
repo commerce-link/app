@@ -97,10 +97,15 @@
             if (rule.id) {
                 describedBy(control, rule.id, shown);
             }
-            if (note && note.id) {
-                describedBy(control, note.id, !note.hidden && !shown);
-            }
         });
+        // the note shows or hides for the whole group, so the fields of the other rules follow it too
+        if (note && note.id) {
+            group.querySelectorAll(':scope > [data-cl-any-of]').forEach(function (each) {
+                ruleControls(form, each).forEach(function (control) {
+                    describedBy(control, note.id, !note.hidden && each.hidden);
+                });
+            });
+        }
     }
 
     function fieldProblem(control) {
@@ -211,10 +216,13 @@
                 sending = !form.hasAttribute('data-cl-async');
             }
         });
-        // Back to a page kept by the browser (bfcache): the form can be sent again.
-        window.addEventListener('pageshow', function () {
-            sending = false;
-        });
+        // Back to a page kept by the browser (bfcache): the form can be sent again. An async form never blocks a second
+        // send, and is swapped for a new element on every answer, which would add a listener each time.
+        if (!form.hasAttribute('data-cl-async')) {
+            window.addEventListener('pageshow', function () {
+                sending = false;
+            });
+        }
         ['input', 'change'].forEach(function (type) {
             form.addEventListener(type, function (event) {
                 if (event.target.id) {

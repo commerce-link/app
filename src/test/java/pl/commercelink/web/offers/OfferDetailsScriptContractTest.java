@@ -169,4 +169,46 @@ class OfferDetailsScriptContractTest {
                 .contains("refused.reason = reason;")
                 .contains("showToast((error && error.reason) || unsaved.getAttribute('data-failed'), 'danger');");
     }
+
+    @Test
+    void cleanPageMarksTheStoredVariantChoiceWhichTheServerTotalsCount() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then: the save's choice (without the dropped items) only once something changed and the totals are recounted
+        assertThat(js).contains("var kept = shownAsStored ? each.items : each.items.filter(function (row) {")
+                .contains("var shownAsStored = true;\n    refresh(false);")
+                .contains("if (shownAsStored) {\n            shownAsStored = false;\n            refresh(false);");
+    }
+
+    @Test
+    void totalIsAnnouncedOnlyWhenItChanged() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then: a move or a saved dialog recounts without changing the total
+        assertThat(js).contains("var changedTotal = !shown || shown.textContent !== values.total;")
+                .contains("if (changedTotal) {\n            announceTotal(values.total);");
+    }
+
+    @Test
+    void confirmationClosedWhileItsSaveRanDoesNotRunTheAction() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then
+        assertThat(js).contains("if (!confirmDialog.open) {\n                    window.location.reload();\n                    return;");
+        assertThat(js.indexOf("if (!confirmDialog.open) {")).isLessThan(js.indexOf("var savedUrl = actionUrl(element);"));
+    }
+
+    @Test
+    void contactNoteDescribesTheFieldsOfEveryRuleOfItsGroup() throws Exception {
+        // when
+        String js = read("static/js/form-check.js");
+
+        // then: shown again after one rule is met, the note is named by the fields of the other rule too
+        assertThat(js).contains("group.querySelectorAll(':scope > [data-cl-any-of]').forEach(function (each) {")
+                .contains("describedBy(control, note.id, !note.hidden && each.hidden);");
+        assertThat(js).contains("if (!form.hasAttribute('data-cl-async')) {\n            window.addEventListener('pageshow'");
+    }
 }

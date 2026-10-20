@@ -314,4 +314,19 @@ class OfferDetailsPageFactoryTest {
         assertThat(page.summary().deliveryName()).isNull();
         assertThat(page.summary().total()).isEqualTo(Money.format(100));
     }
+
+    @Test
+    void priceAndCostFieldsHoldWholeGroszeSoATableSaveStoresThemRounded() {
+        // given: the user's decision K1 - fractional grosze from an import or a conversion are rounded on the next save
+        Basket basket = basket(item("A", 1, 10.005, 3.333));
+
+        // when
+        Item line = (Item) build(basket).lines().get(0);
+
+        // then
+        assertThat(line.unitPriceInput()).isEqualTo("10.01");
+        assertThat(line.unitCostInput()).isEqualTo("3.33");
+        assertThat(line.unitPrice()).isEqualTo(10.005);
+        assertThat(line.unitCost()).isEqualTo(3.333);
+    }
 }
