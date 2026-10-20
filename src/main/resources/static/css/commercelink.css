@@ -13856,7 +13856,8 @@ body.cl-public { background: var(--cl-bg); min-height: 100vh; display: flex; fle
 body.cl-public { --cl-accent: var(--cl-brand-ink); --cl-accent-ink: var(--cl-brand-ink-hover); --cl-accent-soft: var(--cl-brand-soft); }
 body.cl-public .cl-button.is-primary { background: var(--cl-brand); border-color: var(--cl-brand); color: var(--cl-brand-on); }
 body.cl-public .cl-button.is-primary:hover { background: var(--cl-brand-hover); border-color: var(--cl-brand-hover); color: var(--cl-brand-on); }
-body.cl-public a:not(.cl-button) { color: var(--cl-brand-ink); }
+/* content and footer links only: the skip link and the language switch keep their own colours */
+body.cl-public :is(.cl-public-main, .cl-public-foot) a:not(.cl-button) { color: var(--cl-brand-ink); }
 /* there is no top bar on these pages, so the toast sits at the top edge */
 body.cl-public .cl-toast { top: 16px; }
 
@@ -13869,8 +13870,8 @@ body.cl-public .cl-toast { top: 16px; }
   overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .cl-public-lang { display: flex; gap: 2px; flex: none; }
 .cl-public-lang a, .cl-public-lang span { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px;
-  padding: 0 6px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--cl-ink-2) !important; text-decoration: none; }
-.cl-public-lang [aria-current] { color: var(--cl-ink) !important; background: var(--cl-surface-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
+  padding: 0 6px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--cl-ink-2); text-decoration: none; }
+.cl-public-lang [aria-current] { color: var(--cl-ink); background: var(--cl-surface-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
 .cl-public-main { box-sizing: border-box; flex: 1 0 auto; width: 100%; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 28px 16px 40px; }
 .cl-public-main.is-form { --cl-public-width: 760px; }
 .cl-public-main.is-narrow { --cl-public-width: 560px; }
@@ -13880,7 +13881,7 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-public-foot-inner p { margin: 0; }
 .cl-public-foot-inner .cl-public-foot-store { color: var(--cl-ink); font-weight: 600; }
 @media (max-width: 719px) {
-  .cl-public-bar { min-height: 56px; padding: 8px 16px; gap: 8px; }
+  .cl-public-bar { min-height: 56px; padding: 6px 16px; gap: 8px; }
   .cl-public-logo { max-height: 32px; max-width: 160px; }
   .cl-public-store { font-size: 16px; }
   .cl-public-lang a, .cl-public-lang span { min-width: 44px; min-height: 44px; }
@@ -13936,7 +13937,7 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-offer-page .cl-pay-methods { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0 0 14px; }
 .cl-offer-page .cl-pay-methods legend { font-size: 13.5px; font-weight: 500; color: var(--cl-ink-2); margin-bottom: 6px; padding: 0; }
 .cl-offer-page .cl-pay-methods .cl-choice { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--cl-line);
-  border-radius: 8px; margin: 0; cursor: pointer; background: #fff; }
+  border-radius: 8px; margin: 0; cursor: pointer; background: var(--cl-surface); }
 .cl-offer-page .cl-pay-methods .cl-choice:has(input:checked) { border-color: var(--cl-accent); background: var(--cl-accent-soft);
   box-shadow: inset 0 0 0 1px var(--cl-accent); }
 .cl-offer-page .cl-pay-methods .cl-choice input { accent-color: var(--cl-accent); margin: 0; }
@@ -13958,6 +13959,8 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-offer-page .cl-proforma-label { min-width: 0; text-align: left; overflow-wrap: anywhere; }
 .cl-offer-page .cl-help { font-size: 13px; color: var(--cl-ink-2); margin: 8px 0 0; }
 .cl-offer-page .cl-help.is-lock { display: flex; gap: 8px; align-items: flex-start; }
+/* the shared inset rule zeroes help margins; two help lines in a row (lock + contact the store) still need a gap */
+.cl-offer-page .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }
 .cl-offer-page .cl-edit-link { font-size: 13.5px; }
 .cl-offer-page .cl-alert { margin: 0; }
 .cl-offer-page .cl-card-inset > .cl-alert + * { margin-top: 12px; }
