@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -208,6 +209,8 @@ class MarketplaceOrderImporterTest {
         // then
         OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
         assertEquals("MFN-1", productItem.getSku());
+        assertEquals("Cat", productItem.getCategory());
+        verify(pimCatalog, never()).findByMpn(anyString());
         assertEquals("k7m2xq9pz4", productItem.getExternalItemId());
     }
 

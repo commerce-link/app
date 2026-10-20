@@ -51,13 +51,13 @@ public class MarketplaceOrderImporter {
 
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
-            String mfn = pimIdToMfn(product.manufacturerCode());
+            Optional<PimEntry> pimEntry = findByPimId(product.manufacturerCode());
 
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    mfn,
-                    resolveProductCategory(mfn),
+                    pimEntry.flatMap(e -> e.mpns().stream().findFirst()).orElse(product.manufacturerCode()),
+                    resolveProductCategory(pimEntry, product.manufacturerCode()),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -162,18 +162,15 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    // marketplace offers are often keyed by the pimId; a value PIM does not know as a pimId is already an mfn
-    private String pimIdToMfn(String manufacturerCode) {
-        if (StringUtils.isBlank(manufacturerCode)) {
-            return manufacturerCode;
-        }
-        return pimCatalog.findByPimId(manufacturerCode)
-                .flatMap(entry -> entry.mpns().stream().findFirst())
-                .orElse(manufacturerCode);
+    // marketplace offers are often keyed by the pimId; a code PIM does not know as a pimId is already an mfn
+    private Optional<PimEntry> findByPimId(String manufacturerCode) {
+        return StringUtils.isBlank(manufacturerCode) ? Optional.empty() : pimCatalog.findByPimId(manufacturerCode);
     }
 
-    private String resolveProductCategory(String mfn) {
-        return pimCatalog.findByMpn(mfn)
+    // the category comes from the entry found by pimId: an mpn lookup could hit another product sharing the mpn
+    private String resolveProductCategory(Optional<PimEntry> pimEntry, String mfn) {
+        return pimEntry
+                .or(() -> pimCatalog.findByMpn(mfn))
                 .map(PimEntry::category)
                 .orElse(Categories.UNCATEGORIZED);
     }
