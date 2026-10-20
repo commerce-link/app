@@ -1,0 +1,22 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-narrow'">
+<head>
+    <title th:text="#{client.offer.unavailable.pageTitle}">Oferta niedostępna</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+    <section class="cl-card">
+        <p class="cl-eyebrow" th:text="#{client.offer.eyebrow.short(${shortId})}"></p>
+        <h1 class="cl-page-title" th:text="#{client.offer.unavailable.title}"></h1>
+        <p class="cl-page-lead">
+            <th:block th:text="#{client.offer.unavailable.lead}"></th:block>
+            <th:block th:if="${publicPage.contactEmail != null}">
+                <th:block th:text="#{client.offer.unavailable.contact}"></th:block>
+                <a th:href="'mailto:' + ${publicPage.contactEmail}" th:text="${publicPage.contactEmail}"></a>
+            </th:block>
+        </p>
+    </section>
+</th:block>
+</body>
+</html>
