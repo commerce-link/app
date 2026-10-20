@@ -257,6 +257,25 @@ class ClientOfferControllerTest {
     }
 
     @Test
+    void invalidDataOnAnOfferWithSavedDataShowsTheFormWithoutTheEditParameter() {
+        // given
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(submittedBasket()));
+        when(pageFactory.build(any(), any(), anyBoolean(), any())).thenReturn(page(true));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.submitClientOfferForm(STORE_ID, OFFER_ID, new ClientDataDto(), "person", "same", null,
+                model, new RedirectAttributesModelMap(), PL, new MockHttpServletRequest("POST", OFFER_PATH + "/submit"),
+                new MockHttpServletResponse());
+
+        // then
+        assertThat(view).isEqualTo("clientOffer");
+        assertThat((Map<?, ?>) model.get("errors")).isNotEmpty();
+        assertThat(model.get("editing")).isEqualTo(true);
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
     void validDataIsSavedWithTheCopiedShippingAddress() {
         // given
         Basket basket = basket();

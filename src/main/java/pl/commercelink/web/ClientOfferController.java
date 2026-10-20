@@ -98,7 +98,8 @@ public class ClientOfferController {
                 isPersonalCollection(page));
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
-            fillPage(model, basket, store, page, form, errors, EDIT_DATA.equals(edit), locale);
+            // an offer with saved data shows them masked unless edited; the rejected form must stay visible with its errors
+            fillPage(model, basket, store, page, form, errors, EDIT_DATA.equals(edit) || page.submitted(), locale);
             return VIEW;
         }
 
