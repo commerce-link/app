@@ -1,0 +1,154 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Step 2 of the offer page. Until the customer's data is saved (or with ?edit=data) it is the form, checked on the
+       server: every field is in the markup and variant-fields.js only hides what the choices make irrelevant, so the
+       form works without JavaScript and the server reads only the fields that match the choices. Once saved, the data
+       is shown masked, since anyone with the link can open the page; the form never comes back filled with it. */-->
+<section th:fragment="data" class="cl-card" aria-labelledby="client-offer-data-title">
+    <th:block th:if="${!page.submitted or editing}">
+        <div class="cl-card-head has-step">
+            <span class="cl-step-badge" aria-hidden="true">2</span>
+            <h2 class="cl-card-title" id="client-offer-data-title" th:text="#{client.offer.data.title}"></h2>
+        </div>
+        <p class="cl-card-desc" th:if="${editing and page.submitted}" th:text="#{client.offer.data.editingNote}"></p>
+        <form id="client-offer-data" method="post" novalidate data-cl-submit-once
+              th:action="@{|${page.offerPath}/submit|}">
+            <input th:if="${editing}" type="hidden" name="edit" value="data">
+            <div class="cl-card-inset">
+                <div th:replace="~{fragments/settings-form :: errorSummaryTitled('client-offer-errors', ${errors}, null, 'client.offer.errors.title')}"></div>
+                <fieldset class="cl-fieldset">
+                    <legend class="cl-visually-hidden" th:text="#{client.offer.data.billing}"></legend>
+                    <fieldset class="cl-choice-group is-row">
+                        <legend class="cl-label" th:text="#{client.offer.data.customerType}"></legend>
+                        <label class="cl-choice">
+                            <input type="radio" name="customerType" id="customerType" value="person"
+                                   data-cl-variant-select="customer" th:checked="${!form.isCompany()}">
+                            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{client.offer.data.person}"></span></span>
+                        </label>
+                        <label class="cl-choice">
+                            <input type="radio" name="customerType" value="company"
+                                   data-cl-variant-select="customer" th:checked="${form.isCompany()}">
+                            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{client.offer.data.company}"></span></span>
+                        </label>
+                    </fieldset>
+                    <div th:replace="~{client-offer/data :: billingGrid(${form.dto().billingDetails})}"></div>
+                </fieldset>
+
+                <fieldset th:if="${form.personalCollection()}" class="cl-fieldset">
+                    <legend class="cl-fieldset-title" th:text="#{client.offer.data.delivery}"></legend>
+                    <p class="cl-help" th:text="#{client.offer.data.personalCollectionHelp}"></p>
+                </fieldset>
+                <fieldset th:unless="${form.personalCollection()}" class="cl-fieldset">
+                    <legend class="cl-fieldset-title" th:text="#{client.offer.data.shipping}"></legend>
+                    <fieldset class="cl-choice-group is-row">
+                        <legend class="cl-visually-hidden" th:text="#{client.offer.data.shipping}"></legend>
+                        <label class="cl-choice">
+                            <input type="radio" name="shippingAddress" id="shippingAddress" value="same"
+                                   data-cl-variant-select="shipping" th:checked="${!form.isOtherShipping()}"
+                                   th:attr="aria-describedby=${errors['shippingAddress'] != null ? 'shippingAddress-error' : null}">
+                            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{client.offer.data.shipping.same}"></span></span>
+                        </label>
+                        <label class="cl-choice">
+                            <input type="radio" name="shippingAddress" value="other"
+                                   data-cl-variant-select="shipping" th:checked="${form.isOtherShipping()}">
+                            <span class="cl-choice-text"><span class="cl-choice-title" th:text="#{client.offer.data.shipping.other}"></span></span>
+                        </label>
+                        <p th:if="${errors['shippingAddress'] != null}" class="cl-field-error" id="shippingAddress-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="#{${errors['shippingAddress']}}"></span>
+                        </p>
+                    </fieldset>
+                    <div th:replace="~{client-offer/data :: shippingGrid(${form.dto().shippingDetails})}"></div>
+                </fieldset>
+            </div>
+            <div class="cl-card-footer">
+                <button class="cl-button is-primary" type="submit" th:text="#{client.offer.data.save}"></button>
+                <a th:if="${editing}" class="cl-button" th:href="${page.offerPath}" th:text="#{client.offer.data.cancel}"></a>
+                <p class="cl-help" th:text="#{client.offer.data.saveHelp}"></p>
+            </div>
+        </form>
+    </th:block>
+
+    <th:block th:if="${page.submitted and !editing}">
+        <div class="cl-card-head has-step">
+            <span class="cl-step-badge is-done" aria-hidden="true"><i class="fas fa-check"></i></span>
+            <h2 class="cl-card-title" id="client-offer-data-title" th:text="#{client.offer.data.title}"></h2>
+        </div>
+        <p class="cl-card-desc" th:text="#{client.offer.data.savedDesc}"></p>
+        <div class="cl-card-inset">
+            <div class="cl-kv-grid">
+                <div>
+                    <h3 th:text="#{client.offer.data.billing}"></h3>
+                    <th:block th:replace="~{client-offer/data :: party(${page.data.billing})}"></th:block>
+                </div>
+                <div>
+                    <h3 th:text="#{client.offer.data.shipping}"></h3>
+                    <p th:if="${page.data.shippingMode.name() == 'SAME'}" class="cl-muted" th:text="#{client.offer.data.shipping.same}"></p>
+                    <p th:if="${page.data.shippingMode.name() == 'PERSONAL_COLLECTION'}" class="cl-muted"
+                       th:text="#{client.offer.data.personalCollection}"></p>
+                    <th:block th:if="${page.data.shippingMode.name() == 'OTHER'}">
+                        <th:block th:replace="~{client-offer/data :: party(${page.data.shipping})}"></th:block>
+                    </th:block>
+                </div>
+            </div>
+            <p class="cl-help">
+                <th:block th:text="#{client.offer.data.again.before}"></th:block>
+                <a href="?edit=data#client-offer-data" th:text="#{client.offer.data.again.link}"></a>
+                <th:block th:text="#{client.offer.data.again.after}"></th:block>
+            </p>
+        </div>
+    </th:block>
+</section>
+
+<!--/* The billing fields on the 6-column grid; the company pair is shown by variant-fields.js only for a company. */-->
+<div th:fragment="billingGrid(billing)" class="cl-form-grid">
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('billingDetails.name', 'order.address.name', ${billing.name}, 'text', 'given-name', true, ${errors['billingDetails.name']}, null)}"></div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('billingDetails.surname', 'order.address.surname', ${billing.surname}, 'text', 'family-name', true, ${errors['billingDetails.surname']}, null)}"></div>
+    <div class="cl-form-grid" data-cl-variant-when="customer=company">
+        <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('billingDetails.companyName', 'order.address.company', ${billing.companyName}, 'text', 'organization', true, ${errors['billingDetails.companyName']}, null)}"></div>
+        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('billingDetails.taxId', 'order.address.tax.id', ${billing.taxId}, 'text', null, true, ${errors['billingDetails.taxId']}, null)}"></div>
+    </div>
+    <div th:insert="~{fragments/settings-form :: textField('billingDetails.streetAndNumber', 'order.address.street', ${billing.streetAndNumber}, 'text', 'street-address', true, ${errors['billingDetails.streetAndNumber']}, null)}"></div>
+    <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('billingDetails.postalCode', 'order.address.postal', ${billing.postalCode}, 'text', 'postal-code', true, ${errors['billingDetails.postalCode']}, null)}"></div>
+    <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('billingDetails.city', 'order.address.city', ${billing.city}, 'text', 'address-level2', true, ${errors['billingDetails.city']}, null)}"></div>
+    <div class="cl-span-2" th:insert="~{fragments/settings-form :: selectField('billingDetails.country', 'order.address.country', ${billing.country}, ${countries}, 'country', true, ${errors['billingDetails.country']}, null)}"></div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('billingDetails.email', 'client.offer.data.email', ${billing.email}, 'email', 'email', true, ${errors['billingDetails.email']}, null)}"></div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('billingDetails.phone', 'client.offer.data.phone', ${billing.phone}, 'tel', 'tel', true, ${errors['billingDetails.phone']}, null)}"></div>
+</div>
+
+<!--/* The delivery fields, shown by variant-fields.js only for "Other address". Deliveries go to Poland only, so the
+       country is fixed: shown as text, sent as a hidden PL. */-->
+<div th:fragment="shippingGrid(shipping)" class="cl-form-grid" data-cl-variant-when="shipping=other">
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.name', 'order.address.name', ${shipping.name}, 'text', 'shipping given-name', true, ${errors['shippingDetails.name']}, null)}"></div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.surname', 'order.address.surname', ${shipping.surname}, 'text', 'shipping family-name', true, ${errors['shippingDetails.surname']}, null)}"></div>
+    <div th:insert="~{fragments/settings-form :: textField('shippingDetails.companyName', 'order.address.company', ${shipping.companyName}, 'text', 'shipping organization', false, ${errors['shippingDetails.companyName']}, null)}"></div>
+    <div th:insert="~{fragments/settings-form :: textField('shippingDetails.streetAndNumber', 'order.address.street', ${shipping.streetAndNumber}, 'text', 'shipping street-address', true, ${errors['shippingDetails.streetAndNumber']}, null)}"></div>
+    <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.postalCode', 'order.address.postal', ${shipping.postalCode}, 'text', 'shipping postal-code', true, ${errors['shippingDetails.postalCode']}, null)}"></div>
+    <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('shippingDetails.city', 'order.address.city', ${shipping.city}, 'text', 'shipping address-level2', true, ${errors['shippingDetails.city']}, null)}"></div>
+    <div class="cl-span-2 cl-field">
+        <span class="cl-label" th:text="#{order.address.country}"></span>
+        <p class="cl-static-value" th:text="${countries.?[value == 'PL'].size() > 0} ? ${countries.?[value == 'PL'][0].label} : 'PL'"></p>
+        <input type="hidden" name="shippingDetails.country" value="PL">
+    </div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.email', 'client.offer.data.email', ${shipping.email}, 'email', 'shipping email', true, ${errors['shippingDetails.email']}, null)}"></div>
+    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.phone', 'client.offer.data.phone', ${shipping.phone}, 'tel', 'shipping tel', true, ${errors['shippingDetails.phone']}, null)}"></div>
+</div>
+
+<!--/* A saved party, every value masked through the shared fragment; empty lines are left out. */-->
+<th:block th:fragment="party(p)">
+    <p th:if="${p.fullName != null}"><span th:replace="~{fragments/masked-field :: masked(${p.fullName})}"></span></p>
+    <p th:if="${p.companyName != null}"><span th:replace="~{fragments/masked-field :: masked(${p.companyName})}"></span></p>
+    <p th:if="${p.taxId != null}"><th:block th:text="#{order.address.tax.id}"></th:block> <span th:replace="~{fragments/masked-field :: masked(${p.taxId})}"></span></p>
+    <p th:if="${p.street != null}"><span th:replace="~{fragments/masked-field :: masked(${p.street})}"></span></p>
+    <p th:if="${p.postalCode != null or p.city != null or p.country != null}"><span
+            th:replace="~{fragments/masked-field :: masked(${p.postalCode})}"></span> <span
+            th:replace="~{fragments/masked-field :: masked(${p.city})}"></span><th:block th:if="${p.country != null}">, <span
+            th:replace="~{fragments/masked-field :: masked(${p.country})}"></span></th:block></p>
+    <p th:if="${p.email != null}"><span th:replace="~{fragments/masked-field :: masked(${p.email})}"></span></p>
+    <p th:if="${p.phone != null}"><span th:replace="~{fragments/masked-field :: masked(${p.phone})}"></span></p>
+</th:block>
+
+</body>
+</html>

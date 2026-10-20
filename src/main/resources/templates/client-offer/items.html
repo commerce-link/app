@@ -1,0 +1,85 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Step 1 of the offer page: the lines, a variant group as a choice that posts at once (client-offer.js; without
+       JavaScript through its "Change variant" button), the delivery and the total. Unit prices and line amounts follow
+       showPrices; variant deltas and the total are always shown. */-->
+<section th:fragment="items" class="cl-card" aria-labelledby="client-offer-items-title">
+    <div class="cl-card-head has-step">
+        <span class="cl-step-badge" aria-hidden="true">1</span>
+        <h2 class="cl-card-title" id="client-offer-items-title" th:text="#{client.offer.items.title(${#lists.size(page.lines)})}"></h2>
+    </div>
+    <p class="cl-card-desc" th:if="${page.showPrices or page.hasGroups}">
+        <th:block th:if="${page.showPrices}" th:text="#{client.offer.items.grossPrices}"></th:block>
+        <th:block th:if="${page.hasGroups}" th:text="#{client.offer.items.groupHint}"></th:block>
+    </p>
+    <ul class="cl-list is-amounts">
+        <th:block th:each="line : ${page.lines}">
+            <li th:unless="${line.isGroup()}" class="cl-list-item">
+                <div>
+                    <p class="cl-list-title" th:text="${line.name}"></p>
+                    <p class="cl-list-desc" th:text="${page.showPrices}
+                            ? (${line.category != null}
+                                ? #{client.offer.items.line(${line.category}, ${line.qty}, #{general.currency.amount(${line.unitPrice})})}
+                                : #{client.offer.items.unit(${line.qty}, #{general.currency.amount(${line.unitPrice})})})
+                            : (${line.category != null}
+                                ? #{client.offer.items.lineQty(${line.category}, ${line.qty})}
+                                : #{client.offer.items.qty(${line.qty})})"></p>
+                </div>
+                <span th:if="${page.showPrices}" class="cl-list-amount" th:text="#{general.currency.amount(${line.amount})}"></span>
+            </li>
+            <li th:if="${line.isGroup()}" class="cl-list-item is-group">
+                <div>
+                    <div class="cl-line-head">
+                        <div>
+                            <p class="cl-list-title"><th:block th:text="${line.groupId}"></th:block>
+                                <span class="cl-status is-info" th:text="#{client.offer.variant.badge}"></span></p>
+                            <p class="cl-list-desc" th:text="${page.showPrices}
+                                    ? #{client.offer.items.unit(${line.qty}, #{general.currency.amount(${line.unitPrice})})}
+                                    : #{client.offer.items.qty(${line.qty})}"></p>
+                        </div>
+                        <span th:if="${page.showPrices}" class="cl-list-amount" th:text="#{general.currency.amount(${line.amount})}"></span>
+                    </div>
+                    <form class="cl-variant-pick" method="post" th:action="@{|${page.offerPath}/select-variant|}">
+                        <input type="hidden" name="groupId" th:value="${line.groupId}">
+                        <fieldset class="cl-choice-group">
+                            <legend class="cl-visually-hidden" th:text="#{client.offer.variant.legend(${line.groupId})}"></legend>
+                            <label class="cl-choice" th:each="option : ${line.options}">
+                                <input type="radio" name="position" th:value="${option.position}" th:checked="${option.selected}">
+                                <span class="cl-choice-title" th:text="${option.name}"></span>
+                                <span class="cl-choice-aside" th:text="${option.selected} ? #{client.offer.variant.selected}
+                                        : (${option.samePrice} ? #{client.offer.variant.samePrice}
+                                                               : #{general.currency.amount(${option.delta})})"></span>
+                            </label>
+                        </fieldset>
+                        <button class="cl-button cl-variant-apply" type="submit" th:text="#{client.offer.variant.apply}"></button>
+                    </form>
+                </div>
+            </li>
+        </th:block>
+        <li th:if="${page.delivery != null}" class="cl-list-item has-icon">
+            <div>
+                <span class="cl-list-icon" aria-hidden="true"><i th:class="${page.delivery.personalCollection} ? 'fas fa-store' : 'fas fa-truck'"></i></span>
+                <div>
+                    <p class="cl-list-title" th:text="#{client.offer.items.delivery(${page.delivery.name})}"></p>
+                    <p class="cl-list-desc" th:if="${page.delivery.description != null}" th:text="${page.delivery.description}"></p>
+                </div>
+            </div>
+            <span th:if="${page.showPrices}" class="cl-list-amount" th:text="#{general.currency.amount(${page.delivery.price})}"></span>
+        </li>
+    </ul>
+    <div class="cl-card-inset">
+        <dl class="cl-offer-total">
+            <div class="cl-offer-total-row">
+                <dt th:text="#{client.offer.total}"></dt>
+                <dd th:text="#{general.currency.amount(${page.total})}"></dd>
+            </div>
+        </dl>
+        <p class="cl-offer-total-sub"
+           th:text="#{client.offer.total.sub(#{general.currency.amount(${page.vat})}, #{general.currency.amount(${page.net})})}"></p>
+    </div>
+</section>
+
+</body>
+</html>

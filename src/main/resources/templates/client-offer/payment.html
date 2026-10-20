@@ -1,0 +1,103 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Step 3 of the offer page: the outcome of the last action, online payment (not for a split payment invoice) and the
+       bank transfer with the proforma invoice. Everything that acts needs the saved data, so until then it is disabled
+       and described by the lock note. */-->
+<section th:fragment="payment" class="cl-card" aria-labelledby="client-offer-pay-title"
+         th:with="pay=${page.payment}, locked=${!page.payment.unlocked},
+                  online=${!page.payment.splitPayment and !page.payment.options.isEmpty()}">
+    <div class="cl-card-head has-step">
+        <span class="cl-step-badge" th:classappend="${locked} ? 'is-locked'" aria-hidden="true">3</span>
+        <h2 class="cl-card-title" id="client-offer-pay-title" th:text="#{client.offer.payment.title}"></h2>
+    </div>
+    <div class="cl-card-inset">
+        <div th:if="${clientOfferNotice != null}" class="cl-alert" role="status"
+             th:classappend="${clientOfferNotice.tone() == 'ok'} ? 'is-ok' : 'is-bad'">
+            <span class="cl-alert-icon" aria-hidden="true"><i th:class="${clientOfferNotice.tone() == 'ok'} ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i></span>
+            <div><p class="cl-alert-text" th:text="${clientOfferNotice.text()}"></p></div>
+        </div>
+
+        <p th:if="${locked}" class="cl-help is-lock" id="client-offer-pay-lock">
+            <i class="fas fa-lock" aria-hidden="true"></i><span th:text="#{client.offer.payment.locked}"></span>
+        </p>
+
+        <div th:if="${pay.splitPayment}" class="cl-alert is-info">
+            <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-info-circle"></i></span>
+            <div>
+                <p class="cl-alert-title" th:text="#{client.offer.payment.split.title}"></p>
+                <p class="cl-alert-text" th:text="#{client.offer.payment.split.text}"></p>
+            </div>
+        </div>
+
+        <form th:if="${online}" method="post" data-cl-submit-once th:action="@{|${page.offerPath}/checkout|}">
+            <fieldset th:if="${pay.options.size() > 1}" class="cl-pay-methods" th:classappend="${locked} ? 'is-locked'"
+                      th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}">
+                <legend th:text="#{client.offer.payment.methods}"></legend>
+                <label class="cl-choice" th:each="option : ${pay.options}">
+                    <input type="radio" name="paymentOptionId" th:value="${option.name()}"
+                           th:checked="${option.name() == pay.defaultOption}" th:disabled="${locked}">
+                    <span class="cl-choice-text"><span class="cl-choice-title" th:text="${option.displayName()}"></span></span>
+                    <span th:if="${option.name() == pay.defaultOption}" class="cl-status is-info"
+                          th:text="#{client.offer.payment.recommended}"></span>
+                </label>
+            </fieldset>
+            <div class="cl-pay-row">
+                <button class="cl-button is-primary" type="submit" th:disabled="${locked}"
+                        th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}"
+                        th:text="#{client.offer.payment.submit}"></button>
+                <p class="cl-pay-amount"><th:block th:text="#{client.offer.payment.amount}"></th:block><strong
+                        th:text="#{general.currency.amount(${page.total})}"></strong></p>
+            </div>
+            <p th:if="${pay.options.size() == 1}" class="cl-help"
+               th:text="#{client.offer.payment.via(${pay.options[0].displayName()})}"></p>
+        </form>
+
+        <p th:if="${!pay.splitPayment and pay.options.isEmpty()}" class="cl-help"
+           th:text="${pay.bank != null} ? #{client.offer.payment.none.bank} : #{client.offer.payment.none.contact}"></p>
+
+        <th:block th:if="${pay.bank != null}">
+            <p th:if="${online}" class="cl-pay-or" th:text="#{client.offer.payment.or}"></p>
+            <dl class="cl-kv is-bank">
+                <th:block th:if="${pay.bank.holder != null}">
+                    <dt th:text="#{client.offer.bank.holder}"></dt>
+                    <dd th:text="${pay.bank.holder}"></dd>
+                </th:block>
+                <dt th:text="#{client.offer.bank.iban}"></dt>
+                <dd><th:block th:text="${pay.bank.ibanGrouped}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                        th:attr="data-cl-copy=${pay.bank.ibanRaw}, aria-label=#{client.offer.bank.copyIban}"><span
+                        class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
+                <dt th:text="#{client.offer.bank.title}"></dt>
+                <dd><th:block th:text="${pay.bank.transferTitle}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                        th:attr="data-cl-copy=${pay.bank.transferTitle}, aria-label=#{client.offer.bank.copyTitle}"><span
+                        class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
+                <dt th:text="#{client.offer.bank.amount}"></dt>
+                <dd th:text="#{general.currency.amount(${page.total})}"></dd>
+                <th:block th:if="${!#strings.isEmpty(pay.bank.bankName) or !#strings.isEmpty(pay.bank.swift)}">
+                    <dt th:text="#{client.offer.bank.name}"></dt>
+                    <dd th:text="${#strings.isEmpty(pay.bank.bankName)} ? #{client.offer.bank.swift(${pay.bank.swift})}
+                            : (${#strings.isEmpty(pay.bank.swift)} ? ${pay.bank.bankName}
+                                : ${pay.bank.bankName} + ' · ' + #{client.offer.bank.swift(${pay.bank.swift})})"></dd>
+                </th:block>
+                <th:block th:if="${pay.bank.currency != null}">
+                    <dt th:text="#{client.offer.bank.currency}"></dt>
+                    <dd th:text="${pay.bank.currency}"></dd>
+                </th:block>
+            </dl>
+            <form method="post" data-cl-submit-once th:action="@{|${page.offerPath}/send-proforma-invoice|}">
+                <button class="cl-button" type="submit" th:disabled="${locked}"
+                        th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}"><i class="far fa-envelope" aria-hidden="true"></i>
+                    <th:block th:if="${locked or pay.billingEmail == null}" th:text="#{client.offer.proforma.send}"></th:block>
+                    <span th:unless="${locked or pay.billingEmail == null}" class="cl-proforma-label"><th:block
+                            th:text="#{client.offer.proforma.sendTo}"></th:block> <span
+                            th:replace="~{fragments/masked-field :: masked(${pay.billingEmail})}"></span></span>
+                </button>
+                <p class="cl-help" th:text="${locked} ? #{client.offer.proforma.locked} : #{client.offer.proforma.help}"></p>
+            </form>
+        </th:block>
+    </div>
+</section>
+
+</body>
+</html>
