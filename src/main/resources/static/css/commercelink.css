@@ -13845,3 +13845,46 @@ a.cl-link-button:hover {
 @media screen and (max-width: 719px) {
     .cl-page .cl-table.is-basket-items.is-wrap tbody tr > td.is-numeric:last-child::before { content: attr(data-label) ": "; }
 }
+
+/* ===== Public page (customer-facing pages, §4a) ===== */
+body.cl-public { background: var(--cl-bg); min-height: 100vh; display: flex; flex-direction: column;
+  --cl-public-width: 1040px;
+  /* store brand: the server overrides these on <body> (BrandPalette); the defaults are the system accent */
+  --cl-brand: #1b4db1; --cl-brand-on: #fff; --cl-brand-hover: #123a8a; --cl-brand-ink: #1b4db1;
+  --cl-brand-ink-hover: #123a8a; --cl-brand-soft: #e6edfb; }
+/* components take the darkened brand (AA on white); the full colour is only the primary button and the top bar */
+body.cl-public { --cl-accent: var(--cl-brand-ink); --cl-accent-ink: var(--cl-brand-ink-hover); --cl-accent-soft: var(--cl-brand-soft); }
+body.cl-public .cl-button.is-primary { background: var(--cl-brand); border-color: var(--cl-brand); color: var(--cl-brand-on); }
+body.cl-public .cl-button.is-primary:hover { background: var(--cl-brand-hover); border-color: var(--cl-brand-hover); color: var(--cl-brand-on); }
+body.cl-public a:not(.cl-button) { color: var(--cl-brand-ink); }
+/* there is no top bar on these pages, so the toast sits at the top edge */
+body.cl-public .cl-toast { top: 16px; }
+
+.cl-public-head { background: var(--cl-surface); border-top: 4px solid var(--cl-brand); border-bottom: 1px solid var(--cl-line); }
+.cl-public-bar { box-sizing: border-box; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 10px 16px;
+  min-height: 64px; display: flex; align-items: center; gap: 16px; }
+.cl-public-brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; color: var(--cl-ink); text-decoration: none; }
+.cl-public-logo { display: block; height: auto; width: auto; max-height: 40px; max-width: 200px; }
+.cl-public-store { font-size: 18px; font-weight: 650; line-height: 1.25; color: var(--cl-ink);
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.cl-public-lang { display: flex; gap: 2px; flex: none; }
+.cl-public-lang a, .cl-public-lang span { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px;
+  padding: 0 6px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--cl-ink-2) !important; text-decoration: none; }
+.cl-public-lang [aria-current] { color: var(--cl-ink) !important; background: var(--cl-surface-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
+.cl-public-main { box-sizing: border-box; flex: 1 0 auto; width: 100%; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 28px 16px 40px; }
+.cl-public-main.is-form { --cl-public-width: 760px; }
+.cl-public-main.is-narrow { --cl-public-width: 560px; }
+.cl-public-foot { border-top: 1px solid var(--cl-line); background: var(--cl-surface); }
+.cl-public-foot-inner { box-sizing: border-box; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 16px 16px 20px;
+  display: flex; flex-wrap: wrap; gap: 6px 24px; font-size: 13px; line-height: 1.5; color: var(--cl-ink-2); }
+.cl-public-foot-inner p { margin: 0; }
+.cl-public-foot-inner .cl-public-foot-store { color: var(--cl-ink); font-weight: 600; }
+@media (max-width: 719px) {
+  .cl-public-bar { min-height: 56px; padding: 8px 16px; gap: 8px; }
+  .cl-public-logo { max-height: 32px; max-width: 160px; }
+  .cl-public-store { font-size: 16px; }
+  .cl-public-lang a, .cl-public-lang span { min-width: 44px; min-height: 44px; }
+  .cl-public-main { padding: 20px 16px 32px; }
+  .cl-public-foot-inner { flex-direction: column; }
+  body.cl-public .cl-toast { top: 8px; }
+}

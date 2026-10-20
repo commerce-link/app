@@ -1,0 +1,55 @@
+<!DOCTYPE HTML>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE" th:text="${publicPage.storeName}">Store</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" th:href="@{/css/commercelink.css}">
+    <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
+    <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
+</head>
+<body class="cl-public" th:style="${publicPage.brand.style()}" th:attr="data-cl-copied=#{public.copied}">
+<th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
+
+<a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>
+
+<header class="cl-public-head">
+    <div class="cl-public-bar">
+        <div class="cl-public-brand">
+            <img th:if="${publicPage.logoUrl != null}" class="cl-public-logo" th:src="${publicPage.logoUrl}" th:alt="${publicPage.storeName}">
+            <span th:unless="${publicPage.logoUrl != null}" class="cl-public-store" th:text="${publicPage.storeName}"></span>
+        </div>
+        <nav class="cl-public-lang" th:aria-label="#{public.lang.label}">
+            <span aria-current="true" th:lang="${publicPage.language}" th:text="#{'public.lang.' + ${publicPage.language}}"></span>
+            <a th:href="${publicPage.otherLanguageHref}" th:lang="${publicPage.otherLanguage}" th:hreflang="${publicPage.otherLanguage}"
+               th:text="#{'public.lang.' + ${publicPage.otherLanguage}}"></a>
+        </nav>
+    </div>
+</header>
+
+<main id="clContent" class="cl-page cl-public-main" th:classappend="${publicWidth}">
+    <th:block layout:fragment="content"></th:block>
+</main>
+
+<footer class="cl-public-foot" th:if="${publicPage.storeName != ''}">
+    <div class="cl-public-foot-inner">
+        <p class="cl-public-foot-store" th:text="${publicPage.storeName}"></p>
+        <p th:if="${publicPage.hasSeller()}"
+           th:text="#{public.seller(${publicPage.sellerName})}
+                + (${publicPage.sellerTaxId != null} ? ' · ' + #{public.taxId(${publicPage.sellerTaxId})} : '')
+                + (${publicPage.sellerAddress != null} ? ' · ' + ${publicPage.sellerAddress} : '')"></p>
+        <p th:if="${publicPage.hasContact()}">
+            <th:block th:text="#{public.contact}"></th:block>
+            <a th:if="${publicPage.contactEmail != null}" th:href="'mailto:' + ${publicPage.contactEmail}" th:text="${publicPage.contactEmail}"></a>
+            <th:block th:if="${publicPage.contactEmail != null and publicPage.contactPhone != null}"> · </th:block>
+            <a th:if="${publicPage.contactPhone != null}" th:href="'tel:' + ${#strings.replace(publicPage.contactPhone, ' ', '')}"
+               th:text="${publicPage.contactPhone}"></a>
+        </p>
+    </div>
+</footer>
+
+<div id="clToast" class="cl-toast" role="status" aria-live="polite"></div>
+<script th:src="@{/js/public-toast.js}" defer></script>
+</body>
+</html>
