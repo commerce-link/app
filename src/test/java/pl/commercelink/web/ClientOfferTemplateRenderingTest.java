@@ -91,6 +91,17 @@ class ClientOfferTemplateRenderingTest {
     }
 
     @Test
+    void shippingAddressChoiceIsNamedByOneLegend() {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+
+        // then
+        assertThat(html.split(">Delivery address</legend>", -1)).hasSize(2);
+        assertThat(html).contains("<legend class=\"cl-fieldset-title\">Delivery address</legend>")
+                .contains("<div class=\"cl-choice-group is-row\">");
+    }
+
+    @Test
     void customerAutocompleteTokensAreSet() {
         // when
         String html = ClientOfferRenderer.newOffer().render();

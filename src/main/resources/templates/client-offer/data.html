@@ -42,8 +42,7 @@
                 </fieldset>
                 <fieldset th:unless="${form.personalCollection()}" class="cl-fieldset">
                     <legend class="cl-fieldset-title" th:text="#{client.offer.data.shipping}"></legend>
-                    <fieldset class="cl-choice-group is-row">
-                        <legend class="cl-visually-hidden" th:text="#{client.offer.data.shipping}"></legend>
+                    <div class="cl-choice-group is-row">
                         <label class="cl-choice">
                             <input type="radio" name="shippingAddress" id="shippingAddress" value="same"
                                    data-cl-variant-select="shipping" th:checked="${!form.isOtherShipping()}"
@@ -59,7 +58,7 @@
                             <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                             <span th:text="#{${errors['shippingAddress']}}"></span>
                         </p>
-                    </fieldset>
+                    </div>
                     <div th:replace="~{client-offer/data :: shippingGrid(${form.dto().shippingDetails})}"></div>
                 </fieldset>
             </div>
