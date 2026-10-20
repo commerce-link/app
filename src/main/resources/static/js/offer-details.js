@@ -97,14 +97,23 @@
             redirect: 'follow'
         }).then(function (response) {
             var landed = response.url ? new URL(response.url).pathname : '';
+            if (response.status === 403 && /^text\/plain/.test(response.headers.get('Content-Type') || '')) {
+                // the dashboard of an inactive store is read-only (DashboardReadOnlyInterceptor): its answer says so,
+                // as the page does after a plain save
+                return response.text().then(function (reason) {
+                    var refused = new Error('items not saved: 403');
+                    refused.reason = reason;
+                    throw refused;
+                });
+            }
             if (!response.ok || landed !== new URL(form.action, window.location.href).pathname) {
                 throw new Error('items not saved: ' + response.status + ' ' + landed);
             }
             savedHere = true;
             window.CL_markClean(form);
             return true;
-        }).catch(function () {
-            showToast(unsaved.getAttribute('data-failed'), 'danger');
+        }).catch(function (error) {
+            showToast((error && error.reason) || unsaved.getAttribute('data-failed'), 'danger');
             return false;
         }).finally(function () {
             busy = false;

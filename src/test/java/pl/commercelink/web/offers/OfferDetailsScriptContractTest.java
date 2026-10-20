@@ -158,4 +158,15 @@ class OfferDetailsScriptContractTest {
                 .contains(".cl-summary-peek.is-action[data-cl-peek-state=\"hidden\"] { display: none; }")
                 .contains("html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 80px; }");
     }
+
+    @Test
+    void backgroundSaveRefusedByAnInactiveStoreShowsTheRefusal() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then — "Zapisz i …" on a read-only dashboard said only that the save failed, not why
+        assertThat(js).contains("response.status === 403 && /^text\\/plain/.test(response.headers.get('Content-Type') || '')")
+                .contains("refused.reason = reason;")
+                .contains("showToast((error && error.reason) || unsaved.getAttribute('data-failed'), 'danger');");
+    }
 }
