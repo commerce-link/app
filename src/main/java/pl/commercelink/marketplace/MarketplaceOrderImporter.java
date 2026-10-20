@@ -51,12 +51,13 @@ public class MarketplaceOrderImporter {
 
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
+            String mfn = pimIdToMfn(product.manufacturerCode());
 
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    product.manufacturerCode(),
-                    resolveProductCategory(product.manufacturerCode()),
+                    mfn,
+                    resolveProductCategory(mfn),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -159,6 +160,16 @@ public class MarketplaceOrderImporter {
         shipping.setCountry(CountryCodeConverter.getCountryCode(address.country()));
 
         return shipping;
+    }
+
+    // marketplace offers are often keyed by the pimId; a value PIM does not know as a pimId is already an mfn
+    private String pimIdToMfn(String manufacturerCode) {
+        if (StringUtils.isBlank(manufacturerCode)) {
+            return manufacturerCode;
+        }
+        return pimCatalog.findByPimId(manufacturerCode)
+                .flatMap(entry -> entry.mpns().stream().findFirst())
+                .orElse(manufacturerCode);
     }
 
     private String resolveProductCategory(String mfn) {
