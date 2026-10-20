@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -182,6 +183,22 @@ class StoreCopyServiceTest {
         // then
         verify(productRepository).batchSave(productsCaptor.capture());
         assertThat(productsCaptor.getValue().get(0).getPimId()).isEqualTo("x1");
+    }
+
+    @Test
+    void copyLeavesAProductWithoutPimIdWithoutOneAndDoesNotLookItUp() {
+        // given
+        givenOneSourceProductWithPimId(null);
+
+        // when
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        verify(productRepository).batchSave(productsCaptor.capture());
+        Product copied = productsCaptor.getValue().get(0);
+        assertThat(copied.getPimId()).isNull();
+        assertThat(copied.getEan()).isEqualTo("5901234567890");
+        verifyNoInteractions(sourceLookup);
     }
 
     private void givenOneSourceProductWithPimId(String pimId) {
