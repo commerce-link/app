@@ -160,9 +160,10 @@ class InventoryStoreStatisticsTest {
         assertThat(stats).isEqualTo(InventoryStatistics.EMPTY);
     }
 
-    // the global PIM catalog decides whether an own group's id is a store entry (matched by id alone) or a global
-    // entry (deduplicated by code, as before): a global group split by price has no id, only the codes
-    private InventoryStatistics statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId(String ownPimId) {
+    // the global PIM catalog decides whether an own group's id is a store entry or a global entry. A global entry's
+    // own group is deduplicated by code, as before; a store entry's own group joins only a global group of the same
+    // entry or one without any (a price split, or a global supplier's row the global PIM has no entry for)
+    private InventoryStatistics statisticsOfGlobalGroupAndOwnGroupWithId(String globalPimId, String ownPimId) {
         store = mock(Store.class);
         when(store.getGlobalSupplierNames()).thenReturn(List.of("Elko"));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -173,33 +174,51 @@ class InventoryStoreStatisticsTest {
                 List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 3, 1, "Kosatec")), taxonomyCache, supplierRegistry);
         when(storeInventoryProvider.ownInventory(store))
                 .thenReturn(new StoreInventory(InventoryIndex.of(List.of(own)), LocalDateTime.of(2026, 9, 14, 10, 0)));
-        MatchedInventory splitGlobal = new MatchedInventory(new InventoryKey("5900000000041", "G4"),
+        InventoryKey globalKey = new InventoryKey(globalPimId);
+        MatchedInventory global = new MatchedInventory(globalKey,
                 List.of(new InventoryItem("5900000000041", "G4", 100.0, "PLN", 5, 1, "Elko")), taxonomyCache, supplierRegistry);
-        when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(splitGlobal)));
+        when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(global)));
         when(globalInventory.version()).thenReturn(1L);
         return inventory.storeStatistics(STORE_ID);
+    }
+
+    private void globalCatalogKnows(String pimId) {
+        when(pimCatalog.findByPimId(pimId)).thenReturn(Optional.of(new PimEntry(pimId,
+                List.of(new PimIdentifier("5900000000041", PimIdentifierType.GTIN)), "B", "G4", "CPU", null, true, null, null)));
     }
 
     @Test
     void ownGroupOfAGlobalEntryIsCountedWithThePriceSplitGlobalGroup() {
         // given
-        when(pimCatalog.findByPimId("g4")).thenReturn(Optional.of(new PimEntry("g4",
-                List.of(new PimIdentifier("5900000000041", PimIdentifierType.GTIN)), "B", "G4", "CPU", null, true, null, null)));
+        globalCatalogKnows("g4");
 
         // when
-        InventoryStatistics stats = statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId("g4");
+        InventoryStatistics stats = statisticsOfGlobalGroupAndOwnGroupWithId(null, "g4");
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(1);
     }
 
     @Test
-    void ownGroupOfAStoreEntryIsCountedApart() {
+    void ownGroupOfAStoreEntryIsCountedWithAGlobalGroupWithoutEntry() {
         // given
         when(pimCatalog.findByPimId("s1-g4")).thenReturn(Optional.empty());
 
         // when
-        InventoryStatistics stats = statisticsOfPriceSplitGlobalGroupAndOwnGroupWithId("s1-g4");
+        InventoryStatistics stats = statisticsOfGlobalGroupAndOwnGroupWithId(null, "s1-g4");
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+    }
+
+    @Test
+    void ownGroupOfAStoreEntryIsCountedApartFromAGlobalGroupOfAnotherEntry() {
+        // given
+        globalCatalogKnows("g4");
+        when(pimCatalog.findByPimId("s1-g4")).thenReturn(Optional.empty());
+
+        // when
+        InventoryStatistics stats = statisticsOfGlobalGroupAndOwnGroupWithId("g4", "s1-g4");
 
         // then
         assertThat(stats.distinctProducts()).isEqualTo(2);

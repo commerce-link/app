@@ -94,4 +94,31 @@ class ListingInventoryTest {
         // when / then
         assertThat(listing.keys()).containsExactly(splitGlobalKey);
     }
+
+    // a store entry exists because the global PIM lacks the product, while a global supplier still sells it: the
+    // global group has no PIM id, and assembling it picks up the store entry's id, so it is the same listed product
+    @Test
+    void ownKeyOfAStoreEntryIsCoveredByAGlobalGroupWithoutIdSharingItsCodes() {
+        // given
+        InventoryKey globalKey = new InventoryKey("5900000000049", "E3-DUP");
+        InventoryKey ownKey = pimKey("st-s-1", "5900000000049", "E3-DUP");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(ownKey))), STORE_ENTRY);
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey);
+    }
+
+    @Test
+    void ownKeyOfAStoreEntryIsListedWhenAGlobalGroupWithAnotherIdAndOneWithoutIdShareNothingWithIt() {
+        // given
+        InventoryKey globalKey = pimKey("e3-g-c", "5900000000031", "E3-C-G");
+        InventoryKey unrelatedGlobalKey = new InventoryKey("5900000000077", "OTHER");
+        InventoryKey ownKey = pimKey("e3-s-c", "5900000000032", "E3-C-S");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey), group(unrelatedGlobalKey))),
+                InventoryIndex.of(List.of(group(ownKey))), STORE_ENTRY);
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey, unrelatedGlobalKey, ownKey);
+    }
 }

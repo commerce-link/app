@@ -147,4 +147,20 @@ class InventoryStatisticsCalculatorTest {
         assertThat(stats.productsInStock()).isEqualTo(1);
         assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
     }
+
+    @Test
+    void storeEntryGroupJoinsAGlobalGroupWithoutIdSharingItsCodes() {
+        // given
+        MatchedInventory globalGroup = group("5900000000049", "E3-DUP", item("5900000000049", "E3-DUP", "Elko", 5));
+        MatchedInventory ownGroup = pimGroup("st-s-1", "5900000000049", "E3-DUP", item("5900000000049", "E3-DUP", "Kosatec", 3));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(globalGroup)),
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(ownGroup)), STORE_ENTRY);
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
+        assertThat(stats.bySupplier().get("Elko")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
 }

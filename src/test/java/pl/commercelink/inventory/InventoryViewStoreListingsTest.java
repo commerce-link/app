@@ -27,6 +27,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -494,5 +495,44 @@ class InventoryViewStoreListingsTest {
 
         // then
         assertThat(matched.getSuppliers()).containsExactly("Action");
+    }
+
+    private Store storeWithGlobalAbAndOwnIndex(MatchedInventory... ownGroups) {
+        Store store = org.mockito.Mockito.mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
+        when(store.hasOwnSupplierConnections()).thenReturn(true);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(ownGroups));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(ownIndex);
+        when(storeInventoryProvider.ownInventory(store)).thenReturn(new StoreInventory(ownIndex, LocalDateTime.now()));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
+        return store;
+    }
+
+    // W-1: the store added entry st-s-1 because the global PIM lacks the product, and a global supplier sells the
+    // same EAN; the global group has no PIM id, so it is the same product as the store entry, listed and counted once
+    @Test
+    void storeEntrySoldAlsoByAGlobalSupplierWithoutGlobalEntryIsListedAndCountedOnce() {
+        // given
+        InventoryKey ownKey = new InventoryKey("st-s-1");
+        MatchedInventory ownGroup = new MatchedInventory(ownKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+        storeWithGlobalAbAndOwnIndex(ownGroup);
+        stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("AB Group", 1399.0)),
+                taxonomyCache, supplierRegistry)));
+
+        // when
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+        Collection<MatchedInventory> withPimId = view.findAllWithPimId();
+        InventoryStatistics stats = inventory.storeStatistics(STORE_ID);
+
+        // then
+        assertThat(listed).singleElement().satisfies(matched -> {
+            assertThat(matched.getInventoryKey().getId()).isEqualTo("st-s-1");
+            assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action");
+        });
+        assertThat(withPimId).singleElement().extracting(matched -> matched.getInventoryKey().getId()).isEqualTo("st-s-1");
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.bySupplier()).containsOnlyKeys("AB Group", "Action");
     }
 }

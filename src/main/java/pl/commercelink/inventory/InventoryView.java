@@ -50,9 +50,17 @@ public class InventoryView {
 
     public Collection<MatchedInventory> findAllWithPimId() {
         return listedKeys()
-                .filter(key -> key.getId() != null)
+                .filter(this::mayCarryPimId)
                 .map(this::assemble)
+                .filter(matched -> matched.getInventoryKey().getId() != null)
                 .collect(Collectors.toList());
+    }
+
+    // a listed global group without a PIM id takes the id of the store entry it covers when assembled
+    // (see InventoryIndex.covers)
+    private boolean mayCarryPimId(InventoryKey key) {
+        return key.getId() != null || ownIndex.findMatching(key).stream()
+                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own.getInventoryKey(), isStoreEntry));
     }
 
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
