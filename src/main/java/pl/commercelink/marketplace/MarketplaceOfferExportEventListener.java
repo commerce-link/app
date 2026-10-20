@@ -167,9 +167,7 @@ public class MarketplaceOfferExportEventListener {
 
         List<MarketplaceOfferSnapshot> previousSnapshots = loadPreviousSnapshot(store, catalog, marketplace);
         Set<String> currentPimIds = pimIdsOf(currentOffers);
-        List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, currentPimIds).stream()
-                .map(this::withKnownIdentifiers)
-                .toList();
+        List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, currentPimIds);
         List<MarketplaceOfferSnapshot> abandonedRemovals = abandonedRemovals(previousSnapshots, currentPimIds);
         List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
@@ -219,27 +217,6 @@ public class MarketplaceOfferExportEventListener {
                 "Marketplace offer {} (EAN {}) could not be taken off after {} attempts and stays on the marketplace: {} {}",
                 snapshot.pimId(), snapshot.ean(), snapshot.removalAttempts(), snapshot.reasonCode(), snapshot.message()));
         return abandoned;
-    }
-
-    // Snapshots written before the EAN was recorded have none; the product is still in the catalog in most cases.
-    // A failed lookup must not hold back the export of every other offer, so the removal goes without the EAN.
-    private MarketplaceOfferSnapshot withKnownIdentifiers(MarketplaceOfferSnapshot snapshot) {
-        if (snapshot.hasEan()) {
-            return snapshot;
-        }
-        try {
-            Optional<Product> product = productRepository.findAllByPimId(snapshot.pimId()).stream()
-                    .filter(candidate -> candidate.getEan() != null && !candidate.getEan().isBlank())
-                    .findFirst();
-            if (product.isPresent()) {
-                return snapshot.withIdentifiers(product.get().getEan(), product.get().getManufacturerCode());
-            }
-            log.warn("No EAN known for marketplace offer {}: taking it off without a product id may not reach it",
-                    snapshot.pimId());
-        } catch (RuntimeException exception) {
-            log.warn("EAN lookup failed for marketplace offer {}: {}", snapshot.pimId(), exception.toString());
-        }
-        return snapshot;
     }
 
     private boolean isOrphan(MarketplaceOfferSnapshot snapshot, Set<String> currentPimIds) {

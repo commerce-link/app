@@ -63,13 +63,4 @@ public record MarketplaceOfferSnapshot(
                 pimId, price, quantity, removalAttempts, OUTCOME_REJECTED, reasonCode, message,
                 ean, manufacturerCode);
     }
-
-    public boolean hasEan() {
-        return ean != null && !ean.isBlank();
-    }
-
-    public MarketplaceOfferSnapshot withIdentifiers(String ean, String manufacturerCode) {
-        return new MarketplaceOfferSnapshot(
-                pimId, price, quantity, removalAttempts, outcome, reasonCode, message, ean, manufacturerCode);
-    }
 }

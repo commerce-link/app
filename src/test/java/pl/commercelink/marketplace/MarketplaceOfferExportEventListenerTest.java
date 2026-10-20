@@ -226,69 +226,6 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void looksTheEanUpInTheCatalogWhenTheSnapshotWasWrittenWithoutOne() {
-        // given
-        noCategoriesConfigured();
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L));
-        when(productRepository.findAllByPimId("pim-X")).thenReturn(List.of(product("pim-X", "EAN-X")));
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        List<MarketplaceOffer> removed = captureRemovedOffers();
-        assertThat(removed).hasSize(1);
-        assertThat(removed.get(0).ean()).isEqualTo("EAN-X");
-        assertThat(removed.get(0).manufacturerCode()).isEqualTo("MFN-PIM-X");
-        assertThat(captureSavedRows().get(0).ean()).isEqualTo("EAN-X");
-    }
-
-    @Test
-    void takesTheOfferOffWithoutAnEanWhenTheProductIsNoLongerInTheCatalog() {
-        // given
-        noCategoriesConfigured();
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L));
-        when(productRepository.findAllByPimId("pim-X")).thenReturn(List.of());
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        List<MarketplaceOffer> removed = captureRemovedOffers();
-        assertThat(removed).hasSize(1);
-        assertThat(removed.get(0).ean()).isNull();
-    }
-
-    @Test
-    void takesTheOfferOffWithoutAnEanWhenTheCatalogLookupFails() {
-        // given
-        noCategoriesConfigured();
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L));
-        when(productRepository.findAllByPimId("pim-X")).thenThrow(new IllegalStateException("dynamodb down"));
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        List<MarketplaceOffer> removed = captureRemovedOffers();
-        assertThat(removed).hasSize(1);
-        assertThat(removed.get(0).ean()).isNull();
-    }
-
-    @Test
-    void doesNotLookTheProductUpWhenTheSnapshotAlreadyHasTheEan() {
-        // given
-        noCategoriesConfigured();
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L, "EAN-X", "MFN-X"));
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        verify(productRepository, never()).findAllByPimId(any());
-    }
-
-    @Test
     void keepsTheEanOnTheRemovalPendingRowForTheNextAttempt() {
         // given
         noCategoriesConfigured();
