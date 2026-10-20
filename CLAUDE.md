@@ -157,6 +157,14 @@ Feed loading runs on two tracks:
 
 Products are matched across suppliers by EAN and manufacturer code via `InventoryAutoDiscovery`.
 
+### Price Snapshots and Rolling Aggregates
+
+`DailyPriceSnapshotGenerator` (`supplier-daily-price-snapshot-queue`) and `RollingPriceAggregateGenerator` (`supplier-rolling-price-aggregate-queue`, 30 days of snapshots) are prod-only and triggered from outside the app with no payload. Each exists twice, through `PriceDataLocation`: globally in the datalake bucket (`daily-price-snapshot/`, `rolling-price-aggregate/`, from `withGlobalData()`), and per store in the `stores` bucket under `{storeId}/` (from the store's own suppliers only - enabled global suppliers and own or manual feeds included in pricing, `SupplierScope.PRICING` - and not its warehouse), so `StoreDeletionService` wipes them with the rest of the store's files.
+
+A payload-less (or unreadable) message is the global run: it first queues one `{storeId, date}` message per active store on the same queue (`PriceDataFanOut`, so one store's failure is retried alone and a failing global run does not leave the stores without theirs), then does its own work. The store's message carries the day of the run that queued it, so a run past midnight still writes the same day. An inactive store is skipped (new work, see Multi-Tenancy) and a store without priced offers gets no snapshot. After a store's aggregate the store's snapshots older than 30 days are deleted, and a store with no snapshot in the window loses its aggregate, since the newest aggregate file would otherwise override the global prices for good; the global files are kept.
+
+Readers use `RollingPriceAggregateRepository.loadForStore(storeId)`: the global aggregate with the store's laid over it product by product, so a store without history, or with an unreadable aggregate (logged at ERROR), is priced as before (`AvailabilityAndPriceList` stop-loss, `StockLevels` restock). `loadAll()` is the global one only.
+
 ### Order Lifecycle
 
 1. **Order intake**: `Basket` via REST API → payment link from the store's payment provider → `Order` creation; orders are also imported from connected marketplaces (`MarketplaceOrderImporter`)

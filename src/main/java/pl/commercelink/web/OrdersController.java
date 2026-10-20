@@ -1084,7 +1084,7 @@ public class OrdersController extends BaseController {
             }
             // Same lock as the item menu's toggle: the flag is only read when the closing invoice is issued, so after
             // that a change would silently not apply; the page shows the box disabled and the stored value stays.
-            if (order.isInvoiced() || receiptLock.locks()) {
+            if (order.hasClosingDocument() || receiptLock.locks()) {
                 updatedItem.setConsolidated(orderItem.isConsolidated());
             }
             orderItem.update(updatedItem);
@@ -1298,8 +1298,12 @@ public class OrdersController extends BaseController {
     public String toggleConsolidation(@PathVariable String orderId, @RequestParam String itemId,
                                       RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order has no item menu; a stale page or a hand-made request must not change it either
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // The flag is only read when the closing invoice is issued; after that a change would silently not apply.
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.item.consolidation.locked", locale);
         }
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
@@ -1322,7 +1326,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
         boolean priceLocked = !order.getDocuments().isEmpty() || receiptLock.locks();
-        boolean consolidationLocked = order.isInvoiced() || receiptLock.locks();
+        boolean consolidationLocked = order.hasClosingDocument() || receiptLock.locks();
         // name, quantity and VAT rate are read-only with the reason; saveOrderItem refuses a post that changes them
         ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
         model.addAttribute("saleLock", saleLock);
@@ -1332,7 +1336,7 @@ public class OrdersController extends BaseController {
                 : saleLock != null ? saleLock.priceKey() : "order.item.form.price.locked");
         model.addAttribute("consolidationLocked", consolidationLocked);
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
-                : order.isInvoiced() ? "order.item.consolidation.locked"
+                : order.hasClosingDocument() ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
         // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
         model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
@@ -1418,9 +1422,14 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String removeSelectedItemsFromOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
                                                RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order selects no items; removeFromOrder itself would still delete its services
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // the page leaves "Usuń" out of an invoiced order (its invoice or receipt lists the items); a stale page or a
         // hand-made request must not get past that either
-        if (requireOrder(ordersRepository, getStoreId(), orderId).isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.items.remove.locked.invoiced", locale);
         }
         String locked = receiptLockedKey(orderId);

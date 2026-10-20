@@ -63,7 +63,7 @@ public class StockLevels {
             return Collections.emptyList();
         }
 
-        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadAll();
+        Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadForStore(storeId);
 
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.FULFILMENT);
 

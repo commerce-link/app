@@ -49,6 +49,33 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("an RMA replacement counts as invoiced without a closing document, so it cannot be split")
+    void rmaReplacementCountsAsInvoicedWithoutClosingDocument() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.New);
+        order.setSource(new OrderSource("RMA", OrderSourceType.Other));
+
+        // when / then
+        assertThat(order.isInvoiced()).isTrue();
+        assertThat(order.hasClosingDocument()).isFalse();
+        assertThat(order.canBeSplit()).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DocumentType.class, names = {"InvoiceVat", "InvoiceFinal", "InvoicePersonal", "Receipt", "GoodsIssue"})
+    @DisplayName("an invoice or a goods issue blocks the split of an order")
+    void invoiceOrGoodsIssueBlocksSplit(DocumentType type) {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.New);
+        order.addDocument(new Document("doc-1", "DOC/1", null, type));
+
+        // when / then
+        assertThat(order.canBeSplit()).isFalse();
+    }
+
+    @Test
     @DisplayName("createClientOrderUrl builds the public status page link under the given domain")
     void createClientOrderUrlBuildsPublicLink() {
         // given

@@ -25,6 +25,8 @@ import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
@@ -1692,19 +1694,42 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void itemsCanBeAddedToAnRmaReplacementOrderThoughItCountsAsInvoiced() {
+    void anRmaReplacementOrderKeepsItsItemOperationsWhileTheRestOfTheOrderStaysLockedAsInvoiced() {
         // given
         Order order = order(OrderStatus.New);
-        order.setSource(new pl.commercelink.orders.OrderSource("RMA", pl.commercelink.orders.OrderSourceType.Other));
+        order.setSource(new OrderSource("RMA", OrderSourceType.Other));
+        OrderItem group = item(FulfilmentStatus.New);
+        group.setSku("#1xA|1xB");
+        group.setPosition(1);
 
         // when
-        OrderPageModel page = factory.build(order, List.of(item(FulfilmentStatus.New)), ADMIN, PL);
+        OrderPageModel page = factory.build(order, List.of(item(FulfilmentStatus.New), group), ADMIN, PL);
+        OrderPageModel empty = factory.build(order, List.of(), ADMIN, PL);
 
         // then
         assertThat(order.isInvoiced()).isTrue();
+        // adding items
         assertThat(page.items().canAddItems()).isTrue();
         assertThat(page.items().addItemsReasonKey()).isNull();
         assertThat(OrderPageModelFactory.addItemsLockedKey(order, false)).isNull();
+        // removing items; splitting off and moving them to another order stay locked
+        assertThat(page.items().bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
+        assertThat(page.items().bulkStandalone().available()).isTrue();
+        assertThat(page.items().bulkMenus().get(0).actions())
+                .filteredOn(b -> b.action() == BulkAction.SPLIT || b.action() == BulkAction.MOVE)
+                .hasSize(2).noneMatch(OrderPageModel.BulkActionButton::available);
+        // the row menu: merge on invoice, split set, edit
+        assertThat(page.items().products().get(0).actions())
+                .filteredOn(a -> a.action() == ItemAction.CONSOLIDATE || a.action() == ItemAction.EDIT)
+                .hasSize(2).allMatch(ItemAction.State::available);
+        assertThat(page.items().products().get(1).actions()).filteredOn(a -> a.action() == ItemAction.SPLIT_GROUP)
+                .singleElement().satisfies(a -> assertThat(a.available()).isTrue());
+        // the item page's sale fields
+        assertThat(ItemSaleLock.of(order, false)).isNull();
+        // billing details stay as the original order's
+        assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked");
+        // the (item-less) order is not deleted
+        assertThat(empty.header().canDelete()).isFalse();
     }
 
     @Test
