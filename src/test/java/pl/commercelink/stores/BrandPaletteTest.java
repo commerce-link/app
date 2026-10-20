@@ -61,6 +61,28 @@ class BrandPaletteTest {
     }
 
     @Test
+    void paleBrandButtonGetsADarkEdgeOnTheWhiteCard() {
+        // when
+        BrandPalette white = BrandPalette.of("#ffffff");
+        BrandPalette yellow = BrandPalette.of("#ffd400");
+
+        // then
+        assertThat(white.edge()).isEqualTo(white.ink());
+        assertThat(white.edgeHover()).isEqualTo(white.ink());
+        assertThat(yellow.edge()).isEqualTo("#806a00");
+    }
+
+    @Test
+    void brandThatStandsOutOnWhiteIsItsOwnEdge() {
+        // when
+        BrandPalette palette = BrandPalette.of("#0f766e");
+
+        // then
+        assertThat(palette.edge()).isEqualTo("#0f766e");
+        assertThat(palette.edgeHover()).isEqualTo(palette.hover());
+    }
+
+    @Test
     void everyColourHasReadableTextAndAccent() {
         for (int r = 0; r <= 255; r += 17) {
             for (int g = 0; g <= 255; g += 17) {
@@ -76,6 +98,7 @@ class BrandPaletteTest {
                     assertThat(BrandPalette.contrast(palette.ink(), "#ffffff")).as("ink for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.ink(), palette.soft())).as("ink on soft for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.hover(), palette.on())).as("hover for %s", hex).isGreaterThanOrEqualTo(4.5);
+                    assertThat(BrandPalette.contrast(palette.edge(), "#ffffff")).as("button edge for %s", hex).isGreaterThanOrEqualTo(3.0);
                 }
             }
         }
@@ -87,6 +110,6 @@ class BrandPaletteTest {
         String style = BrandPalette.of("#0f766e").style();
 
         // then
-        assertThat(style).matches("(--cl-brand[a-z-]*:#[0-9a-f]{6};){5}--cl-brand-soft:#[0-9a-f]{6}");
+        assertThat(style).matches("(--cl-brand[a-z-]*:#[0-9a-f]{6};){7}--cl-brand-edge-hover:#[0-9a-f]{6}");
     }
 }

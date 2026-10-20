@@ -68,6 +68,21 @@ class ClientOfferPageFactoryTest {
     }
 
     @Test
+    void variantGroupRowIsAnchoredByItsPlaceAmongTheLines() {
+        // given — the group name is free text with a space and a Polish letter, so it cannot be the id
+        Basket basket = basket(item("P", "Laptop", 4999.0, 1, null), item("A", "Monitor", 899.0, 2, "Monitor do biura ł"),
+                item("B", "Monitor", 1149.0, 2, "Monitor do biura ł"));
+
+        // when
+        ClientOfferPage page = factory().build(basket, new Store(), false, PL);
+
+        // then
+        assertThat(page.lines()).extracting(ClientOfferPage.Line::anchor).containsExactly(null, "variant-1");
+        assertThat(ClientOfferPageFactory.variantAnchor(basket, "Monitor do biura ł")).contains("variant-1");
+        assertThat(ClientOfferPageFactory.variantAnchor(basket, "nope")).isEmpty();
+    }
+
+    @Test
     void optionOfTheSamePriceIsMarkedInsteadOfAZeroDelta() {
         // given
         Basket basket = basket(item("A", "Dysk", 2899.0, 1, "Dysk"), item("B", "Dysk", 2899.0, 1, "Dysk"),

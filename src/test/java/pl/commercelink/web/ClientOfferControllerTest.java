@@ -288,7 +288,7 @@ class ClientOfferControllerTest {
                 new MockHttpServletResponse());
 
         // then
-        assertThat(view).isEqualTo("redirect:" + OFFER_PATH);
+        assertThat(view).isEqualTo("redirect:" + OFFER_PATH + "#client-offer-pay-title");
         ArgumentCaptor<Basket> saved = ArgumentCaptor.forClass(Basket.class);
         verify(basketsRepository).save(saved.capture());
         assertThat(saved.getValue().getBillingDetails().getCity()).isEqualTo("Kraków");
@@ -355,7 +355,70 @@ class ClientOfferControllerTest {
         verify(basketsRepository).save(basket);
         assertThat(ssd1.isVariantSelected()).isFalse();
         assertThat(ssd2.isVariantSelected()).isTrue();
-        assertThat(view).isEqualTo("redirect:" + OFFER_PATH);
+        assertThat(view).isEqualTo("redirect:" + OFFER_PATH + "#variant-0");
+    }
+
+    @Test
+    void variantChosenInTheBackgroundAnswersWithTheTwoCards() {
+        // given
+        Basket basket = basket();
+        BasketItem ssd1 = new BasketItem("pim-1", "SSD 1", "MFN-SSD-1", "SSD", 100.0, 0, 1, null, 3, false);
+        BasketItem ssd2 = new BasketItem("pim-2", "SSD 2", "MFN-SSD-2", "SSD", 150.0, 0, 1, null, 3, false);
+        ssd1.setVariantGroupId("SSD");
+        ssd2.setVariantGroupId("SSD");
+        basket.setBasketItems(List.of(ssd1, ssd2));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.selectVariant(STORE_ID, OFFER_ID, "SSD", ssd2.getPosition(), model, PL,
+                asyncRequest(), new MockHttpServletResponse());
+
+        // then
+        verify(basketsRepository).save(basket);
+        assertThat(ssd2.isVariantSelected()).isTrue();
+        assertThat(view).isEqualTo("client-offer/variant-update");
+        assertThat(model.getAttribute("page")).isNotNull();
+        verify(pageFactory).build(basket, store, false, PL);
+    }
+
+    @Test
+    void backgroundChoiceOnAnExpiredOfferIsRefusedWithoutSaving() {
+        // given
+        Basket basket = basket();
+        basket.setType(BasketType.Offer);
+        basket.setExpiresAt(LocalDateTime.now().minusDays(1));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.selectVariant(STORE_ID, OFFER_ID, "SSD", 1, new ExtendedModelMap(), PL,
+                asyncRequest(), response);
+
+        // then
+        assertThat(view).isNull();
+        assertThat(response.getStatus()).isEqualTo(409);
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void backgroundChoiceOfAnUnknownPositionIsRefusedWithoutSaving() {
+        // given
+        Basket basket = basket();
+        BasketItem item = new BasketItem("pim-1", "SSD", "MFN-SSD-1", "SSD", 100.0, 0, 1, null, 3, false);
+        item.setVariantGroupId("SSD");
+        basket.setBasketItems(List.of(item));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.selectVariant(STORE_ID, OFFER_ID, "SSD", 999, new ExtendedModelMap(), PL,
+                asyncRequest(), response);
+
+        // then
+        assertThat(view).isNull();
+        assertThat(response.getStatus()).isEqualTo(409);
+        verify(basketsRepository, never()).save(any());
     }
 
     @Test
@@ -384,7 +447,7 @@ class ClientOfferControllerTest {
                 new MockHttpServletRequest("POST", OFFER_PATH + "/checkout"), new MockHttpServletResponse());
 
         // then
-        assertThat(view.getViewName()).isEqualTo("redirect:" + OFFER_PATH);
+        assertThat(view.getViewName()).isEqualTo("redirect:" + OFFER_PATH + "#client-offer-pay-title");
         ClientOfferNotice notice = (ClientOfferNotice) flash.getFlashAttributes().get("clientOfferNotice");
         assertThat(notice.tone()).isEqualTo("bad");
         assertThat(notice.text()).isEqualTo("client.offer.notice.payment.failed");
@@ -453,7 +516,7 @@ class ClientOfferControllerTest {
                 new MockHttpServletRequest("POST", OFFER_PATH + "/send-proforma-invoice"), new MockHttpServletResponse());
 
         // then
-        assertThat(view).isEqualTo("redirect:" + OFFER_PATH);
+        assertThat(view).isEqualTo("redirect:" + OFFER_PATH + "#client-offer-pay-title");
         ClientOfferNotice notice = (ClientOfferNotice) flash.getFlashAttributes().get("clientOfferNotice");
         assertThat(notice.tone()).isEqualTo("ok");
         assertThat(notice.text()).isEqualTo("client.offer.notice.proforma.sent:jan***")
@@ -470,10 +533,11 @@ class ClientOfferControllerTest {
         RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
 
         // when
-        controller.createProformaInvoice(STORE_ID, OFFER_ID, PL, flash, new ExtendedModelMap(),
+        String view = controller.createProformaInvoice(STORE_ID, OFFER_ID, PL, flash, new ExtendedModelMap(),
                 new MockHttpServletRequest("POST", OFFER_PATH + "/send-proforma-invoice"), new MockHttpServletResponse());
 
         // then
+        assertThat(view).isEqualTo("redirect:" + OFFER_PATH + "#client-offer-pay-title");
         assertThat(flash.getFlashAttributes().get("clientOfferNotice"))
                 .isEqualTo(new ClientOfferNotice("bad", "client.offer.notice.proforma.failed"));
     }
@@ -501,8 +565,8 @@ class ClientOfferControllerTest {
                 new MockHttpServletResponse());
 
         // then
-        assertThat(oldView).isEqualTo("redirect:/store/store-1/individual/offer/old");
-        assertThat(newView).isEqualTo("redirect:/store/store-1/client/offer/new");
+        assertThat(oldView).isEqualTo("redirect:/store/store-1/individual/offer/old#client-offer-pay-title");
+        assertThat(newView).isEqualTo("redirect:/store/store-1/client/offer/new#client-offer-pay-title");
     }
 
     @Test
@@ -544,6 +608,12 @@ class ClientOfferControllerTest {
         basket.setBillingDetails(form.toBilling());
         basket.setShippingDetails(form.toShipping());
         return basket;
+    }
+
+    private static MockHttpServletRequest asyncRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", OFFER_PATH + "/select-variant");
+        request.addHeader("X-Requested-With", "fetch");
+        return request;
     }
 
     private static ClientOfferPage page(boolean submitted) {

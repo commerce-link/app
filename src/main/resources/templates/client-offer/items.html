@@ -5,7 +5,7 @@
 <!--/* Step 1 of the offer page: the lines, a variant group as a choice that posts at once (client-offer.js; without
        JavaScript through its "Change variant" button), the delivery and the total. Unit prices and line amounts follow
        showPrices; variant deltas and the total are always shown. */-->
-<section th:fragment="items" class="cl-card" aria-labelledby="client-offer-items-title">
+<section th:fragment="items" id="client-offer-items" class="cl-card" aria-labelledby="client-offer-items-title">
     <div class="cl-card-head has-step">
         <span class="cl-step-badge" aria-hidden="true">1</span>
         <h2 class="cl-card-title" id="client-offer-items-title" th:text="#{client.offer.items.title(${#lists.size(page.lines)})}"></h2>
@@ -29,7 +29,7 @@
                 </div>
                 <span th:if="${page.showPrices}" class="cl-list-amount" th:text="#{general.currency.amount(${line.amount})}"></span>
             </li>
-            <li th:if="${line.isGroup()}" class="cl-list-item is-group">
+            <li th:if="${line.isGroup()}" class="cl-list-item is-group" th:id="${line.anchor}">
                 <div>
                     <div class="cl-line-head">
                         <div>
@@ -72,7 +72,8 @@
     <div class="cl-card-inset">
         <dl class="cl-offer-total">
             <div class="cl-offer-total-row">
-                <dt th:text="#{client.offer.total}"></dt>
+                <!--/* the spinner shows only while a variant update in the background takes long (client-offer.js) */-->
+                <dt><span th:text="#{client.offer.total}"></span><span class="cl-spinner is-compact cl-offer-updating" aria-hidden="true"></span></dt>
                 <dd th:text="#{general.currency.amount(${page.total})}"></dd>
             </div>
         </dl>

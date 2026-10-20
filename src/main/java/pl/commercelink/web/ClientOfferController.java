@@ -29,6 +29,7 @@ import pl.commercelink.web.clientoffer.ClientOfferPageFactory;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.CountryOptions;
 import pl.commercelink.web.publicpage.PublicPageFactory;
+import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Locale;
 import java.util.Map;
@@ -44,7 +45,11 @@ public class ClientOfferController {
 
     private static final String VIEW = "clientOffer";
     private static final String UNAVAILABLE_VIEW = "client-offer/unavailable";
+    private static final String VARIANT_UPDATE_VIEW = "client-offer/variant-update";
     private static final String EDIT_DATA = "data";
+    // The outcome notice sits in the payment card; without the anchor a phone shows the top of the page and the
+    // customer never sees whether the data was saved or the proforma sent.
+    static final String PAYMENT_ANCHOR = "#client-offer-pay-title";
     private static final int SHORT_ID_LENGTH = 8;
     private static final int VISIBLE_EMAIL_CHARACTERS = 3;
 
@@ -108,7 +113,7 @@ public class ClientOfferController {
         basketsRepository.save(basket);
         redirectAttributes.addFlashAttribute(NOTICE,
                 ClientOfferNotice.ok(messageSource.getMessage("client.offer.notice.saved", null, locale)));
-        return redirectTo(basket);
+        return redirectToPayment(basket);
     }
 
     @PostMapping("/select-variant")
@@ -122,19 +127,33 @@ public class ClientOfferController {
         if (offer.isEmpty()) {
             return unavailable(storeId, offerId, model, locale, request, response);
         }
+        // client-offer.js sends the choice in the background and swaps the items and payment cards in place; any
+        // answer other than those cards makes it send the form the ordinary way, which shows the offer as it is
+        boolean async = SettingsPaths.isAsync(request.getHeader(SettingsPaths.ASYNC_HEADER));
         Basket basket = offer.get().basket();
         if (basket.isExpired()) {
-            return redirectTo(basket);
+            return async ? refused(response) : redirectTo(basket);
         }
 
         try {
             basket.selectVariant(groupId, position);
         } catch (IllegalArgumentException e) {
             // a stale page or a crafted form: show the offer as it is instead of an error page
-            return redirectTo(basket);
+            return async ? refused(response) : redirectTo(basket);
         }
         basketsRepository.save(basket);
-        return redirectTo(basket);
+        if (async) {
+            model.addAttribute("page", buildPage(basket, offer.get().store(), storeId, locale));
+            return VARIANT_UPDATE_VIEW;
+        }
+        // back to the group that was changed, not to the top of the page (a phone would lose its place)
+        return redirectTo(basket) + ClientOfferPageFactory.variantAnchor(basket, groupId).map(a -> "#" + a).orElse("");
+    }
+
+    /** Nothing to swap in the background: the script falls back to an ordinary submit. */
+    private static String refused(HttpServletResponse response) {
+        response.setStatus(HttpServletResponse.SC_CONFLICT);
+        return null;
     }
 
     @PostMapping("/checkout")
@@ -161,7 +180,7 @@ public class ClientOfferController {
             log.error("Payment link failed for offer {} in store {}", offerId, storeId, e);
             redirectAttributes.addFlashAttribute(NOTICE,
                     ClientOfferNotice.bad(messageSource.getMessage("client.offer.notice.payment.failed", null, locale)));
-            return new ModelAndView(redirectTo(basket));
+            return new ModelAndView(redirectToPayment(basket));
         }
 
         if ("POST".equalsIgnoreCase(checkoutResponse.getMethod())) {
@@ -194,13 +213,13 @@ public class ClientOfferController {
             log.warn("Proforma for offer {} in store {} failed: {}", offerId, storeId, op.getErrorMessage());
             redirectAttributes.addFlashAttribute(NOTICE, ClientOfferNotice.bad(
                     messageSource.getMessage("client.offer.notice.proforma.failed", null, locale)));
-            return redirectTo(basket);
+            return redirectToPayment(basket);
         }
 
         String email = maskEmail(basket.getBillingDetails().getEmail());
         redirectAttributes.addFlashAttribute(NOTICE, ClientOfferNotice.ok(
                 messageSource.getMessage("client.offer.notice.proforma.sent", new Object[]{email}, locale)));
-        return redirectTo(basket);
+        return redirectToPayment(basket);
     }
 
     /** The notice survives in the page, so anyone with the link would read the full address. */
@@ -263,6 +282,10 @@ public class ClientOfferController {
 
     private static String redirectTo(Basket basket) {
         return "redirect:" + basket.createOfferUrl("");
+    }
+
+    private static String redirectToPayment(Basket basket) {
+        return redirectTo(basket) + PAYMENT_ANCHOR;
     }
 
     private record Offer(Basket basket, Store store) {

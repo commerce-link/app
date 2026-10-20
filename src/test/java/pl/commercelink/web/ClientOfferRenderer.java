@@ -164,6 +164,14 @@ final class ClientOfferRenderer {
         return engine(locale).process("clientOffer", context);
     }
 
+    /** The answer to a variant chosen in the background: the controller puts only the page model. */
+    String renderVariantUpdate() {
+        Context context = new Context(locale);
+        context.setVariable("page", new ClientOfferPageFactory(mock(PaymentProviderFactory.class))
+                .build(basket, store, canEdit, locale));
+        return engine(locale).process("client-offer/variant-update", context);
+    }
+
     private static TemplateEngine engine(Locale locale) {
         TemplateEngine engine = EnglishFragmentTemplateEngine.create(locale);
         engine.addDialect(new LayoutDialect());

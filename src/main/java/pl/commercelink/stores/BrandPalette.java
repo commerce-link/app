@@ -1,12 +1,14 @@
 package pl.commercelink.stores;
 
-public record BrandPalette(String fill, String on, String hover, String ink, String inkHover, String soft) {
+public record BrandPalette(String fill, String on, String hover, String ink, String inkHover, String soft, String edge,
+                           String edgeHover) {
 
     public static final String SYSTEM_ACCENT = "#1b4db1";
     public static final String INK = "#0e1721";
     private static final String WHITE = "#ffffff";
     private static final String BLACK = "#000000";
     private static final double MIN_CONTRAST = 4.5;
+    private static final double MIN_EDGE_CONTRAST = 3.0;
 
     /** @param safeHex result of {@code Branding.getSafePrimaryColor()}: {@code #rrggbb} or null */
     public static BrandPalette of(String safeHex) {
@@ -27,12 +29,16 @@ public record BrandPalette(String fill, String on, String hover, String ink, Str
         if (contrast(hover, on) < MIN_CONTRAST) {
             hover = mix(fill, WHITE, 0.25);
         }
-        return new BrandPalette(fill, on, hover, ink, mix(ink, BLACK, 0.15), soft);
+        // A pale brand (white, yellow, pastels) fills the button with almost the card's own white, so the button would
+        // be told apart by its text only; its edge takes the darkened accent instead (WCAG 1.4.11, 3:1).
+        String edge = contrast(fill, WHITE) >= MIN_EDGE_CONTRAST ? fill : ink;
+        String edgeHover = edge.equals(fill) ? hover : edge;
+        return new BrandPalette(fill, on, hover, ink, mix(ink, BLACK, 0.15), soft, edge, edgeHover);
     }
 
     public String style() {
-        return "--cl-brand:%s;--cl-brand-on:%s;--cl-brand-hover:%s;--cl-brand-ink:%s;--cl-brand-ink-hover:%s;--cl-brand-soft:%s"
-                .formatted(fill, on, hover, ink, inkHover, soft);
+        return "--cl-brand:%s;--cl-brand-on:%s;--cl-brand-hover:%s;--cl-brand-ink:%s;--cl-brand-ink-hover:%s;--cl-brand-soft:%s;--cl-brand-edge:%s;--cl-brand-edge-hover:%s"
+                .formatted(fill, on, hover, ink, inkHover, soft, edge, edgeHover);
     }
 
     private static String onColour(String fill) {

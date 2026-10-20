@@ -291,7 +291,24 @@ class ClientOfferTemplateRenderingTest {
         // then
         assertThat(html).contains("Contact the store about payment.")
                 .doesNotContain("cl-kv is-bank")
-                .doesNotContain("send-proforma-invoice");
+                .contains("action=\"" + OFFER_PATH + "/send-proforma-invoice\"");
+    }
+
+    @Test
+    void proformaIsOfferedWithoutABankAccountOnceTheDataIsSaved() {
+        // given — the invoicing provider prints the seller's account on the proforma itself
+        ClientOfferRenderer renderer = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing());
+        renderer.store().setBankAccounts(new java.util.ArrayList<>());
+
+        // when
+        String html = renderer.render();
+
+        // then
+        assertThat(html).doesNotContain("cl-kv is-bank")
+                .contains("action=\"" + OFFER_PATH + "/send-proforma-invoice\"")
+                .contains("Send a proforma invoice to")
+                .contains("Every request issues a new proforma invoice.")
+                .doesNotContainPattern("<button[^>]*disabled[^>]*>\\s*<i class=\"far fa-envelope\"");
     }
 
     @Test
@@ -307,6 +324,38 @@ class ClientOfferTemplateRenderingTest {
                 .contains("action=\"" + OFFER_PATH + "/send-proforma-invoice\"")
                 .contains("Send a proforma invoice to")
                 .contains("Every request issues a new proforma invoice.");
+    }
+
+    @Test
+    void variantGroupRowCarriesItsAnchor() {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+
+        // then
+        assertThat(html).containsPattern("<li class=\"cl-list-item is-group\" id=\"variant-\\d+\">");
+    }
+
+    @Test
+    void variantUpdateAnswersWithTheItemsAndPaymentCardsOnly() {
+        // when
+        String html = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).renderVariantUpdate();
+
+        // then — the data card is left out, so whatever the customer is typing there stays
+        assertThat(html).contains("id=\"client-offer-items\"")
+                .contains("id=\"client-offer-payment\"")
+                .contains("Total to pay")
+                .contains("cl-offer-updating")
+                .doesNotContain("client-offer-data")
+                .doesNotContain("cl-public-head");
+    }
+
+    @Test
+    void offerPageHasAPoliteRegionForTheNewTotal() {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+
+        // then
+        assertThat(html).contains("<p id=\"client-offer-live\" class=\"cl-visually-hidden\" role=\"status\" aria-live=\"polite\"></p>");
     }
 
     @Test

@@ -14,8 +14,9 @@ public record ClientOfferPage(String offerId, String shortId, String offerPath, 
                               boolean hasGroups, String total, String vat, String net, boolean submitted,
                               Submitted data, Payment payment) {
 
+    /** {@code anchor} is the element id of a variant group (null for a plain line), the target after a variant is chosen. */
     public record Line(String name, String category, int qty, String unitPrice, String amount, String groupId,
-                       List<Option> options) {
+                       List<Option> options, String anchor) {
 
         public boolean isGroup() {
             return groupId != null && options.size() > 1;

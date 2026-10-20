@@ -25,6 +25,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -37,6 +39,7 @@ public class ClientOfferPageFactory {
 
     private static final String VALID_UNTIL_PATTERN = "d MMMM yyyy, HH:mm";
     private static final int SHORT_ID_LENGTH = 8;
+    private static final String VARIANT_ANCHOR = "variant-";
 
     private final PaymentProviderFactory paymentProviderFactory;
 
@@ -60,7 +63,7 @@ public class ClientOfferPageFactory {
                 basket.isExpired(),
                 canEdit,
                 basket.isShowPrices(),
-                offerLines.stream().map(this::toLine).toList(),
+                IntStream.range(0, offerLines.size()).mapToObj(i -> toLine(offerLines.get(i), i)).toList(),
                 delivery,
                 offerLines.stream().anyMatch(ClientOfferLine::isGroup),
                 Money.format(total),
@@ -79,7 +82,19 @@ public class ClientOfferPageFactory {
         return basket.resolveDeliveryOption(store).orElse(null);
     }
 
-    private ClientOfferPage.Line toLine(ClientOfferLine line) {
+    /**
+     * The id of the variant group's row, by its place among the offer lines: a group name is free text (spaces, Polish
+     * letters, anything typed in the dashboard), so it cannot be an id itself. Empty for an unknown group.
+     */
+    public static Optional<String> variantAnchor(Basket basket, String groupId) {
+        List<ClientOfferLine> lines = ClientOfferLine.from(basket);
+        return IntStream.range(0, lines.size())
+                .filter(i -> lines.get(i).isGroup() && lines.get(i).groupId().equals(groupId))
+                .mapToObj(i -> VARIANT_ANCHOR + i)
+                .findFirst();
+    }
+
+    private ClientOfferPage.Line toLine(ClientOfferLine line, int index) {
         BasketItem item = line.item();
         List<ClientOfferPage.Option> options = line.options().stream()
                 .map(o -> {
@@ -90,7 +105,8 @@ public class ClientOfferPageFactory {
                 .toList();
         return new ClientOfferPage.Line(item.getName(), item.getCategory(), (int) item.getQty(),
                 Money.format(item.getUnitPrice()), Money.format(item.getTotalPrice()),
-                line.isGroup() ? line.groupId() : null, line.isGroup() ? options : List.of());
+                line.isGroup() ? line.groupId() : null, line.isGroup() ? options : List.of(),
+                line.isGroup() ? VARIANT_ANCHOR + index : null);
     }
 
     private String signedDelta(ClientOfferLine.Option option) {

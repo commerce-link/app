@@ -67,4 +67,51 @@ class PublicPageStylesContractTest {
         assertThat(offer).doesNotContain("#fff")
                 .contains("cursor: pointer; background: var(--cl-surface); }");
     }
+
+    @Test
+    void primaryButtonEdgeComesFromThePalette() throws Exception {
+        // given — a pale brand needs a darker edge than its own fill to show the button on the white card
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("body.cl-public .cl-button.is-primary { background: var(--cl-brand); border-color: var(--cl-brand-edge);")
+                .contains("body.cl-public .cl-button.is-primary:hover { background: var(--cl-brand-hover); border-color: var(--cl-brand-edge-hover);");
+    }
+
+    @Test
+    void messageCardHasInnerSpacing() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains(".cl-public-main .cl-card.cl-public-message { padding: 28px 24px; }");
+    }
+
+    @Test
+    void variantButtonIsHiddenFromTheFirstPaintWhenScriptsRun() throws Exception {
+        // given — client-offer.js is deferred behind FontAwesome, so hiding the button from the script alone made it flash
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("@media (scripting: enabled) {\n  .cl-offer-page .cl-variant-apply:not([data-cl-revealed]) { display: none; }");
+    }
+
+    @Test
+    void redirectTargetsKeepAGapToTheTopEdge() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains(".cl-offer-page .cl-list-item.is-group[id], .cl-offer-page #client-offer-pay-title { scroll-margin-top: 16px; }");
+    }
+
+    @Test
+    void variantUpdateSpinnerShowsOnlyWhenTheAnswerIsSlow() throws Exception {
+        // given — a fast update must not flash the spinner
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains(".cl-offer-page .cl-offer-updating { display: none; }")
+                .contains(".cl-offer-page #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }");
+    }
 }

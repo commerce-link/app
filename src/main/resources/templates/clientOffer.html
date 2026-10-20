@@ -50,6 +50,8 @@
             </div></div>
         </section>
 
+        <!--/* client-offer.js reads the new total here after a variant update in the background */-->
+        <p th:unless="${page.expired}" id="client-offer-live" class="cl-visually-hidden" role="status" aria-live="polite"></p>
         <div th:unless="${page.expired}" class="cl-stack">
             <section th:replace="~{client-offer/items :: items}"></section>
             <section th:replace="~{client-offer/data :: data}"></section>

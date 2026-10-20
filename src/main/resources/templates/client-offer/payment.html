@@ -5,7 +5,7 @@
 <!--/* Step 3 of the offer page: the outcome of the last action, online payment (not for a split payment invoice) and the
        bank transfer with the proforma invoice. Everything that acts needs the saved data, so until then it is disabled
        and described by the lock note. */-->
-<section th:fragment="payment" class="cl-card" aria-labelledby="client-offer-pay-title"
+<section th:fragment="payment" id="client-offer-payment" class="cl-card" aria-labelledby="client-offer-pay-title"
          th:with="pay=${page.payment}, locked=${!page.payment.unlocked},
                   online=${!page.payment.splitPayment and !page.payment.options.isEmpty()}">
     <div class="cl-card-head has-step">
@@ -85,17 +85,20 @@
                     <dd th:text="${pay.bank.currency}"></dd>
                 </th:block>
             </dl>
-            <form method="post" data-cl-submit-once th:action="@{|${page.offerPath}/send-proforma-invoice|}">
-                <button class="cl-button" type="submit" th:disabled="${locked}"
-                        th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}"><i class="far fa-envelope" aria-hidden="true"></i>
-                    <th:block th:if="${locked or pay.billingEmail == null}" th:text="#{client.offer.proforma.send}"></th:block>
-                    <span th:unless="${locked or pay.billingEmail == null}" class="cl-proforma-label"><th:block
-                            th:text="#{client.offer.proforma.sendTo}"></th:block> <span
-                            th:replace="~{fragments/masked-field :: masked(${pay.billingEmail})}"></span></span>
-                </button>
-                <p class="cl-help" th:text="${locked} ? #{client.offer.proforma.locked} : #{client.offer.proforma.help}"></p>
-            </form>
         </th:block>
+
+        <!--/* The proforma does not depend on the store's bank account here: the invoicing provider prints its own seller
+               details on it, so it is offered once the data is saved, with or without the transfer details above. */-->
+        <form class="cl-proforma" method="post" data-cl-submit-once th:action="@{|${page.offerPath}/send-proforma-invoice|}">
+            <button class="cl-button" type="submit" th:disabled="${locked}"
+                    th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}"><i class="far fa-envelope" aria-hidden="true"></i>
+                <th:block th:if="${locked or pay.billingEmail == null}" th:text="#{client.offer.proforma.send}"></th:block>
+                <span th:unless="${locked or pay.billingEmail == null}" class="cl-proforma-label"><th:block
+                        th:text="#{client.offer.proforma.sendTo}"></th:block> <span
+                        th:replace="~{fragments/masked-field :: masked(${pay.billingEmail})}"></span></span>
+            </button>
+            <p class="cl-help" th:text="${locked} ? #{client.offer.proforma.locked} : #{client.offer.proforma.help}"></p>
+        </form>
     </div>
 </section>
 

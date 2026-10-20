@@ -43,6 +43,7 @@ class ClientOfferUnavailableRenderingTest {
 
         // then
         assertThat(html).contains("<title>Oferta niedostępna · Nova Tech</title>")
+                .contains("<section class=\"cl-card cl-public-message\">")
                 .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-narrow\"")
                 .contains("<p class=\"cl-eyebrow\">Oferta a1b2c3d4</p>")
                 .contains("<h1 class=\"cl-page-title\">Ta oferta nie jest już dostępna</h1>")
