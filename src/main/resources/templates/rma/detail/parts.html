@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The outcome of the last action (RmaFlash, model attribute rmaNotice), shown where it belongs: scope 'PAGE' under the
+       header, 'ITEMS' next to the items the action was taken on. lines name what was skipped and why. */-->
+<div th:fragment="notice(scope)" th:if="${rmaNotice != null and rmaNotice.scope().name() == scope}"
+     class="cl-alert" th:classappend="${rmaNotice.tone()}" role="status" data-cl-saved-alert>
+    <i class="fas cl-alert-icon" aria-hidden="true"
+       th:classappend="${rmaNotice.tone() == 'is-ok'} ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+    <div>
+        <p class="cl-alert-text" th:text="${rmaNotice.text()}"></p>
+        <ul th:if="${rmaNotice.lines() != null and !rmaNotice.lines().isEmpty()}" class="cl-alert-list">
+            <li th:each="line : ${rmaNotice.lines()}" th:text="${line}"></li>
+        </ul>
+    </div>
+</div>
+
+<!--/* The lock card on top of a closed RMA's work column (spec §4.9, the pattern of the RMA item page): why nothing can be
+       changed any more and, on a rejected RMA, the reason it was rejected with. */-->
+<section th:fragment="closedStatus" th:if="${page.closed()}" class="cl-card is-status" aria-labelledby="closed-title"
+         th:with="c=${page.current()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="closed-title"><i class="fas fa-lock" aria-hidden="true"></i><span
+            th:text="${c.status() == 'Rejected'} ? #{rma.detail.closed.Rejected} : #{rma.detail.closed.Completed}"></span></h2></div>
+    <p class="cl-card-desc" th:text="#{rma.detail.closed.text}"></p>
+    <dl th:if="${c.status() == 'Rejected' and !#strings.isEmpty(c.rejectionReason())}" class="cl-kv is-column cl-card-inset">
+        <div class="cl-kv-wide">
+            <dt th:text="#{rma.detail.reject.reason}"></dt>
+            <dd class="cl-kv-text" th:text="${c.rejectionReason()}"></dd>
+        </div>
+    </dl>
+</section>
+</body>
+</html>
