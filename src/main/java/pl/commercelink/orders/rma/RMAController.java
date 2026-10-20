@@ -1,6 +1,7 @@
 package pl.commercelink.orders.rma;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.io.ByteArrayResource;
@@ -18,6 +19,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.web.rma.RmaAddressForm;
+import pl.commercelink.web.rma.RmaActionNotices;
+import pl.commercelink.web.rma.RmaAddressPage;
+import pl.commercelink.web.rma.RmaDetailPageFactory;
+import pl.commercelink.web.rma.RmaFlash;
+import pl.commercelink.web.rma.RmaNotice;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
@@ -54,6 +61,13 @@ public class RMAController {
 
     private final RmaShipmentsViewFactory rmaShipmentsViewFactory;
 
+    private final OrdersRepository ordersRepository;
+
+    private final RmaDetailPageFactory rmaDetailPageFactory;
+
+    /** Set by "Ship to client" when the RMA's address is incomplete: the address page then shows every missing field. */
+    public static final String ADDRESS_INCOMPLETE_FLASH = "rmaAddressIncomplete";
+
     @Value("${app.domain}")
     private String appDomain;
 
@@ -73,8 +87,12 @@ public class RMAController {
         }
     }
 
+    /** ?open= names the dialog rendered open without JavaScript (with ?item= for "split"); RmaDetailPage validates it. */
     @GetMapping("/dashboard/rma/{rmaId}")
-    public String showRmaDetail(@PathVariable String rmaId, Model model, Locale locale) {
+    public String showRmaDetail(@PathVariable String rmaId, @RequestParam(required = false) String open,
+                                @RequestParam(name = "item", required = false) String splitItem, Model model,
+                                Locale locale) {
+        RmaFlash.adoptLegacy(model);
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
         RMAItemsForm rmaItemsForm = new RMAItemsForm(rmaItems);
@@ -86,28 +104,35 @@ public class RMAController {
                 .collect(Collectors.toList());
 
         model.addAttribute("rma", rma);
-        model.addAttribute("itemConditions", ItemCondition.values());
-        model.addAttribute("rmaStatusTypes", RMAStatus.values());
-        model.addAttribute("rmaResolutionsTypes", RMAResolutionType.values());
         model.addAttribute("rmaItemsForm", rmaItemsForm);
-        model.addAttribute("backofficeDomain", appDomain);
-        model.addAttribute("isClosed", isClosed(rma));
         model.addAttribute("rmaShipments", rmaShipmentsViewFactory.build(rma, isClosed(rma), locale));
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("remainingOrderItems", remainingOrderItems);
-        model.addAttribute("refundDeliveryDefault",
-                rma.isMarketplaceReturn() && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems));
+        boolean refundDeliveryDefault = rma.isMarketplaceReturn()
+                && marketplaceReturnDecisions.coversEveryReturnableItem(rma, rmaItems);
+        model.addAttribute("page", rmaDetailPageFactory.page(getStoreId(), rma, rmaItems, remainingOrderItems,
+                orderAddressOf(rma), refundDeliveryDefault, rma.createClientRmaUrl(appDomain), open, splitItem, locale));
 
         return "rma-detail";
     }
 
+    /** The address "Ship to client" sends the goods back to; ?fill=order puts the order's address in the form, unsaved. */
     @GetMapping("/dashboard/rma/{rmaId}/shipping")
-    public String editRmaShipping(@PathVariable String rmaId, Model model) {
+    public String editRmaShipping(@PathVariable String rmaId, @RequestParam(required = false) String fill, Model model,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-        model.addAttribute("rma", rma);
-        model.addAttribute("isClosed", isClosed(rma));
-
-        return "rma-shipping";
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+        ShippingDetails orderAddress = orderAddressOf(rma);
+        boolean filled = "order".equals(fill) && orderAddress != null;
+        RmaAddressForm form = filled ? RmaAddressForm.of(orderAddress).withCountryCode() : RmaAddressForm.of(rma.getShippingDetails());
+        boolean incomplete = Boolean.TRUE.equals(model.getAttribute(ADDRESS_INCOMPLETE_FLASH));
+        if (incomplete && RmaAddressForm.hasAnyValue(rma.getShippingDetails())) {
+            // against the saved address only the missing fields are reported; passing null would also flag the format of values nobody touched
+            form = form.withErrors(form.validate(rma.getShippingDetails()));
+        }
+        // an RMA with no address at all gets one notice instead of an error on every field nobody has touched yet
+        return addressPage(rma, form, orderAddress, filled, incomplete, incomplete, model);
     }
 
     @PostMapping("/dashboard/rma/{rmaId}")
@@ -203,18 +228,15 @@ public class RMAController {
         OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), orderItemId);
         if (orderItem == null || orderItem.hasOneOfTheStatuses(FulfilmentStatus.Returned, FulfilmentStatus.Replaced)
                 || quantity <= 0 || quantity > orderItem.getQty()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.invalid.quantity", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.invalid.quantity", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
         if (rma.isMarketplaceReturn() && orderItem.isService()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.service.not.returnable", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.service.not.returnable", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
         if (openRmaCoverage.coveredByAnotherOpenRma(storeId, orderItemId, rmaId)) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.item.already.in.open.rma", null, locale));
+            refuseItemAction(redirectAttributes, "rma.item.already.in.open.rma", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -242,7 +264,9 @@ public class RMAController {
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        rmaManager.markItemsAsReceived(getStoreId(), rmaId, form.getSelectedRMAItemIds());
+        List<RMAItem> selected = selectedItems(rmaId, form);
+        RMAManager.OperationResult op = rmaManager.markItemsAsReceived(getStoreId(), rmaId, form.getSelectedRMAItemIds());
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.received", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
@@ -260,11 +284,11 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.replaceSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.replace.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.replace.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -277,8 +301,9 @@ public class RMAController {
         );
 
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+            refuseItemAction(redirectAttributes, "rma.warehouse.document.generation.failed", locale);
+        } else {
+            RmaFlash.items(redirectAttributes, done("rma.detail.done.replaced", selected, op, locale));
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
@@ -298,11 +323,11 @@ public class RMAController {
             return blocked.get();
         }
 
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.returnSelectedItems(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.move.to.warehouse.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.move.to.warehouse.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -319,23 +344,55 @@ public class RMAController {
         );
 
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.warehouse.document.generation.failed", null, locale));
+            refuseItemAction(redirectAttributes, "rma.warehouse.document.generation.failed", locale);
         } else if (!marketplaceReturnDecisions.publishAcceptance(op.getRma(), op.getRmaItems(), deliveryCovered)) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.marketplace.decision.not.sent", null, locale));
+            refuseItemAction(redirectAttributes, "rma.marketplace.decision.not.sent", locale);
+        } else {
+            RmaNotice notice = done("rma.detail.done.accepted", selected, op, locale);
+            if (op.getRma().isMarketplaceReturn()) {
+                // the marketplace carries out the refund later: the page can only say it was requested
+                String deliveryKey = !refundDelivery ? "rma.detail.delivery.notRequested"
+                        : deliveryCovered ? "rma.detail.delivery.refunded" : "rma.detail.delivery.notRefunded";
+                notice = notice.withLine(messageSource.getMessage(deliveryKey, null, locale));
+            }
+            RmaFlash.items(redirectAttributes, notice);
         }
 
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
+    /** The items the operator ticked, read before the action changes their statuses so that skipped ones can be explained. */
+    private List<RMAItem> selectedItems(String rmaId, RMAItemsForm form) {
+        List<String> ids = form.getSelectedRMAItemIds();
+        return rmaItemsRepository.findByRmaId(rmaId).stream()
+                .filter(item -> ids.contains(item.getRmaItemId()))
+                .toList();
+    }
+
+    private RmaNotice done(String doneKey, List<RMAItem> selected, RMAManager.OperationResult op, Locale locale) {
+        List<String> processed = op.isSuccess()
+                ? op.getRmaItems().stream().map(RMAItem::getRmaItemId).toList()
+                : List.of();
+        return new RmaActionNotices(messageSource).done(doneKey, selected, processed, locale);
+    }
+
+    /** A refused action on the items is shown in the Items card next to the selection it refused, not under the header. */
+    private void refuseItemAction(RedirectAttributes redirectAttributes, String key, Locale locale) {
+        RmaFlash.items(redirectAttributes, new RmaNotice(RmaNotice.BAD, messageSource.getMessage(key, null, locale),
+                List.of(), RmaNotice.Scope.ITEMS));
+    }
+
     private String redirectWithMissingCondition(String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
-        redirectAttributes.addFlashAttribute("errorMessage",
-                messageSource.getMessage("rma.item.condition.required", null, locale));
+        refuseItemAction(redirectAttributes, "rma.item.condition.required", locale);
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
     private Optional<String> rejectIfClosedOrMissing(RMA rma, String rmaId, RedirectAttributes redirectAttributes, Locale locale) {
+        return closedOrMissing(rma, rmaId, redirectAttributes, messageSource, locale);
+    }
+
+    /** The single refusal for an RMA that does not exist or is closed; shared with the shipping controller. */
+    static Optional<String> closedOrMissing(RMA rma, String rmaId, RedirectAttributes redirectAttributes, MessageSource messageSource, Locale locale) {
         if (rma == null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.not.found", null, locale));
             return Optional.of("redirect:/dashboard/rma");
@@ -353,44 +410,79 @@ public class RMAController {
 
     @PostMapping("/dashboard/rma/{rmaId}/markItemsAsReturnedToClient")
     public String markItemsAsReturnedToClient(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.markItemsAsReturnedToClient(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.mark.as.returned.to.client.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.mark.as.returned.to.client.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.returnedToClient", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/markItemsAsSentToDistributor")
     public String markItemsAsSentToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
+        List<RMAItem> selected = selectedItems(rmaId, form);
         RMAManager.OperationResult op = rmaManager.markItemsAsSentToDistributor(getStoreId(), rmaId, form.getSelectedRMAItemIds());
 
         if (op.isFailure()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.cannot.mark.as.sent.to.distributor.invalid.status", null, locale));
+            refuseItemAction(redirectAttributes, "rma.cannot.mark.as.sent.to.distributor.invalid.status", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
+        RmaFlash.items(redirectAttributes, done("rma.detail.done.sentToDistributor", selected, op, locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShippingDetails")
     public String updateShippingDetails(@PathVariable String rmaId, @ModelAttribute("rma") RMA updatedRma,
-                                        RedirectAttributes redirectAttributes, Locale locale) {
+                                        @RequestParam(name = RmaAddressPage.SHIP_TO_CLIENT_PARAM, required = false) boolean shipToClient,
+                                        Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA existingRma = rmaRepository.findById(getStoreId(), rmaId);
         Optional<String> blocked = rejectIfClosedOrMissing(existingRma, rmaId, redirectAttributes, locale);
         if (blocked.isPresent()) {
             return blocked.get();
         }
-        if (updatedRma.getShippingDetails() != null) {
-            existingRma.setShippingDetails(updatedRma.getShippingDetails());
+        RmaAddressForm form = RmaAddressForm.of(updatedRma.getShippingDetails());
+        Map<String, String> errors = form.validate(existingRma.getShippingDetails());
+        if (!errors.isEmpty()) {
+            return addressPage(existingRma, form.withErrors(errors), orderAddressOf(existingRma), false, false, shipToClient, model);
         }
-
+        existingRma.setShippingDetails(form.applyTo(existingRma.getShippingDetails()));
         rmaRepository.save(existingRma);
+        // the item selection was lost on the way here from "Ship to client": the details page is where it is made again
+        redirectAttributes.addFlashAttribute("successMessage",
+                messageSource.getMessage(shipToClient ? "rma.address.saved.ship.again" : "rma.address.saved", null, locale));
         return "redirect:/dashboard/rma/" + rmaId;
+    }
+
+    private String addressPage(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
+                               boolean incomplete, boolean shipToClient, Model model) {
+        model.addAttribute("page", RmaAddressPage.of(rma, form, orderAddress, filled, incomplete, shipToClient));
+        return "rma/address";
+    }
+
+    /** The order's shipping address when the order exists and has one, else null. */
+    private ShippingDetails orderAddressOf(RMA rma) {
+        if (StringUtils.isBlank(rma.getOrderId())) {
+            return null;
+        }
+        Order order = ordersRepository.findById(getStoreId(), rma.getOrderId());
+        return order != null && RmaAddressForm.hasAnyValue(order.getShippingDetails()) ? order.getShippingDetails() : null;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/updateShipments")
@@ -404,17 +496,21 @@ public class RMAController {
         }
         if (updatedRma.getShipments() != null) {
             List<Shipment> previous = existingRma.getShipments();
-            // the form carries only what the operator edits and the package id: the courier order, its cancellation
-            // and pickup are taken from the shipment of that package, never from the form
+            List<Shipment> posted = updatedRma.getShipments();
+            // the form carries only what the operator edits and the package id: the courier order, its cancellation,
+            // pickup and what the form does not show (tracking subscription, seconds of a date) come from the stored
+            // shipment the row stands for
+            Map<Shipment, Shipment> stored = storedShipmentsOf(posted, previous);
             Map<Shipment, String> packages = new IdentityHashMap<>();
-            updatedRma.getShipments().forEach(s -> {
-                packages.put(s, s.getExternalId());
-                s.setExternalId(null);
-            });
+            for (Shipment row : posted) {
+                packages.put(row, row.getExternalId());
+                row.setExternalId(null);
+            }
             List<Shipment> shipments = updatedRma.getShipments().stream()
-                    .filter(s -> s.hasShippingData() || s.hasCollectionData())
+                    .filter(row -> isWorthKeeping(row, stored.get(row)))
                     .collect(Collectors.toList());
-            shipments.forEach(s -> s.inheritCourierOrderFrom(shipmentOfPackage(previous, packages.get(s))));
+            shipments.forEach(s -> s.inheritCourierOrderFrom(stored.get(s)));
+            shipments.forEach(s -> s.inheritTrackingFrom(stored.get(s)));
             // a shipment being created has no data the form could show; dropping it would lose its label
             List<Shipment> creations = previous.stream().filter(s -> s.getCreation() != null).toList();
             // nor could the form show a package created after it was opened: only packages it showed may be removed
@@ -438,9 +534,68 @@ public class RMAController {
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
-    private static Shipment shipmentOfPackage(List<Shipment> shipments, String externalId) {
-        return externalId == null ? null
-                : shipments.stream().filter(s -> externalId.equals(s.getExternalId())).findFirst().orElse(null);
+    /**
+     * A shipment is saved with its carrier, number and shipping date (a personal collection with its date), as the
+     * dialog says; clearing the date of a shipment typed in by hand is how the operator removes it. A parcel imported
+     * with a marketplace return never had a date, only a number and a carrier, so a row standing for such a stored
+     * parcel stays with them.
+     */
+    private static boolean isWorthKeeping(Shipment row, Shipment stored) {
+        if (row.hasShippingData() || row.hasCollectionData()) {
+            return true;
+        }
+        boolean storedWithoutDate = stored != null && stored.getShippedAt() == null;
+        return storedWithoutDate
+                && (StringUtils.isNotBlank(row.getTrackingNo()) || StringUtils.isNotBlank(row.getCarrier()));
+    }
+
+    /**
+     * The stored shipment each posted row stands for, or null for a new row. The packages of one dispatch share their
+     * externalId, so a package is matched by its externalId and tracking number first; a row whose number was edited
+     * then takes the package of its externalId left over, preferring the one at its own index (the form numbers rows
+     * by their position in the stored list), and only when that leaves no doubt. A row without a package takes the
+     * stored shipment at its index, when that one has no package and is not being created either.
+     */
+    private static Map<Shipment, Shipment> storedShipmentsOf(List<Shipment> posted, List<Shipment> previous) {
+        Map<Shipment, Shipment> stored = new IdentityHashMap<>();
+        Set<Shipment> claimed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Shipment row : posted) {
+            if (row.getExternalId() == null) {
+                continue;
+            }
+            previous.stream()
+                    .filter(s -> !claimed.contains(s) && row.getExternalId().equals(s.getExternalId())
+                            && (Objects.equals(row.getTrackingNo(), s.getTrackingNo()) || s.hasTrackingNo(row.getTrackingNo())))
+                    .findFirst()
+                    .ifPresent(s -> {
+                        stored.put(row, s);
+                        claimed.add(s);
+                    });
+        }
+        for (int i = 0; i < posted.size(); i++) {
+            Shipment row = posted.get(i);
+            if (row.getExternalId() == null || stored.containsKey(row)) {
+                continue;
+            }
+            List<Shipment> left = previous.stream()
+                    .filter(s -> !claimed.contains(s) && row.getExternalId().equals(s.getExternalId()))
+                    .toList();
+            Shipment atIndex = i < previous.size() ? previous.get(i) : null;
+            Shipment match = left.stream().anyMatch(s -> s == atIndex) ? atIndex
+                    : left.size() == 1 ? left.get(0) : null;
+            if (match != null) {
+                stored.put(row, match);
+                claimed.add(match);
+            }
+        }
+        for (int i = 0; i < posted.size(); i++) {
+            Shipment row = posted.get(i);
+            if (row.getExternalId() == null && i < previous.size() && previous.get(i).getExternalId() == null
+                    && previous.get(i).getCreation() == null) {
+                stored.put(row, previous.get(i));
+            }
+        }
+        return stored;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/items/{rmaItemId}/split")
@@ -457,14 +612,14 @@ public class RMAController {
         RMAItem original = rmaItemsRepository.findById(rmaId, rmaItemId);
 
         if (original == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "RMA item not found.");
+            refuseItemAction(redirectAttributes, "rma.detail.error.item.not.found", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
         int originalQty = original.getQty();
 
         if (qty1 < 1 || qty2 < 1 || qty1 + qty2 != originalQty) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Invalid split quantities.");
+            refuseItemAction(redirectAttributes, "rma.detail.error.split.quantities", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -482,50 +637,93 @@ public class RMAController {
                                       @ModelAttribute RMAItemsForm form,
                                       RedirectAttributes redirectAttributes,
                                       Locale locale) {
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
         List<String> selectedRMAItemIds = form.getSelectedRMAItemIds();
 
         if (selectedRMAItemIds.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("rma.check.serial.no.items.selected", null, locale));
+            refuseItemAction(redirectAttributes, "rma.check.serial.no.items.selected", locale);
             return "redirect:/dashboard/rma/" + rmaId;
         }
 
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
-
-        List<String> errorMessages = new ArrayList<>();
+        // the form never carries serial numbers, so the check reads the stored items
+        Map<String, RMAItem> storedItems = rmaItemsRepository.findByRmaId(rmaId).stream()
+                .collect(Collectors.toMap(RMAItem::getRmaItemId, item -> item, (first, second) -> first));
+        List<String> problems = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        int compared = 0;
 
         for (String rmaItemId : selectedRMAItemIds) {
-            RMAItem rmaItem = form.getRmaItemBy(rmaItemId);
-            OrderItem orderItem = orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
+            RMAItem rmaItem = storedItems.get(rmaItemId);
+            if (rmaItem == null) {
+                continue;
+            }
+            if (SerialNumbers.parse(rmaItem.getSerialNo()).isEmpty()) {
+                skipped.add(messageSource.getMessage("rma.detail.serial.skip.no.serial",
+                        new Object[]{rmaItem.getName()}, locale));
+                continue;
+            }
 
-            List<String> invalidSerialNumbers = orderItem.getInvalidSerialNumbers(rmaItem.getSerialNo());
+            OrderItem orderItem = rma.getOrderId() == null ? null
+                    : orderItemsRepository.findById(rma.getOrderId(), rmaItem.getItemId());
+            if (orderItem == null) {
+                problems.add(messageSource.getMessage("rma.check.serial.order.item.not.found",
+                        new Object[]{rmaItem.getName()}, locale));
+                continue;
+            }
 
-            if (!invalidSerialNumbers.isEmpty()) {
-                String invalidSNs = String.join(", ", invalidSerialNumbers);
-                errorMessages.add(messageSource.getMessage("rma.check.serial.no.mismatch",
-                        new Object[]{rmaItem.getName(), invalidSNs}, locale));
+            // same rule as the item page hint: an order item without numbers is not a mismatch, only not compared
+            List<String> inOrder = SerialNumbers.parse(orderItem.getSerialNo());
+            if (inOrder.isEmpty()) {
+                skipped.add(messageSource.getMessage("rma.detail.serial.skip.order.empty",
+                        new Object[]{rmaItem.getName()}, locale));
+                continue;
+            }
+            compared++;
+            List<String> outside = SerialNumbers.parse(rmaItem.getSerialNo()).stream()
+                    .filter(sn -> !inOrder.contains(sn)).toList();
+            if (!outside.isEmpty()) {
+                problems.add(rmaItem.getName() + " \u2014 " + String.join(", ", outside));
             }
         }
 
-        if (errorMessages.isEmpty()) {
-            redirectAttributes.addFlashAttribute("successMessage",
-                    messageSource.getMessage("rma.check.serial.no.all.valid", null, locale));
+        List<String> lines = new ArrayList<>(problems);
+        lines.addAll(skipped);
+        RmaNotice notice;
+        if (!problems.isEmpty()) {
+            notice = new RmaNotice(RmaNotice.BAD, messageSource.getMessage("rma.detail.serial.mismatch.title", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
+        } else if (compared == 0) {
+            notice = new RmaNotice(RmaNotice.WARN, messageSource.getMessage("rma.detail.serial.nothing", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
         } else {
-            redirectAttributes.addFlashAttribute("errorMessage", String.join("<br>", errorMessages));
+            notice = new RmaNotice(RmaNotice.OK, messageSource.getMessage("rma.detail.serial.ok", null, locale),
+                    List.copyOf(lines), RmaNotice.Scope.ITEMS);
         }
+        RmaFlash.items(redirectAttributes, notice);
 
         return "redirect:/dashboard/rma/" + rmaId;
     }
 
     @PostMapping("/dashboard/rma/{rmaId}/deleteItems")
     public String deleteRMAItems(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Locale locale) {
-        List<RMAItem> rmaItemsToDelete = form.getSelectedRMAItemIds().stream()
-                .map(rmaItemId -> rmaItemsRepository.findById(rmaId, rmaItemId))
+        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = rejectIfClosedOrMissing(rma, rmaId, redirectAttributes, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
+
+        List<RMAItem> selected = selectedItems(rmaId, form);
+        List<RMAItem> rmaItemsToDelete = selected.stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.New, RMAItemStatus.Received))
                 .collect(Collectors.toList());
 
         if  (rmaItemsToDelete.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", "You are allowed to delete only New or Received RMA items.");
+            refuseItemAction(redirectAttributes, "rma.detail.error.delete.status", locale);
             return  "redirect:/dashboard/rma/" + rmaId;
         }
 
@@ -533,11 +731,11 @@ public class RMAController {
 
         double totalAmount = rmaItemsToDelete.stream().mapToDouble(RMAItem::getTotalPrice).sum();
 
-        RMA rma = rmaRepository.findById(getStoreId(), rmaId);
         rma.decreaseShippingInsurance(totalAmount);
         rmaRepository.save(rma);
 
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("rma.items.delete.success", new Object[]{rmaItemsToDelete.size()}, locale));
+        RmaFlash.items(redirectAttributes, new RmaActionNotices(messageSource).done("rma.detail.done.deleted", selected,
+                rmaItemsToDelete.stream().map(RMAItem::getRmaItemId).toList(), locale));
         return "redirect:/dashboard/rma/" + rmaId;
     }
 

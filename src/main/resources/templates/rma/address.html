@@ -1,0 +1,72 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The address "Ship to client" sends an RMA's goods back to. The form is also the address dialog of the RMA details
+       page (rma/detail/side :: addressDialog, inDialog true); this page is its version without JavaScript and where a
+       refused save comes back with the errors. */-->
+<div layout:fragment="content">
+<section class="cl-page" th:fragment="body" th:with="p=${page}">
+    <div class="cl-page-body is-form">
+        <div th:replace="~{fragments/settings-header :: subpageWithActions(|/dashboard/rma/${p.rmaId()}|, #{rma.item.page.back(${p.rmaShortId()})}, #{rma.address.page.title}, #{rma.address.page.lead}, null)}"></div>
+
+        <div th:if="${p.filled()}" class="cl-alert is-info">
+            <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{rma.address.filled(${p.orderShortId()})}"></p>
+        </div>
+        <!--/* Focused like an error summary (error-summary.js) when "Ship to client" sent the operator here. */-->
+        <div th:if="${p.showMissingWarning()}" class="cl-alert is-warn"
+             th:attr="tabindex=${p.focusMissingWarning()} ? '-1' : null, data-cl-error-summary=${p.focusMissingWarning()} ? 'true' : null">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{${p.missingWarningKey()}}"></p>
+        </div>
+
+        <section class="cl-card" aria-labelledby="rma-address-title">
+            <div class="cl-card-head">
+                <h2 class="cl-card-title" id="rma-address-title" th:text="#{rma.address.card.title}"></h2>
+                <div th:if="${p.fillAvailable()}" class="cl-card-actions">
+                    <a class="cl-button" th:href="@{/dashboard/rma/{r}/shipping(r=${p.rmaId()}, fill='order')}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-paste"></i></span>
+                        <span th:text="#{rma.address.fill.from.order}"></span>
+                    </a>
+                </div>
+            </div>
+            <!--/* Autofill is off: the operator types the customer's address, not their own. */-->
+            <!--/* inDialog: true in the details page's dialog, unset on this page. In the wide dialog the form is not
+                   held to the page form's width (cl-form). */-->
+            <form th:fragment="addressForm(p, inDialog)" id="rma-address-form" th:class="${inDialog} ? null : 'cl-form'" method="post" novalidate
+                  th:with="a=${p.form()}"
+                  th:action="@{/dashboard/rma/{r}/updateShippingDetails(r=${p.rmaId()})}">
+                <h2 th:if="${inDialog}" class="cl-dialog-title" id="address-dialog-title" th:text="#{rma.address.page.title}"></h2>
+                <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+                    <p th:if="${inDialog == true and p.fillAvailable()}" class="cl-help"><a class="cl-link-button"
+                            th:href="@{/dashboard/rma/{r}/shipping(r=${p.rmaId()}, fill='order')}"
+                            th:text="#{rma.detail.address.fromOrder(${p.orderShortId()})}"></a></p>
+                    <div th:replace="~{fragments/settings-form :: errorSummaryTitled('rma-address-errors', ${a.errors()}, null, ${p.errorSummaryTitleKey()})}"></div>
+                    <input th:if="${p.shipToClient()}" type="hidden" name="shipToClient" value="true">
+                    <div class="cl-form-grid cl-card-grid">
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.name', 'order.address.name', ${a.name()}, 'text', 'off', true, ${a.error('name')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.surname', 'order.address.surname', ${a.surname()}, 'text', 'off', false, ${a.error('surname')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.companyName', 'order.address.company', ${a.companyName()}, 'text', 'off', false, ${a.error('companyName')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.streetAndNumber', 'order.address.street', ${a.streetAndNumber()}, 'text', 'off', true, ${a.error('streetAndNumber')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.postalCode', 'order.address.postal', ${a.postalCode()}, 'text', 'off', true, ${a.error('postalCode')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.city', 'order.address.city', ${a.city()}, 'text', 'off', true, ${a.error('city')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.country', 'order.address.country', ${a.country()}, 'text', 'off', true, ${a.error('country')}, #{order.address.country.help}, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.email', 'order.address.email', ${a.email()}, 'email', 'off', true, ${a.error('email')}, null, null, null, false, ${a.maxLength()})}"></div>
+                        <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.phone', 'order.address.phone', ${a.phone()}, 'tel', 'off', true, ${a.error('phone')}, null, null, null, false, ${a.maxLength()})}"></div>
+                    </div>
+                </div>
+                <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+                    <button type="submit" class="cl-button is-primary" th:text="#{rma.address.save}"></button>
+                    <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                    <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/rma/{r}(r=${p.rmaId()})}" th:text="#{general.cancel}"></a>
+                </div>
+            </form>
+        </section>
+    </div>
+</section>
+<script th:src="@{/js/error-summary.js}" defer></script>
+</div>
+</body>
+</html>

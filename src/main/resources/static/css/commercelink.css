@@ -1538,6 +1538,205 @@ body.cl-drawer-open .cl-sidebar {
     border-color: var(--cl-bad);
 }
 
+/* File field (new offer from CSV): the frame of a text field, dashed until a file is chosen. The native input covers the
+   whole field with opacity 0, so a click and a dropped file reach it without JavaScript; file-input.js adds is-enhanced
+   and writes the file's name and size. Without the script the native input shows as .cl-file and the rest is hidden. */
+.cl-page .cl-file-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cl-page .cl-file-input:not(.is-enhanced) > :not(input) {
+    display: none;
+}
+
+.cl-page .cl-file-input.is-enhanced {
+    min-height: 52px;
+    padding: 7px 12px 7px 8px;
+    border: 1px dashed var(--cl-ink-3);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-file-input.is-enhanced > input[type=file] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.cl-page .cl-file-input.is-enhanced:hover,
+.cl-page .cl-file-input.is-enhanced:focus-within {
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-file-input.is-enhanced:focus-within {
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-page .cl-file-input.is-enhanced.has-file {
+    border-style: solid;
+    border-color: var(--cl-line);
+}
+
+.cl-page .cl-file-input.is-enhanced.is-dragover {
+    border-style: solid;
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-file-input.is-enhanced.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-page .cl-file-input-button {
+    flex: none;
+    pointer-events: none;
+}
+
+.cl-page .cl-file-input.is-enhanced:hover > .cl-file-input-button {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-file-input-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--cl-radius);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-file-input.is-enhanced:not(.has-file) > .cl-file-input-icon,
+.cl-page .cl-file-input.is-enhanced.has-file > .cl-file-input-button {
+    display: none;
+}
+
+.cl-page .cl-file-input-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-file-input-name {
+    overflow: hidden;
+    color: var(--cl-ink);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-file-input-name.is-empty {
+    color: var(--cl-ink-3);
+    font-weight: 400;
+}
+
+.cl-page .cl-file-input-meta {
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-file-input.is-enhanced {
+        min-height: 58px;
+    }
+}
+
+/* A message shown by a script stays out of the layout until then (.cl-field-error is display: flex). */
+.cl-page .cl-field-error[hidden] {
+    display: none;
+}
+
+/* A group note replaced by the rule's own message while the group shows it (form-check.js). */
+.cl-page .cl-fieldset > [data-cl-any-of-note][hidden] {
+    display: none;
+}
+
+/* The group title floats and only its next sibling clears it; that is the note, hidden while a rule message shows. */
+.cl-page .cl-fieldset > [data-cl-any-of] {
+    clear: both;
+}
+
+.cl-page .cl-fieldset > .cl-help + .cl-form-grid,
+.cl-page .cl-fieldset > .cl-field-error + .cl-form-grid {
+    margin-top: var(--cl-gap-fields);
+}
+
+.cl-page .cl-fieldset > .cl-field-error:not([hidden]) + .cl-field-error {
+    margin-top: 4px;
+}
+
+/* The sentence above an import format reads as help, not as a Bulma paragraph (specific enough to beat .content p). */
+.cl-page .cl-disclosure-body > p.cl-format-intro {
+    margin: 0 0 8px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* Several lines of a literal file or snippet (the example CSV); .cl-code is the one-line counterpart in running text. */
+.cl-page .cl-code-block {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* Columns of an import format: number and name, what to enter, an example value. */
+.cl-page .cl-format-table {
+    margin-top: 4px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-format-table tbody th {
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 500;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-format-table .cl-format-sample {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+}
+
+.cl-page .cl-disclosure-body > p.cl-format-download {
+    margin: 10px 0 0;
+}
+
+.cl-page .cl-format-download a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-format-download a {
+        min-height: 44px;
+    }
+}
+
 .cl-color-row {
     display: flex;
     flex-wrap: wrap;
@@ -6277,6 +6476,8 @@ a.cl-link-button:hover {
    the fieldset already pads its content, so the dl drops the padding it has as a card child */
 .cl-page .cl-fieldset > dl.cl-kv { padding: 0; }
 .cl-page .cl-fieldset > dl.cl-kv + .cl-help { margin: var(--cl-gap-fields) 0 0; }
+/* The fields under the record's facts (the payment method under the summary of a new order) */
+.cl-page .cl-fieldset > .cl-kv + .cl-form-grid { margin-top: 16px; }
 @media screen and (max-width: 719px) {
   .cl-page .cl-fieldset > dl.cl-kv { grid-template-columns: minmax(0, 1fr); }
   .cl-page .cl-fieldset > dl.cl-kv > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
@@ -7280,6 +7481,13 @@ a.cl-link-button:hover {
 
 .cl-page .cl-card-grid.is-last {
     padding: 12px 20px 16px;
+}
+
+/* An address grid inside a fieldset section (new order page) sits in the section's own padding, not in the card's. */
+.cl-page .cl-fieldset > .cl-card-grid,
+.cl-page .cl-fieldset > .cl-choice-group > .cl-card-grid {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .cl-page .cl-card-inset {
@@ -12681,15 +12889,11 @@ a.cl-link-button:hover {
 .cl-page .cl-inline-fields .cl-field { min-width: 180px; }
 .cl-page .cl-ledger-notice { margin-bottom: 20px; }
 .cl-page .cl-ledger-closed { margin-top: 28px; }
-/* closed periods: one labelled column, already named by the card title and description, so the header band is left
-   to screen readers; both tables end on the card edge or the "Older periods" line, without the table margin */
-.cl-page .cl-ledger-closed .cl-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* closed periods: both tables end on the card edge or the "Older periods" line, without the table margin */
 .cl-page .cl-ledger-closed .cl-table { margin: 0; }
-/* without the header band the first row would run into the card description: the row line opens the list instead */
-.cl-page .cl-ledger-closed > .cl-table { margin-top: 12px; border-top: 1px solid var(--cl-line); }
 .cl-page .cl-ledger-fields { display: grid; gap: 12px; }
-/* The closed-periods table has no column labels to repeat on a phone, so the generic stacked row would leave an empty
-   84 px label column: the period and its actions share one line instead. */
+/* The closed-periods table does not repeat its column labels on a phone (the generic stacked row would spend an
+   84 px label column on them): the period, its date and its actions share one line instead. */
 .cl-page .cl-ledger-closed .cl-table-sub { white-space: nowrap; }
 /* deliveries holding a closing: the delivery number is the card's title on a phone, and a 44 px target below 1024 px */
 @media screen and (max-width: 1023px) {
@@ -13579,6 +13783,184 @@ a.cl-link-button:hover {
 .cl-input.cl-textarea.is-short {
     min-height: 72px;
 }
+
+/* cl-media-grid: attached files as tiles (first on the RMA details page). Each cl-media-tile has a thumbnail
+   (cl-media-thumb, a link to the file; .is-photo holds the image itself, other kinds an icon), the file name and the
+   tile's action under it. A tile marked is-removed is greyed and its name struck through until the save. */
+.cl-page .cl-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: var(--cl-gap-fields);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.cl-page .cl-media-tile {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+.cl-page .cl-media-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 4 / 3;
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-3);
+    font-size: 28px;
+    text-decoration: none;
+}
+.cl-page .cl-media-thumb.is-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.cl-page .cl-media-thumb:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+.cl-page .cl-media-meta {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    padding: var(--cl-gap-attached) var(--cl-gap-related) var(--cl-gap-related);
+    font-size: 12.5px;
+}
+/* the name wraps to two lines (a long camera file name stays readable on touch, where title does not show) and only
+   then is cut */
+.cl-page .cl-media-name {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+/* "Usuń" / "Cofnij" start where the name starts */
+.cl-page .cl-media-meta .cl-link-button {
+    padding-inline: 0;
+}
+.cl-page .cl-media-meta .cl-check {
+    font-size: 12.5px;
+}
+/* the "Zachowaj" box (a page without JavaScript) is a compact 28 px row only where the pointer is fine; below 1024 px
+   it keeps the 44 px touch target of every cl-check */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-media-meta .cl-check {
+        min-height: 28px;
+    }
+}
+.cl-page .cl-media-tile.is-removed {
+    border-style: dashed;
+}
+.cl-page .cl-media-tile.is-removed .cl-media-thumb,
+.cl-page .cl-media-tile.is-removed .cl-media-name {
+    opacity: .55;
+}
+.cl-page .cl-media-tile.is-removed .cl-media-name {
+    text-decoration: line-through;
+}
+
+/* RMA details page (spec docs/active/rma-detail-redesign/2026-10-17-rma-detail-design.md §9): only what the shared
+   components have no counterpart for. */
+
+/* the items table: the state column fits the pill and "Klient chce: zwrot · zastosowano: naprawa", the value column a
+   five-digit amount with its "2 × …" line */
+.cl-page .cl-table.is-rma-detail col.cl-col-status { width: 14rem; }
+.cl-page .cl-table.is-rma-detail col.cl-col-value { width: 8.5rem; }
+.cl-page .cl-table.is-rma-detail td .cl-status + .cl-table-sub { margin-top: 4px; }
+/* the client's reason is one line under the item, cut with an ellipsis; the whole text is in its title */
+.cl-page .cl-table.is-rma-detail .cl-table-sub.is-reason {
+    overflow: hidden;
+    max-width: 42ch;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* the settings form fills its card: below 1216 px the side column drops under the work column and the card is wider
+   than the form's 760 px measure, which would leave the footer short of the card's edge */
+.cl-page .cl-form.is-rma-detail { max-width: none; }
+/* a selected row's background is the info pill's own tone: the pill keeps its shape with the warehouse list's outline */
+.cl-page .cl-table.is-rma-detail tr.is-selected .cl-status.is-info {
+    background: var(--cl-surface);
+    box-shadow: inset 0 0 0 1px var(--cl-accent);
+}
+@media screen and (max-width: 719px) {
+    /* in card rows "Klient chce: … · zastosowano: …" stays one line under the pill, not run on after it */
+    .cl-page .cl-table.is-rma-detail tbody tr > td .cl-status + .cl-table-sub {
+        display: block;
+        margin-top: 4px;
+        margin-left: 0;
+    }
+    /* a shipment whose only action is the ⋯ menu keeps it in the row's top right corner */
+    .cl-page .cl-list.is-rma-detail .cl-list-item:has(> .cl-list-actions > .cl-menu:only-child) {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+    }
+}
+/* the selection row: with every group of actions shown (a new and a received item checked) the actions are wider than
+   the items card in Polish at 720-800 px and 1366-1440 px and in English at 720 and 1366-1400 px, so from 720 px they
+   wrap onto a second line inside the row instead of running past the card ("Usuń" and "Wyczyść" then stand at the end of
+   the second line). The row grows by that line and pushes the table down by the difference; it still covers the header.
+   Below 720 px the row already wraps (and is docked to the bottom edge); there the wrapper of "Usuń" and "Wyczyść"
+   (cl-selection-end) is not a box of its own, so the docked row lays them out as before. */
+.cl-page .cl-selection-host.is-rma-detail .cl-selection-end {
+    display: contents;
+}
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-end {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: auto;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-end > .cl-selection-remove {
+        margin-left: 0;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row {
+        padding-top: 5px;
+        padding-bottom: 5px;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-actions {
+        flex-wrap: wrap;
+    }
+    /* "Wyślij" and "Więcej" open leftwards from their toggle's right edge: from its start (the selection row's rule)
+       the 240 px list of "Więcej" reached past the right edge of a 720 px window, and both reached past the card over
+       the side column at 1366 px. "Rozstrzygnij", the first menu, keeps opening from its start. menu.js still turns a
+       list to .is-start when it would leave the window on the left */
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-menu:not(:first-of-type) > .cl-menu-list:not(.is-start) {
+        left: auto;
+        right: 0;
+    }
+}
+/* touch targets of the selection row at 720-1023 px (DS §9: 44 px below 1024 px): the buttons and the menus' summaries
+   are drawn 44 px tall, as in the docked row below 720 px, instead of 30 px with an invisible hit area; the link buttons
+   lose the negative margin that let their 44 px overlap the line above once the actions wrap. The row takes no padding
+   of its own here, so on one line it is 44 px and the table moves down by only 4 px under a 40 px header */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-button {
+        height: 44px;
+        padding: 0 10px;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row :is(.cl-menu > summary, .cl-button)::after {
+        content: none;
+    }
+    .cl-page .cl-selection-host.is-rma-detail .cl-selection-row .cl-link-button {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+}
+/* End of RMA details page */
 
 /* Bank statements: the statement format on the bank account's settings page (store-bank-statement.html) and the
    reconciliation of an uploaded statement on the Payments page (payments-statement.html). The pages are built from the

@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
@@ -358,6 +359,28 @@ public class Shipment {
             this.pickup = previous.pickup;
             this.cancellable = previous.cancellable;
         }
+    }
+
+    /**
+     * The edit form shows neither the tracking subscription nor the seconds of a date, so a row it posts has neither.
+     * The subscription follows the tracking number (see {@link #inheritTrackingSubscriptionFrom}); a date the form
+     * shows unchanged, to the minute, keeps the exact stored value, while a date the operator changed or cleared stays.
+     */
+    public void inheritTrackingFrom(Shipment previous) {
+        if (previous == null) {
+            return;
+        }
+        inheritTrackingSubscriptionFrom(previous);
+        if (sameMinute(shippedAt, previous.shippedAt)) {
+            this.shippedAt = previous.shippedAt;
+        }
+        if (sameMinute(deliveredAt, previous.deliveredAt)) {
+            this.deliveredAt = previous.deliveredAt;
+        }
+    }
+
+    private static boolean sameMinute(LocalDateTime posted, LocalDateTime stored) {
+        return posted != null && stored != null && posted.equals(stored.truncatedTo(ChronoUnit.MINUTES));
     }
 
     /** Nothing but the delivery choice: no tracking, no dates, no courier order. */
