@@ -21,6 +21,7 @@ import pl.commercelink.stores.RMAConfiguration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.shipping.ShippingPageView;
@@ -45,6 +46,10 @@ public class RMAShippingController extends AbstractShippingController {
     @PostMapping("/shipItemsToDistributor")
     public String initiateShippingToDistributor(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, Model model, RedirectAttributes redirectAttributes, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = RMAController.closedOrMissing(rma, rmaId, redirectAttributes, messageSource, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
 
         List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))
@@ -76,6 +81,10 @@ public class RMAShippingController extends AbstractShippingController {
     @PostMapping("/shipItemsToClient")
     public String initiateShippingToClient(@PathVariable String rmaId, @ModelAttribute RMAItemsForm form, RedirectAttributes redirectAttributes, Model model, Locale locale) {
         RMA rma = rmaRepository.findById(getStoreId(), rmaId);
+        Optional<String> blocked = RMAController.closedOrMissing(rma, rmaId, redirectAttributes, messageSource, locale);
+        if (blocked.isPresent()) {
+            return blocked.get();
+        }
 
         List<RMAItem> qualifiedRmaItems = storedSelectedItems(rmaId, form).stream()
                 .filter(i -> i.hasOneOfTheStatuses(RMAItemStatus.Received))

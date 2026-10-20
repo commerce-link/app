@@ -19,7 +19,7 @@ public class RMAManager {
     @Autowired
     private RMALifecycle rmaLifecycle;
 
-    public void markItemsAsReceived(String storeId, String rmaId, List<String> selectedRmaItemIds) {
+    public OperationResult markItemsAsReceived(String storeId, String rmaId, List<String> selectedRmaItemIds) {
         RMA rma = rmaRepository.findById(storeId, rmaId);
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rmaId);
 
@@ -29,7 +29,7 @@ public class RMAManager {
                 .collect(Collectors.toList());
 
         if (qualifiedRmaItems.isEmpty()) {
-            return;
+            return OperationResult.failure();
         }
 
         qualifiedRmaItems.forEach(RMAItem::markAsReceived);
@@ -41,6 +41,8 @@ public class RMAManager {
 
         rmaItemsRepository.batchSave(qualifiedRmaItems);
         rmaLifecycle.update(rma, qualifiedRmaItems);
+
+        return OperationResult.success(rma, qualifiedRmaItems);
     }
 
     public OperationResult replaceSelectedItems(String storeId, String rmaId, List<String> selectedRmaItemIds) {

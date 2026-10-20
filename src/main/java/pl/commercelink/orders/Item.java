@@ -15,7 +15,6 @@ import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -140,30 +139,6 @@ public abstract class Item implements Delivered {
                 .collect(Collectors.joining(","));
 
         setSerialNo(newSerialNumbers);
-    }
-
-    public List<String> getInvalidSerialNumbers(String sns) {
-        String serialNo = getSerialNo();
-
-        if (StringUtils.isBlank(sns)) {
-            return new LinkedList<>();
-        }
-
-        List<String> snsToCheck = Arrays.stream(sns.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-
-        if (StringUtils.isBlank(serialNo)) {
-            return snsToCheck;
-        }
-
-        List<String> snsInUse = Arrays.stream(serialNo.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-
-        return snsToCheck.stream().filter(sn -> !snsInUse.contains(sn)).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
