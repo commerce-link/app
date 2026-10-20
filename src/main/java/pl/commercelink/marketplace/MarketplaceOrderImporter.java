@@ -51,12 +51,13 @@ public class MarketplaceOrderImporter {
 
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
+            Optional<PimEntry> pimEntry = findByPimId(product.manufacturerCode());
 
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    product.manufacturerCode(),
-                    resolveProductCategory(product.manufacturerCode()),
+                    pimEntry.flatMap(e -> e.mpns().stream().findFirst()).orElse(product.manufacturerCode()),
+                    resolveProductCategory(pimEntry, product.manufacturerCode()),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -161,8 +162,15 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    private String resolveProductCategory(String mfn) {
-        return pimCatalog.findByMpn(mfn)
+    // marketplace offers are often keyed by the pimId; a code PIM does not know as a pimId is already an mfn
+    private Optional<PimEntry> findByPimId(String manufacturerCode) {
+        return StringUtils.isBlank(manufacturerCode) ? Optional.empty() : pimCatalog.findByPimId(manufacturerCode);
+    }
+
+    // the category comes from the entry found by pimId: an mpn lookup could hit another product sharing the mpn
+    private String resolveProductCategory(Optional<PimEntry> pimEntry, String mfn) {
+        return pimEntry
+                .or(() -> pimCatalog.findByMpn(mfn))
                 .map(PimEntry::category)
                 .orElse(Categories.UNCATEGORIZED);
     }

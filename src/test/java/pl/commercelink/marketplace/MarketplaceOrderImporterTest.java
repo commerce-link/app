@@ -18,6 +18,9 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Integration;
@@ -36,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -187,6 +191,42 @@ class MarketplaceOrderImporterTest {
         // then: the key must survive byte-for-byte, because Allegro sends it back raw on returns
         OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
         assertEquals("k7m2xq9pz4", productItem.getExternalItemId());
+    }
+
+    @Test
+    void translatesAPimIdToTheFirstMfnButKeepsTheMarketplaceKeyRaw() {
+        // given
+        PimEntry entry = new PimEntry("k7m2xq9pz4",
+                List.of(new PimIdentifier("MFN-1", PimIdentifierType.MPN), new PimIdentifier("MFN-2", PimIdentifierType.MPN)),
+                "Brand", "Widget", "Cat", "Sub", true, null, null);
+        when(pimCatalog.findByPimId("k7m2xq9pz4")).thenReturn(Optional.of(entry));
+        Store store = new Store();
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+
+        // when
+        importer.importOrder(store, "Allegro", orderWithProduct("k7m2xq9pz4"));
+
+        // then
+        OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
+        assertEquals("MFN-1", productItem.getSku());
+        assertEquals("Cat", productItem.getCategory());
+        verify(pimCatalog, never()).findByMpn(anyString());
+        assertEquals("k7m2xq9pz4", productItem.getExternalItemId());
+    }
+
+    @Test
+    void keepsTheCodeWhenPimDoesNotKnowItAsAPimId() {
+        // given
+        when(pimCatalog.findByPimId(anyString())).thenReturn(Optional.empty());
+        Store store = new Store();
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+
+        // when
+        importer.importOrder(store, "Allegro", orderWithProduct("SKU-1"));
+
+        // then
+        OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
+        assertEquals("SKU-1", productItem.getSku());
     }
 
     @Test
