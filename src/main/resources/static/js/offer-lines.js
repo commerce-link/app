@@ -558,23 +558,41 @@
             }
             return false;
         }
-        // The row itself moves through the table while it is dragged (sortable-ghost, styled as lifted): the browser's
-        // half-transparent copy at the pointer, and Sortable's copy under a finger, would show the row twice.
-        var noDragImage = new Image();
-        noDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        // The row is lifted and follows the pointer (Sortable's own copy, not the browser's drag image), holding the
+        // point it was taken by; the place it would land on stays open in the table as an empty, framed slot
+        // (sortable-ghost) and the other rows slide aside. A row taken out of its table has no column widths, so its
+        // cells keep the widths they had while it is held; the copy is solid, Sortable makes it 0.8 transparent.
+        function holdWidths(row, hold) {
+            Array.prototype.forEach.call(row.cells, function (cell) {
+                cell.style.width = hold ? cell.getBoundingClientRect().width + 'px' : '';
+            });
+        }
+        new MutationObserver(function (records) {
+            records.forEach(function (record) {
+                Array.prototype.forEach.call(record.addedNodes, function (node) {
+                    if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
+                        node.style.opacity = '1';
+                    }
+                });
+            });
+        }).observe(body, { childList: true });
         new Sortable(body, {
             handle: '[data-cl-drag]',
             draggable: 'tr',
             filter: '[data-cl-group-foot]',
             animation: reducedMotion.matches ? 0 : 150,
-            setData: function (dataTransfer) {
-                dataTransfer.setData('Text', '');
-                if (typeof dataTransfer.setDragImage === 'function') {
-                    dataTransfer.setDragImage(noDragImage, 0, 0);
-                }
+            forceFallback: true,
+            // a click on the handle is not a drag
+            fallbackTolerance: 4,
+            onChoose: function (event) {
+                holdWidths(event.item, true);
+            },
+            onUnchoose: function (event) {
+                holdWidths(event.item, false);
             },
             onStart: function (event) {
                 table.classList.add('is-dragging');
+                document.documentElement.classList.add('cl-dragging-rows');
                 if (!isHead(event.item)) {
                     return;
                 }
@@ -589,6 +607,7 @@
             },
             onEnd: function (event) {
                 table.classList.remove('is-dragging');
+                document.documentElement.classList.remove('cl-dragging-rows');
                 if (isHead(event.item)) {
                     var anchor = event.item;
                     body.querySelectorAll('[data-cl-drag-hidden]').forEach(function (row) {

@@ -13893,13 +13893,16 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot > td { height: auto; padding: 4px 12px; }
 .cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty .cl-group-drop.is-empty,
 .cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot:not(.is-empty) .cl-group-drop.is-end { display: inline; }
-/* the dragged row is the one in the table (offer-lines.js shows no copy at the pointer): lifted, framed in the accent */
-.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent); }
-.cl-page .cl-table.is-line-editor tr.sortable-ghost > :first-child { box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent), inset 2px 0 0 var(--cl-accent); }
-.cl-page .cl-table.is-line-editor tr.sortable-ghost > :last-child { box-shadow: inset 0 1px 0 var(--cl-accent), inset 0 -1px 0 var(--cl-accent), inset -2px 0 0 var(--cl-accent); }
-.cl-page .cl-table.is-line-editor tr.sortable-ghost .cl-drag { color: var(--cl-accent-ink); }
-/* Sortable's copy that follows a finger (touch; Sortable sets its opacity inline, not its visibility) */
-.cl-page .cl-table.is-line-editor tr.sortable-fallback { visibility: hidden; }
+/* Dragging a row (offer-lines.js): the place it would land on is an empty slot framed in the accent, its content kept
+   for the height but not shown; the row itself is lifted and follows the pointer, solid, with a raised shadow, laid out
+   as a table of its own so its cells keep their widths. */
+.cl-page .cl-table.is-line-editor tr.sortable-ghost { outline: 2px dashed var(--cl-accent); outline-offset: -4px; }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow: none; }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * > * { visibility: hidden; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback { display: table; table-layout: fixed; border-radius: var(--cl-radius); background: var(--cl-surface); box-shadow: var(--cl-shadow), var(--cl-shadow-card); cursor: grabbing; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback > * { background: var(--cl-surface); border-bottom: 0; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback .cl-drag { color: var(--cl-accent-ink); background: var(--cl-accent-soft); }
+html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }
 .cl-page .cl-table.is-line-editor.is-dragging .cl-drag { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }

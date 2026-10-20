@@ -213,15 +213,18 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
-    void draggedRowShowsOnceAsTheRowMovingThroughTheTable() throws Exception {
+    void draggedRowFollowsThePointerAndLeavesAnEmptySlot() throws Exception {
         // when
         String js = read("static/js/offer-lines.js");
         String css = read("static/css/commercelink.css");
 
-        // then: no browser copy at the pointer, no Sortable copy under a finger; the row in the table looks lifted
-        assertThat(js).contains("setData: function (dataTransfer) {")
-                .contains("dataTransfer.setDragImage(noDragImage, 0, 0);");
-        assertThat(css).contains(".cl-page .cl-table.is-line-editor tr.sortable-fallback { visibility: hidden; }")
-                .contains(".cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow:");
+        // then: Sortable's own copy follows the pointer (not the browser's drag image), solid and with the row's widths
+        assertThat(js).contains("forceFallback: true,").contains("fallbackTolerance: 4,")
+                .contains("holdWidths(event.item, true);").contains("holdWidths(event.item, false);")
+                .contains("node.classList.contains('sortable-fallback')").contains("node.style.opacity = '1';")
+                .doesNotContain("setDragImage");
+        assertThat(css).contains(".cl-page .cl-table.is-line-editor tr.sortable-ghost > * > * { visibility: hidden; }")
+                .contains(".cl-page .cl-table.is-line-editor tr.sortable-fallback { display: table; table-layout: fixed;")
+                .contains("html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }");
     }
 }
