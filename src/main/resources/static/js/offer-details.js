@@ -133,6 +133,14 @@
         return index < 0 ? null : url.replace(/\/remove-item\/\d+/, '/remove-item/' + index);
     }
 
+    // Removing an item after a save: the save drops the incomplete items first, so the offer could end up with none,
+    // which the menu refuses on a saved offer ("Oferta musi mieć co najmniej jedną pozycję").
+    function leavesNoItem(element) {
+        var row = element.closest('tr[data-cl-line]');
+        return !!row && !!window.CL_offerLines && /\/remove-item\//.test(element.getAttribute('data-action-url') || '')
+            && window.CL_offerLines.keptWithout(row) === 0;
+    }
+
     function hasOwnConfirm(element) {
         return element.hasAttribute('data-cl-confirm-title') && confirmDialog && typeof confirmDialog.showModal === 'function';
     }
@@ -163,11 +171,20 @@
             }
             submit.disabled = true;
             saveItems().then(function (saved) {
-                if (saved) {
-                    HTMLFormElement.prototype.submit.call(confirmForm);
-                } else if (confirmDialog.open) {
-                    confirmDialog.close();
+                if (!saved) {
+                    if (confirmDialog.open) {
+                        confirmDialog.close();
+                    }
+                    return;
                 }
+                // an item's position is known only now that the table is saved (moved and dropped rows)
+                var savedUrl = actionUrl(element);
+                if (savedUrl === null) {
+                    window.location.reload();
+                    return;
+                }
+                confirmForm.action = savedUrl;
+                HTMLFormElement.prototype.submit.call(confirmForm);
             });
         }
 
@@ -227,6 +244,8 @@
         var field = isDirty() ? fieldToFix() : null;
         if (field) {
             showFieldToFix(field);
+        } else if (isDirty() && leavesNoItem(element)) {
+            showToast(window.CL_offerLines.lastItemMessage(), 'danger');
         } else if (isDirty() && hasOwnConfirm(element)) {
             confirmThen(element, actionUrl(element), true);
         } else if (isDirty()) {
@@ -294,10 +313,25 @@
             if (saved) {
                 detail.proceed();
             } else {
+                // the message of the failed save shows on the page, which the modal dialog would cover; the picked
+                // items stay in the dialog for the next try
                 detail.abort();
+                if (addDialog && addDialog.open) {
+                    addDialog.close();
+                }
             }
         });
     });
+
+    // the list the page was opened from, kept by the add-items post as by the other actions
+    (function keepReturnTo() {
+        var back = form.querySelector('input[type=hidden][name="returnTo"]');
+        if (addDialog && back && back.value) {
+            var url = new URL(addDialog.getAttribute('data-add-items-url'), window.location.href);
+            url.searchParams.set('returnTo', back.value);
+            addDialog.setAttribute('data-add-items-url', url.pathname + url.search);
+        }
+    })();
 
     var addLabels = addDialog && {
         label: addDialog.getAttribute('data-submit-label'),
@@ -410,8 +444,8 @@
         }
         // the sticky top bar covers the top of the viewport
         var topbar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cl-topbar-height'), 10) || 0;
-        // Showing or hiding the peek changes the main column's height by its box and the gap, which moves the summary
-        // (below the table, or the sticky side column whose run ends with the form) by as much. So it shows once the
+        // Showing or hiding the peek changes the form's height by its box and the gap, which can move the summary (the
+        // sticky side column whose run ends with the form, or the page clamped at its bottom) by as much. So it shows once the
         // button leaves the screen, but hides only once the button is clear of the edges by more than that, or the two
         // would trade places on every frame near the end of the table. The band is at least BAND and grows to the shown
         // peek's own box: on a phone the peek is taller than 100 px, and a browser without scroll anchoring (Safari)

@@ -6,9 +6,11 @@
        dialog saved while the table has unsaved changes can swap it from the refresh template (name, client, total).
        Every action that works on the saved offer carries data-cl-offer-action: offer-details.js asks "Save and …"
        first when the table has unsaved changes. Without JavaScript the links and buttons work on their own: order and
-       recalculation through their confirmation pages, the rest as plain posts of the empty form#offer-action-form. */-->
+       recalculation through their confirmation pages, the rest as plain posts of the empty form#offer-action-form. The
+       actions that come back to this page keep the list it was opened from (rt). */-->
 <div th:fragment="header(p)" id="offer-header"
-     th:with="base=|/dashboard/offer/${p.offerId()}|, author=${p.meta().author()}, created=${p.meta().createdAt()}">
+     th:with="base=|/dashboard/offer/${p.offerId()}|, author=${p.meta().author()}, created=${p.meta().createdAt()},
+              rt=${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}">
     <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, #{${p.backLabelKey()}}, ${p.title()},
              ~{offers/details/header :: offerCopy}, ~{offers/details/header :: offerStatus},
              ~{offers/details/header :: offerMeta}, ~{offers/details/header :: offerActions})}">
@@ -30,7 +32,9 @@
                         ? #{${p.template() ? 'offers.details.meta.createdBy.template' : 'offers.details.meta.createdBy'}(${created}, ${author})}
                         : #{${p.template() ? 'offers.details.meta.created.template' : 'offers.details.meta.created'}(${created})}"></span>
                 <span th:unless="${p.template()}"><strong th:text="#{general.currency.amount(${p.meta().total()})}"></strong></span>
-                <span th:text="#{offers.list.items(${p.meta().itemsCount()})}"></span>
+                <!--/* the list's count (variants outside the total left out); next to the items card's own count it says so */-->
+                <span th:with="all=${#lists.size(p.lines().?[#this instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)])}"
+                      th:text="${all == p.meta().itemsCount()} ? #{offers.list.items(${all})} : #{offers.details.meta.itemsCounted(${p.meta().itemsCount()}, ${all})}"></span>
             </p>
         </th:block>
         <th:block th:fragment="offerActions">
@@ -75,7 +79,7 @@
                                without data-cl-confirm: confirm-dialog.js needs a link address, this is a post). */-->
                         <li th:if="${p.proformaAvailable()}"><button type="submit" class="cl-menu-item" form="offer-action-form"
                                 data-cl-offer-action data-action-method="post" data-cl-confirm-tone="primary"
-                                th:attr="formaction=@{|${base}/createProformaInvoice|}, data-action-url=@{|${base}/createProformaInvoice|},
+                                th:attr="formaction=@{|${base}/createProformaInvoice${rt}|}, data-action-url=@{|${base}/createProformaInvoice${rt}|},
                                          data-label=#{offers.details.action.proforma.then},
                                          data-cl-confirm-title=#{offers.details.proforma.confirm.title(${p.title()})},
                                          data-cl-confirm-message=#{offers.details.proforma.confirm.message},
@@ -88,12 +92,12 @@
                             <span th:text="#{offers.details.action.proforma}"></span>
                             <span class="cl-menu-reason" id="offer-proforma-reason" th:text="#{offers.details.action.proforma.reason}"></span>
                         </button></li>
-                        <li><a class="cl-menu-item" th:href="@{|${base}/recalculate|}" data-cl-confirm data-cl-confirm-tone="primary"
+                        <li><a class="cl-menu-item" th:href="@{|${base}/recalculate${rt}|}" data-cl-confirm data-cl-confirm-tone="primary"
                                data-cl-offer-action data-action-method="post"
                                th:attr="data-cl-confirm-title=#{offers.details.recalculate.confirm.title(${p.title()})},
                                         data-cl-confirm-message=#{offers.details.recalculate.confirm.message},
                                         data-cl-confirm-action=#{offers.details.recalculate.confirm.action},
-                                        data-action-url=@{|${base}/recalculate|}, data-label=#{offers.details.action.recalculate.then}">
+                                        data-action-url=@{|${base}/recalculate${rt}|}, data-label=#{offers.details.action.recalculate.then}">
                             <span th:text="#{offers.details.action.recalculate}"></span>
                             <span class="cl-menu-desc" th:text="#{offers.details.action.recalculate.desc}"></span>
                         </a></li>

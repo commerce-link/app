@@ -16,7 +16,7 @@
             <dd class="is-numeric"><output data-cl-sum="items" aria-live="off" th:text="#{general.currency.amount(${s.itemsTotal()})}"></output></dd></div>
         <th:block th:unless="${p.template()}"><div th:replace="~{offers/details/side :: deliveryRow(${s})}"></div></th:block>
         <div class="cl-kv-total"><dt th:text="#{offers.details.summary.total}"></dt>
-            <dd class="is-numeric"><output data-cl-sum="total" th:text="#{general.currency.amount(${s.total()})}"></output>
+            <dd class="is-numeric"><output data-cl-sum="total" aria-live="off" th:text="#{general.currency.amount(${s.total()})}"></output>
                 <span class="cl-kv-sub"><span th:text="#{offers.details.summary.net}"></span> <output data-cl-sum="net" aria-live="off" th:text="#{general.currency.amount(${s.net()})}"></output></span></dd></div>
         <div><dt th:text="#{offers.details.summary.cost}"></dt>
             <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output></dd></div>
@@ -25,6 +25,8 @@
         <div><dt th:text="#{offers.details.summary.profitNet}"></dt>
             <dd class="is-numeric"><output data-cl-sum="profitNet" aria-live="off" th:text="#{general.currency.amount(${s.profitNet()})}"></output></dd></div>
     </dl>
+    <!--/* the new total, said once the typing in the table has stopped (offer-lines.js), not on every key */-->
+    <p class="cl-visually-hidden" role="status" data-cl-sum-status th:attr="data-template=#{offers.details.summary.announce}"></p>
     <p th:if="${s.deliveryRemoved()}" class="cl-card-desc is-warn cl-card-foot-note" th:text="#{offers.details.summary.delivery.removed.help}"></p>
     <p th:if="${s.variantsNote()}" class="cl-card-desc cl-card-foot-note" th:text="#{offers.summary.variants.note}"></p>
     <!--/* The record has no date of its last change, so the clean state says only that nothing is pending. */-->
@@ -53,7 +55,8 @@
 </div>
 
 <!--/* Below 1366 px the summary is under the table: the total, the save state and the same save button stay at the
-       bottom of the screen (Podgląd sumy przyklejony u dołu, the variant with a submit). */-->
+       bottom of the screen (Podgląd sumy przyklejony u dołu, the variant with a submit). Placed last in form#offer-items,
+       so it sticks for the whole page and not only along the table. */-->
 <div th:fragment="peek(p)" class="cl-summary-peek is-action" data-cl-peek>
     <span><span th:text="#{offers.details.peek.total}"></span> <strong class="cl-num"><output data-cl-sum="total" aria-live="off"
           th:text="#{general.currency.amount(${p.summary().total()})}"></output></strong></span>

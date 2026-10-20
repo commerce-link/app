@@ -138,7 +138,8 @@ class OfferDetailsRenderingTest {
                 .contains("class=\"cl-back\" href=\"/dashboard/offers\"")
                 .contains("Marta Zielińska · Biuro Zielińska").contains("do 24.10 (5 dni)")
                 .contains("utworzona 12.10.2026, 14:05 przez Anna Kowalska").contains("33" + NBSP + "901,99 PLN")
-                .contains("pozycje: 4")
+                // the list's count leaves the variant outside the total out, and next to the card's count says so
+                .contains("w sumie 4 z 5 pozycji")
                 .contains("href=\"/dashboard/offer/" + ID + "/order\"").contains("data-cl-confirm-tone=\"primary\"")
                 .contains("Utworzyć zamówienie z oferty „Stanowiska dla biura”?");
         assertThat(count(header, "cl-button is-primary")).isEqualTo(1);
@@ -157,9 +158,8 @@ class OfferDetailsRenderingTest {
                 .contains("action=\"/dashboard/offer/" + ID + "\"")
                 .contains("<input type=\"hidden\" name=\"name\" value=\"Stanowiska dla biura\"")
                 .contains("<input type=\"hidden\" name=\"fulfilmentType\" value=\"WarehouseFulfilment\"")
-                .contains("<input type=\"hidden\" name=\"storeId\" value=\"store-1\"")
-                .contains("<input type=\"hidden\" name=\"type\" value=\"Offer\"")
-                .contains("<input type=\"hidden\" name=\"basketId\" value=\"" + ID + "\"");
+                // the store and the record come from the session and the address, never from the form
+                .doesNotContain("name=\"storeId\"").doesNotContain("name=\"type\"").doesNotContain("name=\"basketId\"");
         assertThat(form.substring(0, form.indexOf(">"))).contains("data-cl-dirty-form");
         assertThat(html).contains("formaction=\"/dashboard/offer/" + ID + "/saveAsTemplate\"")
                 .contains("form=\"offer-items\"");
@@ -283,8 +283,7 @@ class OfferDetailsRenderingTest {
                 .doesNotContain("Więcej").doesNotContain("cl-menu");
         assertThat(count(header, "cl-button is-primary")).isEqualTo(1);
         assertThat(html).doesNotContain("offer-client-card").doesNotContain("offer-client-dialog")
-                .doesNotContain("Dane do faktury").doesNotContain("Ważna do")
-                .contains("<input type=\"hidden\" name=\"type\" value=\"OfferTemplate\"");
+                .doesNotContain("Dane do faktury").doesNotContain("Ważna do");
     }
 
     @Test
@@ -319,18 +318,17 @@ class OfferDetailsRenderingTest {
         String html = html(fullOffer());
         String summary = html.substring(html.indexOf("id=\"summary\""));
 
-        // then: an output is a polite live region by default, so every recount would read all six
+        // then: an output is a polite live region by default, so every recount would read all six; the total is said
+        // by its own status once the typing stops (offer-lines.js)
         Matcher outputs = Pattern.compile("<output data-cl-sum=\"(\\w+)\"([^>]*)>").matcher(summary);
         int checked = 0;
         while (outputs.find()) {
-            if (outputs.group(1).equals("total")) {
-                continue;
-            }
             assertThat(outputs.group(2)).as(outputs.group(1)).contains("aria-live=\"off\"");
             checked++;
         }
-        assertThat(checked).isEqualTo(5);
-        assertThat(summary).contains("<output data-cl-sum=\"total\">");
+        // the six of the summary and the total of the peek, which follows the side column
+        assertThat(checked).isEqualTo(7);
+        assertThat(summary).contains("role=\"status\" data-cl-sum-status data-template=\"Razem dla klienta: {total}\"");
         assertThat(html).contains("data-cl-dirty-status");
     }
 

@@ -223,13 +223,35 @@ public class OfferController {
         return "redirect:" + safeReturnTo(returnTo);
     }
 
-    /** Same fallback as the list rows, so the dialog, the confirm page and the notice name a record alike. */
     private String displayName(Basket offer, Locale locale) {
+        return displayName(offer, messageSource, locale);
+    }
+
+    /** Same fallback as the list rows, so the dialogs, the confirm pages and the notices name a record alike. */
+    public static String displayName(Basket offer, MessageSource messages, Locale locale) {
         if (StringUtils.isNotBlank(offer.getName())) {
             return offer.getName();
         }
         String key = offer.hasType(BasketType.OfferTemplate) ? "offers.list.untitledTemplate" : "offers.list.untitled";
-        return messageSource.getMessage(key, new Object[]{offer.getShortenedBasketId()}, locale);
+        return messages.getMessage(key, new Object[]{offer.getShortenedBasketId()}, locale);
+    }
+
+    /** The offer page, keeping the list it was opened from when that is a list address (see safeReturnTo). */
+    public static String offerPageHref(String offerId, String returnTo) {
+        return offerHref(offerId, "", returnTo);
+    }
+
+    /** An address of the offer page (path: "" or "/recalculate", …) that keeps the list it was opened from. */
+    public static String offerHref(String offerId, String path, String returnTo) {
+        boolean keep = returnTo != null && safeReturnTo(returnTo).equals(returnTo);
+        return "/dashboard/offer/" + offerId + path
+                + (keep ? "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8) : "");
+    }
+
+    /** An unknown offer, or one of another store, is a 404 instead of the 500 of Optional.get(). */
+    private Basket requireBasket(String offerId) {
+        return basketsRepository.findById(getStoreId(), offerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     private Basket deletable(String offerId) {
@@ -258,7 +280,7 @@ public class OfferController {
         if (!withContact) {
             return "redirect:/dashboard/offer/new?intent=copy&sourceId=" + offerId;
         }
-        Basket source = basketsRepository.findById(getStoreId(), offerId).get();
+        Basket source = requireBasket(offerId);
         Basket copy = source.deepCopy(" - Copy", BasketType.Offer);
         copy.setContactDetails(source.getContactDetails());
         copy.setGclid(source.getGclid());
@@ -267,30 +289,36 @@ public class OfferController {
     }
 
     @PostMapping("/dashboard/offer/{offerId}/recalculate")
-    public String recalculateOffer(@PathVariable String offerId) {
-        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+    public String recalculateOffer(@PathVariable String offerId, @RequestParam(required = false) String returnTo,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        Basket basket = requireBasket(offerId);
         offerItemReloader.recalculate(basket);
         save(basket);
-        return "redirect:/dashboard/offer/" + offerId;
+        // the page looks the same before and after unless a price changed: it says the recalculation ran
+        redirectAttributes.addFlashAttribute("offerNotice",
+                messageSource.getMessage("offers.details.saved.recalculated", null, locale));
+        return "redirect:" + offerPageHref(offerId, returnTo);
     }
 
     @PostMapping("/dashboard/offer/{offerId}/createProformaInvoice")
-    public String createProformaInvoice(@PathVariable String offerId, Locale locale, RedirectAttributes redirectAttributes) {
-        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+    public String createProformaInvoice(@PathVariable String offerId, @RequestParam(required = false) String returnTo,
+                                        Locale locale, RedirectAttributes redirectAttributes) {
+        Basket basket = requireBasket(offerId);
 
         InvoicingService.OperationResult op = invoicingService.createProforma(basket, locale, false);
 
         if (op.hasError()) {
             redirectAttributes.addFlashAttribute("errorMessage", op.getErrorMessage());
-            return "redirect:/dashboard/offer/" + offerId;
+            return "redirect:" + offerPageHref(offerId, returnTo);
         }
 
         return "redirect:" + op.getInvoiceUrl();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/add-items")
-    public String addOfferItems(@PathVariable String offerId, @ModelAttribute AddItemsForm form) {
-        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+    public String addOfferItems(@PathVariable String offerId, @ModelAttribute AddItemsForm form,
+                                @RequestParam(required = false) String returnTo) {
+        Basket basket = requireBasket(offerId);
         boolean consolidated = !basket.isShowPrices();
         InventoryView inventoryView = inventory.withEnabledSuppliersOnly(getStoreId());
         Map<String, Map<String, Integer>> sequenceNumbersByCatalog = new HashMap<>();
@@ -309,7 +337,7 @@ public class OfferController {
         }
         save(basket);
 
-        return "redirect:/dashboard/offer/" + offerId;
+        return "redirect:" + offerPageHref(offerId, returnTo);
     }
 
     private Map<String, Integer> catalogCategorySequenceNumbers(String catalogId) {
@@ -318,16 +346,12 @@ public class OfferController {
     }
 
     @PostMapping("/dashboard/offer/{offerId}/remove-item/{index}")
-    public String removeOfferItem(@PathVariable String offerId, @PathVariable int index, Model model) {
-        Optional<Basket> offerOpt = basketsRepository.findById(getStoreId(), offerId);
-        if (!offerOpt.isPresent()) {
-            model.addAttribute("error", "Offer not found");
-            return "error";
-        }
-        Basket offer = offerOpt.get();
+    public String removeOfferItem(@PathVariable String offerId, @PathVariable int index,
+                                  @RequestParam(required = false) String returnTo) {
+        Basket offer = requireBasket(offerId);
         offer.removeBasketItem(index);
         save(offer);
-        return "redirect:/dashboard/offer/" + offerId;
+        return "redirect:" + offerPageHref(offerId, returnTo);
     }
 
     @PostMapping("/dashboard/offer/new/csv")
@@ -374,13 +398,16 @@ public class OfferController {
     }
 
     private Basket save(Basket basket) {
+        stampSource(basket);
+        basketsRepository.save(basket);
+        return basket;
+    }
+
+    /** An offer without a source gets the user who last saved it. */
+    public static void stampSource(Basket basket) {
         if (basket.getType() == BasketType.Offer && basket.getSource() == null) {
             basket.setSource(new OrderSource(CustomSecurityContext.getLoggedInUserName(), OrderSourceType.CallCenter));
         }
-
-        basketsRepository.save(basket);
-
-        return basket;
     }
 
     public static List<BasketItem> normalizeBlankCategories(List<BasketItem> items) {

@@ -24,6 +24,7 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.baskets.ContactDetails;
+import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 
@@ -57,6 +58,8 @@ class OfferDetailsControllerTest {
     private OfferDetailsPageFactory pageFactory;
     @Mock
     private MessageSource messages;
+    @Mock
+    private OfferItemReloader offerItemReloader;
 
     @InjectMocks
     private OfferDetailsController controller;

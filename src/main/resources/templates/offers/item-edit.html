@@ -22,7 +22,8 @@
             </div>
             <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
             <section class="cl-card" aria-labelledby="offer-item-title">
-                <div class="cl-card-head"><h2 class="cl-card-title" id="offer-item-title" th:text="#{offers.details.item.title}"></h2></div>
+                <!--/* the page title already says "Edytuj pozycję": the card names what it edits */-->
+                <div class="cl-card-head"><h2 class="cl-card-title" id="offer-item-title" th:text="#{offers.details.item.card}"></h2></div>
                 <div class="cl-card-inset">
                     <th:block th:replace="~{offers/details/items :: itemFields(${form}, ${errors}, ${p}, 'offer-item')}"></th:block>
                 </div>

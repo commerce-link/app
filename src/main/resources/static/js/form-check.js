@@ -6,7 +6,8 @@
 //   - "one of these" rules: p.cl-field-error[data-cl-any-of="id1 id2"][hidden] inside the group, shown when every field
 //     it names is empty; the group note ([data-cl-any-of-note]) gives way to it.
 // Errors are listed in the summary ([data-cl-form-check-summary]) with links to the fields, which gets the focus.
-// Typing into a field takes its message away. A form that passed is not sent a second time by another click.
+// Typing into a field takes its message away. A form that passed is not sent a second time by another click. A
+// data-cl-async form (async-form.js) is checked the same way, again after each swap, and stays sendable after a failed send.
 (function () {
     'use strict';
 
@@ -82,16 +83,24 @@
         return !!document.getElementById(fieldErrorId(control));
     }
 
+    // A hidden element still counts in a description, so a field names the rule's error, or else the group note, only
+    // while it shows.
     function showRule(form, rule, shown) {
         rule.hidden = !shown;
-        ruleControls(form, rule).forEach(function (control) {
-            markInvalid(control, shown || hasOwnError(control));
-        });
         var group = rule.parentElement;
         var note = group.querySelector(':scope > [data-cl-any-of-note]');
         if (note) {
             note.hidden = !!group.querySelector(':scope > [data-cl-any-of]:not([hidden])');
         }
+        ruleControls(form, rule).forEach(function (control) {
+            markInvalid(control, shown || hasOwnError(control));
+            if (rule.id) {
+                describedBy(control, rule.id, shown);
+            }
+            if (note && note.id) {
+                describedBy(control, note.id, !note.hidden && !shown);
+            }
+        });
     }
 
     function fieldProblem(control) {
@@ -192,11 +201,14 @@
             var problems = check(form);
             if (problems.length) {
                 event.preventDefault();
+                // async-form.js listens on the document and sends a data-cl-async form whatever happened before
+                event.stopPropagation();
                 var summary = fillSummary(form, problems);
                 (summary || document.getElementById(problems[0].id)).focus();
             } else {
                 fillSummary(form, []);
-                sending = true;
+                // an async form stays on the page when its send fails, and must be sendable again
+                sending = !form.hasAttribute('data-cl-async');
             }
         });
         // Back to a page kept by the browser (bfcache): the form can be sent again.
@@ -214,6 +226,12 @@
 
     function init() {
         document.querySelectorAll('form[data-cl-form-check]').forEach(enhance);
+        // a form async-form.js swapped for the server's answer is a new element
+        document.addEventListener('cl:form-replaced', function (event) {
+            if (event.target instanceof HTMLFormElement && event.target.hasAttribute('data-cl-form-check')) {
+                enhance(event.target);
+            }
+        });
     }
 
     if (document.readyState === 'loading') {

@@ -4,11 +4,12 @@
 //   into another group) or moved one step with "Przenieś wyżej/niżej" in their menu or the arrow keys on the handle.
 //   An item's variantGroupId is the name of the head above it; a group name must be filled in and unique (ignoring
 //   case), else the error shows at the name and the save stops. Ungrouping keeps the items.
-// - The chosen variant of a group is its first item marked variantSelected, else its first item (Basket.chosenVariant);
-//   the others are outside the total.
+// - The chosen variant of a group is its first item marked variantSelected, else its first item (Basket.chosenVariant),
+//   counting only the items the save keeps; the others are outside the total.
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
 //   (qty × cost), gross profit = total − cost, net = gross / VAT rate; amounts rounded half up to grosze as Money.format.
+//   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
 //   quantity or price becomes 0, as it does when the field is left.
@@ -169,7 +170,14 @@
         var price = number(priceInput(row));
         var cost = number(field(row, 'unitCost'));
         row.querySelector('[data-cl-line-total]').textContent = amount(qty * price);
-        row.querySelector('[data-cl-line-warn]').hidden = !dropped(row);
+        // a hidden element still counts in a description, so the field points at the warning only while it shows
+        var warn = row.querySelector('[data-cl-line-warn]');
+        warn.hidden = !dropped(row);
+        if (warn.hidden) {
+            qtyInput(row).removeAttribute('aria-describedby');
+        } else {
+            qtyInput(row).setAttribute('aria-describedby', warn.id);
+        }
         if (field(row, 'service').value === 'true') {
             return;
         }
@@ -179,10 +187,12 @@
 
         var margin = marginOf(price, cost);
         var label = row.querySelector('[data-cl-line-margin]');
-        label.textContent = margin.percent === null ? message('line-margin-unknown') : message('line-margin', [margin.percent]);
+        // a low margin says so in words too: the tone alone is barely apart from the plain text
+        var low = margin.percent !== null && margin.tone !== 'loss' && (price - cost) * 10 < price;
+        label.textContent = margin.percent === null ? message('line-margin-unknown')
+            : message(low ? 'line-margin-low' : 'line-margin', [margin.percent]);
         label.classList.toggle('is-bad', margin.percent !== null && margin.tone === 'loss');
-        label.classList.toggle('is-low', margin.percent === null
-            || (margin.tone !== 'loss' && (price - cost) * 10 < price));
+        label.classList.toggle('is-low', margin.percent === null || low);
 
         var mark = row.querySelector('.cl-margin');
         if (!mark) {
@@ -214,7 +224,8 @@
         var items = 0;
         var cost = 0;
         rows().filter(isItem).forEach(function (row) {
-            if (row.classList.contains('is-unpicked')) {
+            // the total the save will leave: no variant outside it, no item the save drops
+            if (row.classList.contains('is-unpicked') || dropped(row)) {
                 return;
             }
             var qty = qtyOf(row);
@@ -239,6 +250,19 @@
                 output.textContent = values[key];
             });
         });
+        announceTotal(values.total);
+    }
+
+    var totalTimer = null;
+    function announceTotal(total) {
+        var status = summary.querySelector('[data-cl-sum-status]');
+        if (!status) {
+            return;
+        }
+        clearTimeout(totalTimer);
+        totalTimer = setTimeout(function () {
+            status.textContent = fill(status.getAttribute('data-template'), { total: total });
+        }, 1000);
     }
 
     // --- groups and order
@@ -320,6 +344,8 @@
 
     function labelGroup(head) {
         var name = nameInput(head).value.trim();
+        // the visible label is the same on every group: the name tells them apart in a list of fields
+        nameInput(head).setAttribute('aria-label', message('group-name', [name]));
         head.querySelector('[data-cl-drag]').setAttribute('aria-label', message('group-drag', [name]));
         head.querySelector('.cl-menu > summary').setAttribute('aria-label', message('group-menu', [name]));
     }
@@ -353,9 +379,14 @@
             row.querySelector('[data-cl-line-ungroup-item]').hidden = !group;
         });
         groups.forEach(function (each) {
-            var chosen = each.items.filter(function (row) {
+            // as the save leaves it: the incomplete items go first, then a group without its marked item takes its first
+            // one (Basket.normalizeVariantSelection)
+            var kept = each.items.filter(function (row) {
+                return !dropped(row);
+            });
+            var chosen = kept.filter(function (row) {
                 return field(row, 'variantSelected').value === 'true';
-            })[0] || each.items[0];
+            })[0] || kept[0];
             each.items.forEach(function (row) {
                 row.classList.toggle('is-unpicked', row !== chosen);
                 row.querySelector('[data-cl-mark-selected]').hidden = row !== chosen;
@@ -369,9 +400,31 @@
         }
     }
 
-    function afterMove(focusTarget) {
+    // Says where a row or a group moved with the keyboard is now: the focus stays on its handle or menu, so a screen
+    // reader would hear nothing.
+    function announceMove(moved) {
+        var status = form.querySelector('[data-cl-lines-status]');
+        if (!status || !moved) {
+            return;
+        }
+        if (isHead(moved)) {
+            var blocks = rows().filter(function (row) {
+                return isHead(row) || (isItem(row) && !row.classList.contains('is-variant'));
+            });
+            status.textContent = message('group-moved', { name: nameInput(moved).value.trim(),
+                n: blocks.indexOf(moved) + 1, count: blocks.length });
+            return;
+        }
+        var items = rows().filter(isItem);
+        var group = moved.getAttribute('data-group');
+        status.textContent = message(group ? 'line-moved-group' : 'line-moved', { name: field(moved, 'name').value,
+            n: items.indexOf(moved) + 1, count: items.length, group: group });
+    }
+
+    function afterMove(focusTarget, moved) {
         refresh(true);
         changed();
+        announceMove(moved);
         if (focusTarget) {
             focusTarget.focus();
             focusTarget.scrollIntoView({ block: 'nearest' });
@@ -473,7 +526,7 @@
         }
         if (foot) {
             foot.after(row);
-            afterMove(menuSummary(row));
+            afterMove(menuSummary(row), row);
         }
     }
 
@@ -699,6 +752,9 @@
         var row = event.target.closest('tr[data-cl-line]');
         if (row && (event.target === qtyInput(row) || event.target === priceInput(row))) {
             recountRow(row);
+            if (row.classList.contains('is-variant')) {
+                refresh(false);
+            }
             recount();
             return;
         }
@@ -727,13 +783,13 @@
         var head = target.closest('tr[data-cl-line-group]');
         if (row && target.hasAttribute('data-cl-line-move')) {
             if (moveItem(row, target.getAttribute('data-cl-line-move'))) {
-                afterMove(menuSummary(row));
+                afterMove(menuSummary(row), row);
             }
         } else if (row && target.hasAttribute('data-cl-line-ungroup')) {
             takeOutOfGroup(row);
         } else if (head && target.hasAttribute('data-cl-group-move')) {
             if (moveGroup(head, target.getAttribute('data-cl-group-move'))) {
-                afterMove(menuSummary(head));
+                afterMove(menuSummary(head), head);
             }
         } else if (head && target.hasAttribute('data-cl-ungroup')) {
             ungroup(head);
@@ -750,7 +806,7 @@
         var direction = event.key === 'ArrowUp' ? 'up' : 'down';
         var row = handle.closest('tr');
         if (isHead(row) ? moveGroup(row, direction) : moveItem(row, direction)) {
-            afterMove(handle);
+            afterMove(handle, row);
         }
     });
 
@@ -778,6 +834,7 @@
         }
         last.after(createFoot());
     });
+    rows().filter(isHead).forEach(labelGroup);
     // the server rendered the totals from the stored amounts: they are recounted once something changes
     refresh(false);
     initSortable();
@@ -786,6 +843,15 @@
     window.CL_offerLines = {
         prepare: prepare,
         recount: recount,
+        // the items a save keeps besides this row
+        keptWithout: function (row) {
+            return rows().filter(function (each) {
+                return isItem(each) && each !== row && !dropped(each);
+            }).length;
+        },
+        lastItemMessage: function () {
+            return message('last-item');
+        },
         // the index the item will have in the saved offer (the save drops incomplete items), or -1 when it is dropped
         savedIndex: function (row) {
             if (dropped(row)) {

@@ -11,7 +11,8 @@
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{offers.details.items.title(${#lists.size(items)})}"></h2>
         <div class="cl-card-actions">
-            <button type="button" class="cl-button" data-cl-dialog-open="item-add-dialog">
+            <!--/* the dialog needs the page script, as the group button next to it */-->
+            <button type="button" class="cl-button" hidden data-cl-lines-reveal data-cl-dialog-open="item-add-dialog">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{offers.details.items.add}"></span>
             </button>
@@ -37,6 +38,7 @@
                         data-msg-group-picks=#{offers.details.group.picks('{n}')},
                         data-msg-group-drag=#{offers.details.group.drag},
                         data-msg-group-menu=#{offers.details.group.menu},
+                        data-msg-group-name=#{offers.details.group.name},
                         data-msg-line-drag=#{offers.details.line.drag},
                         data-msg-line-edit=#{offers.details.line.edit},
                         data-msg-line-qty=#{offers.details.line.qty},
@@ -46,10 +48,15 @@
                         data-msg-line-no-cost=#{offers.details.line.noCost},
                         data-msg-line-margin=#{offers.details.line.margin},
                         data-msg-line-margin-unknown=#{offers.details.line.marginUnknown},
+                        data-msg-line-margin-low=#{offers.details.line.marginLow},
                         data-msg-margin-ok=#{offers.details.margin.ok},
                         data-msg-margin-loss=#{offers.details.margin.loss},
                         data-msg-margin-unknown=#{offers.details.margin.unknown},
-                        data-msg-mfn-prefix=#{order.items.mfn.prefix}">
+                        data-msg-mfn-prefix=#{order.items.mfn.prefix},
+                        data-msg-last-item=#{offers.details.line.menu.remove.reason},
+                        data-msg-line-moved=#{offers.details.line.moved},
+                        data-msg-line-moved-group=#{offers.details.line.moved.inGroup},
+                        data-msg-group-moved=#{offers.details.group.moved}">
             <caption class="cl-visually-hidden" th:text="${p.template()} ? #{offers.details.items.caption.template} : #{offers.details.items.caption.offer}"></caption>
             <colgroup><col class="cl-col-drag"><col><col class="cl-col-qty-in"><col class="cl-col-money-in"><col class="cl-col-value"><col class="cl-col-menu"></colgroup>
             <thead>
@@ -71,6 +78,9 @@
             </th:block>
             </tbody>
         </table>
+        <!--/* where a row or a group moved with the keyboard is now (offer-lines.js); the handles' key help */-->
+        <p class="cl-visually-hidden" role="status" data-cl-lines-status></p>
+        <p class="cl-visually-hidden" id="offer-lines-drag-help" th:text="#{offers.details.line.drag.help}"></p>
         <!--/* a new group head, cloned by offer-lines.js ("Grupa wariantów") */-->
         <template data-cl-group-template>
             <tr th:replace="~{offers/details/items :: group(${null}, 'new')}"></tr>
@@ -78,7 +88,7 @@
         <!--/* The end of a group, added by offer-lines.js under its last item: the drop zone that keeps an item dragged
                above it inside the group. Without JavaScript groups cannot change, so the server renders none. */-->
         <template data-cl-group-foot-template>
-            <tr class="cl-line-group-foot" data-cl-group-foot>
+            <tr class="cl-line-group-foot" data-cl-group-foot aria-hidden="true">
                 <td colspan="6"><span class="cl-group-drop is-empty" th:text="#{offers.details.group.drop.empty}"></span><span
                     class="cl-group-drop is-end" th:text="#{offers.details.group.drop.end}"></span></td>
             </tr>
@@ -90,16 +100,16 @@
        hidden variantGroupId, which the page script writes from the head above it. */-->
 <tr th:fragment="group(g, key)" class="cl-line-group" data-cl-line-group th:attr="data-group=${g != null} ? ${g.name()} : ''">
     <td class="cl-cell-drag">
-        <button type="button" class="cl-drag" hidden data-cl-lines-reveal data-cl-drag
+        <button type="button" class="cl-drag" hidden data-cl-lines-reveal data-cl-drag aria-describedby="offer-lines-drag-help"
                 th:attr="aria-label=#{offers.details.group.drag(${g != null} ? ${g.name()} : '')}"><i class="fas fa-arrows-alt" aria-hidden="true"></i></button>
     </td>
     <td colspan="4">
         <div class="cl-group-bar">
             <label class="cl-group-label" th:for="|offer-group-${key}|" th:text="#{offers.details.group.label}"></label>
             <input class="cl-input" type="text" th:id="|offer-group-${key}|" th:value="${g != null} ? ${g.name()} : ''"
-                   data-cl-group-name autocomplete="off"
+                   data-cl-group-name autocomplete="off" aria-required="true"
                    th:attr="aria-describedby=|offer-group-${key}-help offer-group-${key}-error|">
-            <span class="cl-group-count" th:id="|offer-group-${key}-help|" data-cl-group-count
+            <span class="cl-group-picks" th:id="|offer-group-${key}-help|" data-cl-group-count
                   th:text="#{offers.details.group.picks(${g != null} ? ${g.size()} : 0)}"></span>
             <button type="button" class="cl-link-button" hidden data-cl-lines-reveal data-cl-ungroup
                     th:text="#{offers.details.group.ungroup}"></button>
@@ -130,7 +140,7 @@
                  #{general.currency.amount(${it.market().low()})}, #{general.currency.amount(${it.market().median()})})} : null,
              data-market-stock=${it.market() != null and !it.market().missing()} ? #{offers.details.margin.stock(${it.lowestQty()}, ${it.medianQty()}, ${it.market().stock()})} : null">
     <td class="cl-cell-drag">
-        <button type="button" class="cl-drag" hidden data-cl-lines-reveal data-cl-drag
+        <button type="button" class="cl-drag" hidden data-cl-lines-reveal data-cl-drag aria-describedby="offer-lines-drag-help"
                 th:attr="aria-label=#{offers.details.line.drag(${it.name()})}"><i class="fas fa-arrows-alt" aria-hidden="true"></i></button>
         <input type="hidden" th:name="|basketItems[${i}].id|" th:value="${it.id() ?: ''}" data-cl-field="id">
         <input type="hidden" th:name="|basketItems[${i}].catalogId|" th:value="${it.catalogId() ?: ''}" data-cl-field="catalogId">
@@ -145,7 +155,7 @@
         <input type="hidden" th:name="|basketItems[${i}].consolidated|" th:value="${it.consolidated()}" data-cl-field="consolidated">
     </td>
     <th scope="row" class="cl-table-key" th:attr="data-label=#{offers.details.items.column.product}">
-        <span data-cl-line-name th:text="${it.name()}"></span><a class="cl-table-edit"
+        <span data-cl-line-name th:text="${it.name()}"></span><a class="cl-table-edit" hidden data-cl-lines-reveal
            th:href="@{|/dashboard/offer/${p.offerId()}/items/${i}${rt}|}" data-cl-dialog-open="item-edit-dialog"
            th:attr="aria-label=#{offers.details.line.edit(${it.name()})}"><i class="fas fa-pencil-alt" aria-hidden="true"></i></a>
         <span class="cl-table-marks">
@@ -167,7 +177,8 @@
     <td class="cl-cell-qty" th:attr="data-label=#{offers.details.items.column.qty}">
         <input class="cl-input is-qty" type="number" min="0" step="1" inputmode="numeric" required
                th:name="|basketItems[${i}].qty|" th:value="${it.qty()}" th:id="|offer-line-${i}-qty|"
-               th:attr="aria-label=#{offers.details.line.qty(${it.name()})}, aria-describedby=|offer-line-${i}-warn|">
+               th:attr="aria-label=#{offers.details.line.qty(${it.name()})},
+                        aria-describedby=${it.incomplete()} ? |offer-line-${i}-warn| : null">
         <p class="cl-help is-warn cl-line-warn" th:id="|offer-line-${i}-warn|" data-cl-line-warn th:hidden="${!it.incomplete()}"
            th:text="#{offers.details.line.removed}"></p>
     </td>
@@ -191,9 +202,11 @@
             <th:block th:unless="${it.service()}">
                 <span th:if="${it.margin().percent() == null}" class="cl-line-margin is-low" data-cl-line-margin
                       th:text="#{offers.details.line.marginUnknown}"></span>
+                <!--/* a low margin says so in words, not only by its colour */-->
                 <span th:unless="${it.margin().percent() == null}" class="cl-line-margin" data-cl-line-margin
-                      th:classappend="${it.margin().tone().name() == 'LOSS'} ? 'is-bad' : (${(it.unitPrice() - it.unitCost()) * 10 < it.unitPrice()} ? 'is-low')"
-                      th:text="#{offers.details.line.margin(${it.margin().percent()})}"></span>
+                      th:with="low=${it.margin().tone().name() != 'LOSS' and (it.unitPrice() - it.unitCost()) * 10 < it.unitPrice()}"
+                      th:classappend="${it.margin().tone().name() == 'LOSS'} ? 'is-bad' : (${low} ? 'is-low')"
+                      th:text="${low} ? #{offers.details.line.marginLow(${it.margin().percent()})} : #{offers.details.line.margin(${it.margin().percent()})}"></span>
             </th:block>
             <span class="cl-line-margin cl-line-outside" th:text="#{offers.details.line.outside}"></span>
         </span>
@@ -209,10 +222,14 @@
                 <!--/* shown by the page script while the row sits in a group */-->
                 <li hidden data-cl-line-ungroup-item><button type="button" class="cl-menu-item" data-cl-line-ungroup th:text="#{offers.details.line.menu.ungroup}"></button></li>
                 <li class="cl-menu-sep" aria-hidden="true"></li>
+                <!--/* with the page script it asks first; without it the post removes the item at once, as before */-->
                 <li th:if="${count > 1}"><button type="submit" class="cl-menu-item is-danger" form="offer-action-form"
-                        th:attr="formaction=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}|},
-                                 data-action-url=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}|},
-                                 data-label=#{offers.details.line.menu.remove.then}"
+                        th:attr="formaction=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
+                                 data-action-url=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
+                                 data-label=#{offers.details.line.menu.remove.then},
+                                 data-cl-confirm-title=#{offers.details.line.remove.confirm.title(${it.name()})},
+                                 data-cl-confirm-message=#{offers.details.line.remove.confirm.message},
+                                 data-cl-confirm-action=#{offers.details.line.menu.remove}"
                         data-cl-offer-action data-action-method="post" th:text="#{offers.details.line.menu.remove}"></button></li>
                 <li th:unless="${count > 1}"><button type="button" class="cl-menu-item is-danger" aria-disabled="true"
                         th:attr="aria-describedby=|offer-line-${i}-remove-reason|">
@@ -250,7 +267,7 @@
         <div class="cl-field cl-span-6">
             <label class="cl-label" th:for="|${prefix}-name|" th:text="#{offers.details.item.name}"></label>
             <input class="cl-input" type="text" name="name" th:id="|${prefix}-name|" th:value="${form?.name}" autocomplete="off"
-                   data-cl-item-field="name" th:classappend="${errors.containsKey('name')} ? 'is-invalid'"
+                   data-cl-item-field="name" aria-required="true" th:classappend="${errors.containsKey('name')} ? 'is-invalid'"
                    th:attr="aria-invalid=${errors.containsKey('name')} ? 'true' : null,
                             aria-describedby=|${prefix}-name-help ${prefix}-name-error|">
             <p class="cl-field-error" th:id="|${prefix}-name-error|" th:if="${errors.containsKey('name')}">
@@ -275,7 +292,7 @@
         <div class="cl-field cl-span-3">
             <label class="cl-label" th:for="|${prefix}-mfn|" th:text="#{offers.details.item.mfn}"></label>
             <input class="cl-input" type="text" name="mfn" th:id="|${prefix}-mfn|" th:value="${form?.mfn}" autocomplete="off"
-                   data-cl-item-field="mfn" th:classappend="${errors.containsKey('mfn')} ? 'is-invalid'"
+                   data-cl-item-field="mfn" aria-required="true" th:classappend="${errors.containsKey('mfn')} ? 'is-invalid'"
                    th:attr="aria-invalid=${errors.containsKey('mfn')} ? 'true' : null,
                             aria-describedby=|${prefix}-mfn-help ${prefix}-mfn-error|">
             <p class="cl-field-error" th:id="|${prefix}-mfn-error|" th:if="${errors.containsKey('mfn')}">

@@ -32,13 +32,9 @@
               th:attr="data-discard-confirm=#{offers.details.save.discard.confirm}">
             <input type="hidden" name="name" th:value="${p.recordName() ?: ''}" data-cl-dirty-ignore>
             <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}" data-cl-dirty-ignore>
-            <input type="hidden" name="storeId" th:value="${p.storeId()}">
-            <input type="hidden" name="type" th:value="${p.template()} ? 'OfferTemplate' : 'Offer'">
-            <input type="hidden" name="basketId" th:value="${p.offerId()}">
             <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
             <div class="cl-layout-main">
                 <section th:replace="~{offers/details/items :: card(${p})}"></section>
-                <div th:replace="~{offers/details/side :: peek(${p})}"></div>
             </div>
             <aside class="cl-layout-side is-sticky">
                 <section th:replace="~{offers/details/side :: summary(${p})}"></section>
@@ -46,6 +42,9 @@
                 <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
                 <section th:replace="~{offers/details/side :: note(${p})}"></section>
             </aside>
+            <!--/* Last in the form and across both columns: sticky to the bottom of the screen for as long as any part of
+                   the form is in view, the cards under the summary included (in the main column it ended with the table). */-->
+            <div th:replace="~{offers/details/side :: peek(${p})}"></div>
         </form>
     </div>
 
@@ -94,6 +93,7 @@
 <script th:src="@{/js/dialog.js}" defer></script>
 <script th:src="@{/js/copy-field.js}" defer></script>
 <script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/form-check.js}" defer></script>
 <script th:src="@{/js/async-form.js}" defer></script>
 <script th:src="@{/js/dirty-form.js}" defer></script>
 <script th:src="@{/js/offer-lines.js}" defer></script>
@@ -102,10 +102,11 @@
 
 <!--/* The dialog forms. Each saves only its own fields on a fresh read of the record (OfferDetailsController); with
        JavaScript async-form.js swaps the form with the answer (422 with errors, 200 saved), and a saved answer carries
-       the refresh template for a page whose table has unsaved changes. Without JavaScript: a plain post and a redirect. */-->
+       the refresh template for a page whose table has unsaved changes. Without JavaScript: a plain post and a redirect;
+       a refusal renders the page with the dialog open, and the action's #fragment scrolls to it. */-->
 <form th:fragment="termsForm" id="offer-terms-form" class="cl-form" method="post" data-cl-async
       th:with="p=${page}, f=${termsForm}, invalid=${errors.containsKey('name')}"
-      th:action="@{|/dashboard/offer/${p.offerId()}/terms|}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/terms#offer-terms-dialog|}"
       th:attr="data-success-message=#{offers.details.saved.terms}, data-error-message=#{form.save.failed},
                data-cl-saved=${saved == true} ? 'true' : null">
     <h2 class="cl-dialog-title" id="offer-terms-dialog-title"
@@ -172,9 +173,9 @@
 
 <!--/* The customer's contact, the rule "a name or a company, and an e-mail or a phone" checked by the server
        (ContactDetails.isProperlyFilled); the fields are the ones of the new-offer page. */-->
-<form th:fragment="clientForm" id="offer-client-form" class="cl-form" method="post" data-cl-async
+<form th:fragment="clientForm" id="offer-client-form" class="cl-form" method="post" data-cl-async data-cl-form-check
       th:with="p=${page}"
-      th:action="@{|/dashboard/offer/${p.offerId()}/client|}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/client#offer-client-dialog|}"
       th:attr="data-success-message=#{offers.details.saved.client}, data-error-message=#{form.save.failed},
                data-cl-saved=${saved == true} ? 'true' : null">
     <h2 class="cl-dialog-title" id="offer-client-dialog-title" th:text="#{offers.details.client.dialog.title}"></h2>
@@ -193,7 +194,7 @@
 
 <form th:fragment="noteForm" id="offer-note-form" class="cl-form" method="post" data-cl-async
       th:with="p=${page}"
-      th:action="@{|/dashboard/offer/${p.offerId()}/note|}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/note#offer-note-dialog|}"
       th:attr="data-success-message=#{offers.details.saved.note}, data-error-message=#{form.save.failed},
                data-cl-saved=${saved == true} ? 'true' : null">
     <h2 class="cl-dialog-title" id="offer-note-dialog-title" th:text="#{offers.details.note.title}"></h2>

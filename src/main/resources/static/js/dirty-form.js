@@ -202,12 +202,14 @@
         });
     });
 
-    // after the other deferred scripts of the page, which may still arrange the form (reveal controls, add rows)
+    // after the other deferred scripts of the page, which may still arrange the form (reveal controls, add rows): a
+    // deferred script runs while the document is already "interactive", before the scripts that follow it
     function init() {
         document.querySelectorAll('form[data-cl-dirty-form]').forEach(watch);
     }
 
-    if (document.readyState === 'loading') {
+    var deferred = document.currentScript && document.currentScript.defer;
+    if (document.readyState === 'loading' || (deferred && document.readyState === 'interactive')) {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();

@@ -1,6 +1,8 @@
 package pl.commercelink.web.offers;
 
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
@@ -20,15 +22,12 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.baskets.ContactDetails;
-import pl.commercelink.orders.OrderSource;
-import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.OfferController;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsPaths;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +44,7 @@ import java.util.stream.Collectors;
  */
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class OfferDetailsController {
 
     private static final String VIEW = "offers/details";
@@ -54,12 +54,20 @@ public class OfferDetailsController {
     private final BasketsRepository basketsRepository;
     private final OfferDetailsPageFactory pageFactory;
     private final MessageSource messages;
+    private final OfferItemReloader offerItemReloader;
 
-    OfferDetailsController(BasketsRepository basketsRepository, OfferDetailsPageFactory pageFactory,
-                           MessageSource messages) {
-        this.basketsRepository = basketsRepository;
-        this.pageFactory = pageFactory;
-        this.messages = messages;
+    /** What a dialog answer needs besides the record: the list to return to, whether the script asked, the model. */
+    private record Answer(String returnTo, boolean async, Model model, Locale locale) {
+        Answer(String returnTo, String requestedWith, Model model, Locale locale) {
+            this(returnTo, SettingsPaths.isAsync(requestedWith), model, locale);
+        }
+    }
+
+    /** The three dialog forms rendered with the page: from the record, or one of them as posted. */
+    private record DialogForms(OfferTermsForm terms, ContactDetails client, OfferNoteForm note) {
+        static DialogForms of(Basket offer) {
+            return new DialogForms(OfferTermsForm.from(offer), contactOf(offer), noteOf(offer));
+        }
     }
 
     @GetMapping("/dashboard/offer/{offerId}")
@@ -67,11 +75,7 @@ public class OfferDetailsController {
                 @RequestParam(required = false) String open, Model model, Locale locale) {
         Basket offer = requireOffer(offerId);
         fillPage(model, offer, returnTo, locale);
-        model.addAttribute("termsForm", OfferTermsForm.from(offer));
-        model.addAttribute("clientForm", contactOf(offer));
-        model.addAttribute("noteForm", noteOf(offer));
-        model.addAttribute("errors", Map.of());
-        model.addAttribute("open", dialogToOpen(open, offer));
+        fillDialogs(model, DialogForms.of(offer), Map.of(), dialogToOpen(open, offer));
         return VIEW;
     }
 
@@ -95,15 +99,15 @@ public class OfferDetailsController {
                      @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                      Model model, Locale locale, RedirectAttributes redirectAttributes, HttpServletResponse response) {
         Basket offer = requireOffer(offerId);
+        Answer answer = new Answer(returnTo, requestedWith, model, locale);
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
-            return rejected(offer, "terms", errors, "offers/details :: termsForm", SettingsPaths.isAsync(requestedWith),
-                    returnTo, model, locale, response, form, null, null);
+            DialogForms posted = DialogForms.of(offer);
+            return rejected(offer, "terms", errors, new DialogForms(form, posted.client(), posted.note()), answer, response);
         }
         form.applyTo(offer);
         save(offer);
-        return saved(offer, "terms", "offers/details :: termsForm", "offers.details.saved.terms",
-                SettingsPaths.isAsync(requestedWith), returnTo, model, locale, redirectAttributes);
+        return saved(offer, "terms", "offers.details.saved.terms", answer, redirectAttributes);
     }
 
     @PostMapping("/dashboard/offer/{offerId}/client")
@@ -116,14 +120,15 @@ public class OfferDetailsController {
             // a template has no customer
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        Answer answer = new Answer(returnTo, requestedWith, model, locale);
         if (!form.isProperlyFilled()) {
-            return rejected(offer, "client", Map.of("contact", "offers.contact.invalid"), "offers/details :: clientForm",
-                    SettingsPaths.isAsync(requestedWith), returnTo, model, locale, response, null, form, null);
+            DialogForms stored = DialogForms.of(offer);
+            return rejected(offer, "client", Map.of("contact", "offers.contact.invalid"),
+                    new DialogForms(stored.terms(), form, stored.note()), answer, response);
         }
         offer.setContactDetails(withoutBlanks(form));
         save(offer);
-        return saved(offer, "client", "offers/details :: clientForm", "offers.details.saved.client",
-                SettingsPaths.isAsync(requestedWith), returnTo, model, locale, redirectAttributes);
+        return saved(offer, "client", "offers.details.saved.client", answer, redirectAttributes);
     }
 
     @PostMapping("/dashboard/offer/{offerId}/note")
@@ -134,8 +139,8 @@ public class OfferDetailsController {
         Basket offer = requireOffer(offerId);
         offer.setComment(form.getComment());
         save(offer);
-        return saved(offer, "note", "offers/details :: noteForm", "offers.details.saved.note",
-                SettingsPaths.isAsync(requestedWith), returnTo, model, locale, redirectAttributes);
+        return saved(offer, "note", "offers.details.saved.note", new Answer(returnTo, requestedWith, model, locale),
+                redirectAttributes);
     }
 
     /** Without JavaScript the pencil of a row opens this page; with it the row has its own dialog. */
@@ -143,7 +148,7 @@ public class OfferDetailsController {
     public String showItem(@PathVariable String offerId, @PathVariable int index,
                     @RequestParam(required = false) String returnTo, Model model, Locale locale) {
         Basket offer = requireOffer(offerId);
-        BasketItem item = requireItem(offer, index);
+        BasketItem item = requireItem(recalculatedTemplate(offer), index);
         renderItem(model, offer, index, OfferItemForm.from(item), Map.of(), returnTo, locale);
         return ITEM_VIEW;
     }
@@ -153,7 +158,7 @@ public class OfferDetailsController {
                     @RequestParam(required = false) String returnTo, Model model, Locale locale,
                     RedirectAttributes redirectAttributes) {
         Basket offer = requireOffer(offerId);
-        BasketItem item = requireItem(offer, index);
+        BasketItem item = requireItem(recalculatedTemplate(offer), index);
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
             renderItem(model, offer, index, form, errors, returnTo, locale);
@@ -195,41 +200,55 @@ public class OfferDetailsController {
                 messages.getMessage("offers.details.recalculate.confirm.title", new Object[]{displayName(offer, locale)}, locale),
                 messages.getMessage("offers.details.recalculate.confirm.message", null, locale),
                 messages.getMessage("offers.details.recalculate.confirm.action", null, locale),
-                "/dashboard/offer/" + offerId + "/recalculate", pageHref(offerId, returnTo), false));
+                OfferController.offerHref(offerId, "/recalculate", returnTo), pageHref(offerId, returnTo), false));
         model.addAttribute("backLabel", displayName(offer, locale));
         return "settings-confirm";
     }
 
-    private String rejected(Basket offer, String dialog, Map<String, String> errors, String fragment, boolean async,
-                            String returnTo, Model model, Locale locale, HttpServletResponse response,
-                            OfferTermsForm terms, ContactDetails client, OfferNoteForm note) {
-        fillPage(model, offer, returnTo, locale);
-        model.addAttribute("termsForm", terms != null ? terms : OfferTermsForm.from(offer));
-        model.addAttribute("clientForm", client != null ? client : contactOf(offer));
-        model.addAttribute("noteForm", note != null ? note : noteOf(offer));
-        model.addAttribute("errors", errors);
-        model.addAttribute("open", dialog);
-        if (async) {
+    private String rejected(Basket offer, String dialog, Map<String, String> errors, DialogForms forms, Answer answer,
+                            HttpServletResponse response) {
+        fillPage(answer.model(), offer, answer.returnTo(), answer.locale());
+        fillDialogs(answer.model(), forms, errors, dialog);
+        if (answer.async()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
-            return fragment;
+            return dialogFragment(dialog);
         }
         return VIEW;
     }
 
-    private String saved(Basket offer, String dialog, String fragment, String messageKey, boolean async,
-                         String returnTo, Model model, Locale locale, RedirectAttributes redirectAttributes) {
-        if (async) {
+    private String saved(Basket offer, String dialog, String messageKey, Answer answer,
+                         RedirectAttributes redirectAttributes) {
+        if (answer.async()) {
             // the page is built from the record just saved: the fragment and the refreshed card and header come from it
-            fillPage(model, offer, returnTo, locale);
-            model.addAttribute("termsForm", OfferTermsForm.from(offer));
-            model.addAttribute("clientForm", contactOf(offer));
-            model.addAttribute("noteForm", noteOf(offer));
-            model.addAttribute("errors", Map.of());
-            model.addAttribute("open", dialog);
-            model.addAttribute("saved", true);
-            return fragment;
+            fillPage(answer.model(), offer, answer.returnTo(), answer.locale());
+            fillDialogs(answer.model(), DialogForms.of(offer), Map.of(), dialog);
+            answer.model().addAttribute("saved", true);
+            return dialogFragment(dialog);
         }
-        return savedRedirect(offer, messageKey, returnTo, redirectAttributes, locale);
+        return savedRedirect(offer, messageKey, answer.returnTo(), redirectAttributes, answer.locale());
+    }
+
+    private static String dialogFragment(String dialog) {
+        return VIEW + " :: " + dialog + "Form";
+    }
+
+    private static void fillDialogs(Model model, DialogForms forms, Map<String, String> errors, String open) {
+        model.addAttribute("termsForm", forms.terms());
+        model.addAttribute("clientForm", forms.client());
+        model.addAttribute("noteForm", forms.note());
+        model.addAttribute("errors", errors);
+        model.addAttribute("open", open);
+    }
+
+    /**
+     * A template shows its prices recalculated on open, and a save keeps what it shows (as the old form posted the whole
+     * recalculated table): the page of one item reads and saves the template the same way. An offer is left as stored.
+     */
+    private Basket recalculatedTemplate(Basket offer) {
+        if (offer.hasType(BasketType.OfferTemplate)) {
+            offerItemReloader.recalculate(offer);
+        }
+        return offer;
     }
 
     private String savedRedirect(Basket offer, String messageKey, String returnTo, RedirectAttributes redirectAttributes,
@@ -286,17 +305,11 @@ public class OfferDetailsController {
     }
 
     private static String pageHref(String offerId, String returnTo) {
-        String safe = safeReturnTo(returnTo);
-        return "/dashboard/offer/" + offerId
-                + (safe == null ? "" : "?returnTo=" + URLEncoder.encode(safe, StandardCharsets.UTF_8));
+        return OfferController.offerPageHref(offerId, returnTo);
     }
 
     private String displayName(Basket offer, Locale locale) {
-        if (StringUtils.isNotBlank(offer.getName())) {
-            return offer.getName();
-        }
-        String key = offer.hasType(BasketType.OfferTemplate) ? "offers.list.untitledTemplate" : "offers.list.untitled";
-        return messages.getMessage(key, new Object[]{offer.getShortenedBasketId()}, locale);
+        return OfferController.displayName(offer, messages, locale);
     }
 
     private Basket requireOffer(String offerId) {
@@ -312,11 +325,8 @@ public class OfferDetailsController {
         return items.get(index);
     }
 
-    /** Same stamp as OfferController.save: an offer without a source gets the user who last saved it. */
     private void save(Basket offer) {
-        if (offer.getType() == BasketType.Offer && offer.getSource() == null) {
-            offer.setSource(new OrderSource(CustomSecurityContext.getLoggedInUserName(), OrderSourceType.CallCenter));
-        }
+        OfferController.stampSource(offer);
         basketsRepository.save(offer);
     }
 }
