@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,6 +14,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
@@ -66,6 +68,13 @@ class InventoryViewStoreListingsTest {
 
     @InjectMocks
     private Inventory inventory;
+
+    // the global catalog knows PIM-1, so it is a global entry; any other id (st-s-…) is a store entry (spec 4.3)
+    @BeforeEach
+    void globalCatalogKnowsPim1() {
+        when(pimCatalog.findByPimId("PIM-1")).thenReturn(Optional.of(
+                new PimEntry("PIM-1", List.of(), "Intel", "i7", "CPU", null, true, null, null)));
+    }
 
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
