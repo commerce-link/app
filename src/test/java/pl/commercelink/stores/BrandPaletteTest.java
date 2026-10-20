@@ -37,7 +37,8 @@ class BrandPaletteTest {
         // then
         assertThat(palette.on()).isEqualTo("#0e1721");
         assertThat(BrandPalette.contrast(palette.fill(), palette.on())).isCloseTo(12.61, within(0.01));
-        assertThat(palette.ink()).isEqualTo("#8c7500");
+        assertThat(palette.ink()).isEqualTo("#806a00");
+        assertThat(BrandPalette.contrast(palette.ink(), palette.soft())).isCloseTo(5.07, within(0.01));
     }
 
     @Test
@@ -73,6 +74,7 @@ class BrandPaletteTest {
                     // then
                     assertThat(BrandPalette.contrast(palette.fill(), palette.on())).as("on for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.ink(), "#ffffff")).as("ink for %s", hex).isGreaterThanOrEqualTo(4.5);
+                    assertThat(BrandPalette.contrast(palette.ink(), palette.soft())).as("ink on soft for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.hover(), palette.on())).as("hover for %s", hex).isGreaterThanOrEqualTo(4.5);
                 }
             }

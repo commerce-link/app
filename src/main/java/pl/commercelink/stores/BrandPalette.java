@@ -13,10 +13,12 @@ public record BrandPalette(String fill, String on, String hover, String ink, Str
         String fill = safeHex != null ? safeHex : SYSTEM_ACCENT;
         String on = onColour(fill);
 
-        // The brand colour stays untouched as the button background; links and focus use a darkened copy that passes AA on white.
+        // The brand colour stays untouched as the button background; links and focus use a darkened copy that passes AA
+        // on white and on soft, the selection background that also carries ink text (the step badge).
+        String soft = mix(fill, WHITE, 0.90);
         String ink = fill;
         double t = 0;
-        while (contrast(ink, WHITE) < MIN_CONTRAST) {
+        while (contrast(ink, WHITE) < MIN_CONTRAST || contrast(ink, soft) < MIN_CONTRAST) {
             t += 0.05;
             ink = mix(fill, BLACK, t);
         }
@@ -25,7 +27,7 @@ public record BrandPalette(String fill, String on, String hover, String ink, Str
         if (contrast(hover, on) < MIN_CONTRAST) {
             hover = mix(fill, WHITE, 0.25);
         }
-        return new BrandPalette(fill, on, hover, ink, mix(ink, BLACK, 0.15), mix(fill, WHITE, 0.90));
+        return new BrandPalette(fill, on, hover, ink, mix(ink, BLACK, 0.15), soft);
     }
 
     public String style() {
