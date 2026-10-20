@@ -13979,3 +13979,11 @@ body.cl-public .cl-toast { top: 16px; }
   .cl-offer-page dl.cl-kv.is-bank dd { margin-bottom: 8px; }
   .cl-offer-page .cl-offer-total-row dd { font-size: 20px; }
 }
+
+/* ===== Payment bridge (payments/payment-bridge.html) ===== */
+.cl-bridge { text-align: center; padding: 28px 24px; }
+.cl-bridge .cl-spinner { margin: 0 auto 16px; }
+.cl-bridge .cl-bridge-auto[hidden] { display: none; }
+.cl-bridge .cl-page-title { margin-top: 0; }
+.cl-bridge .cl-page-lead { margin-bottom: 0; }
+.cl-bridge .cl-button.is-primary { width: 100%; min-height: 48px; justify-content: center; margin-top: 20px; }
