@@ -136,7 +136,8 @@
     <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('shippingDetails.phone', 'client.offer.data.phone', ${shipping.phone}, 'tel', 'shipping tel', true, ${errors['shippingDetails.phone']}, null)}"></div>
 </div>
 
-<!--/* A saved party, every value masked through the shared fragment; empty lines are left out. */-->
+<!--/* A saved party, every value masked through the shared fragment except the two-letter country code, which the
+       fragment would turn into "**" and which is not personal data; empty lines are left out. */-->
 <th:block th:fragment="party(p)">
     <p th:if="${p.fullName != null}"><span th:replace="~{fragments/masked-field :: masked(${p.fullName})}"></span></p>
     <p th:if="${p.companyName != null}"><span th:replace="~{fragments/masked-field :: masked(${p.companyName})}"></span></p>
@@ -145,7 +146,7 @@
     <p th:if="${p.postalCode != null or p.city != null or p.country != null}"><span
             th:replace="~{fragments/masked-field :: masked(${p.postalCode})}"></span> <span
             th:replace="~{fragments/masked-field :: masked(${p.city})}"></span><th:block th:if="${p.country != null}">, <span
-            th:replace="~{fragments/masked-field :: masked(${p.country})}"></span></th:block></p>
+            th:text="${p.country}"></span></th:block></p>
     <p th:if="${p.email != null}"><span th:replace="~{fragments/masked-field :: masked(${p.email})}"></span></p>
     <p th:if="${p.phone != null}"><span th:replace="~{fragments/masked-field :: masked(${p.phone})}"></span></p>
 </th:block>

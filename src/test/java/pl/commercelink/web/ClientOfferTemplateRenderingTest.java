@@ -136,6 +136,8 @@ class ClientOfferTemplateRenderingTest {
         // then
         assertThat(html).contains("Jan********")
                 .contains("jan*********************")
+                .containsPattern("War\\*{5}</span>\\s*</span>, <span>PL</span>")
+                .doesNotContain("<span>**</span>")
                 .contains("cl-step-badge is-done")
                 .contains("Same as the billing details")
                 .contains("href=\"?edit=data#client-offer-data\"")
