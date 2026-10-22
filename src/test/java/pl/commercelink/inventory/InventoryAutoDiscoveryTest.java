@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,12 +12,14 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +28,8 @@ class InventoryAutoDiscoveryTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
+    private PimView pimView;
+    @Mock
     private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
@@ -32,10 +37,15 @@ class InventoryAutoDiscoveryTest {
     @InjectMocks
     private InventoryAutoDiscovery autoDiscovery;
 
+    @BeforeEach
+    void globalInventoryMatchesAgainstTheGlobalView() {
+        lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
+    }
+
     @Test
     void returnsNothingForEmptyFeed() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimView.findAll()).thenReturn(List.of());
 
         // when
         Collection<MatchedInventory> result = autoDiscovery.run(List.of());
@@ -47,7 +57,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void keepsUnrelatedItemsApart() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimView.findAll()).thenReturn(List.of());
         InventoryItem first = item("EAN1", "MFN1", 100, "A");
         InventoryItem second = item("EAN2", "MFN2", 200, "A");
 
@@ -62,7 +72,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void mergesOffersOfTheSameEanFromDifferentSuppliers() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimView.findAll()).thenReturn(List.of());
         InventoryItem fromA = item("EAN1", "MFN1", 100, "A");
         InventoryItem fromB = item("EAN1", "MFN1", 110, "B");
 
@@ -79,7 +89,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void mergesOffersSharingOnlyTheManufacturerCode() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimView.findAll()).thenReturn(List.of());
         InventoryItem fromA = item("EAN1", "MFN1", 100, "A");
         InventoryItem fromB = item("EAN2", "MFN1", 105, "B");
 
@@ -96,7 +106,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void usesPimEntryToJoinItemsWithDifferentIdentifiers() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem first = item("EAN1", "MFN1", 100, "A");
         InventoryItem second = item("EAN2", "MFN2", 105, "A");
 
@@ -113,7 +123,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void dropsPimEntriesWithoutAnyOffer() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN9"), mpn("MFN9"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN9"), mpn("MFN9"))));
         InventoryItem unrelated = item("EAN1", "MFN1", 100, "A");
 
         // when
@@ -129,7 +139,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void attachesItemsMatchingOnlyByEanToPimEntryWhenManufacturerCodeIsUnknownToPim() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), mpn("MFN1"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), mpn("MFN1"))));
         InventoryItem known = item("EAN1", "MFN1", 100, "A");
         InventoryItem sameEanOtherMfn = item("EAN1", "MFN1-ALT", 102, "B");
 
@@ -147,7 +157,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void doesNotSplitOffersFromASingleSupplier() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheap = item("EAN1", "MFN1", 100, "A");
         InventoryItem expensive = item("EAN2", "MFN2", 1000, "A");
 
@@ -162,7 +172,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void doesNotSplitUniformGroupEvenWhenPricesDiffer() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimView.findAll()).thenReturn(List.of());
         InventoryItem first = item("EAN1", "MFN1", 100, "A");
         InventoryItem second = item("EAN1", "MFN1", 1000, "B");
 
@@ -177,7 +187,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void splitsMixedGroupIntoCheapAndExpensiveProducts() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheapA = item("EAN2", "MFN2", 100, "A");
         InventoryItem cheapB = item("EAN2", "MFN2", 105, "B");
         InventoryItem expensiveA = item("EAN1", "MFN1", 1000, "A");
@@ -195,7 +205,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void keepsOnlyTheUsablePriceGroupWhenTheOtherHasASingleItem() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheapA = item("EAN2", "MFN2", 100, "A");
         InventoryItem cheapB = item("EAN2", "MFN2", 105, "B");
         InventoryItem strayExpensive = item("EAN1", "MFN1", 1000, "A");
@@ -211,7 +221,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void keepsGroupTogetherWhenNeitherPriceGroupHasMoreThanOneItem() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheap = item("EAN2", "MFN2", 100, "A");
         InventoryItem expensive = item("EAN1", "MFN1", 1000, "B");
 
@@ -226,7 +236,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void doesNotSplitWhenPriceDiscriminatorIsBelowThreshold() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheapA = item("EAN2", "MFN2", 10, "A");
         InventoryItem cheapB = item("EAN2", "MFN2", 11, "B");
         InventoryItem otherA = item("EAN1", "MFN1", 40, "A");
@@ -243,7 +253,7 @@ class InventoryAutoDiscoveryTest {
     @Test
     void dropsOddlyPricedItemsFromTheSurvivingGroup() {
         // given
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
+        when(pimView.findAll()).thenReturn(List.of(pimEntry("PIM1", gtin("EAN1"), gtin("EAN2"), mpn("MFN1"), mpn("MFN2"))));
         InventoryItem cheapA = item("EAN2", "MFN2", 100, "A");
         InventoryItem cheapB = item("EAN2", "MFN2", 100, "B");
         InventoryItem cheapC = item("EAN2", "MFN2", 100, "C");

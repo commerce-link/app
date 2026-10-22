@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -255,6 +256,43 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     public List<Product> findAllWithoutPimIdByEanOrMfn(List<String> eans, List<String> mfnCodes) {
         Map<String, AttributeValue> eav = new HashMap<>();
+        String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+        if (filter == null) {
+            return new ArrayList<>();
+        }
+
+        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
+                .withFilterExpression(filter)
+                .withExpressionAttributeValues(eav);
+
+        return dynamoDBMapper.scan(Product.class, scanExpression);
+    }
+
+    public List<Product> findAllWithoutPimIdByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
+        List<Product> result = new ArrayList<>();
+        for (String categoryId : categoryIds) {
+            Map<String, AttributeValue> eav = new HashMap<>();
+            String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+            if (filter == null) {
+                return result;
+            }
+            eav.put(":categoryId", new AttributeValue().withS(categoryId));
+
+            DynamoDBQueryExpression<Product> queryExpression = new DynamoDBQueryExpression<Product>()
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withFilterExpression(filter)
+                    .withExpressionAttributeValues(eav);
+
+            result.addAll(dynamoDBMapper.query(Product.class, queryExpression));
+        }
+        return result;
+    }
+
+    /**
+     * Builds the filter "pimId missing or null, and ean or mfn among the given codes", adding its values to {@code eav}.
+     * Returns null when both lists are empty, i.e. nothing can match.
+     */
+    private static String withoutPimIdByEanOrMfnFilter(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
         eav.put(":nullValue", new AttributeValue().withNULL(true));
 
         List<String> conditions = new ArrayList<>();
@@ -280,16 +318,10 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         }
 
         if (conditions.isEmpty()) {
-            return new ArrayList<>();
+            return null;
         }
 
-        String filter = "(attribute_not_exists(pimId) OR pimId = :nullValue) AND (" + String.join(" OR ", conditions) + ")";
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(filter)
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(Product.class, scanExpression);
+        return "(attribute_not_exists(pimId) OR pimId = :nullValue) AND (" + String.join(" OR ", conditions) + ")";
     }
 
     public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, Integer minMaxRetailPrice, int page, int pageSize) {

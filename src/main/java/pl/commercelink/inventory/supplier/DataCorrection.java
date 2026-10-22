@@ -66,13 +66,12 @@ class DataCorrection {
             return Optional.empty();
         }
 
-        return pimCatalog.findByMpn(mfn)
-                .map(PimEntry::gtins)
-                .flatMap(gtins -> gtins.stream().findFirst());
+        return pimCatalog.withGlobalData().findByMpn(mfn)
+                .flatMap(PimEntry::primaryGtin);
     }
 
     Optional<PimEntry> resolveFromPim(String ean, String mfn) {
-        return pimCatalog.findByGtinOrMpn(ean, mfn).filter(PimEntry::approved);
+        return pimCatalog.withGlobalData().findByGtinOrMpn(ean, mfn).filter(PimEntry::approved);
     }
 
     private boolean requiresEanCorrection(String ean) {

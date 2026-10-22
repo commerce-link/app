@@ -7,6 +7,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ public class PurchaseReportService {
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
+        PimView pim = pimCatalog.withStoreData(storeId);
         Map<String, String> supplierByDeliveryId = new HashMap<>();
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
@@ -52,15 +54,15 @@ public class PurchaseReportService {
 
             String supplier = resolveSupplier(storeId, doc, supplierByDeliveryId);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                accumulate(item, supplier, aggregates);
+                accumulate(item, supplier, pim, aggregates);
             }
         }
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String supplier, Map<AggregateKey, Aggregate> aggregates) {
+    private void accumulate(WarehouseDocumentItem item, String supplier, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
+        Optional<PimEntry> pim = pimLookup.findByGtinOrMpn(item.getEan(), item.getMfn());
         String category = pim.map(PimEntry::category).orElse(null);
         String brand = pim.map(PimEntry::brand).orElse(null);
 
