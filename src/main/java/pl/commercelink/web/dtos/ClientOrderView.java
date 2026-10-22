@@ -10,13 +10,17 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.shipping.CarrierNames;
 import pl.commercelink.stores.BankAccount;
+import pl.commercelink.stores.Iban;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.CategoryLocalizer;
+import pl.commercelink.web.orders.Money;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -24,8 +28,8 @@ import java.util.stream.Collectors;
 
 /**
  * Everything the public order status page shows, resolved once in the controller so the template carries
- * no logic. Deliberately omits prices per item, costs, suppliers and payment balance — the page is a
- * bearer-token link that customers forward freely.
+ * no logic. Deliberately omits prices per item, costs and suppliers — the page is a bearer-token link that
+ * customers forward freely. The order total and payment balance are shown: the customer needs them to pay.
  */
 @Getter
 public class ClientOrderView {
@@ -63,9 +67,16 @@ public class ClientOrderView {
     private final boolean preferredShippingOffered;
     private final LocalDate preferredShippingWindowEnd;
     private final List<DayOfWeek> preferredShippingDays;
+    private final String headlineKey;
+    private final String leadKey;
+    private final List<DayOption> preferredShippingOptions;
+    private final BankView bank;
+    private final List<ShipmentRow> shipmentRows;
+    private final LocalDateTime readyForCollectionAt;
 
     private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
-                            boolean shippingAddressEditable, boolean preferredShippingEditable) {
+                            boolean shippingAddressEditable, boolean preferredShippingEditable,
+                            LocalDate today) {
         this.orderId = order.getOrderId();
         this.shortOrderId = order.getShortenedOrderId();
         this.orderedAt = order.getOrderedAt();
@@ -112,6 +123,15 @@ public class ClientOrderView {
         this.preferredShippingOffered = store.isClientPreferredShippingDateEnabled();
         this.preferredShippingWindowEnd = order.getPreferredShippingWindowEnd();
         this.preferredShippingDays = store.preferredShippingDaysFor(order.getShipmentType()).stream().sorted().toList();
+        this.headlineKey = resolveHeadlineKey();
+        this.leadKey = resolveLeadKey();
+        this.preferredShippingOptions = resolveDayOptions(order, store, today);
+        this.bank = toBank(order);
+        this.shipmentRows = shipments.stream().map(ClientOrderView::toRow).toList();
+        this.readyForCollectionAt = shipments.stream()
+                .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
+                .map(Shipment::getShippedAt).filter(Objects::nonNull)
+                .min(Comparator.naturalOrder()).orElse(null);
     }
 
     public String getPreferredShippingDayNumbers() {
@@ -119,12 +139,48 @@ public class ClientOrderView {
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false, false);
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false, false, LocalDate.now());
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
                                        boolean shippingAddressEditable, boolean preferredShippingEditable) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable);
+        return from(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable, LocalDate.now());
+    }
+
+    // "today" is a parameter so the offered days are deterministic in tests.
+    public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
+                                       boolean shippingAddressEditable, boolean preferredShippingEditable, LocalDate today) {
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable, today);
+    }
+
+    public boolean isBeforeDispatch() {
+        return !cancelled && (stage == ClientOrderStage.Accepted || stage == ClientOrderStage.Assembly
+                || stage == ClientOrderStage.Preparation);
+    }
+
+    public boolean isAsapSelected() {
+        return preferredShippingAt == null;
+    }
+
+    public String getTotalFormatted() {
+        return Money.format(totalPrice);
+    }
+
+    public String getPaidFormatted() {
+        return Money.format(paidAmount);
+    }
+
+    public String getUnpaidFormatted() {
+        return Money.format(unpaidAmount);
+    }
+
+    // The bare number for the "copy amount" button: no grouping, decimal point.
+    public String getUnpaidRaw() {
+        return Money.input(unpaidAmount);
+    }
+
+    public String getOverpaidFormatted() {
+        return Money.format(overpaidAmount);
     }
 
     public int getProductCount() {
@@ -185,6 +241,72 @@ public class ClientOrderView {
         };
     }
 
+    private String resolveHeadlineKey() {
+        String prefix = "client.order.headline.";
+        if (cancelled) {
+            return prefix + "cancelled";
+        }
+        return prefix + switch (stage) {
+            case Accepted -> "accepted";
+            case Assembly -> "assembly";
+            case Preparation -> "preparation";
+            case Shipping -> personalCollection ? "collection" : "shipping";
+            case Delivered -> personalCollection ? "collected" : "delivered";
+        };
+    }
+
+    private String resolveLeadKey() {
+        if (cancelled) {
+            return null;
+        }
+        String prefix = "client.order.lead.";
+        return prefix + switch (stage) {
+            case Accepted -> "accepted";
+            case Assembly -> resolveAssemblyNoteKey().substring("client.order.note.".length());
+            case Preparation -> "preparation";
+            case Shipping -> personalCollection ? "collection" : "shipping";
+            case Delivered -> "delivered";
+        };
+    }
+
+    // Days from the later of the planned dispatch and today to the end of the window, on the weekdays the store
+    // ships. A day saved earlier stays on the list even when it no longer fits, so the form never silently drops it.
+    private List<DayOption> resolveDayOptions(Order order, Store store, LocalDate today) {
+        if (estimatedShippingAt == null) {
+            return List.of();
+        }
+        LocalDate from = estimatedShippingAt.isAfter(today) ? estimatedShippingAt : today;
+        LocalDate to = order.getPreferredShippingWindowEnd();
+        var allowed = store.preferredShippingDaysFor(order.getShipmentType());
+        List<DayOption> options = new ArrayList<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            if (allowed.contains(day.getDayOfWeek())) {
+                options.add(new DayOption(day, day.equals(estimatedShippingAt), day.equals(preferredShippingAt)));
+            }
+        }
+        if (preferredShippingAt != null && options.stream().noneMatch(DayOption::selected)) {
+            options.add(new DayOption(preferredShippingAt, preferredShippingAt.equals(estimatedShippingAt), true));
+            options.sort(Comparator.comparing(DayOption::date));
+        }
+        return List.copyOf(options);
+    }
+
+    private BankView toBank(Order order) {
+        if (bankAccount == null) {
+            return null;
+        }
+        String currency = StringUtils.isBlank(bankAccount.getCurrency()) || "PLN".equalsIgnoreCase(bankAccount.getCurrency())
+                ? null : bankAccount.getCurrency();
+        return new BankView(bankAccount.getAccountHolder(), Iban.grouped(bankAccount.getIban()),
+                Iban.normalize(bankAccount.getIban()), bankAccount.getSwiftCode(), bankAccount.getBankName(),
+                currency, order.getOrderId());
+    }
+
+    private static ShipmentRow toRow(Shipment shipment) {
+        return new ShipmentRow(CarrierNames.forCustomer(shipment), shipment.getTrackingNo(), shipment.getTrackingUrl(),
+                shipment.getShippedAt(), shipment.getDeliveredAt(), shipment.getType() == ShipmentType.PersonalCollection);
+    }
+
     private String resolveAssemblyNoteKey() {
         boolean anyAwaitingDelivery = items.stream().anyMatch(item -> item.status() == ClientOrderItemStatus.AwaitingDelivery);
         if (anyAwaitingDelivery && assembledCount > 0) {
@@ -208,6 +330,17 @@ public class ClientOrderView {
             return new PickupAddress(company.getCompanyName(), company.getStreetAndNumber(), company.getPostalCode(), company.getCity());
         }
         return null;
+    }
+
+    public record DayOption(LocalDate date, boolean planned, boolean selected) {
+    }
+
+    public record BankView(String holder, String ibanGrouped, String ibanRaw, String swift, String bankName,
+                           String currency, String transferTitle) {
+    }
+
+    public record ShipmentRow(String carrier, String trackingNo, String trackingUrl, LocalDateTime shippedAt,
+                              LocalDateTime deliveredAt, boolean collection) {
     }
 
     public record PickupAddress(String companyName, String streetAndNumber, String postalCode, String city) {
