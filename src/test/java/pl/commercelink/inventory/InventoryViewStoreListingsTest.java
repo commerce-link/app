@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -12,7 +13,6 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
@@ -60,7 +60,7 @@ class InventoryViewStoreListingsTest {
     @Mock
     private GlobalMatchedInventory globalInventory;
     @Mock
-    private PimCatalog pimCatalog;
+    private PimView pimView;
     @Mock
     private ProductRepository productRepository;
 
@@ -69,9 +69,9 @@ class InventoryViewStoreListingsTest {
 
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
-                ProductRecommendationEngine.class.getDeclaredConstructor(PimCatalog.class, ProductRepository.class);
+                ProductRecommendationEngine.class.getDeclaredConstructor(ProductRepository.class);
         ctor.setAccessible(true);
-        return ctor.newInstance(pimCatalog, productRepository);
+        return ctor.newInstance(productRepository);
     }
 
     private CategoryDefinition cpuCategory() {
@@ -164,11 +164,11 @@ class InventoryViewStoreListingsTest {
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);
@@ -188,11 +188,11 @@ class InventoryViewStoreListingsTest {
         stubGlobalIndex(List.of());
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);

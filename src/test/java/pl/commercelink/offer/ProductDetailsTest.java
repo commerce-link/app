@@ -1,6 +1,7 @@
 package pl.commercelink.offer;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -10,7 +11,6 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -35,7 +35,7 @@ class ProductDetailsTest {
     private static final String PIM_ID = "pim-1";
 
     @Mock
-    private PimCatalog pimCatalog;
+    private PimView pimView;
 
     @Mock
     private ProductCatalogRepository productCatalogRepository;
@@ -75,7 +75,7 @@ class ProductDetailsTest {
     void dynamicDefinitionBuildsDetailsFromRecommendation() {
         // given
         dynamicDefinition("Karty graficzne");
-        when(pimCatalog.findByPimId(PIM_ID)).thenReturn(Optional.of(pimEntry()));
+        when(pimView.findByPimId(PIM_ID)).thenReturn(Optional.of(pimEntry()));
         when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
         when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
