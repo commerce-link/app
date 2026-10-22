@@ -7,6 +7,9 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -16,9 +19,11 @@ import pl.commercelink.templates.EmailTemplatesRepository;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +37,10 @@ class StoreCopyServiceTest {
     private ProductRepository productRepository;
     @Mock
     private EmailTemplatesRepository emailTemplatesRepository;
+    @Mock
+    private PimCatalog pimCatalog;
+    @Mock
+    private PimView sourceLookup;
 
     @Captor
     private ArgumentCaptor<List<Product>> productsCaptor;
@@ -129,5 +138,90 @@ class StoreCopyServiceTest {
         assertThat(copy.getWarehouseConfiguration().isDocumentsGenerationEnabled()).isTrue();
         assertThat(copy.getWarehouseConfiguration().getCostCenterId()).isNull();
         assertThat(copy.getWarehouseConfiguration().getPrinters()).isEmpty();
+    }
+
+    @Test
+    void copyClearsPimIdOfAStoreOwnedEntry() {
+        // given
+        givenOneSourceProductWithPimId("s1");
+        when(sourceLookup.findByPimId("s1")).thenReturn(Optional.of(entry("s1", "store-1")));
+
+        // when
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        verify(productRepository).batchSave(productsCaptor.capture());
+        Product copied = productsCaptor.getValue().get(0);
+        assertThat(copied.getPimId()).isNull();
+        assertThat(copied.getName()).isEqualTo("Karta");
+        assertThat(copied.getEan()).isEqualTo("5901234567890");
+    }
+
+    @Test
+    void copyKeepsPimIdOfAGlobalEntry() {
+        // given
+        givenOneSourceProductWithPimId("g1");
+        when(sourceLookup.findByPimId("g1")).thenReturn(Optional.of(entry("g1", null)));
+
+        // when
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        verify(productRepository).batchSave(productsCaptor.capture());
+        assertThat(productsCaptor.getValue().get(0).getPimId()).isEqualTo("g1");
+    }
+
+    @Test
+    void copyKeepsPimIdWhenTheEntryIsUnknown() {
+        // given: e.g. the index is still empty right after startup
+        givenOneSourceProductWithPimId("x1");
+        when(sourceLookup.findByPimId("x1")).thenReturn(Optional.empty());
+
+        // when
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        verify(productRepository).batchSave(productsCaptor.capture());
+        assertThat(productsCaptor.getValue().get(0).getPimId()).isEqualTo("x1");
+    }
+
+    @Test
+    void copyLeavesAProductWithoutPimIdWithoutOneAndDoesNotLookItUp() {
+        // given
+        givenOneSourceProductWithPimId(null);
+
+        // when
+        storeCopyService.copyStore("store-1", "copy000001", "Kopia");
+
+        // then
+        verify(productRepository).batchSave(productsCaptor.capture());
+        Product copied = productsCaptor.getValue().get(0);
+        assertThat(copied.getPimId()).isNull();
+        assertThat(copied.getEan()).isEqualTo("5901234567890");
+        verifyNoInteractions(sourceLookup);
+    }
+
+    private void givenOneSourceProductWithPimId(String pimId) {
+        Store source = new Store();
+        source.setStoreId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(source);
+        when(pimCatalog.withStoreData("store-1")).thenReturn(sourceLookup);
+
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId("cat-def-1");
+        definition.setName("Karty");
+        ProductCatalog catalog = new ProductCatalog("store-1", "catalog");
+        catalog.setCategories(List.of(definition));
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(catalog));
+
+        Product product = new Product("cat-def-1");
+        product.setName("Karta");
+        product.setEan("5901234567890");
+        product.setPimId(pimId);
+        when(productRepository.findAll("cat-def-1")).thenReturn(List.of(product));
+    }
+
+    private PimEntry entry(String pimId, String ownerStoreId) {
+        return new PimEntry(pimId, List.of(), "Brand", "Name", "GPU", null, true, null, null, null, ownerStoreId);
     }
 }

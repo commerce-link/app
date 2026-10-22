@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 class InventoryIndex {
@@ -45,6 +46,31 @@ class InventoryIndex {
         key.getProductEans().forEach(ean -> matches.addAll(byEan.getOrDefault(ean, Set.of())));
         key.getProductCodes().forEach(code -> matches.addAll(byProductCode.getOrDefault(code, Set.of())));
         return List.copyOf(matches);
+    }
+
+    /**
+     * Whether a group of the other (own) index is already represented here. A key resolved to a store entry (a PIM
+     * entry owned by the store, never present in the global catalog) is covered by a group with that id, or by a
+     * group without any id that shares its EAN or code: a global supplier selling a product the global PIM lacks,
+     * which picks up the store entry's id when assembled. A group of another PIM entry never covers it, so a store's
+     * own product never disappears behind a global entry that merely shares a code. Any other key, including one
+     * with a global PIM id, is covered by its id, EAN or code: a global group split by price loses its id and keeps
+     * only codes, and the own copy of that product must still be deduplicated against it.
+     */
+    boolean covers(InventoryKey ownKey, Predicate<String> isStoreEntry) {
+        if (!isStoreEntryKey(ownKey, isStoreEntry)) {
+            return contains(ownKey);
+        }
+        return findMatching(ownKey).stream().anyMatch(group -> sameOrNoEntry(group.getInventoryKey(), ownKey.getId()));
+    }
+
+    // a group belongs to the given PIM entry when it carries that id or no id at all
+    static boolean sameOrNoEntry(InventoryKey key, String pimId) {
+        return key.getId() == null || key.getId().equals(pimId);
+    }
+
+    static boolean isStoreEntryKey(InventoryKey key, Predicate<String> isStoreEntry) {
+        return key.getId() != null && isStoreEntry.test(key.getId());
     }
 
     boolean contains(InventoryKey key) {
