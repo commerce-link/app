@@ -54,7 +54,18 @@ class PublicPageStylesContractTest {
         String css = publicCss();
 
         // then
-        assertThat(css).contains(".cl-offer-page .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+        assertThat(css).contains("body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+    }
+
+    @Test
+    void sharedPublicComponentsAreScopedToThePublicBody() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("body.cl-public .cl-step-badge {", "body.cl-public .cl-kv-grid {",
+                "body.cl-public dl.cl-kv.is-bank {", "body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+        assertThat(css).doesNotContain(".cl-offer-page .cl-step-badge", ".cl-offer-page .cl-kv-grid", ".cl-offer-page dl.cl-kv.is-bank");
     }
 
     @Test

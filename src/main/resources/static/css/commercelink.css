@@ -14211,21 +14211,55 @@ body.cl-public .cl-toast { top: 16px; }
   body.cl-public .cl-toast { top: 8px; }
 }
 
-/* ===== Client offer (clientOffer.html) ===== */
-.cl-offer-page .cl-stack { display: flex; flex-direction: column; gap: 16px; }
-.cl-offer-page .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
-.cl-offer-page .cl-card-head.has-step .cl-card-title { margin: 0; }
+/* ===== Public page components (offer, order) ===== */
+body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
+body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
+body.cl-public .cl-card-head.has-step .cl-card-title { margin: 0; }
 /* step number in the card title */
-.cl-offer-page .cl-step-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+body.cl-public .cl-step-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   border-radius: 50%; flex: none; font-size: 13px; font-weight: 650; background: var(--cl-accent-soft); color: var(--cl-accent); }
-.cl-offer-page .cl-step-badge.is-done { background: var(--cl-ok-soft); color: var(--cl-ok); }
-.cl-offer-page .cl-step-badge.is-locked { background: var(--cl-surface-2); color: var(--cl-ink-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
+body.cl-public .cl-step-badge.is-done { background: var(--cl-ok-soft); color: var(--cl-ok); }
+body.cl-public .cl-step-badge.is-locked { background: var(--cl-surface-2); color: var(--cl-ink-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
 /* lines */
-.cl-offer-page .cl-list .cl-list-item.has-icon > div:first-child { display: flex; gap: 12px; align-items: flex-start; }
-.cl-offer-page .cl-list-amount { flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+body.cl-public .cl-list .cl-list-item.has-icon > div:first-child { display: flex; gap: 12px; align-items: flex-start; }
+body.cl-public .cl-list-amount { flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cl-ink); text-align: right; }
-.cl-offer-page .cl-list-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--cl-surface-2); color: var(--cl-ink-2);
+body.cl-public .cl-list-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--cl-surface-2); color: var(--cl-ink-2);
   display: inline-flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px var(--cl-line); }
+/* saved data */
+body.cl-public .cl-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+body.cl-public .cl-kv-grid h3 { font-size: 13.5px; font-weight: 600; color: var(--cl-ink); margin: 0 0 6px; }
+body.cl-public .cl-kv-grid p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--cl-ink); }
+body.cl-public .cl-kv-grid p.cl-muted { color: var(--cl-ink-2); }
+/* the shared masked-value fragment carries line breaks inside its span; a flex box drops them, so "City, PL" gets no
+   space before the comma */
+body.cl-public .cl-kv-grid p > span { display: inline-flex; max-width: 100%; }
+body.cl-public .cl-kv-grid p > span > span { min-width: 0; overflow-wrap: anywhere; }
+body.cl-public dl.cl-kv.is-bank { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; font-size: 14px; }
+body.cl-public dl.cl-kv.is-bank dt { color: var(--cl-ink-2); font-weight: 500; }
+body.cl-public dl.cl-kv.is-bank dd { margin: 0; color: var(--cl-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+body.cl-public .cl-help { font-size: 13px; color: var(--cl-ink-2); margin: 8px 0 0; }
+body.cl-public .cl-help.is-lock { display: flex; gap: 8px; align-items: flex-start; }
+/* the shared inset rule zeroes help margins; two help lines in a row (lock + contact the store) still need a gap */
+body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }
+body.cl-public .cl-alert { margin: 0; }
+body.cl-public .cl-card-inset > .cl-alert + * { margin-top: 12px; }
+body.cl-public .cl-form-grid { margin-top: 12px; }
+body.cl-public .cl-form-grid .cl-form-grid { margin-top: 0; }
+body.cl-public .cl-fieldset { border: 0; padding: 0; margin: 0; }
+body.cl-public .cl-fieldset + .cl-fieldset { margin-top: 20px; }
+body.cl-public .cl-fieldset-title { font-size: 15px; font-weight: 650; color: var(--cl-ink); padding: 0; margin-bottom: 8px; }
+body.cl-public .cl-choice-group.is-row { margin: 4px 0 0; }
+body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-ink); padding: 9px 0; }
+@media (max-width: 719px) {
+  body.cl-public .cl-kv-grid { grid-template-columns: 1fr; }
+  body.cl-public .cl-list.is-amounts .cl-list-item { grid-template-columns: minmax(0, 1fr) auto; }
+  body.cl-public .cl-card-inset { padding: 14px 16px; }
+  body.cl-public dl.cl-kv.is-bank { grid-template-columns: 1fr; gap: 0; }
+  body.cl-public dl.cl-kv.is-bank dd { margin-bottom: 8px; }
+}
+
+/* ===== Client offer (clientOffer.html) ===== */
 /* variant choice */
 .cl-offer-page .cl-list .cl-list-item.is-group { grid-template-columns: minmax(0, 1fr); }
 .cl-offer-page .cl-line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
@@ -14262,15 +14296,6 @@ body.cl-public .cl-toast { top: 16px; }
 }
 .cl-offer-page .cl-offer-total-row dd { margin: 0; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--cl-ink); }
 .cl-offer-page .cl-offer-total-sub { margin: 2px 0 0; text-align: right; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
-/* saved data */
-.cl-offer-page .cl-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
-.cl-offer-page .cl-kv-grid h3 { font-size: 13.5px; font-weight: 600; color: var(--cl-ink); margin: 0 0 6px; }
-.cl-offer-page .cl-kv-grid p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--cl-ink); }
-.cl-offer-page .cl-kv-grid p.cl-muted { color: var(--cl-ink-2); }
-/* the shared masked-value fragment carries line breaks inside its span; a flex box drops them, so "City, PL" gets no
-   space before the comma */
-.cl-offer-page .cl-kv-grid p > span { display: inline-flex; max-width: 100%; }
-.cl-offer-page .cl-kv-grid p > span > span { min-width: 0; overflow-wrap: anywhere; }
 /* payment */
 .cl-offer-page .cl-pay-methods { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0 0 14px; }
 .cl-offer-page .cl-pay-methods legend { font-size: 13.5px; font-weight: 500; color: var(--cl-ink-2); margin-bottom: 6px; padding: 0; }
@@ -14290,37 +14315,16 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-offer-page .cl-pay-or { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; font-size: 12px; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; color: var(--cl-ink-2); }
 .cl-offer-page .cl-pay-or::before, .cl-offer-page .cl-pay-or::after { content: ""; flex: 1; border-top: 1px solid var(--cl-line); }
-.cl-offer-page dl.cl-kv.is-bank { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; font-size: 14px; }
-.cl-offer-page dl.cl-kv.is-bank dt { color: var(--cl-ink-2); font-weight: 500; }
-.cl-offer-page dl.cl-kv.is-bank dd { margin: 0; color: var(--cl-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 /* the proforma button names the masked e-mail, which can be long: it wraps inside the button on a phone */
 .cl-offer-page .cl-proforma-label { min-width: 0; text-align: left; overflow-wrap: anywhere; }
 /* the proforma stands after the transfer details, or right after online payment when the store shows no bank account */
 .cl-offer-page .cl-card-inset > .cl-proforma { margin-top: 14px; }
 .cl-offer-page .cl-card-inset > .cl-proforma:first-child { margin-top: 0; }
-.cl-offer-page .cl-help { font-size: 13px; color: var(--cl-ink-2); margin: 8px 0 0; }
-.cl-offer-page .cl-help.is-lock { display: flex; gap: 8px; align-items: flex-start; }
-/* the shared inset rule zeroes help margins; two help lines in a row (lock + contact the store) still need a gap */
-.cl-offer-page .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }
 .cl-offer-page .cl-edit-link { font-size: 13.5px; }
-.cl-offer-page .cl-alert { margin: 0; }
-.cl-offer-page .cl-card-inset > .cl-alert + * { margin-top: 12px; }
-.cl-offer-page .cl-form-grid { margin-top: 12px; }
-.cl-offer-page .cl-form-grid .cl-form-grid { margin-top: 0; }
-.cl-offer-page .cl-fieldset { border: 0; padding: 0; margin: 0; }
-.cl-offer-page .cl-fieldset + .cl-fieldset { margin-top: 20px; }
-.cl-offer-page .cl-fieldset-title { font-size: 15px; font-weight: 650; color: var(--cl-ink); padding: 0; margin-bottom: 8px; }
-.cl-offer-page .cl-choice-group.is-row { margin: 4px 0 0; }
-.cl-offer-page .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-ink); padding: 9px 0; }
 @media (max-width: 719px) {
-  .cl-offer-page .cl-kv-grid { grid-template-columns: 1fr; }
-  .cl-offer-page .cl-list.is-amounts .cl-list-item { grid-template-columns: minmax(0, 1fr) auto; }
-  .cl-offer-page .cl-card-inset { padding: 14px 16px; }
   .cl-offer-page .cl-pay-row .cl-button.is-primary { width: 100%; justify-content: center; }
   .cl-offer-page .cl-pay-row { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
   .cl-offer-page .cl-card-footer .cl-button.is-primary { width: 100%; justify-content: center; min-height: 48px; }
-  .cl-offer-page dl.cl-kv.is-bank { grid-template-columns: 1fr; gap: 0; }
-  .cl-offer-page dl.cl-kv.is-bank dd { margin-bottom: 8px; }
   .cl-offer-page .cl-offer-total-row dd { font-size: 20px; }
 }
 
