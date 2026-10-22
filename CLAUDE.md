@@ -155,7 +155,7 @@ Feed loading runs on two tracks:
 - **Global feeds** — `FeedReloaderScheduler` runs every 5 minutes, compares each provider's last update with the feed file date in S3, and reloads only suppliers with newer feeds; prices are converted to the local currency, then the inventory index is updated in one pass.
 - **Per-store feeds** — `StoreSupplierFeedScheduler` creates an EventBridge Scheduler entry per store+supplier (once daily at a random night hour, Europe/Warsaw) targeting `supplier-feed-import-queue`, consumed by `SqsFeedLoaderEventListener`; `triggerImmediateImport()` allows ad-hoc imports. Active only when `application.env=prod`.
 
-Products are matched across suppliers by EAN and manufacturer code via `InventoryAutoDiscovery`.
+Products are matched across suppliers via `InventoryAutoDiscovery`: by EAN, or by manufacturer code together with the brand (`TaxonomyCache.brandOf(ean)`), because suppliers reuse the same code for unrelated products under different brands.
 
 ### Price Snapshots and Rolling Aggregates
 

@@ -37,19 +37,24 @@ class InventoryAutoDiscovery {
         // Build a mapping of EANs and product codes to inventory items for quick lookup
         Map<String, List<InventoryItem>> mappedByEan = new HashMap<>();
         Map<String, List<InventoryItem>> mappedByProductCode = new HashMap<>();
+        Map<String, Set<String>> mfnKeysByProductCode = new HashMap<>();
         for (InventoryItem inventoryItem : inventoryItems) {
             mappedByEan.computeIfAbsent(inventoryItem.ean(), k -> new LinkedList<>()).add(inventoryItem);
-            mappedByProductCode.computeIfAbsent(inventoryItem.mfn(), k -> new LinkedList<>()).add(inventoryItem);
+            mappedByProductCode.computeIfAbsent(mfnKey(inventoryItem), k -> {
+                mfnKeysByProductCode.computeIfAbsent(inventoryItem.mfn(), code -> new HashSet<>()).add(k);
+                return new LinkedList<>();
+            }).add(inventoryItem);
         }
 
         // Resolve already known mappings based on the PIM index
         Map<String, MatchedInventory> keyToMatchedInventory = new HashMap<>();
         for (PimEntry pimEntry : pim.findAll()) {
             InventoryKey inventoryKey = InventoryKey.fromPimEntry(pimEntry);
+            Collection<String> pimMfnKeys = mfnKeysOf(pimEntry, inventoryKey, mfnKeysByProductCode);
 
             Collection<InventoryItem> matchingItems = new LinkedHashSet<>();
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductEans(), mappedByEan));
-            matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode));
+            matchingItems.addAll(findItemsByKeysModifyingCollection(pimMfnKeys, mappedByProductCode));
 
             MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, taxonomyCache, supplierRegistry);
 
@@ -64,7 +69,7 @@ class InventoryAutoDiscovery {
 
             for (InventoryItem itemByEan : items) {
                 matchingItems.add(itemByEan);
-                matchingItems.addAll(mappedByProductCode.getOrDefault(itemByEan.mfn(), Collections.emptyList()));
+                matchingItems.addAll(mappedByProductCode.getOrDefault(mfnKey(itemByEan), Collections.emptyList()));
             }
 
             Set<String> eans = matchingItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
@@ -91,6 +96,27 @@ class InventoryAutoDiscovery {
         }
 
         return processMatchedInventoryCandidates(keyToMatchedInventory.values());
+    }
+
+    // The same code under different brands is a different product; the brand stays out of the group's key.
+    private String mfnKey(InventoryItem item) {
+        return mfnKey(taxonomyCache.brandOf(item.ean()), item.mfn());
+    }
+
+    // A PIM entry without a brand cannot tell brands apart, so its codes match under any brand, as before the brand was part of the key.
+    private static Collection<String> mfnKeysOf(PimEntry pimEntry, InventoryKey inventoryKey, Map<String, Set<String>> mfnKeysByProductCode) {
+        if (pimEntry.brand() == null || pimEntry.brand().isBlank()) {
+            return inventoryKey.getProductCodes().stream()
+                    .flatMap(code -> mfnKeysByProductCode.getOrDefault(code, Collections.emptySet()).stream())
+                    .toList();
+        }
+        return inventoryKey.getProductCodes().stream()
+                .map(code -> mfnKey(pimEntry.brand(), code))
+                .toList();
+    }
+
+    private static String mfnKey(String brand, String mfn) {
+        return (brand == null ? "" : brand.trim().toUpperCase()) + "|" + mfn;
     }
 
     private static Collection<InventoryItem> findItemsByKeysModifyingCollection(Collection<String> keys, Map<String, List<InventoryItem>> col) {
