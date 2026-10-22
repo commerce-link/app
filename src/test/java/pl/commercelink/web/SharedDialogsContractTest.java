@@ -54,16 +54,19 @@ class SharedDialogsContractTest {
     }
 
     @Test
-    void theAddItemsScriptKeepsThePublicFunctionOfTheOfferPage() throws Exception {
+    void theOfferPageOpensTheAddItemsDialogLikeTheOrderPage() throws Exception {
         // given
         String script = read("src/main/resources/static/js/item-add-dialog.js");
-        String offer = read("src/main/resources/templates/offerDetails.html");
+        String offer = read("src/main/resources/templates/offers/details.html");
+        String items = read("src/main/resources/templates/offers/details/items.html");
 
         // then
-        assertThat(script).contains("window.toggleAddItemModal = toggleAddItemModal").contains("showModal")
+        assertThat(script).contains("showModal")
                 .contains("cl:dialog-open").contains("items[").contains("data-add-items-url").contains("'use strict'")
                 .doesNotContain("innerHTML").doesNotContain(".style.");
-        assertThat(offer).contains("fragments/item-add-modal :: itemAddModal(").contains("toggleAddItemModal(");
+        assertThat(offer).contains("fragments/item-add-modal :: itemAddModal(${p.offerId()}, '/dashboard/offer')")
+                .contains("/js/dialog.js");
+        assertThat(items).contains("data-cl-dialog-open=\"item-add-dialog\"");
     }
 
     /** PaymentsCard.sources is a precomputed Option<PaymentSource> list; templates read labelKey, never build the key themselves. */

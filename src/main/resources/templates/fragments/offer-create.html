@@ -17,14 +17,21 @@
        and an e-mail or a phone" is ContactDetails.isProperlyFilled; the browser checks it first (form-check.js) because a
        refused POST comes back as a redirect that empties the form. Autofill is off: these are the customer's details,
        not the signed-in user's. */-->
-<fieldset th:fragment="contact(prefix, contact)" class="cl-fieldset">
+<fieldset th:fragment="contact(prefix, contact)" class="cl-fieldset"
+          th:with="refused=${errors != null and errors.containsKey('contact')},
+                   noIdentity=${refused and #strings.isEmpty(contact?.name) and #strings.isEmpty(contact?.companyName)},
+                   noChannel=${refused and #strings.isEmpty(contact?.email) and #strings.isEmpty(contact?.phone)},
+                   rule=${noIdentity or noChannel} ? null : 'offer-contact-rule'">
     <legend class="cl-fieldset-title" th:text="#{offers.new.contact}"></legend>
-    <p class="cl-help" id="offer-contact-rule" th:text="#{offers.new.contact.rule}" data-cl-any-of-note></p>
-    <p class="cl-field-error" id="offer-contact-identity-error" hidden data-cl-any-of="contact-name contact-company">
+    <!--/* A hidden error or note still counts in a field's description, so a field names one only while it shows: refused
+           by the server (errors['contact'], the offer details' client dialog) here, refused in the browser by form-check.js. */-->
+    <p class="cl-help" id="offer-contact-rule" th:text="#{offers.new.contact.rule}" data-cl-any-of-note
+       th:hidden="${noIdentity or noChannel}"></p>
+    <p class="cl-field-error" id="offer-contact-identity-error" th:hidden="${!noIdentity}" data-cl-any-of="contact-name contact-company">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
         <span th:text="#{offers.new.contact.identity.missing}"></span>
     </p>
-    <p class="cl-field-error" id="offer-contact-channel-error" hidden data-cl-any-of="contact-email contact-phone">
+    <p class="cl-field-error" id="offer-contact-channel-error" th:hidden="${!noChannel}" data-cl-any-of="contact-email contact-phone">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
         <span th:text="#{offers.new.contact.channel.missing}"></span>
     </p>
@@ -34,7 +41,9 @@
                 <label class="cl-label" for="contact-name"><span th:text="#{offers.contact.name}"></span></label>
                 <input class="cl-input" id="contact-name" type="text" autocomplete="off"
                        th:name="${prefix + 'name'}" th:value="${contact?.name}"
-                       aria-describedby="offer-contact-rule offer-contact-identity-error">
+                       th:classappend="${noIdentity} ? 'is-invalid'"
+                       th:attr="aria-invalid=${noIdentity} ? 'true' : null,
+                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -52,7 +61,9 @@
                 <label class="cl-label" for="contact-company"><span th:text="#{offers.contact.company}"></span></label>
                 <input class="cl-input" id="contact-company" type="text" autocomplete="off"
                        th:name="${prefix + 'companyName'}" th:value="${contact?.companyName}"
-                       aria-describedby="offer-contact-rule offer-contact-identity-error">
+                       th:classappend="${noIdentity} ? 'is-invalid'"
+                       th:attr="aria-invalid=${noIdentity} ? 'true' : null,
+                                aria-describedby=${noIdentity} ? 'offer-contact-identity-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -60,8 +71,10 @@
                 <label class="cl-label" for="contact-email"><span th:text="#{offers.new.contact.email}"></span></label>
                 <input class="cl-input" id="contact-email" type="email" inputmode="email" autocomplete="off"
                        th:name="${prefix + 'email'}" th:value="${contact?.email}"
-                       th:attr="data-cl-type-message=#{offers.new.contact.email.invalid}"
-                       aria-describedby="offer-contact-rule offer-contact-channel-error">
+                       th:classappend="${noChannel} ? 'is-invalid'"
+                       th:attr="data-cl-type-message=#{offers.new.contact.email.invalid},
+                                aria-invalid=${noChannel} ? 'true' : null,
+                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : ${rule}">
             </div>
         </div>
         <div class="cl-span-3">
@@ -69,7 +82,9 @@
                 <label class="cl-label" for="contact-phone"><span th:text="#{offers.contact.phone}"></span></label>
                 <input class="cl-input" id="contact-phone" type="tel" inputmode="tel" autocomplete="off"
                        th:name="${prefix + 'phone'}" th:value="${contact?.phone}"
-                       aria-describedby="offer-contact-rule offer-contact-channel-error">
+                       th:classappend="${noChannel} ? 'is-invalid'"
+                       th:attr="aria-invalid=${noChannel} ? 'true' : null,
+                                aria-describedby=${noChannel} ? 'offer-contact-channel-error' : ${rule}">
             </div>
         </div>
     </div>

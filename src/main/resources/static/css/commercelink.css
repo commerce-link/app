@@ -9403,12 +9403,12 @@ a.cl-link-button:hover {
     cursor: pointer;
 }
 
-.cl-page .cl-table.is-delivery .cl-table-edit:hover {
+.cl-page .cl-table:is(.is-delivery, .is-line-editor) .cl-table-edit:hover {
     color: var(--cl-accent-ink);
     background: var(--cl-accent-soft);
 }
 
-.cl-page .cl-table.is-delivery .cl-table-edit:focus-visible {
+.cl-page .cl-table:is(.is-delivery, .is-line-editor) .cl-table-edit:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
 }
@@ -14011,15 +14011,157 @@ a.cl-link-button:hover {
     margin-top: 6px;
 }
 
+/* --- Offer details (/dashboard/offer/{id}, spec docs/active/offer-details-redesign-v2, variant A4): the items table
+   edited in place (.is-line-editor: quantity and price in the row, the cost as a line under the price, the value with
+   its margin, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
+.cl-page .cl-table.is-line-editor { table-layout: fixed; }
+/* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
+.cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
+.cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }
+/* "99 999,99" whole inside the field, with the cell's and the field's insets */
+.cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 144px; }
+.cl-page .cl-table.is-line-editor col.cl-col-value { width: 124px; }
+.cl-page .cl-table.is-line-editor col.cl-col-menu { width: 52px; }
+.cl-page .cl-table.is-line-editor :is(td, th) { vertical-align: top; }
+/* a name without spaces breaks inside the fixed column instead of running out of the page; a code longer than the whole
+   column is cut with an ellipsis (the dialog shows it in full), a shorter one still moves to the next line unbroken */
+.cl-page .cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }
+.cl-page .cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.cl-page .cl-table.is-line-editor .cl-input.is-qty { width: 100%; text-align: right; }
+.cl-page .cl-table.is-line-editor .cl-input.is-money { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
+/* the number fields without the browser's spin buttons, which took the room of the digits (WebKit always, Chromium on
+   hover); the keyboard's arrows still step them */
+.cl-page .cl-table.is-line-editor :is(.cl-input.is-qty, .cl-input.is-money) { appearance: textfield; -moz-appearance: textfield; }
+.cl-page .cl-table.is-line-editor :is(.cl-input.is-qty, .cl-input.is-money)::-webkit-inner-spin-button,
+.cl-page .cl-table.is-line-editor :is(.cl-input.is-qty, .cl-input.is-money)::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cl-page .cl-table.is-line-editor .cl-line-warn { margin: var(--cl-gap-attached) 0 0; font-size: 12.5px; line-height: 1.3; }
+.cl-page .cl-line-hint { display: block; width: max-content; max-width: 100%; margin: var(--cl-gap-attached) 0 0 auto; font-size: 12.5px; color: var(--cl-ink-2); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-line-hint.is-warn { color: var(--cl-warn); }
+.cl-page .cl-line-value { display: grid; justify-items: end; gap: 2px; padding-top: 7px; font-variant-numeric: tabular-nums; }
+.cl-page .cl-line-margin { font-size: 12.5px; color: var(--cl-ink-2); }
+.cl-page .cl-line-margin.is-low { color: var(--cl-warn); }
+.cl-page .cl-line-margin.is-bad { color: var(--cl-bad); }
+/* a variant outside the total: the amount muted with "poza sumą" instead of the margin (no strike-through) */
+.cl-page .cl-table.is-line-editor .cl-line-outside { display: none; }
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-outside { display: block; }
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-margin,
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-line-margin:not(.cl-line-outside) { display: none; }
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-total { color: var(--cl-ink-3); }
+.cl-page .cl-table.is-line-editor .cl-drag { display: inline-grid; place-items: center; width: 28px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--cl-ink-3); cursor: grab; }
+.cl-page .cl-table.is-line-editor .cl-drag:hover { color: var(--cl-accent-ink); background: var(--cl-accent-soft); }
+.cl-page .cl-table.is-line-editor .cl-drag:focus-visible { outline: 2px solid var(--cl-accent); outline-offset: 2px; }
+/* the pencil after the name is the table pencil of the deliveries (.cl-table-edit, hover and focus shared there), here a
+   square link */
+.cl-page .cl-table.is-line-editor .cl-table-edit { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-left: 6px; border-radius: 6px; color: var(--cl-ink-3); vertical-align: -2px; }
+.cl-page .cl-table.is-line-editor .cl-table-edit[hidden] { display: none; }
+.cl-page .cl-table.is-line-editor tr.cl-line-group > * { background: var(--cl-surface-2); border-top: 1px solid var(--cl-line); }
+.cl-page .cl-table.is-line-editor tr.is-variant > th.cl-table-key { box-shadow: inset 3px 0 0 var(--cl-accent); }
+.cl-page .cl-group-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--cl-gap-related) var(--cl-gap-fields); }
+/* shrinks before "Rozgrupuj" goes to a second line in the narrow product column at 1366 px: a line breaks by the items'
+   flex-basis, so the field starts at its narrowest and grows to 160 px into the room the line has left */
+.cl-page .cl-group-bar .cl-input { flex: 1 1 96px; min-width: 96px; max-width: 160px; font-weight: 600; }
+.cl-page .cl-group-bar .cl-link-button { margin-left: auto; }
+.cl-page .cl-group-bar .cl-field-error { flex-basis: 100%; margin: 0; }
+.cl-page .cl-group-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--cl-ink-2); }
+.cl-page .cl-group-picks { font-size: 13px; color: var(--cl-ink-2); }
+/* the end of a group (offer-lines.js): a thin line, the drop zone of an empty group, a hint while a row is dragged */
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot > td { height: 4px; padding: 0 12px; background: var(--cl-surface-2); border-bottom: 2px solid var(--cl-line); font-size: 12px; line-height: 1.4; color: var(--cl-accent-ink); }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot .cl-group-drop { display: none; }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty > td,
+.cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot > td { height: auto; padding: 4px 12px; }
+.cl-page .cl-table.is-line-editor tr.cl-line-group-foot.is-empty .cl-group-drop.is-empty,
+.cl-page .cl-table.is-line-editor.is-dragging tr.cl-line-group-foot:not(.is-empty) .cl-group-drop.is-end { display: inline; }
+/* Dragging a row (offer-lines.js): the place it would land on is an empty slot framed in the accent, its content kept
+   for the height but not shown; the row itself is lifted and follows the pointer, solid, with a raised shadow, laid out
+   as a table of its own so its cells keep their widths. */
+.cl-page .cl-table.is-line-editor tr.sortable-ghost { outline: 2px dashed var(--cl-accent); outline-offset: -4px; }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * { background: var(--cl-accent-soft); box-shadow: none; }
+.cl-page .cl-table.is-line-editor tr.sortable-ghost > * > * { visibility: hidden; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback { display: table; table-layout: fixed; border-radius: var(--cl-radius); background: var(--cl-surface); box-shadow: var(--cl-shadow), var(--cl-shadow-card); cursor: grabbing; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback > * { background: var(--cl-surface); border-bottom: 0; }
+.cl-page .cl-table.is-line-editor tr.sortable-fallback .cl-drag { color: var(--cl-accent-ink); background: var(--cl-accent-soft); }
+html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }
+.cl-page .cl-table.is-line-editor.is-dragging .cl-drag { cursor: grabbing; }
+.cl-page .cl-visibility { white-space: nowrap; }
+.cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
+.cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
+.cl-page .cl-item-market { margin: 0; font-size: 14px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+/* the internal note reads like the values of the cards above it */
+.cl-page.cl-offer-page .cl-card-inset > .cl-note-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+/* a pasted link, an e-mail or a company name without spaces breaks inside its card instead of widening the page */
+.cl-page.cl-offer-page :is(.cl-note-text, .cl-address, .cl-record-meta > span) { min-width: 0; overflow-wrap: anywhere; }
+/* the save state above "Zapisz pozycje": the dot and the warning tone once the table has unsaved changes */
+.cl-page .cl-save-state { margin: 0; font-size: 13px; color: var(--cl-ink-2); }
+.cl-page .cl-unsaved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cl-warn); }
+.cl-page .cl-unsaved::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.cl-page .cl-summary-peek.is-action .cl-save-state:empty { display: none; }
+/* After the columns, the peek closes the items form, so it stays at the bottom of the screen past the table too. With
+   two columns it keeps to the main one (the side column's 320 px and the gap of cl-layout-aside): the sticky side column
+   stays whole beside it. */
+@media screen and (min-width: 1366px) {
+    .cl-page .cl-layout-aside + .cl-summary-peek.is-action { margin-right: calc(320px + 16px); }
+}
+@media screen and (max-width: 1365px) {
+    /* a field reached with Tab does not hide under the peek */
+    html:has(.cl-summary-peek.is-action) { scroll-padding-bottom: 80px; }
+}
+/* With the page script the peek follows the summary's own save button at any width (offer-details.js sets
+   data-cl-peek-state): shown once that button leaves the screen, so "Zapisz pozycje" is always in sight, also past the end
+   of a sticky side column at 1366 px and wider. Hidden it is not rendered, so the card stack keeps its usual 16 px gap;
+   it is sticky at the bottom of the screen, so the room it takes when shown opens below what is in view. Without the
+   script it stays as above: shown below 1366 px only. It appears without a transition, so there is no motion to reduce. */
+.cl-page .cl-summary-peek.is-action[data-cl-peek-state="shown"] { display: flex; }
+.cl-page .cl-summary-peek.is-action[data-cl-peek-state="hidden"] { display: none; }
+html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-padding-bottom: 80px; }
+/* on a phone the peek wraps to two rows (95 px with the unsaved state), taller than the 80 px above */
+@media screen and (max-width: 719px) {
+    html:has(.cl-summary-peek.is-action),
+    html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-padding-bottom: 112px; }
+}
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-line-editor :is(.cl-drag, .cl-table-edit) { width: 44px; height: 44px; }
+    .cl-page .cl-table.is-line-editor .cl-table-edit { margin: -8px -8px -8px 0; }
+    /* the 44 px handle and menu button with their cell padding */
+    .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 64px; }
+    .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 76px; }
+}
+/* < 720 px a row is a card: the name and its menu, quantity | price side by side, the value under them; the drag
+   handle goes (the order is kept with "Przenieś" in the menu). The two :not() outweigh the shared card rules of
+   .is-wrap rows with a menu, which would put the name and the menu in two columns. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 8px 10px; padding: 14px 16px; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(th, td) { padding: 0; border: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > th.cl-table-key { grid-column: 1 / 3; grid-row: 1; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-drag { display: none; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-qty { grid-column: 1; grid-row: 2; display: block; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-price { grid-column: 2; grid-row: 2; display: block; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-value { grid-column: 1 / -1; grid-row: 3; display: block; text-align: left; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-menu { grid-column: 3; grid-row: 1; display: block; }
+    /* one line each, so the two fields stay side by side at 320 px */
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(td.cl-cell-qty, td.cl-cell-price)::before { content: attr(data-label); display: block; margin-bottom: var(--cl-gap-attached); font-size: 12.5px; color: var(--cl-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* a grid cell grows to its content unless told otherwise: a long code is cut inside the card, as in the table */
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(th, td) { min-width: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-value { justify-items: start; padding-top: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-hint { margin-left: 0; text-align: left; white-space: normal; }
+    .cl-page.cl-offer-page .cl-visibility { white-space: normal; }
+    /* two fields side by side on a 320 px screen: a narrower inset keeps "99 999,00" inside the field */
+    .cl-page .cl-table.is-wrap.is-line-editor :is(.cl-input.is-qty, .cl-input.is-money) { padding-left: 6px; padding-right: 6px; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 10px; padding: 12px 16px; }
+    /* the shared card rules place a menu in a third column; the head is the bar and its menu on one line */
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td:not(.cl-cell-drag):not(.cl-cell-menu) { grid-column: 1; grid-row: 1; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td.cl-cell-menu { grid-column: 2; grid-row: 1; }
+    /* the cells lose their padding here, so the variant bar runs along the row's edge instead of under the name */
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.is-variant { box-shadow: inset 3px 0 0 var(--cl-accent); }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.is-variant > th.cl-table-key { box-shadow: none; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td { display: block; padding: 0; border: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group-foot { display: block; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group-foot > td { display: block; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td.cl-cell-drag { display: none; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line-group > td::before { content: none; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-input { flex: 1 1 100%; max-width: none; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-group-bar .cl-link-button { margin-left: 0; }
+}
+
 /* --- Basket view (store cart preview, /dashboard/basket/view/{id}) */
-/* the market column fits "99 999,00 → 99 999,00" on one line */
-.cl-page .cl-table col.cl-col-market { width: 184px; }
 /* notes under a card's list keep the card's side padding */
 .cl-page .cl-card > .cl-card-foot-note { padding: 0 20px 16px; margin: 0; }
-/* the estimate's note sits inside the disclosure body, which already insets it and draws no rule above */
-.cl-page .cl-disclosure-body > .cl-card-desc.cl-card-foot-note { padding: 8px 0 0; border-top: 0; }
-/* as cards (< 720 px) the market range carries its column name ("Rynek (PLN): 2 521,46 → 2 574,00"): next to the price it
-   would be a second bare amount; the price itself ("1 × 3 019,00") speaks for itself, as in the order */
-@media screen and (max-width: 719px) {
-    .cl-page .cl-table.is-basket-items.is-wrap tbody tr > td.is-numeric:last-child::before { content: attr(data-label) ": "; }
-}

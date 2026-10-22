@@ -111,97 +111,6 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("updateOffer applies all settable fields from request payload to the existing basket and persists")
-    void updateOfferAppliesAllSettersFromRequestPayloadToExistingBasket() {
-        // given
-        Basket existing = basketBase();
-        Basket payload = new Basket();
-        payload.setName("Updated Name");
-        payload.setComment("Updated comment");
-        payload.setShowPrices(true);
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        Basket saved = basketCaptor.getValue();
-        assertThat(saved.getName()).isEqualTo("Updated Name");
-        assertThat(saved.getComment()).isEqualTo("Updated comment");
-        assertThat(saved.isShowPrices()).isTrue();
-    }
-
-    @Test
-    @DisplayName("updateOffer persists basket items in submitted order and reindexes positions band-aware")
-    void updateOfferPersistsSubmittedItemOrderAndReindexesPositions() {
-        // given
-        Basket existing = basketBase();
-        existing.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B"), basketItem("MFN-C")));
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(basketItem("MFN-B"), basketItem("MFN-A"), basketItem("MFN-C")));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-B", "MFN-A", "MFN-C");
-        assertThat(savedItems).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
-    }
-
-    @Test
-    @DisplayName("updateOffer keeps a migrated service item without a category and normalizes blank to null")
-    void updateOfferKeepsMigratedServiceItemWithoutCategory() {
-        // given
-        Basket existing = basketBase();
-        BasketItem migratedService = basketItem("MONTAZ-1", "");
-        migratedService.setService(true);
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(migratedService));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).hasSize(1);
-        assertThat(savedItems.get(0).isService()).isTrue();
-        assertThat(savedItems.get(0).getCategory()).isNull();
-    }
-
-    @Test
-    @DisplayName("updateOffer keeps the service flag posted from the offer edit form")
-    void updateOfferKeepsPostedServiceFlag() {
-        // given
-        Basket existing = basketBase();
-        BasketItem serviceItem = basketItem("MFN-S", "");
-        serviceItem.setService(true);
-        BasketItem productItem = basketItem("MFN-P", "Obudowa");
-        Basket payload = new Basket();
-        payload.setBasketItems(List.of(serviceItem, productItem));
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(existing));
-
-        // when
-        offerController.updateOffer(OFFER_ID, payload);
-
-        // then
-        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
-        verify(basketsRepository).save(basketCaptor.capture());
-        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(BasketItem::isService);
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-S")).allMatch(i -> i.getCategory() == null);
-        assertThat(savedItems).filteredOn(i -> i.getMfn().equals("MFN-P")).noneMatch(BasketItem::isService);
-    }
-
-    @Test
     @DisplayName("saveAsTemplate keeps the service flag posted from the offer edit form")
     void saveAsTemplateKeepsPostedServiceFlag() {
         // given
@@ -261,7 +170,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -282,7 +191,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -305,7 +214,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -331,7 +240,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -365,7 +274,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -386,7 +295,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -410,7 +319,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -428,10 +337,9 @@ class OfferControllerTest {
         BasketItem item1 = basketItem("MFN-B");
         basket.setBasketItems(List.of(item0, item1));
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
-        Model model = new ConcurrentModel();
 
         // when
-        String view = offerController.removeOfferItem(OFFER_ID, 0, model);
+        String view = offerController.removeOfferItem(OFFER_ID, 0, null);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/offer/" + OFFER_ID);
@@ -439,24 +347,6 @@ class OfferControllerTest {
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems())
                 .extracting(BasketItem::getMfn).containsExactly("MFN-B");
-    }
-
-    @Test
-    void showsOfferDetailsForAStoreThatHasNeverSavedCheckoutSettings() {
-        // given
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basketBase()));
-        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
-        Model model = new ExtendedModelMap();
-
-        // when
-        String view = offerController.showOfferDetails(OFFER_ID, model);
-
-        // then
-        assertThat(view).isEqualTo("offerDetails");
-        assertThat((List<?>) model.getAttribute("deliveryOptions")).isEmpty();
     }
 
     @Test
@@ -481,7 +371,7 @@ class OfferControllerTest {
         offerController.addOfferItems(OFFER_ID, form(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
                 AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1),
-                AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)));
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -506,7 +396,7 @@ class OfferControllerTest {
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-missing", 1));
 
         // when / then
-        assertThatThrownBy(() -> offerController.addOfferItems(OFFER_ID, form))
+        assertThatThrownBy(() -> offerController.addOfferItems(OFFER_ID, form, null))
                 .isInstanceOf(ResponseStatusException.class);
         verify(basketsRepository, never()).save(any());
     }
@@ -673,5 +563,44 @@ class OfferControllerTest {
         ProductCatalog catalog = new ProductCatalog(STORE_ID, "catalog");
         catalog.setCategories(List.of(definitions));
         return catalog;
+    }
+
+    @Test
+    void removingAnItemComesBackToThePageWithTheListItWasOpenedFrom() {
+        // given
+        Basket basket = basketBase();
+        basket.setBasketItems(List.of(basketItem("MFN-A"), basketItem("MFN-B")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        String view = offerController.removeOfferItem(OFFER_ID, 0, "/dashboard/offers?segment=expired");
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/" + OFFER_ID + "?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dexpired");
+    }
+
+    @Test
+    void actionsOnAnUnknownOfferAreNotFound() {
+        // given
+        when(basketsRepository.findById(STORE_ID, "missing")).thenReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> offerController.removeOfferItem("missing", 0, null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> offerController.recalculateOffer("missing", null, new RedirectAttributesModelMap(), Locale.ENGLISH))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> offerController.duplicateOffer("missing", true))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void anOfferPageAddressKeepsOnlyAListAddress() {
+        // when / then
+        assertThat(OfferController.offerPageHref("o-1", "/dashboard/offers?segment=templates"))
+                .isEqualTo("/dashboard/offer/o-1?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dtemplates");
+        assertThat(OfferController.offerPageHref("o-1", "//evil.example")).isEqualTo("/dashboard/offer/o-1");
+        assertThat(OfferController.offerPageHref("o-1", null)).isEqualTo("/dashboard/offer/o-1");
+        assertThat(OfferController.offerHref("o-1", "/recalculate", "/dashboard/offers"))
+                .isEqualTo("/dashboard/offer/o-1/recalculate?returnTo=%2Fdashboard%2Foffers");
     }
 }

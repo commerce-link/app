@@ -3,7 +3,6 @@ package pl.commercelink.web.offers;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.web.offers.BasketViewPage.*;
 import pl.commercelink.web.orders.AddressBlock;
-import pl.commercelink.web.orders.ItemMargin;
 
 import java.util.List;
 import java.util.Map;
@@ -22,25 +21,20 @@ class BasketViewRenderingTest {
     private static final AddressBlock EMPTY_BLOCK = new AddressBlock(null, null, null, null, null, null, null, null);
 
     private static Row laptop() {
-        return new Row("Laptop Dell", "Laptopy", "DELL-1", 1, "6" + NBSP + "899,00", false,
-                ItemMargin.of(6899, 5949, 1.23), new Market(false, "5" + NBSP + "810,00", "5" + NBSP + "949,00", 5, 41));
+        return new Row("Laptop Dell", "Laptopy", "DELL-1", 1, "6" + NBSP + "899,00", false);
     }
 
     private static Row mouse() {
-        return new Row("Mysz", "Myszy", "MX-2", 2, "449,00", false, ItemMargin.of(449, 0, 1.23), Market.none());
+        return new Row("Mysz", "Myszy", "MX-2", 2, "449,00", false);
     }
 
     private static Row service() {
-        return new Row("Konfiguracja systemu", null, null, 1, "99,00", true, null, null);
+        return new Row("Konfiguracja systemu", null, null, 1, "99,00", true);
     }
 
-    private static Summary summary(DeliveryState state, Estimate estimate) {
+    private static Summary summary(DeliveryState state) {
         return new Summary("7" + NBSP + "797,00", state, "Kurier InPost", "15,00", "7" + NBSP + "812,00",
-                "6" + NBSP + "351,22", "1" + NBSP + "460,78", estimate);
-    }
-
-    private static Estimate okEstimate() {
-        return new Estimate(EstimateState.OK, "5" + NBSP + "949,00", "850,00", "691,06", "12,3", 1);
+                "6" + NBSP + "351,22", "1" + NBSP + "460,78");
     }
 
     private static BasketViewPage page(String client, int itemsCount, Pill pill, List<Row> products, List<Row> services,
@@ -53,7 +47,7 @@ class BasketViewRenderingTest {
 
     private static BasketViewPage fullPage() {
         return page("Biuro", 3, null, List.of(laptop(), mouse()), List.of(service()),
-                summary(DeliveryState.CHOSEN, okEstimate()), new Customer(BILLING, BILLING, true));
+                summary(DeliveryState.CHOSEN), new Customer(BILLING, BILLING, true));
     }
 
     private static String html(BasketViewPage page) {
@@ -84,29 +78,29 @@ class BasketViewRenderingTest {
     }
 
     @Test
-    void itemsShowQuantityTimesPriceWithEstimatedMarginAndTheMarket() {
+    void itemsShowQuantityTimesPriceWithoutSupplierCosts() {
         // given
         BasketViewPage page = fullPage();
 
         // when
         String html = html(page);
 
-        // then
+        // then: the client wants no market column or estimated margin on a basket priced by the shop
         assertThat(html).contains("1 × 6" + NBSP + "899,00")
-                .contains("Szacowana marża")
-                .contains("5" + NBSP + "810,00 → 5" + NBSP + "949,00")
-                .contains("dostawcy: 5 · szt.: 41")
-                .contains("Brak w asortymencie")
                 .contains("Usługi")
                 .contains("Usługa")
                 .contains("Ilość × cena (PLN)")
-                .contains("Rynek (PLN)")
-                .contains("data-label=\"Rynek (PLN)\"")
-                .contains("Kopiuj kod producenta");
+                .contains("Kopiuj kod producenta")
+                .contains("<colgroup><col><col class=\"cl-col-price\"></colgroup>")
+                .contains("colspan=\"2\"")
+                .doesNotContain("Rynek")
+                .doesNotContain("Szacowana marża")
+                .doesNotContain("Brak w asortymencie")
+                .doesNotContain("cl-margin");
     }
 
     @Test
-    void summaryHasTotalsAndAnOpenEstimate() {
+    void summaryHasTotalsWithoutAnEstimate() {
         // given
         BasketViewPage page = fullPage();
 
@@ -116,32 +110,30 @@ class BasketViewRenderingTest {
         // then
         assertThat(html).contains("Dostawa · Kurier InPost")
                 .contains("Razem dla klienta")
-                .contains("Szacowany koszt i zysk")
-                .contains("<details class=\"cl-disclosure\" id=\"basket-estimate\" open")
-                .contains("Pozycje bez ofert: 1");
+                .doesNotContain("Szacowany koszt i zysk")
+                .doesNotContain("basket-estimate")
+                .doesNotContain("Zysk");
     }
 
     @Test
-    void unknownDeliveryAndUnavailableEstimateAreExplained() {
+    void unknownDeliveryIsExplained() {
         // given
         BasketViewPage page = page("Biuro", 3, null, List.of(laptop()), List.of(),
-                summary(DeliveryState.UNKNOWN, new Estimate(EstimateState.UNAVAILABLE, null, null, null, null, 0)),
-                new Customer(BILLING, BILLING, true));
+                summary(DeliveryState.UNKNOWN), new Customer(BILLING, BILLING, true));
 
         // when
         String html = html(page);
 
         // then
         assertThat(html).contains("nieznana opcja")
-                .contains("Tej opcji dostawy nie ma już")
-                .contains("Nie udało się pobrać ofert dostawców");
+                .contains("Tej opcji dostawy nie ma już");
     }
 
     @Test
     void guestBasketExplainsTheMissingCustomerAndOffersItemsOnly() {
         // given
         BasketViewPage page = page(null, 3, null, List.of(laptop()), List.of(),
-                summary(DeliveryState.NONE, okEstimate()), new Customer(EMPTY_BLOCK, EMPTY_BLOCK, false));
+                summary(DeliveryState.NONE), new Customer(EMPTY_BLOCK, EMPTY_BLOCK, false));
 
         // when
         String html = html(page);
@@ -170,7 +162,7 @@ class BasketViewRenderingTest {
     void emptyBasketDisablesCreateOrder() {
         // given
         BasketViewPage page = page(null, 0, null, List.of(), List.of(),
-                summary(DeliveryState.NONE, new Estimate(EstimateState.NO_PRODUCTS, null, null, null, null, 0)),
+                summary(DeliveryState.NONE),
                 new Customer(EMPTY_BLOCK, EMPTY_BLOCK, false));
 
         // when
@@ -182,37 +174,6 @@ class BasketViewRenderingTest {
                 .contains("aria-disabled=\"true\"")
                 .contains("Pusty koszyk — nie ma z czego")
                 .doesNotContain("data-cl-confirm-tone");
-    }
-
-    @Test
-    void unavailableMarketIsNotShownAsMissingFromTheAssortment() {
-        // given
-        Row row = new Row("Laptop Dell", "Laptopy", "DELL-1", 1, "6" + NBSP + "899,00", false,
-                ItemMargin.of(6899, 0, 1.23), Market.indexDown());
-        BasketViewPage page = page("Biuro", 1, null, List.of(row), List.of(),
-                summary(DeliveryState.CHOSEN, new Estimate(EstimateState.UNAVAILABLE, null, null, null, null, 0)),
-                new Customer(BILLING, BILLING, true));
-
-        // when
-        String html = html(page);
-
-        // then
-        assertThat(html).contains("<span class=\"cl-table-empty\">brak danych</span>")
-                .contains("data-tooltip=\"Nie udało się pobrać ofert dostawców — marży nie da się teraz oszacować.\"")
-                .doesNotContain("Brak ofert dostawców")
-                .doesNotContain("Brak w asortymencie");
-    }
-
-    @Test
-    void netProfitIsFormattedWithTheCurrencyBundle() {
-        // given
-        BasketViewPage page = fullPage();
-
-        // when
-        String html = html(page);
-
-        // then
-        assertThat(html).contains("691,06 PLN · 12,3%");
     }
 
     @Test
@@ -233,7 +194,7 @@ class BasketViewRenderingTest {
     void deletionPillOnlyWhenClose() {
         // given
         BasketViewPage closing = page("Biuro", 3, new Pill("offers.basket.pill.deletion.tomorrow", null),
-                List.of(laptop()), List.of(), summary(DeliveryState.CHOSEN, okEstimate()), new Customer(BILLING, BILLING, true));
+                List.of(laptop()), List.of(), summary(DeliveryState.CHOSEN), new Customer(BILLING, BILLING, true));
         BasketViewPage far = fullPage();
 
         // when
