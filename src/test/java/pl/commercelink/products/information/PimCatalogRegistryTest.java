@@ -14,6 +14,9 @@ import pl.commercelink.provider.api.ProviderField;
 
 import org.junit.jupiter.api.AfterEach;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.config.BeanExpressionContext;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
@@ -25,6 +28,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -234,12 +238,53 @@ class PimCatalogRegistryTest {
     }
 
     @Test
-    void scheduledRefreshRunsEveryFiveMinutes() throws Exception {
+    void scheduledRefreshUsesAFixedDelayWithARandomStart() throws Exception {
         // when
         Scheduled scheduled = PimCatalogRegistry.class.getDeclaredMethod("refresh").getAnnotation(Scheduled.class);
 
         // then
-        assertThat(scheduled.cron()).isEqualTo("0 */5 * * * ?");
+        assertThat(scheduled.cron()).isEmpty();
+        assertThat(scheduled.fixedDelay()).isEqualTo(300_000);
+        assertThat(scheduled.initialDelayString()).isNotBlank();
+        Object resolved = new StandardBeanExpressionResolver().evaluate(
+                scheduled.initialDelayString(), new BeanExpressionContext(new DefaultListableBeanFactory(), null));
+        assertThat(Long.parseLong(String.valueOf(resolved))).isBetween(60_000L, 299_999L);
+    }
+
+    @Test
+    void refreshInterruptedByShutdownIsNotAnError() throws Exception {
+        // given
+        CountDownLatch refreshStarted = new CountDownLatch(1);
+        CountDownLatch neverReleased = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            refreshStarted.countDown();
+            try {
+                neverReleased.await();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException("interrupted", e);
+            }
+            return null;
+        }).when(catalogMock).refresh();
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+
+        try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
+            registry.requestRefresh();
+            assertThat(refreshStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            registry.stop();
+            refreshThread().join(2000);
+
+            // then
+            assertThat(logs.errors()).isEmpty();
+        }
+    }
+
+    private static Thread refreshThread() {
+        return Thread.getAllStackTraces().keySet().stream()
+                .filter(t -> t.getName().equals("pim-index-refresh"))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test

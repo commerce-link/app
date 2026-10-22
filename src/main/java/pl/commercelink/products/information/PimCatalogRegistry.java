@@ -117,7 +117,12 @@ public class PimCatalogRegistry {
                 try {
                     catalog.refresh();
                 } catch (Exception e) {
-                    log.error("PIM index refresh failed", e);
+                    if (Thread.currentThread().isInterrupted() || refreshExecutor.isShutdown()) {
+                        // shutdownNow() on deploy interrupts a running refresh; that is not a failure
+                        log.info("PIM index refresh interrupted by shutdown");
+                    } else {
+                        log.error("PIM index refresh failed", e);
+                    }
                 }
             });
         } catch (RuntimeException e) {
@@ -178,8 +183,10 @@ public class PimCatalogRegistry {
         refreshExecutor.shutdownNow();
     }
 
-    // every instance refreshes on its own: an SQS event reaches only one of the app instances
-    @Scheduled(cron = "0 */5 * * * ?")
+    // every instance refreshes on its own: an SQS event reaches only one of the app instances. A fixed delay with a
+    // random first start (1-5 minutes) keeps the instances from refreshing in the same second.
+    @Scheduled(fixedDelay = 300_000,
+            initialDelayString = "#{T(java.util.concurrent.ThreadLocalRandom).current().nextLong(60000, 300000)}")
     void refresh() {
         requestRefresh();
     }
