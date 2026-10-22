@@ -350,6 +350,65 @@ class ClientOfferTemplateRenderingTest {
     }
 
     @Test
+    void variantUpdateCardsAreTheCardsOfTheFullPage() {
+        // given — client-offer.js swaps these two cards in place, so they must be the page's own in every state
+        Map<String, ClientOfferRenderer> states = new java.util.LinkedHashMap<>();
+        states.put("new", ClientOfferRenderer.newOffer());
+        states.put("saved", ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()));
+        ClientOfferRenderer hidden = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing());
+        hidden.basket().setShowPrices(false);
+        states.put("hidden prices", hidden);
+        states.put("personal collection", ClientOfferRenderer.newOffer().personalCollection().submitted(ClientOfferRenderer.billing()));
+        ClientOfferRenderer split = ClientOfferRenderer.newOffer().submitted(billingWithCompany());
+        InvoicingConfiguration invoicing = new InvoicingConfiguration();
+        invoicing.setSplitPaymentsEnabled(true);
+        split.store().setInvoicingConfiguration(invoicing);
+        split.basket().getBasketItems().get(0).setUnitPrice(16000.0);
+        states.put("split payment", split);
+        ClientOfferRenderer noBank = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing());
+        noBank.store().setBankAccounts(new java.util.ArrayList<>());
+        states.put("no bank account", noBank);
+        ClientOfferRenderer noMethods = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing());
+        noMethods.store().setPayments(new java.util.ArrayList<>());
+        states.put("no payment methods", noMethods);
+
+        for (Map.Entry<String, ClientOfferRenderer> state : states.entrySet()) {
+            // when
+            String page = state.getValue().render();
+            String update = state.getValue().renderVariantUpdate();
+
+            // then
+            for (String card : List.of("client-offer-items", "client-offer-payment")) {
+                assertThat(section(update, card)).as("%s in state '%s'", card, state.getKey())
+                        .isNotEmpty()
+                        .isEqualTo(section(page, card));
+            }
+        }
+    }
+
+    /** The card's markup with whitespace collapsed and each tag's attributes sorted: their order is not stable between engines. */
+    private static String section(String html, String id) {
+        Matcher matcher = Pattern.compile("(?s)<section[^>]*id=\"" + id + "\".*?</section>").matcher(html);
+        if (!matcher.find()) {
+            return "";
+        }
+        Matcher tag = Pattern.compile("<([a-z0-9]+)((?:\\s+[^\\s=>]+(?:=\"[^\"]*\")?)*)\\s*>").matcher(matcher.group().replaceAll("\\s+", " "));
+        StringBuilder out = new StringBuilder();
+        while (tag.find()) {
+            Matcher attribute = Pattern.compile("[^\\s=>]+(?:=\"[^\"]*\")?").matcher(tag.group(2));
+            List<String> attributes = new java.util.ArrayList<>();
+            while (attribute.find()) {
+                attributes.add(attribute.group());
+            }
+            java.util.Collections.sort(attributes);
+            tag.appendReplacement(out, Matcher.quoteReplacement("<" + tag.group(1)
+                    + (attributes.isEmpty() ? "" : " " + String.join(" ", attributes)) + ">"));
+        }
+        tag.appendTail(out);
+        return out.toString();
+    }
+
+    @Test
     void offerPageHasAPoliteRegionForTheNewTotal() {
         // when
         String html = ClientOfferRenderer.newOffer().render();

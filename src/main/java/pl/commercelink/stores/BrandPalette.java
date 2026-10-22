@@ -32,7 +32,8 @@ public record BrandPalette(String fill, String on, String hover, String ink, Str
         // A pale brand (white, yellow, pastels) fills the button with almost the card's own white, so the button would
         // be told apart by its text only; its edge takes the darkened accent instead (WCAG 1.4.11, 3:1).
         String edge = contrast(fill, WHITE) >= MIN_EDGE_CONTRAST ? fill : ink;
-        String edgeHover = edge.equals(fill) ? hover : edge;
+        // the hover may be lightened (dark text on a mid colour), which can drop it below 3:1 again
+        String edgeHover = edge.equals(fill) && contrast(hover, WHITE) >= MIN_EDGE_CONTRAST ? hover : ink;
         return new BrandPalette(fill, on, hover, ink, mix(ink, BLACK, 0.15), soft, edge, edgeHover);
     }
 

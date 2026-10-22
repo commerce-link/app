@@ -11,7 +11,7 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-    <div class="cl-offer-page">
+    <div class="cl-client-offer">
         <header class="cl-page-header">
             <p class="cl-eyebrow" th:text="${page.validUntil == null} ? #{client.offer.eyebrow.short(${page.shortId})}
                     : (${page.expired} ? #{client.offer.eyebrow.expired(${page.shortId}, ${page.validUntil})}
