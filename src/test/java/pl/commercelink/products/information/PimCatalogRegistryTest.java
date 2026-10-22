@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -256,7 +257,9 @@ class PimCatalogRegistryTest {
         // given
         CountDownLatch refreshStarted = new CountDownLatch(1);
         CountDownLatch neverReleased = new CountDownLatch(1);
+        AtomicReference<Thread> worker = new AtomicReference<>();
         doAnswer(invocation -> {
+            worker.set(Thread.currentThread());
             refreshStarted.countDown();
             try {
                 neverReleased.await();
@@ -273,18 +276,37 @@ class PimCatalogRegistryTest {
 
             // when
             registry.stop();
-            refreshThread().join(2000);
+            worker.get().join(2000);
+            assertThat(worker.get().isAlive()).isFalse();
 
             // then
             assertThat(logs.errors()).isEmpty();
         }
     }
 
-    private static Thread refreshThread() {
-        return Thread.getAllStackTraces().keySet().stream()
-                .filter(t -> t.getName().equals("pim-index-refresh"))
-                .findFirst()
-                .orElseThrow();
+    @Test
+    void genuineRefreshFailureIsStillLoggedAsOneError() throws Exception {
+        // given
+        CountDownLatch failed = new CountDownLatch(1);
+        AtomicReference<Thread> worker = new AtomicReference<>();
+        doAnswer(invocation -> {
+            worker.set(Thread.currentThread());
+            failed.countDown();
+            throw new IllegalStateException("index unreachable");
+        }).when(catalogMock).refresh();
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+
+        try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
+            // when
+            registry.requestRefresh();
+            assertThat(failed.await(2, TimeUnit.SECONDS)).isTrue();
+            registry.stop();
+            worker.get().join(2000);
+            assertThat(worker.get().isAlive()).isFalse();
+
+            // then
+            assertThat(logs.errors()).containsExactly("PIM index refresh failed");
+        }
     }
 
     @Test

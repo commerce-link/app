@@ -119,7 +119,7 @@ public class PimCatalogRegistry {
                 } catch (Exception e) {
                     if (Thread.currentThread().isInterrupted() || refreshExecutor.isShutdown()) {
                         // shutdownNow() on deploy interrupts a running refresh; that is not a failure
-                        log.info("PIM index refresh interrupted by shutdown");
+                        log.info("PIM index refresh interrupted by shutdown: {}", e.toString());
                     } else {
                         log.error("PIM index refresh failed", e);
                     }
