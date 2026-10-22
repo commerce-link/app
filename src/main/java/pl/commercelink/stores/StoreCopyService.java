@@ -1,6 +1,8 @@
 package pl.commercelink.stores;
 
 import org.springframework.stereotype.Service;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.*;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.templates.EmailTemplate;
@@ -17,15 +19,18 @@ public class StoreCopyService {
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final EmailTemplatesRepository emailTemplatesRepository;
+    private final PimCatalog pimCatalog;
 
     public StoreCopyService(StoresRepository storesRepository,
                             ProductCatalogRepository productCatalogRepository,
                             ProductRepository productRepository,
-                            EmailTemplatesRepository emailTemplatesRepository) {
+                            EmailTemplatesRepository emailTemplatesRepository,
+                            PimCatalog pimCatalog) {
         this.storesRepository = storesRepository;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.emailTemplatesRepository = emailTemplatesRepository;
+        this.pimCatalog = pimCatalog;
     }
 
     public Store copyStore(String sourceStoreId, String newStoreId, String newStoreName) {
@@ -130,11 +135,12 @@ public class StoreCopyService {
             productCatalogRepository.save(newCatalog);
             System.out.println("[StoreCopy] Copied catalog '" + sourceCatalog.getName() + "' with " + newCategories.size() + " categories");
 
-            copyProducts(categoryIdMapping);
+            copyProducts(sourceStoreId, categoryIdMapping);
         }
     }
 
-    private void copyProducts(Map<String, String> categoryIdMapping) {
+    private void copyProducts(String sourceStoreId, Map<String, String> categoryIdMapping) {
+        PimView sourceLookup = pimCatalog.withStoreData(sourceStoreId);
         for (Map.Entry<String, String> entry : categoryIdMapping.entrySet()) {
             String oldCategoryId = entry.getKey();
             String newCategoryId = entry.getValue();
@@ -149,7 +155,7 @@ public class StoreCopyService {
                 Product target = new Product();
                 target.setCategoryId(newCategoryId);
                 target.setProductId(UUID.randomUUID().toString());
-                target.setPimId(source.getPimId());
+                target.setPimId(copiedPimId(sourceLookup, source.getPimId()));
                 target.setEan(source.getEan());
                 target.setManufacturerCode(source.getManufacturerCode());
                 target.setBrand(source.getBrand());
@@ -181,6 +187,16 @@ public class StoreCopyService {
                 System.out.println("[StoreCopy] Copied " + newProducts.size() + " products for category " + newCategoryId);
             }
         }
+    }
+
+    // A store-owned PIM entry is visible only to its owner, so the copy must not point at it. An entry that
+    // cannot be found (e.g. the index is still empty) is not proof of ownership, so its pimId is kept.
+    private String copiedPimId(PimView sourceLookup, String pimId) {
+        if (pimId == null) {
+            return null;
+        }
+        boolean storeOwned = sourceLookup.findByPimId(pimId).map(entry -> !entry.global()).orElse(false);
+        return storeOwned ? null : pimId;
     }
 
     private void copyEmailTemplates(Store sourceStore, String newStoreId) {

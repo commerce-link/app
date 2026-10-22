@@ -10,8 +10,6 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.baskets.OfferItem;
-import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
@@ -23,8 +21,6 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.CategoryLocalizer;
 import pl.commercelink.web.offers.BasketViewPage.DeliveryState;
-import pl.commercelink.web.offers.BasketViewPage.EstimateState;
-import pl.commercelink.web.orders.ItemMargin;
 import pl.commercelink.web.orders.Money;
 
 import java.time.LocalDateTime;
@@ -33,8 +29,6 @@ import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,8 +43,6 @@ class BasketViewPageFactoryTest {
     @Mock
     private StoresRepository storesRepository;
     @Mock
-    private OfferItemReloader offerItemReloader;
-    @Mock
     private CategoryLocalizer categoryLocalizer;
 
     private BasketViewPageFactory factory;
@@ -61,7 +53,7 @@ class BasketViewPageFactoryTest {
         source.setBasename("messages");
         source.setDefaultEncoding("UTF-8");
         source.setFallbackToSystemLocale(false);
-        factory = new BasketViewPageFactory(storesRepository, offerItemReloader, categoryLocalizer, source, 14);
+        factory = new BasketViewPageFactory(storesRepository, categoryLocalizer, source, 14);
 
         Store store = new Store();
         CheckoutConfiguration checkout = new CheckoutConfiguration();
@@ -72,7 +64,6 @@ class BasketViewPageFactoryTest {
         checkout.setDeliveryOptions(new LinkedList<>(List.of(inpost)));
         store.setCheckoutConfiguration(checkout);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(offerItemReloader.reload(any())).thenReturn(List.of());
     }
 
     private static Basket basket(BasketItem... items) {
@@ -102,24 +93,6 @@ class BasketViewPageFactoryTest {
         item.setUnitPrice(unitPrice);
         item.setService(true);
         return item;
-    }
-
-    private static OfferItem offer(BasketItem item, double lowest, double median, long totalQty, int suppliers) {
-        OfferItem offer = mock(OfferItem.class);
-        when(offer.getBasketItem()).thenReturn(item);
-        when(offer.isExistInInventory()).thenReturn(true);
-        when(offer.getLowestCost()).thenReturn(lowest);
-        when(offer.getMedianCost()).thenReturn(median);
-        when(offer.getTotalQty()).thenReturn(totalQty);
-        when(offer.getSupplierCount()).thenReturn(suppliers);
-        return offer;
-    }
-
-    private static OfferItem noOffer(BasketItem item) {
-        OfferItem offer = mock(OfferItem.class);
-        when(offer.getBasketItem()).thenReturn(item);
-        when(offer.isExistInInventory()).thenReturn(false);
-        return offer;
     }
 
     private BasketViewPage build(Basket basket) {
@@ -195,89 +168,20 @@ class BasketViewPageFactoryTest {
     }
 
     @Test
-    void estimateUsesTheMarketMedianOfProductsWithOffers() {
+    void rowsShowTheBasketWithTheShopPrices() {
         // given
-        BasketItem laptop = item("Laptop", "L-1", 1, 6899.00);
-        BasketItem monitor = item("Monitor", "M-1", 2, 1749.00);
-        OfferItem laptopOffer = offer(laptop, 5800.00, 5949.00, 7, 3);
-        OfferItem monitorOffer = offer(monitor, 1400.00, 1455.00, 12, 2);
-        when(offerItemReloader.reload(any())).thenReturn(List.of(laptopOffer, monitorOffer));
+        when(categoryLocalizer.localize("laptops", null)).thenReturn("Laptopy");
+        Basket basket = basket(item("Laptop", "L-1", 2, 6899.00));
 
         // when
-        BasketViewPage page = build(basket(laptop, monitor));
+        BasketViewPage.Row row = build(basket).products().get(0);
 
-        // then
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.OK);
-        assertThat(page.summary().estimate().cost()).isEqualTo("8" + NBSP + "859,00");
-        assertThat(page.summary().estimate().profit()).isEqualTo("1" + NBSP + "538,00");
-        assertThat(page.summary().estimate().margin()).isEqualTo("14,8");
-        assertThat(page.summary().estimate().missing()).isZero();
-        BasketViewPage.Market market = page.products().get(0).market();
-        assertThat(market.missing()).isFalse();
-        assertThat(market.low()).isEqualTo("5" + NBSP + "800,00");
-        assertThat(market.median()).isEqualTo("5" + NBSP + "949,00");
-        assertThat(market.suppliers()).isEqualTo(3);
-        assertThat(market.stock()).isEqualTo(7);
+        // then: no supplier cost, margin or stock; the client found them of no use on a basket priced by the shop
+        assertThat(row).isEqualTo(new BasketViewPage.Row("Laptop", "Laptopy", "L-1", 2, "6" + NBSP + "899,00", false));
     }
 
     @Test
-    void productsWithoutOffersAreLeftOutOfTheEstimateAndCounted() {
-        // given
-        BasketItem laptop = item("Laptop", "L-1", 1, 6899.00);
-        BasketItem monitor = item("Monitor", "M-1", 2, 1749.00);
-        OfferItem laptopOffer = offer(laptop, 5800.00, 5949.00, 7, 3);
-        OfferItem monitorOffer = noOffer(monitor);
-        when(offerItemReloader.reload(any())).thenReturn(List.of(laptopOffer, monitorOffer));
-
-        // when
-        BasketViewPage page = build(basket(laptop, monitor));
-
-        // then
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.OK);
-        assertThat(page.summary().estimate().missing()).isEqualTo(1);
-        assertThat(page.summary().estimate().cost()).isEqualTo("5" + NBSP + "949,00");
-        BasketViewPage.Row row = page.products().get(1);
-        assertThat(row.market().missing()).isTrue();
-        assertThat(row.margin().tone()).isEqualTo(ItemMargin.Tone.UNKNOWN);
-    }
-
-    @Test
-    void noProductWithOffersGivesNoEstimate() {
-        // given
-        BasketItem laptop = item("Laptop", "L-1", 1, 6899.00);
-        OfferItem laptopOffer = noOffer(laptop);
-        when(offerItemReloader.reload(any())).thenReturn(List.of(laptopOffer));
-
-        // when
-        BasketViewPage page = build(basket(laptop));
-
-        // then
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.NO_OFFERS);
-        assertThat(page.summary().estimate().missing()).isEqualTo(1);
-        assertThat(page.summary().estimate().cost()).isNull();
-    }
-
-    @Test
-    void failingSupplierIndexStillRendersThePage() {
-        // given
-        BasketItem laptop = item("Laptop", "L-1", 1, 6899.00);
-        when(offerItemReloader.reload(any())).thenThrow(new IllegalStateException("index down"));
-
-        // when
-        BasketViewPage page = build(basket(laptop));
-
-        // then
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.UNAVAILABLE);
-        assertThat(page.products()).hasSize(1);
-        BasketViewPage.Market market = page.products().get(0).market();
-        assertThat(market.unavailable()).isTrue();
-        assertThat(market.missing()).isFalse();
-        assertThat(page.products().get(0).margin().tone()).isEqualTo(ItemMargin.Tone.UNKNOWN);
-        assertThat(page.summary().items()).isEqualTo("6" + NBSP + "899,00");
-    }
-
-    @Test
-    void basketWithServicesOnlyHasNothingToEstimate() {
+    void servicesAreListedApart() {
         // given
         Basket basket = basket(service("Montaż", 199.00));
 
@@ -285,15 +189,13 @@ class BasketViewPageFactoryTest {
         BasketViewPage page = build(basket);
 
         // then
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.NO_PRODUCTS);
         assertThat(page.products()).isEmpty();
         assertThat(page.services()).hasSize(1);
         assertThat(page.services().get(0).service()).isTrue();
-        assertThat(page.services().get(0).market()).isNull();
     }
 
     @Test
-    void emptyBasketHasNoItemsAndNoEstimateDivision() {
+    void emptyBasketHasNoItems() {
         // given
         Basket basket = basket();
 
@@ -304,7 +206,6 @@ class BasketViewPageFactoryTest {
         assertThat(page.itemsCount()).isZero();
         assertThat(page.empty()).isTrue();
         assertThat(page.total()).isEqualTo("0,00");
-        assertThat(page.summary().estimate().state()).isEqualTo(EstimateState.NO_PRODUCTS);
     }
 
     @Test

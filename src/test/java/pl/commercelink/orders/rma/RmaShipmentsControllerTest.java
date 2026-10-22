@@ -177,18 +177,34 @@ class RmaShipmentsControllerTest {
     }
 
     @Test
-    void aRefusedRetryShowsTheProvidersReason() {
+    void aRefusedRetryShowsTheTranslatedMessageNotTheProvidersWords() {
         // given
         failedReturn();
         when(rmaShippingService.retryReturnShipment(any(), any()))
-                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Zły kod pocztowy", false));
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.REFUSED, "Invalid packageTemplateId", true));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
         controller.retryReturnShipment("rma-1", redirect, PL);
 
         // then
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("Zły kod pocztowy");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("rma.shipments.return.retry.failed");
+    }
+
+    @Test
+    void aRetryThatCouldNotStartShowsTheTranslatedMessageNotTheException() {
+        // given
+        failedReturn();
+        when(rmaShippingService.retryReturnShipment(any(), any()))
+                .thenThrow(new IllegalStateException("Store return settings not configured. Contact store administrator."));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.retryReturnShipment("rma-1", redirect, PL);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/rma/rma-1");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("rma.shipments.return.retry.failed");
     }
 
     @Test

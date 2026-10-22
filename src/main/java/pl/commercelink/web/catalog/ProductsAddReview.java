@@ -13,6 +13,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
@@ -26,11 +27,14 @@ import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.InventoryBrowseController;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * "Uzupełnij dane": the review of products taken from the inventory before they are added to a manual catalog category,
@@ -87,7 +91,7 @@ public class ProductsAddReview {
                 skippedExisting.add(ean);
                 continue;
             }
-            Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+            Optional<PimEntry> entry = pimCatalog.withStoreData(storeId).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
             sources.add(ean);
         }
@@ -150,9 +154,16 @@ public class ProductsAddReview {
      * category as it is now.
      */
     public int save(String storeId, CategoryDefinition category, ProductsBulkAddForm form) {
-        List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
+        List<Product> inCategory = productRepository.findAll(category.getCategoryId());
+        List<InventoryKey> alreadyInCategory = new ArrayList<>(inCategory.stream()
                 .map(InventoryKey::fromProduct)
                 .toList());
+        // one PIM entry, one product of the category: two rows can lead to the same entry (a store entry matching
+        // codes of two inventory groups), and the price list keys products by pim id
+        Set<String> pimIdsInCategory = inCategory.stream()
+                .map(Product::getPimId)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toCollection(HashSet::new));
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId);
         int added = 0;
         for (int index = 0; index < form.getProducts().size(); index++) {
@@ -163,9 +174,13 @@ public class ProductsAddReview {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            pimEntryOf(enabled, key, product).ifPresent(entry -> {
-                product.setPimId(entry.pimId());
-                product.setBrand(brandMapper.unifyBrand(entry.brand()));
+            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, key, product);
+            if (entry.isPresent() && pimIdsInCategory.contains(entry.get().pimId())) {
+                continue;
+            }
+            entry.ifPresent(found -> {
+                product.setPimId(found.pimId());
+                product.setBrand(brandMapper.unifyBrand(found.brand()));
             });
             try {
                 productRepository.save(product);
@@ -177,6 +192,7 @@ public class ProductsAddReview {
                 continue;
             }
             alreadyInCategory.add(key);
+            entry.ifPresent(found -> pimIdsInCategory.add(found.pimId()));
             added++;
         }
         if (added > 0) {
@@ -186,17 +202,18 @@ public class ProductsAddReview {
     }
 
     /** The PIM entry of a product: by the inventory's own key when the inventory knows it, else by its identifiers. */
-    public Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
+    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, InventoryKey key, Product product) {
         MatchedInventory matched = inventory.findByInventoryKey(key);
         if (!matched.isEmpty()) {
             InventoryKey known = matched.getInventoryKey();
-            Optional<PimEntry> byInventoryKey = pimCatalog.findByPimIdOrGtinsOrMpns(
+            PimView pim = pimCatalog.withStoreData(storeId);
+            Optional<PimEntry> byInventoryKey = pim.findByPimIdOrGtinsOrMpns(
                     known.getId(), known.getProductEans(), known.getProductCodes());
             if (byInventoryKey.isPresent()) {
                 return byInventoryKey;
             }
         }
-        return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        return pimCatalog.withStoreData(storeId).findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
     }
 
     /**

@@ -12,8 +12,11 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class NavigationModel {
 
-    // The supplier selection page posts under /dashboard/orders but is the queue's second step (spec B14).
-    private static final Map<String, String> ALIASES = Map.of("/dashboard/orders/fulfilment", "/dashboard/fulfilment/queue");
+    // The supplier selection page posts under /dashboard/orders but is the queue's second step (spec B14). An offer's
+    // own pages (/dashboard/offer/{id}, new, csv) belong to the offers list, as an order's pages to the orders.
+    private static final Map<String, String> ALIASES = Map.of(
+            "/dashboard/orders/fulfilment", "/dashboard/fulfilment/queue",
+            "/dashboard/offer", "/dashboard/offers");
 
     private final List<NavSection> sections;
     private final List<NavItem> footer;

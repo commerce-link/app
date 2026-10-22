@@ -54,6 +54,23 @@ class RMAManagerTest {
         assertTrue(result.isFailure());
     }
 
+    @Test
+    void markItemsAsReceivedReturnsTheProcessedItems() {
+        // given
+        RMAItem fresh = rmaItem("a", RMAItemStatus.New);
+        RMAItem inWarehouse = rmaItem("b", RMAItemStatus.MovedToWarehouse);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(fresh, inWarehouse));
+
+        // when
+        RMAManager.OperationResult result = rmaManager.markItemsAsReceived("store-1", "rma-1", List.of("a", "b"));
+        RMAManager.OperationResult nothingSelected = rmaManager.markItemsAsReceived("store-1", "rma-1", List.of());
+
+        // then
+        assertTrue(result.isSuccess());
+        assertEquals(List.of("a"), result.getRmaItems().stream().map(RMAItem::getRmaItemId).toList());
+        assertTrue(nothingSelected.isFailure());
+    }
+
     private static RMAItem rmaItem(String rmaItemId, RMAItemStatus status) {
         RMAItem item = new RMAItem();
         item.setRmaItemId(rmaItemId);

@@ -134,4 +134,27 @@ class ProductLabelsDynamoDbIntegrationTest {
         // when / then
         assertThat(products.labelsOf("cat-empty")).isEmpty();
     }
+
+    @Test
+    void attachableProductsInCategoriesAreOnlyThoseWithoutPimIdMatchingTheCodes() {
+        // given
+        products.save(unattached("cat-own", "p1", "E1", "M1", null));
+        products.save(unattached("cat-own", "p2", "E1", "M1", "already"));
+        products.save(unattached("cat-own", "p3", "E9", "M9", null));
+        products.save(unattached("cat-foreign", "p4", "E1", "M1", null));
+
+        // when
+        List<Product> found = products.findAllWithoutPimIdByEanOrMfnInCategories(
+                List.of("cat-own", "cat-none"), List.of("E1"), List.of());
+
+        // then
+        assertThat(found).extracting(Product::getProductId).containsExactly("p1");
+        assertThat(products.findAllWithoutPimIdByEanOrMfnInCategories(List.of("cat-own"), List.of(), List.of())).isEmpty();
+    }
+
+    private static Product unattached(String categoryId, String productId, String ean, String mfn, String pimId) {
+        Product product = new Product(categoryId, pimId, ean, mfn, "Brand", "L", "Name", "Default");
+        product.setProductId(productId);
+        return product;
+    }
 }

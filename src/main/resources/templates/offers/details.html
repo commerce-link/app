@@ -1,0 +1,237 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout(ownsErrorMessage=true)}">
+<body>
+<div layout:fragment="content">
+<!--/* Offer and offer template details (spec docs/active/offer-details-redesign-v2, variant A4): the record header, the
+       items table in the main column and the side column with the summary and the save of the table, then the terms,
+       client and note cards, each saved in its own dialog. Parts: offers/details/header, items and side. */-->
+<section th:fragment="page" class="cl-page cl-offer-page" th:with="p=${page}">
+    <div class="cl-page-body is-wide">
+        <!--/* The default button of form#offer-items, first in the document: "Save as template" in the header menu posts
+               the same form, and Enter in a table field must save the items, not make a template. */-->
+        <button type="submit" form="offer-items" class="cl-visually-hidden" tabindex="-1" aria-hidden="true"
+                th:text="#{offers.details.save.items}"></button>
+        <div th:replace="~{offers/details/header :: header(${p})}"></div>
+
+        <div th:if="${offerNotice != null}" class="cl-alert is-ok" role="status" tabindex="-1" data-cl-saved-alert>
+            <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${offerNotice}"></p>
+        </div>
+        <!--/* a refusal sent back by an action of OfferController (the invoicing system refused the proforma) */-->
+        <div th:if="${errorMessage != null}" class="cl-alert is-bad" role="alert" tabindex="-1">
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="${errorMessage}"></p>
+        </div>
+
+        <!--/* The items form spans both columns: the save buttons sit in the summary card and in the peek. It posts only
+               the items (OfferDetailsController.saveItems); name and fulfilmentType are for "Save as template". */-->
+        <form id="offer-items" method="post" data-cl-dirty-form
+              th:action="@{|/dashboard/offer/${p.offerId()}|}"
+              th:attr="data-discard-confirm=#{offers.details.save.discard.confirm}">
+            <input type="hidden" name="name" th:value="${p.recordName() ?: ''}" data-cl-dirty-ignore>
+            <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}" data-cl-dirty-ignore>
+            <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+            <!--/* The columns have their own grid: the sticky side column stops at its end, above the peek, instead of
+                   sliding under it at the bottom of the page. */-->
+            <div class="cl-layout-aside">
+                <div class="cl-layout-main">
+                    <section th:replace="~{offers/details/items :: card(${p})}"></section>
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <section th:replace="~{offers/details/side :: summary(${p})}"></section>
+                    <section th:replace="~{offers/details/side :: terms(${p})}"></section>
+                    <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
+                    <section th:replace="~{offers/details/side :: note(${p})}"></section>
+                </aside>
+            </div>
+            <!--/* Last in the form and below both columns: sticky to the bottom of the screen for as long as any part of
+                   the form is in view, the cards under the summary included (in the main column it ended with the table). */-->
+            <div th:replace="~{offers/details/side :: peek(${p})}"></div>
+        </form>
+    </div>
+
+    <!--/* copy, proforma and removing an item post nothing of their own: the old page posted its whole form, which those
+           endpoints never read */-->
+    <form id="offer-action-form" method="post" hidden></form>
+
+    <dialog class="cl-dialog is-form" id="offer-terms-dialog" aria-labelledby="offer-terms-dialog-title"
+            th:attr="open=${open == 'terms'} ? 'open' : null">
+        <form th:replace="~{offers/details :: termsForm}"></form>
+    </dialog>
+    <th:block th:unless="${p.template()}">
+        <dialog class="cl-dialog is-form" id="offer-client-dialog" aria-labelledby="offer-client-dialog-title"
+                th:attr="open=${open == 'client'} ? 'open' : null">
+            <form th:replace="~{offers/details :: clientForm}"></form>
+        </dialog>
+    </th:block>
+    <dialog class="cl-dialog is-form" id="offer-note-dialog" aria-labelledby="offer-note-dialog-title"
+            th:attr="open=${open == 'note'} ? 'open' : null">
+        <form th:replace="~{offers/details :: noteForm}"></form>
+    </dialog>
+    <dialog th:replace="~{offers/details/items :: editDialog(${p})}"></dialog>
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+    <!--/* Asked by offer-details.js before an action without a confirmation of its own while the table has unsaved
+           changes: "Zapisz i {action}" saves the items, then runs the action as it runs on a clean page. Also carries the
+           texts the page script needs elsewhere: the note an action's own confirmation gets while the table is dirty,
+           the add-items dialog's button and a failed save. */-->
+    <dialog class="cl-dialog" id="offer-unsaved-dialog" aria-labelledby="offer-unsaved-title" aria-describedby="offer-unsaved-message"
+            th:attr="data-save-label=#{offers.details.unsaved.save}, data-failed=#{offers.details.unsaved.failed},
+                     data-add-label=#{offers.details.add.dirty}, data-add-count=#{offers.details.add.dirty.count},
+                     data-confirm-note=#{offers.details.unsaved.confirmNote}">
+        <form method="dialog">
+            <h2 class="cl-dialog-title" id="offer-unsaved-title" th:text="#{offers.details.unsaved.title}"></h2>
+            <p class="cl-dialog-message" id="offer-unsaved-message" th:text="#{offers.details.unsaved.message}"></p>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-unsaved-save></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+    <th:block th:with="catalogs=${p.catalogs()}">
+        <div th:replace="~{fragments/item-add-modal :: itemAddModal(${p.offerId()}, '/dashboard/offer')}"></div>
+    </th:block>
+</section>
+<script th:src="@{/js/menu.js}" defer></script>
+<script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/copy-field.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/form-check.js}" defer></script>
+<script th:src="@{/js/async-form.js}" defer></script>
+<script th:src="@{/js/dirty-form.js}" defer></script>
+<script th:src="@{/js/offer-lines.js}" defer></script>
+<script th:src="@{/js/offer-details.js}" defer></script>
+</div>
+
+<!--/* The dialog forms. Each saves only its own fields on a fresh read of the record (OfferDetailsController); with
+       JavaScript async-form.js swaps the form with the answer (422 with errors, 200 saved), and a saved answer carries
+       the refresh template for a page whose table has unsaved changes. Without JavaScript: a plain post and a redirect;
+       a refusal renders the page with the dialog open, and the action's #fragment scrolls to it. */-->
+<form th:fragment="termsForm" id="offer-terms-form" class="cl-form" method="post" data-cl-async
+      th:with="p=${page}, f=${termsForm}, invalid=${errors.containsKey('name')}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/terms#offer-terms-dialog|}"
+      th:attr="data-success-message=#{offers.details.saved.terms}, data-error-message=#{form.save.failed},
+               data-cl-saved=${saved == true} ? 'true' : null">
+    <h2 class="cl-dialog-title" id="offer-terms-dialog-title"
+        th:text="${p.template()} ? #{offers.details.terms.title.template} : #{offers.details.terms.title}"></h2>
+    <div class="cl-dialog-body">
+        <div th:replace="~{offers/details :: errorSummary}"></div>
+        <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+        <div class="cl-form-grid">
+            <div class="cl-field cl-span-6">
+                <label class="cl-label" for="offer-terms-name" th:text="${p.template()} ? #{offers.details.terms.name.template} : #{offers.details.terms.name}"></label>
+                <input class="cl-input" type="text" id="offer-terms-name" name="name" required autocomplete="off"
+                       th:value="${f.name}" th:classappend="${invalid} ? 'is-invalid'"
+                       th:attr="aria-invalid=${invalid} ? 'true' : null"
+                       aria-describedby="offer-terms-name-help offer-terms-name-error">
+                <p th:if="${invalid}" class="cl-field-error" id="offer-terms-name-error">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span th:text="#{${errors['name']}}"></span></p>
+                <p class="cl-help" id="offer-terms-name-help"><i class="fas fa-eye-slash" aria-hidden="true"></i>
+                    <span th:text="#{offers.details.terms.name.help}"></span></p>
+            </div>
+            <th:block th:unless="${p.template()}">
+                <div class="cl-field cl-span-3">
+                    <label class="cl-label" for="offer-terms-expires"><span th:text="#{offers.details.terms.expires}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                    <input class="cl-input" type="datetime-local" id="offer-terms-expires" name="expiresAt"
+                           th:value="${f.expiresAtInput}" aria-describedby="offer-terms-expires-help">
+                    <p class="cl-help" id="offer-terms-expires-help" th:text="#{offers.details.terms.expires.help}"></p>
+                </div>
+                <div class="cl-field cl-span-3">
+                    <label class="cl-label" for="offer-terms-delivery" th:text="#{offers.details.terms.delivery}"></label>
+                    <select class="cl-select" id="offer-terms-delivery" name="deliveryOptionId" aria-describedby="offer-terms-delivery-help">
+                        <option value="" th:text="#{offers.details.terms.delivery.none}"></option>
+                        <!--/* an option removed from the store's settings stays chosen until another is picked */-->
+                        <option th:if="${p.summary().deliveryRemoved() and f.deliveryOptionId == p.terms().deliveryOptionId()}"
+                                th:value="${f.deliveryOptionId}" selected th:text="#{offers.details.summary.delivery.removed}"></option>
+                        <option th:each="choice : ${p.terms().deliveryChoices()}" th:value="${choice.id()}"
+                                th:selected="${choice.id() == f.deliveryOptionId}" th:text="${choice.label()}"></option>
+                    </select>
+                    <p class="cl-help" id="offer-terms-delivery-help" th:text="#{offers.details.terms.delivery.help}"></p>
+                </div>
+            </th:block>
+            <div class="cl-field cl-span-6">
+                <label class="cl-check"><input type="checkbox" name="showPrices" value="true" th:checked="${f.showPrices}"
+                       aria-describedby="offer-terms-prices-help"> <span th:text="#{offers.details.terms.showPrices}"></span></label>
+                <p class="cl-help" id="offer-terms-prices-help" th:text="#{offers.details.terms.showPrices.help}"></p>
+            </div>
+            <div class="cl-field cl-span-3">
+                <label class="cl-label" for="offer-terms-fulfilment" th:text="#{offers.details.terms.fulfilment}"></label>
+                <select class="cl-select" id="offer-terms-fulfilment" name="fulfilmentType" aria-describedby="offer-terms-fulfilment-help">
+                    <option th:each="type : ${T(pl.commercelink.orders.fulfilment.FulfilmentType).values()}" th:value="${type.name()}"
+                            th:selected="${type == f.fulfilmentType}" th:text="#{${'store.fulfilment.type.' + type.name()}}"></option>
+                </select>
+                <p class="cl-help" id="offer-terms-fulfilment-help" th:text="#{offers.details.terms.fulfilment.help}"></p>
+            </div>
+        </div>
+        <th:block th:unless="${p.template()}"><details th:replace="~{fragments/offer-create :: gclid(${f.gclid})}"></details></th:block>
+        <p class="cl-dialog-effect" th:text="#{offers.details.terms.scope}"></p>
+        <th:block th:if="${saved == true}"><template th:replace="~{offers/details :: refresh}"></template></th:block>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{offers.details.terms.save}"></button>
+        <a class="cl-button" data-cl-dialog-close th:href="@{|/dashboard/offer/${p.offerId()}|}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+<!--/* The customer's contact, the rule "a name or a company, and an e-mail or a phone" checked by the server
+       (ContactDetails.isProperlyFilled); the fields are the ones of the new-offer page. */-->
+<form th:fragment="clientForm" id="offer-client-form" class="cl-form" method="post" data-cl-async data-cl-form-check
+      th:with="p=${page}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/client#offer-client-dialog|}"
+      th:attr="data-success-message=#{offers.details.saved.client}, data-error-message=#{form.save.failed},
+               data-cl-saved=${saved == true} ? 'true' : null">
+    <h2 class="cl-dialog-title" id="offer-client-dialog-title" th:text="#{offers.details.client.dialog.title}"></h2>
+    <div class="cl-dialog-body">
+        <div th:replace="~{offers/details :: errorSummary}"></div>
+        <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+        <fieldset th:replace="~{fragments/offer-create :: contact('', ${clientForm})}"></fieldset>
+        <p class="cl-dialog-effect"><i class="fas fa-eye-slash" aria-hidden="true"></i> <span th:text="#{offers.details.client.hidden}"></span></p>
+        <th:block th:if="${saved == true}"><template th:replace="~{offers/details :: refresh}"></template></th:block>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{offers.details.client.save}"></button>
+        <a class="cl-button" data-cl-dialog-close th:href="@{|/dashboard/offer/${p.offerId()}|}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+<form th:fragment="noteForm" id="offer-note-form" class="cl-form" method="post" data-cl-async
+      th:with="p=${page}"
+      th:action="@{|/dashboard/offer/${p.offerId()}/note#offer-note-dialog|}"
+      th:attr="data-success-message=#{offers.details.saved.note}, data-error-message=#{form.save.failed},
+               data-cl-saved=${saved == true} ? 'true' : null">
+    <h2 class="cl-dialog-title" id="offer-note-dialog-title" th:text="#{offers.details.note.title}"></h2>
+    <div class="cl-dialog-body">
+        <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+        <div class="cl-field">
+            <label class="cl-visually-hidden" for="offer-note-comment" th:text="#{offers.details.note.title}"></label>
+            <textarea class="cl-input cl-textarea is-short" id="offer-note-comment" name="comment" rows="3"
+                      aria-describedby="offer-note-help" th:text="${noteForm.comment}"></textarea>
+            <p class="cl-help" id="offer-note-help"><i class="fas fa-eye-slash" aria-hidden="true"></i>
+                <span th:text="${p.template()} ? #{offers.details.note.help.template} : #{offers.details.note.help}"></span></p>
+        </div>
+        <th:block th:if="${saved == true}"><template th:replace="~{offers/details :: refresh}"></template></th:block>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{offers.details.note.save}"></button>
+        <a class="cl-button" data-cl-dialog-close th:href="@{|/dashboard/offer/${p.offerId()}|}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+<div th:fragment="errorSummary" th:if="${!errors.isEmpty()}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-title" th:text="${errors.containsKey('contact')} ? #{${errors['contact']}} : #{offers.details.form.invalid}"></p>
+</div>
+
+<!--/* What a dialog saved while the table has unsaved changes: offer-details.js swaps each element by its id and takes the
+       delivery price for the live summary, instead of reloading the page and losing the table. Built from the saved record. */-->
+<template th:fragment="refresh" data-cl-offer-refresh th:with="p=${page}">
+    <div th:replace="~{offers/details/header :: header(${p})}"></div>
+    <section th:replace="~{offers/details/side :: terms(${p})}"></section>
+    <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
+    <section th:replace="~{offers/details/side :: note(${p})}"></section>
+    <th:block th:unless="${p.template()}"><div th:replace="~{offers/details/side :: deliveryRow(${p.summary()})}"></div></th:block>
+</template>
+</body>
+</html>

@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
@@ -17,15 +19,24 @@ import pl.commercelink.stores.Store;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RMAShippingControllerTest {
 
     @Mock private RMARepository rmaRepository;
+    @Mock private RMAItemsRepository rmaItemsRepository;
+    @Mock private MessageSource messageSource;
+    @Mock private RedirectAttributes redirectAttributes;
+    @Mock private org.springframework.ui.Model model;
 
     private RMAShippingController controllerFor(Store store) {
         return new RMAShippingController() {
@@ -106,6 +117,47 @@ class RMAShippingControllerTest {
             }
         };
         ReflectionTestUtils.setField(controller, "rmaRepository", rmaRepository);
+        ReflectionTestUtils.setField(controller, "rmaItemsRepository", rmaItemsRepository);
+        ReflectionTestUtils.setField(controller, "messageSource", messageSource);
         return controller;
+    }
+
+    @Test
+    void shipItemsToDistributorOnAClosedRmaIsRefused() {
+        // given
+        RMAShippingController controller = controllerInStore();
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rmaWithStatus(RMAStatus.Completed));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        String view = controller.initiateShippingToDistributor("rma-1", new RMAItemsForm(), model, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertEquals("redirect:/dashboard/rma/rma-1", view);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verifyNoInteractions(rmaItemsRepository, model);
+    }
+
+    @Test
+    void shipItemsToClientOnAClosedRmaIsRefused() {
+        // given
+        RMAShippingController controller = controllerInStore();
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rmaWithStatus(RMAStatus.Rejected));
+        when(messageSource.getMessage(eq("rma.already.closed"), any(), any())).thenReturn("already closed");
+
+        // when
+        String view = controller.initiateShippingToClient("rma-1", new RMAItemsForm(), redirectAttributes, model, Locale.ENGLISH);
+
+        // then
+        assertEquals("redirect:/dashboard/rma/rma-1", view);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "already closed");
+        verifyNoInteractions(rmaItemsRepository, model);
+    }
+
+    private static RMA rmaWithStatus(RMAStatus status) {
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(status);
+        return rma;
     }
 }

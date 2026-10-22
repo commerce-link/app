@@ -193,4 +193,13 @@ class NavigationModelTest {
         // then
         assertThat(model.active().key()).isEqualTo("orders");
     }
+
+    @Test
+    void anOfferPageKeepsTheOffersListActive() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/offer/0e000001-0000-4000-8000-000000000001");
+
+        // then
+        assertThat(model.active()).extracting(NavItem::key).isEqualTo("offers");
+    }
 }

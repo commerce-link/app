@@ -26,6 +26,6 @@ public class TechnicalInventoryViewFactory {
                 })
                 .toList();
         return new TechnicalInventoryView(inventory.size(), taxonomyCache.size(), taxonomyCache.getFileName(),
-                pimCatalog.findAll().size(), feeds);
+                pimCatalog.withGlobalData().findAll().size(), feeds);
     }
 }

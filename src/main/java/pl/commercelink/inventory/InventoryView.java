@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,14 +17,16 @@ public class InventoryView {
 
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
+    private final Predicate<String> isStoreEntry;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
-    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
+    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex, Predicate<String> isStoreEntry,
                   TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
+        this.isStoreEntry = isStoreEntry;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
@@ -47,9 +50,17 @@ public class InventoryView {
 
     public Collection<MatchedInventory> findAllWithPimId() {
         return listedKeys()
-                .filter(key -> key.getId() != null)
+                .filter(this::mayCarryPimId)
                 .map(this::assemble)
+                .filter(matched -> matched.getInventoryKey().getId() != null)
                 .collect(Collectors.toList());
+    }
+
+    // a listed global group without a PIM id takes the id of the store entry it covers when assembled
+    // (see InventoryIndex.covers)
+    private boolean mayCarryPimId(InventoryKey key) {
+        return key.getId() != null || ownIndex.findMatching(key).stream()
+                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own.getInventoryKey(), isStoreEntry));
     }
 
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
@@ -66,7 +77,7 @@ public class InventoryView {
     }
 
     private Stream<InventoryKey> listedKeys() {
-        return new ListingInventory(globalIndex, ownIndex).keys();
+        return new ListingInventory(globalIndex, ownIndex, isStoreEntry).keys();
     }
 
     private MatchedInventory assemble(InventoryKey lookupKey) {

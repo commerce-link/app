@@ -56,7 +56,7 @@ public class OfferRowMapper {
         ContactDetails contact = basket.getContactDetails();
         OfferValidity validity = OfferValidity.of(basket.getExpiresAt(), now);
         double gross = value(basket);
-        return new OfferListPage.OfferRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
+        return new OfferListPage.OfferRow(offerHref(id), name, basket.getShortenedBasketId(), id,
                 itemsText(basket),
                 client(contact), contact == null ? null : StringUtils.trimToNull(contact.getEmail()),
                 date(basket.getCreatedAt()), author(basket),
@@ -72,7 +72,7 @@ public class OfferRowMapper {
     public OfferListPage.TemplateRow template(Basket basket) {
         String id = basket.getBasketId();
         String name = name(basket);
-        return new OfferListPage.TemplateRow("/dashboard/offer/" + id, name, basket.getShortenedBasketId(), id,
+        return new OfferListPage.TemplateRow(offerHref(id), name, basket.getShortenedBasketId(), id,
                 itemsText(basket), itemsCount(basket), date(basket.getCreatedAt()), author(basket),
                 money(value(basket)), "/dashboard/offer/new?intent=template&sourceId=" + id, text("offers.list.createFromTemplate.aria", name),
                 deleteHref(id), text("offers.delete.confirm.titleTemplate", name), text("offers.delete.confirm.messageTemplate"),
@@ -87,6 +87,11 @@ public class OfferRowMapper {
                 client != null ? client : text("offers.list.client.guest"),
                 created == null ? null : date(created) + ", " + TIME.format(created),
                 itemsText(basket), itemsCount(basket), money(value(basket)));
+    }
+
+    /** The offer page carries the list's address, so its back link returns to the same segment, search and page. */
+    private String offerHref(String id) {
+        return "/dashboard/offer/" + id + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
     }
 
     /** The preview carries the list's address, so its back link returns to the same search and page. */
@@ -142,19 +147,46 @@ public class OfferRowMapper {
     }
 
     private String validityNote(OfferValidity validity, LocalDateTime expiresAt) {
+        return validityNote(validity, expiresAt, now, messages, locale);
+    }
+
+    /** Shared with the offer details page, so the header says what the list row says. */
+    static String validityNote(OfferValidity validity, LocalDateTime expiresAt, LocalDateTime now, MessageSource messages, Locale locale) {
         return switch (validity) {
             case NO_EXPIRY -> null;
-            case EXPIRED -> text("offers.list.note.expired", date(expiresAt));
+            case EXPIRED -> messages.getMessage("offers.list.note.expired", new Object[]{date(expiresAt, now)}, locale);
             case ACTIVE, EXPIRING -> {
-                long days = ChronoUnit.DAYS.between(now.toLocalDate(), expiresAt.toLocalDate());
-                if (days == 0) yield text("offers.list.note.today", TIME.format(expiresAt));
-                if (days == 1) yield text("offers.list.note.tomorrow", date(expiresAt));
-                yield text("offers.list.note.until", date(expiresAt), String.valueOf(days));
+                long days = daysLeft(expiresAt, now);
+                if (days == 0) yield messages.getMessage("offers.list.note.today", new Object[]{TIME.format(expiresAt)}, locale);
+                if (days == 1) yield messages.getMessage("offers.list.note.tomorrow", new Object[]{date(expiresAt, now)}, locale);
+                yield messages.getMessage("offers.list.note.until", new Object[]{date(expiresAt, now), String.valueOf(days)}, locale);
             }
         };
     }
 
-    private static String tone(OfferValidity validity) {
+    /**
+     * The terms card's "Ważna do": the full date and time the record holds, with the same day count as the list row
+     * and the header ({@link #validityNote}).
+     */
+    static String expiresAtWithDays(OfferValidity validity, String expiresAtText, LocalDateTime expiresAt,
+                                    LocalDateTime now, MessageSource messages, Locale locale) {
+        return switch (validity) {
+            case NO_EXPIRY -> null;
+            case EXPIRED -> messages.getMessage("offers.details.terms.expired", new Object[]{expiresAtText}, locale);
+            case ACTIVE, EXPIRING -> {
+                long days = daysLeft(expiresAt, now);
+                if (days == 0) yield messages.getMessage("offers.details.terms.expiresToday", new Object[]{expiresAtText}, locale);
+                if (days == 1) yield messages.getMessage("offers.details.terms.expiresTomorrow", new Object[]{expiresAtText}, locale);
+                yield messages.getMessage("offers.details.terms.expiresIn", new Object[]{expiresAtText, String.valueOf(days)}, locale);
+            }
+        };
+    }
+
+    private static long daysLeft(LocalDateTime expiresAt, LocalDateTime now) {
+        return ChronoUnit.DAYS.between(now.toLocalDate(), expiresAt.toLocalDate());
+    }
+
+    static String tone(OfferValidity validity) {
         return switch (validity) {
             case ACTIVE -> "is-ok";
             case EXPIRING -> "is-warn";
@@ -167,6 +199,10 @@ public class OfferRowMapper {
     }
 
     private String date(LocalDateTime value) {
+        return date(value, now);
+    }
+
+    static String date(LocalDateTime value, LocalDateTime now) {
         if (value == null) {
             return null;
         }

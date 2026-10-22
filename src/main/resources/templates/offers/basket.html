@@ -4,8 +4,9 @@
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
-<!--/* Store basket preview, read only (spec docs/active/basket-view-redesign): record header, the items with an
-       estimated margin and the market now, and the side column of the record layout (summary, customer, basket). */-->
+<!--/* Store basket preview, read only (spec docs/active/basket-view-redesign): record header, the items with the shop's prices, and
+       the side column of the record layout (summary, customer, basket). No supplier costs or profit estimate: the
+       prices are the shop's, already accepted by the customer, and the client found the estimate of no use (2026-10-22). */-->
 <section th:fragment="page" class="cl-page" th:with="p=${page}">
     <div class="cl-page-body is-wide">
         <div th:replace="~{fragments/settings-header :: record(${p.backHref()}, #{offers.basket.back},
@@ -72,18 +73,17 @@
                     <div class="cl-card-section">
                         <table th:unless="${p.empty()}" class="cl-table is-compact is-wrap is-basket-items">
                             <caption class="cl-visually-hidden" th:text="#{offers.basket.items.caption}"></caption>
-                            <colgroup><col><col class="cl-col-price"><col class="cl-col-market"></colgroup>
+                            <colgroup><col><col class="cl-col-price"></colgroup>
                             <thead>
                             <tr th:with="unit=${#strings.trim(#messages.msg('general.currency.amount', ''))}">
                                 <th scope="col" th:text="#{offers.basket.items.column.product}"></th>
                                 <th scope="col" class="is-numeric" th:text="#{order.items.column.price(${unit})}"></th>
-                                <th scope="col" class="is-numeric" th:text="#{offers.basket.items.column.market(${unit})}"></th>
                             </tr>
                             </thead>
                             <tbody>
                             <th:block th:each="row : ${p.products()}"><tr th:replace="~{offers/basket :: row(${row})}"></tr></th:block>
                             <tr th:if="${!p.services().isEmpty()}" class="cl-table-group">
-                                <th scope="rowgroup" colspan="3"><span class="cl-eyebrow" th:text="#{offers.basket.items.group.services}"></span></th>
+                                <th scope="rowgroup" colspan="2"><span class="cl-eyebrow" th:text="#{offers.basket.items.group.services}"></span></th>
                             </tr>
                             <th:block th:each="row : ${p.services()}"><tr th:replace="~{offers/basket :: row(${row})}"></tr></th:block>
                             </tbody>
@@ -93,7 +93,7 @@
                 </section>
             </div>
             <div class="cl-layout-side">
-                <section th:replace="~{offers/basket :: summaryCard(${p.summary()}, ${p.empty()})}"></section>
+                <section th:replace="~{offers/basket :: summaryCard(${p.summary()})}"></section>
                 <section th:replace="~{offers/basket :: customer(${p.customer()})}"></section>
                 <section th:replace="~{offers/basket :: facts(${p.facts()})}"></section>
             </div>
@@ -119,34 +119,11 @@
         </span>
     </th>
     <td class="is-numeric" th:attr="data-label=#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
-        <span class="cl-price-margin"><span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span><th:block
-              th:if="${row.margin() != null}"><th:block th:replace="~{offers/basket :: margin(${row.margin()}, ${row.market() != null and row.market().unavailable()})}"></th:block></th:block></span>
-    </td>
-    <td class="is-numeric" th:attr="data-label=#{offers.basket.items.column.market(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
-        <span th:if="${row.market() == null}" class="cl-table-empty" th:text="#{offers.basket.market.service}"></span>
-        <span th:if="${row.market() != null and row.market().unavailable()}" class="cl-table-empty" th:text="#{offers.basket.market.unavailable}"></span>
-        <span th:if="${row.market() != null and row.market().missing()}" class="cl-status is-warn" th:text="#{offers.basket.market.missing}"></span>
-        <th:block th:if="${row.market() != null and !row.market().missing() and !row.market().unavailable()}">
-            <span th:text="#{offers.basket.market.range(${row.market().low()}, ${row.market().median()})}"></span>
-            <span class="cl-table-sub" th:text="#{offers.basket.market.stock(${row.market().suppliers()}, ${row.market().stock()})}"></span>
-        </th:block>
+        <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
     </td>
 </tr>
 
-<!--/* The order's margin mark (orders/details/items :: margin) with the estimate's own wording: the cost is the market
-       median now, not a purchase. Same element, classes and tones. marketDown: the supplier index did not answer, which
-       says nothing about the product's offers. */-->
-<span th:fragment="margin(m, marketDown)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
-      th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
-      th:with="text=${marketDown} ? #{offers.basket.margin.unavailable} : (${m.tone().name() == 'UNKNOWN'} ? #{offers.basket.margin.unknown}
-                : #{${'offers.basket.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
-                    ${#messages.msg('general.currency.amount', m.profit())},
-                    ${#messages.msg('general.currency.amount', m.cost())},
-                    ${#messages.msg('general.currency.amount', m.profitNet())})})"
-      th:attr="data-tooltip=${text}, aria-label=${text}"><i aria-hidden="true" class="fas"
-      th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
-
-<section th:fragment="summaryCard(s, empty)" class="cl-card" aria-labelledby="summary-title">
+<section th:fragment="summaryCard(s)" class="cl-card" aria-labelledby="summary-title">
     <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{offers.basket.summary.title}"></h2></div>
     <dl class="cl-kv is-column">
         <div><dt th:text="#{offers.basket.summary.items}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.items()})}"></dd></div>
@@ -158,25 +135,6 @@
         <div><dt th:text="#{offers.basket.summary.vat}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.vat()})}"></dd></div>
     </dl>
     <p th:if="${s.deliveryState().name() == 'UNKNOWN'}" class="cl-help is-warn cl-card-foot-note" th:text="#{offers.basket.summary.delivery.unknown.help}"></p>
-    <details th:unless="${empty}" class="cl-disclosure" id="basket-estimate" open th:with="e=${s.estimate()}">
-        <summary th:text="#{offers.basket.estimate.title}"></summary>
-        <div class="cl-disclosure-body">
-            <dl th:if="${e.state().name() == 'OK'}" class="cl-kv is-column">
-                <div><dt th:text="#{offers.basket.estimate.cost}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${e.cost()})}"></dd></div>
-                <div class="cl-kv-total"><dt th:text="#{offers.basket.estimate.profit}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${e.profit()})}"></dd></div>
-                <div><dt th:text="#{offers.basket.estimate.profitNet}"></dt><dd class="is-numeric" th:text="#{offers.basket.estimate.profitNet.value(${#messages.msg('general.currency.amount', e.profitNet())}, ${e.margin()})}"></dd></div>
-            </dl>
-            <p class="cl-card-desc cl-card-note cl-card-foot-note">
-                <th:block th:switch="${e.state().name()}">
-                    <span th:case="'OK'" th:text="#{offers.basket.estimate.note}"></span>
-                    <span th:case="'NO_OFFERS'" th:text="#{offers.basket.estimate.none}"></span>
-                    <span th:case="'UNAVAILABLE'" th:text="#{offers.basket.estimate.unavailable}"></span>
-                    <span th:case="'NO_PRODUCTS'" th:text="#{offers.basket.estimate.services}"></span>
-                </th:block>
-                <span th:if="${e.state().name() == 'OK' and e.missing() > 0}" th:text="#{offers.basket.estimate.missing(${e.missing()})}"></span>
-            </p>
-        </div>
-    </details>
 </section>
 
 <section th:fragment="customer(c)" class="cl-card" aria-labelledby="customer-title">

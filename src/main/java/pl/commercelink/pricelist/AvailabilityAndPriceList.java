@@ -3,6 +3,7 @@ package pl.commercelink.pricelist;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.*;
 
 import java.util.*;
@@ -11,6 +12,7 @@ import java.util.stream.Collectors;
 public class AvailabilityAndPriceList {
 
     private final InventoryView inventory;
+    private final PimCatalog pimCatalog;
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final ProductRecommendationEngine recommendationEngine;
@@ -19,6 +21,7 @@ public class AvailabilityAndPriceList {
 
     public AvailabilityAndPriceList(
             InventoryView inventory,
+            PimCatalog pimCatalog,
             ProductCatalogRepository productCatalogRepository,
             ProductRepository productRepository,
             ProductRecommendationEngine recommendationEngine,
@@ -27,6 +30,7 @@ public class AvailabilityAndPriceList {
             String storeId
     ) {
         this.inventory = inventory;
+        this.pimCatalog = pimCatalog;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.recommendationEngine = recommendationEngine;
@@ -39,20 +43,20 @@ public class AvailabilityAndPriceList {
     public List<AvailabilityAndPrice> generate(String storeId, String catalogId) {
         Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(storeId, catalogId);
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
-        return generate(catalog.getCategories(), histories);
+        return generate(storeId, catalog.getCategories(), histories);
     }
 
     public List<AvailabilityAndPrice> generate(String storeId, String catalogId, String categoryId) {
         Map<String, SellingPriceHistory> histories = sellingPriceHistoryRepository.load(storeId, catalogId);
         ProductCatalog catalog = productCatalogRepository.findById(storeId, catalogId);
-        return generate(catalog.getCategories().stream().filter(c -> c.getCategoryId().equals(categoryId)).collect(Collectors.toList()), histories);
+        return generate(storeId, catalog.getCategories().stream().filter(c -> c.getCategoryId().equals(categoryId)).collect(Collectors.toList()), histories);
     }
 
-    private List<AvailabilityAndPrice> generate(List<CategoryDefinition> categories, Map<String, SellingPriceHistory> histories) {
+    private List<AvailabilityAndPrice> generate(String storeId, List<CategoryDefinition> categories, Map<String, SellingPriceHistory> histories) {
         return categories.stream()
                 .map(c -> {
                     if (c.hasType(CategoryDefinitionType.Dynamic)) {
-                        return getAvailabilityAndPricesForDynamicCatalog(c, histories);
+                        return getAvailabilityAndPricesForDynamicCatalog(storeId, c, histories);
                     }
                     return getAvailabilityAndPricesForManagedCatalog(c, histories);
                 })
@@ -65,8 +69,8 @@ public class AvailabilityAndPriceList {
         return getAvailabilityAndPrices(products, categoryDefinition, histories);
     }
 
-    private List<AvailabilityAndPrice> getAvailabilityAndPricesForDynamicCatalog(CategoryDefinition categoryDefinition, Map<String, SellingPriceHistory> histories) {
-        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(categoryDefinition, inventory);
+    private List<AvailabilityAndPrice> getAvailabilityAndPricesForDynamicCatalog(String storeId, CategoryDefinition categoryDefinition, Map<String, SellingPriceHistory> histories) {
+        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(pimCatalog.withStoreData(storeId), categoryDefinition, inventory);
 
         List<Product> products = recommendations.stream()
                 .map(ProductRecommendation::toProduct)
