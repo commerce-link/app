@@ -97,7 +97,7 @@ class ClientPagesMessagesTest {
         List<Path> files = Stream.of(
                         Stream.of(templates.resolve("public-layout.html"), templates.resolve("clientOffer.html"),
                                 templates.resolve("payments/payment-bridge.html")),
-                        listHtml(templates.resolve("client-offer")))
+                        listHtml(templates.resolve("client-offer")), listHtml(templates.resolve("client-order")))
                 .flatMap(s -> s)
                 .toList();
         for (Path file : files) {

@@ -29,19 +29,22 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.CategoryLocalizer;
+import pl.commercelink.web.clientorder.ClientOrderNotice;
 import pl.commercelink.web.dtos.ClientOrderView;
+import pl.commercelink.web.publicpage.PublicPage;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -85,7 +88,7 @@ class ClientOrderControllerTest {
     }
 
     @Test
-    @DisplayName("getOrderForClient renders the status page with the view, store and branding for a trackable order")
+    @DisplayName("getOrderForClient renders the status page with the view and the public page for a trackable order")
     void rendersStatusPageForTrackableOrder() {
         // given
         Order order = order(OrderStatus.Assembly);
@@ -100,8 +103,7 @@ class ClientOrderControllerTest {
 
         // then
         assertThat(template).isEqualTo("clientOrder");
-        assertThat(model.getAttribute("store")).isSameAs(store);
-        assertThat(model.getAttribute("branding")).isInstanceOf(Branding.class);
+        assertThat(((PublicPage) model.getAttribute("publicPage")).storeId()).isEqualTo(STORE_ID);
         ClientOrderView view = (ClientOrderView) model.getAttribute("view");
         assertThat(view.getShortOrderId()).isEqualTo("3f9a2c1e");
     }
@@ -114,10 +116,12 @@ class ClientOrderControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
 
         // when
-        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), response, Locale.ENGLISH);
 
         // then
-        assertThat(template).isEqualTo("error/404");
+        assertThat(template).isEqualTo("client-order/unavailable");
+        assertThat(response.getStatus()).isEqualTo(404);
         verifyNoInteractions(orderItemsRepository);
     }
 
@@ -129,10 +133,12 @@ class ClientOrderControllerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
 
         // when
-        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), response, Locale.ENGLISH);
 
         // then
-        assertThat(template).isEqualTo("error/404");
+        assertThat(template).isEqualTo("client-order/unavailable");
+        assertThat(response.getStatus()).isEqualTo(404);
         verifyNoInteractions(orderItemsRepository);
     }
 
@@ -160,10 +166,12 @@ class ClientOrderControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
 
         // when
-        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        String template = controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, new ExtendedModelMap(), response, Locale.ENGLISH);
 
         // then
-        assertThat(template).isEqualTo("error/404");
+        assertThat(template).isEqualTo("client-order/unavailable");
+        assertThat(response.getStatus()).isEqualTo(404);
         verifyNoInteractions(ordersRepository, orderItemsRepository);
     }
 
@@ -199,10 +207,10 @@ class ClientOrderControllerTest {
                 .thenReturn("ver-1");
 
         // when
-        String result = controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), new RedirectAttributesModelMap(), Locale.ENGLISH);
+        String result = controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), new RedirectAttributesModelMap(), new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
     }
 
     @Test
@@ -217,11 +225,11 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String result = controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), redirect, Locale.ENGLISH);
+        String result = controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID);
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("client.order.address.error.not.editable");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "#delivery");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.not.editable"));
         verify(clientVerificationService, never()).issue(any(), any(), any(), any());
     }
 
@@ -235,10 +243,10 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), redirect, Locale.ENGLISH);
+        controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("client.order.address.error.too.many.requests");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.too.many.requests"));
         verifyNoInteractions(clientVerificationService);
     }
 
@@ -251,10 +259,10 @@ class ClientOrderControllerTest {
         when(clientVerificationService.confirm(any(), eq("ver-1"), eq("123456"))).thenReturn("tok-1");
 
         // when
-        String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", " 123456 ", new MockHttpServletRequest(), new RedirectAttributesModelMap(), Locale.ENGLISH);
+        String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", " 123456 ", new MockHttpServletRequest(), new RedirectAttributesModelMap(), new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?t=tok-1");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?t=tok-1#delivery");
     }
 
     @Test
@@ -268,11 +276,11 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect, Locale.ENGLISH);
+        String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("client.order.address.error.invalid.code");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.codeError("client.order.address.error.invalid.code"));
     }
 
     @Test
@@ -317,7 +325,8 @@ class ClientOrderControllerTest {
         // then
         assertThat(template).isEqualTo("clientOrder");
         assertThat(model.getAttribute("addressStep")).isNull();
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("client.order.address.error.invalid.token");
+        assertThat(model.getAttribute("clientOrderNotice"))
+                .isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.invalid.token"));
     }
 
     @Test
@@ -355,13 +364,13 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, Locale.ENGLISH);
+        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID);
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "#delivery");
         verify(clientVerificationService).consume(any(ClientVerificationSubject.class), eq("tok-1"));
         verify(addressChangeService).change(order, validated, store);
-        assertThat(redirect.getFlashAttributes().get("successMessage")).isEqualTo("client.order.address.success");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.ok("delivery", "client.order.address.success"));
     }
 
     @Test
@@ -377,11 +386,12 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, Locale.ENGLISH);
+        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?t=tok-1");
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("client.order.address.error.invalid.address");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?t=tok-1#delivery");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.invalid.address"));
+        assertThat(redirect.getFlashAttributes().get("form")).isSameAs(form);
         verify(clientVerificationService, never()).consume(any(), any());
         verify(addressChangeService, never()).change(any(), any(), any());
     }
@@ -400,12 +410,271 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, Locale.ENGLISH);
+        String result = controller.changeAddress(STORE_ID, ORDER_ID, "tok-1", form, redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID);
-        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("client.order.address.error.invalid.token");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "#delivery");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.invalid.token"));
         verify(addressChangeService, never()).change(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("every action answers 404 with the public unavailable page when the order cannot be shown")
+    void unavailableOrderAnswers404WithThePublicPage() {
+        // given: the store page is off, the order is missing, completed, or the store is unknown
+        Store disabled = new Store();
+        disabled.setStoreId(STORE_ID);
+        List<Runnable> scenarios = List.of(
+                () -> when(storesRepository.findById(STORE_ID)).thenReturn(disabled),
+                () -> {
+                    when(storesRepository.findById(STORE_ID)).thenReturn(store());
+                    when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+                },
+                () -> {
+                    when(storesRepository.findById(STORE_ID)).thenReturn(store());
+                    when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
+                },
+                () -> when(storesRepository.findById(STORE_ID)).thenReturn(null));
+
+        for (Runnable scenario : scenarios) {
+            scenario.run();
+            List<ExtendedModelMap> models = List.of(new ExtendedModelMap(), new ExtendedModelMap(), new ExtendedModelMap(),
+                    new ExtendedModelMap(), new ExtendedModelMap());
+            List<MockHttpServletResponse> responses = List.of(new MockHttpServletResponse(), new MockHttpServletResponse(),
+                    new MockHttpServletResponse(), new MockHttpServletResponse(), new MockHttpServletResponse());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+            MockHttpServletRequest request = new MockHttpServletRequest();
+
+            // when
+            List<String> views = List.of(
+                    controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, models.get(0), responses.get(0), Locale.ENGLISH),
+                    controller.requestAddressCode(STORE_ID, ORDER_ID, request, redirect, models.get(1), responses.get(1), Locale.ENGLISH),
+                    controller.confirmAddressCode(STORE_ID, ORDER_ID, "v", "1", request, redirect, models.get(2), responses.get(2), Locale.ENGLISH),
+                    controller.changeAddress(STORE_ID, ORDER_ID, "t", new ShippingDetails(), redirect, models.get(3), responses.get(3), Locale.ENGLISH),
+                    controller.changePreferredShipping(STORE_ID, ORDER_ID, "2026-01-05", redirect, models.get(4), responses.get(4), Locale.ENGLISH));
+
+            // then
+            for (int i = 0; i < views.size(); i++) {
+                assertThat(views.get(i)).isEqualTo("client-order/unavailable");
+                assertThat(responses.get(i).getStatus()).isEqualTo(404);
+                assertThat(models.get(i).getAttribute("publicPage")).isInstanceOf(PublicPage.class);
+            }
+        }
+        verifyNoInteractions(clientVerificationService, orderItemsRepository);
+    }
+
+    @Test
+    @DisplayName("the unavailable page of an unknown store has no store id and no short id")
+    void unknownStoreGivesNeutralUnavailablePage() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(null);
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, model, new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(((PublicPage) model.getAttribute("publicPage")).storeId()).isNull();
+        assertThat(model.getAttribute("shortId")).isNull();
+    }
+
+    @Test
+    @DisplayName("the unavailable page of a completed order shows its short id")
+    void completedOrderShowsShortIdOnUnavailablePage() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, null, null, model, new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(model.getAttribute("shortId")).isEqualTo("3f9a2c1e");
+    }
+
+    @Test
+    @DisplayName("the page carries the public page and keeps the verification parameter in the language link")
+    void pageCarriesPublicPageKeepingVerificationParameter() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        Store store = store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(addressChangeService.isEditable(order, store)).thenReturn(true);
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, "x", null, model, new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        PublicPage page = (PublicPage) model.getAttribute("publicPage");
+        assertThat(page.otherLanguageHref()).isEqualTo("/store/store-1/client/order/" + ORDER_ID + "?v=x&lang=pl");
+    }
+
+    @Test
+    @DisplayName("a flashed form from a rejected address replaces the stored address in the edit step")
+    void editStepUsesFlashedFormWhenPresent() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        Store store = store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(clientVerificationService.findByEditToken(any(ClientVerificationSubject.class), eq("tok-1")))
+                .thenReturn(Optional.of(new pl.commercelink.clientaccess.ClientVerification()));
+        when(addressChangeService.isEditable(order, store)).thenReturn(true);
+        ShippingDetails typed = new ShippingDetails();
+        typed.setStreetAndNumber("Typed 9");
+        Model model = new ExtendedModelMap();
+        model.addAttribute("form", typed);
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, null, "tok-1", model, new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(model.getAttribute("form")).isSameAs(typed);
+    }
+
+    @Test
+    @DisplayName("the code step on an order whose address is no longer editable shows the notice in the delivery card")
+    void codeStepNotEditableShowsNotice() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Store store = store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, "ver-1", null, model, new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(model.getAttribute("addressStep")).isNull();
+        assertThat(model.getAttribute("clientOrderNotice"))
+                .isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.not.editable"));
+    }
+
+    @Test
+    @DisplayName("every wrong-code failure returns to the code step with the field error")
+    void wrongCodeReturnsToCodeStepWithFieldError() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        for (ClientVerificationException.Reason reason : List.of(ClientVerificationException.Reason.INVALID_CODE,
+                ClientVerificationException.Reason.CODE_EXPIRED, ClientVerificationException.Reason.TOO_MANY_ATTEMPTS,
+                ClientVerificationException.Reason.NOT_FOUND)) {
+            when(clientVerificationService.confirm(any(), eq("ver-1"), eq("000000"))).thenThrow(new ClientVerificationException(reason));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect,
+                    new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+
+            // then
+            assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
+            ClientOrderNotice notice = notice(redirect);
+            assertThat(notice.field()).isEqualTo("code");
+            assertThat(notice.tone()).isEqualTo("bad");
+            assertThat(notice.target()).isEqualTo("delivery");
+        }
+    }
+
+    @Test
+    @DisplayName("a confirm failure that is not about the code carries no field")
+    void otherConfirmFailureHasNoField() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(clientVerificationService.confirm(any(), eq("ver-1"), eq("000000")))
+                .thenThrow(new ClientVerificationException(ClientVerificationException.Reason.INVALID_TOKEN));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect,
+                new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.invalid.token"));
+    }
+
+    @Test
+    @DisplayName("a preferred day that was saved puts the notice in the date card")
+    void preferredDaySavedNoticeTargetsDate() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String result = controller.changePreferredShipping(STORE_ID, ORDER_ID, "2026-01-05", redirect, new ExtendedModelMap(),
+                new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "#date");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.ok("date", "client.order.preferred.shipping.success"));
+        verify(preferredShippingDateService).change(any(Order.class), eq(LocalDate.of(2026, 1, 5)), any(Store.class));
+    }
+
+    @Test
+    @DisplayName("clearing the preferred day uses the cleared message in the date card")
+    void preferredDayClearedNoticeTargetsDate() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        controller.changePreferredShipping(STORE_ID, ORDER_ID, " ", redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.ok("date", "client.order.preferred.shipping.cleared"));
+        verify(preferredShippingDateService).change(any(Order.class), isNull(), any(Store.class));
+    }
+
+    @Test
+    @DisplayName("an unparsable preferred date puts the error in the date card")
+    void invalidPreferredDateNoticeTargetsDate() {
+        // given
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Assembly));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String result = controller.changePreferredShipping(STORE_ID, ORDER_ID, "nonsense", redirect, new ExtendedModelMap(),
+                new MockHttpServletResponse(), Locale.ENGLISH);
+
+        // then
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "#date");
+        assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("date", "client.order.preferred.shipping.error.invalid.date"));
+        verifyNoInteractions(preferredShippingDateService);
+    }
+
+    @Test
+    @DisplayName("the edit step keeps the same-origin referrer policy so the edit token stays out of third-party logs")
+    void editStepKeepsReferrerPolicy() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        Store store = store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(clientVerificationService.findByEditToken(any(ClientVerificationSubject.class), eq("tok-1")))
+                .thenReturn(Optional.of(new pl.commercelink.clientaccess.ClientVerification()));
+        when(addressChangeService.isEditable(order, store)).thenReturn(true);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        controller.getOrderForClient(STORE_ID, ORDER_ID, null, "tok-1", new ExtendedModelMap(), response, Locale.ENGLISH);
+
+        // then
+        assertThat(response.getHeader("Referrer-Policy")).isEqualTo("same-origin");
+    }
+
+    private static ClientOrderNotice notice(RedirectAttributesModelMap redirect) {
+        return (ClientOrderNotice) redirect.getFlashAttributes().get("clientOrderNotice");
     }
 
     private static Order order(OrderStatus status) {

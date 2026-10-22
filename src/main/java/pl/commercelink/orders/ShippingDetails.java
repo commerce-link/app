@@ -5,13 +5,15 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.Serializable;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @DynamoDBDocument
-public class ShippingDetails {
+// Serializable because the client order page flashes the typed address through the session when it is rejected.
+public class ShippingDetails implements Serializable {
 
     @DynamoDBAttribute(attributeName = "id")
     private String id;
