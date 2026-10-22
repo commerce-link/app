@@ -229,7 +229,7 @@ public class CatalogProductsController {
         List<RecommendationRow> rows = List.of();
         if (category.hasCategoryMapping()) {
             SupplierLabelMap labels = supplierLabels.forStoreId(storeId());
-            rows = recommendationEngine.getRecommendations(pimCatalog.forStore(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+            rows = recommendationEngine.getRecommendations(pimCatalog.withStoreData(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
                     .map(recommendation -> RecommendationRow.of(recommendation, catalogId, categoryId, labels::of))
                     .toList();
         }
@@ -350,7 +350,7 @@ public class CatalogProductsController {
                     currentFilter, model, locale);
         }
         InventoryKey key = matched.getInventoryKey();
-        Optional<PimEntry> entry = pimCatalog.forStore(storeId()).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+        Optional<PimEntry> entry = pimCatalog.withStoreData(storeId()).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
         Product prefilled = new ProductRecommendation(category, matched, entry).toProduct();
         ProductForm form = ProductForm.from(prefilled);
         // Nothing is saved yet, so there is no identity to protect: the PIM entry is resolved again when it is.
@@ -687,7 +687,7 @@ public class CatalogProductsController {
             // Without PIM categories the engine has nothing to match, and reading the inventory would be wasted work.
             // The engine answers in its own order (brand, then price); both kinds of category read the same way.
             return category.hasCategoryMapping()
-                    ? recommendationEngine.getRecommendations(pimCatalog.forStore(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+                    ? recommendationEngine.getRecommendations(pimCatalog.withStoreData(storeId()), category, inventory.withEnabledSuppliersOnly(storeId())).stream()
                             .sorted(byLabelThenName(ProductRecommendation::getLabel, ProductRecommendation::getName))
                             .map(recommendation -> ProductRow.ofRecommendation(recommendation, category))
                             .toList()

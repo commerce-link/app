@@ -6,7 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 class ProductRecommendationEngineTest {
 
     @Mock
-    private PimLookup pim;
+    private PimView pim;
 
     @Mock
     private ProductRepository productRepository;

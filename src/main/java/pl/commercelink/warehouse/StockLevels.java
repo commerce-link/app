@@ -135,7 +135,7 @@ public class StockLevels {
             if (scope == RestockScope.ExpectedStockQty) {
                 return Collections.emptyList();
             }
-            return recommendationEngine.getRecommendations(pimCatalog.forStore(storeId), category, enabledInventory).stream()
+            return recommendationEngine.getRecommendations(pimCatalog.withStoreData(storeId), category, enabledInventory).stream()
                     .filter(ProductRecommendation::hasPimId)
                     .map(ProductRecommendation::toProduct)
                     .filter(p -> !p.isService())

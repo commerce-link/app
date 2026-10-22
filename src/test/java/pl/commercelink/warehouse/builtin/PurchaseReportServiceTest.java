@@ -1,6 +1,7 @@
 package pl.commercelink.warehouse.builtin;
 
 import org.junit.jupiter.api.BeforeEach;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,12 +43,15 @@ class PurchaseReportServiceTest {
     @Mock private WarehouseDocumentItemRepository itemRepository;
     @Mock private DeliveriesRepository deliveriesRepository;
     @Mock private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
 
     @InjectMocks private PurchaseReportService service;
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
 
@@ -64,7 +68,7 @@ class PurchaseReportServiceTest {
         givenDelivery("delivery-1", "AcmeA");
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5901234567890", "RTX4070-DUAL", "DUAL RTX 4070", 5)));
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "RTX4070-DUAL"))
+        when(pimView.findByGtinOrMpn("5901234567890", "RTX4070-DUAL"))
                 .thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
@@ -133,7 +137,7 @@ class PurchaseReportServiceTest {
                 .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
         when(itemRepository.findByDocumentId("doc-2"))
                 .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
-        when(pimCatalog.findByGtinOrMpn("5900000000001", "MFN-A")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("5900000000001", "MFN-A")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -152,7 +156,7 @@ class PurchaseReportServiceTest {
                 .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 3)));
         when(itemRepository.findByDocumentId("doc-2"))
                 .thenReturn(List.of(item("doc-2", "5900000000001", "MFN-A", "Name A", 2)));
-        when(pimCatalog.findByGtinOrMpn("5900000000001", "MFN-A")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("5900000000001", "MFN-A")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -169,7 +173,7 @@ class PurchaseReportServiceTest {
         givenDelivery("delivery-1", "AcmeA");
         when(itemRepository.findByDocumentId("doc-pim-miss"))
                 .thenReturn(List.of(item("doc-pim-miss", "5900000000002", "MFN-MISS", "Mystery", 4)));
-        when(pimCatalog.findByGtinOrMpn("5900000000002", "MFN-MISS")).thenReturn(Optional.empty());
+        when(pimView.findByGtinOrMpn("5900000000002", "MFN-MISS")).thenReturn(Optional.empty());
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -185,7 +189,7 @@ class PurchaseReportServiceTest {
         when(deliveriesRepository.findById(STORE_ID, "delivery-gone")).thenReturn(null);
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5900000000003", "MFN-C", "C", 1)));
-        when(pimCatalog.findByGtinOrMpn("5900000000003", "MFN-C")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("5900000000003", "MFN-C")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -200,7 +204,7 @@ class PurchaseReportServiceTest {
         givenDocuments(goodsReceiptDoc("doc-1", null, "Acme sp. z o.o."));
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5900000000003", "MFN-C", "C", 1)));
-        when(pimCatalog.findByGtinOrMpn("5900000000003", "MFN-C")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("5900000000003", "MFN-C")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -218,7 +222,7 @@ class PurchaseReportServiceTest {
         givenDocuments(doc);
         when(itemRepository.findByDocumentId("doc-1"))
                 .thenReturn(List.of(item("doc-1", "5900000000004", "MFN-X", "X", 1)));
-        when(pimCatalog.findByGtinOrMpn("5900000000004", "MFN-X")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("5900000000004", "MFN-X")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);
@@ -236,7 +240,7 @@ class PurchaseReportServiceTest {
                 .thenReturn(List.of(item("doc-1", "5900000000001", "MFN-A", "Name A", 1)));
         when(itemRepository.findByDocumentId("doc-2"))
                 .thenReturn(List.of(item("doc-2", "5900000000005", "MFN-B", "Name B", 1)));
-        when(pimCatalog.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         service.generate(STORE_ID, FROM, TO);
@@ -259,10 +263,10 @@ class PurchaseReportServiceTest {
         when(itemRepository.findByDocumentId("doc-2")).thenReturn(List.of(item("doc-2", "ean-2", "M-Z-PSU", "Z PSU", 1)));
         when(itemRepository.findByDocumentId("doc-3")).thenReturn(List.of(item("doc-3", "ean-3", "M-A-PSU", "A PSU", 1)));
         when(itemRepository.findByDocumentId("doc-4")).thenReturn(List.of(item("doc-4", "ean-4", "M-A-GPU", "A GPU", 1)));
-        when(pimCatalog.findByGtinOrMpn("ean-1", "M-Z-GPU")).thenReturn(Optional.of(pimEntry("GPU")));
-        when(pimCatalog.findByGtinOrMpn("ean-2", "M-Z-PSU")).thenReturn(Optional.of(pimEntry("PSU")));
-        when(pimCatalog.findByGtinOrMpn("ean-3", "M-A-PSU")).thenReturn(Optional.of(pimEntry("PSU")));
-        when(pimCatalog.findByGtinOrMpn("ean-4", "M-A-GPU")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("ean-1", "M-Z-GPU")).thenReturn(Optional.of(pimEntry("GPU")));
+        when(pimView.findByGtinOrMpn("ean-2", "M-Z-PSU")).thenReturn(Optional.of(pimEntry("PSU")));
+        when(pimView.findByGtinOrMpn("ean-3", "M-A-PSU")).thenReturn(Optional.of(pimEntry("PSU")));
+        when(pimView.findByGtinOrMpn("ean-4", "M-A-GPU")).thenReturn(Optional.of(pimEntry("GPU")));
 
         // when
         List<PurchaseReportRow> rows = service.generate(STORE_ID, FROM, TO);

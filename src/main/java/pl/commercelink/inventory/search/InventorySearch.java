@@ -12,7 +12,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.IntegrationType;
@@ -69,7 +69,7 @@ public class InventorySearch {
     private InventorySearchResult run(String query, InventoryView view, Function<String, ConnectionMode> modeOf,
                                       SupplierLabelMap labels, String storeId, StockQueryService stock) {
         // a store search resolves PIM entries in the store's view; the global search sees global entries only
-        PimLookup pim = storeId == null ? pimCatalog : pimCatalog.forStore(storeId);
+        PimView pim = storeId == null ? pimCatalog.withGlobalData() : pimCatalog.withStoreData(storeId);
         Match match = firstMatch(query, view, pim);
         List<WarehouseItemView> warehouseItems = stock == null
                 ? List.of()
@@ -89,7 +89,7 @@ public class InventorySearch {
         return new InventorySearchResult.Found(matchedBy, product, offers, rows, prices(offers, rows), stock != null);
     }
 
-    private Match firstMatch(String query, InventoryView view, PimLookup pim) {
+    private Match firstMatch(String query, InventoryView view, PimView pim) {
         MatchedInventory byEan = view.findByEan(query);
         if (byEan.hasAnyOffers()) {
             return new Match(MatchedBy.EAN, byEan);
@@ -198,7 +198,7 @@ public class InventorySearch {
                 : pricedOffers.get(size / 2);
     }
 
-    private ProductHeader header(MatchedInventory matched, ProductCodes codes, PimLookup pim) {
+    private ProductHeader header(MatchedInventory matched, ProductCodes codes, PimView pim) {
         InventoryKey key = matched.getInventoryKey();
         Taxonomy taxonomy = matched.getTaxonomy();
         if (taxonomy != null && taxonomy != Taxonomy.EMPTY) {
@@ -222,7 +222,7 @@ public class InventorySearch {
         return new ProductHeader(null, null, codes.ean(), codes.code());
     }
 
-    private InventorySearchResult known(String query, PimLookup pim) {
+    private InventorySearchResult known(String query, PimView pim) {
         String mfn = unifyMfn(query);
         Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
         if (taxonomy != null) {

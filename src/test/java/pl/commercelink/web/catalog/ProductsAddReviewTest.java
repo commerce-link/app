@@ -1,6 +1,7 @@
 package pl.commercelink.web.catalog;
 
 import org.junit.jupiter.api.BeforeEach;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,6 +45,8 @@ class ProductsAddReviewTest {
     @Mock private Inventory inventory;
     @Mock private InventoryView view;
     @Mock private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
     @Mock private BrandMapper brandMapper;
     @Mock private MessageSource messageSource;
     @Mock private CatalogPlacement catalogPlacement;
@@ -51,7 +54,8 @@ class ProductsAddReviewTest {
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
 
@@ -66,7 +70,7 @@ class ProductsAddReviewTest {
         MatchedInventory gone = mock(MatchedInventory.class);
         when(gone.isEmpty()).thenReturn(true);
         when(view.findByEan(anyString())).thenReturn(gone);
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
         when(productRepository.findAll(anyString())).thenReturn(List.of());
         product("1", "MSI RTX 5070");
         product("2", "ASUS RTX 5060");

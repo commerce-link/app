@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -40,6 +41,8 @@ class StoreInventoryProviderManualTest {
     @Mock StoreFeedItemLoader storeFeedItemLoader;
     @Mock ExchangeRates exchangeRates;
     @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
@@ -97,6 +100,7 @@ class StoreInventoryProviderManualTest {
     }
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 }

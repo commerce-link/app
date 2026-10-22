@@ -162,7 +162,7 @@ public class MarketplaceOrderImporter {
     }
 
     private String resolveProductCategory(String storeId, String mfn) {
-        return pimCatalog.forStore(storeId).findByMpn(mfn)
+        return pimCatalog.withStoreData(storeId).findByMpn(mfn)
                 .map(PimEntry::category)
                 .orElse(Categories.UNCATEGORIZED);
     }
