@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
  * suppliers reuse short codes (e.g. "1234") for unrelated products.
  */
 @ExtendWith(MockitoExtension.class)
-class InventoryAutoDiscoveryShortMfnTest {
+class InventoryAutoDiscoveryBrandTest {
 
     private static final String SHORT_MFN = "1234";
     private static final String LONG_MFN = "MX-KEYS-920-009415";
@@ -183,6 +183,23 @@ class InventoryAutoDiscoveryShortMfnTest {
                 .filter(m -> "PIM1".equals(m.getInventoryKey().getId()))
                 .findFirst().orElseThrow();
         assertThat(pimGroup.getInventoryItems()).containsExactly(mouse);
+    }
+
+    @Test
+    void takesOffersByMpnRegardlessOfBrandWhenPimEntryHasNone() {
+        // given
+        brand(MOUSE_EAN, "Logitech");
+        PimEntry pimWithoutBrand = pimEntry("PIM1", null, gtin("5900000000099"), mpn(SHORT_MFN));
+        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A");
+
+        // when
+        Collection<MatchedInventory> result = autoDiscovery(pimWithoutBrand).run(List.of(mouse));
+
+        // then
+        assertThat(result).hasSize(1);
+        MatchedInventory matched = result.iterator().next();
+        assertThat(matched.getInventoryKey().getId()).isEqualTo("PIM1");
+        assertThat(matched.getInventoryItems()).containsExactly(mouse);
     }
 
     private void brand(String ean, String brand) {
