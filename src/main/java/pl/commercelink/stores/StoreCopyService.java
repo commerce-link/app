@@ -2,7 +2,7 @@ package pl.commercelink.stores;
 
 import org.springframework.stereotype.Service;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.*;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.templates.EmailTemplate;
@@ -140,7 +140,7 @@ public class StoreCopyService {
     }
 
     private void copyProducts(String sourceStoreId, Map<String, String> categoryIdMapping) {
-        PimLookup sourceLookup = pimCatalog.forStore(sourceStoreId);
+        PimView sourceLookup = pimCatalog.withStoreData(sourceStoreId);
         for (Map.Entry<String, String> entry : categoryIdMapping.entrySet()) {
             String oldCategoryId = entry.getKey();
             String newCategoryId = entry.getValue();
@@ -191,7 +191,7 @@ public class StoreCopyService {
 
     // A store-owned PIM entry is visible only to its owner, so the copy must not point at it. An entry that
     // cannot be found (e.g. the index is still empty) is not proof of ownership, so its pimId is kept.
-    private String copiedPimId(PimLookup sourceLookup, String pimId) {
+    private String copiedPimId(PimView sourceLookup, String pimId) {
         if (pimId == null) {
             return null;
         }

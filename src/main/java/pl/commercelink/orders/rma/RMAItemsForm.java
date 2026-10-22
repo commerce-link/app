@@ -31,11 +31,4 @@ public class RMAItemsForm {
                 .collect(Collectors.toList());
     }
 
-    public RMAItem getRmaItemBy(String rmaItemId) {
-        return this.rmaItems.stream()
-                .filter(item -> item.getRmaItemId().equals(rmaItemId))
-                .findFirst()
-                .orElse(null);
-    }
-
 }

@@ -1,5 +1,6 @@
 package pl.commercelink.inventory;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,6 +14,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -54,9 +56,16 @@ class InventoryStoreStatisticsTest {
     private GlobalMatchedInventory globalInventory;
     @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView globalPimView;
 
     @InjectMocks
     private Inventory inventory;
+
+    @BeforeEach
+    void globalViewOfTheCatalog() {
+        when(pimCatalog.withGlobalData()).thenReturn(globalPimView);
+    }
 
     private Store store;
 
@@ -183,7 +192,7 @@ class InventoryStoreStatisticsTest {
     }
 
     private void globalCatalogKnows(String pimId) {
-        when(pimCatalog.findByPimId(pimId)).thenReturn(Optional.of(new PimEntry(pimId,
+        when(globalPimView.findByPimId(pimId)).thenReturn(Optional.of(new PimEntry(pimId,
                 List.of(new PimIdentifier("5900000000041", PimIdentifierType.GTIN)), "B", "G4", "CPU", null, true, null, null)));
     }
 
@@ -202,7 +211,7 @@ class InventoryStoreStatisticsTest {
     @Test
     void ownGroupOfAStoreEntryIsCountedWithAGlobalGroupWithoutEntry() {
         // given
-        when(pimCatalog.findByPimId("s1-g4")).thenReturn(Optional.empty());
+        when(globalPimView.findByPimId("s1-g4")).thenReturn(Optional.empty());
 
         // when
         InventoryStatistics stats = statisticsOfGlobalGroupAndOwnGroupWithId(null, "s1-g4");
@@ -215,7 +224,7 @@ class InventoryStoreStatisticsTest {
     void ownGroupOfAStoreEntryIsCountedApartFromAGlobalGroupOfAnotherEntry() {
         // given
         globalCatalogKnows("g4");
-        when(pimCatalog.findByPimId("s1-g4")).thenReturn(Optional.empty());
+        when(globalPimView.findByPimId("s1-g4")).thenReturn(Optional.empty());
 
         // when
         InventoryStatistics stats = statisticsOfGlobalGroupAndOwnGroupWithId("g4", "s1-g4");

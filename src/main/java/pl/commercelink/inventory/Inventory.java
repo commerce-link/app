@@ -172,7 +172,7 @@ public class Inventory {
 
     // The global catalog holds global entries only, so a PIM id it does not know belongs to a store entry (spec 4.3).
     private boolean isStoreEntry(String pimId) {
-        return pimCatalog.findByPimId(pimId).isEmpty();
+        return pimCatalog.withGlobalData().findByPimId(pimId).isEmpty();
     }
 
     static List<String> ownConnectionFingerprint(Store store) {

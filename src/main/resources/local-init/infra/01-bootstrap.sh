@@ -46,6 +46,12 @@ awslocal sqs create-queue --queue-name order-receipt-dlq.fifo \
 awslocal sqs create-queue --queue-name order-receipt-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"600","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-receipt-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
 
+## Report generation queue with a DLQ + redrive mirroring prod (terraform: FIFO, visibility 900 s, 3 receives)
+awslocal sqs create-queue --queue-name report-generation-dlq.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false
+awslocal sqs create-queue --queue-name report-generation-queue.fifo \
+  --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"900","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:report-generation-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
+
 ## E-receipts sweep queue: EventBridge scheduler on prod sends one message per minute
 awslocal sqs create-queue --queue-name receipt-sweep-queue-dlq
 awslocal sqs create-queue --queue-name receipt-sweep-queue \

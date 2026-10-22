@@ -2,9 +2,11 @@ package pl.commercelink.web.reports;
 
 import pl.commercelink.warehouse.builtin.StockLedgerPeriod;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * The stock ledger closing page: the range offered to close and the closed periods, newest first. Once a period is
@@ -18,15 +20,23 @@ public record StockLedgerClosingView(LocalDate dateFrom, LocalDate dateTo, boole
     /** Closed periods shown at once; a store closing every month would otherwise grow the page by a row a month. */
     public static final int RECENT_PERIODS = 6;
 
-    public record ClosedPeriod(LocalDate from, LocalDate to, String label, String rangeText, String regenerateHref) {
+    public record ClosedPeriod(LocalDate from, LocalDate to, String label, String rangeText, String regenerateHref,
+                               String generatedAt) {
     }
 
     public static StockLedgerClosingView of(List<StockLedgerPeriod> closed, LocalDate fallbackFrom, LocalDate fallbackTo, Locale locale) {
+        return of(closed, Map.of(), fallbackFrom, fallbackTo, locale);
+    }
+
+    /** {@code generatedAt} holds the moment each closed period's report was last generated; a missing one shows a dash. */
+    public static StockLedgerClosingView of(List<StockLedgerPeriod> closed, Map<StockLedgerPeriod, Instant> generatedAt,
+                                            LocalDate fallbackFrom, LocalDate fallbackTo, Locale locale) {
         List<ClosedPeriod> periods = closed.stream()
                 .sorted(StockLedgerPeriod.BY_END.reversed())
                 .map(period -> new ClosedPeriod(period.from(), period.to(), StockLedgerPeriodLabel.of(period, locale),
                         new ReportPeriod(period.from(), period.to()).rangeText(),
-                        CLOSE_PATH + "?dateFrom=" + period.from() + "&dateTo=" + period.to()))
+                        CLOSE_PATH + "?dateFrom=" + period.from() + "&dateTo=" + period.to(),
+                        generatedAt.containsKey(period) ? ReportTimes.format(generatedAt.get(period)) : null))
                 .toList();
         StockLedgerPeriod last = closed.stream().max(StockLedgerPeriod.BY_END).orElse(null);
         StockLedgerPeriod offered = last != null ? last.next() : new StockLedgerPeriod(fallbackFrom, fallbackTo);

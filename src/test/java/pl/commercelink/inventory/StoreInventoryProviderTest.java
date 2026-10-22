@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -65,6 +66,8 @@ class StoreInventoryProviderTest {
     private ExchangeRates exchangeRates;
     @Mock
     private pl.commercelink.pim.api.PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
     @Mock
     private TaxonomyCache taxonomyCache;
 
@@ -280,6 +283,7 @@ class StoreInventoryProviderTest {
     }
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 }

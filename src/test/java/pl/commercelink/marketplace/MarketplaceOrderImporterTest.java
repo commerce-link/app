@@ -1,6 +1,7 @@
 package pl.commercelink.marketplace;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -48,6 +49,8 @@ class MarketplaceOrderImporterTest {
 
     @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
 
     @Mock
     private OrdersManager ordersManager;
@@ -57,7 +60,8 @@ class MarketplaceOrderImporterTest {
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
 
@@ -163,7 +167,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void setsTheExternalItemIdOnProductItemsButNotOnTheShippingItem() {
         // given
-        when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
+        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder marketplaceOrder = orderWithProduct("SKU-1");
@@ -182,7 +186,7 @@ class MarketplaceOrderImporterTest {
     @Test
     void storesTheMarketplaceKeyVerbatimEvenWhenItIsLowercase() {
         // given: pimId-shaped seller SKU — UniqueIdentifierGenerator emits 10 lowercase alphanumerics
-        when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
+        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder order = orderWithProduct("k7m2xq9pz4");
@@ -197,7 +201,7 @@ class MarketplaceOrderImporterTest {
 
     @Test
     void storesTheMarketplaceShippingDateAsThePreferredOne() {
-        when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
+        when(pimView.findByMpn(anyString())).thenReturn(Optional.empty());
         Store store = new Store();
         store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         MarketplaceOrder base = orderWithProduct("SKU-1");

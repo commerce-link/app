@@ -86,7 +86,7 @@ public class StoreInventoryProvider {
             }
         }
 
-        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.forStore(storeId))), LocalDateTime.now());
+        return new StoreInventory(InventoryIndex.of(autoDiscovery.run(ownItems, pimCatalog.withStoreData(storeId))), LocalDateTime.now());
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {

@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.search;
 
 import org.junit.jupiter.api.BeforeEach;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -64,10 +65,13 @@ class InventorySearchTest {
     private StoresRepository storesRepository;
     @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
 
     @org.junit.jupiter.api.BeforeEach
     void pimStoreViewIsTheCatalog() {
-        org.mockito.Mockito.lenient().when(pimCatalog.forStore(org.mockito.ArgumentMatchers.any())).thenReturn(pimCatalog);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 
     @Mock
@@ -106,8 +110,8 @@ class InventorySearchTest {
         when(view.findByEan(anyString())).thenReturn(empty());
         when(view.findByProductCode(anyString())).thenReturn(empty());
         when(view.findByInventoryKey(any())).thenReturn(empty());
-        when(pimCatalog.findByPimId(anyString())).thenReturn(Optional.empty());
-        when(pimCatalog.findByGtin(anyString())).thenReturn(Optional.empty());
+        when(pimView.findByPimId(anyString())).thenReturn(Optional.empty());
+        when(pimView.findByGtin(anyString())).thenReturn(Optional.empty());
         when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of());
     }
 
@@ -326,7 +330,7 @@ class InventorySearchTest {
         when(entry.pimId()).thenReturn("PIM-7");
         when(entry.gtins()).thenReturn(List.of(EAN));
         when(entry.mpns()).thenReturn(List.of(MFN));
-        when(pimCatalog.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
+        when(pimView.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
         when(view.findByInventoryKey(any())).thenReturn(offers(offer("Elko", 100.0, 5)));
 
         // when
@@ -586,7 +590,7 @@ class InventorySearchTest {
         when(entry.brand()).thenReturn("Logitech");
         when(entry.gtins()).thenReturn(List.of(EAN));
         when(entry.mpns()).thenReturn(List.of(MFN));
-        when(pimCatalog.findByGtin(EAN)).thenReturn(Optional.of(entry));
+        when(pimView.findByGtin(EAN)).thenReturn(Optional.of(entry));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, EAN);
@@ -605,7 +609,7 @@ class InventorySearchTest {
         when(entry.name()).thenReturn("Logitech MX Keys S");
         when(entry.gtins()).thenReturn(List.of(EAN));
         when(entry.mpns()).thenReturn(List.of(MFN));
-        when(pimCatalog.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
+        when(pimView.findByPimId("PIM-7")).thenReturn(Optional.of(entry));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, "PIM-7");

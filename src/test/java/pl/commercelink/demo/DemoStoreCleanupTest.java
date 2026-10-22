@@ -16,11 +16,11 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DemoStoreCleanupJobTest {
+class DemoStoreCleanupTest {
 
     @Mock private StoresRepository storesRepository;
     @Mock private StoreDeletionService storeDeletionService;
-    @InjectMocks private DemoStoreCleanupJob job;
+    @InjectMocks private DemoStoreCleanup cleanup;
 
     private Store store(String storeId, DemoStoreMetadata demo) {
         Store store = new Store();
@@ -39,7 +39,7 @@ class DemoStoreCleanupJobTest {
         when(storesRepository.findAll()).thenReturn(List.of(regular, active, expired));
 
         // when
-        job.deleteExpiredDemoStores(now);
+        cleanup.deleteExpiredDemoStores(now);
 
         // then
         verify(storeDeletionService).deleteDemoStore("expired0001");
@@ -56,7 +56,7 @@ class DemoStoreCleanupJobTest {
         when(storesRepository.findAll()).thenReturn(List.of(corrupted, expired));
 
         // when
-        job.deleteExpiredDemoStores(now);
+        cleanup.deleteExpiredDemoStores(now);
 
         // then
         verify(storeDeletionService).deleteDemoStore("expired0001");
@@ -73,7 +73,7 @@ class DemoStoreCleanupJobTest {
         doThrow(new RuntimeException("boom")).when(storeDeletionService).deleteDemoStore("expired0001");
 
         // when
-        job.deleteExpiredDemoStores(now);
+        cleanup.deleteExpiredDemoStores(now);
 
         // then
         verify(storeDeletionService).deleteDemoStore("expired0002");

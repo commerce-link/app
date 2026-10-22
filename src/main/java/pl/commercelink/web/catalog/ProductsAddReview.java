@@ -13,7 +13,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
@@ -91,7 +91,7 @@ public class ProductsAddReview {
                 skippedExisting.add(ean);
                 continue;
             }
-            Optional<PimEntry> entry = pimCatalog.forStore(storeId).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+            Optional<PimEntry> entry = pimCatalog.withStoreData(storeId).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
             sources.add(ean);
         }
@@ -206,14 +206,14 @@ public class ProductsAddReview {
         MatchedInventory matched = inventory.findByInventoryKey(key);
         if (!matched.isEmpty()) {
             InventoryKey known = matched.getInventoryKey();
-            PimLookup pim = pimCatalog.forStore(storeId);
+            PimView pim = pimCatalog.withStoreData(storeId);
             Optional<PimEntry> byInventoryKey = pim.findByPimIdOrGtinsOrMpns(
                     known.getId(), known.getProductEans(), known.getProductCodes());
             if (byInventoryKey.isPresent()) {
                 return byInventoryKey;
             }
         }
-        return pimCatalog.forStore(storeId).findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        return pimCatalog.withStoreData(storeId).findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
     }
 
     /**

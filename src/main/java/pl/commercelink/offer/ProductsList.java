@@ -48,7 +48,7 @@ public class ProductsList {
     }
 
     private Stream<ProductView> computeProductsListBasedOnRecommendations(String storeId, CategoryDefinition c) {
-        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(pimCatalog.forStore(storeId), c, inventory);
+        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(pimCatalog.withStoreData(storeId), c, inventory);
         return recommendations.stream()
                 .map(ProductRecommendation::toProduct)
                 .map(this::createProductInfo);

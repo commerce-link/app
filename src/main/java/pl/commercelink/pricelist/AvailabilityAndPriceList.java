@@ -70,7 +70,7 @@ public class AvailabilityAndPriceList {
     }
 
     private List<AvailabilityAndPrice> getAvailabilityAndPricesForDynamicCatalog(String storeId, CategoryDefinition categoryDefinition, Map<String, SellingPriceHistory> histories) {
-        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(pimCatalog.forStore(storeId), categoryDefinition, inventory);
+        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendationsForMappedProducts(pimCatalog.withStoreData(storeId), categoryDefinition, inventory);
 
         List<Product> products = recommendations.stream()
                 .map(ProductRecommendation::toProduct)

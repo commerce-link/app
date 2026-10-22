@@ -9,6 +9,7 @@ import pl.commercelink.starter.storage.FileStorage;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -48,6 +49,10 @@ class StockLedgerClosings {
     Optional<byte[]> find(String storeId, StockLedgerPeriod period) {
         String key = key(storeId, period);
         return fileStorage.canRead(bucketName, key) ? Optional.of(fileStorage.getBytes(bucketName, key)) : Optional.empty();
+    }
+
+    Optional<Instant> generatedAt(String storeId, StockLedgerPeriod period) {
+        return fileStorage.findLastModified(bucketName, key(storeId, period));
     }
 
     void save(String storeId, StockLedgerPeriod period, byte[] report) {

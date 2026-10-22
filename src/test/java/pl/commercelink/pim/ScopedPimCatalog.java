@@ -5,7 +5,6 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimEntryIndex;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
-import pl.commercelink.pim.api.PimLookup;
 
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -13,8 +12,8 @@ import java.util.function.UnaryOperator;
 import static org.mockito.Mockito.mock;
 
 /**
- * A {@link PimCatalog} mock backed by a real {@link PimEntryIndex}: {@code forStore(id)} returns the index's view of that
- * store, and the catalog's own lookups are the global view, as in the real catalog.
+ * A {@link PimCatalog} mock backed by a real {@link PimEntryIndex}: {@code withStoreData(id)} returns the index's view of
+ * that store and {@code withGlobalData()} its global view, as in the real catalog.
  */
 public final class ScopedPimCatalog {
 
@@ -26,14 +25,10 @@ public final class ScopedPimCatalog {
 
     public static PimCatalog of(PimEntry... entries) {
         PimEntryIndex index = new PimEntryIndex(List.of(entries), UnaryOperator.identity(), UnaryOperator.identity());
-        return mock(PimCatalog.class, invocation -> {
-            if (invocation.getMethod().getName().equals("forStore")) {
-                return index.forStore(invocation.getArgument(0));
-            }
-            if (invocation.getMethod().getDeclaringClass() == PimLookup.class) {
-                return invocation.getMethod().invoke(index.global(), invocation.getArguments());
-            }
-            return null;
+        return mock(PimCatalog.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "withGlobalData" -> index.global();
+            case "withStoreData" -> index.forStore(invocation.getArgument(0));
+            default -> null;
         });
     }
 

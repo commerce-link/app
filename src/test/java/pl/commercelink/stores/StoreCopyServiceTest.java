@@ -9,7 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -40,7 +40,7 @@ class StoreCopyServiceTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
-    private PimLookup sourceLookup;
+    private PimView sourceLookup;
 
     @Captor
     private ArgumentCaptor<List<Product>> productsCaptor;
@@ -205,7 +205,7 @@ class StoreCopyServiceTest {
         Store source = new Store();
         source.setStoreId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(source);
-        when(pimCatalog.forStore("store-1")).thenReturn(sourceLookup);
+        when(pimCatalog.withStoreData("store-1")).thenReturn(sourceLookup);
 
         CategoryDefinition definition = new CategoryDefinition();
         definition.setCategoryId("cat-def-1");

@@ -2,6 +2,7 @@ package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -63,7 +64,11 @@ class InventoryViewStoreListingsTest {
     @Mock
     private GlobalMatchedInventory globalInventory;
     @Mock
+    private PimView pimView;
+    @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView globalPimView;
     @Mock
     private ProductRepository productRepository;
 
@@ -73,7 +78,8 @@ class InventoryViewStoreListingsTest {
     // the global catalog knows PIM-1, so it is a global entry; any other id (st-s-…) is a store entry (spec 4.3)
     @BeforeEach
     void globalCatalogKnowsPim1() {
-        when(pimCatalog.findByPimId("PIM-1")).thenReturn(Optional.of(
+        when(pimCatalog.withGlobalData()).thenReturn(globalPimView);
+        when(globalPimView.findByPimId("PIM-1")).thenReturn(Optional.of(
                 new PimEntry("PIM-1", List.of(), "Intel", "i7", "CPU", null, true, null, null)));
     }
 
@@ -174,11 +180,11 @@ class InventoryViewStoreListingsTest {
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(pimCatalog, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);
@@ -198,11 +204,11 @@ class InventoryViewStoreListingsTest {
         stubGlobalIndex(List.of());
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(pimCatalog, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);

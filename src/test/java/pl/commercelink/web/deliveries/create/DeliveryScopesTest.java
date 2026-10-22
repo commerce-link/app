@@ -370,7 +370,7 @@ class DeliveryScopesTest {
     }
 
     @Test
-    void releasingUnselectedLinesIsADropshipActionOnly() {
+    void releasingUnselectedLinesGoesThroughTheCreationServiceOfEitherScope() {
         // given
         DeliveryCreationForm form = new DeliveryCreationForm();
         DeliveryScope dropship = dropshipScope(order());
@@ -381,7 +381,8 @@ class DeliveryScopesTest {
 
         // then
         verify(dropshipPurchase).releaseUnselected(STORE_ID, form);
-        assertThatThrownBy(() -> warehouse.releaseUnselected(form)).isInstanceOf(UnsupportedOperationException.class);
+        warehouse.releaseUnselected(form);
+        verify(deliveryCreation).releaseUnselectedAllocations(STORE_ID, form);
     }
 
     @Test

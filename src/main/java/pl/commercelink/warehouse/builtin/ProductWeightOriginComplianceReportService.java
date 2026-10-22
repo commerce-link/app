@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimLookup;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 
 import java.time.LocalDate;
@@ -43,7 +43,7 @@ public class ProductWeightOriginComplianceReportService {
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
-        PimLookup pim = pimCatalog.forStore(storeId);
+        PimView pim = pimCatalog.withStoreData(storeId);
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
             if (doc.getReason() != DocumentReason.SupplierDelivery) continue;
@@ -56,7 +56,7 @@ public class ProductWeightOriginComplianceReportService {
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String country, PimLookup pimLookup, Map<AggregateKey, Aggregate> aggregates) {
+    private void accumulate(WarehouseDocumentItem item, String country, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
         Optional<PimEntry> pim = pimLookup.findByGtinOrMpn(item.getEan(), item.getMfn());
         String category = pim.map(PimEntry::category).orElse(null);
