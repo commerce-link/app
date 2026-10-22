@@ -232,7 +232,7 @@ class OfferDetailsRenderingTest {
                 .contains("name=\"basketItems[0].variantGroupId\" value=\"\"")
                 .contains("koszt 5" + NBSP + "810,00").contains("marża 15,8 %").contains("20" + NBSP + "697,00")
                 .contains("href=\"/dashboard/offer/" + ID + "/items/0\"").contains("data-cl-dialog-open=\"item-edit-dialog\"")
-                .contains("Rynek: 5" + NBSP + "810,00 PLN → 5" + NBSP + "949,00 PLN");
+                .contains("Koszt u dostawców: 5" + NBSP + "810,00 PLN → 5" + NBSP + "949,00 PLN (najniższy → mediana)");
     }
 
     @Test
@@ -485,7 +485,7 @@ class OfferDetailsRenderingTest {
         // then
         assertThat(html).contains("action=\"/dashboard/offer/" + ID + "/items/1\"").contains("Edytuj pozycję")
                 .contains("value=\"Stacja dokująca\"").contains("<option value=\"Spoza katalogu\" selected")
-                .contains("Podaj kod producenta.").contains("Zapisz pozycję").contains("Rynek: 611,00 PLN → 642,00 PLN")
+                .contains("Podaj kod producenta.").contains("Zapisz pozycję").contains("Koszt u dostawców: 611,00 PLN → 642,00 PLN (najniższy → mediana)")
                 .contains("href=\"/dashboard/offer/" + ID + "\"")
                 .containsPattern("<input class=\"cl-input is-money\"[^>]*id=\"offer-item-cost\"")
                 .doesNotContainPattern("<input[^>]*id=\"offer-item-cost\"[^>]*required");
