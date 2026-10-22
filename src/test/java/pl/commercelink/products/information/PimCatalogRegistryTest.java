@@ -2,6 +2,7 @@ package pl.commercelink.products.information;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
+import pl.commercelink.pim.api.PIMEntryDeletedEvent;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -196,6 +197,40 @@ class PimCatalogRegistryTest {
         verify(catalogMock, timeout(2000)).refresh();
         assertThat(product.getPimId()).isEqualTo("pim-1");
         verify(productRepository).save(product);
+    }
+
+    @Test
+    void globalEntryEventBehavesAsBefore() {
+        // given
+        Product product = new Product();
+        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+
+        // when
+        entryAddedHandler().accept(event());
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("pim-1");
+        verify(productRepository, never()).findAllByPimId(any());
+        verify(productRepository, never()).detachPimFromProducts(any());
+        verify(productRepository, never()).findAllByEanOrMfnInCategories(any(), any(), any());
+        verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deletedEventRefreshesTheIndex() {
+        // given
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryDeletedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(catalogMock).onEntryDeleted(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryDeletedEvent("pim-1"));
+
+        // then
+        var order = inOrder(productRepository, catalogMock);
+        order.verify(productRepository).detachPimFromProducts("pim-1");
+        order.verify(catalogMock, timeout(2000)).refresh();
     }
 
     @Test

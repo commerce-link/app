@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
+import pl.commercelink.pim.api.PIMEntryDeletedEvent;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -46,11 +47,11 @@ public class PimCatalogRegistry {
     });
     private final AtomicBoolean refreshPending = new AtomicBoolean(false);
 
-    /** Test seam: wires the entry-added handler onto an already built catalog. */
+    /** Test seam: wires the entry handlers onto an already built catalog. */
     PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository) {
         this.catalog = catalog;
-        catalog.onEntryAdded(event -> onEntryAdded(event, productRepository, productCatalogRepository));
+        registerEntryHandlers(productRepository, productCatalogRepository);
     }
 
     @Autowired
@@ -69,10 +70,7 @@ public class PimCatalogRegistry {
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
 
-        catalog.onEntryAdded(event -> onEntryAdded(event, productRepository, productCatalogRepository));
-
-        catalog.onEntryDeleted(event ->
-                productRepository.detachPimFromProducts(event.pimId()));
+        registerEntryHandlers(productRepository, productCatalogRepository);
 
         catalog.onCategoryMatched(taxonomyCategoryEnrichment::applyMatch);
 
@@ -81,10 +79,27 @@ public class PimCatalogRegistry {
                 .register();
     }
 
-    private void onEntryAdded(PIMEntryAddedEvent event, ProductRepository productRepository,
-                              ProductCatalogRepository productCatalogRepository) {
-        attachEntryToProducts(event, productRepository, productCatalogRepository);
-        // the in-memory index must learn about the new entry; only after pinning, so lookups see a consistent state
+    private void registerEntryHandlers(ProductRepository productRepository,
+                                       ProductCatalogRepository productCatalogRepository) {
+        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository);
+        catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository, productCatalogRepository));
+        catalog.onEntryDeleted(event -> onEntryDeleted(event, storeEntryPinning));
+    }
+
+    private void onEntryAdded(PIMEntryAddedEvent event, StoreEntryPinning storeEntryPinning,
+                              ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
+        if (event.ownerStoreId() == null) {
+            attachEntryToProducts(event, productRepository, productCatalogRepository);
+        } else {
+            storeEntryPinning.onStoreEntryAnnounced(event, catalog);
+        }
+        // the in-memory index must learn about the entry; only after pinning, so the pinning still reads the codes
+        // before the change and lookups see a consistent state
+        requestRefresh();
+    }
+
+    private void onEntryDeleted(PIMEntryDeletedEvent event, StoreEntryPinning storeEntryPinning) {
+        storeEntryPinning.onEntryDeleted(event.pimId(), catalog);
         requestRefresh();
     }
 
@@ -125,7 +140,7 @@ public class PimCatalogRegistry {
         });
     }
 
-    private static List<String> categoryIdsOf(String storeId, ProductCatalogRepository productCatalogRepository) {
+    static List<String> categoryIdsOf(String storeId, ProductCatalogRepository productCatalogRepository) {
         return productCatalogRepository.findAll(storeId).stream()
                 .flatMap(catalog -> catalog.getCategories().stream())
                 .map(CategoryDefinition::getCategoryId)
