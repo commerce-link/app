@@ -2,48 +2,72 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<!--/* Before dispatch only: the planned dates and, while the store allows it, the customer's own day. The server checks
-       the day against the window and the store's weekdays. */-->
+<!--/* Before dispatch only: the planned dates and, while the store allows it, the customer's own day picked from the days
+       the server accepts (the window after the planned day, on the store's weekdays). "As soon as possible" posts a blank
+       date, which clears the choice. A notice about the day can arrive after dispatch, so the card then carries it alone. */-->
 <section th:fragment="date" id="date" class="cl-card" aria-labelledby="order-date-title"
-         th:with="notice=${clientOrderNotice != null and clientOrderNotice.target() == 'date' ? clientOrderNotice : null}">
+         th:with="notice=${clientOrderNotice != null and clientOrderNotice.target() == 'date' ? clientOrderNotice : null},
+                  collection=${view.personalCollection}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="order-date-title"
-            th:text="${view.personalCollection} ? #{client.order.date.title.collection} : #{client.order.date.title.shipping}"></h2>
+            th:text="${collection} ? #{client.order.date.title.collection} : #{client.order.date.title.shipping}"></h2>
     </div>
-    <div class="cl-card-inset">
-        <div th:if="${notice != null}" class="cl-alert" role="status" tabindex="-1"
-             th:classappend="${notice.tone() == 'ok'} ? 'is-ok' : 'is-bad'">
-            <span class="cl-alert-icon" aria-hidden="true"><i th:class="${notice.tone() == 'ok'} ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i></span>
-            <div><p class="cl-alert-text" th:text="${notice.text()}"></p></div>
-        </div>
+    <div class="cl-card-inset" th:if="${notice != null}">
+        <div th:replace="~{client-order/delivery :: notice(${notice})}"></div>
+    </div>
 
-        <th:block th:unless="${view.hasEstimatedDates()}">
-            <p class="cl-help" th:text="#{client.order.dates.unknown}"></p>
-            <p th:if="${view.preferredShippingOffered}" class="cl-help" th:text="#{client.order.dates.unknown.preferred}"></p>
-        </th:block>
+    <div class="cl-card-inset" th:if="${view.beforeDispatch and !view.hasEstimatedDates()}">
+        <p class="cl-note" th:text="#{client.order.dates.unknown}"></p>
+        <p th:if="${view.preferredShippingOffered}" class="cl-help" th:text="#{client.order.dates.unknown.preferred}"></p>
+    </div>
 
-        <th:block th:if="${view.preferredShippingEditable}">
-            <p class="cl-help" th:text="#{client.order.preferred.shipping.hint(${#temporals.format(view.estimatedShippingAt, 'd MMMM')}, ${#temporals.format(view.preferredShippingWindowEnd, 'd MMMM')})}"></p>
-            <form method="post" data-cl-submit-once th:action="|${orderPath}/preferred-shipping|">
-                <div class="cl-field">
-                    <label class="cl-label" for="preferredShippingDate"
-                           th:text="${view.personalCollection} ? #{client.order.preferred.shipping.collection} : #{client.order.preferred.shipping.shipping}"></label>
-                    <input id="preferredShippingDate" name="date" type="date" class="cl-input" required
-                           th:value="${view.preferredShippingAt}" th:min="${view.estimatedShippingAt}"
-                           th:max="${view.preferredShippingWindowEnd}">
+    <div class="cl-card-inset" th:if="${view.beforeDispatch and view.hasEstimatedDates() and view.preferredShippingEditable}"
+         th:with="days=${view.preferredShippingDays},
+                  dayNames=${days.![#messages.msg('DayOfWeek.short.' + name())]},
+                  daysText=${days.size() >= 3 and days[days.size() - 1].value - days[0].value == days.size() - 1}
+                        ? ${dayNames[0] + '–' + dayNames[dayNames.size() - 1]} : ${#strings.listJoin(dayNames, ', ')},
+                  windowEnd=${#temporals.format(view.preferredShippingWindowEnd, 'd MMMM')},
+                  planned=${#temporals.format(view.estimatedShippingAt, 'EEEE d MMMM')}">
+        <p class="cl-help"
+           th:text="${collection} ? #{client.order.date.intro.collection(${planned})} : #{client.order.date.intro.shipping(${planned})}"></p>
+        <form method="post" data-cl-submit-once th:action="|${orderPath}/preferred-shipping|">
+            <fieldset class="cl-choice-group is-dates">
+                <legend th:text="${collection} ? #{client.order.date.legend.collection(${daysText}, ${windowEnd})}
+                        : #{client.order.date.legend.shipping(${daysText}, ${windowEnd})}"></legend>
+                <div class="cl-date-grid">
+                    <label class="cl-choice is-date is-wide">
+                        <input type="radio" name="date" value="" th:checked="${view.asapSelected}">
+                        <span class="cl-date-day" th:text="#{client.order.date.asap.hint}"></span>
+                        <span class="cl-date-num" th:text="#{client.order.date.asap}"></span>
+                    </label>
+                    <label th:each="option : ${view.preferredShippingOptions}" class="cl-choice is-date">
+                        <input type="radio" name="date" th:value="${option.date()}" th:checked="${option.selected()}">
+                        <span class="cl-date-day" th:text="#{${'DayOfWeek.short.' + option.date().dayOfWeek.name()}}"></span>
+                        <span class="cl-date-num" th:text="${#temporals.format(option.date(), 'd MMM')}"></span>
+                        <span th:if="${option.planned()}" class="cl-date-tag" th:text="#{client.order.date.planned}"></span>
+                    </label>
                 </div>
-                <div class="cl-card-actions">
-                    <button class="cl-button is-primary" type="submit" th:text="#{client.order.preferred.shipping.submit}"></button>
-                </div>
-            </form>
-            <form th:if="${view.preferredShippingAt != null}" method="post" data-cl-submit-once
-                  th:action="|${orderPath}/preferred-shipping|">
-                <p class="cl-help"><button class="cl-link-button" type="submit" th:text="#{client.order.preferred.shipping.clear}"></button></p>
-            </form>
-        </th:block>
-        <p th:if="${view.preferredShippingVisible and !view.preferredShippingEditable}" class="cl-help"
-           th:text="#{client.order.preferred.shipping.locked}"></p>
-        <p th:if="${view.hasEstimatedDates()}" class="cl-help" th:text="#{client.order.dates.note}"></p>
+            </fieldset>
+            <div class="cl-date-actions">
+                <button class="cl-button is-primary" type="submit" th:text="#{client.order.preferred.shipping.submit}"></button>
+            </div>
+        </form>
+        <p class="cl-help" th:text="#{client.order.dates.note}"></p>
+    </div>
+
+    <div class="cl-card-inset" th:if="${view.beforeDispatch and view.hasEstimatedDates() and !view.preferredShippingEditable}">
+        <dl class="cl-facts" th:if="${view.estimatedShippingAt != null or view.preferredShippingAt != null}">
+            <div th:if="${view.estimatedShippingAt != null}">
+                <dt th:text="${collection} ? #{client.order.facts.collection} : #{client.order.facts.shipping}"></dt>
+                <dd th:text="${#temporals.format(view.estimatedShippingAt, 'EEE d MMMM')}"></dd>
+            </div>
+            <div th:if="${view.preferredShippingAt != null}">
+                <dt th:text="${collection} ? #{client.order.facts.chosen.collection} : #{client.order.facts.chosen.shipping}"></dt>
+                <dd th:text="${#temporals.format(view.preferredShippingAt, 'EEE d MMMM')}"></dd>
+            </div>
+        </dl>
+        <p th:if="${view.preferredShippingVisible}" class="cl-help" th:text="#{client.order.preferred.shipping.locked}"></p>
+        <p class="cl-help" th:text="#{client.order.dates.note}"></p>
     </div>
 </section>
 

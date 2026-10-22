@@ -494,6 +494,266 @@ class ClientOrderTemplateRenderingTest {
         assertThat(plain.indexOf("id=\"delivery\"")).isGreaterThan(plain.indexOf("order-progress-title"));
     }
 
+    @Test
+    void dayPickerOffersAsapAndWindowDays() {
+        // when
+        String html = ClientOrderRenderer.newOrder().locale(PL).render();
+
+        // then
+        assertThat(html).contains("<fieldset class=\"cl-choice-group is-dates\">")
+                .contains("<legend>Dzień wysyłki (pon.–pt., do 6 listopada)</legend>")
+                .containsPattern("<label class=\"cl-choice is-date is-wide\">\\s*<input type=\"radio\" name=\"date\" value=\"\" checked=\"checked\">")
+                .containsPattern("<input type=\"radio\" name=\"date\" value=\"2026-10-23\">\\s*<span class=\"cl-date-day\">pt\\.</span>\\s*"
+                        + "<span class=\"cl-date-num\">23 paź</span>\\s*<span class=\"cl-date-tag\">planowany</span>")
+                .contains("Planowany dzień wysyłki: piątek 23 października.")
+                .contains(">Zapisz dzień</button>");
+        assertThat(html.split("name=\"date\" value=\"2026-", -1)).hasSize(12);
+        assertThat(html.split("class=\"cl-date-tag\"", -1)).hasSize(2);
+        assertThat(html).doesNotContain("value=\"2026-10-24\"").doesNotContain("value=\"2026-11-07\"");
+    }
+
+    @Test
+    void savedDayIsChecked() {
+        // when
+        String html = ClientOrderRenderer.newOrder().preferredShippingAt(LocalDate.of(2026, 10, 27)).locale(PL).render();
+
+        // then
+        assertThat(html).contains("<input type=\"radio\" name=\"date\" value=\"2026-10-27\" checked=\"checked\">")
+                .contains("<input type=\"radio\" name=\"date\" value=\"\">");
+        assertThat(html.split(" checked=", -1)).hasSize(2);
+    }
+
+    @Test
+    void noDateInputAndNoInlineScript() {
+        // when
+        String html = ClientOrderRenderer.newOrder().preferredShippingAt(LocalDate.of(2026, 10, 27)).locale(PL).render();
+
+        // then
+        assertThat(html).doesNotContain("type=\"date\"")
+                .doesNotContain("Usuń preferowaną datę")
+                .doesNotContainPattern("<script(?![^>]*\\ssrc=)[^>]*>")
+                .containsPattern("<form method=\"post\" data-cl-submit-once action=\"[^\"]*/preferred-shipping\">");
+        assertThat(html.split("/preferred-shipping\"", -1)).hasSize(2);
+    }
+
+    @Test
+    void dateCardHiddenAfterDispatch() {
+        // when
+        String shipped = ClientOrderRenderer.newOrder().status(OrderStatus.Shipping)
+                .shipments(ClientOrderRenderer.shipment("dpd", "111", null, SHIPPED, null)).locale(PL).render();
+        String delivered = ClientOrderRenderer.newOrder().status(OrderStatus.Delivered).locale(PL).render();
+
+        // then
+        for (String html : List.of(shipped, delivered)) {
+            assertThat(html).doesNotContain("id=\"date\"").doesNotContain("Termin wysyłki");
+        }
+    }
+
+    @Test
+    void dateNoticeOpensTheDateCard() {
+        // when
+        String html = ClientOrderRenderer.newOrder().preferredShippingAt(LocalDate.of(2026, 10, 27))
+                .notice(ClientOrderNotice.ok(ClientOrderNotice.DATE, "Preferowana data została zapisana.")).locale(PL).render();
+
+        // then
+        int card = html.indexOf("id=\"date\"");
+        assertThat(html.indexOf("<div class=\"cl-alert is-ok\" role=\"status\" tabindex=\"-1\">")).isGreaterThan(card)
+                .isLessThan(html.indexOf("cl-choice-group is-dates"));
+        assertThat(html).contains("Preferowana data została zapisana.");
+    }
+
+    @Test
+    void lockedDayExplainsWhy() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.New)
+                .preferredShippingAt(LocalDate.of(2026, 10, 27)).locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"date\""), html.indexOf("</section>", html.indexOf("id=\"date\"")));
+        assertThat(card).contains("<dl class=\"cl-facts\">")
+                .contains("<dt>Planowana wysyłka</dt>")
+                .contains("<dd>pt. 23 października</dd>")
+                .contains("<dt>Twój dzień wysyłki</dt>")
+                .contains("<dd>wt. 27 października</dd>")
+                .contains("Preferowaną datę można ustawić tylko, gdy zamówienie jest w kompletacji lub w realizacji.")
+                .contains("Terminy są szacunkowe")
+                .doesNotContain("name=\"date\"");
+    }
+
+    @Test
+    void knownDatesWithoutTheFeatureShowFactsOnly() {
+        // given
+        ClientOrderRenderer renderer = ClientOrderRenderer.newOrder();
+        renderer.store().getFulfilmentConfiguration().setClientPreferredShippingDateEnabled(false);
+
+        // when
+        String html = renderer.locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"date\""), html.indexOf("</section>", html.indexOf("id=\"date\"")));
+        assertThat(card).contains("<dt>Planowana wysyłka</dt>")
+                .doesNotContain("Preferowaną datę można ustawić")
+                .doesNotContain("name=\"date\"");
+    }
+
+    @Test
+    void unknownDatesSentence() {
+        // given
+        ClientOrderRenderer renderer = ClientOrderRenderer.newOrder().status(OrderStatus.New);
+        renderer.order().setEstimatedAssemblyAt(null);
+        renderer.order().setEstimatedShippingAt(null);
+
+        // when
+        String html = renderer.locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"date\""), html.indexOf("</section>", html.indexOf("id=\"date\"")));
+        assertThat(card).contains("Termin kompletacji i wysyłki podamy, gdy potwierdzimy dostępność wszystkich produktów.")
+                .contains("Wtedy też będziesz mieć możliwość")
+                .doesNotContain("cl-facts")
+                .doesNotContain("name=\"date\"")
+                .doesNotContain("Preferowaną datę można ustawić");
+    }
+
+    @Test
+    void collectionDayPickerSpeaksOfPickup() {
+        // when
+        String html = ClientOrderRenderer.newOrder().personalCollection().locale(PL).render();
+
+        // then
+        assertThat(html).contains("id=\"order-date-title\">Termin odbioru</h2>")
+                .contains("<legend>Dzień odbioru (pon.–pt., do 6 listopada)</legend>")
+                .contains("Planowany dzień odbioru: piątek 23 października.");
+    }
+
+    @Test
+    void paymentDueShowsBankWithCopyButtons() {
+        // when
+        String html = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0)).locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"payment\""), html.indexOf("</section>", html.indexOf("id=\"payment\"")));
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Do dopłaty</span>")
+                .contains("<dl class=\"cl-amounts\">")
+                .containsPattern("<div class=\"is-total\">\\s*<dt>Wartość zamówienia</dt>\\s*<dd>6 245,99 PLN</dd>")
+                .containsPattern("<dt>Wpłacono</dt>\\s*<dd>3 000,00 PLN</dd>")
+                .containsPattern("<div class=\"is-sum\">\\s*<dt>Pozostało do zapłaty</dt>\\s*<dd>3 245,99 PLN</dd>")
+                .contains("<dl class=\"cl-kv is-bank\">")
+                .contains("<dt>Odbiorca</dt>")
+                .contains("Nova Tech sp. z o.o.")
+                .contains("PL61 1090 1014 0000 0712 1981 2874")
+                .contains("data-cl-copy=\"PL61109010140000071219812874\"")
+                .contains("data-cl-copy=\"3245.99\"")
+                .contains("data-cl-copy=\"" + ClientOrderRenderer.ORDER_ID + "\"")
+                .contains("aria-label=\"Kopiuj numer konta\"")
+                .contains("aria-label=\"Kopiuj kwotę\"")
+                .contains("aria-label=\"Kopiuj tytuł przelewu\"")
+                .doesNotContain("<dt>SWIFT</dt>")
+                .doesNotContain("<dt>Waluta</dt>");
+        assertThat(card.split("<button type=\"button\" class=\"cl-copy-inline is-icon\" hidden data-cl-copy-reveal", -1)).hasSize(4);
+        assertThat(html).contains("/js/copy-field.js");
+    }
+
+    @Test
+    void bankHidesSwiftBankAndCurrencyWhenMissing() {
+        // given
+        ClientOrderRenderer full = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0));
+        full.store().getDefaultBankAccount().setSwiftCode("BPKOPLPW");
+        full.store().getDefaultBankAccount().setBankName("PKO BP");
+        full.store().getDefaultBankAccount().setCurrency("EUR");
+        ClientOrderRenderer bare = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0));
+        bare.store().getDefaultBankAccount().setAccountHolder(null);
+        bare.store().getDefaultBankAccount().setCurrency(null);
+
+        // when
+        String withAll = full.locale(PL).render();
+        String without = bare.locale(PL).render();
+
+        // then
+        assertThat(withAll).containsPattern("<dt>SWIFT</dt>\\s*<dd>BPKOPLPW</dd>")
+                .containsPattern("<dt>Bank</dt>\\s*<dd>PKO BP</dd>")
+                .containsPattern("<dt>Waluta</dt>\\s*<dd>EUR</dd>");
+        assertThat(without).contains("<dl class=\"cl-kv is-bank\">")
+                .doesNotContain("<dt>SWIFT</dt>").doesNotContain("<dt>Bank</dt>").doesNotContain("<dt>Waluta</dt>")
+                .doesNotContain("<dt>Odbiorca</dt>");
+    }
+
+    @Test
+    void noPaymentRecordedShowsNeutralSentenceWithoutBank() {
+        // when
+        String html = ClientOrderRenderer.newOrder().locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"payment\""), html.indexOf("</section>", html.indexOf("id=\"payment\"")));
+        assertThat(card).contains("<p class=\"cl-help\">Nie odnotowaliśmy jeszcze wpłaty.</p>")
+                .containsPattern("<dt>Wartość zamówienia</dt>\\s*<dd>6 245,99 PLN</dd>")
+                .doesNotContain("cl-status")
+                .doesNotContain("cl-kv is-bank")
+                .doesNotContain("Pozostało do zapłaty")
+                .doesNotContain("Wpłacono");
+    }
+
+    @Test
+    void fullyPaidShowsOnlyTheValueAndThePill() {
+        // when
+        String html = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Całość", 6245.99)).locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"payment\""), html.indexOf("</section>", html.indexOf("id=\"payment\"")));
+        assertThat(card).contains("<span class=\"cl-status is-ok\">Opłacone</span>")
+                .contains("<dt>Wartość zamówienia</dt>")
+                .doesNotContain("Wpłacono")
+                .doesNotContain("cl-kv is-bank")
+                .doesNotContain("Nie odnotowaliśmy");
+    }
+
+    @Test
+    void overpaidShowsRefund() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.Delivered)
+                .payments(Payment.bankTransfer("REF-1", "Całość", 6445.99)).locale(PL).render();
+
+        // then
+        String card = html.substring(html.indexOf("id=\"payment\""), html.indexOf("</section>", html.indexOf("id=\"payment\"")));
+        assertThat(card).contains("<span class=\"cl-status is-info\">Nadpłata</span>")
+                .containsPattern("<div class=\"is-sum\">\\s*<dt>Zwrócimy Ci</dt>\\s*<dd>200,00 PLN</dd>")
+                .contains("<p class=\"cl-help\">Nadpłatę zwrócimy na rachunek, z którego przyszła wpłata. Jeśli wolisz inaczej, napisz do nas.</p>")
+                .doesNotContain("cl-kv is-bank");
+    }
+
+    @Test
+    void amountsUseTheCurrencyKey() throws IOException {
+        // when
+        String english = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Advance", 3000.0)).render();
+
+        // then
+        assertThat(english).containsPattern("<dt>Order value</dt>\\s*<dd>6 245,99 PLN</dd>");
+        for (Path source : templateSources()) {
+            assertThat(Files.readString(source)).as(source.toString()).doesNotContain("PLN");
+        }
+    }
+
+    @Test
+    void paymentDueCardStandsBeforeDelivery() {
+        // when
+        String due = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0)).locale(PL).render();
+        String overpaid = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Całość", 6445.99)).locale(PL).render();
+
+        // then
+        assertThat(due.indexOf("id=\"payment\"")).isPositive().isLessThan(due.indexOf("id=\"delivery\""));
+        assertThat(overpaid.indexOf("id=\"payment\"")).isGreaterThan(overpaid.indexOf("id=\"date\""));
+    }
+
+    @Test
+    void cancelledHasNoPaymentCard() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.Cancelled)
+                .payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0)).locale(PL).render();
+
+        // then
+        assertThat(html).doesNotContain("id=\"payment\"").doesNotContain("cl-kv is-bank").doesNotContain("cl-amounts");
+    }
+
     static List<Path> templateSources() throws IOException {
         Path templates = Path.of("src/main/resources/templates");
         try (Stream<Path> fragments = Files.list(templates.resolve("client-order"))) {

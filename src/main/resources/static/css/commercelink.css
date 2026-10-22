@@ -14378,6 +14378,39 @@ body.cl-public .cl-code-row + .cl-field-error { margin-top: 6px; }
 .cl-order-page .cl-list-actions .cl-button { white-space: nowrap; }
 .cl-order-page .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
 .cl-order-page .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
+.cl-order-page .cl-card-inset > .cl-help:first-child { margin-top: 0; }
+/* the dashboard's dl.cl-kv brings its own side padding; inside a public card inset the bank details line up with the text */
+.cl-order-page dl.cl-kv.is-bank { margin: 10px 0 0; padding: 0; }
+/* a day picked from a short list: fieldset.cl-choice-group.is-dates > legend + .cl-date-grid > label.cl-choice.is-date
+   (.is-wide for "as soon as possible"). The radio stays in the tab order and arrow-key group but is invisible, so the
+   tile carries the checked state and the focus ring. */
+body.cl-public .cl-choice-group.is-dates { display: block; }
+body.cl-public .cl-choice-group.is-dates > legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-size: 13.5px; font-weight: 500;
+  color: var(--cl-ink-2); }
+body.cl-public .cl-choice-group.is-dates > legend + * { clear: both; }
+body.cl-public .cl-date-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+body.cl-public label.cl-choice.is-date { position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-height: 56px; padding: 6px 8px; border: 1px solid var(--cl-line); border-radius: var(--cl-radius); background: var(--cl-surface);
+  text-align: center; }
+body.cl-public label.cl-choice.is-date.is-wide { grid-column: span 2; }
+body.cl-public label.cl-choice.is-date input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+body.cl-public label.cl-choice.is-date:hover { border-color: var(--cl-ink-3); }
+body.cl-public label.cl-choice.is-date:has(input:checked) { border-color: var(--cl-accent); background: var(--cl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--cl-accent); }
+body.cl-public label.cl-choice.is-date:has(input:focus-visible) { outline: 2px solid var(--cl-accent); outline-offset: 2px; }
+body.cl-public .cl-date-day { font-size: 12px; color: var(--cl-ink-2); }
+body.cl-public .cl-date-num { font-size: 15px; font-weight: 600; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+body.cl-public .cl-date-tag { font-size: 11px; font-weight: 600; color: var(--cl-ok); }
+body.cl-public .cl-date-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+/* amounts as label and value on one line, the closing row (balance or refund) under a rule: dl.cl-amounts > div(.is-total|.is-sum) */
+body.cl-public dl.cl-amounts { display: flex; flex-direction: column; gap: 6px; margin: 0; font-size: 14px; }
+body.cl-public dl.cl-amounts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+body.cl-public dl.cl-amounts dt { color: var(--cl-ink-2); }
+body.cl-public dl.cl-amounts dd { margin: 0; text-align: right; white-space: nowrap; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+body.cl-public dl.cl-amounts > :is(.is-total, .is-sum) > * { color: var(--cl-ink); font-weight: 650; }
+body.cl-public dl.cl-amounts > .is-total > dt { font-size: 15px; font-weight: 600; }
+body.cl-public dl.cl-amounts > :is(.is-total, .is-sum) > dd { font-size: 18px; }
+body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--cl-line); }
 @media (max-width: 719px) {
   body.cl-public ol.cl-stages { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
   body.cl-public .cl-stage { flex-direction: row; align-items: flex-start; text-align: left; gap: 12px; padding: 0 0 14px; }
@@ -14392,10 +14425,14 @@ body.cl-public .cl-code-row + .cl-field-error { margin-top: 6px; }
   .cl-order-page .cl-list.is-items .cl-status { justify-self: start; }
   .cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
   .cl-order-page .cl-card-actions .cl-button { min-height: 44px; }
+  body.cl-public .cl-date-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.cl-public label.cl-choice.is-date { min-height: 52px; }
+  body.cl-public .cl-date-actions .cl-button { flex: 1; justify-content: center; }
 }
 @media (max-width: 1023px) {
   body.cl-public .cl-code-row :is(.cl-input, .cl-button) { min-height: 44px; }
   .cl-order-page #delivery :is(.cl-input, .cl-button) { min-height: 44px; }
+  body.cl-public .cl-date-actions .cl-button { min-height: 44px; }
 }
 
 /* ===== Public message page (client-offer/unavailable.html): one card with eyebrow, title and lead ===== */

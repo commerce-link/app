@@ -2,52 +2,71 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<!--/* The order value and, once a payment is recorded, the balance; the bank account only while something is due. */-->
+<!--/* The order value and, once a payment is recorded, the balance. Without any payment the page asks for nothing: the
+       order may be paid on delivery or by a transfer not yet booked, so the bank account shows only while a balance is due. */-->
 <section th:fragment="payment" id="payment" class="cl-card" aria-labelledby="order-payment-title">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="order-payment-title" th:text="#{client.order.payment}"></h2>
         <span th:if="${view.paymentRecorded and view.fullyPaid}" class="cl-status is-ok" th:text="#{client.order.payment.paid}"></span>
+        <span th:if="${view.paymentDue}" class="cl-status is-warn" th:text="#{client.order.payment.due}"></span>
+        <span th:if="${view.overpaid}" class="cl-status is-info" th:text="#{client.order.payment.overpaid}"></span>
     </div>
     <div class="cl-card-inset">
-        <dl class="cl-kv is-bank">
-            <dt th:text="#{client.order.payment.total}"></dt>
-            <dd th:text="#{general.currency.amount(${view.totalFormatted})}"></dd>
+        <dl class="cl-amounts">
+            <div class="is-total">
+                <dt th:text="#{client.order.payment.total}"></dt>
+                <dd th:text="#{general.currency.amount(${view.totalFormatted})}"></dd>
+            </div>
             <th:block th:if="${view.paymentRecorded and !view.fullyPaid}">
-                <dt th:text="#{client.order.payment.settled}"></dt>
-                <dd th:text="#{general.currency.amount(${view.paidFormatted})}"></dd>
-                <dt th:text="${view.overpaid} ? #{client.order.payment.refund} : #{client.order.payment.remaining}"></dt>
-                <dd th:text="#{general.currency.amount(${view.overpaid ? view.overpaidFormatted : view.unpaidFormatted})}"></dd>
+                <div>
+                    <dt th:text="#{client.order.payment.settled}"></dt>
+                    <dd th:text="#{general.currency.amount(${view.paidFormatted})}"></dd>
+                </div>
+                <div class="is-sum">
+                    <dt th:text="${view.overpaid} ? #{client.order.payment.refund} : #{client.order.payment.remaining}"></dt>
+                    <dd th:text="#{general.currency.amount(${view.overpaid ? view.overpaidFormatted : view.unpaidFormatted})}"></dd>
+                </div>
             </th:block>
         </dl>
-        <th:block th:if="${view.bankAccountVisible}" th:with="bank=${view.bank}">
-            <p class="cl-help" th:text="#{client.order.bank.description}"></p>
-            <dl class="cl-kv is-bank">
-                <th:block th:if="${bank.holder() != null}">
-                    <dt th:text="#{bank.account.holder}"></dt>
-                    <dd th:text="${bank.holder()}"></dd>
-                </th:block>
-                <dt th:text="#{bank.iban}"></dt>
-                <dd><th:block th:text="${bank.ibanGrouped()}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
-                        th:attr="data-cl-copy=${bank.ibanRaw()}, aria-label=#{client.offer.bank.copyIban}"><span
-                        class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
-                <th:block th:if="${bank.swift() != null}">
-                    <dt th:text="#{bank.swift}"></dt>
-                    <dd th:text="${bank.swift()}"></dd>
-                </th:block>
-                <th:block th:if="${bank.bankName() != null}">
-                    <dt th:text="#{bank.name}"></dt>
-                    <dd th:text="${bank.bankName()}"></dd>
-                </th:block>
-                <th:block th:if="${bank.currency() != null}">
-                    <dt th:text="#{bank.currency}"></dt>
-                    <dd th:text="${bank.currency()}"></dd>
-                </th:block>
-                <dt th:text="#{bank.transfer.title}"></dt>
-                <dd><th:block th:text="${bank.transferTitle()}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
-                        th:attr="data-cl-copy=${bank.transferTitle()}, aria-label=#{client.offer.bank.copyTitle}"><span
-                        class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
-            </dl>
-        </th:block>
+    </div>
+    <div class="cl-card-inset" th:unless="${view.paymentRecorded}">
+        <p class="cl-help" th:text="#{client.order.payment.none}"></p>
+    </div>
+    <div class="cl-card-inset" th:if="${view.overpaid}">
+        <p class="cl-help" th:text="#{client.order.payment.refund.note}"></p>
+    </div>
+    <div class="cl-card-inset" th:if="${view.bankAccountVisible}" th:with="bank=${view.bank}">
+        <p class="cl-help" th:text="#{client.order.bank.description}"></p>
+        <dl class="cl-kv is-bank">
+            <th:block th:if="${bank.holder() != null}">
+                <dt th:text="#{client.order.bank.holder}"></dt>
+                <dd th:text="${bank.holder()}"></dd>
+            </th:block>
+            <dt th:text="#{client.order.bank.iban}"></dt>
+            <dd><th:block th:text="${bank.ibanGrouped()}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                    th:attr="data-cl-copy=${bank.ibanRaw()}, aria-label=#{client.order.bank.copyIban}"><span
+                    class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
+            <th:block th:if="${bank.swift() != null}">
+                <dt th:text="#{client.order.bank.swift}"></dt>
+                <dd th:text="${bank.swift()}"></dd>
+            </th:block>
+            <th:block th:if="${bank.bankName() != null}">
+                <dt th:text="#{client.order.bank.name}"></dt>
+                <dd th:text="${bank.bankName()}"></dd>
+            </th:block>
+            <th:block th:if="${bank.currency() != null}">
+                <dt th:text="#{client.order.bank.currency}"></dt>
+                <dd th:text="${bank.currency()}"></dd>
+            </th:block>
+            <dt th:text="#{client.order.bank.amount}"></dt>
+            <dd><th:block th:text="#{general.currency.amount(${view.unpaidFormatted})}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                    th:attr="data-cl-copy=${view.unpaidRaw}, aria-label=#{client.order.bank.copyAmount}"><span
+                    class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
+            <dt th:text="#{client.order.bank.title}"></dt>
+            <dd><th:block th:text="${bank.transferTitle()}"></th:block>&#8288;<button type="button" class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                    th:attr="data-cl-copy=${bank.transferTitle()}, aria-label=#{client.order.bank.copyTitle}"><span
+                    class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></dd>
+        </dl>
     </div>
 </section>
 

@@ -150,4 +150,17 @@ class PublicPageStylesContractTest {
         assertThat(phone).contains("body.cl-public ol.cl-stages { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }")
                 .contains(".cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }");
     }
+
+    @Test
+    void dayTilesShowFocusOnTheTileAndStayTouchSized() throws Exception {
+        // given — the radio itself is invisible, so the tile has to carry the focus ring
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+
+        // then
+        assertThat(order).contains("body.cl-public label.cl-choice.is-date:has(input:focus-visible) { outline: 2px solid var(--cl-accent);",
+                        "body.cl-public label.cl-choice.is-date input { position: absolute; inset: 0;",
+                        "body.cl-public dl.cl-amounts {", "  body.cl-public label.cl-choice.is-date { min-height: 52px; }",
+                        "  body.cl-public .cl-date-actions .cl-button { min-height: 44px; }");
+    }
 }

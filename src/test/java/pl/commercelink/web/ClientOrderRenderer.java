@@ -194,7 +194,7 @@ final class ClientOrderRenderer {
                 && order.getStatus() != OrderStatus.Cancelled;
         ClientOrderView view = ClientOrderView.from(order, items, store, echoingLocalizer(),
                 beforeDispatch && store.isClientShippingAddressChangeEnabled() && !order.isPersonalCollection(),
-                beforeDispatch && store.isClientPreferredShippingDateEnabled() && order.getEstimatedShippingAt() != null,
+                store.isClientPreferredShippingDateEnabled() && order.canClientSetPreferredShippingAt(),
                 today);
         Context context = new Context(locale);
         Map<String, String> kept = new LinkedHashMap<>();
