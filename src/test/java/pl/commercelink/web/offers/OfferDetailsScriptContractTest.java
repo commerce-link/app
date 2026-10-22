@@ -182,6 +182,16 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
+    void clearedCostInTheItemDialogReadsZeroOnLeavingTheField() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then: shown as 0 on blur, and stored as 0 by "Zastosuj" even without leaving the field
+        assertThat(js).contains("input('unitCost').addEventListener('blur', function () {\n            if (this.value === '') {\n                this.value = '0';")
+                .contains("field(row, 'unitCost').value = input('unitCost').value === '' ? '0' : input('unitCost').value;");
+    }
+
+    @Test
     void totalIsAnnouncedOnlyWhenItChanged() throws Exception {
         // when
         String js = read("static/js/offer-lines.js");

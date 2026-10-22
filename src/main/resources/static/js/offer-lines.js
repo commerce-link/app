@@ -636,6 +636,13 @@
             return editForm.querySelector('[data-cl-item-field="' + name + '"]');
         }
 
+        // a cleared cost reads 0 as soon as the field is left, as on the old page; "Zastosuj" stores it as 0 either way
+        input('unitCost').addEventListener('blur', function () {
+            if (this.value === '') {
+                this.value = '0';
+            }
+        });
+
         function clearError(control) {
             control.classList.remove('is-invalid');
             control.removeAttribute('aria-invalid');
