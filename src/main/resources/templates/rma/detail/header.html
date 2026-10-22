@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Record header of an RMA: back to the list, h1 with the short number, the status pill, the next step of the process
+       as the primary action, "Więcej" and the meta lines. Every dialog opener is also a link to ?open=…, which renders
+       the page with that dialog open when JavaScript is off. The slots are defined inside the replaced element, so they
+       are never rendered twice. */-->
+<div th:fragment="header"
+     th:replace="~{fragments/settings-header :: record('/dashboard/rma', #{rma.list.title},
+             #{rma.detail.title(${page.shortId()})}, ~{::rmaCopy}, ~{::rmaStatus}, ~{::rmaMeta}, ~{::rmaActions})}">
+    <th:block th:fragment="rmaCopy">
+        <button type="button" class="cl-copy-inline is-icon"
+                th:attr="data-cl-copy=${page.rmaId()}, aria-label=#{rma.detail.copy.id}, title=${page.rmaId()}">
+            <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+        </button>
+    </th:block>
+    <th:block th:fragment="rmaStatus">
+        <span class="cl-status" th:classappend="${page.header().statusTone()}" th:text="${page.header().statusLabel()}"></span>
+    </th:block>
+
+    <th:block th:fragment="rmaMeta" th:with="h=${page.header()}">
+        <p class="cl-record-meta">
+            <span th:if="${h.clientName() != null}"><strong th:text="${h.clientName()}"></strong></span>
+            <span th:text="${h.source()}"></span>
+            <span th:if="${h.orderId() != null}"
+                  th:with="orderShort=${h.orderId().length() > 8 ? h.orderId().substring(0, 8) : h.orderId()}">
+                <span th:text="#{rma.detail.meta.order}"></span>
+                <a th:href="@{${h.orderHref()}}" th:title="${h.orderId()}" th:text="${orderShort}"></a>
+            </span>
+            <span th:if="${h.createdAt() != null}" th:text="#{rma.detail.meta.created(${h.createdAt()})}"></span>
+            <span th:text="${h.itemCount()}"></span>
+            <span><strong th:text="${h.total()}"></strong></span>
+        </p>
+        <p class="cl-record-meta is-secondary" th:if="${h.marketplaceLine() != null or h.clientLink() != null}">
+            <span th:if="${h.marketplaceLine() != null}" th:with="m=${h.marketplaceLine()}">
+                <span th:text="${m.text()}"></span>
+                <span th:if="${m.statusLabel() != null}" class="cl-status" th:classappend="${m.statusTone()}" th:text="${m.statusLabel()}"></span>
+                <span th:if="${m.carrier() != null}" th:text="${m.carrier()}"></span>
+            </span>
+            <span th:if="${h.clientLink() != null}">
+                <span th:text="#{rma.detail.meta.client.link}"></span>
+                <button type="button" class="cl-copy-inline is-icon"
+                        th:attr="data-cl-copy=${h.clientLink()}, aria-label=#{rma.detail.copy.client.link}, title=${h.clientLink()}">
+                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span></span>
+                </button>
+            </span>
+        </p>
+    </th:block>
+
+    <th:block th:fragment="rmaActions" th:with="h=${page.header()}">
+        <a th:if="${h.next() != null}" class="cl-button is-primary" href="?open=next" data-cl-dialog-open="next-dialog">
+            <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${h.next().icon()}"></i></span>
+            <span th:text="#{${h.next().labelKey()}}"></span>
+        </a>
+        <!--/* a native details: without JavaScript it still opens and every entry below is a link */-->
+        <details class="cl-menu">
+            <summary class="cl-button">
+                <span th:text="#{rma.detail.more}"></span>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </summary>
+            <ul class="cl-menu-list" id="rma-more-menu">
+                <li th:if="${h.clientLink() != null}">
+                    <a class="cl-menu-item" th:href="${h.clientLink()}" target="_blank" rel="noopener"
+                       th:text="#{rma.detail.menu.clientPage}"></a>
+                </li>
+                <!--/* offered on a closed RMA too: resending is how a decision lost on the way (DLQ) is recovered. It opens
+                       the marketplace card's #resend-dialog; without JavaScript it leads to the card and its POST form. */-->
+                <li th:if="${h.resendHref() != null and page.marketplaceCard() != null}">
+                    <a class="cl-menu-item" href="#zwrot-marketplace" data-cl-dialog-open="resend-dialog"
+                       th:text="#{rma.detail.menu.resend(${page.marketplaceCard().name()})}"></a>
+                </li>
+                <li>
+                    <a th:if="${h.canChangeStatus()}" class="cl-menu-item" href="?open=status"
+                       data-cl-dialog-open="status-dialog" th:text="#{rma.detail.menu.status}"></a>
+                    <button th:unless="${h.canChangeStatus()}" type="button" class="cl-menu-item" aria-disabled="true">
+                        <span th:text="#{rma.detail.menu.status}"></span>
+                        <span class="cl-menu-reason" th:text="#{rma.detail.status.closed}"></span>
+                    </button>
+                </li>
+                <!--/* a closed RMA hides the rejection: there is nothing left to explain */-->
+                <th:block th:unless="${page.closed()}">
+                    <li class="cl-menu-sep" aria-hidden="true"></li>
+                    <li>
+                        <a th:if="${h.canReject()}" class="cl-menu-item is-danger" href="?open=reject"
+                           data-cl-dialog-open="reject-dialog" th:text="#{rma.detail.menu.reject}"></a>
+                        <button th:unless="${h.canReject()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
+                            <span th:text="#{rma.detail.menu.reject}"></span>
+                            <span class="cl-menu-reason" th:text="#{${h.rejectBlockedKey()}}"></span>
+                        </button>
+                    </li>
+                </th:block>
+            </ul>
+        </details>
+    </th:block>
+</div>
+</body>
+</html>

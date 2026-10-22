@@ -42,6 +42,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -191,6 +192,99 @@ class MarketplaceOfferExportEventListenerTest {
         // given
         noCategoriesConfigured();
         previousSnapshotContains(MarketplaceOfferSnapshot.removalPending("pim-X", 999L, 3));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
+    }
+
+    @Test
+    void sendsTheEanAndManufacturerCodeItWasPublishedWithWhenTakingTheOfferOff() {
+        // given
+        Product product = product("pim-A", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        listener.handleMessage(request());
+        List<MarketplaceOfferSnapshot> published = captureSavedRows();
+        reset(marketplaceExportRunService, provider);
+        previousSnapshotContains(published.toArray(new MarketplaceOfferSnapshot[0]));
+        noCategoriesConfigured();
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> removed = captureRemovedOffers();
+        assertThat(removed).hasSize(1);
+        assertThat(removed.get(0).productId()).isEqualTo("pim-A");
+        assertThat(removed.get(0).ean()).isEqualTo("EAN-A");
+        assertThat(removed.get(0).manufacturerCode()).isEqualTo("MFN-PIM-A");
+        assertThat(removed.get(0).quantity()).isZero();
+    }
+
+    @Test
+    void keepsTheEanOnTheRemovalPendingRowForTheNextAttempt() {
+        // given
+        noCategoriesConfigured();
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-X", 999L, 5L, "EAN-X", "MFN-X"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).ean()).isEqualTo("EAN-X");
+        assertThat(saved.get(0).manufacturerCode()).isEqualTo("MFN-X");
+    }
+
+    @Test
+    void marksTheRemovalAsFailedWhenTheMarketplaceRefusedTheLastAttempt() {
+        // given
+        noCategoriesConfigured();
+        previousSnapshotContains(
+                MarketplaceOfferSnapshot.removalPending("pim-X", 999L, 3, "EAN-X", "MFN-X")
+                        .rejected("NOT_FOUND", "no such offer"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+        List<MarketplaceOfferSnapshot> saved = captureSavedRows();
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).pimId()).isEqualTo("pim-X");
+        assertThat(saved.get(0).outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_REMOVAL_FAILED);
+        assertThat(saved.get(0).removalAttempts()).isEqualTo(3);
+        assertThat(saved.get(0).reasonCode()).isEqualTo("NOT_FOUND");
+        assertThat(saved.get(0).ean()).isEqualTo("EAN-X");
+    }
+
+    @Test
+    void doesNotCallARejectedPublicationAFailedRemovalWhenRemovalIsSwitchedOff() {
+        // given
+        ReflectionTestUtils.setField(listener, "removalRetryCount", 0);
+        noCategoriesConfigured();
+        previousSnapshotContains(
+                MarketplaceOfferSnapshot.published("pim-X", 999L, 5L).rejected("VALIDATION", "title too short"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
+    }
+
+    @Test
+    void forgetsAFailedRemovalOnTheRunAfterItWasRecorded() {
+        // given
+        noCategoriesConfigured();
+        previousSnapshotContains(MarketplaceOfferSnapshot.removalFailed(
+                "pim-X", 999L, 3, "NOT_FOUND", "no such offer", "EAN-X", "MFN-X"));
 
         // when
         listener.handleMessage(request());

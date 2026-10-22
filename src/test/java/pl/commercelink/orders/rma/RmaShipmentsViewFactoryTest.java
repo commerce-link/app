@@ -87,6 +87,16 @@ class RmaShipmentsViewFactoryTest {
         return shipment;
     }
 
+    /** Nothing to do about the shipment but correct it by hand ("Edytuj" in its menu). */
+    private static void assertOnlyEditable(RmaShipmentsView.Row row) {
+        assertThat(row.editable()).isTrue();
+        assertThat(row.labelHref()).isNull();
+        assertThat(row.retryHref()).isNull();
+        assertThat(row.removeAction()).isNull();
+        assertThat(row.pickupRetryAction()).isNull();
+        assertThat(row.returnRetryAction()).isNull();
+    }
+
     @Test
     void anOperatorPackageWaitingForPickupOffersTheLabelAndThePickupPage() {
         // when
@@ -109,7 +119,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         assertThat(html).contains("href=\"/dashboard/shipping/pickups/new?group=furgonetka%7CDPD%7Caddr-1&amp;back=/dashboard/rma/rma-1\"")
@@ -140,7 +150,7 @@ class RmaShipmentsViewFactoryTest {
 
         // then
         assertThat(row.stateKey()).isEqualTo("order.shipments.state.creation.failed");
-        assertThat(row.retryHref()).isEqualTo("/dashboard/rma/rma-1#rmaItemsForm");
+        assertThat(row.retryHref()).isEqualTo("/dashboard/rma/rma-1#pozycje");
         assertThat(row.removeAction()).isEqualTo("/dashboard/rma/rma-1/shipments/creations/cmd-1/remove");
         assertThat(row.labelHref()).isNull();
     }
@@ -278,11 +288,11 @@ class RmaShipmentsViewFactoryTest {
 
         // then
         assertThat(view.rows().get(0).stateKey()).isNull();
-        assertThat(view.rows().get(0).hasActions()).isFalse();
+        assertOnlyEditable(view.rows().get(0));
     }
 
     @Test
-    void theTableRendersTheFormattedStateAndTheActions() {
+    void theCardRendersTheFormattedStateAndTheActions() {
         // given
         Shipment ordered = operatorPackage();
         ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
@@ -297,7 +307,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then: the argument array is spread, never printed as one value
         assertThat(html).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
@@ -307,7 +317,7 @@ class RmaShipmentsViewFactoryTest {
                 .contains("action=\"/dashboard/rma/rma-1/shipments/21480004/pickup\"")
                 .contains(">Zamów odbiór ponownie</button>")
                 .contains("action=\"/dashboard/rma/rma-1/shipments/creations/cmd-1/remove\"")
-                .contains("href=\"/dashboard/rma/rma-1#rmaItemsForm\"")
+                .contains("href=\"/dashboard/rma/rma-1#pozycje\"")
                 .contains("action=\"/dashboard/rma/rma-1/return-shipment/retry\"")
                 .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/rma/rma-1\"")
                 .doesNotContain("??");
@@ -326,7 +336,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Integracja wysyłki (Furgonetka) "
@@ -349,16 +359,16 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         RmaShipmentsView.Row row = view.rows().get(0);
         assertThat(row.stateKey()).isNull();
         assertThat(row.labelHref()).isNull();
-        assertThat(row.hasActions()).isFalse();
+        assertOnlyEditable(row);
         assertThat(view.pickupHref()).isNull();
         assertThat(html).contains("href=\"https://tracking.example/0000123\"").contains(">0000123</a>")
-                .contains("Przewoźnik</span>: <span>DPD")
+                .contains("<span>Kurier · DPD</span>")
                 .doesNotContain("cl-status")
                 .doesNotContain("Pobierz etykietę")
                 .doesNotContain("APP/CRIN/13023761");
@@ -402,7 +412,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         assertThat(view.rows().get(0).labelHref()).isNull();
@@ -440,7 +450,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         assertThat(html).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków</span>")
@@ -450,7 +460,7 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
-    void anOperatorShipmentKeepsItsLabelAndItsStateInTheTable() {
+    void anOperatorShipmentKeepsItsLabelAndItsStateInTheCard() {
         // given: the shop prints the label of what it sends itself
         Shipment ordered = operatorPackage();
         ordered.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
@@ -459,7 +469,7 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
         assertThat(html).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
@@ -468,7 +478,7 @@ class RmaShipmentsViewFactoryTest {
     }
 
     @Test
-    void theCarrierStateAndActionsSitUnderTheNumberSoTheTableKeepsFourColumns() {
+    void theCarrierStateAndActionsSitInTheShipmentsRowOfAList() {
         // given
         Shipment failedPickup = customerReturn();
         failedPickup.setPickup(ShipmentPickup.awaiting().failed("Brak kuriera"));
@@ -476,11 +486,66 @@ class RmaShipmentsViewFactoryTest {
 
         // when
         String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/rma-shipments :: table(${view})}\"></div>", Map.of("view", view));
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
 
         // then
-        String trackingCell = html.substring(html.indexOf("0000123"), html.indexOf("</td>", html.indexOf("0000123")));
-        assertThat(html.split("</th>").length - 1).isEqualTo(4);
-        assertThat(trackingCell).contains("Przewoźnik</span>: <span>DPD").contains("cl-status is-warn").contains(">Zamów odbiór ponownie</button>");
+        String row = html.substring(html.indexOf("<li class=\"cl-list-item\""), html.lastIndexOf("</li>"));
+        assertThat(html).doesNotContain("<table");
+        assertThat(row).contains("<span>Kurier · DPD</span>").contains("cl-status is-warn").contains(">Zamów odbiór ponownie</button>");
+    }
+
+    @Test
+    void rowsCarryTheirNumberFormattedDatesAndWhetherTheyCanBeEdited() {
+        // given
+        Shipment typed = new Shipment(ShipmentType.Courier);
+        typed.setCarrier("InPost");
+        typed.setTrackingNo("5201130293");
+        typed.setShippedAt(LocalDateTime.of(2026, 10, 13, 8, 31));
+        typed.setDeliveredAt(LocalDateTime.of(2026, 10, 14, 9, 55));
+        RMA rma = rmaWith(typed, failedCreation(false));
+
+        // when
+        RmaShipmentsView open = factory.build(rma, false, PL);
+        RmaShipmentsView closed = factory.build(rma, true, PL);
+
+        // then: numbered from 1 over the whole list like the ?open=shipment-{n} dialogs; a shipment being created has nothing to edit
+        RmaShipmentsView.Row first = open.rows().get(0);
+        assertThat(first.number()).isEqualTo(1);
+        assertThat(first.index()).isZero();
+        assertThat(first.dialogId()).isEqualTo("shipment-dialog-1");
+        assertThat(first.typeKey()).isEqualTo("ShipmentType.Courier");
+        assertThat(first.shippedAt()).isEqualTo("13.10.2026 08:31");
+        assertThat(first.deliveredAt()).isEqualTo("14.10.2026 09:55");
+        assertThat(first.editable()).isTrue();
+        assertThat(open.rows().get(1).number()).isEqualTo(2);
+        assertThat(open.rows().get(1).shippedAt()).isNull();
+        assertThat(open.rows().get(1).editable()).isFalse();
+        assertThat(open.editable()).isTrue();
+        assertThat(open.updateAction()).isEqualTo("/dashboard/rma/rma-1/updateShipments");
+        assertThat(open.types()).containsExactly(ShipmentType.values());
+        assertThat(closed.rows().get(0).editable()).isFalse();
+        assertThat(closed.editable()).isFalse();
+    }
+
+    @Test
+    void aTrackingLinkIsOnlyAWebAddress() {
+        // given: the URL is typed by the operator or comes from an integration; a javascript: one would run on click
+        Shipment scripted = new Shipment(ShipmentType.Courier);
+        scripted.setTrackingNo("T-1");
+        scripted.setTrackingUrl("javascript:alert(document.cookie)");
+        Shipment web = new Shipment(ShipmentType.Courier);
+        web.setTrackingNo("T-2");
+        web.setTrackingUrl("https://tracking.example/T-2");
+        RmaShipmentsView view = factory.build(rmaWith(scripted, web), false, PL);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{rma/detail/shipments :: card}\"></div>", Map.of("rmaShipments", view));
+
+        // then
+        assertThat(view.rows().get(0).trackingHref()).isNull();
+        assertThat(view.rows().get(1).trackingHref()).isEqualTo("https://tracking.example/T-2");
+        assertThat(html).doesNotContain("href=\"javascript:").contains("<span>T-1</span>")
+                .contains("href=\"https://tracking.example/T-2\"");
     }
 }

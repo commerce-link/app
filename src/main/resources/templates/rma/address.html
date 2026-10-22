@@ -3,8 +3,9 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-<!--/* The address "Ship to client" sends an RMA's goods back to. A page of its own while rma-detail is on Bulma; the
-       form is a fragment so the redesigned RMA page can open it in a dialog later (as the order's address). */-->
+<!--/* The address "Ship to client" sends an RMA's goods back to. The form is also the address dialog of the RMA details
+       page (rma/detail/side :: addressDialog, inDialog true); this page is its version without JavaScript and where a
+       refused save comes back with the errors. */-->
 <div layout:fragment="content">
 <section class="cl-page" th:fragment="body" th:with="p=${page}">
     <div class="cl-page-body is-form">
@@ -32,10 +33,16 @@
                 </div>
             </div>
             <!--/* Autofill is off: the operator types the customer's address, not their own. */-->
-            <form th:fragment="addressForm(p)" id="rma-address-form" class="cl-form" method="post" novalidate
+            <!--/* inDialog: true in the details page's dialog, unset on this page. In the wide dialog the form is not
+                   held to the page form's width (cl-form). */-->
+            <form th:fragment="addressForm(p, inDialog)" id="rma-address-form" th:class="${inDialog} ? null : 'cl-form'" method="post" novalidate
                   th:with="a=${p.form()}"
                   th:action="@{/dashboard/rma/{r}/updateShippingDetails(r=${p.rmaId()})}">
-                <div class="cl-card-inset">
+                <h2 th:if="${inDialog}" class="cl-dialog-title" id="address-dialog-title" th:text="#{rma.address.page.title}"></h2>
+                <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+                    <p th:if="${inDialog == true and p.fillAvailable()}" class="cl-help"><a class="cl-link-button"
+                            th:href="@{/dashboard/rma/{r}/shipping(r=${p.rmaId()}, fill='order')}"
+                            th:text="#{rma.detail.address.fromOrder(${p.orderShortId()})}"></a></p>
                     <div th:replace="~{fragments/settings-form :: errorSummaryTitled('rma-address-errors', ${a.errors()}, null, ${p.errorSummaryTitleKey()})}"></div>
                     <input th:if="${p.shipToClient()}" type="hidden" name="shipToClient" value="true">
                     <div class="cl-form-grid cl-card-grid">
@@ -50,9 +57,10 @@
                         <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.phone', 'order.address.phone', ${a.phone()}, 'tel', 'off', true, ${a.error('phone')}, null, null, null, false, ${a.maxLength()})}"></div>
                     </div>
                 </div>
-                <div class="cl-card-footer">
+                <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
                     <button type="submit" class="cl-button is-primary" th:text="#{rma.address.save}"></button>
-                    <a class="cl-button" th:href="@{/dashboard/rma/{r}(r=${p.rmaId()})}" th:text="#{general.cancel}"></a>
+                    <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                    <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/rma/{r}(r=${p.rmaId()})}" th:text="#{general.cancel}"></a>
                 </div>
             </form>
         </section>

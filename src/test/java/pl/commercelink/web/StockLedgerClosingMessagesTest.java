@@ -48,7 +48,7 @@ class StockLedgerClosingMessagesTest {
         Properties en = load("messages_en.properties");
 
         // then
-        assertThat(keys).contains("reports.stockLedger.closing.missing.sync", "reports.stockLedger.closing.regenerated");
+        assertThat(keys).contains("reports.stockLedger.closing.missing.sync", "reports.stockLedger.closing.accepted");
         assertThat(keys.stream().filter(k -> !pl.containsKey(k)).toList()).as("missing in PL").isEmpty();
         assertThat(keys.stream().filter(k -> !en.containsKey(k)).toList()).as("missing in EN").isEmpty();
     }

@@ -1,6 +1,7 @@
 package pl.commercelink.orders.rma;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
@@ -23,15 +24,13 @@ public class RMAItemsRepository extends DynamoDbRepository<RMAItem> {
         return dynamoDBMapper.load(RMAItem.class, rmaId, rmaItemId);
     }
 
+    /** Every item of the RMA, read by the table's partition key and ordered by rmaItemId. */
     public List<RMAItem> findByRmaId(String rmaId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":rmaId", new AttributeValue().withS(rmaId));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("rmaId = :rmaId")
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(RMAItem.class, scanExpression);
+        RMAItem key = new RMAItem();
+        key.setRmaId(rmaId);
+        DynamoDBQueryExpression<RMAItem> query = new DynamoDBQueryExpression<RMAItem>()
+                .withHashKeyValues(key);
+        return new ArrayList<>(dynamoDBMapper.query(RMAItem.class, query));
     }
 
     public List<RMAItem> findBySerialNo(String serialNo) {

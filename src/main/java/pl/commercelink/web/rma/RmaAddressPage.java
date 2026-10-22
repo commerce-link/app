@@ -1,5 +1,8 @@
 package pl.commercelink.web.rma;
 
+import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.rma.RMA;
+
 /**
  * The return address page of an RMA. fillAvailable: the order has a shipping address that differs from the form;
  * filled: the form shows the order's address, not saved yet; missing: the RMA has no address at all;
@@ -13,6 +16,22 @@ public record RmaAddressPage(String rmaId, String rmaShortId, String orderShortI
 
     /** Posted by the form when the operator came from "Ship to client" (the template writes the same name). */
     public static final String SHIP_TO_CLIENT_PARAM = "shipToClient";
+
+    /**
+     * The page for an RMA's address form. orderAddress: the order's shipping address, null when the order has none;
+     * filled: the form shows it; incomplete and shipToClient as in the record.
+     */
+    public static RmaAddressPage of(RMA rma, RmaAddressForm form, ShippingDetails orderAddress, boolean filled,
+                                    boolean incomplete, boolean shipToClient) {
+        boolean fillAvailable = !filled && orderAddress != null && form.differsFrom(orderAddress);
+        return new RmaAddressPage(rma.getRmaId(), shortId(rma.getRmaId()), shortId(rma.getOrderId()), form,
+                fillAvailable, filled, !RmaAddressForm.hasAnyValue(rma.getShippingDetails()), incomplete, shipToClient);
+    }
+
+    /** The address form as the RMA details page's dialog shows it: the saved address, nothing submitted yet. */
+    public static RmaAddressPage forDetails(RMA rma, ShippingDetails orderAddress) {
+        return of(rma, RmaAddressForm.of(rma.getShippingDetails()), orderAddress, false, false, false);
+    }
 
     public static String shortId(String id) {
         return id == null ? null : id.length() > 8 ? id.substring(0, 8) : id;
