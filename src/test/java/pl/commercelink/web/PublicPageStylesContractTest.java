@@ -125,4 +125,29 @@ class PublicPageStylesContractTest {
         assertThat(css).contains(".cl-offer-page .cl-offer-updating { display: none; }")
                 .contains(".cl-offer-page #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }");
     }
+
+    @Test
+    void orderStagesAndFactsAreSharedPublicComponents() throws Exception {
+        // given
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+
+        // then
+        assertThat(order).contains("body.cl-public ol.cl-stages {", "body.cl-public .cl-stage.is-current .cl-stage-dot {",
+                "body.cl-public dl.cl-facts {", ".cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }")
+                .doesNotContain("!important")
+                .doesNotContain(".cl-offer-page");
+    }
+
+    @Test
+    void orderStagesTurnIntoAVerticalListOnAPhone() throws Exception {
+        // given
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+        String phone = order.substring(order.indexOf("@media (max-width: 719px) {"));
+
+        // then
+        assertThat(phone).contains("body.cl-public ol.cl-stages { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }")
+                .contains(".cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }");
+    }
 }

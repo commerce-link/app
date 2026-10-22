@@ -1,0 +1,51 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Before dispatch only: the planned dates and, while the store allows it, the customer's own day. The server checks
+       the day against the window and the store's weekdays. */-->
+<section th:fragment="date" id="date" class="cl-card" aria-labelledby="order-date-title"
+         th:with="notice=${clientOrderNotice != null and clientOrderNotice.target() == 'date' ? clientOrderNotice : null}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-date-title"
+            th:text="${view.personalCollection} ? #{client.order.date.title.collection} : #{client.order.date.title.shipping}"></h2>
+    </div>
+    <div class="cl-card-inset">
+        <div th:if="${notice != null}" class="cl-alert" role="status" tabindex="-1"
+             th:classappend="${notice.tone() == 'ok'} ? 'is-ok' : 'is-bad'">
+            <span class="cl-alert-icon" aria-hidden="true"><i th:class="${notice.tone() == 'ok'} ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i></span>
+            <div><p class="cl-alert-text" th:text="${notice.text()}"></p></div>
+        </div>
+
+        <th:block th:unless="${view.hasEstimatedDates()}">
+            <p class="cl-help" th:text="#{client.order.dates.unknown}"></p>
+            <p th:if="${view.preferredShippingOffered}" class="cl-help" th:text="#{client.order.dates.unknown.preferred}"></p>
+        </th:block>
+
+        <th:block th:if="${view.preferredShippingEditable}">
+            <p class="cl-help" th:text="#{client.order.preferred.shipping.hint(${#temporals.format(view.estimatedShippingAt, 'd MMMM')}, ${#temporals.format(view.preferredShippingWindowEnd, 'd MMMM')})}"></p>
+            <form method="post" data-cl-submit-once th:action="|${orderPath}/preferred-shipping|">
+                <div class="cl-field">
+                    <label class="cl-label" for="preferredShippingDate"
+                           th:text="${view.personalCollection} ? #{client.order.preferred.shipping.collection} : #{client.order.preferred.shipping.shipping}"></label>
+                    <input id="preferredShippingDate" name="date" type="date" class="cl-input" required
+                           th:value="${view.preferredShippingAt}" th:min="${view.estimatedShippingAt}"
+                           th:max="${view.preferredShippingWindowEnd}">
+                </div>
+                <div class="cl-card-actions">
+                    <button class="cl-button is-primary" type="submit" th:text="#{client.order.preferred.shipping.submit}"></button>
+                </div>
+            </form>
+            <form th:if="${view.preferredShippingAt != null}" method="post" data-cl-submit-once
+                  th:action="|${orderPath}/preferred-shipping|">
+                <p class="cl-help"><button class="cl-link-button" type="submit" th:text="#{client.order.preferred.shipping.clear}"></button></p>
+            </form>
+        </th:block>
+        <p th:if="${view.preferredShippingVisible and !view.preferredShippingEditable}" class="cl-help"
+           th:text="#{client.order.preferred.shipping.locked}"></p>
+        <p th:if="${view.hasEstimatedDates()}" class="cl-help" th:text="#{client.order.dates.note}"></p>
+    </div>
+</section>
+
+</body>
+</html>

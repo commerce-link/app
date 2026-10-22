@@ -27,7 +27,6 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.CategoryLocalizer;
@@ -97,8 +96,6 @@ public class ClientOrderController {
         ClientOrderView view = ClientOrderView.from(context.order(), orderItemsRepository.findByOrderId(orderId), context.store(),
                 categoryLocalizer, editable, preferredShippingEditable);
         model.addAttribute("view", view);
-        // The old template still reads these until it is rewritten on top of the public frame.
-        addStore(model, context.store());
         Map<String, String> kept = new LinkedHashMap<>();
         kept.put("v", verificationId);
         kept.put("t", editToken);
@@ -282,11 +279,6 @@ public class ClientOrderController {
         model.addAttribute("shortId", lookup.order() != null ? lookup.order().getShortenedOrderId() : null);
         response.setStatus(HttpServletResponse.SC_NOT_FOUND);
         return UNAVAILABLE;
-    }
-
-    private static void addStore(Model model, Store store) {
-        model.addAttribute("store", store);
-        model.addAttribute("branding", store.getBranding() != null ? store.getBranding() : new Branding());
     }
 
     private String redirectWithError(ClientOrderContext context, RedirectAttributes redirectAttributes, Locale locale, String reason) {
