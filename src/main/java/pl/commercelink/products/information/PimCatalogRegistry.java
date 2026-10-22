@@ -89,7 +89,7 @@ public class PimCatalogRegistry {
     private void onEntryAdded(PIMEntryAddedEvent event, StoreEntryPinning storeEntryPinning,
                               ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
         if (event.ownerStoreId() == null) {
-            attachEntryToProducts(event, productRepository, productCatalogRepository);
+            attachEntryToProducts(event, productRepository);
         } else {
             storeEntryPinning.onStoreEntryAnnounced(event, catalog);
         }
@@ -132,14 +132,9 @@ public class PimCatalogRegistry {
         }
     }
 
-    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository,
-                                      ProductCatalogRepository productCatalogRepository) {
-        List<Product> products = event.ownerStoreId() == null
-                ? productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes())
-                // a store's own entry only fills products of that store
-                : productRepository.findAllWithoutPimIdByEanOrMfnInCategories(
-                        categoryIdsOf(event.ownerStoreId(), productCatalogRepository), event.eans(), event.mfnCodes());
-        products.forEach(product -> {
+    /** Global entries only: a store's own entries are pinned by {@link StoreEntryPinning}. */
+    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository) {
+        productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes()).forEach(product -> {
             product.setPimId(event.pimId());
             productRepository.save(product);
         });
