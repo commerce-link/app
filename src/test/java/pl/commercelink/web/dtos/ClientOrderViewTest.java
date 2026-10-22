@@ -76,40 +76,8 @@ class ClientOrderViewTest {
     }
 
     @Test
-    @DisplayName("from picks the partial-assembly note when some items await delivery and others are assembled")
-    void fromPicksPartialAssemblyNote() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        List<OrderItem> items = List.of(
-                product(order, "A", "Cat", 1, FulfilmentStatus.Ordered, 1),
-                product(order, "B", "Cat", 1, FulfilmentStatus.Reserved, 2)
-        );
-
-        // when
-        ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
-
-        // then
-        assertThat(view.getStage()).isEqualTo(ClientOrderStage.Assembly);
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly.partial");
-    }
-
-    @Test
-    @DisplayName("from picks the awaiting note when every item is still on its way from the supplier")
-    void fromPicksAwaitingNoteWhenNothingAssembledYet() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        List<OrderItem> items = List.of(product(order, "A", "Cat", 1, FulfilmentStatus.Ordered, 1));
-
-        // when
-        ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
-
-        // then
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly.awaiting");
-    }
-
-    @Test
-    @DisplayName("from picks the plain assembly note when items are only allocated, hiding that nothing was ordered")
-    void fromPicksPlainAssemblyNoteWhenItemsOnlyAllocated() {
+    @DisplayName("from hides that nothing was ordered when items are only allocated")
+    void fromHidesUnorderedItemsWhenOnlyAllocated() {
         // given
         Order order = order(OrderStatus.Assembly);
         List<OrderItem> items = List.of(
@@ -121,7 +89,6 @@ class ClientOrderViewTest {
         ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
 
         // then
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly");
         assertThat(view.getItems()).extracting(ClientOrderView.ClientOrderItemView::status)
                 .containsOnly(ClientOrderItemStatus.Allocation);
     }
@@ -138,7 +105,6 @@ class ClientOrderViewTest {
         // then
         assertThat(view.isCancelled()).isTrue();
         assertThat(view.getStage()).isNull();
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.cancelled");
         assertThat(view.isStageDone(ClientOrderStage.Accepted)).isFalse();
     }
 
@@ -161,7 +127,6 @@ class ClientOrderViewTest {
         assertThat(view.getShipments()).containsExactly(collected);
         assertThat(view.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 12, 16, 40));
         assertThat(view.getDeliveredAt()).isNull();
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.ready.for.collection");
         assertThat(view.getPickupAddress().city()).isEqualTo("Kraków");
     }
 
@@ -243,7 +208,6 @@ class ClientOrderViewTest {
 
         // then
         assertThat(view.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 15, 11, 5));
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.delivered");
         assertThat(view.isStageDone(ClientOrderStage.Shipping)).isTrue();
         assertThat(view.isStageDone(ClientOrderStage.Delivered)).isTrue();
     }

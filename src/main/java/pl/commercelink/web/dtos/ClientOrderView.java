@@ -39,7 +39,6 @@ public class ClientOrderView {
     private final LocalDateTime orderedAt;
     private final ClientOrderStage stage;
     private final boolean cancelled;
-    private final String noteKey;
     private final List<ClientOrderItemView> items;
     private final long assembledCount;
     private final String deliveryMethod;
@@ -89,7 +88,6 @@ public class ClientOrderView {
                 .toList();
         this.assembledCount = items.stream().filter(item -> item.status() == ClientOrderItemStatus.Assembled).count();
         this.personalCollection = order.isPersonalCollection();
-        this.noteKey = resolveNoteKey();
         this.deliveryMethod = orderItems.stream()
                 .filter(item -> item.isService() && OrderItem.DELIVERY_CATEGORY.equals(item.getCategory()))
                 .map(OrderItem::getName)
@@ -228,19 +226,6 @@ public class ClientOrderView {
         return candidate == stage;
     }
 
-    private String resolveNoteKey() {
-        if (cancelled) {
-            return "client.order.note.cancelled";
-        }
-        return switch (stage) {
-            case Accepted -> "client.order.note.accepted";
-            case Assembly -> resolveAssemblyNoteKey();
-            case Preparation -> "client.order.note.preparation";
-            case Shipping -> personalCollection ? "client.order.note.ready.for.collection" : "client.order.note.shipping";
-            case Delivered -> "client.order.note.delivered";
-        };
-    }
-
     private String resolveHeadlineKey() {
         String prefix = "client.order.headline.";
         if (cancelled) {
@@ -262,7 +247,7 @@ public class ClientOrderView {
         String prefix = "client.order.lead.";
         return prefix + switch (stage) {
             case Accepted -> "accepted";
-            case Assembly -> resolveAssemblyNoteKey().substring("client.order.note.".length());
+            case Assembly -> resolveAssemblyLeadSuffix();
             case Preparation -> "preparation";
             case Shipping -> personalCollection ? "collection" : "shipping";
             case Delivered -> "delivered";
@@ -307,15 +292,15 @@ public class ClientOrderView {
                 shipment.getShippedAt(), shipment.getDeliveredAt(), shipment.getType() == ShipmentType.PersonalCollection);
     }
 
-    private String resolveAssemblyNoteKey() {
+    private String resolveAssemblyLeadSuffix() {
         boolean anyAwaitingDelivery = items.stream().anyMatch(item -> item.status() == ClientOrderItemStatus.AwaitingDelivery);
         if (anyAwaitingDelivery && assembledCount > 0) {
-            return "client.order.note.assembly.partial";
+            return "assembly.partial";
         }
         if (anyAwaitingDelivery) {
-            return "client.order.note.assembly.awaiting";
+            return "assembly.awaiting";
         }
-        return "client.order.note.assembly";
+        return "assembly";
     }
 
     // The pickup address is not stored on the order; the store's default pickup address (the same one POS
