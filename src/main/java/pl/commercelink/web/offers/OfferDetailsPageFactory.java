@@ -19,7 +19,6 @@ import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.OfferController;
-import pl.commercelink.web.offers.BasketViewPage.Market;
 import pl.commercelink.web.offers.OfferDetailsPage.*;
 import pl.commercelink.web.orders.ItemMargin;
 import pl.commercelink.web.orders.Money;

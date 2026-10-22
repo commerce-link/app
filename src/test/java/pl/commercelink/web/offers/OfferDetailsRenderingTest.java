@@ -3,7 +3,6 @@ package pl.commercelink.web.offers;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.products.StoreCategories;
-import pl.commercelink.web.offers.BasketViewPage.Market;
 import pl.commercelink.web.offers.OfferDetailsPage.*;
 import pl.commercelink.web.orders.AddressBlock;
 import pl.commercelink.web.orders.ItemMargin;

@@ -2,7 +2,6 @@ package pl.commercelink.web.offers;
 
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.StoreCategories;
-import pl.commercelink.web.offers.BasketViewPage.Market;
 import pl.commercelink.web.orders.AddressBlock;
 import pl.commercelink.web.orders.ItemMargin;
 
@@ -48,6 +47,13 @@ public record OfferDetailsPage(String offerId, String storeId, String shortId, b
                        boolean consolidated, String variantGroupId, boolean variantSelected, boolean service,
                        Integer estimatedDeliveryDays, boolean incomplete, ItemMargin margin, Market market,
                        String medianProviders, String otherProviders, long lowestQty, long medianQty) implements Line {
+    }
+
+    /** Supplier cost now (lowest → median gross per unit at the enabled suppliers); missing = no supplier offers it. */
+    public record Market(boolean missing, String low, String median, int suppliers, long stock) {
+        static Market none() {
+            return new Market(true, null, null, 0, 0);
+        }
     }
 
     /** deliveryRemoved = the chosen option is no longer in the store's configuration (counted as 0, like the list). */

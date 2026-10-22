@@ -1,7 +1,6 @@
 package pl.commercelink.web.offers;
 
 import pl.commercelink.web.orders.AddressBlock;
-import pl.commercelink.web.orders.ItemMargin;
 
 import java.util.List;
 
@@ -25,36 +24,14 @@ public record BasketViewPage(String basketId, String shortId, String backHref, S
     public record Pill(String key, Object arg) {
     }
 
-    /** market null = a service; market.missing() = a product no enabled supplier offers; market.unavailable() = no answer from the index. */
-    public record Row(String name, String category, String mfn, long qty, String unitPrice, boolean service,
-                      ItemMargin margin, Market market) {
-    }
-
-    /** unavailable = the supplier index could not answer, which says nothing about the assortment. */
-    public record Market(boolean missing, boolean unavailable, String low, String median, int suppliers, long stock) {
-        public Market(boolean missing, String low, String median, int suppliers, long stock) {
-            this(missing, false, low, median, suppliers, stock);
-        }
-
-        static Market none() {
-            return new Market(true, null, null, 0, 0);
-        }
-
-        static Market indexDown() {
-            return new Market(false, true, null, null, 0, 0);
-        }
+    /** The basket with the shop's prices; no supplier costs or estimated margin (the client's decision, 2026-10-22). */
+    public record Row(String name, String category, String mfn, long qty, String unitPrice, boolean service) {
     }
 
     public enum DeliveryState { CHOSEN, NONE, UNKNOWN }
 
-    public enum EstimateState { OK, NO_OFFERS, UNAVAILABLE, NO_PRODUCTS }
-
     public record Summary(String items, DeliveryState deliveryState, String deliveryName, String delivery, String total,
-                          String net, String vat, Estimate estimate) {
-    }
-
-    /** missing = products without supplier offers, left out of the cost. */
-    public record Estimate(EstimateState state, String cost, String profit, String profitNet, String margin, int missing) {
+                          String net, String vat) {
     }
 
     public record Customer(AddressBlock billing, AddressBlock shipping, boolean sameAddress) {
