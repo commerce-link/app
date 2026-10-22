@@ -98,7 +98,7 @@ public class ClientOrderView {
                 .orElse(null);
         this.shipmentType = order.firstShipment().map(Shipment::getType).orElse(ShipmentType.Courier);
         this.collectionPointCode = order.firstShipment().map(Shipment::getCollectionPointCode).orElse(null);
-        this.carrier = order.firstShipment().map(Shipment::getCarrier).filter(StringUtils::isNotBlank).orElse(null);
+        this.carrier = order.firstShipment().map(CarrierNames::forCustomer).orElse(null);
         this.shippingDetails = order.getShippingDetails();
         this.pickupAddress = personalCollection ? resolvePickupAddress(store) : null;
         this.shipments = order.getShipments().stream()

@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.Shipment;
@@ -327,14 +328,170 @@ class ClientOrderTemplateRenderingTest {
     }
 
     @Test
-    void deliveryAddressStaysMasked() {
+    void addressIsMaskedExceptPostalCodeCityAndCountry() {
         // when
         String html = ClientOrderRenderer.newOrder().locale(PL).render();
 
         // then
         assertThat(html).doesNotContain("Kowalski").doesNotContain("Miodowa 14").doesNotContain("600100789")
                 .doesNotContain("jan.kowalski@gmail.com")
-                .contains("00-251 Warszawa, PL");
+                .contains("<h3>Adres dostawy</h3>")
+                .contains("<p>00-251 Warszawa, PL</p>");
+    }
+
+    @Test
+    void changeAddressButtonOnlyWhenEditable() {
+        // when
+        String editable = ClientOrderRenderer.newOrder().locale(PL).render();
+        String shipped = ClientOrderRenderer.newOrder().status(OrderStatus.Shipping)
+                .shipments(ClientOrderRenderer.shipment("dpd", "111", null, SHIPPED, null)).locale(PL).render();
+        String collection = ClientOrderRenderer.newOrder().personalCollection().locale(PL).render();
+
+        // then
+        assertThat(editable).containsPattern("<form method=\"post\" data-cl-submit-once action=\"[^\"]*/address/request-code\">\\s*"
+                        + "<button class=\"cl-button\" type=\"submit\"><i class=\"fas fa-pencil-alt\" aria-hidden=\"true\"></i>\\s*<span>Zmień adres</span>")
+                .contains("<p class=\"cl-help\">Adres możesz zmienić do nadania paczki. Wyślemy kod potwierdzający na e-mail podany w zamówieniu.</p>");
+        for (String html : List.of(shipped, collection)) {
+            assertThat(html).doesNotContain("/address/request-code").doesNotContain("Zmień adres")
+                    .doesNotContain("Adres możesz zmienić");
+        }
+    }
+
+    @Test
+    void codeStepShowsStepOneOfTwoAndCodeField() {
+        // when
+        String html = ClientOrderRenderer.newOrder().addressStep("code").locale(PL).render();
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-substep\"><span class=\"cl-step-badge\" aria-hidden=\"true\">1</span>\\s*Krok 1 z 2</p>")
+                .contains("<h3 class=\"cl-fieldset-title\">Potwierdź, że to Ty</h3>")
+                .contains("<input type=\"hidden\" name=\"v\" value=\"ver-1\">")
+                .containsPattern("<input id=\"code\" name=\"code\" class=\"cl-input cl-code-input\" type=\"text\" maxlength=\"6\" required"
+                        + "\\s+autocomplete=\"one-time-code\" autocapitalize=\"characters\" spellcheck=\"false\"\\s+autofocus")
+                .contains("class=\"cl-code-row\"")
+                .containsPattern("Sprawdź folder spam albo\\s*<button class=\"cl-link-button\" type=\"submit\">wyślij kod ponownie</button>.")
+                .doesNotContain("Zmień adres");
+        assertThat(html.split("data-cl-submit-once", -1)).hasSize(4);
+    }
+
+    @Test
+    void codeErrorIsAttachedToTheField() {
+        // when
+        String html = ClientOrderRenderer.newOrder().addressStep("code")
+                .notice(ClientOrderNotice.codeError("Nieprawidłowy kod. Spróbuj ponownie.")).locale(PL).render();
+
+        // then
+        assertThat(html).contains("aria-invalid=\"true\"").contains("aria-describedby=\"code-error\"")
+                .containsPattern("<p class=\"cl-field-error\" id=\"code-error\">\\s*<i class=\"fas fa-exclamation-circle\" aria-hidden=\"true\"></i>"
+                        + "<span>Nieprawidłowy kod. Spróbuj ponownie.</span>")
+                .doesNotContain("autofocus")
+                .doesNotContain("cl-alert is-bad");
+        assertThat(html.indexOf("class=\"cl-code-row\"")).isLessThan(html.indexOf("id=\"code-error\""));
+    }
+
+    @Test
+    void editStepPostsAllAddressFieldsAndToken() {
+        // when
+        String html = ClientOrderRenderer.newOrder().addressStep("edit").locale(PL).render();
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-substep\"><span class=\"cl-step-badge\" aria-hidden=\"true\">2</span>\\s*Krok 2 z 2</p>")
+                .contains("<h3 class=\"cl-fieldset-title\">Nowy adres dostawy</h3>")
+                .containsPattern("<form method=\"post\" data-cl-submit-once action=\"[^\"]*/address\">")
+                .contains("<input type=\"hidden\" name=\"t\" value=\"tok-1\">")
+                .contains("value=\"Kowalski\"")
+                .doesNotContain("<h3>Adres dostawy</h3>");
+        for (String field : List.of("name", "surname", "companyName", "streetAndNumber", "postalCode", "city", "email", "phone")) {
+            assertThat(html).contains("name=\"" + field + "\"");
+        }
+        for (String required : List.of("streetAndNumber", "postalCode", "city", "email", "phone")) {
+            assertThat(html).containsPattern("name=\"" + required + "\"[^>]*required");
+        }
+        assertThat(html).containsPattern("autocomplete=\"shipping postal-code\"")
+                .containsPattern("<div class=\"cl-span-2\">\\s*<div class=\"cl-field\">\\s*<label class=\"cl-label\" for=\"postalCode\">")
+                .containsPattern("<div class=\"cl-span-4\">\\s*<div class=\"cl-field\">\\s*<label class=\"cl-label\" for=\"city\">");
+    }
+
+    @Test
+    void editStepShowsCountryAsText() {
+        // when
+        String polish = ClientOrderRenderer.newOrder().addressStep("edit").locale(PL).render();
+        String english = ClientOrderRenderer.newOrder().addressStep("edit").render();
+
+        // then
+        assertThat(polish).contains("<p class=\"cl-static-value\">Polska</p>").doesNotContain("name=\"country\"");
+        assertThat(english).contains("<p class=\"cl-static-value\">Poland</p>");
+    }
+
+    @Test
+    void deliveryNoticeRendersInTheDeliveryCard() {
+        // when
+        String edit = ClientOrderRenderer.newOrder().addressStep("edit")
+                .notice(ClientOrderNotice.bad(ClientOrderNotice.DELIVERY, "Uzupełnij poprawnie wszystkie wymagane pola adresu."))
+                .locale(PL).render();
+        String saved = ClientOrderRenderer.newOrder()
+                .notice(ClientOrderNotice.ok(ClientOrderNotice.DELIVERY, "Adres dostawy został zmieniony.")).locale(PL).render();
+
+        // then
+        assertThat(edit).contains("Krok 2 z 2");
+        int card = edit.indexOf("id=\"delivery\"");
+        int alert = edit.indexOf("<div class=\"cl-alert is-bad\" role=\"status\" tabindex=\"-1\">");
+        assertThat(alert).isGreaterThan(edit.indexOf("Krok 2 z 2")).isGreaterThan(card)
+                .isLessThan(edit.indexOf("name=\"name\"")).isLessThan(edit.indexOf("order-progress-title"));
+        assertThat(edit.split("cl-alert is-bad", -1)).hasSize(2);
+        assertThat(saved).contains("<div class=\"cl-alert is-ok\" role=\"status\" tabindex=\"-1\">")
+                .contains("Adres dostawy został zmieniony.");
+        assertThat(saved.indexOf("cl-alert is-ok")).isGreaterThan(saved.indexOf("id=\"delivery\""))
+                .isLessThan(saved.indexOf("<h3>Adres dostawy</h3>"));
+    }
+
+    @Test
+    void pickupPointShowsMaskedPointCode() {
+        // when
+        String html = ClientOrderRenderer.newOrder().pickupPoint("WAW01M").locale(PL).render();
+
+        // then
+        assertThat(html).contains("<h3>Punkt odbioru</h3>")
+                .containsPattern("<p>InPost · <span>\\s*<span>WAW\\*\\*\\*</span>")
+                .doesNotContain("WAW01M")
+                .doesNotContain("<p>inpost</p>");
+    }
+
+    @Test
+    void personalCollectionShowsPickupAddress() {
+        // given
+        ClientOrderRenderer renderer = ClientOrderRenderer.newOrder().personalCollection();
+        BillingDetails company = new BillingDetails();
+        company.setCompanyName("Nova Tech sp. z o.o.");
+        company.setStreetAndNumber("ul. Prosta 12");
+        company.setPostalCode("00-850");
+        company.setCity("Warszawa");
+        renderer.store().setBillingDetails(company);
+
+        // when
+        String html = renderer.locale(PL).render();
+
+        // then
+        assertThat(html).contains("<h3>Adres odbioru</h3>")
+                .contains("<p>Nova Tech sp. z o.o.</p>")
+                .contains("<p>ul. Prosta 12</p>")
+                .contains("<p>00-850 Warszawa</p>")
+                .doesNotContain("<h3>Adres dostawy</h3>");
+    }
+
+    @Test
+    void deliveryCardComesFirstDuringAddressChange() {
+        // when
+        String code = ClientOrderRenderer.newOrder().addressStep("code").locale(PL).render();
+        String edit = ClientOrderRenderer.newOrder().addressStep("edit").locale(PL).render();
+        String plain = ClientOrderRenderer.newOrder().locale(PL).render();
+
+        // then
+        for (String html : List.of(code, edit)) {
+            assertThat(html.indexOf("id=\"delivery\"")).isPositive().isLessThan(html.indexOf("order-progress-title"));
+            assertThat(html.split("id=\"delivery\"", -1)).hasSize(2);
+        }
+        assertThat(plain.indexOf("id=\"delivery\"")).isGreaterThan(plain.indexOf("order-progress-title"));
     }
 
     static List<Path> templateSources() throws IOException {

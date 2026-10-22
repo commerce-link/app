@@ -14362,6 +14362,18 @@ body.cl-public dl.cl-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 6
 .cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }
 .cl-order-page .cl-card-inset form > .cl-card-actions { margin-top: 12px; }
 .cl-order-page .cl-card-inset > :is(.cl-kv-grid, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form) { margin-top: 12px; }
+/* a step of a multi-step change inside a card: p.cl-substep = cl-step-badge + "Step n of m" */
+body.cl-public p.cl-substep { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--cl-ink-2); }
+/* a short one-time code typed from an e-mail: large, spaced capitals; the buttons sit in the same row */
+body.cl-public .cl-code-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+body.cl-public input.cl-input.cl-code-input { width: 11rem; max-width: 100%; font-size: 18px; font-weight: 600; letter-spacing: .3em;
+  text-transform: uppercase; text-align: center; }
+body.cl-public .cl-code-row + .cl-field-error { margin-top: 6px; }
+/* delivery card */
+.cl-order-page .cl-card-inset > .cl-help + :is(form, .cl-alert) { margin-top: 12px; }
+.cl-order-page .cl-card-inset > form > .cl-help { margin: 0; }
+/* a link-styled button inside a sentence (send the code again) reads as a word of it, not as a separate control */
+.cl-order-page .cl-help .cl-link-button { display: inline; min-height: 0; padding: 0; font-size: inherit; text-decoration: underline; }
 /* shipments */
 .cl-order-page .cl-list-actions .cl-button { white-space: nowrap; }
 .cl-order-page .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
@@ -14380,6 +14392,10 @@ body.cl-public dl.cl-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 6
   .cl-order-page .cl-list.is-items .cl-status { justify-self: start; }
   .cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
   .cl-order-page .cl-card-actions .cl-button { min-height: 44px; }
+}
+@media (max-width: 1023px) {
+  body.cl-public .cl-code-row :is(.cl-input, .cl-button) { min-height: 44px; }
+  .cl-order-page #delivery :is(.cl-input, .cl-button) { min-height: 44px; }
 }
 
 /* ===== Public message page (client-offer/unavailable.html): one card with eyebrow, title and lead ===== */

@@ -189,6 +189,23 @@ class ClientOrderViewTest {
     }
 
     @Test
+    @DisplayName("from names the pickup point carrier the way the shipments list does, not by its stored code")
+    void fromNamesPickupPointCarrierForTheCustomer() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        Shipment locker = new Shipment(ShipmentType.PickupPoint);
+        locker.setCarrier("inpost");
+        locker.setCollectionPointCode("KRA01A");
+        order.setShipments(new LinkedList<>(List.of(locker)));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(view.getCarrier()).isEqualTo("InPost");
+    }
+
+    @Test
     @DisplayName("from keeps shipments visible for a courier order that is not cancelled")
     void fromKeepsShipmentsVisibleForCourierOrder() {
         // given
