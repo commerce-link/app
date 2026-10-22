@@ -26,6 +26,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryOptions;
@@ -181,6 +182,8 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         Inventory inventory = mock(Inventory.class);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
         PimCatalog pimCatalog = mock(PimCatalog.class);
+        PimView pimView = mock(PimView.class);
+        org.mockito.Mockito.when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
         BrandMapper brandMapper = mock(BrandMapper.class);
         MessageSource messageSource = mock(MessageSource.class);
         CatalogPlacement placement = mock(CatalogPlacement.class);

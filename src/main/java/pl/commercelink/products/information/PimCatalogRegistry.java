@@ -9,6 +9,10 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
+import pl.commercelink.pim.api.PIMEntryAddedEvent;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
@@ -29,6 +33,7 @@ public class PimCatalogRegistry {
 
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
+                       ProductCatalogRepository productCatalogRepository,
                        SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
 
         PimCatalogDescriptor descriptor = resolveDescriptor(
@@ -41,12 +46,7 @@ public class PimCatalogRegistry {
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
 
-        catalog.onEntryAdded(event ->
-                productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes())
-                        .forEach(product -> {
-                            product.setPimId(event.pimId());
-                            productRepository.save(product);
-                        }));
+        catalog.onEntryAdded(event -> attachEntryToProducts(event, productRepository, productCatalogRepository));
 
         catalog.onEntryDeleted(event ->
                 productRepository.detachPimFromProducts(event.pimId()));
@@ -56,6 +56,27 @@ public class PimCatalogRegistry {
         EventBindingRegistrar.forDescriptors(List.of(descriptor))
                 .withQueues(sqsAsyncClient, containers, catalog::dispatch)
                 .register();
+    }
+
+    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository,
+                                      ProductCatalogRepository productCatalogRepository) {
+        List<Product> products = event.ownerStoreId() == null
+                ? productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes())
+                // a store's own entry only fills products of that store
+                : productRepository.findAllWithoutPimIdByEanOrMfnInCategories(
+                        categoryIdsOf(event.ownerStoreId(), productCatalogRepository), event.eans(), event.mfnCodes());
+        products.forEach(product -> {
+            product.setPimId(event.pimId());
+            productRepository.save(product);
+        });
+    }
+
+    private static List<String> categoryIdsOf(String storeId, ProductCatalogRepository productCatalogRepository) {
+        return productCatalogRepository.findAll(storeId).stream()
+                .flatMap(catalog -> catalog.getCategories().stream())
+                .map(CategoryDefinition::getCategoryId)
+                .distinct()
+                .toList();
     }
 
     static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {

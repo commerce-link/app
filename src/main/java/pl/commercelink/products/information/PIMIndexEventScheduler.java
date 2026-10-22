@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntryRequest;
 import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
@@ -78,8 +79,9 @@ class PIMIndexEventScheduler {
                 ? getRecommendedProducts(storeId, categoryDefinition)
                 : productRepository.findAll(categoryDefinition.getCategoryId());
 
+        PimView pim = pimCatalog.withStoreData(storeId);
         return products.stream()
-                .filter(product -> pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).isEmpty())
+                .filter(product -> pim.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).isEmpty())
                 .map(p -> toPimEntryRequest(storeId, categoryDefinition.getType(), p))
                 .collect(Collectors.toList());
     }
@@ -91,7 +93,7 @@ class PIMIndexEventScheduler {
     }
 
     private List<Product> getRecommendedProducts(String storeId, CategoryDefinition categoryDefinition) {
-        return recommendationEngine.getRecommendations(categoryDefinition, inventory.withEnabledSuppliersOnly(storeId))
+        return recommendationEngine.getRecommendations(pimCatalog.withStoreData(storeId), categoryDefinition, inventory.withEnabledSuppliersOnly(storeId))
                 .stream()
                 .map(ProductRecommendation::toProduct)
                 .collect(Collectors.toList());

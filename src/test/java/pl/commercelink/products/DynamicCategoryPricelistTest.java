@@ -1,6 +1,7 @@
 package pl.commercelink.products;
 
 import org.junit.jupiter.api.BeforeEach;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -50,6 +51,8 @@ class DynamicCategoryPricelistTest {
 
     @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
 
     @Mock
     private ProductRepository productRepository;
@@ -70,12 +73,13 @@ class DynamicCategoryPricelistTest {
 
     @BeforeEach
     void setUp() {
-        recommendationEngine = new ProductRecommendationEngine(pimCatalog, productRepository);
+        recommendationEngine = new ProductRecommendationEngine(productRepository);
+        when(pimCatalog.withStoreData(any())).thenReturn(pimView);
 
         when(rollingPriceAggregateRepository.loadForStore(STORE_ID)).thenReturn(Map.of());
         when(sellingPriceHistoryRepository.load(STORE_ID, CATALOG_ID)).thenReturn(Map.of());
         when(productRepository.findAll(CATEGORY_ID)).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
+        when(pimView.findByPimIdOrGtinsOrMpns(eq(PIM_ID), any(), any())).thenReturn(Optional.of(pimEntry()));
 
         when(inventory.findAllByProductCategoryIds(List.of("170"))).thenReturn(Map.of("170", List.of(matchedInventory)));
         when(inventory.findByProduct(any())).thenReturn(matchedInventory);
@@ -108,6 +112,7 @@ class DynamicCategoryPricelistTest {
 
         AvailabilityAndPriceList availabilityAndPriceList = new AvailabilityAndPriceList(
                 inventory,
+                pimCatalog,
                 productCatalogRepository,
                 productRepository,
                 recommendationEngine,

@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
@@ -32,6 +34,12 @@ class AvailabilityAndPriceListTest {
 
     @Mock
     private InventoryView inventory;
+
+    @Mock
+    private PimCatalog pimCatalog;
+
+    @Mock
+    private PimView pim;
 
     @Mock
     private ProductCatalogRepository productCatalogRepository;
@@ -68,6 +76,7 @@ class AvailabilityAndPriceListTest {
         when(rollingPriceAggregateRepository.loadForStore(anyString())).thenReturn(Collections.emptyMap());
         availabilityAndPriceList = new AvailabilityAndPriceList(
                 inventory,
+                pimCatalog,
                 productCatalogRepository,
                 productRepository,
                 recommendationEngine,
@@ -125,7 +134,8 @@ class AvailabilityAndPriceListTest {
     void dynamicCatalogRowTakesCategoryFromDefinitionNameNotFromProduct() {
         // given
         when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(true);
-        when(recommendationEngine.getRecommendationsForMappedProducts(categoryDefinition, inventory)).thenReturn(List.of(recommendation));
+        when(pimCatalog.withStoreData(any())).thenReturn(pim);
+        when(recommendationEngine.getRecommendationsForMappedProducts(pim, categoryDefinition, inventory)).thenReturn(List.of(recommendation));
         when(recommendation.toProduct()).thenReturn(product);
 
         // when

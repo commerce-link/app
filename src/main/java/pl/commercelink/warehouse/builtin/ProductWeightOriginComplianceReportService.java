@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 
 import java.time.LocalDate;
@@ -42,21 +43,22 @@ public class ProductWeightOriginComplianceReportService {
 
     private Map<AggregateKey, Aggregate> aggregate(String storeId, LocalDateTime periodStart, LocalDateTime periodEnd) {
         Map<AggregateKey, Aggregate> aggregates = new HashMap<>();
+        PimView pim = pimCatalog.withStoreData(storeId);
         for (WarehouseDocument doc : documentRepository.findAllInDateRange(storeId, periodStart, periodEnd)) {
             if (doc.getType() != DocumentType.GoodsReceipt) continue;
             if (doc.getReason() != DocumentReason.SupplierDelivery) continue;
 
             String country = resolveCountry(doc);
             for (WarehouseDocumentItem item : itemRepository.findByDocumentId(doc.getDocumentId())) {
-                accumulate(item, country, aggregates);
+                accumulate(item, country, pim, aggregates);
             }
         }
         return aggregates;
     }
 
-    private void accumulate(WarehouseDocumentItem item, String country, Map<AggregateKey, Aggregate> aggregates) {
+    private void accumulate(WarehouseDocumentItem item, String country, PimView pimLookup, Map<AggregateKey, Aggregate> aggregates) {
         if (item.getMfn() == null || item.getMfn().isBlank()) return;
-        Optional<PimEntry> pim = pimCatalog.findByGtinOrMpn(item.getEan(), item.getMfn());
+        Optional<PimEntry> pim = pimLookup.findByGtinOrMpn(item.getEan(), item.getMfn());
         String category = pim.map(PimEntry::category).orElse(null);
         String brand = pim.map(PimEntry::brand).orElse(null);
         Integer netG = pim.map(PimEntry::netWeightInGrams).orElse(null);

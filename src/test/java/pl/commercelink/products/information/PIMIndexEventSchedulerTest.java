@@ -1,6 +1,7 @@
 package pl.commercelink.products.information;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,6 +25,8 @@ import static org.mockito.Mockito.when;
 class PIMIndexEventSchedulerTest {
 
     @Mock private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
     @Mock private ProductRepository productRepository;
     @Mock private ProductCatalogRepository productCatalogRepository;
     @Mock private StoresRepository storesRepository;
@@ -33,6 +36,13 @@ class PIMIndexEventSchedulerTest {
 
     @InjectMocks
     private PIMIndexEventScheduler scheduler;
+
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
+    }
+
 
     private static Store store(String storeId) {
         Store store = new Store();

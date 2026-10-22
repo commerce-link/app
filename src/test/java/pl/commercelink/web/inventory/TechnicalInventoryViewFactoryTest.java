@@ -1,6 +1,7 @@
 package pl.commercelink.web.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,6 +27,8 @@ class TechnicalInventoryViewFactoryTest {
 
     @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
 
     @InjectMocks
     private TechnicalInventoryViewFactory factory;
@@ -40,7 +43,8 @@ class TechnicalInventoryViewFactoryTest {
         when(inventory.getLastUpdateDate("elko")).thenReturn(now.minusMinutes(5));
         when(taxonomyCache.size()).thenReturn(80_000);
         when(taxonomyCache.getFileName()).thenReturn("taxonomy-merged-full.csv");
-        when(pimCatalog.findAll()).thenReturn(List.of());
+        when(pimCatalog.withGlobalData()).thenReturn(pimView);
+        when(pimView.findAll()).thenReturn(List.of());
 
         // when
         TechnicalInventoryView view = factory.build(now);

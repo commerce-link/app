@@ -4,14 +4,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.shipping.ShipmentLinks;
 import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderPageModelFactory;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -19,6 +23,8 @@ import java.util.Set;
 @Component
 @RequiredArgsConstructor
 public class RmaShipmentsViewFactory {
+
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     private final ShippingService shippingService;
     private final StoresRepository storesRepository;
@@ -33,24 +39,35 @@ public class RmaShipmentsViewFactory {
         boolean returnRetry = !closed && CustomerReturnRetry.possible(rma);
         Set<String> labelProviders = ShipmentLinks.labelProviders(shipments,
                 provider -> shippingService.supportsLabels(store, provider));
-        List<RmaShipmentsView.Row> rows = shipments.stream().map(s -> {
+        List<RmaShipmentsView.Row> rows = new ArrayList<>();
+        for (int i = 0; i < shipments.size(); i++) {
+            Shipment s = shipments.get(i);
             // only a shipment created through an integration has a state line, and it names its own provider
             OrderLabels.ShipmentState state = shownState(s, locale,
                     shippingIntegrationNames.of(s.getProvider(), store, locale));
-            return new RmaShipmentsView.Row(s,
+            rows.add(new RmaShipmentsView.Row(s, i + 1,
+                    s.getType() == null ? null : "ShipmentType." + s.getType().name(),
+                    date(s.getShippedAt()), date(s.getDeliveredAt()), OrderPageModelFactory.safeWebUrl(s.getTrackingUrl()),
+                    // a shipment being created has nothing the form could show; the server keeps it as it is
+                    !closed && s.getCreation() == null,
                     state == null ? null : state.key(), state == null ? null : state.args(),
-                    state == null ? null : state.tone(),
+                    state == null ? null : state.tone(), state != null && state.inProgress(),
                     !isCustomerReturn(s) && ShipmentLinks.hasPackage(s) && labelProviders.contains(s.getProvider())
                             ? ShipmentLinks.label(s.getProvider(), s.getExternalId(), details) : null,
-                    !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#rmaItemsForm" : null,
+                    !closed && s.creationFailed() && !isCustomerReturn(s) ? details + "#pozycje" : null,
                     !closed && s.creationFailed() ? removeAction(details, s) : null,
                     !closed && isCustomerReturn(s) && s.awaitsPickup() && s.getExternalId() != null
                             ? pickupRetryAction(details, s) : null,
-                    returnRetry && isCustomerReturn(s) && s.creationFailed() ? details + "/return-shipment/retry" : null);
-        }).toList();
+                    returnRetry && isCustomerReturn(s) && s.creationFailed() ? details + "/return-shipment/retry" : null));
+        }
         LocalDateTime now = LocalDateTime.now();
         String pollHref = shipments.stream().anyMatch(s -> s.awaitsProviderAnswer(now)) ? details + "/shipments/state" : null;
-        return new RmaShipmentsView(rows, closed ? null : ShipmentLinks.pickup(shipments, details), pollHref);
+        return new RmaShipmentsView(rows, closed ? null : ShipmentLinks.pickup(shipments, details), pollHref, !closed,
+                details + "/updateShipments", List.of(ShipmentType.values()));
+    }
+
+    private static String date(LocalDateTime at) {
+        return at == null ? null : at.format(DATE);
     }
 
     /**
