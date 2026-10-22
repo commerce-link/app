@@ -195,7 +195,7 @@ class ClientOrderControllerTest {
     }
 
     @Test
-    @DisplayName("requestAddressCode issues a code to the billing e-mail and redirects to the code form")
+    @DisplayName("requestAddressCode issues a code and redirects to the code form without an anchor, so the code field takes the focus")
     void requestAddressCodeIssuesCodeAndRedirects() {
         // given
         Order order = order(OrderStatus.Assembly);
@@ -210,7 +210,7 @@ class ClientOrderControllerTest {
         String result = controller.requestAddressCode(STORE_ID, ORDER_ID, new MockHttpServletRequest(), new RedirectAttributesModelMap(), new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
     }
 
     @Test

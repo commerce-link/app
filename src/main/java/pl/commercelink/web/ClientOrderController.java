@@ -123,7 +123,9 @@ public class ClientOrderController {
         try {
             String verificationId = clientVerificationService.issue(context.subject(), ClientVerificationPurpose.SHIPPING_ADDRESS_CHANGE,
                     context.order().getBillingDetails().getEmail(), context.order().getBillingDetails().getName());
-            return "redirect:" + context.basePath() + "?v=" + verificationId + DELIVERY_ANCHOR;
+            // No anchor: browsers skip autofocus when the URL targets an element, and the code field should take the focus.
+            // The delivery card is already first during the step, right under the header.
+            return "redirect:" + context.basePath() + "?v=" + verificationId;
         } catch (ClientVerificationException e) {
             return redirectWithError(context, redirectAttributes, locale, e.getReason().name());
         }
