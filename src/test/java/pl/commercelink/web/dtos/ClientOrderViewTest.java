@@ -426,6 +426,35 @@ class ClientOrderViewTest {
     }
 
     @Test
+    void shippingLeadPointsToTheCarrierOnlyWhenAShipmentHasATrackingLink() {
+        // given
+        Order tracked = order(OrderStatus.Shipping);
+        Shipment withUrl = new Shipment(ShipmentType.Courier);
+        withUrl.setCarrier("dpd");
+        withUrl.setTrackingNo("1");
+        withUrl.setTrackingUrl("https://track/1");
+        withUrl.setShippedAt(LocalDateTime.of(2026, 10, 21, 10, 0));
+        tracked.setShipments(new LinkedList<>(List.of(withUrl)));
+        Order untracked = order(OrderStatus.Shipping);
+        Shipment withoutUrl = new Shipment(ShipmentType.Courier);
+        withoutUrl.setCarrier("dpd");
+        withoutUrl.setTrackingNo("2");
+        withoutUrl.setShippedAt(LocalDateTime.of(2026, 10, 21, 10, 0));
+        untracked.setShipments(new LinkedList<>(List.of(withoutUrl)));
+        Order noParcel = order(OrderStatus.Shipping);
+
+        // when
+        ClientOrderView trackedView = ClientOrderView.from(tracked, List.of(), store(), categoryLocalizer);
+        ClientOrderView untrackedView = ClientOrderView.from(untracked, List.of(), store(), categoryLocalizer);
+        ClientOrderView noParcelView = ClientOrderView.from(noParcel, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(trackedView.getLeadKey()).isEqualTo("client.order.lead.shipping");
+        assertThat(untrackedView.getLeadKey()).isEqualTo("client.order.lead.shipping.noTracking");
+        assertThat(noParcelView.getLeadKey()).isEqualTo("client.order.lead.shipping.noParcel");
+    }
+
+    @Test
     void preferredDaysCoverTheWindowOnAllowedWeekdays() {
         // given
         Order order = order(OrderStatus.Assembly);
@@ -568,8 +597,6 @@ class ClientOrderViewTest {
         assertThat(view.getShipmentRows().get(0).carrier()).isEqualTo("InPost");
         assertThat(view.getShipmentRows().get(0).trackingNo()).isEqualTo("123");
         assertThat(view.getShipmentRows().get(0).trackingUrl()).isEqualTo("https://track/123");
-        assertThat(view.getShipmentRows().get(0).collection()).isFalse();
-        assertThat(view.getShipmentRows().get(1).collection()).isTrue();
         assertThat(view.getReadyForCollectionAt()).isEqualTo(LocalDateTime.of(2026, 10, 20, 9, 0));
     }
 

@@ -122,10 +122,10 @@ public class ClientOrderView {
         this.preferredShippingWindowEnd = order.getPreferredShippingWindowEnd();
         this.preferredShippingDays = store.preferredShippingDaysFor(order.getShipmentType()).stream().sorted().toList();
         this.headlineKey = resolveHeadlineKey();
+        this.shipmentRows = shipments.stream().map(ClientOrderView::toRow).toList();
         this.leadKey = resolveLeadKey();
         this.preferredShippingOptions = resolveDayOptions(order, store, today);
         this.bank = toBank(order);
-        this.shipmentRows = shipments.stream().map(ClientOrderView::toRow).toList();
         this.readyForCollectionAt = shipments.stream()
                 .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
                 .map(Shipment::getShippedAt).filter(Objects::nonNull)
@@ -249,7 +249,7 @@ public class ClientOrderView {
             case Accepted -> "accepted";
             case Assembly -> resolveAssemblyLeadSuffix();
             case Preparation -> "preparation";
-            case Shipping -> personalCollection ? "collection" : "shipping";
+            case Shipping -> personalCollection ? "collection" : resolveShippingLeadSuffix();
             case Delivered -> "delivered";
         };
     }
@@ -289,7 +289,16 @@ public class ClientOrderView {
 
     private static ShipmentRow toRow(Shipment shipment) {
         return new ShipmentRow(CarrierNames.forCustomer(shipment), shipment.getTrackingNo(), shipment.getTrackingUrl(),
-                shipment.getShippedAt(), shipment.getDeliveredAt(), shipment.getType() == ShipmentType.PersonalCollection);
+                shipment.getShippedAt(), shipment.getDeliveredAt());
+    }
+
+    // "Check with the carrier" only makes sense when a tracking link is there to follow.
+    private String resolveShippingLeadSuffix() {
+        if (shipmentRows.isEmpty()) {
+            return "shipping.noParcel";
+        }
+        return shipmentRows.stream().anyMatch(row -> row.trackingUrl() != null && !row.trackingUrl().isBlank())
+                ? "shipping" : "shipping.noTracking";
     }
 
     private String resolveAssemblyLeadSuffix() {
@@ -325,7 +334,7 @@ public class ClientOrderView {
     }
 
     public record ShipmentRow(String carrier, String trackingNo, String trackingUrl, LocalDateTime shippedAt,
-                              LocalDateTime deliveredAt, boolean collection) {
+                              LocalDateTime deliveredAt) {
     }
 
     public record PickupAddress(String companyName, String streetAndNumber, String postalCode, String city) {

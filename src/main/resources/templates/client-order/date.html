@@ -42,8 +42,10 @@
                     </label>
                     <label th:each="option : ${view.preferredShippingOptions}" class="cl-choice is-date">
                         <input type="radio" name="date" th:value="${option.date()}" th:checked="${option.selected()}">
-                        <span class="cl-date-day" th:text="#{${'DayOfWeek.short.' + option.date().dayOfWeek.name()}}"></span>
-                        <span class="cl-date-num" th:text="${#temporals.format(option.date(), 'd MMM')}"></span>
+                        <!--/* The tile shows an abbreviated date; assistive tech reads the full one instead. */-->
+                        <span class="cl-visually-hidden" th:text="${#temporals.format(option.date(), 'EEEE d MMMM')}"></span>
+                        <span class="cl-date-day" aria-hidden="true" th:text="#{${'DayOfWeek.short.' + option.date().dayOfWeek.name()}}"></span>
+                        <span class="cl-date-num" aria-hidden="true" th:text="${#temporals.format(option.date(), 'd MMM')}"></span>
                         <span th:if="${option.planned()}" class="cl-date-tag" th:text="#{client.order.date.planned}"></span>
                     </label>
                 </div>

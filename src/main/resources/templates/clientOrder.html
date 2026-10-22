@@ -14,7 +14,7 @@
     <div class="cl-order-page"
          th:with="orderPath=@{/store/{storeId}/client/order/{orderId}(storeId=${publicPage.storeId},orderId=${view.orderId})},
                   deliveryFirst=${addressStep != null or (clientOrderNotice != null and clientOrderNotice.target() == 'delivery')},
-                  dateVisible=${view.beforeDispatch or (!view.cancelled and clientOrderNotice != null and clientOrderNotice.target() == 'date')},
+                  dateVisible=${view.beforeDispatch or (clientOrderNotice != null and clientOrderNotice.target() == 'date')},
                   collection=${view.personalCollection},
                   chosenDay=${view.preferredShippingAt},
                   leadDay=${view.preferredShippingAt != null ? view.preferredShippingAt : view.estimatedShippingAt}">

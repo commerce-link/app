@@ -12,8 +12,11 @@ import java.util.stream.Stream;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @DynamoDBDocument
-// Serializable because the client order page flashes the typed address through the session when it is rejected.
+// Kept serializable so the address flashed through the session survives a session store, should one be added;
+// sessions are in memory today and nothing serializes them.
 public class ShippingDetails implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @DynamoDBAttribute(attributeName = "id")
     private String id;

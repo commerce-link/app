@@ -503,8 +503,8 @@ class ClientOrderTemplateRenderingTest {
         assertThat(html).contains("<fieldset class=\"cl-choice-group is-dates\">")
                 .contains("<legend>Dzień wysyłki (pon.–pt., do 6 listopada)</legend>")
                 .containsPattern("<label class=\"cl-choice is-date is-wide\">\\s*<input type=\"radio\" name=\"date\" value=\"\" checked=\"checked\">")
-                .containsPattern("<input type=\"radio\" name=\"date\" value=\"2026-10-23\">\\s*<span class=\"cl-date-day\">pt\\.</span>\\s*"
-                        + "<span class=\"cl-date-num\">23 paź</span>\\s*<span class=\"cl-date-tag\">planowany</span>")
+                .containsPattern("<input type=\"radio\" name=\"date\" value=\"2026-10-23\">\\s*<span class=\"cl-visually-hidden\">piątek 23 października</span>\\s*"
+                        + "<span class=\"cl-date-day\" aria-hidden=\"true\">pt\\.</span>\\s*<span class=\"cl-date-num\" aria-hidden=\"true\">23 paź</span>\\s*<span class=\"cl-date-tag\">planowany</span>")
                 .contains("Planowany dzień wysyłki: piątek 23 października.")
                 .contains(">Zapisz dzień</button>");
         assertThat(html.split("name=\"date\" value=\"2026-", -1)).hasSize(12);
@@ -560,6 +560,27 @@ class ClientOrderTemplateRenderingTest {
         assertThat(html.indexOf("<div class=\"cl-alert is-ok\" role=\"status\" tabindex=\"-1\">")).isGreaterThan(card)
                 .isLessThan(html.indexOf("cl-choice-group is-dates"));
         assertThat(html).contains("Preferowana data została zapisana.");
+    }
+
+    @Test
+    void dateNoticeStaysVisibleWhenTheOrderWasCancelledMeanwhile() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.Cancelled)
+                .notice(ClientOrderNotice.bad(ClientOrderNotice.DATE, "Tego zamówienia nie można już zmienić.")).locale(PL).render();
+
+        // then
+        assertThat(html).contains("id=\"date\"").contains("Tego zamówienia nie można już zmienić.")
+                .doesNotContain("cl-choice-group is-dates");
+    }
+
+    @Test
+    void dayTilesAreAnnouncedWithTheFullDate() {
+        // when
+        String html = ClientOrderRenderer.newOrder().locale(PL).render();
+
+        // then
+        assertThat(html).containsPattern("<span class=\"cl-visually-hidden\">piątek 23 października</span>")
+                .containsPattern("<span class=\"cl-date-day\" aria-hidden=\"true\">pt\\.</span>\\s*<span class=\"cl-date-num\" aria-hidden=\"true\">23 paź</span>");
     }
 
     @Test

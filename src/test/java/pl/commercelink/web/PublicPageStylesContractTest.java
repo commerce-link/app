@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -162,5 +163,42 @@ class PublicPageStylesContractTest {
                         "body.cl-public label.cl-choice.is-date input { position: absolute; inset: 0;",
                         "body.cl-public dl.cl-amounts {", "  body.cl-public label.cl-choice.is-date { min-height: 52px; }",
                         "  body.cl-public .cl-date-actions .cl-button { min-height: 44px; }");
+    }
+
+    @Test
+    void noMovedComponentIsStillScopedToTheOfferPage() throws Exception {
+        // given
+        String css = publicCss();
+        List<String> selectors = List.of(".cl-stack", ".cl-card-head.has-step", ".cl-step-badge", ".cl-list .cl-list-item.has-icon",
+                ".cl-list-icon", ".cl-list-amount", ".cl-kv-grid", "dl.cl-kv.is-bank", ".cl-help", ".cl-form-grid",
+                ".cl-fieldset", ".cl-choice-group.is-row", ".cl-static-value");
+
+        // then
+        for (String selector : selectors) {
+            assertThat(css).as(selector).doesNotContain(".cl-offer-page " + selector + " ")
+                    .doesNotContain(".cl-offer-page " + selector + ",")
+                    .doesNotContain(".cl-offer-page " + selector + "{")
+                    .contains("body.cl-public " + selector);
+        }
+    }
+
+    @Test
+    void resendLinkReachesATouchTargetOnPhoneAndTablet() throws Exception {
+        // given
+        String css = publicCss();
+        String tablet = css.substring(css.indexOf("@media (max-width: 1023px) {", css.indexOf("/* ===== Client order")));
+
+        // then
+        assertThat(tablet).contains(".cl-order-page .cl-help .cl-link-button { min-height: 44px; margin-block: -14px; }");
+    }
+
+    @Test
+    void dayTileHoverNeedsAHoverDevice() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("@media (hover: hover) {\n  body.cl-public label.cl-choice.is-date:hover {")
+                .doesNotContain("\nbody.cl-public label.cl-choice.is-date:hover");
     }
 }

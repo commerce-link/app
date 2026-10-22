@@ -52,6 +52,7 @@ class ClientPagesMessagesTest {
             "client.order.headline.delivered", "client.order.headline.cancelled",
             "client.order.lead.accepted", "client.order.lead.assembly", "client.order.lead.assembly.awaiting",
             "client.order.lead.assembly.partial", "client.order.lead.preparation", "client.order.lead.shipping",
+            "client.order.lead.shipping.noTracking", "client.order.lead.shipping.noParcel",
             "client.order.lead.collection", "client.order.lead.delivered",
             "ClientOrderStage.Accepted", "ClientOrderStage.Assembly", "ClientOrderStage.Preparation",
             "ClientOrderStage.Shipping", "ClientOrderStage.Delivered", "ClientOrderStage.Accepted.collection",
