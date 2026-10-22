@@ -19,6 +19,7 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -287,25 +288,17 @@ class PimCatalogRegistryTest {
     @Test
     void genuineRefreshFailureIsStillLoggedAsOneError() throws Exception {
         // given
-        CountDownLatch failed = new CountDownLatch(1);
-        AtomicReference<Thread> worker = new AtomicReference<>();
-        doAnswer(invocation -> {
-            worker.set(Thread.currentThread());
-            failed.countDown();
-            throw new IllegalStateException("index unreachable");
-        }).when(catalogMock).refresh();
+        doThrow(new IllegalStateException("index unreachable")).when(catalogMock).refresh();
         registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
 
         try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
             // when
             registry.requestRefresh();
-            assertThat(failed.await(2, TimeUnit.SECONDS)).isTrue();
-            registry.stop();
-            worker.get().join(2000);
-            assertThat(worker.get().isAlive()).isFalse();
 
-            // then
-            assertThat(logs.errors()).containsExactly("PIM index refresh failed");
+            // then: shutdown only after the error is observed, so the executor is still live when the worker logs
+            assertThat(logs.awaitErrors(1, Duration.ofSeconds(2))).containsExactly("PIM index refresh failed");
+        } finally {
+            registry.stop();
         }
     }
 

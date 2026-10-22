@@ -31,6 +31,15 @@ final class CapturedLogs implements AutoCloseable {
                 .toList();
     }
 
+    /** Polls (no sleep) until at least {@code count} errors are logged or the timeout passes; returns the errors. */
+    List<String> awaitErrors(int count, java.time.Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (errors().size() < count && System.nanoTime() < deadline) {
+            java.util.concurrent.locks.LockSupport.parkNanos(1_000_000);
+        }
+        return errors();
+    }
+
     @Override
     public void close() {
         logger.detachAppender(appender);
