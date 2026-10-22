@@ -10,12 +10,14 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -34,12 +36,15 @@ class InventoryAutoDiscoveryBrandTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
+    private PimView pimView;
+    @Mock
     private TaxonomyCache taxonomyCache;
     @Mock
     private SupplierRegistry supplierRegistry;
 
     private InventoryAutoDiscovery autoDiscovery(PimEntry... pimEntries) {
-        when(pimCatalog.findAll()).thenReturn(List.of(pimEntries));
+        lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
+        when(pimView.findAll()).thenReturn(List.of(pimEntries));
         return new InventoryAutoDiscovery(pimCatalog, taxonomyCache, supplierRegistry);
     }
 
