@@ -63,7 +63,19 @@ class PublicPageStylesContractTest {
         String css = publicCss();
 
         // then
-        assertThat(css).contains(".cl-client-offer .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+        assertThat(css).contains("body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+    }
+
+    @Test
+    void sharedPublicComponentsAreScopedToThePublicBody() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("body.cl-public .cl-step-badge {", "body.cl-public .cl-kv-grid {",
+                "body.cl-public dl.cl-kv.is-bank {", "body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
+        assertThat(css).doesNotContain(".cl-client-offer .cl-step-badge", ".cl-client-offer .cl-kv-grid", ".cl-client-offer dl.cl-kv.is-bank",
+                ".cl-offer-page .cl-step-badge", ".cl-offer-page .cl-kv-grid", ".cl-offer-page dl.cl-kv.is-bank");
     }
 
     @Test
@@ -187,5 +199,82 @@ class PublicPageStylesContractTest {
         // then
         assertThat(css).contains(".cl-client-offer .cl-offer-updating { display: none; }")
                 .contains(".cl-client-offer #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }");
+    }
+
+    @Test
+    void orderStagesAndFactsAreSharedPublicComponents() throws Exception {
+        // given
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+
+        // then
+        assertThat(order).contains("body.cl-public ol.cl-stages {", "body.cl-public .cl-stage.is-current .cl-stage-dot {",
+                "body.cl-public dl.cl-facts {", ".cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }")
+                .doesNotContain("!important")
+                .doesNotContain(".cl-client-offer", ".cl-offer-page");
+    }
+
+    @Test
+    void orderStagesTurnIntoAVerticalListOnAPhone() throws Exception {
+        // given
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+        String phone = order.substring(order.indexOf("@media (max-width: 719px) {"));
+
+        // then
+        assertThat(phone).contains("body.cl-public ol.cl-stages { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }")
+                .contains(".cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }");
+    }
+
+    @Test
+    void dayTilesShowFocusOnTheTileAndStayTouchSized() throws Exception {
+        // given — the radio itself is invisible, so the tile has to carry the focus ring
+        String css = publicCss();
+        String order = css.substring(css.indexOf("/* ===== Client order"), css.indexOf("/* ===== Public message page"));
+
+        // then
+        assertThat(order).contains("body.cl-public label.cl-choice.is-date:has(input:focus-visible) { outline: 2px solid var(--cl-accent);",
+                        "body.cl-public label.cl-choice.is-date input { position: absolute; inset: 0;",
+                        "body.cl-public dl.cl-amounts {", "  body.cl-public label.cl-choice.is-date { min-height: 52px; }",
+                        "  body.cl-public .cl-date-actions .cl-button { min-height: 44px; }");
+    }
+
+    @Test
+    void noMovedComponentIsStillScopedToTheOfferPage() throws Exception {
+        // given
+        String css = publicCss();
+        List<String> selectors = List.of(".cl-stack", ".cl-card-head.has-step", ".cl-step-badge", ".cl-list .cl-list-item.has-icon",
+                ".cl-list-icon", ".cl-list-amount", ".cl-kv-grid", "dl.cl-kv.is-bank", ".cl-help", ".cl-form-grid",
+                ".cl-fieldset", ".cl-choice-group.is-row", ".cl-static-value");
+
+        // then — neither the public offer scope nor the dashboard offer details class may take a shared component back
+        for (String selector : selectors) {
+            for (String offerScope : List.of(".cl-client-offer ", ".cl-offer-page ")) {
+                assertThat(css).as(selector).doesNotContain(offerScope + selector + " ")
+                        .doesNotContain(offerScope + selector + ",")
+                        .doesNotContain(offerScope + selector + "{");
+            }
+            assertThat(css).as(selector).contains("body.cl-public " + selector);
+        }
+    }
+
+    @Test
+    void resendLinkReachesATouchTargetOnPhoneAndTablet() throws Exception {
+        // given
+        String css = publicCss();
+        String tablet = css.substring(css.indexOf("@media (max-width: 1023px) {", css.indexOf("/* ===== Client order")));
+
+        // then
+        assertThat(tablet).contains(".cl-order-page .cl-help .cl-link-button { min-height: 44px; margin-block: -14px; }");
+    }
+
+    @Test
+    void dayTileHoverNeedsAHoverDevice() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains("@media (hover: hover) {\n  body.cl-public label.cl-choice.is-date:hover {")
+                .doesNotContain("\nbody.cl-public label.cl-choice.is-date:hover");
     }
 }

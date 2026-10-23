@@ -14211,21 +14211,55 @@ body.cl-public .cl-toast { top: 16px; }
   body.cl-public .cl-toast { top: 8px; }
 }
 
-/* ===== Client offer (clientOffer.html) ===== */
-.cl-client-offer .cl-stack { display: flex; flex-direction: column; gap: 16px; }
-.cl-client-offer .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
-.cl-client-offer .cl-card-head.has-step .cl-card-title { margin: 0; }
+/* ===== Public page components (offer, order) ===== */
+body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
+body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
+body.cl-public .cl-card-head.has-step .cl-card-title { margin: 0; }
 /* step number in the card title */
-.cl-client-offer .cl-step-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+body.cl-public .cl-step-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   border-radius: 50%; flex: none; font-size: 13px; font-weight: 650; background: var(--cl-accent-soft); color: var(--cl-accent); }
-.cl-client-offer .cl-step-badge.is-done { background: var(--cl-ok-soft); color: var(--cl-ok); }
-.cl-client-offer .cl-step-badge.is-locked { background: var(--cl-surface-2); color: var(--cl-ink-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
+body.cl-public .cl-step-badge.is-done { background: var(--cl-ok-soft); color: var(--cl-ok); }
+body.cl-public .cl-step-badge.is-locked { background: var(--cl-surface-2); color: var(--cl-ink-2); box-shadow: inset 0 0 0 1px var(--cl-line); }
 /* lines */
-.cl-client-offer .cl-list .cl-list-item.has-icon > div:first-child { display: flex; gap: 12px; align-items: flex-start; }
-.cl-client-offer .cl-list-amount { flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+body.cl-public .cl-list .cl-list-item.has-icon > div:first-child { display: flex; gap: 12px; align-items: flex-start; }
+body.cl-public .cl-list-amount { flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cl-ink); text-align: right; }
-.cl-client-offer .cl-list-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--cl-surface-2); color: var(--cl-ink-2);
+body.cl-public .cl-list-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--cl-surface-2); color: var(--cl-ink-2);
   display: inline-flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px var(--cl-line); }
+/* saved data */
+body.cl-public .cl-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+body.cl-public .cl-kv-grid h3 { font-size: 13.5px; font-weight: 600; color: var(--cl-ink); margin: 0 0 6px; }
+body.cl-public .cl-kv-grid p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--cl-ink); }
+body.cl-public .cl-kv-grid p.cl-muted { color: var(--cl-ink-2); }
+/* the shared masked-value fragment carries line breaks inside its span; a flex box drops them, so "City, PL" gets no
+   space before the comma */
+body.cl-public .cl-kv-grid p > span { display: inline-flex; max-width: 100%; }
+body.cl-public .cl-kv-grid p > span > span { min-width: 0; overflow-wrap: anywhere; }
+body.cl-public dl.cl-kv.is-bank { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; font-size: 14px; }
+body.cl-public dl.cl-kv.is-bank dt { color: var(--cl-ink-2); font-weight: 500; }
+body.cl-public dl.cl-kv.is-bank dd { margin: 0; color: var(--cl-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+body.cl-public .cl-help { font-size: 13px; color: var(--cl-ink-2); margin: 8px 0 0; }
+body.cl-public .cl-help.is-lock { display: flex; gap: 8px; align-items: flex-start; }
+/* the shared inset rule zeroes help margins; two help lines in a row (lock + contact the store) still need a gap */
+body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }
+body.cl-public .cl-alert { margin: 0; }
+body.cl-public .cl-card-inset > .cl-alert + * { margin-top: 12px; }
+body.cl-public .cl-form-grid { margin-top: 12px; }
+body.cl-public .cl-form-grid .cl-form-grid { margin-top: 0; }
+body.cl-public .cl-fieldset { border: 0; padding: 0; margin: 0; }
+body.cl-public .cl-fieldset + .cl-fieldset { margin-top: 20px; }
+body.cl-public .cl-fieldset-title { font-size: 15px; font-weight: 650; color: var(--cl-ink); padding: 0; margin-bottom: 8px; }
+body.cl-public .cl-choice-group.is-row { margin: 4px 0 0; }
+body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-ink); padding: 9px 0; }
+@media (max-width: 719px) {
+  body.cl-public .cl-kv-grid { grid-template-columns: 1fr; }
+  body.cl-public .cl-list.is-amounts .cl-list-item { grid-template-columns: minmax(0, 1fr) auto; }
+  body.cl-public .cl-card-inset { padding: 14px 16px; }
+  body.cl-public dl.cl-kv.is-bank { grid-template-columns: 1fr; gap: 0; }
+  body.cl-public dl.cl-kv.is-bank dd { margin-bottom: 8px; }
+}
+
+/* ===== Client offer (clientOffer.html) ===== */
 /* variant choice */
 .cl-client-offer .cl-list .cl-list-item.is-group { grid-template-columns: minmax(0, 1fr); }
 .cl-client-offer .cl-line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
@@ -14262,15 +14296,6 @@ body.cl-public .cl-toast { top: 16px; }
 }
 .cl-client-offer .cl-offer-total-row dd { margin: 0; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--cl-ink); }
 .cl-client-offer .cl-offer-total-sub { margin: 2px 0 0; text-align: right; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
-/* saved data */
-.cl-client-offer .cl-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
-.cl-client-offer .cl-kv-grid h3 { font-size: 13.5px; font-weight: 600; color: var(--cl-ink); margin: 0 0 6px; }
-.cl-client-offer .cl-kv-grid p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--cl-ink); }
-.cl-client-offer .cl-kv-grid p.cl-muted { color: var(--cl-ink-2); }
-/* the shared masked-value fragment carries line breaks inside its span; a flex box drops them, so "City, PL" gets no
-   space before the comma */
-.cl-client-offer .cl-kv-grid p > span { display: inline-flex; max-width: 100%; }
-.cl-client-offer .cl-kv-grid p > span > span { min-width: 0; overflow-wrap: anywhere; }
 /* payment */
 .cl-client-offer .cl-pay-methods { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0 0 14px; }
 .cl-client-offer .cl-pay-methods legend { font-size: 13.5px; font-weight: 500; color: var(--cl-ink-2); margin-bottom: 6px; padding: 0; }
@@ -14290,44 +14315,137 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-client-offer .cl-pay-or { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; font-size: 12px; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; color: var(--cl-ink-2); }
 .cl-client-offer .cl-pay-or::before, .cl-client-offer .cl-pay-or::after { content: ""; flex: 1; border-top: 1px solid var(--cl-line); }
-.cl-client-offer dl.cl-kv.is-bank { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; font-size: 14px; }
-.cl-client-offer dl.cl-kv.is-bank dt { color: var(--cl-ink-2); font-weight: 500; }
-.cl-client-offer dl.cl-kv.is-bank dd { margin: 0; color: var(--cl-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 /* the proforma button names the masked e-mail, which can be long: it wraps inside the button on a phone */
 .cl-client-offer .cl-proforma-label { min-width: 0; text-align: left; overflow-wrap: anywhere; }
 /* the proforma stands after the transfer details, or right after online payment when the store shows no bank account */
 .cl-client-offer .cl-card-inset > .cl-proforma { margin-top: 14px; }
 .cl-client-offer .cl-card-inset > .cl-proforma:first-child { margin-top: 0; }
-.cl-client-offer .cl-help { font-size: 13px; color: var(--cl-ink-2); margin: 8px 0 0; }
-.cl-client-offer .cl-help.is-lock { display: flex; gap: 8px; align-items: flex-start; }
-/* the shared inset rule zeroes help margins; two help lines in a row (lock + contact the store) still need a gap */
-.cl-client-offer .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }
 .cl-client-offer .cl-edit-link { font-size: 13.5px; }
-.cl-client-offer .cl-alert { margin: 0; }
-.cl-client-offer .cl-card-inset > .cl-alert + * { margin-top: 12px; }
-.cl-client-offer .cl-form-grid { margin-top: 12px; }
-.cl-client-offer .cl-form-grid .cl-form-grid { margin-top: 0; }
-.cl-client-offer .cl-fieldset { border: 0; padding: 0; margin: 0; }
-.cl-client-offer .cl-fieldset + .cl-fieldset { margin-top: 20px; }
-.cl-client-offer .cl-fieldset-title { font-size: 15px; font-weight: 650; color: var(--cl-ink); padding: 0; margin-bottom: 8px; }
-.cl-client-offer .cl-choice-group.is-row { margin: 4px 0 0; }
-.cl-client-offer .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-ink); padding: 9px 0; }
 @media (max-width: 719px) {
-  .cl-client-offer .cl-kv-grid { grid-template-columns: 1fr; }
-  .cl-client-offer .cl-list.is-amounts .cl-list-item { grid-template-columns: minmax(0, 1fr) auto; }
-  .cl-client-offer .cl-card-inset { padding: 14px 16px; }
   .cl-client-offer .cl-pay-row .cl-button.is-primary { width: 100%; justify-content: center; }
   .cl-client-offer .cl-pay-row { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
   .cl-client-offer .cl-card-footer .cl-button.is-primary { width: 100%; justify-content: center; min-height: 48px; }
-  .cl-client-offer dl.cl-kv.is-bank { grid-template-columns: 1fr; gap: 0; }
-  .cl-client-offer dl.cl-kv.is-bank dd { margin-bottom: 8px; }
   .cl-client-offer .cl-offer-total-row dd { font-size: 20px; }
+}
+
+/* ===== Client order (clientOrder.html) ===== */
+/* stages of a process: ol.cl-stages > li.cl-stage(.is-done|.is-current) > .cl-stage-dot + .cl-stage-text; a row from 720 px
+   with the line in the accent colour up to the current stage, a vertical list on a phone */
+body.cl-public ol.cl-stages { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+body.cl-public .cl-stage { position: relative; margin: 0; padding: 0 4px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+body.cl-public .cl-stage::before { content: ""; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--cl-line); }
+body.cl-public .cl-stage:first-child::before { display: none; }
+body.cl-public .cl-stage:is(.is-done, .is-current)::before { background: var(--cl-accent); }
+body.cl-public .cl-stage-dot { position: relative; z-index: 1; flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; background: var(--cl-surface); box-shadow: inset 0 0 0 2px var(--cl-line); color: var(--cl-ink-2);
+  font-size: 12.5px; font-weight: 650; }
+body.cl-public .cl-stage.is-done .cl-stage-dot { background: var(--cl-accent); box-shadow: none; color: var(--cl-surface); }
+body.cl-public .cl-stage.is-current .cl-stage-dot { background: var(--cl-accent-soft); color: var(--cl-accent);
+  box-shadow: inset 0 0 0 2px var(--cl-accent), 0 0 0 4px var(--cl-accent-soft); }
+body.cl-public .cl-stage-text { display: flex; flex-direction: column; gap: 2px; }
+body.cl-public .cl-stage-name { font-size: 13px; line-height: 1.3; color: var(--cl-ink-2); }
+body.cl-public .cl-stage.is-done .cl-stage-name { color: var(--cl-ink); }
+body.cl-public .cl-stage.is-current .cl-stage-name { color: var(--cl-ink); font-weight: 650; }
+body.cl-public .cl-stage-when { font-size: 12.5px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+/* known facts as label over value: dl.cl-facts > div > dt + dd */
+body.cl-public dl.cl-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 24px; margin: 0; }
+body.cl-public dl.cl-facts dt { font-size: 12.5px; font-weight: 500; color: var(--cl-ink-2); }
+body.cl-public dl.cl-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+/* page */
+.cl-order-page .cl-page-header { margin-bottom: 20px; }
+.cl-order-page .cl-page-title { margin: 2px 0 6px; }
+.cl-order-page .cl-card-inset + .cl-card-inset { border-top: 1px solid var(--cl-line); }
+.cl-order-page .cl-note { margin: 0; font-size: 14px; line-height: 1.5; color: var(--cl-ink); }
+.cl-order-page .cl-note a { overflow-wrap: anywhere; }
+.cl-order-page .cl-note a[href^="tel:"] { white-space: nowrap; }
+/* redirect targets after a notice (#delivery, #date) keep a gap to the top edge */
+.cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }
+.cl-order-page .cl-card-inset form > .cl-card-actions { margin-top: 12px; }
+.cl-order-page .cl-card-inset > :is(.cl-kv-grid, dl.cl-facts, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form, .cl-card-actions) { margin-top: 12px; }
+/* a step of a multi-step change inside a card: p.cl-substep = cl-step-badge + "Step n of m" */
+body.cl-public p.cl-substep { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--cl-ink-2); }
+/* a short one-time code typed from an e-mail: large, spaced capitals; the buttons sit in the same row */
+body.cl-public .cl-code-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+body.cl-public input.cl-input.cl-code-input { width: 11rem; max-width: 100%; font-size: 18px; font-weight: 600; letter-spacing: .3em;
+  text-transform: uppercase; text-align: center; }
+body.cl-public .cl-code-row + .cl-field-error { margin-top: 6px; }
+/* delivery card */
+.cl-order-page .cl-card-inset > .cl-help + :is(form, .cl-alert) { margin-top: 12px; }
+.cl-order-page .cl-card-inset > form > .cl-help { margin: 0; }
+/* a link-styled button inside a sentence (send the code again) reads as a word of it, not as a separate control */
+.cl-order-page .cl-help .cl-link-button { display: inline; min-height: 0; padding: 0; font-size: inherit; text-decoration: underline; }
+/* shipments */
+.cl-order-page .cl-list-actions .cl-button { white-space: nowrap; }
+.cl-order-page .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
+.cl-order-page .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
+.cl-order-page .cl-card-inset > .cl-help:first-child { margin-top: 0; }
+/* the dashboard's dl.cl-kv brings its own side padding; inside a public card inset the bank details line up with the text.
+   The body.cl-public prefix outranks the shared bank-details rule, whose bottom margin would otherwise win here. */
+body.cl-public .cl-order-page dl.cl-kv.is-bank { margin: 12px 0 0; padding: 0; }
+/* a day picked from a short list: fieldset.cl-choice-group.is-dates > legend + .cl-date-grid > label.cl-choice.is-date
+   (.is-wide for "as soon as possible"). The radio stays in the tab order and arrow-key group but is invisible, so the
+   tile carries the checked state and the focus ring. */
+body.cl-public .cl-choice-group.is-dates { display: block; }
+body.cl-public .cl-choice-group.is-dates > legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; font-size: 13.5px; font-weight: 500;
+  color: var(--cl-ink-2); }
+body.cl-public .cl-choice-group.is-dates > legend + * { clear: both; }
+body.cl-public .cl-date-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+body.cl-public label.cl-choice.is-date { position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-height: 56px; padding: 6px 8px; border: 1px solid var(--cl-line); border-radius: var(--cl-radius); background: var(--cl-surface);
+  text-align: center; }
+body.cl-public label.cl-choice.is-date.is-wide { grid-column: span 2; }
+body.cl-public label.cl-choice.is-date input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+@media (hover: hover) {
+  body.cl-public label.cl-choice.is-date:hover { border-color: var(--cl-ink-3); }
+}
+body.cl-public label.cl-choice.is-date:has(input:checked) { border-color: var(--cl-accent); background: var(--cl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--cl-accent); }
+body.cl-public label.cl-choice.is-date:has(input:focus-visible) { outline: 2px solid var(--cl-accent); outline-offset: 2px; }
+body.cl-public .cl-date-day { font-size: 12px; color: var(--cl-ink-2); }
+body.cl-public .cl-date-num { font-size: 15px; font-weight: 600; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+body.cl-public .cl-date-tag { font-size: 11px; font-weight: 600; color: var(--cl-ok); }
+body.cl-public .cl-date-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+/* amounts as label and value on one line, the closing row (balance or refund) under a rule: dl.cl-amounts > div(.is-total|.is-sum) */
+body.cl-public dl.cl-amounts { display: flex; flex-direction: column; gap: 6px; margin: 0; font-size: 14px; }
+body.cl-public dl.cl-amounts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+body.cl-public dl.cl-amounts dt { color: var(--cl-ink-2); }
+body.cl-public dl.cl-amounts dd { margin: 0; text-align: right; white-space: nowrap; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+body.cl-public dl.cl-amounts > :is(.is-total, .is-sum) > * { color: var(--cl-ink); font-weight: 650; }
+body.cl-public dl.cl-amounts > .is-total > dt { font-size: 15px; font-weight: 600; }
+body.cl-public dl.cl-amounts > :is(.is-total, .is-sum) > dd { font-size: 18px; }
+body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--cl-line); }
+@media (max-width: 719px) {
+  body.cl-public ol.cl-stages { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+  body.cl-public .cl-stage { flex-direction: row; align-items: flex-start; text-align: left; gap: 12px; padding: 0 0 14px; }
+  body.cl-public .cl-stage:last-child { padding-bottom: 0; }
+  body.cl-public .cl-stage::before { display: none; }
+  body.cl-public .cl-stage::after { content: ""; position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--cl-line); }
+  body.cl-public .cl-stage:last-child::after { display: none; }
+  body.cl-public .cl-stage:has(+ .cl-stage:is(.is-done, .is-current))::after { background: var(--cl-accent); }
+  body.cl-public .cl-stage-text { padding-top: 4px; }
+  body.cl-public dl.cl-facts { grid-template-columns: 1fr 1fr; }
+  .cl-order-page .cl-list.is-items .cl-list-item { gap: 6px; }
+  .cl-order-page .cl-list.is-items .cl-status { justify-self: start; }
+  .cl-order-page .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
+  .cl-order-page .cl-card-actions .cl-button { min-height: 44px; }
+  body.cl-public .cl-date-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  body.cl-public label.cl-choice.is-date { min-height: 52px; }
+  body.cl-public .cl-date-actions .cl-button { flex: 1; justify-content: center; }
+}
+@media (max-width: 1023px) {
+  body.cl-public .cl-code-row :is(.cl-input, .cl-button) { min-height: 44px; }
+  /* the target grows to 44 px but is pulled out of the sentence, so the line height stays */
+  .cl-order-page .cl-help .cl-link-button { min-height: 44px; margin-block: -14px; }
+  .cl-order-page #delivery :is(.cl-input, .cl-button) { min-height: 44px; }
+  body.cl-public .cl-date-actions .cl-button { min-height: 44px; }
 }
 
 /* ===== Public message page (client-offer/unavailable.html): one card with eyebrow, title and lead ===== */
 .cl-public-main .cl-card.cl-public-message { padding: 28px 24px; }
 .cl-public-message .cl-page-title { margin-top: 0; }
 .cl-public-message .cl-page-lead { margin-bottom: 0; }
+/* the store's contact e-mail is one unbreakable word; without this a long one scrolls the page sideways on a phone */
+.cl-public-message .cl-page-lead a { overflow-wrap: anywhere; }
 
 /* ===== Payment bridge (payments/payment-bridge.html) ===== */
 .cl-bridge { text-align: center; padding: 28px 24px; }

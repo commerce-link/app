@@ -5,13 +5,18 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.Serializable;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @DynamoDBDocument
-public class ShippingDetails {
+// A rejected address form travels back to the customer as a flash attribute, i.e. in the HTTP session, and session
+// attributes are expected to be serializable.
+public class ShippingDetails implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @DynamoDBAttribute(attributeName = "id")
     private String id;

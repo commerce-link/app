@@ -5,13 +5,16 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.Store;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PublicPageFactoryTest {
 
     private static final String PATH = "/store/s1/client/offer/o1";
+    private static final String ORDER_PATH = "/store/s1/client/order/o1";
     private static final Locale PL = Locale.forLanguageTag("pl");
 
     @Test
@@ -135,6 +138,49 @@ class PublicPageFactoryTest {
         assertThat(english.otherLanguage()).isEqualTo("pl");
         assertThat(english.otherLanguageHref()).isEqualTo(PATH + "?lang=pl");
         assertThat(other.language()).isEqualTo("pl");
+    }
+
+    @Test
+    void otherLanguageHrefKeepsVerificationParameters() {
+        // given
+        Store store = store();
+        Map<String, String> kept = new LinkedHashMap<>();
+        kept.put("v", "abc");
+
+        // when
+        PublicPage page = PublicPageFactory.of(store, ORDER_PATH, kept, PL);
+
+        // then
+        assertThat(page.otherLanguageHref()).isEqualTo("/store/s1/client/order/o1?v=abc&lang=en");
+    }
+
+    @Test
+    void otherLanguageHrefEncodesKeptValues() {
+        // given
+        Store store = store();
+        Map<String, String> kept = new LinkedHashMap<>();
+        kept.put("t", "a+b/c=");
+
+        // when
+        PublicPage page = PublicPageFactory.of(store, ORDER_PATH, kept, PL);
+
+        // then
+        assertThat(page.otherLanguageHref()).isEqualTo("/store/s1/client/order/o1?t=a%2Bb%2Fc%3D&lang=en");
+    }
+
+    @Test
+    void blankKeptParameterIsSkipped() {
+        // given
+        Store store = store();
+        Map<String, String> kept = new LinkedHashMap<>();
+        kept.put("v", "  ");
+        kept.put("t", "tok");
+
+        // when
+        PublicPage page = PublicPageFactory.of(store, ORDER_PATH, kept, PL);
+
+        // then
+        assertThat(page.otherLanguageHref()).isEqualTo("/store/s1/client/order/o1?t=tok&lang=en");
     }
 
     @Test

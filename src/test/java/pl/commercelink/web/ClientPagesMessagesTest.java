@@ -24,7 +24,7 @@ class ClientPagesMessagesTest {
     private static final Path RESOURCES = Path.of("src/main/resources");
     private static final Pattern MESSAGE_REFERENCE = Pattern.compile("#\\{([a-zA-Z0-9._-]+)");
     /** Keys handed to fragments as plain string arguments, e.g. a field label or an error summary title. */
-    private static final Pattern KEY_LITERAL = Pattern.compile("'((?:client\\.offer|public|payment\\.bridge)\\.[a-zA-Z0-9._-]*[a-zA-Z0-9_-])'");
+    private static final Pattern KEY_LITERAL = Pattern.compile("'((?:client\\.offer|client\\.order|order\\.address|public|payment\\.bridge)\\.[a-zA-Z0-9._-]*[a-zA-Z0-9_-])'");
     private static final Pattern LONE_APOSTROPHE = Pattern.compile("(?<!')'(?!')");
     private static final Pattern DOUBLED_APOSTROPHE = Pattern.compile("''");
 
@@ -46,7 +46,21 @@ class ClientPagesMessagesTest {
             "client.offer.error.shipping.city.required", "client.offer.error.shipping.email.required",
             "client.offer.error.shipping.phone.required", "client.offer.error.shipping.postalCode.invalid",
             "client.offer.error.shipping.email.invalid", "client.offer.error.shipping.phone.invalid",
-            "client.offer.error.shipping.country");
+            "client.offer.error.shipping.country",
+            "client.order.headline.accepted", "client.order.headline.assembly", "client.order.headline.preparation",
+            "client.order.headline.shipping", "client.order.headline.collection", "client.order.headline.collected",
+            "client.order.headline.delivered", "client.order.headline.cancelled",
+            "client.order.lead.accepted", "client.order.lead.assembly", "client.order.lead.assembly.awaiting",
+            "client.order.lead.assembly.partial", "client.order.lead.preparation", "client.order.lead.shipping",
+            "client.order.lead.shipping.noTracking", "client.order.lead.shipping.noParcel",
+            "client.order.lead.collection", "client.order.lead.delivered",
+            "ClientOrderStage.Accepted", "ClientOrderStage.Assembly", "ClientOrderStage.Preparation",
+            "ClientOrderStage.Shipping", "ClientOrderStage.Delivered", "ClientOrderStage.Accepted.collection",
+            "ClientOrderStage.Assembly.collection", "ClientOrderStage.Preparation.collection",
+            "ClientOrderStage.Shipping.collection", "ClientOrderStage.Delivered.collection",
+            "ClientOrderItemStatus.Allocation", "ClientOrderItemStatus.AwaitingDelivery", "ClientOrderItemStatus.Assembled",
+            "ClientOrderItemStatus.InClaim", "ClientOrderItemStatus.Returned",
+            "ShipmentType.Courier", "ShipmentType.PickupPoint", "ShipmentType.PersonalCollection");
 
     @Test
     void everyKeyTheClientPagesUseExistsInBothLanguages() throws Exception {
@@ -96,8 +110,9 @@ class ClientPagesMessagesTest {
         Path templates = RESOURCES.resolve("templates");
         List<Path> files = Stream.of(
                         Stream.of(templates.resolve("public-layout.html"), templates.resolve("clientOffer.html"),
+                                templates.resolve("clientOrder.html"),
                                 templates.resolve("payments/payment-bridge.html")),
-                        listHtml(templates.resolve("client-offer")))
+                        listHtml(templates.resolve("client-offer")), listHtml(templates.resolve("client-order")))
                 .flatMap(s -> s)
                 .toList();
         for (Path file : files) {

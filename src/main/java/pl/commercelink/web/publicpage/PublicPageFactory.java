@@ -6,8 +6,12 @@ import pl.commercelink.stores.BrandPalette;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.Store;
 
+import java.net.URLEncoder;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public final class PublicPageFactory {
 
@@ -18,6 +22,10 @@ public final class PublicPageFactory {
     }
 
     public static PublicPage of(Store store, String path, Locale locale) {
+        return of(store, path, Map.of(), locale);
+    }
+
+    public static PublicPage of(Store store, String path, Map<String, String> keptParameters, Locale locale) {
         Branding branding = store.getBranding() != null ? store.getBranding() : new Branding();
         BillingDetails billing = store.getBillingDetails() != null ? store.getBillingDetails() : new BillingDetails();
 
@@ -35,7 +43,7 @@ public final class PublicPageFactory {
                 blankToNull(billing.getPhone()),
                 language,
                 other,
-                path + "?lang=" + other);
+                otherLanguageHref(path, keptParameters, other));
     }
 
     public static PublicPage unknownStore(String path, Locale locale) {
@@ -43,6 +51,17 @@ public final class PublicPageFactory {
         String other = ENGLISH.equals(language) ? POLISH : ENGLISH;
         return new PublicPage(null, "", null, BrandPalette.of(null), null, null, null, null, null,
                 language, other, path + "?lang=" + other);
+    }
+
+    // Blank values are dropped so an unset step parameter does not leak into the link as an empty token.
+    private static String otherLanguageHref(String path, Map<String, String> keptParameters, String other) {
+        StringBuilder href = new StringBuilder(path).append('?');
+        keptParameters.forEach((key, value) -> {
+            if (StringUtils.isNotBlank(value)) {
+                href.append(key).append('=').append(URLEncoder.encode(value, UTF_8)).append('&');
+            }
+        });
+        return href.append("lang=").append(other).toString();
     }
 
     private static String languageOf(Locale locale) {

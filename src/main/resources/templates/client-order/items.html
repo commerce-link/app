@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Products only, without prices (the link is forwarded freely); a cancelled order lists them without statuses. */-->
+<section th:fragment="items" class="cl-card" aria-labelledby="order-items-title">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-items-title" th:text="#{client.order.items.title(${view.productCount})}"></h2>
+    </div>
+    <p th:unless="${view.cancelled}" class="cl-card-desc"
+       th:text="#{client.order.items.assembled(${view.assembledCount}, ${view.productCount})}"></p>
+    <ul class="cl-list is-items">
+        <li th:each="item : ${view.items}" class="cl-list-item">
+            <div>
+                <p class="cl-list-title" th:text="${item.name()}"></p>
+                <p class="cl-list-desc" th:text="${item.category() != null}
+                        ? #{client.order.items.lineQty(${item.category()}, ${item.qty()})}
+                        : #{client.order.items.qty(${item.qty()})}"></p>
+            </div>
+            <span th:unless="${view.cancelled}" class="cl-status"
+                  th:with="status=${item.status().name()}"
+                  th:classappend="${status == 'Assembled'} ? 'is-ok'
+                        : (${status == 'AwaitingDelivery'} ? 'is-info' : (${status == 'InClaim'} ? 'is-warn' : 'is-neutral'))"
+                  th:text="#{${'ClientOrderItemStatus.' + status}}"></span>
+        </li>
+    </ul>
+</section>
+
+</body>
+</html>

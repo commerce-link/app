@@ -25,8 +25,10 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.CategoryLocalizer;
+import pl.commercelink.web.orders.Money;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
@@ -42,6 +44,7 @@ import static org.mockito.Mockito.when;
 class ClientOrderViewTest {
 
     private static final String STORE_ID = "store-1";
+    private static final LocalDate TODAY = LocalDate.of(2026, 10, 22);
 
     @Mock
     private CategoryLocalizer categoryLocalizer;
@@ -73,40 +76,8 @@ class ClientOrderViewTest {
     }
 
     @Test
-    @DisplayName("from picks the partial-assembly note when some items await delivery and others are assembled")
-    void fromPicksPartialAssemblyNote() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        List<OrderItem> items = List.of(
-                product(order, "A", "Cat", 1, FulfilmentStatus.Ordered, 1),
-                product(order, "B", "Cat", 1, FulfilmentStatus.Reserved, 2)
-        );
-
-        // when
-        ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
-
-        // then
-        assertThat(view.getStage()).isEqualTo(ClientOrderStage.Assembly);
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly.partial");
-    }
-
-    @Test
-    @DisplayName("from picks the awaiting note when every item is still on its way from the supplier")
-    void fromPicksAwaitingNoteWhenNothingAssembledYet() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        List<OrderItem> items = List.of(product(order, "A", "Cat", 1, FulfilmentStatus.Ordered, 1));
-
-        // when
-        ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
-
-        // then
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly.awaiting");
-    }
-
-    @Test
-    @DisplayName("from picks the plain assembly note when items are only allocated, hiding that nothing was ordered")
-    void fromPicksPlainAssemblyNoteWhenItemsOnlyAllocated() {
+    @DisplayName("from hides that nothing was ordered when items are only allocated")
+    void fromHidesUnorderedItemsWhenOnlyAllocated() {
         // given
         Order order = order(OrderStatus.Assembly);
         List<OrderItem> items = List.of(
@@ -118,7 +89,6 @@ class ClientOrderViewTest {
         ClientOrderView view = ClientOrderView.from(order, items, store(), categoryLocalizer);
 
         // then
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.assembly");
         assertThat(view.getItems()).extracting(ClientOrderView.ClientOrderItemView::status)
                 .containsOnly(ClientOrderItemStatus.Allocation);
     }
@@ -135,7 +105,6 @@ class ClientOrderViewTest {
         // then
         assertThat(view.isCancelled()).isTrue();
         assertThat(view.getStage()).isNull();
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.cancelled");
         assertThat(view.isStageDone(ClientOrderStage.Accepted)).isFalse();
     }
 
@@ -158,7 +127,6 @@ class ClientOrderViewTest {
         assertThat(view.getShipments()).containsExactly(collected);
         assertThat(view.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 12, 16, 40));
         assertThat(view.getDeliveredAt()).isNull();
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.ready.for.collection");
         assertThat(view.getPickupAddress().city()).isEqualTo("Kraków");
     }
 
@@ -182,6 +150,23 @@ class ClientOrderViewTest {
         assertThat(view.isPersonalCollection()).isFalse();
         assertThat(view.isShipmentsVisible()).isTrue();
         assertThat(view.getCollectionPointCode()).isEqualTo("KRA01A");
+        assertThat(view.getCarrier()).isEqualTo("InPost");
+    }
+
+    @Test
+    @DisplayName("from names the pickup point carrier the way the shipments list does, not by its stored code")
+    void fromNamesPickupPointCarrierForTheCustomer() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        Shipment locker = new Shipment(ShipmentType.PickupPoint);
+        locker.setCarrier("inpost");
+        locker.setCollectionPointCode("KRA01A");
+        order.setShipments(new LinkedList<>(List.of(locker)));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer);
+
+        // then
         assertThat(view.getCarrier()).isEqualTo("InPost");
     }
 
@@ -223,7 +208,6 @@ class ClientOrderViewTest {
 
         // then
         assertThat(view.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 15, 11, 5));
-        assertThat(view.getNoteKey()).isEqualTo("client.order.note.delivered");
         assertThat(view.isStageDone(ClientOrderStage.Shipping)).isTrue();
         assertThat(view.isStageDone(ClientOrderStage.Delivered)).isTrue();
     }
@@ -390,6 +374,241 @@ class ClientOrderViewTest {
         assertThat(collectionView.getPreferredShippingDays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.SATURDAY);
         assertThat(collectionView.getPreferredShippingDayNumbers()).isEqualTo("1,6");
         assertThat(courierView.getPreferredShippingDayNumbers()).isEqualTo("1,2,3,4,5");
+    }
+
+    @Test
+    void headlineFollowsTheStage() {
+        // given
+        Order accepted = order(OrderStatus.New);
+        Order collecting = order(OrderStatus.Shipping);
+        collecting.addShipment(new Shipment(ShipmentType.PersonalCollection));
+        Order collected = order(OrderStatus.Delivered);
+        collected.addShipment(new Shipment(ShipmentType.PersonalCollection));
+        Order cancelled = order(OrderStatus.Cancelled);
+
+        // when
+        ClientOrderView acceptedView = ClientOrderView.from(accepted, List.of(), store(), categoryLocalizer);
+        ClientOrderView collectingView = ClientOrderView.from(collecting, List.of(), store(), categoryLocalizer);
+        ClientOrderView collectedView = ClientOrderView.from(collected, List.of(), store(), categoryLocalizer);
+        ClientOrderView cancelledView = ClientOrderView.from(cancelled, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(acceptedView.getHeadlineKey()).isEqualTo("client.order.headline.accepted");
+        assertThat(collectingView.getHeadlineKey()).isEqualTo("client.order.headline.collection");
+        assertThat(collectedView.getHeadlineKey()).isEqualTo("client.order.headline.collected");
+        assertThat(cancelledView.getHeadlineKey()).isEqualTo("client.order.headline.cancelled");
+        assertThat(cancelledView.getLeadKey()).isNull();
+        assertThat(acceptedView.isBeforeDispatch()).isTrue();
+        assertThat(collectingView.isBeforeDispatch()).isFalse();
+        assertThat(cancelledView.isBeforeDispatch()).isFalse();
+    }
+
+    @Test
+    void leadForAssemblyDependsOnItems() {
+        // given
+        Order partial = order(OrderStatus.Assembly);
+        Order awaiting = order(OrderStatus.Assembly);
+        Order plain = order(OrderStatus.Assembly);
+
+        // when
+        ClientOrderView partialView = ClientOrderView.from(partial, List.of(
+                product(partial, "A", "Cat", 1, FulfilmentStatus.Ordered, 1),
+                product(partial, "B", "Cat", 1, FulfilmentStatus.Reserved, 2)), store(), categoryLocalizer);
+        ClientOrderView awaitingView = ClientOrderView.from(awaiting, List.of(
+                product(awaiting, "A", "Cat", 1, FulfilmentStatus.Ordered, 1)), store(), categoryLocalizer);
+        ClientOrderView plainView = ClientOrderView.from(plain, List.of(
+                product(plain, "A", "Cat", 1, FulfilmentStatus.New, 1)), store(), categoryLocalizer);
+
+        // then
+        assertThat(partialView.getLeadKey()).isEqualTo("client.order.lead.assembly.partial");
+        assertThat(awaitingView.getLeadKey()).isEqualTo("client.order.lead.assembly.awaiting");
+        assertThat(plainView.getLeadKey()).isEqualTo("client.order.lead.assembly");
+    }
+
+    @Test
+    void shippingLeadPointsToTheCarrierOnlyWhenAShipmentHasATrackingLink() {
+        // given
+        Order tracked = order(OrderStatus.Shipping);
+        Shipment withUrl = new Shipment(ShipmentType.Courier);
+        withUrl.setCarrier("dpd");
+        withUrl.setTrackingNo("1");
+        withUrl.setTrackingUrl("https://track/1");
+        withUrl.setShippedAt(LocalDateTime.of(2026, 10, 21, 10, 0));
+        tracked.setShipments(new LinkedList<>(List.of(withUrl)));
+        Order untracked = order(OrderStatus.Shipping);
+        Shipment withoutUrl = new Shipment(ShipmentType.Courier);
+        withoutUrl.setCarrier("dpd");
+        withoutUrl.setTrackingNo("2");
+        withoutUrl.setShippedAt(LocalDateTime.of(2026, 10, 21, 10, 0));
+        untracked.setShipments(new LinkedList<>(List.of(withoutUrl)));
+        Order noParcel = order(OrderStatus.Shipping);
+
+        // when
+        ClientOrderView trackedView = ClientOrderView.from(tracked, List.of(), store(), categoryLocalizer);
+        ClientOrderView untrackedView = ClientOrderView.from(untracked, List.of(), store(), categoryLocalizer);
+        ClientOrderView noParcelView = ClientOrderView.from(noParcel, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(trackedView.getLeadKey()).isEqualTo("client.order.lead.shipping");
+        assertThat(untrackedView.getLeadKey()).isEqualTo("client.order.lead.shipping.noTracking");
+        assertThat(noParcelView.getLeadKey()).isEqualTo("client.order.lead.shipping.noParcel");
+    }
+
+    @Test
+    void preferredDaysCoverTheWindowOnAllowedWeekdays() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setEstimatedShippingAt(LocalDate.of(2026, 10, 23));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer, false, true, TODAY);
+
+        // then
+        assertThat(view.getPreferredShippingOptions()).hasSize(11);
+        assertThat(view.getPreferredShippingOptions().get(0))
+                .isEqualTo(new ClientOrderView.DayOption(LocalDate.of(2026, 10, 23), true, false));
+        assertThat(view.getPreferredShippingOptions().get(10).date()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(view.getPreferredShippingOptions()).filteredOn(ClientOrderView.DayOption::planned).hasSize(1);
+        assertThat(view.isAsapSelected()).isTrue();
+    }
+
+    @Test
+    void pastDaysAreNotOffered() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setEstimatedShippingAt(LocalDate.of(2026, 10, 20));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer, false, true, TODAY);
+
+        // then
+        assertThat(view.getPreferredShippingOptions().get(0).date()).isEqualTo(TODAY);
+        assertThat(view.getPreferredShippingOptions()).noneMatch(ClientOrderView.DayOption::planned);
+    }
+
+    @Test
+    void savedDayOutsideTheWindowIsOfferedAndSelected() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setEstimatedShippingAt(LocalDate.of(2026, 10, 23));
+        order.setPreferredShippingAt(LocalDate.of(2026, 11, 20));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer, false, true, TODAY);
+
+        // then
+        List<ClientOrderView.DayOption> options = view.getPreferredShippingOptions();
+        assertThat(options).hasSize(12);
+        assertThat(options.get(11)).isEqualTo(new ClientOrderView.DayOption(LocalDate.of(2026, 11, 20), false, true));
+        assertThat(options).extracting(ClientOrderView.DayOption::date).isSorted();
+        assertThat(view.isAsapSelected()).isFalse();
+    }
+
+    @Test
+    void asapSelectedWithoutPreferredDay() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setEstimatedShippingAt(LocalDate.of(2026, 10, 23));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer, false, true, TODAY);
+
+        // then
+        assertThat(view.isAsapSelected()).isTrue();
+        assertThat(view.getPreferredShippingOptions()).noneMatch(ClientOrderView.DayOption::selected);
+    }
+
+    @Test
+    void noOptionsWithoutEstimatedShipping() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer, false, true, TODAY);
+
+        // then
+        assertThat(view.getPreferredShippingOptions()).isEmpty();
+    }
+
+    @Test
+    void amountsAreFormatted() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setTotalPrice(6245.99);
+        order.addPayment(Payment.bankTransfer("REF-1", "Przelew", 1000.0));
+        Order overpaid = order(OrderStatus.New);
+        overpaid.setTotalPrice(100.0);
+        overpaid.addPayment(Payment.bankTransfer("REF-2", "Przelew", 150.5));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer);
+        ClientOrderView overpaidView = ClientOrderView.from(overpaid, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(view.getTotalFormatted()).isEqualTo(Money.format(6245.99));
+        assertThat(view.getTotalFormatted()).endsWith("245,99");
+        assertThat(view.getPaidFormatted()).isEqualTo(Money.format(1000.0));
+        assertThat(view.getUnpaidFormatted()).isEqualTo(Money.format(5245.99));
+        assertThat(view.getUnpaidRaw()).isEqualTo("5245.99");
+        assertThat(overpaidView.getOverpaidFormatted()).isEqualTo(Money.format(50.5));
+    }
+
+    @Test
+    void bankShowsCurrencyOnlyWhenNotPln() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setTotalPrice(100.0);
+        Store pln = store();
+        pln.setBankAccounts(new LinkedList<>(List.of(bankAccount("PLN"))));
+        Store eur = store();
+        eur.setBankAccounts(new LinkedList<>(List.of(bankAccount("EUR"))));
+
+        // when
+        ClientOrderView plnView = ClientOrderView.from(order, List.of(), pln, categoryLocalizer);
+        ClientOrderView eurView = ClientOrderView.from(order, List.of(), eur, categoryLocalizer);
+
+        // then
+        assertThat(plnView.getBank().currency()).isNull();
+        assertThat(eurView.getBank().currency()).isEqualTo("EUR");
+        assertThat(eurView.getBank().ibanRaw()).isEqualTo("PL61109010140000071219812874");
+        assertThat(eurView.getBank().ibanGrouped()).isEqualTo("PL61 1090 1014 0000 0712 1981 2874");
+        assertThat(eurView.getBank().holder()).isEqualTo("Sklep sp. z o.o.");
+        assertThat(eurView.getBank().transferTitle()).isEqualTo(order.getOrderId());
+    }
+
+    @Test
+    void shipmentRowsUseCustomerCarrierNames() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment courier = new Shipment(ShipmentType.Courier);
+        courier.setCarrier("inpost");
+        courier.setTrackingNo("123");
+        courier.setTrackingUrl("https://track/123");
+        courier.setShippedAt(LocalDateTime.of(2026, 10, 21, 10, 0));
+        Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+        collection.setShippedAt(LocalDateTime.of(2026, 10, 20, 9, 0));
+        order.setShipments(new LinkedList<>(List.of(courier, collection)));
+
+        // when
+        ClientOrderView view = ClientOrderView.from(order, List.of(), store(), categoryLocalizer);
+
+        // then
+        assertThat(view.getShipmentRows()).hasSize(2);
+        assertThat(view.getShipmentRows().get(0).carrier()).isEqualTo("InPost");
+        assertThat(view.getShipmentRows().get(0).trackingNo()).isEqualTo("123");
+        assertThat(view.getShipmentRows().get(0).trackingUrl()).isEqualTo("https://track/123");
+        assertThat(view.getReadyForCollectionAt()).isEqualTo(LocalDateTime.of(2026, 10, 20, 9, 0));
+    }
+
+    private static BankAccount bankAccount(String currency) {
+        BankAccount account = new BankAccount();
+        account.setIban("PL61109010140000071219812874");
+        account.setAccountHolder("Sklep sp. z o.o.");
+        account.setBankName("Bank");
+        account.setSwiftCode("SWIFT");
+        account.setCurrency(currency);
+        account.set_default(true);
+        return account;
     }
 
     private static Order order(OrderStatus status) {

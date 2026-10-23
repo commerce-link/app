@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The sentence is put together from escaped pieces: the contact e-mail is typed by the store, so it is never inserted
+       as markup. */-->
+<section th:fragment="contact" class="cl-card" aria-labelledby="order-help-title"
+         th:with="email=${publicPage.contactEmail}, phone=${publicPage.contactPhone}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-help-title" th:text="#{client.order.contact}"></h2>
+    </div>
+    <div class="cl-card-inset">
+        <p class="cl-note">
+            <th:block th:if="${email != null}">
+                <th:block th:text="#{client.order.contact.write}"></th:block>
+                <a th:href="'mailto:' + ${email}" th:text="${email}"></a>
+                <th:block th:if="${phone != null}" th:text="#{client.order.contact.orCall}"></th:block>
+            </th:block>
+            <th:block th:if="${email == null}" th:text="#{client.order.contact.call}"></th:block>
+            <a th:if="${phone != null}" th:href="'tel:' + ${#strings.replace(phone, ' ', '')}" th:text="${phone}"></a>
+            <th:block th:text="#{client.order.contact.quote}"></th:block>
+            <strong th:text="${view.shortOrderId}"></strong>.
+        </p>
+    </div>
+</section>
+
+</body>
+</html>
