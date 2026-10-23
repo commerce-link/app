@@ -8,7 +8,7 @@ import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Field checks shared by the settings forms; each form decides which fields are required and in what order. */
+/** Field checks shared by the forms (settings, public return page); each form decides which fields are required and in what order. */
 public final class FormRules {
 
     private static final Pattern POLISH_POSTAL_CODE = Pattern.compile("\\d{2}-\\d{3}");

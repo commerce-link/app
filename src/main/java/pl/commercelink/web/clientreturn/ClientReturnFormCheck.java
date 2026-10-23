@@ -18,6 +18,7 @@ public final class ClientReturnFormCheck {
 
     private static final int MAX_LENGTH = 100;
     private static final String TOO_LONG = "client.return.form.tooLong";
+    private static final String PACKAGE_INVALID = "client.return.form.package.invalid";
 
     private ClientReturnFormCheck() {
     }
@@ -47,7 +48,7 @@ public final class ClientReturnFormCheck {
 
         String packageId = form == null ? null : form.getSelectedPackageTemplateId();
         if (packageId == null || options.stream().noneMatch(option -> option.id().equals(packageId))) {
-            errors.put("selectedPackageTemplateId", "client.return.form.package.package.invalid".replace("package.package", "package"));
+            errors.put("selectedPackageTemplateId", PACKAGE_INVALID);
         }
         return errors;
     }
