@@ -1,0 +1,15 @@
+<!-- One message card of a customer page (§4a "Strona komunikatu"): an offer or order that is gone, a return form that is
+     not available, an inactive store, an error. Texts come resolved; the store's contact e-mail closes the lead when the
+     page offers it, otherwise the fallback sentence does (if any). -->
+<section th:fragment="card(eyebrow, title, lead, contact, fallback)" class="cl-card cl-public-message" xmlns:th="http://www.thymeleaf.org">
+    <p class="cl-eyebrow" th:if="${eyebrow != null}" th:text="${eyebrow}"></p>
+    <h1 class="cl-page-title" th:text="${title}"></h1>
+    <p class="cl-page-lead">
+        <th:block th:text="${lead}"></th:block>
+        <th:block th:if="${contact != null and publicPage.contactEmail != null}">
+            <th:block th:text="${contact}"></th:block>
+            <a th:href="'mailto:' + ${publicPage.contactEmail}" th:text="${publicPage.contactEmail}"></a>
+        </th:block>
+        <th:block th:if="${fallback != null and (contact == null or publicPage.contactEmail == null)}" th:text="${fallback}"></th:block>
+    </p>
+</section>

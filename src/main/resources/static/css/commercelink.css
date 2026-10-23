@@ -14199,7 +14199,7 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-public-foot { border-top: 1px solid var(--cl-line); background: var(--cl-surface); }
 .cl-public-foot-inner { box-sizing: border-box; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 16px 16px 20px;
   display: flex; flex-wrap: wrap; gap: 6px 24px; font-size: 13px; line-height: 1.5; color: var(--cl-ink-2); }
-.cl-public-foot-inner p { margin: 0; }
+.cl-public-foot-inner p { margin: 0; overflow-wrap: anywhere; }
 .cl-public-foot-inner .cl-public-foot-store { color: var(--cl-ink); font-weight: 600; }
 @media (max-width: 719px) {
   .cl-public-bar { min-height: 56px; padding: 6px 16px; gap: 8px; }

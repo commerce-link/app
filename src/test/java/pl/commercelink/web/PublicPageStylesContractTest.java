@@ -109,6 +109,15 @@ class PublicPageStylesContractTest {
     }
 
     @Test
+    void footerTextWrapsALongContactAddressInsteadOfWideningThePage() throws Exception {
+        // given
+        String css = publicCss();
+
+        // then
+        assertThat(css).contains(".cl-public-foot-inner p { margin: 0; overflow-wrap: anywhere; }");
+    }
+
+    @Test
     void variantButtonIsHiddenFromTheFirstPaintWhenScriptsRun() throws Exception {
         // given — client-offer.js is deferred behind FontAwesome, so hiding the button from the script alone made it flash
         String css = publicCss();
@@ -170,7 +179,8 @@ class PublicPageStylesContractTest {
     }
 
     private static boolean isPublicTemplate(String path, String html) {
-        return path.equals("public-layout.html") || path.startsWith("client-offer/")
+        // fragments/public-*.html are included only by public pages (e.g. the message card)
+        return path.equals("public-layout.html") || path.startsWith("client-offer/") || path.startsWith("fragments/public-")
                 || html.contains("layout:decorate=\"~{public-layout}\"");
     }
 
