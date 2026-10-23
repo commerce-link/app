@@ -279,7 +279,7 @@ class ClientOrderControllerTest {
         String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect, new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
-        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
         assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.codeError("client.order.address.error.invalid.code"));
     }
 
@@ -574,7 +574,7 @@ class ClientOrderControllerTest {
                     new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
             // then
-            assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1#delivery");
+            assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
             ClientOrderNotice notice = notice(redirect);
             assertThat(notice.field()).isEqualTo("code");
             assertThat(notice.tone()).isEqualTo("bad");
@@ -593,10 +593,11 @@ class ClientOrderControllerTest {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect,
+        String result = controller.confirmAddressCode(STORE_ID, ORDER_ID, "ver-1", "000000", new MockHttpServletRequest(), redirect,
                 new ExtendedModelMap(), new MockHttpServletResponse(), Locale.ENGLISH);
 
         // then
+        assertThat(result).isEqualTo("redirect:/store/store-1/client/order/" + ORDER_ID + "?v=ver-1");
         assertThat(notice(redirect)).isEqualTo(ClientOrderNotice.bad("delivery", "client.order.address.error.invalid.token"));
     }
 

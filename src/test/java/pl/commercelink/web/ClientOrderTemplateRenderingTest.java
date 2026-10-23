@@ -384,9 +384,11 @@ class ClientOrderTemplateRenderingTest {
         assertThat(html).contains("aria-invalid=\"true\"").contains("aria-describedby=\"code-error\"")
                 .containsPattern("<p class=\"cl-field-error\" id=\"code-error\">\\s*<i class=\"fas fa-exclamation-circle\" aria-hidden=\"true\"></i>"
                         + "<span>Nieprawidłowy kod. Spróbuj ponownie.</span>")
-                .doesNotContain("autofocus")
+                .containsPattern("spellcheck=\"false\"\\s+autofocus")
                 .doesNotContain("cl-alert is-bad");
+        // the error sits right under the field, before the way out of the step
         assertThat(html.indexOf("class=\"cl-code-row\"")).isLessThan(html.indexOf("id=\"code-error\""));
+        assertThat(html.indexOf("id=\"code-error\"")).isLessThan(html.indexOf(">Anuluj</a>"));
     }
 
     @Test

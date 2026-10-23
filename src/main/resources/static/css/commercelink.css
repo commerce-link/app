@@ -14361,7 +14361,7 @@ body.cl-public dl.cl-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 6
 /* redirect targets after a notice (#delivery, #date) keep a gap to the top edge */
 .cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }
 .cl-order-page .cl-card-inset form > .cl-card-actions { margin-top: 12px; }
-.cl-order-page .cl-card-inset > :is(.cl-kv-grid, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form) { margin-top: 12px; }
+.cl-order-page .cl-card-inset > :is(.cl-kv-grid, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form, .cl-card-actions) { margin-top: 12px; }
 /* a step of a multi-step change inside a card: p.cl-substep = cl-step-badge + "Step n of m" */
 body.cl-public p.cl-substep { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--cl-ink-2); }
 /* a short one-time code typed from an e-mail: large, spaced capitals; the buttons sit in the same row */
@@ -14379,8 +14379,9 @@ body.cl-public .cl-code-row + .cl-field-error { margin-top: 6px; }
 .cl-order-page .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
 .cl-order-page .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
 .cl-order-page .cl-card-inset > .cl-help:first-child { margin-top: 0; }
-/* the dashboard's dl.cl-kv brings its own side padding; inside a public card inset the bank details line up with the text */
-.cl-order-page dl.cl-kv.is-bank { margin: 10px 0 0; padding: 0; }
+/* the dashboard's dl.cl-kv brings its own side padding; inside a public card inset the bank details line up with the text.
+   The body.cl-public prefix outranks the shared bank-details rule, whose bottom margin would otherwise win here. */
+body.cl-public .cl-order-page dl.cl-kv.is-bank { margin: 12px 0 0; padding: 0; }
 /* a day picked from a short list: fieldset.cl-choice-group.is-dates > legend + .cl-date-grid > label.cl-choice.is-date
    (.is-wide for "as soon as possible"). The radio stays in the tab order and arrow-key group but is invisible, so the
    tile carries the checked state and the focus ring. */

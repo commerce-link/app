@@ -154,7 +154,8 @@ public class ClientOrderController {
             redirectAttributes.addFlashAttribute(NOTICE, CODE_REASONS.contains(e.getReason())
                     ? ClientOrderNotice.codeError(text)
                     : ClientOrderNotice.bad(ClientOrderNotice.DELIVERY, text));
-            return "redirect:" + context.basePath() + "?v=" + verificationId + DELIVERY_ANCHOR;
+            // No anchor, as after "Change address": the code field takes the focus again and reads the error it points to.
+            return "redirect:" + context.basePath() + "?v=" + verificationId;
         }
     }
 

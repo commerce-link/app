@@ -62,12 +62,11 @@
             <div class="cl-field">
                 <label class="cl-label" for="code" th:text="#{client.order.address.code.label}"></label>
                 <div class="cl-code-row">
+                    <!--/* Focused also after a wrong code: the field then reads its error through aria-describedby. */-->
                     <input id="code" name="code" class="cl-input cl-code-input" type="text" maxlength="6" required
-                           autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
-                           th:autofocus="${!codeError}"
+                           autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" autofocus
                            th:attr="aria-invalid=${codeError ? 'true' : null}, aria-describedby=${codeError ? 'code-error' : null}">
                     <button class="cl-button is-primary" type="submit" th:text="#{client.order.address.code.submit}"></button>
-                    <a class="cl-button" th:href="${orderPath}" th:text="#{general.cancel}"></a>
                 </div>
                 <p th:if="${codeError}" class="cl-field-error" id="code-error">
                     <i class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="${notice.text()}"></span>
@@ -78,6 +77,10 @@
             <p class="cl-help"><th:block th:text="#{client.order.address.code.resend.hint}"></th:block>
                 <button class="cl-link-button" type="submit" th:text="#{client.order.address.code.resend}"></button>.</p>
         </form>
+        <!--/* "Cancel" leaves the step, so it stands after it: in the field row it pushed the error away from the field on a phone. */-->
+        <div class="cl-card-actions">
+            <a class="cl-button" th:href="${orderPath}" th:text="#{general.cancel}"></a>
+        </div>
     </div>
 
     <div class="cl-card-inset" th:if="${addressStep == 'edit'}">
