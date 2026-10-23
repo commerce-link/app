@@ -128,12 +128,14 @@ public class RMAClientController {
             return redirectTo(storeId, rmaId, PARCEL_ANCHOR);
         }
 
-        List<ReturnPackageOption> packageOptions = ReturnPackageOptions.of(store);
-        if (packageOptions.isEmpty()) {
-            // without return templates every choice would read as a wrong field; the store has to fix its settings
-            log.error("Return form of RMA {} in store {} was submitted, but the store has no return templates", rmaId, storeId);
+        String missingConfiguration = ClientReturnView.missingConfiguration(store);
+        if (missingConfiguration != null) {
+            // the page shows no form then, so field errors would never be seen; the store has to fix its settings
+            log.error("Return form of RMA {} in store {} was submitted, but the store cannot book returns: missing {}",
+                    rmaId, storeId, missingConfiguration);
             return refuse(redirectAttributes, rmaReturnForm, storeId, rmaId, unavailableReason(locale));
         }
+        List<ReturnPackageOption> packageOptions = ReturnPackageOptions.of(store);
         Map<String, String> errors = ClientReturnFormCheck.validate(rmaReturnForm, packageOptions);
         if (!errors.isEmpty()) {
             // nothing invalid may reach the carrier: the booking is paid; the typed values come back with the errors
@@ -149,12 +151,19 @@ public class RMAClientController {
         request.setCustomerAddress(checkedForm.getShippingDetails());
         request.setInsuranceValue(rma.getShippingInsurance());
 
+        // resolved before the carrier is called: a failed lookup afterwards would land in the generic catch and tell
+        // the customer that a booking which did start had failed
+        String bookedText = messageSource.getMessage("client.return.notice.booked", null, locale);
+        String inProgressText = returnInProgress(locale);
+        String failedText = messageSource.getMessage("client.return.notice.failed", null, locale);
+        String unavailableText = unavailableReason(locale);
+
         try {
             ShipmentCreationStart start = rmaShippingService.startReturnShipment(request, store);
             if (start.outcome() == ShipmentCreationStart.Outcome.GONE) {
                 // a return already on the RMA (being created, created, or unconfirmed with a label that may be paid)
                 // is the store's to settle: a second submission would book a second courier to the customer
-                redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, returnInProgress(locale)));
+                redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, inProgressText));
                 return redirectTo(storeId, rmaId, PARCEL_ANCHOR);
             }
             boolean unconfirmed = start.outcome() == ShipmentCreationStart.Outcome.REFUSED && holdsReturn(storeId, rmaId);
@@ -162,7 +171,7 @@ public class RMAClientController {
                 // a clean refusal left nothing on the RMA: the customer corrects the data and submits again; only the
                 // provider's own answer (e.g. a wrong postcode) is meant for the customer, the adapter's words are not
                 String reason = start.providerAnswer() && start.error() != null ? start.error()
-                        : messageSource.getMessage("client.return.notice.failed", null, locale);
+                        : failedText;
                 return refuse(redirectAttributes, rmaReturnForm, storeId, rmaId, reason);
             }
             // the creation saved its placeholder on the RMA: these changes go onto a fresh read; an unconfirmed return
@@ -183,20 +192,18 @@ public class RMAClientController {
             }
             if (unconfirmed) {
                 // its reason is the operator's (check the provider's panel), never the customer's
-                redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, returnInProgress(locale)));
+                redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, inProgressText));
                 return redirectTo(storeId, rmaId, PARCEL_ANCHOR);
             }
-            redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.ok(ClientReturnNotice.PARCEL,
-                    messageSource.getMessage("client.return.notice.booked", null, locale)));
+            redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.ok(ClientReturnNotice.PARCEL, bookedText));
             return redirectTo(storeId, rmaId, PARCEL_ANCHOR);
         } catch (InvalidReturnConfigurationException e) {
             // the exception's words are the store administrator's, not the customer's
             log.error("Return shipment of RMA {} in store {} was not started: {}", rmaId, storeId, e.getMessage());
-            redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.bad(ClientReturnNotice.FORM, unavailableReason(locale)));
+            redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.bad(ClientReturnNotice.FORM, unavailableText));
             return redirectTo(storeId, rmaId, FORM_ANCHOR);
         } catch (Exception e) {
-            return refuse(redirectAttributes, rmaReturnForm, storeId, rmaId,
-                    messageSource.getMessage("client.return.notice.failed", null, locale));
+            return refuse(redirectAttributes, rmaReturnForm, storeId, rmaId, failedText);
         }
     }
 

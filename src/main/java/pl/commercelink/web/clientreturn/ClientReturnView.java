@@ -41,7 +41,7 @@ public final class ClientReturnView {
         this.rma = rma;
         this.items = items;
         this.now = now;
-        String missing = missingConfigurationOf(store);
+        String missing = missingConfiguration(store);
         this.state = stateOf(missing);
         this.missingConfiguration = state == ClientReturnState.BOOK_UNAVAILABLE ? missing : null;
         this.shipmentRows = shipments().stream().filter(this::isShown).map(this::toRow).toList();
@@ -86,8 +86,11 @@ public final class ClientReturnView {
         return missing == null ? ClientReturnState.BOOK : ClientReturnState.BOOK_UNAVAILABLE;
     }
 
-    /** Mirrors RMAShippingService.validateStoreReturnConfiguration plus the template list the form offers. */
-    private static String missingConfigurationOf(Store store) {
+    /**
+     * What the store lacks to book a customer's return: "carrier", "templates" or null. Mirrors
+     * RMAShippingService.validateStoreReturnConfiguration plus the template list the form offers.
+     */
+    public static String missingConfiguration(Store store) {
         if (store.getRmaConfiguration() == null || store.getRmaConfiguration().getCarrier() == null) {
             return "carrier";
         }

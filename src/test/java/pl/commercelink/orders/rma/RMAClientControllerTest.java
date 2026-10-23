@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,7 +40,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -214,6 +217,7 @@ class RMAClientControllerTest {
         assertThat(approved).isEqualTo("client-return");
         assertThat(approvedResponse.getStatus()).isEqualTo(200);
         assertThat(((ClientReturnView) approvedModel.get("view")).state()).isEqualTo(ClientReturnState.BOOK_UNAVAILABLE);
+        assertThat(((ClientReturnView) approvedModel.get("view")).missingConfiguration()).isEqualTo("carrier");
         assertThat(approvedModel.get("selectedPackage")).isNull();
         assertThat(waiting).isEqualTo("client-return");
         assertThat(waitingResponse.getStatus()).isEqualTo(200);
@@ -401,6 +405,54 @@ class RMAClientControllerTest {
                 .isEqualTo(ClientReturnNotice.bad(ClientReturnNotice.FORM, "client.return.notice.unavailable"));
         assertThat(redirect.getFlashAttributes().get("clientReturnForm")).isSameAs(form);
         verifyNoInteractions(rmaShippingService);
+    }
+
+    @Test
+    void aStoreWithoutACarrierRefusesTheBookingBeforeCheckingTheForm() {
+        // given: a return template is there, the carrier is not; the page of such a store shows no form fields
+        RMA rma = rma(RMAStatus.Approved);
+        rma.setShipments(new ArrayList<>());
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        Store store = returnStore();
+        store.setRmaConfiguration(null);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
+        RMAReturnForm form = validForm("7");
+        form.getShippingDetails().setPhone("601-234-567");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = submit(form, redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-form");
+        assertThat(redirect.getFlashAttributes().get(NOTICE))
+                .isEqualTo(ClientReturnNotice.bad(ClientReturnNotice.FORM, "client.return.notice.unavailable"));
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("clientReturnErrors");
+        assertThat(redirect.getFlashAttributes().get("clientReturnForm")).isSameAs(form);
+        verifyNoInteractions(rmaShippingService);
+    }
+
+    @Test
+    void theOutcomeTextsAreResolvedBeforeTheCarrierIsCalled() {
+        // given
+        approvedRma();
+        when(rmaShippingService.startReturnShipment(any(), any()))
+                .thenReturn(new ShipmentCreationStart(ShipmentCreationStart.Outcome.STARTED, null, false));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        submit(validForm("7"), redirect);
+
+        // then: no lookup after the carrier call could turn a started booking into the generic failure
+        InOrder order = inOrder(messageSource, rmaShippingService);
+        order.verify(messageSource).getMessage(eq("client.return.notice.booked"), any(), any());
+        order.verify(messageSource).getMessage(eq("client.return.notice.inProgress"), any(), any());
+        order.verify(messageSource).getMessage(eq("client.return.notice.failed"), any(), any());
+        order.verify(rmaShippingService).startReturnShipment(any(), any());
+        order.verify(messageSource, never()).getMessage(anyString(), any(), any());
+        assertThat(redirect.getFlashAttributes().get(NOTICE))
+                .isEqualTo(ClientReturnNotice.ok(ClientReturnNotice.PARCEL, "client.return.notice.booked"));
     }
 
     @Test
