@@ -5,17 +5,42 @@
 // The choice goes to the server in the background and the two cards whose amounts depend on it (items and payment) are
 // swapped in place, so the page neither reloads nor jumps; the data card is left alone. While the answer is on its way
 // the amounts fade, the spinner next to the total shows after SLOW_MS, and paying or sending a proforma is blocked, so
-// nobody pays the old amount. Choices are sent one after another: a choice made while one is on its way waits and goes
-// last (cancelling a request in the browser would not stop the server from saving it, possibly after the newer one).
-// Any failure sends the form the ordinary way (a reload that shows the true state).
+// nobody pays the old amount. Choices are sent one after another: choices made while one is on its way wait, one per
+// group, and go in the order they were made (cancelling a request in the browser would not stop the server from saving
+// it, possibly after the newer one).
+// A failed answer sends the form the ordinary way (a reload that shows the true state), unless the customer is leaving
+// the page: Firefox and Safari reject the request as soon as a navigation starts, and an ordinary submit then would
+// cancel that navigation (the data form being saved, the language switch).
 // Without JavaScript the button stays visible and sends the choice with a reload.
 (function () {
     'use strict';
 
     var SLOW_MS = 300;
+    // a rejected request waits this long for the page to start unloading before it counts as a failure
+    var LEAVE_GRACE_MS = 300;
     var pointerForm = null;
     var running = false;
-    var queued = null;
+    var queued = [];
+    var leaving = false;
+
+    function markLeaving() {
+        leaving = true;
+    }
+    // beforeunload only while a request is on its way: a page that always listens to it is kept out of Firefox's
+    // back-forward cache
+    function watchLeaving(on) {
+        if (on) {
+            leaving = false;
+            window.addEventListener('beforeunload', markLeaving);
+        } else {
+            window.removeEventListener('beforeunload', markLeaving);
+        }
+    }
+    window.addEventListener('pagehide', markLeaving);
+    // back from the browser cache: the page is alive again
+    window.addEventListener('pageshow', function () {
+        leaving = false;
+    });
 
     // pointerdown comes before the change it causes; a keyboard change has no pointerdown before it
     document.addEventListener('pointerdown', function (event) {
@@ -56,14 +81,13 @@
     });
 
     function send(form) {
+        var groupId = form.querySelector('input[name="groupId"]').value;
         if (running) {
-            var radio = form.querySelector('input[type="radio"]:checked');
-            queued = {groupId: form.querySelector('input[name="groupId"]').value, position: radio ? radio.value : null};
+            enqueue(groupId, form.querySelector('input[type="radio"]:checked'));
             return;
         }
         running = true;
-        var groupId = form.querySelector('input[name="groupId"]').value;
-        var focused = form.contains(document.activeElement);
+        watchLeaving(true);
         var items = document.getElementById('client-offer-items');
         var payment = document.getElementById('client-offer-payment');
         setBusy(items, payment, true);
@@ -79,7 +103,7 @@
             headers: {'X-Requested-With': 'fetch'}
         }).then(function (response) {
             if (!response.ok) {
-                throw new Error('status ' + response.status);
+                throw {answered: true};
             }
             return response.text();
         }).then(function (html) {
@@ -87,44 +111,84 @@
             var newItems = answer.getElementById('client-offer-items');
             var newPayment = answer.getElementById('client-offer-payment');
             if (!newItems || !newPayment || !items || !payment) {
-                throw new Error('cards missing');
+                throw {answered: true};
             }
+            // the customer may have moved on to the data form meanwhile: focus comes back only if it is still in the card
+            var focusInItems = items.contains(document.activeElement);
             items.replaceWith(newItems);
             payment.replaceWith(newPayment);
             // the copy buttons are hidden in the markup until copy-field.js sees the clipboard API
             newPayment.dispatchEvent(new CustomEvent('cl-list:swapped', {bubbles: true}));
-            if (focused) {
+            if (focusInItems) {
                 restoreFocus(newItems, groupId);
             }
-            announce(newItems);
+            announce(newItems, groupId);
             clearTimeout(slow);
             running = false;
+            watchLeaving(false);
             setBusy(newItems, newPayment, false);
             sendQueued(newItems);
-        }).catch(function () {
+        }).catch(function (error) {
             clearTimeout(slow);
-            queued = null;
-            if (form.isConnected) {
-                HTMLFormElement.prototype.submit.call(form);
-            } else {
-                window.location.reload();
-            }
+            setTimeout(function () {
+                fail(form, items, payment);
+            }, error && error.answered ? 0 : LEAVE_GRACE_MS);
         });
     }
 
-    // the newer choice, made on the old card, is applied to the swapped card and sent
-    function sendQueued(card) {
-        var next = queued;
-        queued = null;
-        if (!next || next.position === null) {
+    function fail(form, items, payment) {
+        queued = [];
+        watchLeaving(false);
+        if (leaving) {
+            // the navigation the customer started wins; if it never happens (a mailto link), the page stays usable and
+            // the radios go back to what the server has (their checked attribute), as the choice may not have been saved
+            leaving = false;
+            running = false;
+            setBusy(items, payment, false);
+            if (items) {
+                items.querySelectorAll('form.cl-variant-pick').forEach(function (pick) {
+                    pick.reset();
+                });
+            }
             return;
         }
-        var form = groupForm(card, next.groupId);
-        var radio = form && form.querySelector('input[type="radio"][value="' + next.position + '"]');
-        if (radio && !radio.checked) {
-            radio.checked = true;
-            send(form);
+        if (form.isConnected) {
+            HTMLFormElement.prototype.submit.call(form);
+        } else {
+            window.location.reload();
         }
+    }
+
+    // one waiting choice per group, kept in the order the groups were chosen
+    function enqueue(groupId, radio) {
+        queued = queued.filter(function (entry) {
+            return entry.groupId !== groupId;
+        });
+        if (radio) {
+            queued.push({groupId: groupId, position: radio.value});
+        }
+    }
+
+    // The waiting choices were made on the old card: shown on the swapped one at once (a choice the server already has is
+    // dropped), then sent one by one.
+    function sendQueued(card) {
+        var pending = [];
+        queued.forEach(function (entry) {
+            var radio = groupRadio(card, entry.groupId, entry.position);
+            if (radio && !radio.checked) {
+                radio.checked = true;
+                pending.push(entry);
+            }
+        });
+        queued = pending.slice(1);
+        if (pending.length) {
+            send(groupForm(card, pending[0].groupId));
+        }
+    }
+
+    function groupRadio(card, groupId, position) {
+        var form = groupForm(card, groupId);
+        return form && form.querySelector('input[type="radio"][value="' + position + '"]');
     }
 
     function groupForm(card, groupId) {
@@ -172,12 +236,18 @@
         }
     }
 
-    function announce(card) {
+    // the chosen variant and the new total: a variant of the same price leaves the total as it was, and a live region
+    // does not read the same text twice
+    function announce(card, groupId) {
         var live = document.getElementById('client-offer-live');
         var label = card.querySelector('.cl-offer-total-row dt');
         var amount = card.querySelector('.cl-offer-total-row dd');
-        if (live && label && amount) {
-            live.textContent = label.textContent.trim() + ': ' + amount.textContent.trim();
+        if (!live || !label || !amount) {
+            return;
         }
+        var form = groupForm(card, groupId);
+        var title = form && form.querySelector('input[type="radio"]:checked + .cl-choice-title');
+        var total = label.textContent.trim() + ': ' + amount.textContent.trim();
+        live.textContent = title ? title.textContent.trim() + '. ' + total : total;
     }
 })();

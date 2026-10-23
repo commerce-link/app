@@ -4,7 +4,15 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,7 +74,8 @@ class PublicPageStylesContractTest {
         // then
         assertThat(css).contains("body.cl-public .cl-step-badge {", "body.cl-public .cl-kv-grid {",
                 "body.cl-public dl.cl-kv.is-bank {", "body.cl-public .cl-card-inset > .cl-help + .cl-help { margin-top: 8px; }");
-        assertThat(css).doesNotContain(".cl-offer-page .cl-step-badge", ".cl-offer-page .cl-kv-grid", ".cl-offer-page dl.cl-kv.is-bank");
+        assertThat(css).doesNotContain(".cl-client-offer .cl-step-badge", ".cl-client-offer .cl-kv-grid", ".cl-client-offer dl.cl-kv.is-bank",
+                ".cl-offer-page .cl-step-badge", ".cl-offer-page .cl-kv-grid", ".cl-offer-page dl.cl-kv.is-bank");
     }
 
     @Test
@@ -105,7 +114,7 @@ class PublicPageStylesContractTest {
         String css = publicCss();
 
         // then
-        assertThat(css).contains("@media (scripting: enabled) {\n  .cl-offer-page .cl-variant-apply:not([data-cl-revealed]) { display: none; }");
+        assertThat(css).contains("@media (scripting: enabled) {\n  .cl-client-offer .cl-variant-apply:not([data-cl-revealed]) { display: none; }");
     }
 
     @Test
@@ -114,7 +123,72 @@ class PublicPageStylesContractTest {
         String css = publicCss();
 
         // then
-        assertThat(css).contains(".cl-offer-page .cl-list-item.is-group[id], .cl-offer-page #client-offer-pay-title { scroll-margin-top: 16px; }");
+        assertThat(css).contains(".cl-client-offer .cl-list-item.is-group[id], .cl-client-offer #client-offer-pay-title { scroll-margin-top: 16px; }");
+    }
+
+    @Test
+    void publicRulesAreScopedByClassesNoDashboardTemplateUses() throws Exception {
+        // given — the public block once scoped the offer by .cl-offer-page, which the dashboard offer details took too, so the
+        // customer page styles reached the dashboard; every rule must open with a class that only public templates carry
+        String css = publicCss().replaceAll("(?s)/\\*.*?\\*/", "");
+        Set<String> scopes = new TreeSet<>();
+        Matcher rule = Pattern.compile("([^{}]+)\\{").matcher(css);
+        while (rule.find()) {
+            String selectors = rule.group(1).trim();
+            if (selectors.startsWith("@") || selectors.matches("from|to|[\\d.]+%")) {
+                continue;
+            }
+            for (String selector : splitTopLevel(selectors)) {
+                Matcher first = Pattern.compile("^[^\\s>+~]+").matcher(selector);
+                assertThat(first.find()).as(selector).isTrue();
+                Matcher scope = Pattern.compile("\\.(cl-[a-z0-9-]+)").matcher(first.group());
+                assertThat(scope.find()).as("rule without a class scope: %s", selector).isTrue();
+                scopes.add(scope.group(1));
+            }
+        }
+
+        // when
+        Map<String, List<String>> usedOutside = new TreeMap<>();
+        Path templates = Path.of("src/main/resources/templates");
+        try (Stream<Path> files = Files.walk(templates)) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".html")).toList()) {
+                String html = Files.readString(file);
+                if (isPublicTemplate(templates.relativize(file).toString(), html)) {
+                    continue;
+                }
+                for (String scope : scopes) {
+                    if (Pattern.compile("[\"'\\s]" + Pattern.quote(scope) + "[\"'\\s]").matcher(html).find()) {
+                        usedOutside.computeIfAbsent(scope, s -> new ArrayList<>()).add(templates.relativize(file).toString());
+                    }
+                }
+            }
+        }
+
+        // then
+        assertThat(usedOutside).as("public scope classes used by other templates").isEmpty();
+        assertThat(scopes).contains("cl-public", "cl-client-offer");
+    }
+
+    private static boolean isPublicTemplate(String path, String html) {
+        return path.equals("public-layout.html") || path.startsWith("client-offer/")
+                || html.contains("layout:decorate=\"~{public-layout}\"");
+    }
+
+    private static List<String> splitTopLevel(String selectors) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        StringBuilder current = new StringBuilder();
+        for (char c : selectors.toCharArray()) {
+            depth += c == '(' ? 1 : c == ')' ? -1 : 0;
+            if (c == ',' && depth == 0) {
+                parts.add(current.toString().trim());
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+        parts.add(current.toString().trim());
+        return parts;
     }
 
     @Test
@@ -123,8 +197,8 @@ class PublicPageStylesContractTest {
         String css = publicCss();
 
         // then
-        assertThat(css).contains(".cl-offer-page .cl-offer-updating { display: none; }")
-                .contains(".cl-offer-page #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }");
+        assertThat(css).contains(".cl-client-offer .cl-offer-updating { display: none; }")
+                .contains(".cl-client-offer #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }");
     }
 
     @Test
@@ -137,7 +211,7 @@ class PublicPageStylesContractTest {
         assertThat(order).contains("body.cl-public ol.cl-stages {", "body.cl-public .cl-stage.is-current .cl-stage-dot {",
                 "body.cl-public dl.cl-facts {", ".cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }")
                 .doesNotContain("!important")
-                .doesNotContain(".cl-offer-page");
+                .doesNotContain(".cl-client-offer", ".cl-offer-page");
     }
 
     @Test
@@ -173,12 +247,14 @@ class PublicPageStylesContractTest {
                 ".cl-list-icon", ".cl-list-amount", ".cl-kv-grid", "dl.cl-kv.is-bank", ".cl-help", ".cl-form-grid",
                 ".cl-fieldset", ".cl-choice-group.is-row", ".cl-static-value");
 
-        // then
+        // then — neither the public offer scope nor the dashboard offer details class may take a shared component back
         for (String selector : selectors) {
-            assertThat(css).as(selector).doesNotContain(".cl-offer-page " + selector + " ")
-                    .doesNotContain(".cl-offer-page " + selector + ",")
-                    .doesNotContain(".cl-offer-page " + selector + "{")
-                    .contains("body.cl-public " + selector);
+            for (String offerScope : List.of(".cl-client-offer ", ".cl-offer-page ")) {
+                assertThat(css).as(selector).doesNotContain(offerScope + selector + " ")
+                        .doesNotContain(offerScope + selector + ",")
+                        .doesNotContain(offerScope + selector + "{");
+            }
+            assertThat(css).as(selector).contains("body.cl-public " + selector);
         }
     }
 

@@ -73,6 +73,19 @@ class BrandPaletteTest {
     }
 
     @Test
+    void hoverLightenedBelowTheEdgeContrastKeepsTheDarkEdge() {
+        // given — #2277ee takes black text, so its hover is lightened, to 2.89:1 on white
+        BrandPalette palette = BrandPalette.of("#2277ee");
+
+        // when
+        String edgeHover = palette.edgeHover();
+
+        // then
+        assertThat(palette.edge()).isEqualTo("#2277ee");
+        assertThat(edgeHover).isEqualTo(palette.ink());
+    }
+
+    @Test
     void brandThatStandsOutOnWhiteIsItsOwnEdge() {
         // when
         BrandPalette palette = BrandPalette.of("#0f766e");
@@ -99,6 +112,7 @@ class BrandPaletteTest {
                     assertThat(BrandPalette.contrast(palette.ink(), palette.soft())).as("ink on soft for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.hover(), palette.on())).as("hover for %s", hex).isGreaterThanOrEqualTo(4.5);
                     assertThat(BrandPalette.contrast(palette.edge(), "#ffffff")).as("button edge for %s", hex).isGreaterThanOrEqualTo(3.0);
+                    assertThat(BrandPalette.contrast(palette.edgeHover(), "#ffffff")).as("hovered button edge for %s", hex).isGreaterThanOrEqualTo(3.0);
                 }
             }
         }
