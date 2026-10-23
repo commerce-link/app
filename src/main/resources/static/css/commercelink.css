@@ -13437,10 +13437,18 @@ a.cl-link-button:hover {
     padding: 16px 24px;
 }
 
-.cl-auth .cl-card-footer > .cl-button.is-primary {
+.cl-auth .cl-card-footer > .cl-button {
     flex: 1 1 100%;
     justify-content: center;
     height: 44px;
+}
+
+/* "Signed in as …" under the lead of the access-denied card; an e-mail address has no break opportunity */
+.cl-page .cl-auth-head .cl-auth-meta {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
 }
 
 @media screen and (max-width: 719px) {
