@@ -1,0 +1,9 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The answer to a variant chosen in the background (client-offer.js): the two cards whose amounts depend on it. The
+       data card is left alone, so whatever the customer is typing there stays. */-->
+<section th:replace="~{client-offer/items :: items}"></section>
+<section th:replace="~{client-offer/payment :: payment}"></section>
+</body>
+</html>

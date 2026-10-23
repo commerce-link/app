@@ -14,7 +14,7 @@ class DeliveryDetailsStylesContractTest {
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
         int start = css.indexOf("/* --- Delivery details");
         assertThat(start).as("the delivery details block").isPositive();
-        return css.substring(start);
+        return css.substring(start, css.indexOf("/* ===== Public page"));
     }
 
     @Test

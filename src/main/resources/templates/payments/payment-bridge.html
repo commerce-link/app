@@ -1,45 +1,33 @@
 <!DOCTYPE HTML>
-<html xmlns:th="http://www.thymeleaf.org"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}" th:with="showNavbar=false">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-narrow'">
+<head>
+    <title th:text="#{payment.bridge.title}">Przekierowanie do płatności</title>
+</head>
 <body>
-
-<div layout:fragment="content">
-
-    <div class="container">
-        <div class="columns is-centered">
-            <div class="column is-half-desktop is-three-quarters-tablet">
-                <div class="box has-text-centered">
-                    <h1 class="title is-4" th:text="#{payment.bridge.title}"></h1>
-                    <p class="subtitle is-6 mt-4" th:text="#{payment.bridge.message}"></p>
-
-                    <div class="mt-5">
-                        <progress class="progress is-primary is-small" max="100">Loading</progress>
-                    </div>
-
-                    <form id="paymentForm" th:action="${url}" method="POST" class="is-hidden">
-                        <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
-                    </form>
-
-                    <noscript>
-                        <div class="notification is-warning mt-4">
-                            <p th:text="#{payment.bridge.javascript.disabled}"></p>
-                        </div>
-                        <form th:action="${url}" method="POST">
-                            <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
-                            <button type="submit" class="button is-primary is-medium mt-3" th:text="#{payment.bridge.continue}"></button>
-                        </form>
-                    </noscript>
-                </div>
-            </div>
+<th:block layout:fragment="content">
+    <section class="cl-card cl-bridge">
+        <!-- shown by payment-bridge.js right before it submits the form; without JS only the noscript card is visible -->
+        <div class="cl-bridge-auto" hidden>
+            <span class="cl-spinner" aria-hidden="true"></span>
+            <h1 class="cl-page-title" th:text="#{payment.bridge.title}"></h1>
+            <p class="cl-page-lead" role="status" th:text="#{payment.bridge.message}"></p>
         </div>
-    </div>
 
-    <script>
-        document.getElementById('paymentForm').submit();
-    </script>
+        <form id="paymentForm" th:action="${url}" method="POST" class="is-hidden">
+            <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
+        </form>
 
-</div>
-
+        <noscript>
+            <h1 class="cl-page-title" th:text="#{payment.bridge.noscript.title}"></h1>
+            <p class="cl-page-lead" th:text="#{payment.bridge.javascript.disabled}"></p>
+            <form th:action="${url}" method="POST">
+                <input th:each="entry : ${params}" type="hidden" th:name="${entry.key}" th:value="${entry.value}"/>
+                <button type="submit" class="cl-button is-primary" th:text="#{payment.bridge.continue}"></button>
+            </form>
+        </noscript>
+    </section>
+    <script th:src="@{/js/payment-bridge.js}"></script>
+</th:block>
 </body>
 </html>
