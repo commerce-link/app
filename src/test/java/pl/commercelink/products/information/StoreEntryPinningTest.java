@@ -210,6 +210,28 @@ class StoreEntryPinningTest {
     }
 
     @Test
+    void everyPinChangeIsLoggedWithTheProductAndTheReason() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of()));
+        product("p1", STORE_CATEGORY, "X", E1, null);
+        product("p2", STORE_CATEGORY, null, E2, null);
+
+        // when
+        List<String> infos;
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of()), copy);
+            infos = logs.infos();
+        }
+
+        // then
+        assertThat(infos).anySatisfy(line -> assertThat(line)
+                .contains("c1/p1").contains("X -> null").contains("removed"));
+        assertThat(infos).anySatisfy(line -> assertThat(line)
+                .contains("c1/p2").contains("null -> X").contains("matches"));
+        assertThat(infos).anySatisfy(line -> assertThat(line).contains("1 products unpinned, 1 pinned"));
+    }
+
+    @Test
     void detachedProductIsPinnedToAMatchingGlobalEntry() {
         // given
         PimCatalog copy = ScopedPimCatalog.of(
