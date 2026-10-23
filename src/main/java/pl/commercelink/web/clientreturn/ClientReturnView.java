@@ -3,12 +3,15 @@ package pl.commercelink.web.clientreturn;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.rma.RMAItemStatus;
 import pl.commercelink.orders.rma.CustomerReturnRetry;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
 import pl.commercelink.orders.rma.RMAStatus;
+import pl.commercelink.shipping.CarrierNames;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
+import pl.commercelink.web.orders.OrderPageModelFactory;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,6 +33,9 @@ public final class ClientReturnView {
     private final LocalDateTime now;
     private final ClientReturnState state;
     private final String missingConfiguration;
+    private final List<ReturnShipmentRow> shipmentRows;
+    private final List<ReturnItemRow> itemRows;
+    private final ReturnPackageOption packageOption;
 
     private ClientReturnView(RMA rma, List<RMAItem> items, Store store, LocalDateTime now) {
         this.rma = rma;
@@ -38,6 +44,10 @@ public final class ClientReturnView {
         String missing = missingConfigurationOf(store);
         this.state = stateOf(missing);
         this.missingConfiguration = state == ClientReturnState.BOOK_UNAVAILABLE ? missing : null;
+        this.shipmentRows = shipments().stream().filter(this::isShown).map(this::toRow).toList();
+        this.itemRows = items.stream().map(this::toRow).toList();
+        this.packageOption = rma.getReturnPackageTemplateId() == null ? null
+                : ReturnPackageOptions.find(store, rma.getReturnPackageTemplateId()).orElse(null);
     }
 
     /** Only for an RMA that has a page: a New RMA has none, the controller answers it with the unavailable page. */
@@ -61,7 +71,7 @@ public final class ClientReturnView {
             default:
                 break;
         }
-        if (anyShipment(s -> isCustomersReturn(s) && isCreating(s))) {
+        if (anyShipment(s -> isCustomersReturn(s) && s.isCreating(now))) {
             return ClientReturnState.BOOKING;
         }
         // An Approved RMA with a return parcel but no address: its save after the booking failed. The form would end in
@@ -70,7 +80,7 @@ public final class ClientReturnView {
             return ClientReturnState.WAITING;
         }
         // Another shipment being created makes the booking POST answer GONE, so no form either.
-        if (rma.getShippingDetails() != null || anyShipment(this::isCreating)) {
+        if (rma.getShippingDetails() != null || anyShipment(s -> s.isCreating(now))) {
             return ClientReturnState.STORE_BOOKS;
         }
         return missing == null ? ClientReturnState.BOOK : ClientReturnState.BOOK_UNAVAILABLE;
@@ -150,10 +160,10 @@ public final class ClientReturnView {
     // Only the customer's own return parcel tells where the goods are; a shipment from the store says nothing about it.
     private String waitingLead() {
         List<Shipment> returns = customersReturns();
-        if (returns.stream().anyMatch(s -> StringUtils.isNotBlank(s.getTrackingNo()) && !creationFailed(s))) {
+        if (returns.stream().anyMatch(s -> StringUtils.isNotBlank(s.getTrackingNo()) && !s.creationFailed(now))) {
             return "tracked";
         }
-        if (returns.stream().anyMatch(this::creationFailed)) {
+        if (returns.stream().anyMatch(s -> s.creationFailed(now))) {
             return "checking";
         }
         return "noParcel";
@@ -202,12 +212,86 @@ public final class ClientReturnView {
     }
 
     private String parcelCard() {
-        return hasShownShipments() ? "parcel" : null;
+        return shipmentRows.isEmpty() ? null : "parcel";
+    }
+
+    /** Every shipment of the RMA in the order it was saved, in the customer's words. */
+    public List<ReturnShipmentRow> shipmentRows() {
+        return shipmentRows;
+    }
+
+    public List<ReturnItemRow> itemRows() {
+        return itemRows;
+    }
+
+    /** The template the return was booked with, or null when none was chosen or the store has removed it. */
+    public ReturnPackageOption packageOption() {
+        return packageOption;
     }
 
     // A failed creation of the operator's shipment is not a shipment: the operator books it again or removes it.
-    private boolean hasShownShipments() {
-        return anyShipment(s -> isCustomersReturn(s) || !creationFailed(s));
+    private boolean isShown(Shipment shipment) {
+        return isCustomersReturn(shipment) || !shipment.creationFailed(now);
+    }
+
+    // The page is public and its link gets forwarded: the reason of a failed creation (provider or operator words)
+    // never reaches it, and a number from a creation in doubt is not one the customer can follow.
+    private ReturnShipmentRow toRow(Shipment shipment) {
+        boolean customers = isCustomersReturn(shipment);
+        String stateKey = null;
+        String stateTone = null;
+        if (shipment.isCreating(now)) {
+            stateKey = customers ? "client.return.shipment.state.booking" : "client.return.shipment.state.preparing";
+            stateTone = "info";
+        } else if (customers && shipment.creationFailed(now)) {
+            stateKey = "client.return.shipment.state.checking";
+            stateTone = "warn";
+        }
+        boolean settled = stateKey == null;
+        String carrier = CarrierNames.forCustomer(shipment);
+        return new ReturnShipmentRow(carrier,
+                carrier == null ? "ShipmentType." + shipment.getType() : null,
+                labelKeyOf(shipment, customers),
+                settled ? StringUtils.trimToNull(shipment.getTrackingNo()) : null,
+                settled ? OrderPageModelFactory.safeWebUrl(shipment.getTrackingUrl()) : null,
+                shipment.getShippedAt(), shipment.getDeliveredAt(),
+                shipment.getPickup() == null ? null : shipment.getPickup().getWindow(),
+                stateKey, stateTone);
+    }
+
+    // A shipment typed by hand in the dashboard says nothing about who sent it, so it carries no label.
+    private static String labelKeyOf(Shipment shipment, boolean customers) {
+        if (customers) {
+            return "client.return.shipment.label.customer";
+        }
+        return shipment.getPickUpAddressId() != null ? "client.return.shipment.label.store" : null;
+    }
+
+    private ReturnItemRow toRow(RMAItem item) {
+        boolean rejected = state == ClientReturnState.REJECTED;
+        RMAItemStatus status = rejected ? null : item.getStatus();
+        return new ReturnItemRow(item.getName(), item.getQty(), item.getDesiredResolution(),
+                rejected ? null : item.getActualResolution(), StringUtils.trimToNull(item.getReason()),
+                statusKeyOf(status), statusToneOf(status));
+    }
+
+    private static String statusKeyOf(RMAItemStatus status) {
+        if (status == null || status == RMAItemStatus.New) {
+            return null;
+        }
+        String name = status.name();
+        return "client.return.item.status." + Character.toLowerCase(name.charAt(0)) + name.substring(1);
+    }
+
+    private static String statusToneOf(RMAItemStatus status) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case New -> null;
+            case Received, SentForRepair -> "info";
+            case ReturnedToClient, MovedToWarehouse -> "ok";
+        };
     }
 
     /** The customer's return parcel: booked from this page, or imported with a marketplace return (no provider). */
@@ -226,15 +310,5 @@ public final class ClientReturnView {
 
     private List<Shipment> shipments() {
         return rma.getShipments() == null ? List.of() : rma.getShipments();
-    }
-
-    // Same rules as Shipment.isCreating/creationFailed, but against the page's clock.
-    private boolean isCreating(Shipment shipment) {
-        return shipment.getCreation() != null && shipment.getCreation().isInProgress(now);
-    }
-
-    private boolean creationFailed(Shipment shipment) {
-        return shipment.getCreation() != null
-                && (shipment.getCreation().isFailed() || shipment.getCreation().isUnconfirmed(now));
     }
 }

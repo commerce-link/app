@@ -4,12 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import pl.commercelink.orders.ProviderCommandTimeout;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentPickup;
+import pl.commercelink.orders.ShipmentPickupWindow;
 import pl.commercelink.orders.ShipmentCreationState;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.RMA;
 import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemStatus;
+import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.PackageTemplate;
@@ -17,7 +22,9 @@ import pl.commercelink.stores.RMAConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
@@ -28,7 +35,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 class ClientReturnViewTest {
 
-    private static final LocalDateTime NOW = LocalDateTime.now();
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 23, 12, 0);
     private static final String RMA_ID = "1a2b3c4d-0000-0000-0000-000000000000";
     private static final String ORDER_ID = "9f8e7d6c-1111-1111-1111-111111111111";
 
@@ -73,12 +80,12 @@ class ClientReturnViewTest {
     }
 
     private static Shipment creating(Shipment shipment) {
-        shipment.setCreation(ShipmentCreationState.pending("cmd", LocalDateTime.now()));
+        shipment.setCreation(ShipmentCreationState.pending("cmd", NOW));
         return shipment;
     }
 
     private static Shipment failed(Shipment shipment) {
-        shipment.setCreation(ShipmentCreationState.pending("cmd", LocalDateTime.now()).failed("refused"));
+        shipment.setCreation(ShipmentCreationState.pending("cmd", NOW).failed("refused"));
         return shipment;
     }
 
@@ -419,5 +426,252 @@ class ClientReturnViewTest {
         assertThat(view.shortOrderId()).isEqualTo("9f8e7d6c");
         assertThat(view.createdAt()).isEqualTo(rma.getCreatedAt());
         assertThat(noOrder.shortOrderId()).isNull();
+    }
+
+    @Test
+    void shipmentRowsKeepEveryCreatedShipment() {
+        // given
+        Shipment returned = tracked(customerReturn());
+        returned.setCarrier("dhl");
+        Shipment fromStore = tracked(operatorShipment());
+        fromStore.setCarrier("inpost");
+        Shipment manualEntry = new Shipment(ShipmentType.Courier);
+        manualEntry.setCarrier("Kurier sklepu");
+        manualEntry.setTrackingNo("MANUAL1");
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.WaitingForItems, true, returned, fromStore, manualEntry));
+
+        // then
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::carrier)
+                .containsExactly("DHL", "InPost", "Kurier sklepu");
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::labelKey)
+                .containsExactly("client.return.shipment.label.customer", "client.return.shipment.label.store", null);
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::typeKey).containsOnlyNulls();
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::stateKey).containsOnlyNulls();
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::trackingNo)
+                .containsExactly("TRACK123", "TRACK123", "MANUAL1");
+    }
+
+    @Test
+    void aShipmentWithoutCarrierIsNamedByItsType() {
+        // given
+        Shipment manualEntry = new Shipment(ShipmentType.PickupPoint);
+        manualEntry.setTrackingNo("MANUAL1");
+
+        // when
+        ReturnShipmentRow row = view(rma(RMAStatus.WaitingForItems, true, manualEntry)).shipmentRows().get(0);
+
+        // then
+        assertThat(row.carrier()).isNull();
+        assertThat(row.typeKey()).isEqualTo("ShipmentType.PickupPoint");
+    }
+
+    @Test
+    void aCustomerReturnBeingCreatedSaysSo() {
+        // given
+        Shipment returned = creating(customerReturn());
+        Shipment fromStore = creating(operatorShipment());
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.Approved, true, returned, fromStore));
+
+        // then
+        assertThat(view.shipmentRows()).hasSize(2);
+        ReturnShipmentRow booking = view.shipmentRows().get(0);
+        assertThat(booking.stateKey()).isEqualTo("client.return.shipment.state.booking");
+        assertThat(booking.stateTone()).isEqualTo("info");
+        assertThat(booking.trackingNo()).isNull();
+        assertThat(booking.trackingUrl()).isNull();
+        ReturnShipmentRow preparing = view.shipmentRows().get(1);
+        assertThat(preparing.stateKey()).isEqualTo("client.return.shipment.state.preparing");
+        assertThat(preparing.stateTone()).isEqualTo("info");
+    }
+
+    @Test
+    void aFailedOrUnknownCustomerReturnIsCheckedNotExplained() {
+        // given
+        Shipment refused = customerReturn();
+        refused.setCreation(ShipmentCreationState.pending("cmd", NOW).failed("401 Unauthorized"));
+        refused.setCarrier("dhl");
+        Shipment unknown = customerReturn();
+        unknown.setCreation(ShipmentCreationState.pending("cmd", NOW).failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.WaitingForItems, true, refused, unknown));
+
+        // then
+        assertThat(view.shipmentRows()).hasSize(2).allSatisfy(row -> {
+            assertThat(row.stateKey()).isEqualTo("client.return.shipment.state.checking");
+            assertThat(row.stateTone()).isEqualTo("warn");
+            assertThat(row.toString()).doesNotContain("401").doesNotContain("Unauthorized")
+                    .doesNotContain(ShipmentCreationState.UNCONFIRMED_KEY);
+        });
+    }
+
+    @Test
+    void aCustomerReturnPendingPastTheTimeoutIsChecked() {
+        // given
+        Shipment overdue = customerReturn();
+        overdue.setCreation(ShipmentCreationState.pending("cmd",
+                NOW.minus(ProviderCommandTimeout.UNCONFIRMED_AFTER).minusMinutes(1)));
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.Approved, true, overdue));
+
+        // then
+        assertThat(view.state()).isEqualTo(ClientReturnState.WAITING);
+        assertThat(view.leadKey()).isEqualTo("client.return.lead.waiting.checking");
+        assertThat(view.shipmentRows()).singleElement().satisfies(row -> {
+            assertThat(row.stateKey()).isEqualTo("client.return.shipment.state.checking");
+            assertThat(row.stateTone()).isEqualTo("warn");
+        });
+    }
+
+    @Test
+    void aFailedOperatorShipmentIsHidden() {
+        // given
+        Shipment failedFromStore = failed(operatorShipment());
+        Shipment fromStore = tracked(operatorShipment());
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.WaitingForItems, false, failedFromStore, fromStore));
+        ClientReturnView onlyFailed = view(rma(RMAStatus.WaitingForItems, false, failed(operatorShipment())));
+
+        // then
+        assertThat(view.shipmentRows()).singleElement()
+                .satisfies(row -> assertThat(row.trackingNo()).isEqualTo("TRACK123"));
+        assertThat(view.cards()).contains("parcel");
+        assertThat(onlyFailed.shipmentRows()).isEmpty();
+        assertThat(onlyFailed.cards()).doesNotContain("parcel");
+    }
+
+    @Test
+    void trackingLinkOnlyForWebAddresses() {
+        // given
+        Shipment script = tracked(customerReturn());
+        script.setTrackingUrl("javascript:alert(1)");
+        Shipment web = tracked(operatorShipment());
+        web.setTrackingUrl(" https://tracking.example/TRACK123 ");
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.WaitingForItems, true, script, web));
+
+        // then
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::trackingUrl)
+                .containsExactly(null, "https://tracking.example/TRACK123");
+    }
+
+    @Test
+    void aShipmentWithoutNumberKeepsCarrierAndDate() {
+        // given
+        Shipment shipment = operatorShipment();
+        shipment.setCarrier("dpd");
+        shipment.setShippedAt(NOW.minusDays(2));
+        shipment.setDeliveredAt(NOW.minusDays(1));
+
+        // when
+        ReturnShipmentRow row = view(rma(RMAStatus.Completed, false, shipment)).shipmentRows().get(0);
+
+        // then
+        assertThat(row.carrier()).isEqualTo("DPD");
+        assertThat(row.trackingNo()).isNull();
+        assertThat(row.shippedAt()).isEqualTo(NOW.minusDays(2));
+        assertThat(row.deliveredAt()).isEqualTo(NOW.minusDays(1));
+    }
+
+    @Test
+    void pickupWindowComesFromThePickup() {
+        // given
+        Shipment withWindow = tracked(customerReturn());
+        withWindow.setPickup(ShipmentPickup.pending("p1", NOW, LocalDate.of(2026, 10, 24), LocalTime.of(9, 0), LocalTime.of(15, 0))
+                .ordered("PICK1"));
+        Shipment bookedByCarrier = tracked(customerReturn());
+        bookedByCarrier.setPickup(ShipmentPickup.bookedByCarrier("PICK2"));
+        Shipment noPickup = tracked(operatorShipment());
+
+        // when
+        List<ReturnShipmentRow> rows = view(rma(RMAStatus.WaitingForItems, true, withWindow, bookedByCarrier, noPickup))
+                .shipmentRows();
+
+        // then
+        ShipmentPickupWindow window = rows.get(0).pickupWindow();
+        assertThat(window.getDate()).isEqualTo("2026-10-24");
+        assertThat(window.formatFrom()).isEqualTo("9:00");
+        assertThat(window.formatTo()).isEqualTo("15:00");
+        assertThat(rows.get(1).pickupWindow()).isNull();
+        assertThat(rows.get(2).pickupWindow()).isNull();
+    }
+
+    private static RMAItem item(String name, RMAItemStatus status, RMAResolutionType actual) {
+        RMAItem item = new RMAItem();
+        item.setName(name);
+        item.setQty(2);
+        item.setDesiredResolution(RMAResolutionType.Repair);
+        item.setActualResolution(actual);
+        item.setReason("  Nie działa  ");
+        item.setStatus(status);
+        return item;
+    }
+
+    @Test
+    void itemRowsMapStatusesToCustomerWords() {
+        // given
+        List<RMAItem> items = List.of(
+                item("A", RMAItemStatus.New, null),
+                item("B", RMAItemStatus.Received, null),
+                item("C", RMAItemStatus.SentForRepair, RMAResolutionType.Repair),
+                item("D", RMAItemStatus.ReturnedToClient, RMAResolutionType.Repair),
+                item("E", RMAItemStatus.MovedToWarehouse, RMAResolutionType.Return));
+
+        // when
+        List<ReturnItemRow> rows = ClientReturnView.of(rma(RMAStatus.Processing, false), items, store(Config.CONFIGURED), NOW)
+                .itemRows();
+
+        // then
+        assertThat(rows).extracting(ReturnItemRow::statusKey).containsExactly(null,
+                "client.return.item.status.received", "client.return.item.status.sentForRepair",
+                "client.return.item.status.returnedToClient", "client.return.item.status.movedToWarehouse");
+        assertThat(rows).extracting(ReturnItemRow::statusTone).containsExactly(null, "info", "info", "ok", "ok");
+        assertThat(rows.get(4)).isEqualTo(new ReturnItemRow("E", 2, RMAResolutionType.Repair, RMAResolutionType.Return,
+                "Nie działa", "client.return.item.status.movedToWarehouse", "ok"));
+    }
+
+    @Test
+    void rejectedItemsHaveNoStatusNorResolution() {
+        // given
+        List<RMAItem> items = List.of(item("A", RMAItemStatus.Received, RMAResolutionType.Return));
+
+        // when
+        List<ReturnItemRow> rows = ClientReturnView.of(rma(RMAStatus.Rejected, false), items, store(Config.CONFIGURED), NOW)
+                .itemRows();
+
+        // then
+        assertThat(rows).singleElement().isEqualTo(
+                new ReturnItemRow("A", 2, RMAResolutionType.Repair, null, "Nie działa", null, null));
+    }
+
+    @Test
+    void packageOptionDescribesTheChosenTemplate() {
+        // given
+        Store store = store(Config.CONFIGURED);
+        PackageTemplate unprefixed = new PackageTemplate("duży karton", List.of(new pl.commercelink.stores.Parcel(80, 40, 60, 12, 0, null)));
+        unprefixed.setId("t2");
+        store.getShippingConfiguration().getPackageTemplates().add(unprefixed);
+        RMA chosen = rma(RMAStatus.WaitingForItems, true);
+        chosen.setReturnPackageTemplateId("t2");
+        RMA removed = rma(RMAStatus.WaitingForItems, true);
+        removed.setReturnPackageTemplateId("gone");
+        RMA none = rma(RMAStatus.WaitingForItems, true);
+
+        // when
+        ReturnPackageOption option = ClientReturnView.of(chosen, List.of(new RMAItem()), store, NOW).packageOption();
+
+        // then
+        assertThat(option.id()).isEqualTo("t2");
+        assertThat(option.title()).isEqualTo("Duży karton");
+        assertThat(option.parcels()).isEqualTo("80 × 40 × 60 cm · 12 kg");
+        assertThat(ClientReturnView.of(removed, List.of(new RMAItem()), store, NOW).packageOption()).isNull();
+        assertThat(ClientReturnView.of(none, List.of(new RMAItem()), store, NOW).packageOption()).isNull();
     }
 }
