@@ -43,13 +43,22 @@ class StoreEntryPinning {
         List<String> ownerCategoryIds = categoryIdsOf(ownerStoreId);
         Codes announced = Codes.of(event.eans(), event.mfnCodes());
         PimView storeView = catalog.withStoreData(ownerStoreId);
+        // the codes before the event: the copy holds them until its next refresh, and a refresh triggered meanwhile by
+        // another event leaves them only in the history
+        Codes inCopy = storeView.findByPimId(event.pimId())
+                .map(entry -> Codes.of(entry.gtins(), entry.mpns()))
+                .orElse(Codes.EMPTY);
+        Codes before = inCopy.plus(Codes.of(codeHistory.eansOf(event.pimId()), codeHistory.mpnsOf(event.pimId())));
 
-        int unpinned = detachProductsOfRemovedCodes(event.pimId(), ownerStoreId, announced, storeView, ownerCategoryIds, catalog);
+        int unpinned = detachProductsOfRemovedCodes(event.pimId(), ownerStoreId, announced, inCopy, before,
+                ownerCategoryIds, catalog);
         int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, announced, storeView, ownerCategoryIds);
-        if (unpinned + pinned > 0) {
-            log.info("PIM entry {} of store {} with EANs {} and MPNs {}: {} products unpinned, {} pinned or moved here",
-                    event.pimId(), ownerStoreId, announced.eans(), announced.mfnCodes(), unpinned, pinned);
-        }
+        // one line per event, also when nothing changed: with two instances, it shows which one handled the event and
+        // whether that instance knew the codes the edit replaced (a product pinned by an unknown code stays pinned)
+        log.info("PIM entry {} of store {} with EANs {} and MPNs {}: {} products unpinned, {} pinned or moved here{}",
+                event.pimId(), ownerStoreId, announced.eans(), announced.mfnCodes(), unpinned, pinned,
+                before.isEmpty() ? "; its codes before this event are unknown to this instance (a new entry, or one "
+                        + "created or changed after this instance last loaded the PIM index)" : "");
     }
 
     void onEntryDeleted(String pimId, PimCatalog catalog) {
@@ -59,19 +68,16 @@ class StoreEntryPinning {
         }
         PimView globalView = catalog.withGlobalData();
         detached.forEach(product -> pinToGlobalEntry(product, pimId, globalView).ifPresentOrElse(
-                globalPimId -> repin(product, globalPimId, pimId, "entry deleted, pinned to a global entry"),
+                // detachPimFromProducts already cleared the pin: the deleted entry is the old one
+            globalPimId -> repin(product, pimId, globalPimId, pimId, "entry deleted, pinned to a global entry"),
                 () -> log.info("PIM entry {} deleted: product {}/{} unpinned", pimId, product.getCategoryId(),
                         product.getProductId())));
     }
 
-    private int detachProductsOfRemovedCodes(String pimId, String ownerStoreId, Codes announced, PimView storeView,
-                                             List<String> ownerCategoryIds, PimCatalog catalog) {
-        // the codes before the edit: the copy holds them until its next refresh, and a refresh triggered meanwhile by
-        // another event leaves them only in the history; codes known to neither unpin nothing (the product stays pinned)
-        Codes inCopy = storeView.findByPimId(pimId)
-                .map(entry -> Codes.of(entry.gtins(), entry.mpns()))
-                .orElse(Codes.EMPTY);
-        Codes removed = inCopy.plus(Codes.of(codeHistory.eansOf(pimId), codeHistory.mpnsOf(pimId))).minus(announced);
+    // codes known to neither the copy nor the history unpin nothing: the product stays pinned
+    private int detachProductsOfRemovedCodes(String pimId, String ownerStoreId, Codes announced, Codes inCopy,
+                                             Codes before, List<String> ownerCategoryIds, PimCatalog catalog) {
+        Codes removed = before.minus(announced);
         if (removed.isEmpty()) {
             return 0;
         }
@@ -89,8 +95,8 @@ class StoreEntryPinning {
             return 0;
         }
         PimView globalView = catalog.withGlobalData();
-        toDetach.forEach(product -> repin(product, pinToGlobalEntry(product, pimId, globalView).orElse(null), pimId,
-                "its code was removed from the entry"));
+        toDetach.forEach(product -> repin(product, product.getPimId(),
+                pinToGlobalEntry(product, pimId, globalView).orElse(null), pimId, "its code was removed from the entry"));
         return toDetach.size();
     }
 
@@ -101,17 +107,18 @@ class StoreEntryPinning {
                 .filter(product -> isBlank(product.getPimId())
                         || isOtherEntryOfSameStore(product.getPimId(), pimId, ownerStoreId, storeView))
                 .toList();
-        toAttach.forEach(product -> repin(product, pimId, pimId, isBlank(product.getPimId())
+        toAttach.forEach(product -> repin(product, product.getPimId(), pimId, pimId, isBlank(product.getPimId())
                 ? "its code matches the entry" : "its code moved here from another entry of the store"));
         return toAttach.size();
     }
 
-    // every pin change is logged: the app keeps no other trace of why a product was pinned, unpinned or moved
-    private void repin(Product product, String newPimId, String handledPimId, String reason) {
-        log.info("PIM entry {}: product {}/{} pin {} -> {} ({})", handledPimId, product.getCategoryId(),
-                product.getProductId(), product.getPimId(), newPimId, reason);
+    // every pin change is logged, after the save: the app keeps no other trace of why a product was pinned,
+    // unpinned or moved, and a save that fails (the event is redelivered) must not leave a change that did not happen
+    private void repin(Product product, String oldPimId, String newPimId, String handledPimId, String reason) {
         product.setPimId(newPimId);
         productRepository.save(product);
+        log.info("PIM entry {}: product {}/{} pin {} -> {} ({})", handledPimId, product.getCategoryId(),
+                product.getProductId(), oldPimId, newPimId, reason);
     }
 
     // a code belongs to one entry within a store, so a product of the store on another of its entries moves here;

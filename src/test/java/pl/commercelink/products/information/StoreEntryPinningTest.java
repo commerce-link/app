@@ -27,8 +27,10 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -229,6 +231,81 @@ class StoreEntryPinningTest {
         assertThat(infos).anySatisfy(line -> assertThat(line)
                 .contains("c1/p2").contains("null -> X").contains("matches"));
         assertThat(infos).anySatisfy(line -> assertThat(line).contains("1 products unpinned, 1 pinned"));
+    }
+
+    @Test
+    void failedSaveLeavesNoPinChangeInTheLog() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of()));
+        product("p1", STORE_CATEGORY, "X", E1, null);
+        doThrow(new IllegalStateException("save failed")).when(productRepository).save(any());
+
+        // when
+        List<String> infos;
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            assertThatThrownBy(() -> pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of()), copy))
+                    .isInstanceOf(IllegalStateException.class);
+            infos = logs.infos();
+        }
+
+        // then
+        assertThat(infos).noneSatisfy(line -> assertThat(line).contains("c1/p1").contains(" pin "));
+    }
+
+    @Test
+    void deletedEntryIsLoggedAsTheOldPinOfARepinnedProduct() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                storeEntry("X", STORE, List.of(E1), List.of()),
+                ScopedPimCatalog.globalEntry("G", E1, null, "cat"));
+        product("p1", STORE_CATEGORY, "X", E1, null);
+
+        // when
+        List<String> infos;
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            pinning.onEntryDeleted("X", copy);
+            infos = logs.infos();
+        }
+
+        // then
+        assertThat(infos).anySatisfy(line -> assertThat(line).contains("c1/p1").contains("pin X -> G"));
+    }
+
+    @Test
+    void eventThatChangesNothingIsLoggedAndSaysTheOldCodesAreUnknown() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of();
+        Product product = product("p1", STORE_CATEGORY, "X", E1, null);
+
+        // when
+        List<String> infos;
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of()), copy);
+            infos = logs.infos();
+        }
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("X");
+        assertThat(infos).singleElement().satisfies(line -> assertThat(line)
+                .contains("PIM entry X of store s1").contains("0 products unpinned, 0 pinned")
+                .contains("unknown to this instance"));
+    }
+
+    @Test
+    void eventWithKnownOldCodesDoesNotSayTheyAreUnknown() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of()));
+
+        // when
+        List<String> infos;
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of()), copy);
+            infos = logs.infos();
+        }
+
+        // then
+        assertThat(infos).singleElement().satisfies(line -> assertThat(line)
+                .contains("0 products unpinned, 0 pinned").doesNotContain("unknown"));
     }
 
     @Test
