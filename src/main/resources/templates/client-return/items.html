@@ -14,7 +14,7 @@
             <div>
                 <p class="cl-list-title" th:text="${row.name()}"></p>
                 <p class="cl-list-desc" th:text="#{client.return.items.line(${row.qty()},
-                        ${row.desired() != null ? #messages.msg('RMAResolutionType.' + row.desired().name()) : '-'})}
+                        ${row.desired() != null ? #messages.msg('RMAResolutionType.' + row.desired().name()) : #messages.msg('client.return.items.expects.unknown')})}
                         + (${row.actual() != null} ? ' · ' + #{client.return.items.resolution(${#messages.msg('RMAResolutionType.' + row.actual().name())})} : '')"></p>
                 <p th:if="${row.reason() != null}" class="cl-list-desc cl-muted" th:text="#{client.return.items.reason(${row.reason()})}"></p>
             </div>

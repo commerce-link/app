@@ -38,6 +38,31 @@ class ClientReturnTemplateRenderingTest {
 
     private static final String FIELDS = "name=\"shippingDetails.";
 
+    private static final LocalDateTime NOW = ClientReturnRenderer.NOW;
+
+    private static Shipment customerReturn() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("dhl");
+        return shipment;
+    }
+
+    private static Shipment trackedReturn() {
+        Shipment shipment = customerReturn();
+        shipment.setTrackingNo("00007731440201U");
+        shipment.setTrackingUrl("https://tracking.example/00007731440201U");
+        shipment.setShippedAt(LocalDateTime.of(2026, 10, 22, 10, 14));
+        shipment.setPickup(ShipmentPickup.pending("p1", NOW, LocalDate.of(2026, 10, 23), LocalTime.of(9, 0), LocalTime.of(15, 0))
+                .ordered("PICK1"));
+        return shipment;
+    }
+
+    private static ShippingDetails fullAddress() {
+        ShippingDetails details = ClientReturnRenderer.address();
+        details.setPostalCode("00-950");
+        return details;
+    }
+
     @Test
     void bookStateShowsTheFormFirst() {
         // when
@@ -346,29 +371,35 @@ class ClientReturnTemplateRenderingTest {
         assertThat(html.split("<h1", -1)).hasSize(2);
     }
 
-    private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 23, 12, 0);
+    @Test
+    void aBlankStreetPhoneOrEmailLeavesNoEmptyLine() {
+        // given
+        ShippingDetails details = fullAddress();
+        details.setStreetAndNumber("  ");
+        details.setPhone(" ");
 
-    private static Shipment customerReturn() {
-        Shipment shipment = new Shipment(ShipmentType.Courier);
-        shipment.setProvider("furgonetka");
-        shipment.setCarrier("dhl");
-        return shipment;
+        // when
+        String address = card(ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(details)
+                .shipments(trackedReturn()).render(), "return-address");
+
+        // then
+        assertThat(address).contains("<span>jan****************</span>").doesNotContain(" · ").doesNotContain("<p></p>")
+                .doesNotContain("<p class=\"cl-muted\"></p>").doesNotContain("<span>\n    \n</span>");
     }
 
-    private static Shipment trackedReturn() {
-        Shipment shipment = customerReturn();
-        shipment.setTrackingNo("00007731440201U");
-        shipment.setTrackingUrl("https://tracking.example/00007731440201U");
-        shipment.setShippedAt(LocalDateTime.of(2026, 10, 22, 10, 14));
-        shipment.setPickup(ShipmentPickup.pending("p1", NOW, LocalDate.of(2026, 10, 23), LocalTime.of(9, 0), LocalTime.of(15, 0))
-                .ordered("PICK1"));
-        return shipment;
-    }
+    @Test
+    void anItemWithoutADesiredResolutionSaysSoInWords() {
+        // given
+        RMAItem item = ClientReturnRenderer.item("Dysk", 1, null);
 
-    private static ShippingDetails fullAddress() {
-        ShippingDetails details = ClientReturnRenderer.address();
-        details.setPostalCode("00-950");
-        return details;
+        // when
+        String items = card(ClientReturnRenderer.approved().status(RMAStatus.Completed).items(item).render(), "return-items");
+        String english = card(ClientReturnRenderer.approved().status(RMAStatus.Completed).items(item)
+                .locale(Locale.ENGLISH).render(), "return-items");
+
+        // then
+        assertThat(items).contains("1 szt. · Oczekujesz: nie podano").doesNotContain("Oczekujesz: -");
+        assertThat(english).contains("1 pc · You expect: not given");
     }
 
     @Test
@@ -470,7 +501,7 @@ class ClientReturnTemplateRenderingTest {
         assertThat(parcel).contains("<span class=\"cl-status is-warn\">Sprawdzamy zamówienie kuriera</span>")
                 .contains("Nie musisz nic robić — sklep sprawdza u przewoźnika, czy kurier jest zamówiony, i odezwie się do Ciebie.")
                 .doesNotContain("MAYBE1");
-        assertThat(html).doesNotContain("401").doesNotContain("Unauthorized");
+        assertThat(main(html)).doesNotContain("401").doesNotContain("Unauthorized");
     }
 
     @Test

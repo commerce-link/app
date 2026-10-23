@@ -530,6 +530,41 @@ class ClientReturnViewTest {
     }
 
     @Test
+    void blankStreetPhoneAndEmailAreLeftOut() {
+        // given
+        RMA blank = rma(RMAStatus.WaitingForItems, true);
+        blank.getShippingDetails().setStreetAndNumber(" ");
+        blank.getShippingDetails().setPhone("");
+        blank.getShippingDetails().setEmail("  jan@poczta ");
+
+        // when
+        ClientReturnView view = view(blank);
+
+        // then
+        assertThat(view.addressStreet()).isNull();
+        assertThat(view.addressPhone()).isNull();
+        assertThat(view.addressEmail()).isEqualTo("jan@poczta");
+        assertThat(view(rma(RMAStatus.Completed, true)).addressEmail()).isNull();
+    }
+
+    @Test
+    void onlyABookingOrACheckedParcelCarriesAHelpKey() {
+        // given
+        Shipment booking = creating(customerReturn());
+        Shipment preparing = creating(operatorShipment());
+        Shipment unknown = customerReturn();
+        unknown.setCreation(ShipmentCreationState.pending("cmd", NOW).failedWithKey(ShipmentCreationState.UNCONFIRMED_KEY));
+        Shipment tracked = tracked(customerReturn());
+
+        // when
+        ClientReturnView view = view(rma(RMAStatus.WaitingForItems, true, booking, preparing, unknown, tracked));
+
+        // then
+        assertThat(view.shipmentRows()).extracting(ReturnShipmentRow::helpKey).containsExactly(
+                "client.return.shipment.booking.help", null, "client.return.shipment.checking.help", null);
+    }
+
+    @Test
     void aCustomerReturnBeingCreatedSaysSo() {
         // given
         Shipment returned = creating(customerReturn());

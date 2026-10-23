@@ -209,6 +209,24 @@ public final class ClientReturnView {
         return joinPresent(", ", joinPresent(" ", details.getPostalCode(), details.getCity()), details.getCountry());
     }
 
+    /** The street and number, null when blank or without an address card. */
+    public String addressStreet() {
+        ShippingDetails details = address();
+        return details == null ? null : StringUtils.trimToNull(details.getStreetAndNumber());
+    }
+
+    /** The phone number, null when blank or without an address card. */
+    public String addressPhone() {
+        ShippingDetails details = address();
+        return details == null ? null : StringUtils.trimToNull(details.getPhone());
+    }
+
+    /** The e-mail address, null when blank or without an address card. */
+    public String addressEmail() {
+        ShippingDetails details = address();
+        return details == null ? null : StringUtils.trimToNull(details.getEmail());
+    }
+
     private static String joinPresent(String separator, String... parts) {
         String joined = Stream.of(parts).map(StringUtils::trimToNull).filter(Objects::nonNull)
                 .collect(Collectors.joining(separator));
@@ -273,12 +291,15 @@ public final class ClientReturnView {
         boolean customers = isCustomersReturn(shipment);
         String stateKey = null;
         String stateTone = null;
+        String helpKey = null;
         if (shipment.isCreating(now)) {
             stateKey = customers ? "client.return.shipment.state.booking" : "client.return.shipment.state.preparing";
             stateTone = "info";
+            helpKey = customers ? "client.return.shipment.booking.help" : null;
         } else if (customers && shipment.creationFailed(now)) {
             stateKey = "client.return.shipment.state.checking";
             stateTone = "warn";
+            helpKey = "client.return.shipment.checking.help";
         }
         boolean settled = stateKey == null;
         String carrier = CarrierNames.forCustomer(shipment);
@@ -289,7 +310,7 @@ public final class ClientReturnView {
                 settled ? OrderPageModelFactory.safeWebUrl(shipment.getTrackingUrl()) : null,
                 shipment.getShippedAt(), shipment.getDeliveredAt(),
                 shipment.getPickup() == null ? null : shipment.getPickup().getWindow(),
-                stateKey, stateTone);
+                stateKey, stateTone, helpKey);
     }
 
     // A shipment typed by hand in the dashboard says nothing about who sent it, so it carries no label.

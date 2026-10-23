@@ -27,10 +27,7 @@
                             th:if="${row.stateKey() == null and row.deliveredAt() != null}"> <span class="cl-status is-ok"
                             th:text="#{client.return.shipment.delivered}"></span></th:block></p>
                     <p th:if="${row.labelKey() != null}" class="cl-list-desc" th:text="#{${row.labelKey()}}"></p>
-                    <p th:if="${row.stateKey() == 'client.return.shipment.state.booking'}" class="cl-list-desc"
-                       th:text="#{client.return.shipment.booking.help}"></p>
-                    <p th:if="${row.stateKey() == 'client.return.shipment.state.checking'}" class="cl-list-desc"
-                       th:text="#{client.return.shipment.checking.help}"></p>
+                    <p th:if="${row.helpKey() != null}" class="cl-list-desc" th:text="#{${row.helpKey()}}"></p>
                     <p th:if="${row.trackingNo() != null}" class="cl-list-desc"><th:block
                             th:text="#{client.return.shipment.number(${row.trackingNo()})}"></th:block>&#8288;<button type="button"
                             class="cl-copy-inline is-icon" hidden data-cl-copy-reveal

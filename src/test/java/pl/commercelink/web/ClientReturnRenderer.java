@@ -40,7 +40,7 @@ final class ClientReturnRenderer {
     static final String STORE_ID = "s1";
     static final String RETURN_PATH = "/store/" + STORE_ID + "/client/rma/" + RMA_ID;
     static final Locale PL = Locale.forLanguageTag("pl");
-    private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 23, 12, 0);
+    static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 23, 12, 0);
 
     private final Store store;
     private final RMA rma;
