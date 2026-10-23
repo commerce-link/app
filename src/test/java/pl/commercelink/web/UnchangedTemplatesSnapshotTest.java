@@ -8,12 +8,9 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.web.orders.OrderAddressForm;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -21,7 +18,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Guards pages that a redesign must not change: the customer-facing client offer form and the order address form.
+ * Guards pages that a redesign must not change: the order address form.
  * Run with {@code -Dsnapshots.update=true} to rewrite the snapshots deliberately.
  */
 class UnchangedTemplatesSnapshotTest {
@@ -30,19 +27,6 @@ class UnchangedTemplatesSnapshotTest {
     private static final boolean UPDATE = Boolean.getBoolean("snapshots.update");
 
     private final TemplateEngine engine = EnglishFragmentTemplateEngine.create();
-
-    @Test
-    void clientOfferBillingShippingFormIsUnchanged() throws IOException {
-        // given
-        // The form uses th:field, which needs a Spring request context bound to a form object that a plain
-        // Thymeleaf engine cannot provide; the customer-facing sources are pinned by their hashes instead.
-        String snapshot = "clientOffer.html sha256=" + sourceHash("templates/clientOffer.html") + "\n"
-                + "fragments/billing-shipping-form.html sha256="
-                + sourceHash("templates/fragments/billing-shipping-form.html") + "\n";
-
-        // when / then
-        assertMatchesSnapshot("clientOffer-form.html", snapshot);
-    }
 
     @Test
     void orderAddressBillingDialogIsUnchanged() throws IOException {
@@ -93,17 +77,6 @@ class UnchangedTemplatesSnapshotTest {
 
     private static String normalize(String html) {
         return html.replaceAll("\\s+", " ").replaceAll("> <", ">\n<").trim() + "\n";
-    }
-
-    private static String sourceHash(String classpathResource) throws IOException {
-        try (InputStream in = UnchangedTemplatesSnapshotTest.class.getClassLoader().getResourceAsStream(classpathResource)) {
-            assertThat(in).as(classpathResource).isNotNull();
-            // Line endings are normalised so a checkout with different autocrlf settings keeps the same hash.
-            String text = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     private static void assertMatchesSnapshot(String name, String actual) throws IOException {

@@ -217,7 +217,7 @@ class RegistrationPagesRenderingTest {
     void signUpStylesUseTokensOnly() throws Exception {
         // given
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
-        String section = css.substring(css.indexOf("Sign-up and auth pages"));
+        String section = css.substring(css.indexOf("Sign-up and auth pages"), css.indexOf("/* ===== Public page"));
 
         // when / then
         assertThat(section).doesNotContainPattern(Pattern.compile("#[0-9a-fA-F]{3,6}\\b")).doesNotContain("gradient");

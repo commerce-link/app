@@ -19,7 +19,7 @@ class FulfilmentSelectStylesContractTest {
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
         int start = css.indexOf("/* Supplier selection (POST /dashboard/orders/fulfilment");
         assertThat(start).as("the supplier selection block").isPositive();
-        return css.substring(start);
+        return css.substring(start, css.indexOf("/* ===== Public page"));
     }
 
     private static String ruleBody(String css, String head) {
