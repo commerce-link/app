@@ -12,15 +12,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
-import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.products.Product;
+import pl.commercelink.pim.api.PIMEntryDeletedEvent;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +31,7 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 @Slf4j
 @Configuration
@@ -45,19 +48,31 @@ public class PimCatalogRegistry {
         return thread;
     });
     private final AtomicBoolean refreshPending = new AtomicBoolean(false);
+    private final Supplier<List<String>> storeIds;
+    private final StoreEntryCodeHistory codeHistory;
 
-    /** Test seam: wires the entry-added handler onto an already built catalog. */
+    /** Test seam: wires the entry handlers onto an already built catalog, with no stores and no code history. */
     PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository) {
+        this(catalog, productRepository, productCatalogRepository, List::of, new StoreEntryCodeHistory(Clock.systemUTC()));
+    }
+
+    /** Test seam: as above, with the stores whose entries the code history records before each refresh. */
+    PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
+                       ProductCatalogRepository productCatalogRepository, Supplier<List<String>> storeIds,
+                       StoreEntryCodeHistory codeHistory) {
         this.catalog = catalog;
-        catalog.onEntryAdded(event -> onEntryAdded(event, productRepository, productCatalogRepository));
+        this.storeIds = storeIds;
+        this.codeHistory = codeHistory;
+        registerEntryHandlers(productRepository, productCatalogRepository);
     }
 
     @Autowired
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository,
-                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
+                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment,
+                       StoresRepository storesRepository) {
 
         PimCatalogDescriptor descriptor = resolveDescriptor(
                 ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
@@ -68,11 +83,10 @@ public class PimCatalogRegistry {
         }
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
+        this.storeIds = () -> storesRepository.findAll().stream().map(Store::getStoreId).toList();
+        this.codeHistory = new StoreEntryCodeHistory(Clock.systemUTC());
 
-        catalog.onEntryAdded(event -> onEntryAdded(event, productRepository, productCatalogRepository));
-
-        catalog.onEntryDeleted(event ->
-                productRepository.detachPimFromProducts(event.pimId()));
+        registerEntryHandlers(productRepository, productCatalogRepository);
 
         catalog.onCategoryMatched(taxonomyCategoryEnrichment::applyMatch);
 
@@ -81,10 +95,27 @@ public class PimCatalogRegistry {
                 .register();
     }
 
-    private void onEntryAdded(PIMEntryAddedEvent event, ProductRepository productRepository,
-                              ProductCatalogRepository productCatalogRepository) {
-        attachEntryToProducts(event, productRepository, productCatalogRepository);
-        // the in-memory index must learn about the new entry; only after pinning, so lookups see a consistent state
+    private void registerEntryHandlers(ProductRepository productRepository,
+                                       ProductCatalogRepository productCatalogRepository) {
+        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository, codeHistory);
+        catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository, productCatalogRepository));
+        catalog.onEntryDeleted(event -> onEntryDeleted(event, storeEntryPinning));
+    }
+
+    private void onEntryAdded(PIMEntryAddedEvent event, StoreEntryPinning storeEntryPinning,
+                              ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
+        if (event.ownerStoreId() == null) {
+            attachEntryToProducts(event, productRepository);
+        } else {
+            storeEntryPinning.onStoreEntryAnnounced(event, catalog);
+        }
+        // the in-memory index must learn about the entry; only after pinning, so the pinning still reads the codes
+        // before the change and lookups see a consistent state
+        requestRefresh();
+    }
+
+    private void onEntryDeleted(PIMEntryDeletedEvent event, StoreEntryPinning storeEntryPinning) {
+        storeEntryPinning.onEntryDeleted(event.pimId(), catalog);
         requestRefresh();
     }
 
@@ -99,10 +130,16 @@ public class PimCatalogRegistry {
         try {
             refreshExecutor.execute(() -> {
                 refreshPending.set(false);
+                rememberStoreEntryCodes();
                 try {
                     catalog.refresh();
                 } catch (Exception e) {
-                    log.error("PIM index refresh failed", e);
+                    if (Thread.currentThread().isInterrupted() || refreshExecutor.isShutdown()) {
+                        // shutdownNow() on deploy interrupts a running refresh; that is not a failure
+                        log.info("PIM index refresh interrupted by shutdown: {}", e.toString());
+                    } else {
+                        log.error("PIM index refresh failed", e);
+                    }
                 }
             });
         } catch (RuntimeException e) {
@@ -112,25 +149,29 @@ public class PimCatalogRegistry {
         }
     }
 
-    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository,
-                                      ProductCatalogRepository productCatalogRepository) {
-        List<Product> products = event.ownerStoreId() == null
-                ? productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes())
-                // a store's own entry only fills products of that store
-                : productRepository.findAllWithoutPimIdByEanOrMfnInCategories(
-                        categoryIdsOf(event.ownerStoreId(), productCatalogRepository), event.eans(), event.mfnCodes());
-        products.forEach(product -> {
+    // before the copy is replaced: an event handled after this refresh still finds the codes its edit removed
+    private void rememberStoreEntryCodes() {
+        try {
+            for (String storeId : storeIds.get()) {
+                if (storeId == null || storeId.isBlank()) {
+                    continue;
+                }
+                codeHistory.remember(catalog.withStoreData(storeId).findAll().stream()
+                        .filter(entry -> storeId.equals(entry.ownerStoreId()))
+                        .toList());
+            }
+        } catch (RuntimeException e) {
+            // without the history a removed code may leave a product pinned, as before; the refresh itself must run
+            log.warn("Codes of store entries not recorded before the PIM index refresh: {}", e.toString());
+        }
+    }
+
+    /** Global entries only: a store's own entries are pinned by {@link StoreEntryPinning}. */
+    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository) {
+        productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes()).forEach(product -> {
             product.setPimId(event.pimId());
             productRepository.save(product);
         });
-    }
-
-    private static List<String> categoryIdsOf(String storeId, ProductCatalogRepository productCatalogRepository) {
-        return productCatalogRepository.findAll(storeId).stream()
-                .flatMap(catalog -> catalog.getCategories().stream())
-                .map(CategoryDefinition::getCategoryId)
-                .distinct()
-                .toList();
     }
 
     static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {
@@ -163,8 +204,10 @@ public class PimCatalogRegistry {
         refreshExecutor.shutdownNow();
     }
 
-    // every instance refreshes on its own: an SQS event reaches only one of the app instances
-    @Scheduled(cron = "0 */5 * * * ?")
+    // every instance refreshes on its own: an SQS event reaches only one of the app instances. A fixed delay with a
+    // random first start (1-5 minutes) keeps the instances from refreshing in the same second.
+    @Scheduled(fixedDelay = 300_000,
+            initialDelayString = "#{T(java.util.concurrent.ThreadLocalRandom).current().nextLong(60000, 300000)}")
     void refresh() {
         requestRefresh();
     }

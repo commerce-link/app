@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
@@ -177,15 +178,18 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         return query(queryRequest, Product.class);
     }
 
-    public void detachPimFromProducts(String pimId) {
-        List<Product> products = findAllByPimId(pimId);
-        for (Product product : products) {
+    /** Clears {@code pimId} on every product pinned to it and returns those products, fully loaded. */
+    public List<Product> detachPimFromProducts(String pimId) {
+        List<Product> detached = new ArrayList<>();
+        for (Product product : findAllByPimId(pimId)) {
             Product fullProduct = findByProductId(product.getCategoryId(), product.getProductId());
             if (fullProduct != null) {
                 fullProduct.setPimId(null);
                 dynamoDBMapper.save(fullProduct);
+                detached.add(fullProduct);
             }
         }
+        return detached;
     }
 
     public List<Product> findAllProductsThatQualifiesForRestock(ProductCatalog catalog) {
@@ -269,10 +273,20 @@ public class ProductRepository extends DynamoDbRepository<Product> {
     }
 
     public List<Product> findAllWithoutPimIdByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
+        return findAllInCategories(categoryIds, eav -> withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav));
+    }
+
+    /** Products of the given categories whose EAN or MFN is among the codes, pinned to a PIM entry or not. */
+    public List<Product> findAllByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
+        return findAllInCategories(categoryIds, eav -> eanOrMfnCondition(eans, mfnCodes, eav));
+    }
+
+    private List<Product> findAllInCategories(Collection<String> categoryIds,
+                                              Function<Map<String, AttributeValue>, String> filterBuilder) {
         List<Product> result = new ArrayList<>();
         for (String categoryId : categoryIds) {
             Map<String, AttributeValue> eav = new HashMap<>();
-            String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+            String filter = filterBuilder.apply(eav);
             if (filter == null) {
                 return result;
             }
@@ -293,8 +307,19 @@ public class ProductRepository extends DynamoDbRepository<Product> {
      * Returns null when both lists are empty, i.e. nothing can match.
      */
     private static String withoutPimIdByEanOrMfnFilter(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
+        String codes = eanOrMfnCondition(eans, mfnCodes, eav);
+        if (codes == null) {
+            return null;
+        }
         eav.put(":nullValue", new AttributeValue().withNULL(true));
+        return "(attribute_not_exists(pimId) OR pimId = :nullValue) AND " + codes;
+    }
 
+    /**
+     * Builds the condition "ean or mfn among the given codes", adding its values to {@code eav}.
+     * Returns null when both lists are empty, i.e. nothing can match.
+     */
+    private static String eanOrMfnCondition(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
         List<String> conditions = new ArrayList<>();
 
         List<String> eanPlaceholders = new ArrayList<>();
@@ -321,7 +346,7 @@ public class ProductRepository extends DynamoDbRepository<Product> {
             return null;
         }
 
-        return "(attribute_not_exists(pimId) OR pimId = :nullValue) AND (" + String.join(" OR ", conditions) + ")";
+        return "(" + String.join(" OR ", conditions) + ")";
     }
 
     public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, Integer minMaxRetailPrice, int page, int pageSize) {
