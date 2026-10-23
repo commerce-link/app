@@ -3,7 +3,7 @@ package pl.commercelink.web.clientorder;
 import java.io.Serializable;
 
 /**
- * The outcome shown inside one card of the order page after a redirect; a flash attribute, so it must survive the session store.
+ * The outcome shown inside one card of the order page after a redirect; a flash attribute, i.e. kept in the HTTP session, hence serializable.
  * {@code target} is {@code "delivery"} or {@code "date"}, {@code tone} is {@code "ok"} or {@code "bad"} and {@code field}
  * names the input the message belongs to ({@code "code"}) or is null when the message concerns the whole card.
  */

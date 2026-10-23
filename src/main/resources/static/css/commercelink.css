@@ -14361,7 +14361,7 @@ body.cl-public dl.cl-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 6
 /* redirect targets after a notice (#delivery, #date) keep a gap to the top edge */
 .cl-order-page :is(#delivery, #date, #payment) { scroll-margin-top: 16px; }
 .cl-order-page .cl-card-inset form > .cl-card-actions { margin-top: 12px; }
-.cl-order-page .cl-card-inset > :is(.cl-kv-grid, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form, .cl-card-actions) { margin-top: 12px; }
+.cl-order-page .cl-card-inset > :is(.cl-kv-grid, dl.cl-facts, .cl-fieldset-title, form) + :is(.cl-help, .cl-fieldset-title, form, .cl-card-actions) { margin-top: 12px; }
 /* a step of a multi-step change inside a card: p.cl-substep = cl-step-badge + "Step n of m" */
 body.cl-public p.cl-substep { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--cl-ink-2); }
 /* a short one-time code typed from an e-mail: large, spaced capitals; the buttons sit in the same row */
@@ -14444,6 +14444,8 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 .cl-public-main .cl-card.cl-public-message { padding: 28px 24px; }
 .cl-public-message .cl-page-title { margin-top: 0; }
 .cl-public-message .cl-page-lead { margin-bottom: 0; }
+/* the store's contact e-mail is one unbreakable word; without this a long one scrolls the page sideways on a phone */
+.cl-public-message .cl-page-lead a { overflow-wrap: anywhere; }
 
 /* ===== Payment bridge (payments/payment-bridge.html) ===== */
 .cl-bridge { text-align: center; padding: 28px 24px; }

@@ -20,6 +20,7 @@ import pl.commercelink.web.orders.Money;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -33,6 +34,10 @@ import java.util.stream.Collectors;
  */
 @Getter
 public class ClientOrderView {
+
+    // The offered days start at the customer's "today"; on a server in UTC the bare LocalDate.now() is still yesterday
+    // for the first hours after a Polish midnight, and the server would accept that past day.
+    private static final ZoneId CUSTOMER_ZONE = ZoneId.of("Europe/Warsaw");
 
     private final String orderId;
     private final String shortOrderId;
@@ -137,12 +142,12 @@ public class ClientOrderView {
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false, false, LocalDate.now());
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false, false, LocalDate.now(CUSTOMER_ZONE));
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
                                        boolean shippingAddressEditable, boolean preferredShippingEditable) {
-        return from(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable, LocalDate.now());
+        return from(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable, LocalDate.now(CUSTOMER_ZONE));
     }
 
     // "today" is a parameter so the offered days are deterministic in tests.
@@ -288,8 +293,8 @@ public class ClientOrderView {
     }
 
     private static ShipmentRow toRow(Shipment shipment) {
-        return new ShipmentRow(CarrierNames.forCustomer(shipment), shipment.getTrackingNo(), shipment.getTrackingUrl(),
-                shipment.getShippedAt(), shipment.getDeliveredAt());
+        return new ShipmentRow(CarrierNames.forCustomer(shipment), shipment.getTrackingNo(),
+                StringUtils.trimToNull(shipment.getTrackingUrl()), shipment.getShippedAt(), shipment.getDeliveredAt());
     }
 
     // "Check with the carrier" only makes sense when a tracking link is there to follow.
@@ -297,7 +302,7 @@ public class ClientOrderView {
         if (shipmentRows.isEmpty()) {
             return "shipping.noParcel";
         }
-        return shipmentRows.stream().anyMatch(row -> row.trackingUrl() != null && !row.trackingUrl().isBlank())
+        return shipmentRows.stream().anyMatch(row -> row.trackingUrl() != null)
                 ? "shipping" : "shipping.noTracking";
     }
 

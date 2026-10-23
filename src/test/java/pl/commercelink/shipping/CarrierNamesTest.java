@@ -14,8 +14,7 @@ class CarrierNamesTest {
         Shipment upper = shipment("DHL", null);
         Shipment kurier = shipment("inpostpaczkakurierska", null);
 
-        // when
-        // then
+        // when / then
         assertThat(CarrierNames.forCustomer(lower)).isEqualTo("DHL");
         assertThat(CarrierNames.forCustomer(upper)).isEqualTo("DHL");
         assertThat(CarrierNames.forCustomer(kurier)).isEqualTo("InPost Kurier");
@@ -38,8 +37,7 @@ class CarrierNamesTest {
         // given
         Shipment shipment = shipment(" ", null);
 
-        // when
-        // then
+        // when / then
         assertThat(CarrierNames.forCustomer(shipment)).isNull();
     }
 
@@ -53,6 +51,18 @@ class CarrierNamesTest {
 
         // then
         assertThat(name).isEqualTo("One by Allegro");
+    }
+
+    @Test
+    void allegroShipmentWithAPlainCarrierCodeFallsBackToTheKnownNames() {
+        // given
+        Shipment shipment = shipment("dhl", ShippingIntegrationChoice.ALLEGRO);
+
+        // when
+        String name = CarrierNames.forCustomer(shipment);
+
+        // then
+        assertThat(name).isEqualTo("DHL");
     }
 
     private static Shipment shipment(String carrier, String provider) {

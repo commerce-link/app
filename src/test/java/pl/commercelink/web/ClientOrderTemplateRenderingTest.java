@@ -150,6 +150,19 @@ class ClientOrderTemplateRenderingTest {
     }
 
     @Test
+    void blankTrackingLinkCountsAsMissing() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.Shipping)
+                .shipments(ClientOrderRenderer.shipment("dpd", "1000634722104", " ", SHIPPED, null))
+                .locale(PL).render();
+
+        // then
+        assertThat(html).contains("Numer: 1000634722104")
+                .contains("Numer przesyłki znajdziesz niżej.")
+                .doesNotContain("Śledź przesyłkę");
+    }
+
+    @Test
     void deliveredShipmentHasAPillAndBothDates() {
         // when
         String html = ClientOrderRenderer.newOrder().status(OrderStatus.Shipping)

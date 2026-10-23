@@ -12,8 +12,8 @@ import java.util.stream.Stream;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 @DynamoDBDocument
-// Kept serializable so the address flashed through the session survives a session store, should one be added;
-// sessions are in memory today and nothing serializes them.
+// A rejected address form travels back to the customer as a flash attribute, i.e. in the HTTP session, and session
+// attributes are expected to be serializable.
 public class ShippingDetails implements Serializable {
 
     private static final long serialVersionUID = 1L;

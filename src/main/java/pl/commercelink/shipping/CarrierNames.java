@@ -25,12 +25,16 @@ public final class CarrierNames {
     }
 
     public static String forCustomer(Shipment shipment) {
-        if (ShippingIntegrationChoice.ALLEGRO.equals(shipment.getProvider())) {
-            return AllegroCarrierNames.displayName(shipment.getCarrier());
-        }
         String carrier = shipment.getCarrier();
         if (StringUtils.isBlank(carrier)) {
             return null;
+        }
+        // Allegro names only its own services; a plain carrier code from Allegro still gets the common name.
+        if (ShippingIntegrationChoice.ALLEGRO.equals(shipment.getProvider())) {
+            String allegroName = AllegroCarrierNames.displayName(carrier);
+            if (!carrier.equals(allegroName)) {
+                return allegroName;
+            }
         }
         return KNOWN.getOrDefault(carrier.trim().toLowerCase(Locale.ROOT), carrier);
     }
