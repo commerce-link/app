@@ -48,8 +48,12 @@ public class WebSecurityConfiguration {
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
                         .addHeaderWriter(frameOptions()))
                 .authorizeHttpRequests(auth -> {
+                    // /error is public so that a customer whose page failed sees the store's error page
+                    // (PublicErrorViewResolver) instead of the dashboard login; a page that is not public still
+                    // sends an anonymous visitor to the login before it is dispatched
                     auth.requestMatchers(
                             "/",
+                            "/error",
                             "/env",
                             "/Global/**",
                             "/Store/**",

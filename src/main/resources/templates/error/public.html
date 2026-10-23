@@ -1,0 +1,15 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-narrow'">
+<head>
+    <title th:text="${notFound} ? #{error.public.notFound.pageTitle} : #{error.public.failed.pageTitle}">Nie ma takiej strony</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+    <section th:replace="~{fragments/public-message :: card(eyebrow=#{error.public.eyebrow(${errorStatus})},
+            title=${notFound} ? #{error.public.notFound.title} : #{error.public.failed.title},
+            lead=${notFound} ? #{error.public.notFound.lead} : #{error.public.failed.lead},
+            contact=${notFound} ? #{error.public.notFound.contact} : #{error.public.failed.contact}, fallback=null)}"></section>
+</th:block>
+</body>
+</html>
