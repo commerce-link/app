@@ -19,9 +19,12 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import software.amazon.awssdk.services.sqs.SqsAsyncClient;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +33,7 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 @Slf4j
 @Configuration
@@ -46,11 +50,22 @@ public class PimCatalogRegistry {
         return thread;
     });
     private final AtomicBoolean refreshPending = new AtomicBoolean(false);
+    private final Supplier<List<String>> storeIds;
+    private final StoreEntryCodeHistory codeHistory;
 
-    /** Test seam: wires the entry handlers onto an already built catalog. */
+    /** Test seam: wires the entry handlers onto an already built catalog, with no stores and no code history. */
     PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository) {
+        this(catalog, productRepository, productCatalogRepository, List::of, new StoreEntryCodeHistory(Clock.systemUTC()));
+    }
+
+    /** Test seam: as above, with the stores whose entries the code history records before each refresh. */
+    PimCatalogRegistry(PimCatalog catalog, ProductRepository productRepository,
+                       ProductCatalogRepository productCatalogRepository, Supplier<List<String>> storeIds,
+                       StoreEntryCodeHistory codeHistory) {
         this.catalog = catalog;
+        this.storeIds = storeIds;
+        this.codeHistory = codeHistory;
         registerEntryHandlers(productRepository, productCatalogRepository);
     }
 
@@ -58,7 +73,8 @@ public class PimCatalogRegistry {
     @SuppressWarnings("unchecked")
     PimCatalogRegistry(SqsAsyncClient sqsAsyncClient, ProductRepository productRepository,
                        ProductCatalogRepository productCatalogRepository,
-                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment) {
+                       SecretsManager secretsManager, @Lazy TaxonomyCategoryEnrichment taxonomyCategoryEnrichment,
+                       StoresRepository storesRepository) {
 
         PimCatalogDescriptor descriptor = resolveDescriptor(
                 ServiceLoader.load(PimCatalogDescriptor.class).stream().map(ServiceLoader.Provider::get).toList());
@@ -69,6 +85,8 @@ public class PimCatalogRegistry {
         }
 
         this.catalog = descriptor.create(configuration, Map.of("sqsAsyncClient", sqsAsyncClient));
+        this.storeIds = () -> storesRepository.findAll().stream().map(Store::getStoreId).toList();
+        this.codeHistory = new StoreEntryCodeHistory(Clock.systemUTC());
 
         registerEntryHandlers(productRepository, productCatalogRepository);
 
@@ -81,7 +99,7 @@ public class PimCatalogRegistry {
 
     private void registerEntryHandlers(ProductRepository productRepository,
                                        ProductCatalogRepository productCatalogRepository) {
-        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository);
+        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository, codeHistory);
         catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository, productCatalogRepository));
         catalog.onEntryDeleted(event -> onEntryDeleted(event, storeEntryPinning));
     }
@@ -114,6 +132,7 @@ public class PimCatalogRegistry {
         try {
             refreshExecutor.execute(() -> {
                 refreshPending.set(false);
+                rememberStoreEntryCodes();
                 try {
                     catalog.refresh();
                 } catch (Exception e) {
@@ -129,6 +148,23 @@ public class PimCatalogRegistry {
             // executor already shut down
             refreshPending.set(false);
             log.warn("PIM index refresh not scheduled: {}", e.getMessage());
+        }
+    }
+
+    // before the copy is replaced: an event handled after this refresh still finds the codes its edit removed
+    private void rememberStoreEntryCodes() {
+        try {
+            for (String storeId : storeIds.get()) {
+                if (storeId == null || storeId.isBlank()) {
+                    continue;
+                }
+                codeHistory.remember(catalog.withStoreData(storeId).findAll().stream()
+                        .filter(entry -> storeId.equals(entry.ownerStoreId()))
+                        .toList());
+            }
+        } catch (RuntimeException e) {
+            // without the history a removed code may leave a product pinned, as before; the refresh itself must run
+            log.warn("Codes of store entries not recorded before the PIM index refresh: {}", e.toString());
         }
     }
 

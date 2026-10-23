@@ -30,6 +30,7 @@ class StoreEntryPinning {
 
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
+    private final StoreEntryCodeHistory codeHistory;
 
     void onStoreEntryAnnounced(PIMEntryAddedEvent event, PimCatalog catalog) {
         String ownerStoreId = event.ownerStoreId();
@@ -58,11 +59,13 @@ class StoreEntryPinning {
 
     private void detachProductsOfRemovedCodes(String pimId, Codes announced, PimView storeView,
                                               List<String> ownerCategoryIds, PimCatalog catalog) {
-        // the app's copy of the index is refreshed only after this handler, so it still holds the codes before the edit;
-        // a copy that already has the new codes, or does not know the entry, yields no removed codes and unpins nothing
-        Codes removed = storeView.findByPimId(pimId)
-                .map(entry -> Codes.of(entry.gtins(), entry.mpns()).minus(announced))
-                .orElse(Codes.EMPTY);
+        // the codes before the edit: the copy holds them until its next refresh, and a refresh triggered meanwhile by
+        // another event leaves them only in the history; codes known to neither unpin nothing (the product stays pinned)
+        Codes before = storeView.findByPimId(pimId)
+                .map(entry -> Codes.of(entry.gtins(), entry.mpns()))
+                .orElse(Codes.EMPTY)
+                .plus(Codes.of(codeHistory.eansOf(pimId), codeHistory.mpnsOf(pimId)));
+        Codes removed = before.minus(announced);
         if (removed.isEmpty()) {
             return;
         }
@@ -131,6 +134,14 @@ class StoreEntryPinning {
                     .filter(code -> code != null && !code.isBlank())
                     .map(unify)
                     .collect(Collectors.toUnmodifiableSet());
+        }
+
+        Codes plus(Codes other) {
+            Set<String> allEans = new HashSet<>(eans);
+            allEans.addAll(other.eans);
+            Set<String> allMfnCodes = new HashSet<>(mfnCodes);
+            allMfnCodes.addAll(other.mfnCodes);
+            return new Codes(allEans, allMfnCodes);
         }
 
         Codes minus(Codes other) {

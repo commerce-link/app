@@ -8,6 +8,10 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.provider.api.ProviderField;
 
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +21,7 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -298,5 +303,46 @@ class PimCatalogRegistryTest {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    @Test
+    void refreshRecordsTheStoreEntryCodesBeforeTheCopyChanges() {
+        // given
+        StoreEntryCodeHistory history = new StoreEntryCodeHistory(Clock.systemUTC());
+        PimView storeView = mock(PimView.class);
+        when(storeView.findAll()).thenReturn(List.of(
+                pimEntry("X", "5900000000011", "s1"), pimEntry("G", "5900000000022", null)));
+        when(catalogMock.withStoreData("s1")).thenReturn(storeView);
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository,
+                () -> List.of("s1", " "), history);
+
+        // when
+        registry.requestRefresh();
+
+        // then
+        var order = inOrder(catalogMock);
+        order.verify(catalogMock, timeout(2000)).withStoreData("s1");
+        order.verify(catalogMock, timeout(2000)).refresh();
+        assertThat(history.eansOf("X")).containsExactly("5900000000011");
+        assertThat(history.eansOf("G")).isEmpty();
+    }
+
+    @Test
+    void refreshRunsWhenTheStoreEntryCodesCannotBeRecorded() {
+        // given
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository,
+                () -> { throw new IllegalStateException("DynamoDB down"); },
+                new StoreEntryCodeHistory(Clock.systemUTC()));
+
+        // when
+        registry.requestRefresh();
+
+        // then
+        verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    private static PimEntry pimEntry(String pimId, String gtin, String ownerStoreId) {
+        return new PimEntry(pimId, List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN)), "Brand", "Name",
+                null, null, true, null, null, null, ownerStoreId);
     }
 }

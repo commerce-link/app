@@ -19,6 +19,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -50,6 +51,7 @@ class StoreEntryPinningTest {
     private ProductCatalogRepository productCatalogRepository;
 
     private final List<Product> products = new ArrayList<>();
+    private final StoreEntryCodeHistory history = new StoreEntryCodeHistory(Clock.systemUTC());
     private StoreEntryPinning pinning;
 
     @BeforeEach
@@ -82,7 +84,7 @@ class StoreEntryPinningTest {
             detached.forEach(product -> product.setPimId(null));
             return detached;
         });
-        pinning = new StoreEntryPinning(productRepository, productCatalogRepository);
+        pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history);
     }
 
     @Test
@@ -159,6 +161,49 @@ class StoreEntryPinningTest {
 
         // when
         pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of("m 1")), copy);
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("X");
+    }
+
+    @Test
+    void productPinnedByACodeOnlyTheHistoryStillKnowsIsDetached() {
+        // given: another event's refresh already put the new codes into the copy
+        history.remember(List.of(storeEntry("X", STORE, List.of(E1), List.of())));
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E2), List.of()));
+        Product product = product("p1", STORE_CATEGORY, "X", E1, null);
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of()), copy);
+
+        // then
+        assertThat(product.getPimId()).isNull();
+    }
+
+    @Test
+    void productPinnedBySiblingEanStaysWhenTheHistoryKnowsTheOldCodes() {
+        // given
+        history.remember(List.of(storeEntry("X", STORE, List.of(E1), List.of())));
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E2), List.of()));
+        Product product = product("p1", STORE_CATEGORY, "X", E9, "M9");
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E2), List.of()), copy);
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("X");
+    }
+
+    @Test
+    void codeTheEditPutBackIsNotDetachedThoughTheHistoryHasOthers() {
+        // given: E1 -> E2 -> back to E1
+        history.remember(List.of(storeEntry("X", STORE, List.of(E1), List.of())));
+        history.remember(List.of(storeEntry("X", STORE, List.of(E2), List.of())));
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of()));
+        Product product = product("p1", STORE_CATEGORY, "X", E1, null);
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of()), copy);
 
         // then
         assertThat(product.getPimId()).isEqualTo("X");
