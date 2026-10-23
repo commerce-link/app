@@ -51,7 +51,7 @@ class ManualWarehouseItemFulfilmentTest {
         // given
         OrderItem orderItem = new OrderItem(ORDER_ID, Categories.UNCATEGORIZED, "Widget", 1, 199.0, "MFN-1", false);
         WarehouseItemView warehouseItem = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
+                STORE_ID, "warehouse-item-1", "Test item", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
         );
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(warehouseFulfilmentService.run(eq(order), any())).thenReturn(List.of(orderItem));

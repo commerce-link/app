@@ -9,8 +9,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.rest.client.HttpClientException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.shipping.api.OrderReference;
+import pl.commercelink.shipping.api.ShipmentRequest;
 import pl.commercelink.shipping.api.ShippingEstimate;
-import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.rma.RMACenter;
 import pl.commercelink.orders.rma.RMACentersRepository;
@@ -43,6 +44,14 @@ public abstract class AbstractShippingController {
     @Autowired
     protected MessageSource messageSource;
 
+    @Autowired
+    protected ShipmentCreationService shipmentCreationService;
+
+    /** The unpaid amount in whole grosze: the form must show 59.98, not the double's 59.980000000000004. */
+    protected static double roundedUnpaidAmount(Order order) {
+        return java.math.BigDecimal.valueOf(order.getUnpaidAmount()).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
+    }
+
     @PostMapping("/template")
     public String loadTemplates(@ModelAttribute ShippingForm form, Model model) {
         Store store = getStore();
@@ -58,7 +67,7 @@ public abstract class AbstractShippingController {
         double defaultCodAmount = 0;
         if (form.getShippingEntityType().equals("orders")) {
             Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
-            defaultCodAmount = order.getUnpaidAmount();
+            defaultCodAmount = roundedUnpaidAmount(order);
         }
         form.setCashOnDeliveryAmount(defaultCodAmount);
 
@@ -86,32 +95,63 @@ public abstract class AbstractShippingController {
 
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        String createdAfterAll = redirectIfCreatedAfterAll(form, redirectAttributes, locale);
+        if (createdAfterAll != null) {
+            return createdAfterAll;
+        }
         // a tab left open, a page restored from the back/forward cache or a re-sent form must not book (and pay for) a
         // second label once the first booking is saved; the check is not atomic, so two requests in flight at the same
         // time are only kept apart by the button being disabled on submit (shipping-booking.js)
         String refusal = refuseBooking(form);
+        if (refusal == null) {
+            refusal = refuseIntegration(form);
+        }
         if (refusal != null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
             return "redirect:" + getEntityUrl(form);
         }
         Store store = getStore();
-        OperationResult<List<Shipment>> result;
+        ShipmentCreationStart start;
         try {
-            result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
+            DeliveryTarget target = resolveDeliveryTarget(form);
+            ShipmentRequest request = ShippingService.withOrderReference(
+                    shippingService.buildRequest(form, store, target), orderReference(form));
+            start = shipmentCreationService.start(creationSeed(form).storeId(getStoreId()).build(), request, store,
+                    placeholder(form, store, target));
         } catch (ShippingUnavailableException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(noProviderKey(), null, locale));
             return "redirect:" + getEntityUrl(form);
         }
-        if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
-            return "redirect:" + form.getShippingAction();
+        return redirectAfterStart(start, form, redirectAttributes, locale);
+    }
+
+    /** Where the operator lands after a creation started, was refused or found its owner gone. */
+    protected String redirectAfterStart(ShipmentCreationStart start, ShippingForm form, RedirectAttributes redirectAttributes,
+                                        Locale locale) {
+        switch (start.outcome()) {
+            case REFUSED -> {
+                redirectAttributes.addFlashAttribute("errorMessage", start.error());
+                return "redirect:" + form.getShippingAction();
+            }
+            case GONE -> redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(goneMessageKey(), null, locale));
+            case STARTED -> redirectAttributes.addFlashAttribute("successMessage",
+                    messageSource.getMessage(startedMessageKey(), null, locale));
         }
-        List<Shipment> shipments = result.getPayload();
-        onShippingCreated(form, shipments);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("shipping.create.success", null, locale));
-
         return "redirect:" + getEntityUrl(form);
+    }
+
+    /** The shipment shown while the provider creates it: the chosen carrier and the delivery point. */
+    private static Shipment placeholder(ShippingForm form, Store store, DeliveryTarget target) {
+        Shipment placeholder = new Shipment(target.pointCode() != null ? ShipmentType.PickupPoint : ShipmentType.Courier);
+        placeholder.setCollectionPointCode(target.pointCode());
+        if (store.getShippingConfiguration() != null) {
+            store.getShippingConfiguration().getAuthorizedCarriers().stream()
+                    .filter(carrier -> carrier.getId().equals(form.getServiceId()))
+                    .findFirst()
+                    .ifPresent(carrier -> placeholder.setCarrier(carrier.getName()));
+        }
+        return placeholder;
     }
 
     protected String renderShippingForm(Store store, ShippingForm shippingForm, List<ShippingDetails> shippingDetailsList, Model model) {
@@ -150,7 +190,7 @@ public abstract class AbstractShippingController {
                 .collect(Collectors.toList());
     }
 
-    private String getEntityUrl(ShippingForm form) {
+    protected String getEntityUrl(ShippingForm form) {
         String url = "/dashboard/" + form.getShippingEntityType();
         String entityId = form.getShippingEntityId();
         if (StringUtils.isNotBlank(entityId)) {
@@ -180,11 +220,43 @@ public abstract class AbstractShippingController {
         return null;
     }
 
+    /**
+     * Message key of the reason the integration named by the form must not book here, or null. These steps always book
+     * through the store's default integration: another one (Wysyłam z Allegro) has its own step.
+     */
+    protected String refuseIntegration(ShippingForm form) {
+        return null;
+    }
+
+    /**
+     * Where to send the operator instead of booking, when an earlier creation command with an unknown outcome turns out
+     * to have created the shipment after all (ShipmentCreationReconciler); null to go on booking.
+     */
+    protected String redirectIfCreatedAfterAll(ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        return null;
+    }
+
+    /** The marketplace order the shipment is for, null for any other record. */
+    protected OrderReference orderReference(ShippingForm form) {
+        return null;
+    }
+
     protected abstract double calculateShippingInsurance(ShippingForm form);
 
     protected abstract List<ShippingDetails> retrieveShippingDetailsList(ShippingForm form);
 
-    protected abstract void onShippingCreated(ShippingForm form, List<Shipment> shipments);
+    /** Who the shipment belongs to and what settling it needs; commandId, provider and attempt are filled in later. */
+    protected abstract ShipmentCreationCheckRequest.ShipmentCreationCheckRequestBuilder creationSeed(ShippingForm form);
+
+    /** Message key of the reason shown when the owner refused the new shipment (gone, or one is being created). */
+    protected String goneMessageKey() {
+        return "shipping.create.gone";
+    }
+
+    /** Message key of the note shown once the creation started. */
+    protected String startedMessageKey() {
+        return "shipping.create.started";
+    }
 
     protected abstract DeliveryTarget resolveDeliveryTarget(ShippingForm form);
 

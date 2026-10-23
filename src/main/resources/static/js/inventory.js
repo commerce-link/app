@@ -10,8 +10,15 @@
     const MIN_QUERY_LENGTH = 3;
     const SPINNER_DELAY_MS = 150;
 
+    // The supplier assortment page carries the summary slot, the prices and availability page the search form.
     const summarySlot = page.querySelector('[data-inventory-summary]');
+    if (summarySlot) {
+        loadSummary();
+    }
     const form = page.querySelector('[data-inventory-search]');
+    if (!form) {
+        return;
+    }
     const input = form.querySelector('#inventory-q');
     const clearButton = form.querySelector('[data-inventory-clear]');
     const submitButton = form.querySelector('[data-inventory-submit]');
@@ -28,6 +35,20 @@
 
     function urlQuery() {
         return (new URLSearchParams(window.location.search).get('q') || '').trim();
+    }
+
+    // The way back to the browse list (from=) travels with every pushed address, so a reload keeps the back link.
+    function pageAddress(query) {
+        const params = new URLSearchParams();
+        if (query) {
+            params.set('q', query);
+        }
+        const from = new URLSearchParams(window.location.search).get('from');
+        if (from) {
+            params.set('from', from);
+        }
+        const search = params.toString();
+        return page.dataset.pageUrl + (search ? '?' + search : '');
     }
 
     function parseFragment(html, name) {
@@ -212,7 +233,7 @@
                 results.replaceChildren(fragment);
                 failedQuery = null;
                 if (pushHistory) {
-                    window.history.pushState({q: query}, '', page.dataset.pageUrl + '?q=' + encodeURIComponent(query));
+                    window.history.pushState({q: query}, '', pageAddress(query));
                 }
                 announce(fragment);
                 const heading = fragment.querySelector('[data-inventory-results-heading]');
@@ -281,7 +302,7 @@
         searchError.hidden = true;
         showEmptyState();
         if (urlQuery()) {
-            window.history.pushState({q: ''}, '', page.dataset.pageUrl);
+            window.history.pushState({q: ''}, '', pageAddress(''));
         }
         input.focus();
     });
@@ -316,9 +337,8 @@
         }
     });
 
-    // Arriving straight at ?q= -- a bookmark, a reload, the legacy check-price redirect -- renders the
-    // result server-side below the tiles and the sources bar, so on a laptop it starts off-screen.
-    // The fetch path already moves focus to the heading; do the same for the rendered one.
+    // Arriving straight at ?q= -- a bookmark, a reload, a browse row, the legacy redirects -- renders the
+    // result server-side. The fetch path already moves focus to the heading; do the same for the rendered one.
     function revealServerRenderedResult() {
         if (urlQuery().length < MIN_QUERY_LENGTH) {
             return;
@@ -332,5 +352,4 @@
 
     updateControls();
     revealServerRenderedResult();
-    loadSummary();
 })();

@@ -7,7 +7,7 @@ import pl.commercelink.orders.ShippingDetails;
 import java.util.LinkedList;
 import java.util.List;
 
-class RMACarrierConfirmationEmailNotification extends EmailNotification {
+public class RMACarrierConfirmationEmailNotification extends EmailNotification {
     @JsonProperty("rmaId")
     private String rmaId;
     @JsonProperty("orderId")
@@ -17,7 +17,7 @@ class RMACarrierConfirmationEmailNotification extends EmailNotification {
     @JsonProperty("trackingUrls")
     private List<String> trackingUrls = new LinkedList<>();
 
-    RMACarrierConfirmationEmailNotification(String recipientEmail, String recipientName, String rmaId, String orderId, ShippingDetails shippingDetails) {
+    public RMACarrierConfirmationEmailNotification(String recipientEmail, String recipientName, String rmaId, String orderId, ShippingDetails shippingDetails) {
         super(recipientEmail, recipientName);
         this.rmaId = rmaId;
         this.orderId = orderId;

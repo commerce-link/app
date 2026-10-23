@@ -36,6 +36,17 @@ class NavigationMessagesTest {
     }
 
     @Test
+    void namesTheAssortmentEntryWithoutTheSupplierQualifier() {
+        // given
+        ResourceBundle polish = bundle("pl");
+        ResourceBundle english = bundle("en");
+
+        // when / then
+        assertThat(polish.getString("nav.inventory")).isEqualTo("Asortyment");
+        assertThat(english.getString("nav.inventory")).isEqualTo("Assortment");
+    }
+
+    @Test
     void translatesEveryNavigationControlInBothLanguages() {
         for (String language : List.of("pl", "en")) {
             // given

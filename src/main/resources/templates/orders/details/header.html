@@ -4,7 +4,7 @@
 <!--/* Record header: back to the list as left, h1 with the number, the status and its action, the meta
        lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
 <div th:fragment="header"
-     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
+     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{${page.backLabelKey()}},
              #{order.page.title(${page.shortId()})}, ~{::orderCopy}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
     <th:block th:fragment="orderCopy">
         <button type="button" class="cl-copy-inline is-icon"
@@ -72,6 +72,7 @@
                        the link opens the sheet and the browser prints it */-->
                 <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" data-cl-print-frame th:text="#{order.page.print.card}"></a></li>
                 <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" data-cl-print-frame th:text="#{order.page.print.collection}"></a></li>
+                <li th:if="${h.rmaHref() != null}"><a class="cl-menu-item" th:href="@{${h.rmaHref()}}" th:text="#{order.page.rma.create}"></a></li>
                 <!--/* a closed order keeps an available cancel (a completed order can still be cancelled after a full
                        return), but not the greyed-out placeholders: there is nothing left to explain */-->
                 <th:block th:unless="${page.superAdmin()}">

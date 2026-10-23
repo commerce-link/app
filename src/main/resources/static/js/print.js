@@ -3,6 +3,8 @@
 // print dialog, so the paper shows exactly that sheet (its layout carries only the sheet) and the order page stays
 // where it was. Without this script the link simply opens the sheet and the browser's Print menu prints it; a click
 // with a modifier key (new tab or window) keeps that behaviour on purpose.
+// window.CL_printInFrame(href, opener) prints an address built at click time the same way (the orders list's
+// "Print cards" button in table-select.js); opener gets the focus back once the frame is gone.
 (function () {
     'use strict';
 
@@ -87,6 +89,10 @@
         frame.src = href;
         document.body.appendChild(frame);
     }
+
+    window.CL_printInFrame = function (href, opener) {
+        printInFrame(href, opener);
+    };
 
     document.addEventListener('click', function (event) {
         var link = event.target.closest ? event.target.closest('a[data-cl-print-frame]') : null;

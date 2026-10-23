@@ -9,12 +9,17 @@ import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
 public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
+
+    // position first (products, services, delivery bands), then the dearer item of a position first
+    private static final Comparator<OrderItem> ITEM_ORDER = Comparator.comparingInt(OrderItem::getPosition)
+            .thenComparing(Comparator.comparingDouble(OrderItem::getPrice).reversed());
 
     public OrderItemsRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -33,6 +38,29 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
                 .withExpressionAttributeValues(eav);
 
         return scanAndSort(scanExpression);
+    }
+
+    /**
+     * The items of each given order (keys in the given order), each list sorted like scanAndSort. orderId is the
+     * table's hash key, so every order is one query on its own partition; findByOrderId filters a scan of the whole
+     * table, which a page of printed order cards would repeat up to 50 times.
+     */
+    public Map<String, List<OrderItem>> findByOrderIds(List<String> orderIds) {
+        Map<String, List<OrderItem>> items = new LinkedHashMap<>();
+        for (String orderId : orderIds) {
+            if (items.containsKey(orderId)) {
+                continue;
+            }
+            Map<String, AttributeValue> eav = new HashMap<>();
+            eav.put(":orderId", new AttributeValue().withS(orderId));
+            DynamoDBQueryExpression<OrderItem> query = new DynamoDBQueryExpression<OrderItem>()
+                    .withKeyConditionExpression("orderId = :orderId")
+                    .withExpressionAttributeValues(eav);
+            items.put(orderId, dynamoDBMapper.query(OrderItem.class, query).stream()
+                    .sorted(ITEM_ORDER)
+                    .collect(Collectors.toList()));
+        }
+        return items;
     }
 
     public List<OrderItem> findByDeliveryId(String deliveryId) {
@@ -120,24 +148,6 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
         return dynamoDBMapper.scan(OrderItem.class, scanExpression);
     }
 
-    public OrderItem findBySerialNoAndStatuses(String serialNo, List<FulfilmentStatus> statuses) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":serialNo", new AttributeValue().withS(serialNo));
-
-        Map<String, String> ean = new HashMap<>();
-        ean.put("#status", "status");
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("contains(serialNo, :serialNo) and #status IN (" + buildStatusesFilter(statuses, eav) + ")")
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(ean);
-
-        return dynamoDBMapper.scan(OrderItem.class, scanExpression)
-                .stream()
-                .findFirst()
-                .orElse(null);
-    }
-
     private String buildStatusesFilter(List<FulfilmentStatus> statuses, Map<String, AttributeValue> eav) {
         StringBuilder statusFilter = new StringBuilder();
         for (int i = 0; i < statuses.size(); i++) {
@@ -154,8 +164,7 @@ public class OrderItemsRepository extends DynamoDbRepository<OrderItem> {
     public List<OrderItem> scanAndSort(DynamoDBScanExpression scanExpression) {
         return dynamoDBMapper.scan(OrderItem.class, scanExpression)
                 .stream()
-                .sorted(Comparator.comparingInt(OrderItem::getPosition)
-                        .thenComparing(Comparator.comparingDouble(OrderItem::getPrice).reversed()))
+                .sorted(ITEM_ORDER)
                 .collect(Collectors.toList());
     }
 

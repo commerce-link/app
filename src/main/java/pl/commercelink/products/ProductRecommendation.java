@@ -15,6 +15,7 @@ public class ProductRecommendation {
     private String catagoryId;
 
     private String pimId;
+    private boolean storeEntry;
     private String brand;
     private String name;
     private String label;
@@ -37,6 +38,7 @@ public class ProductRecommendation {
             PimEntry entry = pimEntry.get();
 
             this.pimId = entry.pimId();
+            this.storeEntry = !entry.global();
             this.brand = entry.brand();
             this.name = entry.name();
             this.label = StringUtils.isNotBlank(entry.subcategory()) ? entry.subcategory() : entry.name();
@@ -127,6 +129,11 @@ public class ProductRecommendation {
 
     public boolean hasPimId() {
         return StringUtils.isNotBlank(pimId);
+    }
+
+    /** The PIM entry belongs to a store (not a global entry). */
+    public boolean hasStoreEntry() {
+        return storeEntry;
     }
 
 }

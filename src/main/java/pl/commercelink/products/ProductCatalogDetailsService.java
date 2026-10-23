@@ -25,15 +25,18 @@ public class ProductCatalogDetailsService {
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final PricelistEventScheduler pricelistEventScheduler;
+    private final CatalogPlacement placement;
     private final int minIntervalMinutes;
 
     public ProductCatalogDetailsService(ProductCatalogRepository productCatalogRepository,
                                         ProductRepository productRepository,
                                         PricelistEventScheduler pricelistEventScheduler,
+                                        CatalogPlacement placement,
                                         @Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.pricelistEventScheduler = pricelistEventScheduler;
+        this.placement = placement;
         this.minIntervalMinutes = minIntervalMinutes;
     }
 
@@ -84,6 +87,7 @@ public class ProductCatalogDetailsService {
             compensate(compensations);
             return UpdateResult.errors(SAVE_FAILED);
         }
+        placement.evict(storeId);
         return UpdateResult.ok();
     }
 
@@ -100,6 +104,7 @@ public class ProductCatalogDetailsService {
             compensate(compensations);
             return UpdateResult.errors(DELETE_FAILED);
         }
+        placement.evict(storeId);
         return UpdateResult.ok();
     }
 

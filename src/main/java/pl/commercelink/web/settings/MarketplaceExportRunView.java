@@ -16,7 +16,7 @@ import java.util.Map;
 public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> counts, String abortMessage) {
 
     public enum Outcome {
-        PUBLISHED("is-ok"), REJECTED("is-warn"), REMOVAL_PENDING("is-neutral"), UNKNOWN("is-neutral");
+        PUBLISHED("is-ok"), REJECTED("is-warn"), REMOVAL_PENDING("is-neutral"), REMOVAL_FAILED("is-warn"), UNKNOWN("is-neutral");
 
         private final String tone;
 
@@ -41,6 +41,9 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
             if (MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING.equals(value)) {
                 return REMOVAL_PENDING;
             }
+            if (MarketplaceOfferSnapshot.OUTCOME_REMOVAL_FAILED.equals(value)) {
+                return REMOVAL_FAILED;
+            }
             // A value this version does not know is not claimed to be a rejection.
             return MarketplaceOfferSnapshot.OUTCOME_REJECTED.equals(value) ? REJECTED : UNKNOWN;
         }
@@ -51,6 +54,12 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
      */
     public record Row(String pimId, Long price, long quantity, Outcome outcome, int removalAttempts, String reasonCode,
                       String message) {
+
+        static Row of(MarketplaceOfferSnapshot snapshot) {
+            return new Row(snapshot.pimId(), snapshot.price() > 0 ? snapshot.price() : null, snapshot.quantity(),
+                    Outcome.of(snapshot.outcome()), snapshot.removalAttempts(),
+                    StringUtils.trimToNull(snapshot.reasonCode()), StringUtils.trimToNull(snapshot.message()));
+        }
 
         /** Text the search box matches: the product id and the marketplace's words about it. */
         public String searchText() {
@@ -71,11 +80,9 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
                 abortMessage = StringUtils.defaultIfBlank(snapshot.message(), "");
                 continue;
             }
-            Outcome outcome = Outcome.of(snapshot.outcome());
-            counts.merge(outcome, 1, Integer::sum);
-            rows.add(new Row(snapshot.pimId(), snapshot.price() > 0 ? snapshot.price() : null, snapshot.quantity(), outcome,
-                    snapshot.removalAttempts(), StringUtils.trimToNull(snapshot.reasonCode()),
-                    StringUtils.trimToNull(snapshot.message())));
+            Row row = Row.of(snapshot);
+            counts.merge(row.outcome(), 1, Integer::sum);
+            rows.add(row);
         }
         return new MarketplaceExportRunView(rows, counts, abortMessage);
     }

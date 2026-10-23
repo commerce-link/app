@@ -1,6 +1,8 @@
 package pl.commercelink.inventory;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -13,6 +15,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
@@ -25,6 +28,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -60,18 +64,30 @@ class InventoryViewStoreListingsTest {
     @Mock
     private GlobalMatchedInventory globalInventory;
     @Mock
+    private PimView pimView;
+    @Mock
     private PimCatalog pimCatalog;
+    @Mock
+    private PimView globalPimView;
     @Mock
     private ProductRepository productRepository;
 
     @InjectMocks
     private Inventory inventory;
 
+    // the global catalog knows PIM-1, so it is a global entry; any other id (st-s-…) is a store entry (spec 4.3)
+    @BeforeEach
+    void globalCatalogKnowsPim1() {
+        when(pimCatalog.withGlobalData()).thenReturn(globalPimView);
+        when(globalPimView.findByPimId("PIM-1")).thenReturn(Optional.of(
+                new PimEntry("PIM-1", List.of(), "Intel", "i7", "CPU", null, true, null, null)));
+    }
+
     private ProductRecommendationEngine recommendationEngine() throws Exception {
         Constructor<ProductRecommendationEngine> ctor =
-                ProductRecommendationEngine.class.getDeclaredConstructor(PimCatalog.class, ProductRepository.class);
+                ProductRecommendationEngine.class.getDeclaredConstructor(ProductRepository.class);
         ctor.setAccessible(true);
-        return ctor.newInstance(pimCatalog, productRepository);
+        return ctor.newInstance(productRepository);
     }
 
     private CategoryDefinition cpuCategory() {
@@ -164,11 +180,11 @@ class InventoryViewStoreListingsTest {
                 List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);
@@ -188,11 +204,11 @@ class InventoryViewStoreListingsTest {
         stubGlobalIndex(List.of());
         when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         List<ProductRecommendation> recommendations =
-                recommendationEngine().getRecommendations(cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
+                recommendationEngine().getRecommendations(pimView, cpuCategory(), inventory.withEnabledSuppliersOnly(STORE_ID));
 
         // then
         assertThat(recommendations).hasSize(1);
@@ -456,7 +472,7 @@ class InventoryViewStoreListingsTest {
                 realCache, supplierRegistry);
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
-        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
+        InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()), pimId -> false,
                 realCache, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
@@ -485,5 +501,75 @@ class InventoryViewStoreListingsTest {
 
         // then
         assertThat(matched.getSuppliers()).containsExactly("Action");
+    }
+
+    private Store storeWithGlobalAbAndOwnIndex(MatchedInventory... ownGroups) {
+        Store store = org.mockito.Mockito.mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(List.of("AB Group"));
+        when(store.hasOwnSupplierConnections()).thenReturn(true);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        InventoryIndex ownIndex = InventoryIndex.of(List.of(ownGroups));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(ownIndex);
+        when(storeInventoryProvider.ownInventory(store)).thenReturn(new StoreInventory(ownIndex, LocalDateTime.now()));
+        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
+        return store;
+    }
+
+    // W-1: the store added entry st-s-1 because the global PIM lacks the product, and a global supplier sells the
+    // same EAN; the global group has no PIM id, so it is the same product as the store entry, listed and counted once
+    @Test
+    void storeEntrySoldAlsoByAGlobalSupplierWithoutGlobalEntryIsListedAndCountedOnce() {
+        // given
+        InventoryKey ownKey = new InventoryKey("st-s-1");
+        MatchedInventory ownGroup = new MatchedInventory(ownKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+        storeWithGlobalAbAndOwnIndex(ownGroup);
+        stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("AB Group", 1399.0)),
+                taxonomyCache, supplierRegistry)));
+
+        // when
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+        Collection<MatchedInventory> withPimId = view.findAllWithPimId();
+        InventoryStatistics stats = inventory.storeStatistics(STORE_ID);
+
+        // then
+        assertThat(listed).singleElement().satisfies(matched -> {
+            assertThat(matched.getInventoryKey().getId()).isEqualTo("st-s-1");
+            assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action");
+        });
+        assertThat(withPimId).singleElement().extracting(matched -> matched.getInventoryKey().getId()).isEqualTo("st-s-1");
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.bySupplier()).containsOnlyKeys("AB Group", "Action");
+    }
+
+    // c-own (spec 4.3): global entry PIM-1 (…031/MFN-G, and a global feed row …031/MFN-S), store entry st-s-1
+    // (…032/MFN-S); they share MFN-S but are different products, so the store entry keeps its own row
+    @Test
+    void storeEntrySharingAnMpnWithAnotherGlobalEntryKeepsItsOwnRowWithoutTheGlobalOffer() {
+        // given
+        InventoryKey globalKey = new InventoryKey("PIM-1");
+        globalKey.addEan("5900000000031");
+        globalKey.addManufacturerCode("MFN-G");
+        MatchedInventory globalGroup = new MatchedInventory(globalKey,
+                List.of(new InventoryItem("5900000000031", "MFN-S", 1399.0, "PLN", 5, 1, "AB Group", true, true, false)),
+                taxonomyCache, supplierRegistry);
+        InventoryKey ownKey = new InventoryKey("st-s-1");
+        MatchedInventory ownGroup = new MatchedInventory(ownKey,
+                List.of(new InventoryItem("5900000000032", "MFN-S", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
+                taxonomyCache, supplierRegistry);
+        storeWithGlobalAbAndOwnIndex(ownGroup);
+        stubGlobalIndex(List.of(globalGroup));
+
+        // when
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+        InventoryStatistics stats = inventory.storeStatistics(STORE_ID);
+
+        // then
+        assertThat(listed).extracting(matched -> matched.getInventoryKey().getId()).containsExactly("PIM-1", "st-s-1");
+        MatchedInventory storeEntryRow = listed.stream()
+                .filter(matched -> "st-s-1".equals(matched.getInventoryKey().getId())).findFirst().orElseThrow();
+        assertThat(storeEntryRow.getSuppliers()).containsExactly("Action");
+        assertThat(stats.distinctProducts()).isEqualTo(2);
     }
 }

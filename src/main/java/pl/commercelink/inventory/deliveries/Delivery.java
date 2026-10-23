@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.Shipment;
@@ -120,6 +121,8 @@ public class Delivery {
     private boolean paid;
     @DynamoDBAttribute(attributeName = "externalDeliveryIdProvisional")
     private boolean externalDeliveryIdProvisional;
+    @DynamoDBAttribute(attributeName = "awaitingSupplierConfirmation")
+    private boolean awaitingSupplierConfirmation;
 
     @DynamoDBAttribute(attributeName = "tracking")
     private DeliveryTracking tracking;
@@ -618,6 +621,14 @@ public class Delivery {
         this.externalDeliveryIdProvisional = externalDeliveryIdProvisional;
     }
 
+    public boolean isAwaitingSupplierConfirmation() {
+        return awaitingSupplierConfirmation;
+    }
+
+    public void setAwaitingSupplierConfirmation(boolean awaitingSupplierConfirmation) {
+        this.awaitingSupplierConfirmation = awaitingSupplierConfirmation;
+    }
+
     public int getPurchaseAttempts() {
         return purchaseAttempts;
     }
@@ -765,6 +776,22 @@ public class Delivery {
 
     public void setSynced(boolean synced) {
         this.synced = synced;
+    }
+
+    // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
+    @DynamoDBIgnore
+    public boolean isMissingInvoice() {
+        return !invoiced && !isOwnWarehouse();
+    }
+
+    // only the sync flag counts (client's decision): a delivery still waiting for its invoice is unsynced too
+    @DynamoDBIgnore
+    public boolean isMissingInvoiceSync() {
+        return !synced && !isOwnWarehouse();
+    }
+
+    private boolean isOwnWarehouse() {
+        return SupplierRegistry.WAREHOUSE.equals(provider);
     }
 
     public Long getVersion() {

@@ -3,39 +3,47 @@ package pl.commercelink.starter.security.config;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.util.ServletRequestPathUtils;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.handler.MappedInterceptor;
 import pl.commercelink.starter.security.StoreAccessInterceptor;
 import pl.commercelink.starter.security.StoreApiKeyAuthorizationInterceptor;
 import pl.commercelink.registration.EmailVerificationInterceptor;
 import pl.commercelink.starter.security.interceptor.ApiGatewayIdInterceptor;
+import pl.commercelink.web.activity.DashboardReadOnlyInterceptor;
+import pl.commercelink.web.activity.PublicStoreActivityInterceptor;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
+@ExtendWith(MockitoExtension.class)
 class WebConfigTest {
 
-    private StoreAccessInterceptor storeAccessInterceptor;
+    @Mock private ApiGatewayIdInterceptor apiGatewayIdInterceptor;
+    @Mock private StoreApiKeyAuthorizationInterceptor storeApiKeyAuthorizationInterceptor;
+    @Mock private EmailVerificationInterceptor emailVerificationInterceptor;
+    @Mock private DashboardReadOnlyInterceptor dashboardReadOnlyInterceptor;
+    @Mock private PublicStoreActivityInterceptor publicStoreActivityInterceptor;
+
+    private final StoreAccessInterceptor storeAccessInterceptor = new StoreAccessInterceptor();
     private InterceptorRegistry registry;
 
     @BeforeEach
     void setUp() {
-        storeAccessInterceptor = new StoreAccessInterceptor();
-
-        WebConfig webConfig = new WebConfig();
+        WebConfig webConfig = new WebConfig(apiGatewayIdInterceptor, storeApiKeyAuthorizationInterceptor,
+                storeAccessInterceptor, emailVerificationInterceptor, dashboardReadOnlyInterceptor,
+                publicStoreActivityInterceptor);
         ReflectionTestUtils.setField(webConfig, "cors", "http://localhost");
-        ReflectionTestUtils.setField(webConfig, "apiGatewayIdInterceptor", mock(ApiGatewayIdInterceptor.class));
-        ReflectionTestUtils.setField(webConfig, "storeApiKeyAuthorizationInterceptor", mock(StoreApiKeyAuthorizationInterceptor.class));
-        ReflectionTestUtils.setField(webConfig, "storeAccessInterceptor", storeAccessInterceptor);
-        ReflectionTestUtils.setField(webConfig, "emailVerificationInterceptor", mock(EmailVerificationInterceptor.class));
 
         registry = new InterceptorRegistry();
         WebMvcConfigurer configurer = webConfig.corsConfigurer();
@@ -68,22 +76,112 @@ class WebConfigTest {
         assertThat(storeAccessGuards(get("/dashboard/store/other-store/receipts"))).isTrue();
     }
 
+    @Test
+    void readOnlyGateGuardsEveryDashboardPage() {
+        // given / when / then
+        assertThat(guards(dashboardReadOnlyInterceptor, get("/dashboard"))).isTrue();
+        assertThat(guards(dashboardReadOnlyInterceptor, get("/dashboard/orders"))).isTrue();
+        assertThat(guards(dashboardReadOnlyInterceptor, post("/dashboard/store/branding"))).isTrue();
+        assertThat(guards(dashboardReadOnlyInterceptor, get("/dashboard/store/other-store/receipts"))).isTrue();
+    }
+
+    @Test
+    void readOnlyGateLeavesPagesOutsideTheDashboardAlone() {
+        // given / when / then
+        assertThat(guards(dashboardReadOnlyInterceptor, get("/register/verify-email"))).isFalse();
+        assertThat(guards(dashboardReadOnlyInterceptor, post("/logout"))).isFalse();
+        assertThat(guards(dashboardReadOnlyInterceptor, post("/Store/abc123def4/Checkout"))).isFalse();
+    }
+
+    @Test
+    void readOnlyGateRunsAfterTheEmailCheck() {
+        // given
+        List<Object> interceptors = registeredInterceptors();
+
+        // when
+        int emailCheck = indexOf(interceptors, emailVerificationInterceptor);
+        int readOnlyGate = indexOf(interceptors, dashboardReadOnlyInterceptor);
+
+        // then
+        assertThat(emailCheck).isNotNegative();
+        assertThat(readOnlyGate).isGreaterThan(emailCheck);
+    }
+
+    @Test
+    void publicGateGuardsTheShopApiAndClientPages() {
+        // given / when / then
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Checkout"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/Store/abc123def4/Checkout/DeliveryOptions"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Basket"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/Store/abc123def4/Catalog/main"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/Store/abc123def4/Reporting/Google/Conversions/t"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/order/o-1"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/rma/r-1"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/offer/f-1"))).isTrue();
+        assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/individual/offer/f-1"))).isTrue();
+    }
+
+    @Test
+    void publicGateLetsWebhooksAndSharedPathsThrough() {
+        // given / when / then
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Payments/PayU"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Shipping/Furgonetka"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Receipts/Fiskator"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, get("/StoreLogo/abc123def4"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, get("/Global/Inventory"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, get("/dashboard/orders"))).isFalse();
+    }
+
+    @Test
+    void publicGateRunsAfterTheApiKeyCheck() {
+        // given
+        List<Object> interceptors = registeredInterceptors();
+
+        // when
+        int apiKeyCheck = indexOf(interceptors, storeApiKeyAuthorizationInterceptor);
+        int publicGate = indexOf(interceptors, publicStoreActivityInterceptor);
+
+        // then
+        assertThat(apiKeyCheck).isNotNegative();
+        assertThat(publicGate).isGreaterThan(apiKeyCheck);
+    }
+
     private boolean storeAccessGuards(HttpServletRequest request) {
+        return guards(storeAccessInterceptor, request);
+    }
+
+    private boolean guards(HandlerInterceptor interceptor, HttpServletRequest request) {
         ServletRequestPathUtils.parseAndCache(request);
-        return mappedStoreAccessInterceptors().stream().anyMatch(i -> i.matches(request));
+        return mappedInterceptorsOf(interceptor).stream().anyMatch(i -> i.matches(request));
+    }
+
+    private List<MappedInterceptor> mappedInterceptorsOf(HandlerInterceptor interceptor) {
+        return registeredInterceptors().stream()
+                .filter(MappedInterceptor.class::isInstance)
+                .map(MappedInterceptor.class::cast)
+                .filter(i -> i.getInterceptor() == interceptor)
+                .toList();
+    }
+
+    private static int indexOf(List<Object> interceptors, HandlerInterceptor interceptor) {
+        for (int i = 0; i < interceptors.size(); i++) {
+            if (interceptors.get(i) instanceof MappedInterceptor mapped && mapped.getInterceptor() == interceptor) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @SuppressWarnings("unchecked")
-    private List<MappedInterceptor> mappedStoreAccessInterceptors() {
-        List<Object> interceptors = (List<Object>) ReflectionTestUtils.invokeMethod(registry, "getInterceptors");
-        return interceptors.stream()
-                .filter(MappedInterceptor.class::isInstance)
-                .map(MappedInterceptor.class::cast)
-                .filter(i -> i.getInterceptor() == storeAccessInterceptor)
-                .toList();
+    private List<Object> registeredInterceptors() {
+        return (List<Object>) ReflectionTestUtils.invokeMethod(registry, "getInterceptors");
     }
 
     private HttpServletRequest get(String path) {
         return new MockHttpServletRequest("GET", path);
+    }
+
+    private HttpServletRequest post(String path) {
+        return new MockHttpServletRequest("POST", path);
     }
 }

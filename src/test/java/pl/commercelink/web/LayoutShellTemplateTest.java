@@ -27,22 +27,14 @@ class LayoutShellTemplateTest {
         assertThat(html).contains("<html th:lang=\"${#locale.language}\"");
     }
 
-    /**
-     * The item history page still draws its timeline with the `bulma-timeline` classes; dropping the stylesheet
-     * turns it into an unstyled list. Remove the link only together with a restyle of that page.
-     */
+    /** Every timeline is drawn by cl-timeline in commercelink.css; no page uses the bulma-timeline classes any more. */
     @Test
-    void keepsTheTimelineStylesheetWhileItemHistoryUsesIt() throws Exception {
-        // given
-        String itemHistory = Files.readString(Path.of("src/main/resources/templates/item-history.html"), StandardCharsets.UTF_8);
-
+    void loadsNoTimelineStylesheetFromTheCdn() throws Exception {
         // when
         String html = layout();
 
         // then
-        if (itemHistory.contains("timeline")) {
-            assertThat(html).contains("https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css");
-        }
+        assertThat(html).doesNotContain("bulma-timeline");
     }
 
     @Test

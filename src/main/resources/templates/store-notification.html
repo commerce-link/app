@@ -15,12 +15,20 @@
                       th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
                     <div th:replace="~{fragments/settings-form :: errorSummary('notification-sender-errors', ${errors}, null)}"></div>
 
+                    <div th:if="${overview.senderMissing()}" class="cl-alert is-warn" role="status">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{store.notification.sender.missing.title}"></p>
+                            <p class="cl-alert-text" th:text="#{store.notification.sender.missing.text}"></p>
+                        </div>
+                    </div>
+
                     <div class="cl-card">
                         <fieldset class="cl-fieldset">
                             <legend class="cl-fieldset-title" th:text="#{store.notification.sender.title}"></legend>
                             <div class="cl-form-grid">
-                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('senderName', 'store.notification.senderName', *{senderName}, 'text', 'off', false, ${errors['senderName']}, #{store.notification.senderName.help(${senderPreviewName}, ${senderEmail})})}"></div>
-                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('replyToEmail', 'store.notification.replyToEmail', *{replyToEmail}, 'email', 'off', false, ${errors['replyToEmail']}, #{store.notification.replyToEmail.help})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('senderName', 'store.notification.senderName', *{senderName}, 'text', 'off', true, ${errors['senderName']}, ${senderPreviewName != null} ? #{store.notification.senderName.help(${senderPreviewName}, ${senderEmail})} : #{store.notification.senderName.help.empty(${senderEmail})})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('replyToEmail', 'store.notification.replyToEmail', *{replyToEmail}, 'email', 'off', true, ${errors['replyToEmail']}, #{store.notification.replyToEmail.help})}"></div>
                             </div>
                         </fieldset>
                         <div class="cl-card-footer">

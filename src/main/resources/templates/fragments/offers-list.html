@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The rest of the query as hidden fields, so a menu's form never drops what the others set; "skip" names the
+       parameter the form itself submits (validity, dates = from/to, search = q). The segment always travels. */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <input type="hidden" name="segment" th:if="${q.segment().name() != 'OFFERS'}" th:value="${q.segment().param()}"/>
+    <th:block th:if="${skip != 'validity'}"><input type="hidden" name="validity" th:each="v : ${q.validity()}" th:value="${v.param()}"/></th:block>
+    <th:block th:if="${skip != 'dates'}">
+        <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>
+        <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
+    </th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+</th:block>
+
+</body>
+</html>

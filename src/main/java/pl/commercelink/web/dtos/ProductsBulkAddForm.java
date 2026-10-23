@@ -41,6 +41,12 @@ public class ProductsBulkAddForm {
          * of the field (422 with the review) rather than a binding failure answered with a bare 400.
          */
         private String availabilityType;
+        /**
+         * The inventory EAN the row was proposed for. A review opened from the inventory is rebuilt when the operator picks
+         * another category; the rows are matched to what was typed by this value, not by their index (the new category
+         * may skip other rows). Never part of the product.
+         */
+        private String sourceEan;
 
         public Row() {
         }

@@ -2,11 +2,12 @@
 // data-cl-list-results, data-cl-list-path (the list page itself) and data-cl-list-fragment (the endpoint returning only
 // that block). A click on a chip, menu item, sort header or page link (a[data-cl-list-nav]), a submit of a
 // form[data-cl-list-form], and a tick in an auto-submitting menu fetch the fragment with the same query and swap the
-// results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the count line so
-// a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
+// results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the element marked
+// data-cl-list-focus in the fresh block, or else on the count line, so a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
 // box) so several values can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
 // once. Emptying the search field refreshes the list too, and an open menu (a native <details>) closes on a click
-// outside or Escape. Anything unexpected falls back to a plain navigation.
+// outside or Escape. After each swap the fresh block dispatches `cl-list:swapped` (bubbles), so other scripts can set
+// it up again. Anything unexpected falls back to a plain navigation.
 (function () {
     'use strict';
 
@@ -35,6 +36,16 @@
         });
     }
 
+    // Links outside the results block that lead away and back ("Zamów odbiór" in the orders list header) return to
+    // the list as it is narrowed now, not as the page was first loaded.
+    function syncBackLinks(target) {
+        document.querySelectorAll('a[data-cl-list-back]').forEach(function (link) {
+            var url = new URL(link.getAttribute('href'), window.location.href);
+            url.searchParams.set('back', target.pathname + target.search);
+            link.setAttribute('href', url.pathname + url.search);
+        });
+    }
+
     function load(href, push, focusSearch) {
         var target = new URL(href, window.location.href);
         if (target.pathname !== listPath) {
@@ -52,9 +63,12 @@
                 if (!fresh) { throw new Error('no results block'); }
                 root.replaceWith(fresh);
                 root = fresh;
+                // scripts that decorate the results (row-toggle.js) set up the fresh block again
+                root.dispatchEvent(new CustomEvent('cl-list:swapped', { bubbles: true }));
                 applyFold();
                 hideAutosubmitButtons();
                 if (push) { history.pushState({ listPage: true }, '', target.pathname + target.search); }
+                syncBackLinks(target);
                 if (reopen) {
                     var menu = root.querySelector('details[data-cl-filter-menu="' + reopen.menu + '"]');
                     var box = menu && menu.querySelector('input[value="' + reopen.value + '"]');
@@ -68,8 +82,13 @@
                     if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); }
                     return;
                 }
-                var results = root.querySelector('.cl-table-results');
-                if (results) { results.setAttribute('tabindex', '-1'); results.focus({ preventScroll: true }); }
+                // A block can name its own focus target (a visible heading) instead of the count line, which some
+                // lists only show to screen readers; a focused invisible element leaves no focus indicator.
+                var focusTarget = root.querySelector('[data-cl-list-focus]') || root.querySelector('.cl-table-results');
+                if (focusTarget) {
+                    if (!focusTarget.hasAttribute('tabindex')) { focusTarget.setAttribute('tabindex', '-1'); }
+                    focusTarget.focus({ preventScroll: true });
+                }
                 if (window.scrollY > root.getBoundingClientRect().top + window.scrollY) { root.scrollIntoView({ block: 'start' }); }
             })
             .catch(function () { window.location.assign(href); });
@@ -110,7 +129,8 @@
 
     document.addEventListener('submit', function (event) {
         var form = event.target.closest && event.target.closest('form[data-cl-list-form]');
-        if (!form || !root.contains(form) || form.method.toLowerCase() !== 'get') { return; }
+        // the attribute, not the property: a field named "method" (the payment-method filter on Payments) shadows it
+        if (!form || !root.contains(form) || (form.getAttribute('method') || 'get').toLowerCase() !== 'get') { return; }
         event.preventDefault();
         submitSearch(form, false);
     });
@@ -172,5 +192,10 @@
 
     hideAutosubmitButtons();
     applyFold();
+    // An outcome message rendered after a redirect (e.g. "Usunięto ofertę …", [data-cl-list-notice][tabindex=-1]) gets the
+    // focus once, so a screen reader reads it; a role=status present at load is usually not announced. A swapped block
+    // never carries it (no flash on the fragment request).
+    var notice = root.querySelector('[data-cl-list-notice]');
+    if (notice) { notice.focus(); }
     history.replaceState({ listPage: true }, '', window.location.pathname + window.location.search);
 })();

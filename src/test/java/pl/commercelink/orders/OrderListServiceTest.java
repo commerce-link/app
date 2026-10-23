@@ -14,6 +14,7 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.shipping.PickupCandidates;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
@@ -33,6 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 
@@ -49,6 +53,8 @@ class OrderListServiceTest {
     private OrderFiltersService orderFilters;
     @Mock
     private StoresRepository storesRepository;
+    @Mock
+    private PickupCandidates pickupCandidates;
 
     private OrderListService service;
     private final List<Order> orders = new ArrayList<>();
@@ -58,7 +64,7 @@ class OrderListServiceTest {
         ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
-        service = new OrderListService(ordersRepository, orderFilters, messages, storesRepository);
+        service = new OrderListService(ordersRepository, orderFilters, messages, storesRepository, pickupCandidates);
         // the repository reads only the asked-for statuses (StoreIdStatusIndex); the stub filters the same way, so any
         // Completed or Cancelled order below is not seen by the list, as in the database
         when(ordersRepository.findByStoreAndStatuses(eq("store-1"), any())).thenAnswer(inv -> {
@@ -97,6 +103,60 @@ class OrderListServiceTest {
 
     private OrdersPageModel page(OrderListQuery query) {
         return service.page(ACTOR, query, TODAY, PL);
+    }
+
+    @Test
+    void theFullPageOffersThePickupPageWithTheNumberOfWaitingPackagesCountedFromTheListedOrders() {
+        // given
+        Order open = add("o1", OrderStatus.Shipping, TODAY, 10, 10, null);
+        when(pickupCandidates.count("store-1", List.of(open))).thenReturn(5);
+
+        // when
+        OrdersPageModel model = service.fullPage(ACTOR, query("status", "Shipping", "q", "Jan Kowalski"), TODAY, PL);
+
+        // then: back to the same narrowed list, the orders read once for both the rows and the number
+        assertThat(model.pickup().waiting()).isEqualTo(5);
+        assertThat(model.pickup().href()).isEqualTo("/dashboard/shipping/pickups/new?back="
+                + "%2Fdashboard%2Forders%3Fstatus%3DShipping%26q%3DJan%2BKowalski");
+        verify(ordersRepository).findByStoreAndStatuses("store-1", OrderListService.OPEN);
+    }
+
+    @Test
+    void withNothingWaitingThePickupActionStaysWithoutANumber() {
+        // given
+        when(pickupCandidates.count(eq("store-1"), anyList())).thenReturn(0);
+
+        // when
+        OrdersPageModel model = service.fullPage(ACTOR, query(), TODAY, PL);
+
+        // then
+        assertThat(model.pickup().waiting()).isNull();
+        assertThat(model.pickup().href()).isEqualTo("/dashboard/shipping/pickups/new?back=%2Fdashboard%2Forders%3FfilterId%3D");
+    }
+
+    @Test
+    void aNumberThatCannotBeReadLeavesTheListAndTheActionWithoutIt() {
+        // given
+        add("o1", OrderStatus.New, TODAY, 10, 10, null);
+        when(pickupCandidates.count(eq("store-1"), anyList())).thenThrow(new IllegalStateException("RMA table down"));
+
+        // when
+        OrdersPageModel model = service.fullPage(ACTOR, query(), TODAY, PL);
+
+        // then
+        assertThat(model.rows()).hasSize(1);
+        assertThat(model.pickup().waiting()).isNull();
+        assertThat(model.pickup().href()).isNotNull();
+    }
+
+    @Test
+    void theResultsFragmentDoesNotCountThePackages() {
+        // when: the header with the action is outside the fragment list-page.js swaps
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(model.pickup()).isNull();
+        verify(pickupCandidates, never()).count(anyString(), anyList());
     }
 
     @Test
@@ -313,6 +373,20 @@ class OrderListServiceTest {
     }
 
     @Test
+    void emptySearchOffersTheSameSearchInTheArchive() {
+        // given
+        add("old", OrderStatus.Completed, null, 10, 10, null);
+
+        // when
+        OrdersPageModel page = page(query("q", "kowalski"));
+
+        // then
+        assertThat(page.emptyState().archiveHref()).isEqualTo("/dashboard/orders/archive?q=kowalski");
+        assertThat(page.emptyState().archiveLabel()).isEqualTo("Szukaj „kowalski” w archiwum");
+        assertThat(page.emptyState().text()).isEqualTo("Brak otwartych zamówień dla „kowalski”. Zakończone i anulowane są w archiwum.");
+    }
+
+    @Test
     void sortsByAmountAndNumber() {
         add("b", OrderStatus.New, null, 300, 300, null);
         add("a", OrderStatus.New, null, 100, 100, null);
@@ -364,7 +438,7 @@ class OrderListServiceTest {
         assertThat(page(query()).emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
         assertThat(page(query()).emptyState().actionHref()).isNull();
         add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
-        assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak wyników dla „zzz”");
+        assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak otwartych zamówień dla „zzz”");
         assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query("status", "Blocked")).emptyState().text()).isEqualTo("Brak zamówień w statusie „Zablokowane”.");
         OrderFilter f = OrderFilter.of("Kurier", List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint")));

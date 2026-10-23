@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -39,6 +40,9 @@ class StoreInventoryProviderManualTest {
     @Mock InventoryAutoDiscovery autoDiscovery;
     @Mock StoreFeedItemLoader storeFeedItemLoader;
     @Mock ExchangeRates exchangeRates;
+    @Mock pl.commercelink.pim.api.PimCatalog pimCatalog;
+    @Mock
+    private PimView pimView;
     @InjectMocks StoreInventoryProvider provider;
 
     @Captor ArgumentCaptor<SupplierProviderDescriptor> descriptorCaptor;
@@ -55,7 +59,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -83,7 +87,7 @@ class StoreInventoryProviderManualTest {
 
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
-        when(autoDiscovery.run(any())).thenReturn(List.of());
+        when(autoDiscovery.run(any(), any())).thenReturn(List.of());
         when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
@@ -93,5 +97,10 @@ class StoreInventoryProviderManualTest {
         // then
         verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:Enabled"), descriptorCaptor.capture(), any());
         assertEquals("manual:Enabled", descriptorCaptor.getValue().name());
+    }
+    @org.junit.jupiter.api.BeforeEach
+    void pimStoreViewIsTheCatalog() {
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
     }
 }

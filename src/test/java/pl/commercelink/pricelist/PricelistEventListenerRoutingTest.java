@@ -1,5 +1,6 @@
 package pl.commercelink.pricelist;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -12,14 +13,17 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.SupplierScope;
 
 import java.io.IOException;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,15 +51,22 @@ class PricelistEventListenerRoutingTest {
     private AvailabilityAndPriceList availabilityAndPriceList;
     @Mock
     private ScheduledExecutionCounter scheduledExecutionCounter;
+    @Mock
+    private StoreActivity storeActivity;
 
     @InjectMocks
     private PricelistEventListener listener;
+
+    @BeforeEach
+    void storesAreActive() {
+        lenient().when(storeActivity.isActive(anyString())).thenReturn(true);
+    }
 
     @Test
     void handlePricelistEventCallsInventoryWithPricingScope() throws IOException {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenReturn(List.of());
 
         PricelistEventPayload payload = new PricelistEventPayload(STORE_ID, CATALOG_ID);
@@ -71,7 +82,7 @@ class PricelistEventListenerRoutingTest {
     void completedPricelistCalculationIsRecordedAfterPublishing() throws IOException {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenReturn(List.of());
         when(pricelistRepository.save(STORE_ID, CATALOG_ID, List.of())).thenReturn("pricelist-1");
 
@@ -88,11 +99,24 @@ class PricelistEventListenerRoutingTest {
     void failedPricelistCalculationIsNotRecorded() {
         // given
         when(inventory.withEnabledSuppliersAndWarehouseData(STORE_ID, SupplierScope.PRICING)).thenReturn(inventoryView);
-        when(availabilityAndPriceListFactory.create(inventoryView)).thenReturn(availabilityAndPriceList);
+        when(availabilityAndPriceListFactory.create(inventoryView, STORE_ID)).thenReturn(availabilityAndPriceList);
         when(availabilityAndPriceList.generate(STORE_ID, CATALOG_ID)).thenThrow(new IllegalStateException("inventory unavailable"));
 
         // when / then
         assertThrows(IllegalStateException.class, () -> listener.handlePricelistEvent(new PricelistEventPayload(STORE_ID, CATALOG_ID)));
         verifyNoInteractions(scheduledExecutionCounter);
+    }
+
+    @Test
+    void pricelistOfInactiveStoreIsNotGenerated() throws IOException {
+        // given
+        when(storeActivity.isActive(STORE_ID)).thenReturn(false);
+
+        // when
+        listener.handlePricelistEvent(new PricelistEventPayload(STORE_ID, CATALOG_ID));
+
+        // then
+        verifyNoInteractions(inventory, pricelistRepository, pricelistEventPublisher, sellingPriceHistoryService,
+                scheduledExecutionCounter);
     }
 }

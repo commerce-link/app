@@ -1,0 +1,128 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The delivery method and address, masked as before because the link is forwarded; the address change goes through a
+       code sent to the order's e-mail (?v=, step 1 of 2) and then a form valid for a few minutes (?t=, step 2 of 2). */-->
+<section th:fragment="delivery" id="delivery" class="cl-card" aria-labelledby="order-delivery-title"
+         th:with="details=${view.shippingDetails}, courier=${!view.personalCollection and !view.pickupPoint},
+                  canChange=${view.shippingAddressEditable and addressStep == null},
+                  notice=${clientOrderNotice != null and clientOrderNotice.target() == 'delivery' ? clientOrderNotice : null}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-delivery-title" th:text="#{client.order.delivery}"></h2>
+        <form th:if="${canChange}" method="post" data-cl-submit-once th:action="|${orderPath}/address/request-code|">
+            <button class="cl-button" type="submit"><i class="fas fa-pencil-alt" aria-hidden="true"></i>
+                <span th:text="#{client.order.address.change}"></span></button>
+        </form>
+    </div>
+
+    <!--/* In step 2 the form takes the place of the address; in step 1 the address stays, so the customer sees what changes. */-->
+    <div class="cl-card-inset" th:unless="${addressStep == 'edit'}">
+        <th:block th:if="${notice != null and notice.field() == null}">
+            <div th:replace="~{client-order/delivery :: notice(${notice})}"></div>
+        </th:block>
+        <div class="cl-kv-grid">
+            <div>
+                <h3 th:text="#{client.order.delivery.method}"></h3>
+                <p th:text="${view.deliveryMethod != null} ? ${view.deliveryMethod} : #{${'ShipmentType.' + view.shipmentType.name()}}"></p>
+            </div>
+            <div th:if="${view.personalCollection}">
+                <h3 th:text="#{client.order.delivery.pickup.address}"></h3>
+                <th:block th:if="${view.pickupAddress != null}">
+                    <p th:if="${view.pickupAddress.companyName() != null}" th:text="${view.pickupAddress.companyName()}"></p>
+                    <p th:text="${view.pickupAddress.streetAndNumber()}"></p>
+                    <p th:text="${view.pickupAddress.postalCode() + ' ' + view.pickupAddress.city()}"></p>
+                </th:block>
+                <p th:if="${view.pickupAddress == null}">-</p>
+            </div>
+            <div th:if="${view.pickupPoint}">
+                <h3 th:text="#{client.order.delivery.point.code}"></h3>
+                <p th:if="${view.collectionPointCode != null}"><th:block th:if="${view.carrier != null}" th:text="${view.carrier + ' · '}"></th:block><span
+                        th:replace="~{fragments/masked-field :: masked(${view.collectionPointCode})}"></span></p>
+                <p th:if="${view.collectionPointCode == null}" th:text="${view.carrier != null} ? ${view.carrier} : '-'"></p>
+            </div>
+            <div th:if="${courier and details != null}">
+                <h3 th:text="#{client.order.delivery.address}"></h3>
+                <p><span th:replace="~{fragments/masked-field :: masked(${details.displayName})}"></span></p>
+                <p><span th:replace="~{fragments/masked-field :: masked(${details.streetAndNumber})}"></span></p>
+                <p th:text="${details.postalCode + ' ' + details.city + ', ' + details.country}"></p>
+                <p class="cl-muted"><span th:replace="~{fragments/masked-field :: masked(${details.phone})}"></span> · <span
+                        th:replace="~{fragments/masked-field :: masked(${details.email})}"></span></p>
+            </div>
+        </div>
+        <p th:if="${canChange}" class="cl-help" th:text="#{client.order.address.change.hint}"></p>
+    </div>
+
+    <div class="cl-card-inset" th:if="${addressStep == 'code'}" th:with="codeError=${notice != null and notice.field() == 'code'}">
+        <p class="cl-substep"><span class="cl-step-badge" aria-hidden="true">1</span><th:block th:text="#{client.order.address.step(1, 2)}"></th:block></p>
+        <h3 class="cl-fieldset-title" th:text="#{client.order.address.code.title}"></h3>
+        <p class="cl-help" th:text="#{client.order.address.code.sent(${maskedEmail}, ${codeValidityMinutes})}"></p>
+        <form method="post" data-cl-submit-once th:action="|${orderPath}/address/confirm-code|">
+            <input type="hidden" name="v" th:value="${verificationId}">
+            <div class="cl-field">
+                <label class="cl-label" for="code" th:text="#{client.order.address.code.label}"></label>
+                <div class="cl-code-row">
+                    <!--/* Focused also after a wrong code: the field then reads its error through aria-describedby. */-->
+                    <input id="code" name="code" class="cl-input cl-code-input" type="text" maxlength="6" required
+                           autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" autofocus
+                           th:attr="aria-invalid=${codeError ? 'true' : null}, aria-describedby=${codeError ? 'code-error' : null}">
+                    <button class="cl-button is-primary" type="submit" th:text="#{client.order.address.code.submit}"></button>
+                </div>
+                <p th:if="${codeError}" class="cl-field-error" id="code-error">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i><span th:text="${notice.text()}"></span>
+                </p>
+            </div>
+        </form>
+        <form method="post" data-cl-submit-once th:action="|${orderPath}/address/request-code|">
+            <p class="cl-help"><th:block th:text="#{client.order.address.code.resend.hint}"></th:block>
+                <button class="cl-link-button" type="submit" th:text="#{client.order.address.code.resend}"></button>.</p>
+        </form>
+        <!--/* "Cancel" leaves the step, so it stands after it: in the field row it pushed the error away from the field on a phone. */-->
+        <div class="cl-card-actions">
+            <a class="cl-button" th:href="${orderPath}" th:text="#{general.cancel}"></a>
+        </div>
+    </div>
+
+    <div class="cl-card-inset" th:if="${addressStep == 'edit'}">
+        <p class="cl-substep"><span class="cl-step-badge" aria-hidden="true">2</span><th:block th:text="#{client.order.address.step(2, 2)}"></th:block></p>
+        <h3 class="cl-fieldset-title" th:text="#{client.order.address.edit.title}"></h3>
+        <p class="cl-help" th:text="#{client.order.address.edit.hint(${editTokenValidityMinutes})}"></p>
+        <!--/* The service names no field for INVALID_ADDRESS, so the reason is one message above the fields. */-->
+        <th:block th:if="${notice != null}">
+            <div th:replace="~{client-order/delivery :: notice(${notice})}"></div>
+        </th:block>
+        <form method="post" data-cl-submit-once th:action="|${orderPath}/address|">
+            <input type="hidden" name="t" th:value="${editToken}">
+            <div class="cl-form-grid">
+                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('name', 'order.address.name', ${form.name}, 'text', 'shipping given-name', false, null, null, null, null, false, 100)}"></div>
+                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('surname', 'order.address.surname', ${form.surname}, 'text', 'shipping family-name', false, null, null, null, null, false, 100)}"></div>
+                <div th:insert="~{fragments/settings-form :: textFieldLimited('companyName', 'order.address.company', ${form.companyName}, 'text', 'shipping organization', false, null, null, null, null, false, 100)}"></div>
+                <div th:insert="~{fragments/settings-form :: textFieldLimited('streetAndNumber', 'order.address.street', ${form.streetAndNumber}, 'text', 'shipping street-address', true, null, null, null, null, false, 100)}"></div>
+                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('postalCode', 'order.address.postal', ${form.postalCode}, 'text', 'shipping postal-code', true, null, null, null, null, false, 100)}"></div>
+                <div class="cl-span-4" th:insert="~{fragments/settings-form :: textFieldLimited('city', 'order.address.city', ${form.city}, 'text', 'shipping address-level2', true, null, null, null, null, false, 100)}"></div>
+                <!--/* The country is not posted: the service keeps the order's one. A rejected form flashes back without it,
+                       so the name comes from the order. */-->
+                <div class="cl-field">
+                    <span class="cl-label" th:text="#{order.address.country}"></span>
+                    <p class="cl-static-value"
+                       th:text="${T(pl.commercelink.web.dtos.CountryOptions).displayName(details?.country, #locale)}"></p>
+                </div>
+                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('email', 'client.offer.data.email', ${form.email}, 'email', 'shipping email', true, null, null, null, null, false, 100)}"></div>
+                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('phone', 'client.offer.data.phone', ${form.phone}, 'tel', 'shipping tel', true, null, null, null, null, false, 100)}"></div>
+            </div>
+            <div class="cl-card-actions">
+                <button class="cl-button is-primary" type="submit" th:text="#{client.order.address.edit.submit}"></button>
+                <a class="cl-button" th:href="${orderPath}" th:text="#{general.cancel}"></a>
+            </div>
+        </form>
+    </div>
+</section>
+
+<div th:fragment="notice(notice)" class="cl-alert" role="status" tabindex="-1"
+     th:classappend="${notice.tone() == 'ok'} ? 'is-ok' : 'is-bad'">
+    <span class="cl-alert-icon" aria-hidden="true"><i th:class="${notice.tone() == 'ok'} ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i></span>
+    <div><p class="cl-alert-text" th:text="${notice.text()}"></p></div>
+</div>
+
+</body>
+</html>

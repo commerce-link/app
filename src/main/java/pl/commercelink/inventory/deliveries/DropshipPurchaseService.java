@@ -245,6 +245,19 @@ public class DropshipPurchaseService {
 
     SupplierOrderResult placeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines,
                                            String orderId) {
+        SupplierDropshipRequest request = dropshipRequest(storeId, delivery, lines, orderId);
+        return supplierProviderResolver.resolve(storeId, delivery.getProvider()).placeDropshipOrder(request);
+    }
+
+    /** Finishes a dropship order the supplier accepted but had not confirmed; never places a new one. */
+    SupplierOrderResult completeDropshipOrder(String storeId, Delivery delivery, List<SupplierOrderLine> lines,
+                                              String orderId) {
+        SupplierDropshipRequest request = dropshipRequest(storeId, delivery, lines, orderId);
+        return supplierProviderResolver.resolve(storeId, delivery.getProvider()).completePlacedDropshipOrder(request);
+    }
+
+    private SupplierDropshipRequest dropshipRequest(String storeId, Delivery delivery, List<SupplierOrderLine> lines,
+                                                    String orderId) {
         Order order = ordersRepository.findById(storeId, orderId);
         if (order == null || !order.hasShippingDetails()) {
             throw new SupplierOrderException("Order " + orderId
@@ -258,9 +271,8 @@ public class DropshipPurchaseService {
         } catch (IllegalArgumentException e) {
             throw new SupplierOrderException(e.getMessage());
         }
-        return supplierProviderResolver.resolve(storeId, delivery.getProvider()).placeDropshipOrder(
-                new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
-                        "CommerceLink " + delivery.getPurchaseRef(), pickupPoint, delivery.getSupplierOrderChoices()));
+        return new SupplierDropshipRequest(delivery.getPurchaseRef(), lines, consignee,
+                "CommerceLink " + delivery.getPurchaseRef(), pickupPoint, delivery.getSupplierOrderChoices());
     }
 
     /** The customer's pickup point, when the order's first shipment is a pickup-point delivery. */

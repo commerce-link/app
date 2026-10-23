@@ -69,7 +69,7 @@ class OrderPrintViewTest {
 
         // when
         OrderPrintView.Card card = OrderPrintView.card(order(), List.of(fromConnection, fromDelivery, undelivered),
-                OrderLinks.of(order(), false), labels());
+                OrderLinks.of(order(), false), labels(), "https://app.example.pl/dashboard/scan/orders/s/o");
 
         // then
         assertThat(card.items()).extracting(OrderPrintView.ItemRow::delivery)
@@ -91,7 +91,7 @@ class OrderPrintViewTest {
         order.getShipments().add(new Shipment(ShipmentType.PersonalCollection));
 
         // when
-        OrderPrintView.Card card = OrderPrintView.card(order, List.of(), OrderLinks.of(order, false), labels());
+        OrderPrintView.Card card = OrderPrintView.card(order, List.of(), OrderLinks.of(order, false), labels(), "https://app.example.pl/dashboard/scan/orders/s/o");
 
         // then
         assertThat(card.orderedAt()).isEqualTo("27.09.2026, 21:33");
@@ -107,7 +107,7 @@ class OrderPrintViewTest {
     @Test
     void theCardOfASuperAdminLinksToTheStoreScopedOrder() {
         // when
-        OrderPrintView.Card card = OrderPrintView.card(order(), List.of(), OrderLinks.of(order(), true), labels());
+        OrderPrintView.Card card = OrderPrintView.card(order(), List.of(), OrderLinks.of(order(), true), labels(), "https://app.example.pl/dashboard/scan/orders/s/o");
 
         // then
         assertThat(card.detailsHref()).isEqualTo("/dashboard/store/store-1/orders/" + ORDER_ID);
@@ -122,7 +122,7 @@ class OrderPrintViewTest {
         order.setShipments(null);
 
         // when
-        OrderPrintView.Card card = OrderPrintView.card(order, List.of(), OrderLinks.of(order, false), labels());
+        OrderPrintView.Card card = OrderPrintView.card(order, List.of(), OrderLinks.of(order, false), labels(), "https://app.example.pl/dashboard/scan/orders/s/o");
 
         // then
         assertThat(card.documents()).isEmpty();
@@ -166,7 +166,7 @@ class OrderPrintViewTest {
 
         // when
         OrderPrintView.Card card = OrderPrintView.card(order(), List.of(fromWarehouse, fromConnection),
-                OrderLinks.of(order(), false), labels);
+                OrderLinks.of(order(), false), labels, "https://app.example.pl/dashboard/scan/orders/s/o");
         OrderPrintView.Collection collection = OrderPrintView.collection(order(), List.of(fromWarehouse), store(),
                 LocalDate.of(2026, 9, 29), "Kraków, PL", OrderLinks.of(order(), false), labels);
 
@@ -174,5 +174,18 @@ class OrderPrintViewTest {
         assertThat(card.items()).extracting(OrderPrintView.ItemRow::delivery)
                 .containsExactly("Magazyn sklepu", "Hurtownia Kowalski");
         assertThat(collection.items()).extracting(OrderPrintView.ItemRow::delivery).containsExactly("Magazyn sklepu");
+    }
+
+    @Test
+    void theCardDrawsTheQrCodeOfItsScanAddress() {
+        // given
+        String scanUrl = "https://app.example.pl/dashboard/scan/orders/s/o";
+
+        // when
+        OrderPrintView.Card card = OrderPrintView.card(order(), List.of(), OrderLinks.of(order(), false), labels(), scanUrl);
+
+        // then
+        assertThat(card.scanUrl()).isEqualTo(scanUrl);
+        assertThat(card.scanQrSvg()).isEqualTo(QrCodeSvg.of(scanUrl));
     }
 }

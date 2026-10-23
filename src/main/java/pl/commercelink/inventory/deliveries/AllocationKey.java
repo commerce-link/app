@@ -14,7 +14,7 @@ public class AllocationKey {
     public AllocationKey(String orderId, String itemId, String name) {
         this.orderId = orderId;
         this.itemId = itemId;
-        this.name = StringUtils.isBlank(name) ? "Warehouse" : name.split("@")[0];
+        this.name = StringUtils.isBlank(name) ? "Warehouse" : name;
     }
 
     public String getId() {

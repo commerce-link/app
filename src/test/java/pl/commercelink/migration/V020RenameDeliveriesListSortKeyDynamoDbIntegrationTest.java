@@ -12,10 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryListKey;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -33,7 +33,7 @@ class V020RenameDeliveriesListSortKeyDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static final String TRANSIT_DATED = "aaaa0001-0000-0000-0000-000000000000";
     static final String TRANSIT_UNDATED = "aaaa0002-0000-0000-0000-000000000000";
@@ -104,9 +104,9 @@ class V020RenameDeliveriesListSortKeyDynamoDbIntegrationTest {
         assertThat(deliveries.findToSettle("store-1")).extracting(Delivery::getDeliveryId).containsExactly(TO_SETTLE);
         assertThat(deliveries.countToSettle("store-1")).isEqualTo(1);
         assertThat(deliveries.countToSettle("store-2")).isZero();
-        assertThat(deliveries.findReceivedBetween("store-1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+        assertThat(deliveries.findReceivedSince("store-1", LocalDate.of(2026, 9, 1)))
                 .extracting(Delivery::getDeliveryId).containsExactly(TO_SETTLE);
-        assertThat(deliveries.findReceivedBetween("store-1", null, null)).hasSize(2);
+        assertThat(deliveries.findReceivedSince("store-1", null)).hasSize(2);
     }
 
     @Test

@@ -40,10 +40,8 @@
             };
         })();
     </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css">
     <link rel="stylesheet" th:href="@{/css/commercelink.css}">
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
 </head>
@@ -69,7 +67,8 @@
             <span th:text="${successMessage}"></span>
         </div>
 
-        <div th:if="${errorMessage}" class="notification is-danger is-small has-text-centered">
+        <!--/* A page that shows the refusal in its own content decorates with layout(ownsErrorMessage=true). */-->
+        <div th:if="${errorMessage} and ${ownsErrorMessage != true}" class="notification is-danger is-small has-text-centered">
             <button class="delete" onclick="hideNotification(this)"></button>
             <span th:text="${errorMessage}"></span>
         </div>
@@ -90,6 +89,11 @@
 
         <main id="clContent" class="cl-content" tabindex="-1">
             <section class="section">
+                <div class="container is-fluid cl-page cl-frame-notices"
+                     th:if="${accountStatus != null and accountStatus.hasAlert()}">
+                    <div th:replace="~{fragments/account-status :: alert(${accountStatus})}"></div>
+                    <script th:if="${accountStatus.dismissible()}" th:src="@{/js/dismissible-alert.js}"></script>
+                </div>
                 <div class="container content is-fluid" layout:fragment="content">
                 </div>
             </section>
@@ -221,7 +225,7 @@
         const toast = document.getElementById('clToast');
         toast.textContent = message;
         toast.className = 'cl-toast' + (type ? ' is-' + type : '');
-        toast.style.display = 'block';
+        toast.style.display = 'flex';
         requestAnimationFrame(() => { toast.style.opacity = '1'; });
         clearTimeout(clToastTimer);
         clToastTimer = setTimeout(() => {

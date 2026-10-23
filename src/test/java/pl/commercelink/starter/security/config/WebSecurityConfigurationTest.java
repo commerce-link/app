@@ -18,7 +18,8 @@ class WebSecurityConfigurationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/dashboard/orders/3e373abc/card", "/dashboard/orders/3e373abc/collection",
-            "/dashboard/store/store-1/orders/3e373abc/card", "/dashboard/store/store-1/orders/3e373abc/collection"})
+            "/dashboard/store/store-1/orders/3e373abc/card", "/dashboard/store/store-1/orders/3e373abc/collection",
+            "/dashboard/orders/cards"})
     void theOrderPrintoutsMayBeFramedByTheSameOrigin(String uri) {
         // when
         String header = frameOptionsOf(uri);
@@ -29,7 +30,9 @@ class WebSecurityConfigurationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/dashboard/orders/3e373abc", "/dashboard/orders/3e373abc/card/extra", "/login",
-            "/dashboard/orders/3e373abc/cancel", "/dashboard/store/store-1/orders/3e373abc", "/dashboard/card"})
+            "/dashboard/orders/3e373abc/cancel", "/dashboard/store/store-1/orders/3e373abc", "/dashboard/card",
+            "/dashboard/orders/cards/extra", "/dashboard/store/store-1/orders/cards", "/dashboard/orders/list",
+            "/dashboard/orders"})
     void everyOtherPageStillRefusesAnyFrame(String uri) {
         // when
         String header = frameOptionsOf(uri);

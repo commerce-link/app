@@ -46,6 +46,12 @@ awslocal sqs create-queue --queue-name order-receipt-dlq.fifo \
 awslocal sqs create-queue --queue-name order-receipt-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"600","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-receipt-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
 
+## Report generation queue with a DLQ + redrive mirroring prod (terraform: FIFO, visibility 900 s, 3 receives)
+awslocal sqs create-queue --queue-name report-generation-dlq.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false
+awslocal sqs create-queue --queue-name report-generation-queue.fifo \
+  --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"900","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:report-generation-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
+
 ## E-receipts sweep queue: EventBridge scheduler on prod sends one message per minute
 awslocal sqs create-queue --queue-name receipt-sweep-queue-dlq
 awslocal sqs create-queue --queue-name receipt-sweep-queue \
@@ -64,6 +70,11 @@ awslocal sqs create-queue --queue-name supplier-order-refresh-queue-dlq
 awslocal sqs create-queue --queue-name supplier-order-refresh-queue \
   --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-order-refresh-queue-dlq\",\"maxReceiveCount\":\"6\"}"}'
 
+## Completion queue for purchases the supplier confirms asynchronously (first check after 60 s, 12 receives)
+awslocal sqs create-queue --queue-name supplier-purchase-completion-queue-dlq
+awslocal sqs create-queue --queue-name supplier-purchase-completion-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:supplier-purchase-completion-queue-dlq\",\"maxReceiveCount\":\"12\"}"}'
+
 ## Tracking queue with a DLQ + redrive mirroring prod (visibility short for local E2E)
 awslocal sqs create-queue --queue-name supplier-order-tracking-queue-dlq
 awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
@@ -73,13 +84,34 @@ awslocal sqs create-queue --queue-name supplier-order-tracking-queue \
 awslocal sqs create-queue --queue-name shipment-tracking-queue-dlq
 awslocal sqs create-queue --queue-name shipment-tracking-queue \
   --attributes '{"VisibilityTimeout":"120","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-queue-dlq\",\"maxReceiveCount\":\"5\"}"}'
+awslocal sqs create-queue --queue-name shipment-cancellation-queue-dlq
+awslocal sqs create-queue --queue-name shipment-cancellation-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-cancellation-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-creation-queue-dlq
+awslocal sqs create-queue --queue-name shipment-creation-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-creation-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-pickup-queue-dlq
+awslocal sqs create-queue --queue-name shipment-pickup-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-pickup-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
+awslocal sqs create-queue --queue-name shipment-tracking-sweep-queue-dlq
+awslocal sqs create-queue --queue-name shipment-tracking-sweep-queue \
+  --attributes '{"VisibilityTimeout":"300","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-sweep-queue-dlq\",\"maxReceiveCount\":\"1\"}"}'
+awslocal sqs create-queue --queue-name shipment-tracking-poll-queue-dlq
+awslocal sqs create-queue --queue-name shipment-tracking-poll-queue \
+  --attributes '{"VisibilityTimeout":"60","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:shipment-tracking-poll-queue-dlq\",\"maxReceiveCount\":\"3\"}"}'
 
 # Secrets Manager - point CommerceLinkPimDescriptor at the local PIM service on :8081.
 # When PIM is up locally, App fetches its index from there. When PIM is down,
 # PimIndexCatalog.refresh swallows the HTTP error (non-prod) and leaves the cache empty.
+# scopeKey must equal PIM pim.index.scope-all-key (localdev: local-scope-key); the adapter sends it as x-pim-scope-key.
+# create-secret fails on an existing secret, so a persistent LocalStack volume keeps an older commercelink-pim
+# secret without scopeKey: PIM localdev then answers 403 (logged by the adapter) and the app runs with an empty
+# PIM catalog. Reseed (drop the volume) or update the secret in place:
+#   awslocal secretsmanager update-secret --secret-id commercelink-pim \
+#     --secret-string '{"apiDomain":"http://localhost:8081","apiKey":"","scopeKey":"local-scope-key"}'
 awslocal secretsmanager create-secret \
   --name commercelink-pim \
-  --secret-string '{"apiDomain":"http://localhost:8081","apiKey":""}'
+  --secret-string '{"apiDomain":"http://localhost:8081","apiKey":"","scopeKey":"local-scope-key"}'
 
 # Secrets Manager - global supplier configuration for the dev-profile test suppliers.
 # A supplier connected in GLOBAL mode builds its provider from a secret named exactly like the

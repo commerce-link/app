@@ -203,4 +203,61 @@ class GroupInventorySourceTest {
         // then
         assertThat(result.getSuppliers()).isEmpty();
     }
+
+    private static InventoryKey pimKey(String id, String ean, String mfn) {
+        InventoryKey key = new InventoryKey(id);
+        key.addEan(ean);
+        key.addManufacturerCode(mfn);
+        return key;
+    }
+
+    @Test
+    void globalSourceSkipsAGroupOfAnotherPimEntryForAStoreEntryRow() {
+        // given
+        MatchedInventory otherEntry = group(pimKey("e3-g-c", "5900000000031", "E3-C-G"), item("5900000000031", "E3-C-S", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(otherEntry)), supplier -> true,
+                id -> id.contains("-s-"));
+        InventoryKey lookupKey = pimKey("e3-s-c", "5900000000032", "E3-C-S");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.isEmpty()).isTrue();
+        assertThat(result.getInventoryKey().getProductEans()).containsExactly("5900000000032");
+    }
+
+    @Test
+    void globalSourceMergesAGroupWithoutPimIdIntoAStoreEntryRow() {
+        // given
+        MatchedInventory noEntry = group(new InventoryKey("5900000000049", "E3-DUP"), item("5900000000049", "E3-DUP", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(noEntry)), supplier -> true,
+                id -> id.contains("-s-"));
+        InventoryKey lookupKey = pimKey("st-s-1", "5900000000049", "E3-DUP");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("AB Group");
+        assertThat(result.getInventoryKey().getId()).isEqualTo("st-s-1");
+    }
+
+    @Test
+    void globalSourceStillMergesGroupsOfOtherPimEntriesForAGlobalEntryRow() {
+        // given
+        MatchedInventory otherEntry = group(pimKey("g2", "5900000000031", "SHARED"), item("5900000000031", "SHARED", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(otherEntry)), supplier -> true,
+                id -> id.contains("-s-"));
+        InventoryKey lookupKey = pimKey("g1", "5900000000032", "SHARED");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("AB Group");
+    }
 }

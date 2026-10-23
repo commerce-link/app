@@ -14,7 +14,8 @@ import java.util.stream.Stream;
  * rule, which customers would copy into a failing transfer; the row says so instead of looking healthy.
  */
 public record BankAccountView(String id, String title, String iban, String detailLine, boolean isDefault,
-                              boolean ibanValid, String editHref, String defaultHref, String deleteHref) {
+                              boolean ibanValid, String editHref, String defaultHref, String deleteHref,
+                              String statementHref, boolean statementReady) {
 
     public static BankAccountView of(BankAccount account, String accountsPath) {
         String title = StringUtils.isNotBlank(account.getBankName()) ? account.getBankName() : account.getAccountHolder();
@@ -26,6 +27,7 @@ public record BankAccountView(String id, String title, String iban, String detai
         String base = accountsPath + "/" + account.getId();
         return new BankAccountView(account.getId(), title, Iban.grouped(account.getIban()),
                 detailLine.isEmpty() ? null : detailLine, account.is_default(),
-                Iban.isValid(Iban.normalize(account.getIban())), base, base + "/default", base + "/delete");
+                Iban.isValid(Iban.normalize(account.getIban())), base, base + "/default", base + "/delete",
+                base + "/statement", account.hasStatementFormat());
     }
 }

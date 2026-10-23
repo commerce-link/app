@@ -25,6 +25,8 @@ public class AddPaymentForm {
     private String bankTransactionNo;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate bankTransactionDate;
+    /** The Payments page's own address when the dialog was opened there (PaymentsReturn); null elsewhere. */
+    private String returnTo;
 
     /**
      * Why the amounts cannot be saved, as a message key, or null: the amount is a number other than 0 below the limit,
@@ -132,5 +134,13 @@ public class AddPaymentForm {
 
     public void setBankTransactionDate(LocalDate bankTransactionDate) {
         this.bankTransactionDate = bankTransactionDate;
+    }
+
+    public String getReturnTo() {
+        return returnTo;
+    }
+
+    public void setReturnTo(String returnTo) {
+        this.returnTo = returnTo;
     }
 }

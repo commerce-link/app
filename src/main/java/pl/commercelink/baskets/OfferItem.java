@@ -18,6 +18,7 @@ public class OfferItem {
 
     private String remainingProviders = "";
     private long totalQty;
+    private int supplierCount;
 
     private boolean existInInventory;
 
@@ -41,6 +42,7 @@ public class OfferItem {
         this.medianCostProviders = String.join(", ", matchedInventory.getMedianPriceSuppliers());
 
         this.totalQty = matchedInventory.getTotalAvailableQty();
+        this.supplierCount = matchedInventory.getSuppliers().size();
 
         List<String> providers = new LinkedList<>(matchedInventory.getSuppliers());
         providers.removeAll(matchedInventory.getMedianPriceSuppliers());
@@ -94,6 +96,17 @@ public class OfferItem {
     }
 
     public boolean isExistInInventory() { return existInInventory; }
+
+    public double getLowestCost() { return lowestCost; }
+    public int getLowestCostQty() { return lowestCostQty; }
+    public int getMedianCostQty() { return medianCostQty; }
+
+    public double getMedianCost() { return medianCost; }
+
+    public long getTotalQty() { return totalQty; }
+
+    /** Suppliers with an offer for this product, the median ones included. */
+    public int getSupplierCount() { return supplierCount; }
 
     public double getTotalPrice() { return basketItem.getTotalPrice(); }
 

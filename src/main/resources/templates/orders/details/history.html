@@ -23,17 +23,10 @@
             th:attr="data-cl-timeline-limit=${h.rest().isEmpty()} ? null : ${h.visible()}">
             <th:block th:each="e : ${h.events()}"><li class="cl-timeline-item" th:insert="~{orders/details/history :: event(${e})}"></li></th:block>
         </ol>
-        <th:block th:if="${!h.rest().isEmpty()}">
-            <div class="cl-timeline-more" hidden data-cl-timeline-more
-                 th:attr="data-shown-text=#{order.history.shown(${h.rest().size()})}, data-hidden-text=#{order.history.hidden(${h.rest().size()})}">
-                <button type="button" class="cl-link-button cl-timeline-node" aria-controls="history-events" aria-expanded="false"
-                        data-cl-timeline-toggle="expand"><span class="cl-timeline-node-dot" aria-hidden="true"></span><span
-                        th:text="#{${h.moreKey()}(${h.rest().size()})}"></span></button>
-                <button type="button" class="cl-link-button cl-timeline-less" aria-controls="history-events" aria-expanded="true"
-                        data-cl-timeline-toggle="collapse" hidden th:text="#{order.history.less}"></button>
-            </div>
-            <p class="cl-visually-hidden" role="status" data-cl-timeline-status></p>
-        </th:block>
+        <!--/* th:replace outranks th:if, so the guard sits on a wrapper. */-->
+        <th:block th:if="${!h.rest().isEmpty()}"><th:block
+                th:replace="~{fragments/timeline :: more('history-events', #{${h.moreKey()}(${h.rest().size()})},
+                    #{order.history.shown(${h.rest().size()})}, #{order.history.hidden(${h.rest().size()})}, #{order.history.less})}"></th:block></th:block>
         <p th:if="${h.events().isEmpty()}" class="cl-list-empty" th:text="#{order.history.empty}"></p>
     </div>
 </section>

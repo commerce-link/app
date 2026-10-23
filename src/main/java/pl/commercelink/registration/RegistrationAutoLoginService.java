@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @ConditionalOnProperty(name = "app.registration.enabled", havingValue = "true")
 public class RegistrationAutoLoginService {
@@ -86,13 +88,14 @@ public class RegistrationAutoLoginService {
             ClientRegistration registration = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
             AuthenticationResultType tokens = authenticate(email, password, registration);
             if (tokens == null) {
-                System.err.println("[Registration] Auto login for " + email + " returned no tokens");
+                // The usual answer of a pool that requires MFA: the user signs in through the hosted UI instead.
+                log.warn("Auto login after registration of store {} got a challenge instead of tokens", storeId);
                 return false;
             }
             establishSession(email, storeId, tokens, registration, request, response);
             return true;
         } catch (RuntimeException e) {
-            System.err.println("[Registration] Auto login failed for " + email + ": " + e.getMessage());
+            log.warn("Auto login after registration of store {} failed", storeId, e);
             return false;
         }
     }

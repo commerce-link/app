@@ -414,6 +414,66 @@ class MarketplaceOrderLifecycleEventListenerTest {
         verifyNoInteractions(provider);
     }
 
+    private void allegroOrder() {
+        when(source.getName()).thenReturn("Allegro");
+        when(store.getMarketplaceIntegration("Allegro")).thenReturn(new MarketplaceIntegration("Allegro"));
+        when(providerFactory.get(store, "Allegro")).thenReturn(provider);
+    }
+
+    private static Shipment trackedShipment(String provider, String trackingNo) {
+        Shipment shipment = mock(Shipment.class);
+        when(shipment.hasShippingData()).thenReturn(true);
+        when(shipment.getProvider()).thenReturn(provider);
+        when(shipment.getTrackingNo()).thenReturn(trackingNo);
+        when(shipment.getCarrier()).thenReturn("DPD");
+        when(shipment.getTrackingUrl()).thenReturn(null);
+        return shipment;
+    }
+
+    @Test
+    void shipmentBookedThroughWysylamZAllegroOnlyMarksTheAllegroOrderSent() {
+        // given: Allegro attaches the waybill of its own shipment; posting it again would be refused (422)
+        allegroOrder();
+        Shipment shipment = trackedShipment("allegro", "AD000123");
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate(null, null, null, null));
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test
+    void allegroOrderShippedThroughFurgonetkaStillSendsTheNumber() {
+        // given
+        allegroOrder();
+        Shipment shipment = trackedShipment("furgonetka", "FURG-1");
+        when(order.getShipments()).thenReturn(List.of(shipment));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-1", null, "DPD", null));
+    }
+
+    @Test
+    void mixedOrderSendsTheNumberOfTheShipmentAllegroDidNotAttach() {
+        // given: first carton through Wysyłam z Allegro, second through Furgonetka
+        allegroOrder();
+        Shipment wza = trackedShipment("allegro", "AD000123");
+        Shipment furgonetka = trackedShipment("furgonetka", "FURG-2");
+        when(order.getShipments()).thenReturn(List.of(wza, furgonetka));
+
+        // when
+        handle(OrderLifecycleEventType.ShipmentCreated);
+
+        // then
+        verify(provider).shipOrder(EXTERNAL_ORDER_ID, new ShipmentUpdate("FURG-2", null, "DPD", null));
+    }
+
     private void handle(OrderLifecycleEventType type) {
         listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type));
     }

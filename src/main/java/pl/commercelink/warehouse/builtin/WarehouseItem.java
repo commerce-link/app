@@ -5,15 +5,19 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConverted;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
+import pl.commercelink.orders.ProviderCommandTimeout;
+import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.GoodsReceiptItem;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
@@ -36,6 +40,14 @@ public class WarehouseItem extends Item {
 
     @DynamoDBAttribute(attributeName = "unitSystemCost")
     private double unitSystemCost;
+
+    /** The shipment creation command that holds the item until its goods-out; see WarehouseShippingReservations. */
+    @DynamoDBAttribute(attributeName = "shippingCommandId")
+    private String shippingCommandId;
+
+    @DynamoDBAttribute(attributeName = "shippingRequestedAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime shippingRequestedAt;
 
     // required for DynamoDB
     public WarehouseItem() {
@@ -113,6 +125,38 @@ public class WarehouseItem extends Item {
     @DynamoDBIgnore
     public boolean isAvailable() {
         return Arrays.asList(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered).contains(getStatus());
+    }
+
+    /**
+     * Whether a shipment may still take the item out: its goods-out has not happened yet. The warehouse offers the
+     * shipment for items in RMA (to a distributor or service); the goods-out moves them to InExternalService.
+     */
+    @DynamoDBIgnore
+    public boolean isNotShippedOut() {
+        return !hasOneOfTheStatuses(FulfilmentStatus.InExternalService);
+    }
+
+    /** A shipment is being created for the item and its goods-out has not happened yet. */
+    @DynamoDBIgnore
+    public boolean isBeingShipped(LocalDateTime now) {
+        return shippingCommandId != null && !ProviderCommandTimeout.isOverdue(shippingRequestedAt, now);
+    }
+
+    @DynamoDBIgnore
+    public void holdForShipping(String commandId, LocalDateTime now) {
+        this.shippingCommandId = commandId;
+        this.shippingRequestedAt = now;
+    }
+
+    @DynamoDBIgnore
+    public boolean isHeldBy(String commandId) {
+        return shippingCommandId != null && shippingCommandId.equals(commandId);
+    }
+
+    @DynamoDBIgnore
+    public void releaseFromShipping() {
+        this.shippingCommandId = null;
+        this.shippingRequestedAt = null;
     }
 
     @DynamoDBIgnore
@@ -238,5 +282,21 @@ public class WarehouseItem extends Item {
 
     public void setUnitSystemCost(double unitSystemCost) {
         this.unitSystemCost = unitSystemCost;
+    }
+
+    public String getShippingCommandId() {
+        return shippingCommandId;
+    }
+
+    public void setShippingCommandId(String shippingCommandId) {
+        this.shippingCommandId = shippingCommandId;
+    }
+
+    public LocalDateTime getShippingRequestedAt() {
+        return shippingRequestedAt;
+    }
+
+    public void setShippingRequestedAt(LocalDateTime shippingRequestedAt) {
+        this.shippingRequestedAt = shippingRequestedAt;
     }
 }

@@ -7,6 +7,10 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.inventory.CatalogTargetOptions;
+import pl.commercelink.web.inventory.InventoryAddController;
+import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,6 +18,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -274,5 +280,246 @@ class ProductsAddTemplateTest {
 
         // then
         assertThat(html).containsPattern("<input type=\"hidden\" name=\"reviewId\" value=\"[0-9a-f-]{36}\"");
+    }
+
+    /** The back link is named after the page it leads to: the supplier assortment when the review came from there. */
+    @Test
+    void aReviewFromTheInventoryNamesItsBackLinkAfterTheInventory() {
+        // given
+        Context context = baseContext();
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+        context.setVariable("errors", Map.of());
+        context.setVariable("errorSummary", Map.of());
+        context.setVariable("labels", List.of());
+        context.setVariable("pricingGroups", List.of("Default"));
+        context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of());
+        context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
+        context.setVariable("backHref", "/dashboard/inventory?cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?cat=11");
+
+        // when
+        String fromInventory = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+        String fromCatalog = renderedReview(Map.of());
+
+        // then
+        assertThat(fromInventory).contains("Assortment");
+        assertThat(fromCatalog).doesNotContain("Assortment");
+    }
+
+    /** From the inventory the save needs the way back and the count of products the review already dropped. */
+    @Test
+    void aReviewFromTheInventoryPostsTheWayBackAndWhatItSkipped() {
+        // given
+        Context context = baseContext();
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+        context.setVariable("errors", Map.of());
+        context.setVariable("errorSummary", Map.of());
+        context.setVariable("labels", List.of());
+        context.setVariable("pricingGroups", List.of("Default"));
+        context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of("5901234567890"));
+        context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
+        context.setVariable("backHref", "/dashboard/inventory?cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?cat=11");
+        context.setVariable("skippedBefore", 1);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" name=\"returnTo\" value=\"/dashboard/inventory?cat=11\"/>")
+                .contains("<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>");
+    }
+
+    @Test
+    void aReviewFromTheCatalogPostsNoSkippedCount() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).doesNotContain("name=\"skippedBefore\"");
+    }
+
+    /** From the catalog the category is the one of the address: named for the operator, never a field to post. */
+    @Test
+    void aReviewFromTheCatalogShowsItsCategoryReadOnly() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).contains("<p class=\"cl-help\">Catalog category: Parts › GPU</p>");
+        assertThat(html).doesNotContain("name=\"target\"", "review-target", "reviewedTarget", "Change category", "cl-stack");
+    }
+
+    /**
+     * From the inventory the category is the first field: the category picker over the native select it enhances -- one
+     * flat list, the matching categories first, the catalog's name on a grey line above each. Without the script
+     * the select and "Zmień kategorię" beside it do the job; nothing is sent when the select changes (WCAG 3.2.2).
+     */
+    @Test
+    void aReviewFromTheInventoryAsksForTheCategoryAboveTheRows() {
+        // given
+        Context context = inventoryContext(new CatalogTargetOptions(2,
+                List.of(new CatalogTargetOptions.Option("c1", "k1", "Parts", "GPU", 1)),
+                List.of(new CatalogTargetOptions.Option("c2", "k2", "Garden", "Tools", 0)),
+                "c1/k1", false, "Graphics cards"), "c1/k1", Map.of());
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).doesNotContain("??", "Catalog category: Parts");
+        assertThat(html).contains("<label class=\"cl-label\" id=\"review-target-label\" for=\"review-target\">Catalog category</label>");
+        assertThat(html).containsPattern("<div class=\"cl-input-row\">\\s*<div class=\"cl-picker is-flat\">\\s*"
+                + "<select class=\"cl-select\" id=\"review-target\" name=\"target\" data-picker-select");
+        // the order of the processed attributes is not fixed
+        assertThat(tagsOf(html, "select").get(0)).contains("aria-describedby=\"review-target-help\"", "required=\"required\"",
+                "autofocus=\"autofocus\"");
+        assertThat(html).containsPattern("</div>\\s*<button class=\"cl-button\" type=\"submit\" formnovalidate data-review-change\\s+"
+                + "formaction=\"/dashboard/inventory/add\">Change category</button>\\s*</div>");
+        assertThat(html).containsPattern("<option value=\"c1/k1\"\\s+selected=\"selected\">GPU — Parts \\(suggested\\)</option>");
+        assertThat(html).contains("<option value=\"c2/k2\">Tools — Garden</option>",
+                "<span class=\"cl-picker-name\">GPU</span>", "aria-label=\"GPU, Parts, suggested\"", "aria-label=\"Tools, Garden\"",
+                "<span class=\"cl-picker-path\" title=\"Garden\">Garden</span>",
+                "<span data-picker-label id=\"review-target-value\">GPU</span>",
+                "placeholder=\"Filter categories, e.g. GPU, Tools…\"",
+                "PIM category: Graphics cards. Manual categories only",
+                "<input type=\"hidden\" name=\"ean\" value=\"5901234567890\"/>", "<input type=\"hidden\" name=\"ean\" value=\"5901234567891\"/>",
+                "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
+                "<input type=\"hidden\" name=\"products[0].sourceEan\" value=\"5901234567890\">",
+                "initialiseOn('[data-option-picker]', setUp)", "<script src=\"/js/review-target.js\" defer></script>",
+                "data-review-status=\"Category: Parts › GPU. Rows: 1.\"",
+                ">Add</button>");
+        assertThat(html).doesNotContain("Next</button>", "Add products", "optgroup", "already here");
+        assertThat(html.indexOf("id=\"review-target\"")).isLessThan(html.indexOf("id=\"review-area\""));
+        assertThat(html.indexOf("id=\"review-area\"")).isLessThan(html.indexOf("id=\"products\""));
+        assertThat(html).contains("<div class=\"cl-stack is-wide\">");
+    }
+
+    /** The rows, their notes and what the save needs about them form the part a pick in the category picker redraws. */
+    @Test
+    void theRedrawnPartCarriesTheRowsTheirNotesAndTheReviewedCategory() {
+        // given
+        Context context = inventoryContext(new CatalogTargetOptions(2,
+                List.of(new CatalogTargetOptions.Option("c1", "k1", "Parts", "GPU", 1)), List.of(), "c1/k1", false, null),
+                "c1/k1", Map.of());
+        context.setVariable("skippedExisting", List.of("5901234567891"));
+        context.setVariable("skippedBefore", 1);
+        context.setVariable("partial", true);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review-parts", Set.of("reviewArea"), context);
+
+        // then
+        assertThat(html).startsWith("<div class=\"cl-stack is-wide\" id=\"review-area\" data-review-area");
+        assertThat(html).contains("data-review-title=\"Complete the data: 1 products\"",
+                "data-review-status=\"Category: Parts › GPU. Rows: 1. Skipped: 1.\"",
+                "<input type=\"hidden\" name=\"reviewedTarget\" value=\"c1/k1\"/>",
+                "<input type=\"hidden\" name=\"skippedBefore\" value=\"1\"/>",
+                "already in this category: 5901234567891", "id=\"products\"", ">Add</button>");
+        assertThat(html).doesNotContain("review-target-label", "data-option-picker", "name=\"ean\"", "name=\"reviewId\"", "hidden=\"hidden\"");
+    }
+
+    /**
+     * Nothing matched: the field starts empty and says why; there are no rows to fill in until a category is chosen.
+     * Without the script "Next" -- not a change of the select -- draws them; with it, a pick does.
+     */
+    @Test
+    void anInventoryReviewWithoutACategoryHasOnlyTheFieldWithNextAsItsMainButton() {
+        // given
+        Context context = inventoryContext(new CatalogTargetOptions(1, List.of(),
+                List.of(new CatalogTargetOptions.Option("c1", "k2", "Parts", "Cases", 0)), null, false, null), "", Map.of());
+        context.setVariable("category", null);
+        context.setVariable("catalog", null);
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).doesNotContain("??", "id=\"products\"", ">Add</button>", "reviewedTarget", "uggested",
+                ">Change category</button>", "cl-input-row", "data-review-status=");
+        assertThat(html).containsPattern("<option value=\"\"\\s+selected=\"selected\">Choose a catalog category</option>");
+        assertThat(html).contains("<span data-picker-label id=\"review-target-value\">Choose a catalog category</span>",
+                "<input type=\"hidden\" name=\"target\" value=\"\" disabled data-picker-value>",
+                "placeholder=\"Filter categories…\"", "data-picker-required=\"true\"");
+        // one catalog still names it above every option; nothing matches, so nothing is suggested
+        assertThat(html).contains("<option value=\"c1/k2\">Cases — Parts</option>", "<span class=\"cl-picker-path\" title=\"Parts\">Parts</span>");
+        assertThat(html).contains(
+                "This product&#39;s PIM category is not mapped to any catalog category.",
+                "<a class=\"cl-button\" href=\"/dashboard/inventory?cat=11\">Cancel</a>",
+                "Complete the data: 1 products");
+        assertThat(html).containsPattern("<button class=\"cl-button is-primary\" type=\"submit\" formnovalidate data-review-next\\s+formaction=\"/dashboard/inventory/add\">Next</button>");
+        assertThat(tagsOf(html, "div").stream().filter(tag -> tag.contains("data-review-area")).findFirst().orElseThrow())
+                .contains("id=\"review-area\"", "hidden=\"hidden\"");
+    }
+
+    /** A category the store does not have (or no longer offers) is an error of the field, linked from the summary. */
+    @Test
+    void anUnknownCategoryIsAnErrorOfTheField() {
+        // given
+        Map<String, String> errors = Map.of("review-target", "No catalog category was chosen.");
+        Context context = inventoryContext(new CatalogTargetOptions(1, List.of(), List.of(), null, false, null), "", errors);
+        context.setVariable("category", null);
+        context.setVariable("form", ProductsBulkAddForm.of(List.of()));
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).contains("<a href=\"#review-target\">No catalog category was chosen.</a>",
+                "aria-invalid=\"true\"", "aria-describedby=\"review-target-error review-target-help\"",
+                "<p class=\"cl-field-error\" id=\"review-target-error\">");
+        assertThat(tagsOf(html, "select").get(0)).doesNotContain("autofocus");
+    }
+
+    @Test
+    void aStoreWithoutManualCategoriesIsSentToTheCatalogsInsteadOfAForm() {
+        // given
+        Context context = inventoryContext(new CatalogTargetOptions(1, List.of(), List.of(), null, true, null), "", Map.of());
+        context.setVariable("category", null);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);
+
+        // then
+        assertThat(html).contains("There is no manual category in your product catalogs.",
+                "<a href=\"/dashboard/catalogs\">Go to product catalogs</a>");
+        assertThat(html).doesNotContain("<form", "review-target");
+    }
+
+    private static MessageSource englishMessages() {
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        messages.setFallbackToSystemLocale(false);
+        return messages;
+    }
+
+    private static Context inventoryContext(CatalogTargetOptions options, String selected, Map<String, String> errors) {
+        Product product = new Product("k1", "pim-1", "5901234567890", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(product));
+        form.getProducts().get(0).setSourceEan("5901234567890");
+        Context context = baseContext();
+        context.setVariable("form", form);
+        context.setVariable("errors", errors);
+        context.setVariable("errorSummary", errors);
+        context.setVariable("labels", List.of());
+        context.setVariable("pricingGroups", List.of("Default"));
+        context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of());
+        context.setVariable("saveAction", "/dashboard/inventory/add/save");
+        context.setVariable("changeAction", "/dashboard/inventory/add");
+        context.setVariable("backHref", "/dashboard/inventory?cat=11");
+        context.setVariable("returnTo", "/dashboard/inventory?cat=11");
+        context.setVariable("skippedBefore", 0);
+        context.setVariable("resetRows", 0);
+        context.setVariable("targetOptions", options);
+        context.setVariable("targetChoices", InventoryAddController.targetOptions(options, englishMessages(), Locale.ENGLISH));
+        context.setVariable("selectedTarget", selected);
+        context.setVariable("eans", List.of("5901234567890", "5901234567891"));
+        context.setVariable("reviewCount", options.count());
+        return context;
     }
 }

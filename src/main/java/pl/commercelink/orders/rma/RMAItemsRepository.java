@@ -1,11 +1,14 @@
 package pl.commercelink.orders.rma;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,15 +24,13 @@ public class RMAItemsRepository extends DynamoDbRepository<RMAItem> {
         return dynamoDBMapper.load(RMAItem.class, rmaId, rmaItemId);
     }
 
+    /** Every item of the RMA, read by the table's partition key and ordered by rmaItemId. */
     public List<RMAItem> findByRmaId(String rmaId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":rmaId", new AttributeValue().withS(rmaId));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("rmaId = :rmaId")
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(RMAItem.class, scanExpression);
+        RMAItem key = new RMAItem();
+        key.setRmaId(rmaId);
+        DynamoDBQueryExpression<RMAItem> query = new DynamoDBQueryExpression<RMAItem>()
+                .withHashKeyValues(key);
+        return new ArrayList<>(dynamoDBMapper.query(RMAItem.class, query));
     }
 
     public List<RMAItem> findBySerialNo(String serialNo) {
@@ -51,6 +52,25 @@ public class RMAItemsRepository extends DynamoDbRepository<RMAItem> {
                 .withFilterExpression("itemId = :itemId")
                 .withExpressionAttributeValues(eav);
         return dynamoDBMapper.scan(RMAItem.class, scan);
+    }
+
+    /** RMA items referencing any of the order items: one scan per 100 ids instead of one scan per item. */
+    public List<RMAItem> findByOrderItemIds(Collection<String> orderItemIds) {
+        List<String> ids = List.copyOf(orderItemIds);
+        List<RMAItem> found = new ArrayList<>();
+        for (int from = 0; from < ids.size(); from += 100) {
+            List<String> chunk = ids.subList(from, Math.min(from + 100, ids.size()));
+            Map<String, AttributeValue> eav = new HashMap<>();
+            List<String> placeholders = new ArrayList<>();
+            for (int i = 0; i < chunk.size(); i++) {
+                eav.put(":i" + i, new AttributeValue().withS(chunk.get(i)));
+                placeholders.add(":i" + i);
+            }
+            found.addAll(dynamoDBMapper.scan(RMAItem.class, new DynamoDBScanExpression()
+                    .withFilterExpression("itemId IN (" + String.join(", ", placeholders) + ")")
+                    .withExpressionAttributeValues(eav)));
+        }
+        return found;
     }
 
     public List<RMAItem> findByDeliveryId(String deliveryId) {

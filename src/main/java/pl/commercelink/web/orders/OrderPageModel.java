@@ -26,6 +26,11 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                              CustomerView customer, OrderSettingsView settings, FinancesView finances,
                              HistoryCard history, OrderStatusOptions statusOptions) {
 
+    /** The back link names the list the operator came from: the archive or the open orders. */
+    public String backLabelKey() {
+        return OrderBackLink.isArchive(backHref) ? "orders.archive.title" : "orders.list.title";
+    }
+
     /**
      * cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an e-receipt
      * being issued), null for the general reason; cancelUnavailableKey: that general reason, which names what the
@@ -38,7 +43,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, boolean canCancel,
                          String cancelLockedKey, String cancelUnavailableKey, String cancelMessage, boolean canDelete,
-                         String deleteMessage) {
+                         String deleteMessage, String rmaHref) {
     }
 
     public record PrimaryAction(String labelKey, String href, String icon) {
@@ -91,26 +96,58 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
+     * cancellationPollHref: the JSON shipments state the page polls while a command of
+     * one of its shipments waits for the provider (a cancellation, a creation or a pickup order), reloading once none
+     * does; null when nothing waits or the page is read-only. "Zamów odbiór" is not here: it is ordered from the orders
+     * list, for every package of the store at once (client decision 2026-10-07).
      */
-    public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
+    public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, String cancellationPollHref,
                                 List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
     /**
      * number counts from 1. editHref leads to the shipment page (its dialog, dialogId, intercepts it) and removeHref to
      * the removal confirmation; both null on a read-only page. For a shipment of a delivered order, one with a delivery
-     * date and one with a courier order (cancelled with "Cancel courier order" instead) removeHref is null and
+     * date and one with a courier order (cancelled with "Cancel shipment" instead) removeHref is null and
      * removeReasonKey says why, so "Remove" shows greyed with that reason instead of disappearing. The only shipment
      * with nothing but the delivery choice has neither: removing it would change nothing. removeMessageKey and
      * removeActionKey are the confirmation's text and button, which say when the removal delivers the order or moves it
      * back to Realization. placeholder: the order's only shipment holds nothing but the customer's delivery choice, so the
      * row reads as "no shipment yet" with "Uzupełnij" instead of a shipment waiting to go out.
+     * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one.
+     * stateKey with stateArgs and stateTone: the line of a shipment created through an integration (OrderLabels
+     * #shipmentState), null for one typed in by hand; stateInProgress: it waits for the provider (spinner). A shipment
+     * being created or whose creation failed has no editHref: the form would rebuild it without its command.
+     * labelHref: "Pobierz etykietę", when the store's integration hands out labels of the package; retryHref: "Spróbuj
+     * ponownie" of a failed creation, the shipping page with the fields filled from the order. integration: the name of
+     * the shipment's shipping integration (ShippingIntegrationNames), the argument of the tracking and cancellation
+     * pills and of the removal confirmation, which name it. integrationPill: the shipment's integration name when
+     * the store ships through several, else null; integrationNoteKey: a sentence about the integration (Wysyłam z
+     * Allegro adds the number to the Allegro order itself), null for others; cancelHref: "Cancel shipment" of this
+     * row's courier order (the confirmation page, data-cl-confirm intercepts it); cancelReasonKey: it is greyed with
+     * this reason (its argument is integration). cancellationReason: the provider's words for refusing the cancellation,
+     * the second argument of the failed-with-reason pill, null without one.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
-                              String trackingTone, String trackingHelpKey, String dialogId, String editHref,
+                              String trackingTone, String trackingHelpKey, String cancellationKey,
+                              String cancellationTone, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
-                              String removeActionKey, boolean placeholder) {
+                              String removeActionKey, boolean placeholder, String stateKey, Object[] stateArgs,
+                              String stateTone, boolean stateInProgress, String labelHref, String retryHref,
+                              String integration, String integrationPill, String integrationNoteKey,
+                              String cancelHref, String cancelReasonKey, String cancellationReason) {
+
+        /** The ⋯ menu holds the rare and blocking actions: edit, cancel and remove, live or greyed with a reason. */
+        public boolean hasMenu() {
+            return editHref != null || removeHref != null || removeReasonKey != null || cancelHref != null
+                    || cancelReasonKey != null;
+        }
+
+        /** Any action of the row is offered, live or greyed with its reason. */
+        public boolean hasActions() {
+            return hasMenu() || labelHref != null || retryHref != null;
+        }
     }
 
     /**

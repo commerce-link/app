@@ -1,0 +1,149 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The side column of the offer details page: the summary with the table's save (Karta podsumowania z akcjami), then the
+       read-only cards whose "Edytuj" opens their dialog, or ?open=… without JavaScript (Dialog otwarty bez JS). */-->
+
+<!--/* Today's figures and formulas (OfferDetailsPageFactory.summary); offer-lines.js recounts the outputs from the table
+       with the same formula, the delivery price coming from data-cl-delivery-price. */-->
+<section th:fragment="summary(p)" class="cl-card" id="summary" aria-labelledby="summary-title"
+         th:with="s=${p.summary()}, vatRate=${T(pl.commercelink.invoicing.api.Price).DEFAULT_VAT_RATE}"
+         th:attr="data-cl-delivery-price=${p.template()} ? ${s.deliveryPriceValue()} : null, data-cl-vat-rate=${vatRate}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{offers.details.summary.title}"></h2></div>
+    <dl class="cl-kv is-column cl-card-inset">
+        <div><dt th:text="#{offers.details.summary.items}"></dt>
+            <dd class="is-numeric"><output data-cl-sum="items" aria-live="off" th:text="#{general.currency.amount(${s.itemsTotal()})}"></output></dd></div>
+        <th:block th:unless="${p.template()}"><div th:replace="~{offers/details/side :: deliveryRow(${s})}"></div></th:block>
+        <div class="cl-kv-total"><dt th:text="#{offers.details.summary.total}"></dt>
+            <dd class="is-numeric"><output data-cl-sum="total" aria-live="off" th:text="#{general.currency.amount(${s.total()})}"></output>
+                <span class="cl-kv-sub"><span th:text="#{offers.details.summary.net}"></span> <output data-cl-sum="net" aria-live="off" th:text="#{general.currency.amount(${s.net()})}"></output></span></dd></div>
+        <div><dt th:text="#{offers.details.summary.cost}"></dt>
+            <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output></dd></div>
+        <div><dt th:text="#{offers.details.summary.profitGross}"></dt>
+            <dd class="is-numeric"><output data-cl-sum="profitGross" aria-live="off" th:text="#{general.currency.amount(${s.profitGross()})}"></output></dd></div>
+        <div><dt th:text="#{offers.details.summary.profitNet}"></dt>
+            <dd class="is-numeric"><output data-cl-sum="profitNet" aria-live="off" th:text="#{general.currency.amount(${s.profitNet()})}"></output></dd></div>
+    </dl>
+    <!--/* the new total, said once the typing in the table has stopped (offer-lines.js), not on every key */-->
+    <p class="cl-visually-hidden" role="status" data-cl-sum-status th:attr="data-template=#{offers.details.summary.announce}"></p>
+    <p th:if="${s.deliveryRemoved()}" class="cl-card-desc is-warn cl-card-foot-note" th:text="#{offers.details.summary.delivery.removed.help}"></p>
+    <p th:if="${s.variantsNote()}" class="cl-card-desc cl-card-foot-note" th:text="#{offers.summary.variants.note}"></p>
+    <!--/* The record has no date of its last change, so the clean state says only that nothing is pending. */-->
+    <div class="cl-card-footer is-stacked">
+        <p class="cl-save-state" role="status" data-cl-dirty-status
+           th:attr="data-template=#{offers.details.save.dirty}, data-clean=#{offers.details.save.clean}"
+           th:text="#{offers.details.save.clean}"></p>
+        <button type="submit" class="cl-button" data-cl-save-items th:text="#{offers.details.save.items}"></button>
+        <p class="cl-help" th:text="${p.template()} ? #{offers.details.save.help.template} : #{offers.details.save.help}"></p>
+        <!--/* reloads the page without saving once the browser's own leave-page question is answered */-->
+        <a class="cl-link-button" hidden data-cl-discard th:href="@{|/dashboard/offer/${p.offerId()}${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|}"
+           th:text="#{offers.details.save.discard}"></a>
+    </div>
+</section>
+
+<!--/* The delivery line of the summary; also in the refresh template, since the terms dialog changes it. */-->
+<div th:fragment="deliveryRow(s)" id="offer-summary-delivery" th:attr="data-cl-delivery-price=${s.deliveryPriceValue()}">
+    <th:block th:if="${s.deliveryName() != null}">
+        <dt th:text="#{offers.details.summary.delivery(${s.deliveryName()})}"></dt>
+        <dd class="is-numeric" th:text="#{general.currency.amount(${s.deliveryPrice()})}"></dd>
+    </th:block>
+    <th:block th:if="${s.deliveryName() == null}">
+        <dt th:text="#{offers.details.summary.delivery.plain}"></dt>
+        <dd th:text="${s.deliveryRemoved()} ? #{offers.details.summary.delivery.removed} : #{offers.details.summary.delivery.none}"></dd>
+    </th:block>
+</div>
+
+<!--/* Below 1366 px the summary is under the table: the total, the save state and the same save button stay at the
+       bottom of the screen (Podgląd sumy przyklejony u dołu, the variant with a submit). Placed last in form#offer-items,
+       so it sticks for the whole page and not only along the table. */-->
+<div th:fragment="peek(p)" class="cl-summary-peek is-action" data-cl-peek>
+    <span><span th:text="#{offers.details.peek.total}"></span> <strong class="cl-num"><output data-cl-sum="total" aria-live="off"
+          th:text="#{general.currency.amount(${p.summary().total()})}"></output></strong></span>
+    <span class="cl-save-state" data-cl-dirty-status th:attr="data-template=#{offers.details.save.peekDirty}, data-clean=''"></span>
+    <button type="submit" class="cl-button" data-cl-save-items th:text="#{offers.details.save.items}"></button>
+</div>
+
+<section th:fragment="terms(p)" class="cl-card" id="offer-terms-card" aria-labelledby="offer-terms-title"
+         th:with="t=${p.terms()}, s=${p.summary()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="offer-terms-title" th:text="${p.template()} ? #{offers.details.terms.title.template} : #{offers.details.terms.title}"></h2>
+        <a class="cl-link-button" data-cl-dialog-open="offer-terms-dialog"
+           th:href="@{|/dashboard/offer/${p.offerId()}?open=terms${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}#offer-terms-dialog|}"
+           th:text="#{offers.details.edit}"></a>
+    </div>
+    <dl class="cl-kv is-column">
+        <th:block th:unless="${p.template()}">
+            <div><dt th:text="#{offers.details.terms.expires}"></dt>
+                <dd th:text="${t.expiresAtText() ?: #messages.msg('offers.details.terms.noExpiry')}"></dd></div>
+            <div><dt th:text="#{offers.details.terms.delivery}"></dt>
+                <dd th:if="${s.deliveryName() != null}" th:text="|${s.deliveryName()} · ${#messages.msg('general.currency.amount', s.deliveryPrice())}|"></dd>
+                <dd th:if="${s.deliveryName() == null}" th:text="${s.deliveryRemoved()} ? #{offers.details.summary.delivery.removed} : #{offers.details.summary.delivery.none}"></dd></div>
+        </th:block>
+        <div><dt th:text="#{offers.details.terms.prices}"></dt>
+            <dd th:text="${t.showPrices()} ? #{offers.details.terms.prices.shown} : #{offers.details.terms.prices.hidden}"></dd></div>
+        <div><dt th:text="#{offers.details.terms.fulfilment}"></dt>
+            <dd th:text="${t.fulfilmentLabelKey() != null} ? #{${t.fulfilmentLabelKey()}} : '—'"></dd></div>
+    </dl>
+</section>
+
+<section th:fragment="client(p)" class="cl-card" id="offer-client-card" aria-labelledby="offer-client-title" th:with="c=${p.customer()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="offer-client-title" th:text="#{offers.details.client.title}"></h2>
+        <a class="cl-link-button" data-cl-dialog-open="offer-client-dialog"
+           th:href="@{|/dashboard/offer/${p.offerId()}?open=client${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}#offer-client-dialog|}"
+           th:text="#{offers.details.edit}"></a>
+    </div>
+    <div class="cl-address" th:with="person=${#strings.trim((c.name() ?: '') + ' ' + (c.surname() ?: ''))}">
+        <th:block th:unless="${#strings.isEmpty(person) and #strings.isEmpty(c.company()) and #strings.isEmpty(c.email()) and #strings.isEmpty(c.phone())}">
+            <th:block th:unless="${#strings.isEmpty(person)}"><strong th:text="${person}"></strong><br></th:block>
+            <th:block th:unless="${#strings.isEmpty(c.company())}"><span th:text="${c.company()}"></span><br></th:block>
+            <div th:unless="${#strings.isEmpty(c.email())}"><a th:href="'mailto:' + ${c.email()}" th:text="${c.email()}"></a></div>
+            <div th:unless="${#strings.isEmpty(c.phone())}"><a th:href="'tel:' + ${c.phone()}" th:text="${c.phone()}"></a></div>
+        </th:block>
+        <p th:if="${#strings.isEmpty(person) and #strings.isEmpty(c.company()) and #strings.isEmpty(c.email()) and #strings.isEmpty(c.phone())}"
+           class="cl-help" th:text="#{offers.details.client.empty}"></p>
+    </div>
+    <div class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.link}"></span></div>
+        <div class="cl-copy-actions">
+            <button type="button" class="cl-button" hidden data-cl-copy-reveal th:attr="data-cl-copy=${p.clientUrl()}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-copy"></i></span>
+                <span th:text="#{offers.details.client.copyLink}"></span>
+            </button>
+            <a class="cl-button" th:href="${p.clientUrl()}" target="_blank" rel="noopener">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+                <span th:text="#{offers.details.client.open}"></span>
+            </a>
+        </div>
+        <p class="cl-help" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></p>
+    </div>
+    <div class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.billing}"></span></div>
+        <th:block th:if="${c.billing() != null}"><th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block></th:block>
+        <p th:if="${c.billing() == null}" class="cl-help" th:text="#{offers.details.client.notSent}"></p>
+    </div>
+    <div th:if="${c.billing() != null and (c.shipping() != null or c.shippingSameAsBilling())}" class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.shipping}"></span></div>
+        <span th:if="${c.shippingSameAsBilling()}" th:text="#{offers.details.client.sameAddress}"></span>
+        <th:block th:if="${!c.shippingSameAsBilling() and c.shipping() != null}"><th:block th:replace="~{orders/details/customer :: address(${c.shipping()})}"></th:block></th:block>
+    </div>
+</section>
+
+<section th:fragment="note(p)" class="cl-card" id="offer-note-card" aria-labelledby="offer-note-title">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="offer-note-title" th:text="#{offers.details.note.title}"></h2>
+        <a class="cl-link-button" data-cl-dialog-open="offer-note-dialog"
+           th:href="@{|/dashboard/offer/${p.offerId()}?open=note${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}#offer-note-dialog|}"
+           th:text="#{offers.details.edit}"></a>
+    </div>
+    <div class="cl-card-inset">
+        <p th:unless="${#strings.isEmpty(p.note())}" class="cl-note-text is-pre" th:text="${p.note()}"></p>
+        <p th:if="${#strings.isEmpty(p.note())}" class="cl-help" th:text="#{offers.details.note.empty}"></p>
+        <p class="cl-help"><i class="fas fa-eye-slash" aria-hidden="true"></i>
+            <span th:text="${p.template()} ? #{offers.details.note.help.template} : #{offers.details.note.help}"></span></p>
+    </div>
+</section>
+
+</body>
+</html>

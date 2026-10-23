@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
@@ -38,6 +39,23 @@ public class Shipment {
     private String trackingSubscriptionId;
     @DynamoDBAttribute(attributeName = "trackingExternalId")
     private String trackingExternalId;
+    /** The last cancel command of the courier order; null when none was sent. */
+    @DynamoDBAttribute(attributeName = "cancellation")
+    private CourierCancellation cancellation;
+    /** The shipping integration that created it (e.g. "furgonetka"); null for one typed by hand. */
+    @DynamoDBAttribute(attributeName = "provider")
+    private String provider;
+    /** The store's pickup address it leaves from; null for a customer return picked up at the customer. */
+    @DynamoDBAttribute(attributeName = "pickUpAddressId")
+    private String pickUpAddressId;
+    /** The creation command while the provider has not created the shipment; null once created. */
+    @DynamoDBAttribute(attributeName = "creation")
+    private ShipmentCreationState creation;
+    @DynamoDBAttribute(attributeName = "pickup")
+    private ShipmentPickup pickup;
+    /** False when the integration cannot cancel it (One by Allegro); null = it can (older records, Furgonetka). */
+    @DynamoDBAttribute(attributeName = "cancellable")
+    private Boolean cancellable;
 
     public Shipment() {
     }
@@ -189,6 +207,76 @@ public class Shipment {
         this.trackingExternalId = trackingExternalId;
     }
 
+    public CourierCancellation getCancellation() {
+        return cancellation;
+    }
+
+    public void setCancellation(CourierCancellation cancellation) {
+        this.cancellation = cancellation;
+    }
+
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getPickUpAddressId() { return pickUpAddressId; }
+    public void setPickUpAddressId(String pickUpAddressId) { this.pickUpAddressId = pickUpAddressId; }
+    public ShipmentCreationState getCreation() { return creation; }
+    public void setCreation(ShipmentCreationState creation) { this.creation = creation; }
+    public ShipmentPickup getPickup() { return pickup; }
+    public void setPickup(ShipmentPickup pickup) { this.pickup = pickup; }
+    public Boolean getCancellable() { return cancellable; }
+    public void setCancellable(Boolean cancellable) { this.cancellable = cancellable; }
+
+    /** Named apart from the getter: the DynamoDB mapper would read isCancellable() as a second "cancellable". */
+    @DynamoDBIgnore
+    public boolean allowsCancellation() {
+        return !Boolean.FALSE.equals(cancellable);
+    }
+
+    /**
+     * The creation command still waits for its result. One PENDING past ProviderCommandTimeout.UNCONFIRMED_AFTER does
+     * not: nothing will settle it, so it counts as failed and the operator can remove it or book again.
+     */
+    @DynamoDBIgnore
+    public boolean isCreating() {
+        return creation != null && creation.isInProgress(LocalDateTime.now());
+    }
+
+    /** The creation failed, or was never confirmed (see isCreating). */
+    @DynamoDBIgnore
+    public boolean creationFailed() {
+        return creation != null && (creation.isFailed() || creation.isUnconfirmed(LocalDateTime.now()));
+    }
+
+    /**
+     * The placeholder of that very command, however old: a late result of a command nobody superseded still settles
+     * it, while a placeholder dropped by a new booking lets the late result go.
+     */
+    @DynamoDBIgnore
+    public boolean isCreationPendingFor(String commandId) {
+        return creation != null && creation.isPending() && creation.hasCommand(commandId);
+    }
+
+    /**
+     * The placeholder of that command, still PENDING or settled as never confirmed: a result found later
+     * (ShipmentCreationReconciler) still settles it, since the provider may have created the shipment after all.
+     */
+    @DynamoDBIgnore
+    public boolean isCreationUnsettledFor(String commandId) {
+        return isCreationPendingFor(commandId)
+                || (creation != null && creation.isFailedUnconfirmed() && creation.hasCommand(commandId));
+    }
+
+    @DynamoDBIgnore
+    public boolean awaitsPickup() {
+        // a delivered package was evidently collected, whoever brought it to the carrier
+        return creation == null && deliveredAt == null && pickup != null && pickup.isAwaiting();
+    }
+
+    @DynamoDBIgnore
+    public boolean isPickupPendingFor(String commandId) {
+        return pickup != null && pickup.isPendingFor(commandId);
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingSubscription() {
         return trackingSubscriptionStatus != null;
@@ -213,6 +301,40 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
+    /** A cancel command younger than CourierCancellation.STALE waits for its result: a new request must wait too. */
+    @DynamoDBIgnore
+    public boolean isCancellationInProgress(LocalDateTime now) {
+        return cancellation != null && cancellation.isInProgress(now);
+    }
+
+    /** The result of the last cancel command is unknown: asking again reads that command, not a new one. */
+    @DynamoDBIgnore
+    public boolean needsCancellationRecheck(LocalDateTime now) {
+        return cancellation != null && cancellation.needsRecheck(now);
+    }
+
+    /** The last cancellation failed or its result is unknown: the label may or may not still be paid at the carrier. */
+    @DynamoDBIgnore
+    public boolean isCancellationUnresolved() {
+        return cancellation != null && cancellation.isUnresolved();
+    }
+
+    /**
+     * A command of the provider (creation, pickup order, cancellation) has not been settled yet: its result will change
+     * the shipment within moments, so a page showing it asks again until it does.
+     */
+    @DynamoDBIgnore
+    public boolean awaitsProviderAnswer(LocalDateTime now) {
+        return isCancellationInProgress(now) || (creation != null && creation.isInProgress(now))
+                || (pickup != null && pickup.isInProgress(now));
+    }
+
+    /** The shipment still waits for the result of that very cancel command. */
+    @DynamoDBIgnore
+    public boolean isCancellationPendingFor(String commandId) {
+        return cancellation != null && cancellation.isPending() && cancellation.hasCommand(commandId);
+    }
+
     /** The tracking subscription follows the tracking number: a changed number is tracked anew. */
     public void inheritTrackingSubscriptionFrom(Shipment previous) {
         if (previous == null || !previous.hasTrackingNo(trackingNo)) {
@@ -225,19 +347,46 @@ public class Shipment {
 
     /**
      * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
-     * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
-     * label orphaned.
+     * only "Cancel shipment" cancels it at the carrier, and a shipment that lost it could be removed and leave the
+     * label orphaned. It keeps the state of its cancellation together with it.
      */
     public void inheritCourierOrderFrom(Shipment previous) {
         if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
+            this.cancellation = previous.cancellation;
+            this.provider = previous.provider;
+            this.pickUpAddressId = previous.pickUpAddressId;
+            this.pickup = previous.pickup;
+            this.cancellable = previous.cancellable;
         }
+    }
+
+    /**
+     * The edit form shows neither the tracking subscription nor the seconds of a date, so a row it posts has neither.
+     * The subscription follows the tracking number (see {@link #inheritTrackingSubscriptionFrom}); a date the form
+     * shows unchanged, to the minute, keeps the exact stored value, while a date the operator changed or cleared stays.
+     */
+    public void inheritTrackingFrom(Shipment previous) {
+        if (previous == null) {
+            return;
+        }
+        inheritTrackingSubscriptionFrom(previous);
+        if (sameMinute(shippedAt, previous.shippedAt)) {
+            this.shippedAt = previous.shippedAt;
+        }
+        if (sameMinute(deliveredAt, previous.deliveredAt)) {
+            this.deliveredAt = previous.deliveredAt;
+        }
+    }
+
+    private static boolean sameMinute(LocalDateTime posted, LocalDateTime stored) {
+        return posted != null && stored != null && posted.equals(stored.truncatedTo(ChronoUnit.MINUTES));
     }
 
     /** Nothing but the delivery choice: no tracking, no dates, no courier order. */
     @DynamoDBIgnore
     public boolean isPlaceholder() {
         return isEmpty(trackingNo) && isEmpty(trackingUrl) && isEmpty(externalId) && shippedAt == null
-                && deliveredAt == null;
+                && deliveredAt == null && creation == null;
     }
 }

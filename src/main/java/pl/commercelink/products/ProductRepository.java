@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,48 @@ public class ProductRepository extends DynamoDbRepository<Product> {
             lastEvaluatedKey = queryResult.getLastEvaluatedKey();
         } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
         return labels;
+    }
+
+    /** The two codes of a product, the only fields the inventory's "W katalogu" column compares. */
+    public record ProductCodes(String ean, String manufacturerCode) {
+    }
+
+    /**
+     * The codes of every product of the category, for {@link CatalogPlacement}. Read consistently: the inventory page
+     * shows a product as in the catalog right after "Uzupełnij dane" saved it, possibly on another instance, and an
+     * eventually consistent read could miss the rows written a moment ago.
+     */
+    public List<ProductCodes> codesOf(String categoryId) {
+        return codesOf(categoryId, null);
+    }
+
+    /** As {@link #codesOf(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
+    List<ProductCodes> codesOf(String categoryId, Integer pageSize) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":categoryId", new AttributeValue().withS(categoryId));
+        List<ProductCodes> codes = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName(TABLE)
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withExpressionAttributeValues(eav)
+                    .withProjectionExpression("ean, mfn")
+                    .withConsistentRead(true)
+                    .withLimit(pageSize)
+                    .withExclusiveStartKey(lastEvaluatedKey);
+            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
+            for (Map<String, AttributeValue> item : queryResult.getItems()) {
+                codes.add(new ProductCodes(stringOf(item, "ean"), stringOf(item, "mfn")));
+            }
+            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
+        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
+        return codes;
+    }
+
+    private static String stringOf(Map<String, AttributeValue> item, String attribute) {
+        AttributeValue value = item.get(attribute);
+        return value == null ? null : value.getS();
     }
 
     public List<Product> findAll(ProductCatalog catalog) {
@@ -213,6 +256,43 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     public List<Product> findAllWithoutPimIdByEanOrMfn(List<String> eans, List<String> mfnCodes) {
         Map<String, AttributeValue> eav = new HashMap<>();
+        String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+        if (filter == null) {
+            return new ArrayList<>();
+        }
+
+        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
+                .withFilterExpression(filter)
+                .withExpressionAttributeValues(eav);
+
+        return dynamoDBMapper.scan(Product.class, scanExpression);
+    }
+
+    public List<Product> findAllWithoutPimIdByEanOrMfnInCategories(Collection<String> categoryIds, List<String> eans, List<String> mfnCodes) {
+        List<Product> result = new ArrayList<>();
+        for (String categoryId : categoryIds) {
+            Map<String, AttributeValue> eav = new HashMap<>();
+            String filter = withoutPimIdByEanOrMfnFilter(eans, mfnCodes, eav);
+            if (filter == null) {
+                return result;
+            }
+            eav.put(":categoryId", new AttributeValue().withS(categoryId));
+
+            DynamoDBQueryExpression<Product> queryExpression = new DynamoDBQueryExpression<Product>()
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withFilterExpression(filter)
+                    .withExpressionAttributeValues(eav);
+
+            result.addAll(dynamoDBMapper.query(Product.class, queryExpression));
+        }
+        return result;
+    }
+
+    /**
+     * Builds the filter "pimId missing or null, and ean or mfn among the given codes", adding its values to {@code eav}.
+     * Returns null when both lists are empty, i.e. nothing can match.
+     */
+    private static String withoutPimIdByEanOrMfnFilter(List<String> eans, List<String> mfnCodes, Map<String, AttributeValue> eav) {
         eav.put(":nullValue", new AttributeValue().withNULL(true));
 
         List<String> conditions = new ArrayList<>();
@@ -238,16 +318,10 @@ public class ProductRepository extends DynamoDbRepository<Product> {
         }
 
         if (conditions.isEmpty()) {
-            return new ArrayList<>();
+            return null;
         }
 
-        String filter = "(attribute_not_exists(pimId) OR pimId = :nullValue) AND (" + String.join(" OR ", conditions) + ")";
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(filter)
-                .withExpressionAttributeValues(eav);
-
-        return dynamoDBMapper.scan(Product.class, scanExpression);
+        return "(attribute_not_exists(pimId) OR pimId = :nullValue) AND (" + String.join(" OR ", conditions) + ")";
     }
 
     public List<Product> findAllProductsPaginated(String categoryId, Boolean enabled, String brand, String label, String pimId, String ean, String mfn, Boolean pimIdExists, Integer minStockExpectedQty, Boolean marketplacesNotEmpty, Integer minSuggestedRetailPrice, Integer minMaxRetailPrice, int page, int pageSize) {

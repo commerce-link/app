@@ -30,7 +30,7 @@ import java.util.stream.Stream;
  * the delivery not before the shipping; "today" is the operator's day, in Warsaw, whatever the server's zone.
  * <p>
  * courierOrder: the shipment has a courier order (a paid label whose number the carrier gave), so its type, carrier
- * and tracking number are shown read-only and a change of any is refused; "Cancel courier order" is the way to change
+ * and tracking number are shown read-only and a change of any is refused; "Cancel shipment" is the way to change
  * them.
  */
 public record OrderShipmentForm(String orderId, Integer index, String version, ShipmentType type, String carrier,
@@ -171,7 +171,7 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
             if (!Objects.equals(StringUtils.trimToNull(trackingNo), StringUtils.trimToNull(saved.getTrackingNo()))) {
                 found.put(field("trackingNo"), "order.shipments.error.courierLocked");
             }
-            // without its shipped date the shipment would stop counting as sent: "Cancel courier order" would lose it
+            // without its shipped date the shipment would stop counting as sent: "Cancel shipment" would lose it
             // and "Book courier" would come back, paying for a second label; another past day stays allowed
             if (saved.getShippedAt() != null && StringUtils.isBlank(shippedDate)) {
                 found.put(field("shippedDate"), "order.shipments.error.courierShippedDate");

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -33,6 +34,20 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
     public Delivery findById(String storeId, String deliveryId) {
         return dynamoDBMapper.load(Delivery.class, storeId, deliveryId);
+    }
+
+    /** The store's deliveries with these ids, read in batches of 100 keys; ids not in the store are absent. */
+    public List<Delivery> findAllByIds(String storeId, Collection<String> deliveryIds) {
+        List<Delivery> keys = deliveryIds.stream().distinct().map(id -> {
+            Delivery key = new Delivery();
+            key.setStoreId(storeId);
+            key.setDeliveryId(id);
+            return key;
+        }).toList();
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(Delivery.class::cast).toList();
     }
 
     /**
@@ -111,7 +126,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)
                 .stream()
-                .sorted(Comparator.comparing(Delivery::getPaymentDueDate))
+                .sorted(Comparator.comparing(Delivery::getPaymentDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
     }
 
@@ -157,14 +172,16 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
     }
 
     /**
-     * Received deliveries in a reception window; a missing bound means from the start, an open upper bound reaches
-     * every reception up to the end of the history. Partial, see findInTransit.
+     * Received deliveries whose reception is on or after the given day; null means the whole history. The list filters
+     * by the day a delivery was created (orderedAt), which the index does not carry, but a delivery is never received
+     * before it is created, so every delivery created since that day is among these; the caller narrows the rest by
+     * orderedAt. Partial, see findInTransit.
      */
-    public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
+    public List<Delivery> findReceivedSince(String storeId, LocalDate since) {
         List<Delivery> result = new ArrayList<>();
         for (String prefix : List.of(DeliveryListKey.TO_SETTLE, DeliveryListKey.SETTLED)) {
-            String lo = from == null ? prefix : DeliveryListKey.receivedBound(prefix, from, false);
-            String hi = to == null ? prefix + "\uffff" : DeliveryListKey.receivedBound(prefix, to, true);
+            String lo = since == null ? prefix : DeliveryListKey.receivedBound(prefix, since, false);
+            String hi = prefix + "\uffff";
             result.addAll(readList(storeId, "deliveryListSortKey BETWEEN :lo AND :hi", lo, hi,
                     key -> key.compareTo(lo) >= 0 && key.compareTo(hi) <= 0));
         }

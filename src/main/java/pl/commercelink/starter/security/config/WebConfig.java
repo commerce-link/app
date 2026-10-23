@@ -1,6 +1,6 @@
 package pl.commercelink.starter.security.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,24 +11,27 @@ import pl.commercelink.starter.security.StoreAccessInterceptor;
 import pl.commercelink.starter.security.StoreApiKeyAuthorizationInterceptor;
 import pl.commercelink.registration.EmailVerificationInterceptor;
 import pl.commercelink.starter.security.interceptor.ApiGatewayIdInterceptor;
+import pl.commercelink.web.activity.DashboardReadOnlyInterceptor;
+import pl.commercelink.web.activity.PublicStoreActivityInterceptor;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig {
 
     @Value("${app.cors}")
     private String cors;
 
-    @Autowired
-    private ApiGatewayIdInterceptor apiGatewayIdInterceptor;
+    private final ApiGatewayIdInterceptor apiGatewayIdInterceptor;
 
-    @Autowired
-    private StoreApiKeyAuthorizationInterceptor storeApiKeyAuthorizationInterceptor;
+    private final StoreApiKeyAuthorizationInterceptor storeApiKeyAuthorizationInterceptor;
 
-    @Autowired
-    private StoreAccessInterceptor storeAccessInterceptor;
+    private final StoreAccessInterceptor storeAccessInterceptor;
 
-    @Autowired
-    private EmailVerificationInterceptor emailVerificationInterceptor;
+    private final EmailVerificationInterceptor emailVerificationInterceptor;
+
+    private final DashboardReadOnlyInterceptor dashboardReadOnlyInterceptor;
+
+    private final PublicStoreActivityInterceptor publicStoreActivityInterceptor;
 
     @Bean
     public WebMvcConfigurer corsConfigurer()
@@ -48,7 +51,18 @@ public class WebConfig {
                         .addPathPatterns("/Store/*/Catalog/**")
                         .excludePathPatterns("/store/*/individual/offer/**");
 
+                // Webhooks report what already happened at the provider: a basket paid before the deactivation still
+                // becomes an order, a delivered parcel or a fiscalised receipt is still recorded. Refusing them would
+                // only lose that, and Fakturownia switches a failing webhook off for the whole account.
+                registry.addInterceptor(publicStoreActivityInterceptor)
+                        .addPathPatterns("/Store/*/**", "/store/*/client/**", "/store/*/individual/**")
+                        .excludePathPatterns("/Store/*/Webhooks/**");
+
                 registry.addInterceptor(emailVerificationInterceptor)
+                        .addPathPatterns("/dashboard/**");
+
+                // After the e-mail check, so an owner who has not confirmed the address yet is sent there first.
+                registry.addInterceptor(dashboardReadOnlyInterceptor)
                         .addPathPatterns("/dashboard/**");
 
                 registry.addInterceptor(storeAccessInterceptor)

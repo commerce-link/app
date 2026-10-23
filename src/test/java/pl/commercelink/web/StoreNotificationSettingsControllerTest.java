@@ -94,8 +94,28 @@ class StoreNotificationSettingsControllerTest {
         assertThat(model.get("form")).isInstanceOf(NotificationSenderForm.class);
         assertThat(model.get("formAction")).isEqualTo("/dashboard/store/notification");
         assertThat(((NotificationOverview) model.get("overview")).totalCount()).isEqualTo(EmailNotificationType.values().length);
-        assertThat(model.get("senderPreviewName")).isEqualTo("Sklep store-1");
+        assertThat(((NotificationOverview) model.get("overview")).senderMissing()).isTrue();
+        assertThat(model.get("senderPreviewName")).isNull();
         assertThat(errors(model)).isEmpty();
+    }
+
+    @Test
+    void previewsTheStoredSenderName() {
+        // given
+        logInAs("ADMIN", "store-1");
+        Store store = store("store-1");
+        ClientNotificationsConfiguration configuration = new ClientNotificationsConfiguration();
+        configuration.setSenderName("Obsługa Sklepu");
+        configuration.setReplyToEmail("kontakt@sklep-demo.pl");
+        store.setClientNotificationsConfiguration(configuration);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.notification(model);
+
+        // then
+        assertThat(model.get("senderPreviewName")).isEqualTo("Obsługa Sklepu");
+        assertThat(((NotificationOverview) model.get("overview")).senderMissing()).isFalse();
     }
 
     @Test
@@ -136,7 +156,7 @@ class StoreNotificationSettingsControllerTest {
         Store store = store("store-9");
 
         // when
-        String view = controller.superAdminSaveNotification("store-9", form("Sklep 9", null), null, new ExtendedModelMap(),
+        String view = controller.superAdminSaveNotification("store-9", form("Sklep 9", "kontakt@sklep-9.pl"), null, new ExtendedModelMap(),
                 POLISH, new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
@@ -173,7 +193,7 @@ class StoreNotificationSettingsControllerTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
-        String view = controller.saveNotification(form(" Sklep Demo ", ""), "fetch", model, POLISH,
+        String view = controller.saveNotification(form(" Sklep Demo ", "kontakt@sklep-demo.pl"), "fetch", model, POLISH,
                 new RedirectAttributesModelMap(), response);
 
         // then
@@ -181,6 +201,24 @@ class StoreNotificationSettingsControllerTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(model.get("savedMessage")).isEqualTo("Zapisano");
         assertThat(((NotificationSenderForm) model.get("form")).getSenderName()).isEqualTo("Sklep Demo");
+        assertThat(((NotificationOverview) model.get("overview")).senderMissing()).isFalse();
+    }
+
+    @Test
+    void aFormWithoutTheSenderIsNotSaved() {
+        // given
+        logInAs("ADMIN", "store-1");
+        store("store-1");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.saveNotification(form(" ", ""), null, model, POLISH,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
+
+        // then
+        verify(storesRepository, never()).save(any());
+        assertThat(view).isEqualTo("store-notification");
+        assertThat(errors(model)).containsOnlyKeys("senderName", "replyToEmail");
     }
 
     @Test

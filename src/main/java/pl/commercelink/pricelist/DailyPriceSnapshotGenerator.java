@@ -1,105 +1,84 @@
 package pl.commercelink.pricelist;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.starter.csv.CSVWriter;
 import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.stores.StoreActivity;
+import pl.commercelink.stores.SupplierScope;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 class DailyPriceSnapshotGenerator {
 
-    @Autowired
-    private Inventory inventory;
-    @Autowired
-    private FileStorage fileStorage;
-    @Value("${s3.bucket.datalake}")
-    private String bucketName;
+    static final String QUEUE = "supplier-daily-price-snapshot-queue";
+
+    private final Inventory inventory;
+    private final FileStorage fileStorage;
+    private final PriceDataFanOut fanOut;
+    private final StoreActivity storeActivity;
+    private final String datalakeBucket;
+    private final String storesBucket;
+
+    DailyPriceSnapshotGenerator(Inventory inventory,
+                                FileStorage fileStorage,
+                                PriceDataFanOut fanOut,
+                                StoreActivity storeActivity,
+                                @Value("${s3.bucket.datalake}") String datalakeBucket,
+                                @Value("${s3.bucket.stores}") String storesBucket) {
+        this.inventory = inventory;
+        this.fileStorage = fileStorage;
+        this.fanOut = fanOut;
+        this.storeActivity = storeActivity;
+        this.datalakeBucket = datalakeBucket;
+        this.storesBucket = storesBucket;
+    }
 
     @SqsListener(
-            value = "supplier-daily-price-snapshot-queue",
+            value = QUEUE,
             maxConcurrentMessages = "1",
             maxMessagesPerPoll = "1",
             pollTimeoutSeconds = "20"
     )
-    void handleMessage(String message) throws IOException {
-        byte[] result;
-        List<DailyPriceSnapshot> rows = getDailyPriceSnapshots();
-        try {
-            result = new CSVWriter().writeAllRowsToBytes(rows, DailyPriceSnapshot.COLUMNS);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    void handleMessage(String body) throws IOException {
+        PriceDataMessage message = PriceDataMessage.parse(body);
+        LocalDate day = message.dayOrToday();
+
+        if (message.isForStore()) {
+            generateForStore(message.storeId(), day);
+            return;
         }
-        String fileName = "daily-price-snapshot/" + LocalDate.now() + ".csv";
-        fileStorage.put(bucketName, fileName, result);
+
+        // Fan out first: a failing global snapshot must not leave the stores without theirs
+        fanOut.toActiveStores(QUEUE, day);
+        write(PriceDataLocation.global(datalakeBucket), DailyPriceSnapshotBuilder.build(inventory.withGlobalData(), day), day);
     }
 
-    private List<DailyPriceSnapshot> getDailyPriceSnapshots() {
-        List<DailyPriceSnapshot> rows = new ArrayList<>();
-        for (MatchedInventory matchedInventory : inventory.withGlobalData().findAllWithPimId()) {
-            if (matchedInventory.hasOffersFromMultipleSuppliers(2) || matchedInventory.hasTotalMinQty(2)) {
-                rows.add(createSnapshot(matchedInventory));
-            }
+    private void generateForStore(String storeId, LocalDate day) throws IOException {
+        if (!storeActivity.isActive(storeId)) {
+            log.warn("Daily price snapshot skipped for store {}: the store is inactive", storeId);
+            return;
         }
-        return rows;
+        InventoryView view = inventory.withEnabledSuppliersOnly(storeId, SupplierScope.PRICING);
+        List<DailyPriceSnapshot> rows = DailyPriceSnapshotBuilder.build(view, day);
+        if (rows.isEmpty()) {
+            return;
+        }
+        write(PriceDataLocation.store(storesBucket, storeId), rows, day);
     }
 
-    private DailyPriceSnapshot createSnapshot(MatchedInventory matchedInventory) {
-        List<InventoryItem> items = matchedInventory.getInventoryItems();
-
-        Price lowestPrice = matchedInventory.getLowestPrice();
-        Price medianPrice = matchedInventory.getMedianPrice();
-        Price highestPrice = matchedInventory.getHighestPrice();
-
-        // lookup item inventory item that is connected with the lowest price
-        InventoryItem lowestPricedItem = items.stream()
-                .filter(i -> Price.fromNet(i.netPrice()).netValue() == lowestPrice.netValue())
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("No inventory item found with lowest price"));
-
-        // lookup three best value distributors starting with the lowest priced one
-        int lowestIndex = items.indexOf(lowestPricedItem);
-        List<InventoryItem> bestValueItems = items.subList(lowestIndex, Math.min(lowestIndex + 3, items.size()));
-
-        String bestValueDistributorsPipeSeparated = bestValueItems.stream()
-                .map(InventoryItem::supplier)
-                .collect(Collectors.joining("|"));
-        String bestValuePricesPipeSeparated = bestValueItems.stream()
-                .map(i -> String.valueOf(i.netPrice()))
-                .collect(Collectors.joining("|"));
-
-        // // all available distributors starting with the lowest priced one
-        String allAvailableDistributorsPipeSeparated = items.subList(lowestIndex, items.size()).stream()
-                .map(InventoryItem::supplier)
-                .distinct()
-                .collect(Collectors.joining("|"));
-
-        return new DailyPriceSnapshot(
-                matchedInventory.getInventoryKey().getId(),
-                lowestPrice.netValue(),
-                medianPrice.netValue(),
-                highestPrice.netValue(),
-                lowestPricedItem.qty(),
-                matchedInventory.getTotalAvailableQty(),
-                lowestPricedItem.supplier(),
-                bestValueDistributorsPipeSeparated,
-                bestValuePricesPipeSeparated,
-                allAvailableDistributorsPipeSeparated,
-                LocalDate.now()
-        );
+    private void write(PriceDataLocation location, List<DailyPriceSnapshot> rows, LocalDate day) throws IOException {
+        byte[] csv = new CSVWriter().writeAllRowsToBytes(rows, DailyPriceSnapshot.COLUMNS);
+        fileStorage.put(location.bucket(), location.snapshotKey(day), csv);
     }
-
 }

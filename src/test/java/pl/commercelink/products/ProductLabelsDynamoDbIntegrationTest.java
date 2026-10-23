@@ -17,7 +17,7 @@ import org.mockito.Mockito;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.util.List;
 
@@ -36,7 +36,7 @@ class ProductLabelsDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static AmazonDynamoDB client;
     static ProductRepository products;
@@ -108,8 +108,53 @@ class ProductLabelsDynamoDbIntegrationTest {
     }
 
     @Test
+    void codesOfReadsBothCodesConsistentlyAcrossEveryPage() {
+        // given
+        save("cat-codes", "A", "B", "C");
+        AmazonDynamoDB spy = Mockito.mock(AmazonDynamoDB.class, AdditionalAnswers.delegatesTo(client));
+
+        // when: two items a page, so two pages
+        List<ProductRepository.ProductCodes> codes = new ProductRepository(spy).codesOf("cat-codes", 2);
+
+        // then
+        assertThat(codes).hasSize(3).allSatisfy(product -> {
+            assertThat(product.ean()).isEqualTo("5900000000008");
+            assertThat(product.manufacturerCode()).isEqualTo("MFN");
+        });
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(spy, times(2)).query(request.capture());
+        assertThat(request.getAllValues()).allSatisfy(query -> {
+            assertThat(query.getProjectionExpression()).isEqualTo("ean, mfn");
+            assertThat(query.getConsistentRead()).isTrue();
+        });
+    }
+
+    @Test
     void anEmptyCategoryHasNoLabels() {
         // when / then
         assertThat(products.labelsOf("cat-empty")).isEmpty();
+    }
+
+    @Test
+    void attachableProductsInCategoriesAreOnlyThoseWithoutPimIdMatchingTheCodes() {
+        // given
+        products.save(unattached("cat-own", "p1", "E1", "M1", null));
+        products.save(unattached("cat-own", "p2", "E1", "M1", "already"));
+        products.save(unattached("cat-own", "p3", "E9", "M9", null));
+        products.save(unattached("cat-foreign", "p4", "E1", "M1", null));
+
+        // when
+        List<Product> found = products.findAllWithoutPimIdByEanOrMfnInCategories(
+                List.of("cat-own", "cat-none"), List.of("E1"), List.of());
+
+        // then
+        assertThat(found).extracting(Product::getProductId).containsExactly("p1");
+        assertThat(products.findAllWithoutPimIdByEanOrMfnInCategories(List.of("cat-own"), List.of(), List.of())).isEmpty();
+    }
+
+    private static Product unattached(String categoryId, String productId, String ean, String mfn, String pimId) {
+        Product product = new Product(categoryId, pimId, ean, mfn, "Brand", "L", "Name", "Default");
+        product.setProductId(productId);
+        return product;
     }
 }

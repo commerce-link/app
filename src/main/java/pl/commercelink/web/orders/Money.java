@@ -29,6 +29,16 @@ public final class Money {
         return value.setScale(Math.max(2, value.stripTrailingZeros().scale()), RoundingMode.UNNECESSARY).toPlainString();
     }
 
+    /** An amount rounded to whole grosze, half up: a cost typed or converted with more decimals than money has. */
+    public static double round(double amount) {
+        return BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    /** {@link #input(double)} of the amount rounded to two decimals, for a field that only takes whole grosze. */
+    public static String inputRounded(double amount) {
+        return input(round(amount));
+    }
+
     private static DecimalFormatSymbols symbols() {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("pl-PL"));
         symbols.setGroupingSeparator('\u00A0');

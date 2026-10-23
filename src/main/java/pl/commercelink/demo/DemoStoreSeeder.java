@@ -149,7 +149,6 @@ public class DemoStoreSeeder implements StoreSeeder {
     private static final String ACME_B = "AcmeB";
     /** Second AcmeB instance of the local store: same adapter, its own feed file and configuration. */
     private static final String ACME_B_SECOND = "AcmeB-h6rxcqtb";
-    private static final List<String> SIM_SUPPLIERS = List.of(ACME, ACME_B);
     private static final String SIM_MFN_PREFIX = "SIM-";
     /** AcmeB simulates dropshipping only when asked to; the demo store asks, so the OWN path is visible. */
     static final String ACME_B_DROPSHIP_KNOB = "orderingDropshipEnabled";
@@ -167,7 +166,6 @@ public class DemoStoreSeeder implements StoreSeeder {
      * refreshes that document instead of adding a duplicate next to it.
      */
     static final String DEV_PURCHASE_INVOICE_ID_PREFIX = "dev-pur-";
-    private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
     /**
      * The catalog screens need what the plain seed has nowhere: an automatic category, a category with labels, a
@@ -175,7 +173,8 @@ public class DemoStoreSeeder implements StoreSeeder {
      * labelled outside the list. All of it is put on CPU and on one extra automatic category.
      */
     static final String SHOWCASE_CATEGORY = "CPU";
-    static final List<String> SHOWCASE_LABELS = List.of("Intel LGA 1851", "AMD AM5");
+    static final List<String> SHOWCASE_LABELS = List.of(
+            "Intel LGA 1851 (Core Ultra)", "AMD AM5 (Ryzen 9xxx)", "AMD AM5 (Ryzen 7xxx)");
     static final String SHOWCASE_PRICING_GROUP = "Premium";
     /** Marketplaces the demo store is "connected" to; no adapter is installed locally, so the names are the labels. */
     static final String DEMO_MARKETPLACE = "Allegro";
@@ -184,10 +183,42 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String AUTOMATIC_CATEGORY = "Cooling";
     static final String AUTOMATIC_CATEGORY_NAME = "Chłodzenie i wentylacja";
     private static final List<String> AUTOMATIC_PIM_CATEGORY_IDS = List.of("921", "1571");
-    private static final String SHOWCASE_APPROVED_PIM_ID = "local-seed-0001";
-    private static final String SHOWCASE_LABELLED_PIM_ID = "local-seed-0062";
-    private static final String SHOWCASE_DISABLED_PIM_ID = "local-seed-0063";
-    private static final String SHOWCASE_WITHOUT_PIM_ID = "local-seed-0064";
+    private static final String SHOWCASE_APPROVED_PIM_ID = "local-seed-0101";
+    private static final String SHOWCASE_LABELLED_PIM_ID = "local-seed-0109";
+    private static final String SHOWCASE_DISABLED_PIM_ID = "local-seed-0104";
+    private static final String SHOWCASE_WITHOUT_PIM_ID = "local-seed-0111";
+    static final String CATALOG_NAME = "Podzespoły komputerowe";
+    static final Map<String, String> CATEGORY_NAMES = Map.of(
+            "CPU", "Procesory",
+            "GPU", "Karty graficzne",
+            "Motherboard", "Płyty główne",
+            "Memory", "Pamięci RAM",
+            "Storage", "Dyski SSD",
+            "PSU", "Zasilacze",
+            "Case", "Obudowy",
+            "Cooler", "Chłodzenie procesora",
+            "Fan", "Wentylatory");
+    private static final String RYZEN_7_9800X3D = "100-100001084WOF";
+    private static final String RYZEN_5_9600X = "100-100001405WOF";
+    private static final String CORE_ULTRA_7_265KF = "BX80768265KF";
+    private static final String ASUS_DUAL_RTX_5070 = "90YV0M17-M0NA00";
+    private static final String MSI_RTX_5070_TI_GAMING_TRIO = "V531-240R";
+    private static final String GIGABYTE_RX_9070_XT_GAMING = "GV-R9070XTGAMINGOC-16GD";
+    private static final String GIGABYTE_B850_A_ELITE = "B850AELITEWF7ICE";
+    private static final String MSI_Z890_TOMAHAWK = "MAGZ890TOMAHAWKWIFI";
+    private static final String KINGSTON_FURY_BEAST_32GB = "KF560C30BBEK2-32";
+    private static final String GSKILL_TRIDENT_Z5_NEO_32GB = "F5-6000J3038F16GX2-TZ5N";
+    private static final String CORSAIR_VENGEANCE_32GB = "CMK32GX5M2B6000Z30";
+    private static final String CORSAIR_VENGEANCE_RGB_32GB = "CMH32GX5M2B6000C30";
+    private static final String SAMSUNG_990_EVO_PLUS_2TB = "MZ-V9S2T0BW";
+    private static final String SAMSUNG_9100_PRO_2TB = "MZ-VAP2T0BW";
+    private static final String BE_QUIET_PURE_POWER_13_M_850W = "BP027EU";
+    private static final String CORSAIR_RM850X = "CP-9020270-EU";
+    private static final String LIAN_LI_LANCOOL_217 = "LAN217X";
+    private static final String FRACTAL_NORTH = "FD-C-NOR1C-02";
+    private static final String ARCTIC_LIQUID_FREEZER_III_PRO_360 = "ACFRE00180A";
+    private static final String NZXT_KRAKEN_PLUS_360 = "RL-KN360-B2";
+    private static final String BE_QUIET_PURE_ROCK_3 = "BK039";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
@@ -474,7 +505,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         ProductCatalog catalog = new ProductCatalog();
         catalog.setStoreId(storeId);
         catalog.setCatalogId(CATALOG_ID);
-        catalog.setName("Local Catalog");
+        catalog.setName(CATALOG_NAME);
         catalog.setDeletionProtection(false);
         catalog.setCategories(categories);
         mapper.save(catalog, clobber);
@@ -620,20 +651,19 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     static CompletedDemoOrders buildCompletedDemoOrders(String storeId, String ownerEmail, List<CatalogSeedRow> rows) {
         List<CatalogSeedRow> catalogRows = rows.stream().filter(CatalogSeedRow::inCatalog).toList();
-        List<CatalogSeedRow> acmeRows = catalogRows.stream().filter(row -> row.soldBy(ACME)).toList();
-        List<CatalogSeedRow> acmeBRows = catalogRows.stream().filter(row -> row.soldBy(ACME_B)).toList();
         String warehouseId = DEMO_WAREHOUSE_ID;
         String pzSequenceKey = DocumentType.GoodsReceipt.getSequenceKey(warehouseId);
         String wzSequenceKey = DocumentType.GoodsIssue.getSequenceKey(warehouseId);
 
         CompletedOrderBundle first = completedOrderBundle(storeId, ownerEmail, "Tomasz", "Lis",
                 COMPLETED_ORDER_KEY, new OrderSource("Sklep internetowy", OrderSourceType.WebStore), null,
-                List.of(acmeRows.get(3), acmeRows.get(4)), ACME, ConnectionMode.GLOBAL, acmeOrderRef(104496),
+                List.of(product(catalogRows, MSI_Z890_TOMAHAWK), product(catalogRows, CORE_ULTRA_7_265KF)),
+                ACME, ConnectionMode.GLOBAL, acmeOrderRef(104496),
                 acmeCounterparty(), 8, warehouseId, pzSequenceKey + "/000001", wzSequenceKey + "/000001", "1");
         CompletedOrderBundle second = completedOrderBundle(storeId, ownerEmail, "Ewa", "Mazur",
                 COMPLETED_ORDER_2_KEY, new OrderSource("Allegro", OrderSourceType.Marketplace),
                 demoExternalOrderNo(storeId, COMPLETED_EXTERNAL_KEY),
-                List.of(acmeBRows.get(3)), ACME_B, ConnectionMode.OWN, acmeBOrderRef(88203),
+                List.of(product(catalogRows, MSI_RTX_5070_TI_GAMING_TRIO)), ACME_B, ConnectionMode.OWN, acmeBOrderRef(88203),
                 acmeBCounterparty(), 15, warehouseId, pzSequenceKey + "/000002", wzSequenceKey + "/000002", "2");
 
         Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
@@ -1133,11 +1163,6 @@ public class DemoStoreSeeder implements StoreSeeder {
         demoOrders.itemsByOrderId().values().forEach(mapper::batchSave);
         mapper.save(demoOrders.delivery(), clobber);
         demoOrders.events().forEach(event -> mapper.save(event, clobber));
-
-        SimOrders simOrders = buildSimOrders(storeId, rows);
-        simOrders.orders().forEach(order -> mapper.save(order, clobber));
-        simOrders.itemsByOrderId().values().forEach(mapper::batchSave);
-        simOrders.events().forEach(event -> mapper.save(event, clobber));
     }
 
     private boolean simulationSuppliersAvailable() {
@@ -1160,16 +1185,16 @@ public class DemoStoreSeeder implements StoreSeeder {
         List<Order> orders = new ArrayList<>();
         Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
 
-        Order first = demoOrder(storeId,"Jan", "Kowalski", demoId(storeId, POS_ORDER_KEY),
-                new OrderSource("Demo", OrderSourceType.PointOfSale));
+        Order first = placedHoursAgo(demoOrder(storeId,"Jan", "Kowalski", demoId(storeId, POS_ORDER_KEY),
+                new OrderSource("Demo", OrderSourceType.PointOfSale)), 3);
         itemsByOrderId.put(first.getOrderId(), List.of(
-                unassignedItem(first.getOrderId(), catalogRows.get(0), 1, 1),
-                unassignedItem(first.getOrderId(), catalogRows.get(1), 2, 2)));
-        Order second = demoOrder(storeId,"Anna", "Nowak", demoId(storeId, MARKETPLACE_ORDER_KEY),
-                new OrderSource("Allegro", OrderSourceType.Marketplace));
+                unassignedItem(first.getOrderId(), product(catalogRows, RYZEN_7_9800X3D), 1, 1),
+                unassignedItem(first.getOrderId(), product(catalogRows, ARCTIC_LIQUID_FREEZER_III_PRO_360), 1, 2)));
+        Order second = placedHoursAgo(demoOrder(storeId,"Anna", "Nowak", demoId(storeId, MARKETPLACE_ORDER_KEY),
+                new OrderSource("Allegro", OrderSourceType.Marketplace)), 26);
         second.setExternalOrderId(demoExternalOrderNo(storeId, MARKETPLACE_EXTERNAL_KEY));
         itemsByOrderId.put(second.getOrderId(), List.of(
-                allocationItem(second.getOrderId(), catalogRows.get(2), ACME, 1, 1)));
+                allocationItem(second.getOrderId(), product(catalogRows, ASUS_DUAL_RTX_5070), ACME, 1, 1)));
 
         // Shipping cost 15.0 is mirrored in invoicing-dev's DevPurchaseInvoices.SHIPPING_POSITION_NET,
         // which is what makes the invoice-sync screen auto-match it. Keep both in step.
@@ -1177,63 +1202,67 @@ public class DemoStoreSeeder implements StoreSeeder {
                 LocalDate.now().plusDays(2), 15.0, 0.0, 14, Price.DEFAULT_VAT_RATE);
         delivery.setDeliveryId(demoId(storeId, "demo-delivery-open"));
         delivery.setType(DeliveryType.WAREHOUSE);
-        Order third = demoOrder(storeId,"Piotr", "Wisniewski", demoId(storeId, MARKETPLACE_ORDER_2_KEY),
-                new OrderSource("Allegro", OrderSourceType.Marketplace));
+        Order third = placedHoursAgo(demoOrder(storeId,"Piotr", "Wisniewski", demoId(storeId, MARKETPLACE_ORDER_2_KEY),
+                new OrderSource("Allegro", OrderSourceType.Marketplace)), 50);
         third.setExternalOrderId(demoExternalOrderNo(storeId, MARKETPLACE_EXTERNAL_2_KEY));
-        OrderItem orderedItem = allocationItem(third.getOrderId(), catalogRows.get(0), delivery.getDeliveryId(), 1, 1);
+        OrderItem orderedItem = allocationItem(third.getOrderId(), product(catalogRows, KINGSTON_FURY_BEAST_32GB),
+                delivery.getDeliveryId(), 1, 1);
         orderedItem.setStatus(FulfilmentStatus.Ordered);
         itemsByOrderId.put(third.getOrderId(), List.of(orderedItem));
         third.setStatus(OrderStatus.Assembly);
         third.setEstimatedAssemblyAt(delivery.getEstimatedDeliveryAt());
         delivery.increaseTotalCost(orderedItem.getCost() * orderedItem.getQty());
 
-        Order fourth = demoOrder(storeId,"Maria", "Zielinska", demoId(storeId, WEBSTORE_ORDER_KEY),
-                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        Order fourth = placedHoursAgo(demoOrder(storeId,"Maria", "Zielinska", demoId(storeId, WEBSTORE_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore)), 6);
         itemsByOrderId.put(fourth.getOrderId(), List.of(
-                allocationItem(fourth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+                allocationItem(fourth.getOrderId(), product(catalogRows, SAMSUNG_9100_PRO_2TB), ACME_B, 1, 1)));
 
-        Order fifth = demoOrder(storeId, "Tomasz", "Lis", demoId(storeId, DROPSHIP_ACME_ORDER_KEY),
-                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        Order fifth = placedHoursAgo(demoOrder(storeId, "Tomasz", "Lis", demoId(storeId, DROPSHIP_ACME_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore)), 9);
         fifth.setFulfilmentType(FulfilmentType.DirectToConsumer);
         itemsByOrderId.put(fifth.getOrderId(), List.of(
-                allocationItem(fifth.getOrderId(), acmeRow(catalogRows), ACME, 1, 1)));
+                allocationItem(fifth.getOrderId(), product(catalogRows, NZXT_KRAKEN_PLUS_360), ACME, 1, 1)));
 
-        Order sixth = demoOrder(storeId, "Zofia", "Krol", demoId(storeId, DROPSHIP_ACME_B_ORDER_KEY),
-                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+        Order sixth = placedHoursAgo(demoOrder(storeId, "Zofia", "Krol", demoId(storeId, DROPSHIP_ACME_B_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore)), 11);
         sixth.setFulfilmentType(FulfilmentType.DirectToConsumer);
         itemsByOrderId.put(sixth.getOrderId(), List.of(
-                allocationItem(sixth.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
+                allocationItem(sixth.getOrderId(), product(catalogRows, CORSAIR_RM850X), ACME_B, 1, 1)));
 
-        List<CatalogSeedRow> acmeRows = acmeRows(catalogRows, 3);
-        Order pickupAtAcme = dropshipOrder(storeId, "Krzysztof", "Dudek", demoId(storeId, DROPSHIP_PICKUP_ACME_ORDER_KEY),
-                pickupShipment("InPost", "WAW04A"));
+        Order pickupAtAcme = placedHoursAgo(dropshipOrder(storeId, "Krzysztof", "Dudek",
+                demoId(storeId, DROPSHIP_PICKUP_ACME_ORDER_KEY), pickupShipment("InPost", "WAW04A")), 20);
         itemsByOrderId.put(pickupAtAcme.getOrderId(), List.of(
-                allocationItem(pickupAtAcme.getOrderId(), acmeRows.get(0), ACME, 1, 1),
-                allocationItem(pickupAtAcme.getOrderId(), acmeRows.get(1), ACME, 1, 2)));
-        Order pickupAtAcmeB = dropshipOrder(storeId, "Barbara", "Zajac", demoId(storeId, DROPSHIP_PICKUP_ACME_B_ORDER_KEY),
-                pickupShipment("DPD", "PL12345"));
+                allocationItem(pickupAtAcme.getOrderId(), product(catalogRows, SAMSUNG_990_EVO_PLUS_2TB), ACME, 1, 1),
+                allocationItem(pickupAtAcme.getOrderId(), product(catalogRows, GSKILL_TRIDENT_Z5_NEO_32GB), ACME, 1, 2)));
+        Order pickupAtAcmeB = placedHoursAgo(dropshipOrder(storeId, "Barbara", "Zajac",
+                demoId(storeId, DROPSHIP_PICKUP_ACME_B_ORDER_KEY), pickupShipment("DPD", "PL12345")), 22);
         itemsByOrderId.put(pickupAtAcmeB.getOrderId(), List.of(
-                allocationItem(pickupAtAcmeB.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
-        Order pickupWithoutCode = dropshipOrder(storeId, "Pawel", "Sadowski", demoId(storeId, DROPSHIP_PICKUP_NO_CODE_ORDER_KEY),
-                pickupShipment("InPost", null));
+                allocationItem(pickupAtAcmeB.getOrderId(), product(catalogRows, CORSAIR_VENGEANCE_RGB_32GB), ACME_B, 1, 1)));
+        Order pickupWithoutCode = placedHoursAgo(dropshipOrder(storeId, "Pawel", "Sadowski",
+                demoId(storeId, DROPSHIP_PICKUP_NO_CODE_ORDER_KEY), pickupShipment("InPost", null)), 28);
         itemsByOrderId.put(pickupWithoutCode.getOrderId(), List.of(
-                allocationItem(pickupWithoutCode.getOrderId(), acmeRows.get(0), ACME, 1, 1)));
-        Order courierMulti = dropshipOrder(storeId, "Natalia", "Borkowska", demoId(storeId, DROPSHIP_ACME_MULTI_ORDER_KEY), null);
+                allocationItem(pickupWithoutCode.getOrderId(), product(catalogRows, BE_QUIET_PURE_ROCK_3), ACME, 1, 1)));
+        Order courierMulti = placedHoursAgo(dropshipOrder(storeId, "Natalia", "Borkowska",
+                demoId(storeId, DROPSHIP_ACME_MULTI_ORDER_KEY), null), 2);
         itemsByOrderId.put(courierMulti.getOrderId(), List.of(
-                allocationItem(courierMulti.getOrderId(), acmeRows.get(0), ACME, 1, 1),
-                allocationItem(courierMulti.getOrderId(), acmeRows.get(1), ACME, 1, 2),
-                allocationItem(courierMulti.getOrderId(), acmeRows.get(2), ACME, 1, 3)));
-        Order courierAcmeSpare = dropshipOrder(storeId, "Joanna", "Michalska", demoId(storeId, DROPSHIP_ACME_SPARE_ORDER_KEY), null);
+                allocationItem(courierMulti.getOrderId(), product(catalogRows, RYZEN_5_9600X), ACME, 1, 1),
+                allocationItem(courierMulti.getOrderId(), product(catalogRows, GIGABYTE_B850_A_ELITE), ACME, 1, 2),
+                allocationItem(courierMulti.getOrderId(), product(catalogRows, CORSAIR_VENGEANCE_32GB), ACME, 1, 3)));
+        Order courierAcmeSpare = placedHoursAgo(dropshipOrder(storeId, "Joanna", "Michalska",
+                demoId(storeId, DROPSHIP_ACME_SPARE_ORDER_KEY), null), 14);
         itemsByOrderId.put(courierAcmeSpare.getOrderId(), List.of(
-                allocationItem(courierAcmeSpare.getOrderId(), acmeRows.get(1), ACME, 1, 1)));
-        Order courierAcmeBSpare = dropshipOrder(storeId, "Lukasz", "Czarnecki", demoId(storeId, DROPSHIP_ACME_B_SPARE_ORDER_KEY), null);
+                allocationItem(courierAcmeSpare.getOrderId(), product(catalogRows, FRACTAL_NORTH), ACME, 1, 1)));
+        Order courierAcmeBSpare = placedHoursAgo(dropshipOrder(storeId, "Lukasz", "Czarnecki",
+                demoId(storeId, DROPSHIP_ACME_B_SPARE_ORDER_KEY), null), 16);
         itemsByOrderId.put(courierAcmeBSpare.getOrderId(), List.of(
-                allocationItem(courierAcmeBSpare.getOrderId(), acmeBExclusiveRow(catalogRows), ACME_B, 1, 1)));
-        Order warehouseTwoItems = demoOrder(storeId, "Marek", "Pawlak", demoId(storeId, WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY),
-                new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
+                allocationItem(courierAcmeBSpare.getOrderId(), product(catalogRows, GIGABYTE_RX_9070_XT_GAMING), ACME_B, 1, 1)));
+        Order warehouseTwoItems = placedHoursAgo(demoOrder(storeId, "Marek", "Pawlak",
+                demoId(storeId, WAREHOUSE_ACME_TWO_ITEMS_ORDER_KEY),
+                new OrderSource("Sklep internetowy", OrderSourceType.WebStore)), 1);
         itemsByOrderId.put(warehouseTwoItems.getOrderId(), List.of(
-                allocationItem(warehouseTwoItems.getOrderId(), acmeRows.get(0), ACME, 1, 1),
-                allocationItem(warehouseTwoItems.getOrderId(), acmeRows.get(1), ACME, 1, 2)));
+                allocationItem(warehouseTwoItems.getOrderId(), product(catalogRows, LIAN_LI_LANCOOL_217), ACME, 1, 1),
+                allocationItem(warehouseTwoItems.getOrderId(), product(catalogRows, BE_QUIET_PURE_POWER_13_M_850W), ACME, 1, 2)));
 
         orders.add(first);
         orders.add(second);
@@ -1264,47 +1293,16 @@ public class DemoStoreSeeder implements StoreSeeder {
         return event;
     }
 
-    static SimOrders buildSimOrders(String storeId, List<CatalogSeedRow> rows) {
-        List<Order> orders = new ArrayList<>();
-        Map<String, List<OrderItem>> itemsByOrderId = new HashMap<>();
-        List<OrderEvent> events = new ArrayList<>();
-
-        rows.stream()
-                .filter(row -> row.mfn().startsWith(SIM_MFN_PREFIX))
-                .forEach(row -> SIM_SUPPLIERS.stream()
-                        .filter(row::soldBy)
-                        .forEach(supplier -> {
-                            Order order = demoOrder(storeId, "Symulacja", simulationScenarioLabel(row),
-                                    demoId(storeId, "sim-" + row.mfn().toLowerCase(Locale.ROOT) + "-" + supplier.toLowerCase(Locale.ROOT)),
-                                    new OrderSource("Sklep internetowy", OrderSourceType.WebStore));
-                            OrderItem item = allocationItem(order.getOrderId(), row, supplier, 1, 1);
-                            order.setTotalPrice(item.getTotalPrice());
-                            orders.add(order);
-                            itemsByOrderId.put(order.getOrderId(), List.of(item));
-                            events.add(orderEvent(storeId, order,
-                                    EventType.email, EmailNotificationType.ORDER_CONFIRMATION.name(), order.getOrderedAt()));
-                        }));
-
-        return new SimOrders(orders, itemsByOrderId, events);
-    }
-
-    private static String simulationScenarioLabel(CatalogSeedRow row) {
-        return row.name().startsWith(SIM_LABEL_PREFIX) ? row.name().substring(SIM_LABEL_PREFIX.length()) : row.name();
-    }
-
-    private static CatalogSeedRow acmeRow(List<CatalogSeedRow> catalogRows) {
+    private static CatalogSeedRow product(List<CatalogSeedRow> catalogRows, String mfn) {
         return catalogRows.stream()
-                .filter(row -> row.soldBy(ACME))
+                .filter(row -> row.mfn().equals(mfn))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No catalog row sold by " + ACME));
+                .orElseThrow(() -> new IllegalStateException("No catalog row with MFN " + mfn));
     }
 
-    private static List<CatalogSeedRow> acmeRows(List<CatalogSeedRow> catalogRows, int count) {
-        List<CatalogSeedRow> rows = catalogRows.stream().filter(row -> row.soldBy(ACME)).limit(count).toList();
-        if (rows.size() < count) {
-            throw new IllegalStateException("Need " + count + " catalog rows sold by " + ACME + ", found " + rows.size());
-        }
-        return rows;
+    private static Order placedHoursAgo(Order order, int hours) {
+        order.setOrderedAt(LocalDateTime.now().minusHours(hours));
+        return order;
     }
 
     private static Order dropshipOrder(String storeId, String name, String surname, String orderId, Shipment pickup) {
@@ -1321,13 +1319,6 @@ public class DemoStoreSeeder implements StoreSeeder {
         shipment.setCarrier(carrier);
         shipment.setCollectionPointCode(collectionPointCode);
         return shipment;
-    }
-
-    private static CatalogSeedRow acmeBExclusiveRow(List<CatalogSeedRow> catalogRows) {
-        return catalogRows.stream()
-                .filter(row -> row.soldBy(ACME_B) && !row.soldBy(ACME))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No catalog row sold only by " + ACME_B));
     }
 
     private static Order demoOrder(String storeId, String name, String surname, String orderId,
@@ -1366,7 +1357,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         return item;
     }
 
-    /** The catalog of a store seeded on registration: the categories of the feed, nothing added for the local screens. */
+    /** The catalog of a store seeded on registration: the categories of the seeded products, nothing added for the local screens. */
     static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId) {
         return buildCategoryDefinitions(rows, storeId, false);
     }
@@ -1382,7 +1373,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         for (String category : distinctCategories(rows)) {
             CategoryDefinition definition = new CategoryDefinition();
             definition.setCategoryId(CatalogSeed.categoryId(category, storeId));
-            definition.setName(category);
+            definition.setName(CATEGORY_NAMES.getOrDefault(category, category));
             definition.setCategory(category);
             definition.setType(CategoryDefinitionType.Managed);
             definition.setRequiredDuringOrder(false);
@@ -1439,7 +1430,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     private static List<String> distinctCategories(List<CatalogSeedRow> rows) {
-        return rows.stream().map(CatalogSeedRow::category).distinct().toList();
+        return rows.stream().filter(CatalogSeedRow::inCatalog).map(CatalogSeedRow::category).distinct().toList();
     }
 
     private static ShippingDetails customerShippingDetails(String name, String surname, String email) {

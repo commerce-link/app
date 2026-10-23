@@ -68,6 +68,27 @@ class NotificationOverviewTest {
     }
 
     @Test
+    void theSenderIsMissingWithoutAReplyToAddress() {
+        // given
+        Store store = storeWith(EmailNotificationType.ORDER_CONFIRMATION);
+        store.getClientNotificationsConfiguration().setSenderName("Sklep Demo");
+
+        // when / then
+        assertThat(overview(store, List.of(), defaultsForEveryType()).senderMissing()).isTrue();
+    }
+
+    @Test
+    void theSenderIsSetWithANameAndAReplyToAddress() {
+        // given
+        Store store = storeWith(EmailNotificationType.ORDER_CONFIRMATION);
+        store.getClientNotificationsConfiguration().setSenderName("Sklep Demo");
+        store.getClientNotificationsConfiguration().setReplyToEmail("kontakt@sklep-demo.pl");
+
+        // when / then
+        assertThat(overview(store, List.of(), defaultsForEveryType()).senderMissing()).isFalse();
+    }
+
+    @Test
     void warnsWhenCustomerAddressChangeIsOnButARequiredTypeIsOff() {
         // given
         Store store = storeWith(EmailNotificationType.CLIENT_VERIFICATION_CODE);

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The rest of the query for a menu or search form. The tab (kind) is never carried: narrowing lets the page pick
+       the tab that has results (spec §3.6). "skip" names the parameter the form itself submits (provider, search). */-->
+<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
+    <th:block th:if="${skip != 'provider'}"><input type="hidden" name="provider" th:each="p : ${q.providers()}" th:value="${p}"/></th:block>
+    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
+</th:block>
+
+<!--/* The toggle of a row: without JavaScript the button stays hidden and the plain count shows, and the detail row is
+       open; row-toggle.js shows the button, hides the count and closes the detail row. */-->
+<th:block th:fragment="toggle(row)">
+    <button type="button" class="cl-row-toggle" data-cl-row-toggle hidden aria-expanded="false"
+            th:attr="aria-controls=${row.detailId()},aria-label=#{deliveries.pending.items.toggle(${row.piecesText()}, ${row.label()})}">
+        <span th:text="${row.piecesText()}"></span><i class="fas fa-chevron-down cl-row-toggle-caret" aria-hidden="true"></i>
+    </button>
+    <span class="cl-row-toggle-fallback" data-cl-row-toggle-fallback th:text="${row.piecesText()}"></span>
+</th:block>
+
+<th:block th:fragment="due(row)">
+    <span class="cl-card-due"><span class="cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span></span>
+</th:block>
+
+<th:block th:fragment="action(row)">
+    <span class="cl-card-action">
+        <a class="cl-button is-primary" th:href="@{${row.createHref()}}" th:text="#{deliveries.preview.create}"
+           th:attr="aria-label=#{deliveries.pending.create.label(${row.label()})}"></a>
+    </span>
+</th:block>
+
+<!--/* The expanded row: one item table (the old "Items" + "Allocations"), sources only in the warehouse tab. */-->
+<tr th:fragment="detail(row, withSources)" class="cl-row-detail" th:id="${row.detailId()}">
+    <td colspan="6">
+        <div class="cl-row-detail-inner">
+            <p class="cl-row-detail-note" th:if="${row.forwardToCustomer()}">
+                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                <span th:text="#{deliveries.directToConsumer.viaWarehouse.notice}"></span>
+            </p>
+            <table class="cl-subtable">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{deliveries.pending.detail.product}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{deliveries.pending.detail.qty}"></th>
+                    <th scope="col" class="is-numeric cl-sub-unit" th:text="#{deliveries.pending.detail.unit}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{deliveries.pending.detail.value}"></th>
+                    <th scope="col" th:if="${withSources}" th:text="#{deliveries.pending.detail.sources}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${row.items()}">
+                    <td class="cl-sub-product"><th:block th:text="${item.name()}"></th:block><span class="cl-table-sub" th:text="${item.codes()}"></span></td>
+                    <td class="is-numeric cl-sub-qty" th:text="${item.qtyText()}"></td>
+                    <td class="is-numeric cl-sub-unit" th:text="${item.unitText()}"></td>
+                    <td class="is-numeric cl-sub-value" th:text="${item.valueText()}"></td>
+                    <td class="cl-sub-sources" th:if="${withSources}">
+                        <ul class="cl-ref-list" th:attr="aria-label=#{deliveries.pending.sources.label}">
+                            <li th:each="source : ${item.sources()}">
+                                <a th:if="${source.href() != null}" class="cl-ref" th:href="@{${source.href()}}"><i th:if="${source.warehouse()}" class="fas fa-warehouse" aria-hidden="true"></i><th:block th:text="${source.label()}"></th:block> <span class="cl-ref-qty" th:text="'×' + ${source.qty()}"></span></a>
+                                <span th:if="${source.href() == null}" class="cl-ref"><i th:if="${source.warehouse()}" class="fas fa-warehouse" aria-hidden="true"></i><th:block th:text="${source.label()}"></th:block> <span class="cl-ref-qty" th:text="'×' + ${source.qty()}"></span></span>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+                </tbody>
+                <tfoot>
+                <tr>
+                    <th scope="row" th:text="#{deliveries.pending.detail.total}"></th>
+                    <td class="is-numeric cl-sub-qty" th:text="${row.piecesText()}"></td>
+                    <td class="cl-sub-unit"></td>
+                    <td class="is-numeric cl-sub-value" th:text="${row.costText()}"></td>
+                    <td th:if="${withSources}"></td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    </td>
+</tr>
+
+</body>
+</html>

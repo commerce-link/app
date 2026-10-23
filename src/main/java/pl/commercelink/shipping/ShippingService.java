@@ -1,26 +1,26 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.orders.rma.InvalidReturnConfigurationException;
 import pl.commercelink.shipping.api.*;
-import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Store;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import pl.commercelink.stores.IntegrationType;
 
+@Slf4j
 @Service
 public class ShippingService {
 
@@ -29,6 +29,9 @@ public class ShippingService {
 
     @Autowired
     private CarrierDictionary carrierDictionary;
+
+    @Autowired
+    private ShippingProviders shippingProviders;
 
     /**
      * Whether the store can price and book a courier: a shipping provider is connected and its adapter is installed.
@@ -41,8 +44,19 @@ public class ShippingService {
                 && shippingProviderFactory.getDescriptor(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)) != null;
     }
 
+    /**
+     * Whether "Nadaj przesyłkę" can work for this order: the store's default integration is there, or the store ships
+     * orders placed on Allegro through Wysyłam z Allegro and this is one. Asks nobody: whether Allegro accepts the
+     * order's delivery method is said by the page itself (ShippingIntegrationChoice).
+     */
+    public boolean isAvailableFor(Store store, Order order) {
+        return isAvailable(store) || (store != null
+                && store.hasShippingIntegration(ShippingIntegrationChoice.ALLEGRO)
+                && ShippingIntegrationChoice.isAllegroOrder(order));
+    }
+
     public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
-        ShippingProvider shippingProvider = requireProvider(store);
+        ShippingProvider shippingProvider = providerFor(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -69,8 +83,53 @@ public class ShippingService {
         return shippingProvider.estimateShipment(request, carrierIds);
     }
 
-    public OperationResult<List<Shipment>> createShipping(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
-        ShippingProvider shippingProvider = requireProvider(store);
+    /** The store's provider, or ShippingUnavailableException when none is connected or its adapter is missing. */
+    public ShippingProvider providerFor(Store store) {
+        ShippingProvider shippingProvider = isAvailable(store) ? shippingProviderFactory.get(store) : null;
+        if (shippingProvider == null) {
+            throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
+        }
+        return shippingProvider;
+    }
+
+    /** The integration of a shipment or a pickup group, if the store still has it and its adapter is installed. */
+    public Optional<ShippingProvider> providerNamed(Store store, String provider) {
+        return shippingProviders.forName(store, provider);
+    }
+
+    /** The store's address a shipment leaves from, for the pickup calls; null when it leaves from the customer. */
+    public ShipmentAddress pickupAddress(Store store, String pickUpAddressId) {
+        if (store == null || pickUpAddressId == null) {
+            return null;
+        }
+        ShippingDetails details = store.getPickUpAddress(pickUpAddressId);
+        return details == null ? null : toShipmentAddress(details);
+    }
+
+    /**
+     * "Pobierz etykietę" can work for a package of this integration: the store still has it (a label lives on the
+     * account that created it) and its adapter hands out labels. Loads the account, so pages ask once per integration.
+     */
+    public boolean supportsLabels(Store store, String provider) {
+        if (store == null || provider == null) {
+            return false;
+        }
+        try {
+            return providerNamed(store, provider).map(ShippingProvider::supportsLabels).orElse(false);
+        } catch (RuntimeException e) {
+            // the link is left out, the page itself still shows; the label endpoint says why when asked directly
+            log.warn("Shipping provider {} of store {} could not be loaded to offer labels", provider, store.getStoreId(), e);
+            return false;
+        }
+    }
+
+    public String providerName(Store store) {
+        return store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    public ShipmentRequest buildRequest(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
+        // a store without a provider fails with the domain reason here, not on a missing address below
+        providerFor(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -81,7 +140,7 @@ public class ShippingService {
                     form.getCashOnDeliveryAmount(), bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
         }
 
-        ShipmentRequest request = ShipmentRequest.builder()
+        return ShipmentRequest.builder()
                 .pickup(toShipmentAddress(pickupAddress))
                 .sender(toShipmentAddress(senderAddress))
                 .receiver(toReceiverAddress(form.getShippingDetails(), deliveryTarget.pointCode()))
@@ -90,10 +149,67 @@ public class ShippingService {
                 .deliveryPoint(toDeliveryPoint(deliveryTarget.pointCode()))
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
-
-        return executeCreateShipment(request, shippingProvider);
     }
 
+    /**
+     * A Wysyłam z Allegro shipment of an order: the store's pickup and sender addresses, one parcel, cash on delivery
+     * (paid out by Allegro, so the store's default account is optional) and the order's reference. The adapter takes the recipient and the delivery
+     * method from Allegro's own proposal for the order (the buyer's masked e-mail), never from this request: the
+     * receiver here is only what the order knows.
+     */
+    public ShipmentRequest buildAllegroRequest(ShippingForm form, Store store, Order order) {
+        ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
+        ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
+        ShipmentOptions.CashOnDelivery cod = null;
+        if (form.isCashOnDelivery()) {
+            // Allegro pays the collected amount out to the seller's Allegro funds and the adapter sends no account,
+            // so a store without a bank account still ships cash on delivery
+            BankAccount bankAccount = store.getDefaultBankAccount();
+            cod = bankAccount == null
+                    ? new ShipmentOptions.CashOnDelivery(form.getCashOnDeliveryAmount(), null, null, null)
+                    : new ShipmentOptions.CashOnDelivery(form.getCashOnDeliveryAmount(),
+                            bankAccount.getIban(), bankAccount.getAccountHolder(), bankAccount.getSwiftCode());
+        }
+        return ShipmentRequest.builder()
+                .pickup(toShipmentAddress(pickupAddress))
+                .sender(toShipmentAddress(senderAddress))
+                .receiver(toShipmentAddress(order.getShippingDetails()))
+                .parcels(toParcels(form.getCompleteParcels()))
+                .options(new ShipmentOptions(false, false, cod))
+                .orderReference(orderReference(order))
+                .build();
+    }
+
+    /** The marketplace order a shipment is for (Allegro needs its checkout form); null for any other order. */
+    public static OrderReference orderReference(Order order) {
+        if (order == null || !order.isMarketplaceOrder()) {
+            return null;
+        }
+        return new OrderReference(order.getSource().getName(), order.getExternalOrderId(), order.getShortenedOrderId());
+    }
+
+    public static ShipmentRequest withOrderReference(ShipmentRequest request, OrderReference reference) {
+        if (reference == null) {
+            return request;
+        }
+        return new ShipmentRequest(request.pickup(), request.sender(), request.receiver(), request.parcels(),
+                request.carrierId(), request.options(), request.deliveryPoint(), reference);
+    }
+
+    /** A customer return: picked up at the customer's address, delivered to the store's default pickup address. */
+    public ShipmentRequest buildReturnRequest(ShippingDetails customerAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
+        providerFor(store);
+        ShippingDetails receiverAddress = store.getDefaultPickupAddress()
+                .orElseThrow(() -> new InvalidReturnConfigurationException(
+                        "Default receiver address not configured. Contact store administrator."));
+        return ShipmentRequest.builder()
+                .pickup(toShipmentAddress(customerAddress))
+                .receiver(toShipmentAddress(receiverAddress))
+                .parcels(toParcels(parcels))
+                .carrierId(carrier.id())
+                .options(new ShipmentOptions(false, true, null))
+                .build();
+    }
 
     public List<ParcelForm> retrieveParcelsListBasedOnPackageTemplate(double totalPrice, String packageTemplateId, Store store) {
         PackageTemplate packageTemplate = store.getPackageTemplate(packageTemplateId);
@@ -117,41 +233,6 @@ public class ShippingService {
         for (ParcelForm parcel : parcels) {
             parcel.setValue(perParcel);
         }
-    }
-
-    public OperationResult<List<Shipment>> createShipping(ShippingDetails pickupAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
-        ShippingProvider shippingProvider = requireProvider(store);
-        ShippingDetails receiverAddress = store.getDefaultPickupAddress()
-                .orElseThrow(() -> new InvalidReturnConfigurationException(
-                        "Default receiver address not configured. Contact store administrator."
-                ));
-
-        ShipmentRequest request = ShipmentRequest.builder()
-                .pickup(toShipmentAddress(pickupAddress))
-                .receiver(toShipmentAddress(receiverAddress))
-                .parcels(toParcels(parcels))
-                .carrierId(carrier.id())
-                .options(new ShipmentOptions(false, true, null))
-                .build();
-
-        return executeCreateShipment(request, shippingProvider);
-    }
-
-    private OperationResult<List<Shipment>> executeCreateShipment(ShipmentRequest request, ShippingProvider shippingProvider) {
-        try {
-            ShipmentResult result = shippingProvider.createShipment(request);
-            return OperationResult.success(toShipments(result));
-        } catch (ShippingException e) {
-            return OperationResult.failure(e.getMessage());
-        }
-    }
-
-    private ShippingProvider requireProvider(Store store) {
-        ShippingProvider shippingProvider = isAvailable(store) ? shippingProviderFactory.get(store) : null;
-        if (shippingProvider == null) {
-            throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
-        }
-        return shippingProvider;
     }
 
     static ShipmentAddress toReceiverAddress(ShippingDetails details, String pointCode) {
@@ -210,20 +291,6 @@ public class ShippingService {
     private static List<Parcel> toParcels(List<ParcelForm> parcels) {
         return parcels.stream()
                 .map(p -> new Parcel(p.getWidth(), p.getDepth(), p.getHeight(), p.getWeight(), p.getValue(), p.getDescription(), p.getType()))
-                .collect(Collectors.toList());
-    }
-
-    private static List<Shipment> toShipments(ShipmentResult result) {
-        return result.parcels().stream()
-                .map(parcel -> {
-                    Shipment shipment = new Shipment();
-                    shipment.setExternalId(result.externalId());
-                    shipment.setTrackingNo(parcel.trackingNo());
-                    shipment.setCarrier(parcel.carrier());
-                    shipment.setTrackingUrl(parcel.trackingUrl());
-                    shipment.setShippedAt(LocalDateTime.now());
-                    return shipment;
-                })
                 .collect(Collectors.toList());
     }
 }

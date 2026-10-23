@@ -19,7 +19,16 @@ public record OrdersPageModel(
         Map<OrderListQuery.Sort, SortHeader> sortHeaders,
         List<OrderRow> rows,
         Pagination pagination,
-        EmptyState emptyState) {
+        EmptyState emptyState,
+        PickupAction pickup) {
+
+    /**
+     * "Zamów odbiór" in the page header: the pickup page with the way back to this list, and how many packages wait for
+     * a courier (null when none waits or the number could not be read). Null on the results fragment, which does not
+     * carry the header.
+     */
+    public record PickupAction(String href, Integer waiting) {
+    }
 
     /**
      * A figure above the list: label, number of the whole store's open orders, one short hint (the Asortyment cl-stat,
@@ -46,6 +55,11 @@ public record OrdersPageModel(
     public record SortHeader(String href, String ariaSort) {
     }
 
-    public record EmptyState(String text, String actionLabel, String actionHref) {
+    /** archiveHref: the same search in the orders archive, offered when an open-orders search finds nothing. */
+    public record EmptyState(String text, String actionLabel, String actionHref, String archiveLabel, String archiveHref) {
+
+        public EmptyState(String text, String actionLabel, String actionHref) {
+            this(text, actionLabel, actionHref, null, null);
+        }
     }
 }

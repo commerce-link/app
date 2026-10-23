@@ -10,50 +10,107 @@
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
             <div class="cl-stack">
-                <!--/* Courier account: read-only here, chosen and filled in on its own page (as the invoicing system). */-->
-                <section class="cl-card is-status" id="shipping-account" aria-labelledby="shipping-account-title"
-                         th:with="ok=${account.configured() and !webhookTokenMissing}">
+                <!--/* Shipping integrations: the courier account (the default) and Wysyłam z Allegro, each edited on its
+                       own page. Nothing here asks a provider: the rows show what the store has saved. */-->
+                <section class="cl-card" id="shipping-integrations" aria-labelledby="shipping-integrations-title">
                     <div class="cl-card-head">
-                        <h2 class="cl-card-title" id="shipping-account-title">
-                            <i class="fas" th:classappend="${ok} ? 'fa-check-circle is-ok' : 'fa-exclamation-triangle is-warn'"
-                               aria-hidden="true"></i>
-                            <span th:if="${ok}" th:text="#{store.shipping.account.status.ok(${account.displayName()})}"></span>
-                            <span th:if="${account.configured() and webhookTokenMissing}"
-                                  th:text="#{store.shipping.account.status.unverified(${account.displayName()})}"></span>
-                            <span th:unless="${account.chosen()}" th:text="#{store.shipping.account.none.title}"></span>
-                            <span th:if="${account.chosen() and !account.installed()}"
-                                  th:text="#{store.shipping.account.missing.title(${account.providerName()})}"></span>
-                            <span th:if="${account.installed() and !account.configured()}"
-                                  th:text="#{store.shipping.account.status.incomplete(${account.displayName()})}"></span>
-                        </h2>
-                        <div class="cl-list-actions">
-                            <a class="cl-link-button" th:href="@{${accountHref}}"
-                               th:text="${!account.chosen()} ? #{store.shipping.account.connect}
-                                        : (${account.installed() and !account.configured()} ? #{store.shipping.account.complete} : #{store.shipping.account.change})"></a>
-                            <a th:if="${account.chosen()}" class="cl-link-button is-danger" th:href="@{${disconnectHref}}"
-                               data-cl-confirm th:text="#{store.shipping.account.disconnect}"
-                               th:attr="data-cl-confirm-title=#{store.shipping.account.disconnect.title(${account.displayName()})},
-                                        data-cl-confirm-message=#{store.shipping.account.disconnect.message},
-                                        data-cl-confirm-action=#{store.shipping.account.disconnect.action}"></a>
-                        </div>
+                        <h2 class="cl-card-title" id="shipping-integrations-title" th:text="#{settings.shipping.integrations.title}"></h2>
+                        <a th:unless="${account.chosen()}" class="cl-button" th:href="@{${accountHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.shipping.account.connect}"></span>
+                        </a>
                     </div>
-                    <p class="cl-card-desc" th:classappend="${account.configured() and webhookTokenMissing} ? 'is-warn'"
-                       th:text="${ok} ? #{store.shipping.account.status.ok.text(${account.displayName()})}
-                                : (${account.configured()} ? #{store.shipping.account.status.unverified.text}
-                                : (${!account.chosen()} ? #{store.shipping.account.none.text}
-                                : (${!account.installed()} ? #{store.shipping.account.missing.text} : #{store.shipping.account.incomplete.text})))"></p>
+                    <p class="cl-card-desc" th:text="#{settings.shipping.integrations.description}"></p>
+                    <div th:if="${!account.chosen() and !allegroShipping.enabled()}" class="cl-alert is-warn" role="status">
+                        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                        <span th:text="#{settings.shipping.integrations.none}"></span>
+                    </div>
+                    <ul th:if="${account.chosen() or allegroShipping.installed()}" class="cl-list"
+                        aria-labelledby="shipping-integrations-title">
+                        <li th:if="${account.chosen()}" class="cl-list-item"
+                            th:with="name=${account.installed()} ? ${account.displayName()} : ${account.providerName()}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${name}"></span>
+                                    <span class="cl-status is-info" th:text="#{settings.shipping.integrations.default}"></span>
+                                    <span th:if="${account.installed() and !account.configured()}" class="cl-status is-warn"
+                                          th:text="#{settings.list.incomplete}"></span>
+                                    <span th:unless="${account.installed()}" class="cl-status is-warn"
+                                          th:text="#{settings.shipping.integrations.unavailable}"></span>
+                                </div>
+                                <p class="cl-list-desc"
+                                   th:text="${allegroShipping.enabled()} ? #{settings.shipping.integrations.default.scope}
+                                            : #{settings.shipping.integrations.default.scope.only}"></p>
+                                <p th:if="${account.configured() and webhookTokenMissing}" class="cl-list-desc is-warn"
+                                   th:text="#{store.shipping.account.status.unverified(${name})}"></p>
+                                <p th:if="${account.installed() and !account.configured()}" class="cl-list-desc is-warn"
+                                   th:text="#{store.shipping.account.incomplete.text}"></p>
+                                <p th:unless="${account.installed()}" class="cl-list-desc is-warn"
+                                   th:text="#{store.shipping.account.missing.text}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a th:if="${account.installed()}" class="cl-link-button" th:href="@{${accountHref}}"
+                                   th:text="${account.configured()} ? #{settings.list.edit} : #{settings.list.complete}"
+                                   th:attr="aria-label=${account.configured()} ? #{settings.list.edit.for(${name})} : #{settings.list.complete.for(${name})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${disconnectHref}}" data-cl-confirm
+                                   th:text="#{store.shipping.account.disconnect}"
+                                   th:attr="aria-label=#{store.shipping.account.disconnect} + ': ' + ${name},
+                                            data-cl-confirm-title=#{store.shipping.account.disconnect.title(${name})},
+                                            data-cl-confirm-message=#{store.shipping.account.disconnect.message},
+                                            data-cl-confirm-action=#{store.shipping.account.disconnect.action}"></a>
+                            </div>
+                        </li>
+                        <li th:if="${allegroShipping.installed()}" class="cl-list-item">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="#{shipping.allegro.name}"></span>
+                                    <span th:if="${allegroShipping.enabled()}" class="cl-status is-neutral"
+                                          th:text="#{settings.shipping.integrations.allegro.badge}"></span>
+                                </div>
+                                <th:block th:if="${allegroShipping.enabled()}">
+                                    <p class="cl-list-desc" th:text="#{settings.shipping.integrations.allegro.scope}"></p>
+                                    <p class="cl-list-desc"
+                                       th:text="#{settings.shipping.integrations.allegro.details(#{${allegroShipping.labelFormat().messageKey()}})}"></p>
+                                </th:block>
+                                <p th:if="${!allegroShipping.enabled() and allegroShipping.marketplaceConnected()}" class="cl-list-desc"
+                                   th:text="#{settings.shipping.integrations.allegro.off}"></p>
+                                <p th:if="${!allegroShipping.enabled() and !allegroShipping.marketplaceConnected()}" class="cl-list-desc"
+                                   th:text="#{settings.shipping.integrations.allegro.noMarketplace}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a th:if="${allegroShipping.enabled()}" class="cl-link-button" th:href="@{${allegroHref}}"
+                                   th:text="#{settings.list.edit}"
+                                   th:attr="aria-label=#{settings.list.edit.for(#{shipping.allegro.name})}"></a>
+                                <a th:if="${allegroShipping.enabled()}" class="cl-link-button is-danger"
+                                   th:href="@{${allegroDisconnectHref}}" data-cl-confirm th:text="#{shipping.allegro.disconnect}"
+                                   th:attr="aria-label=#{shipping.allegro.disconnect.for},
+                                            data-cl-confirm-title=#{shipping.allegro.disconnect.title},
+                                            data-cl-confirm-message=#{shipping.allegro.disconnect.message},
+                                            data-cl-confirm-action=#{shipping.allegro.disconnect.action}"></a>
+                                <a th:unless="${allegroShipping.enabled()}" class="cl-link-button" th:href="@{${allegroHref}}"
+                                   th:text="#{settings.shipping.integrations.allegro.enable}"
+                                   th:attr="aria-label=#{settings.shipping.integrations.allegro.enable.for}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                    <p th:if="${account.chosen() and account.installed() and allegroShipping.enabled()}" class="cl-card-desc"
+                       th:text="#{settings.shipping.integrations.rule(${account.displayName()})}"></p>
                 </section>
 
                 <section class="cl-card" id="shipping-carriers" aria-labelledby="shipping-carriers-title">
                     <div class="cl-card-head">
-                        <h2 class="cl-card-title" id="shipping-carriers-title" th:text="#{store.shipping.carriers.title}"></h2>
+                        <h2 class="cl-card-title" id="shipping-carriers-title"
+                            th:text="${account.installed()} ? #{store.shipping.carriers.title.of(${account.displayName()})} : #{store.shipping.carriers.title}"></h2>
                         <!--/* One setting, like the label sender: a text action; "+ Add" buttons belong to list cards. */-->
                         <div th:if="${account.configured()}" class="cl-list-actions">
                             <a class="cl-link-button" th:href="@{${carriersHref}}" th:text="#{store.shipping.carriers.choose}"
                                th:attr="aria-label=#{store.shipping.carriers.change.label}"></a>
                         </div>
                     </div>
-                    <p class="cl-card-desc" th:text="#{store.shipping.carriers.description}"></p>
+                    <p class="cl-card-desc">
+                        <span th:text="#{store.shipping.carriers.description}"></span>
+                        <span th:if="${allegroShipping.enabled()}" th:text="#{store.shipping.carriers.allegro.note}"></span>
+                    </p>
                     <p th:unless="${carriers.isEmpty()}" class="cl-card-body" th:text="${#strings.listJoin(carriers, ' · ')}"></p>
                     <p th:if="${carriers.isEmpty() and account.configured()}" class="cl-list-empty"
                        th:text="#{store.shipping.carriers.empty(${account.displayName()})}"></p>

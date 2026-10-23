@@ -5,8 +5,6 @@ import pl.commercelink.inventory.supplier.SupplierChoice;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,15 +20,14 @@ class SupplierLabelTemplatesTest {
         // when / then
         // the list resolves the label once per row in DeliveryRowMapper, so the template never sees an identity
         assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
-        assertThat(template("deliveriesPreview.html")).contains("supplierLabels.of(candidate.provider)")
-                .contains("supplierLabels.of(delivery.provider)");
-        assertThat(template("deliveryApproval.html")).contains("supplierLabels.of(delivery.provider)");
-        assertThat(template("deliveryDetails.html")).contains("supplierLabels.of(delivery.provider)");
-        assertThat(template("deliveryCreate.html")).contains("supplierLabels.of(form.provider)");
-        assertThat(template("deliveryPurchaseConfirmation.html")).contains("supplierLabels.of(form.provider)");
-        assertThat(template("dropshipCreate.html")).contains("supplierLabels.of(form.provider)");
-        assertThat(template("dropshipConfirmation.html")).contains("supplierLabels.of(form.provider)");
-        assertThat(template("payments.html")).contains("supplierLabels.of(delivery.provider)");
+        assertThat(template("deliveries/pending.html")).contains("row.providerLabel()").doesNotContain("row.provider()");
+        assertThat(template("deliveries/approval.html")).contains("page.supplierLabel()");
+        // the controller takes the name from SupplierLabels, the details page prints the model's value
+        assertThat(Files.readString(Path.of("src/main/java/pl/commercelink/web/DeliveriesController.java")))
+                .contains("supplierLabels.forStoreId(storeId).of(delivery.getProvider())");
+        assertThat(template("deliveries/details/header.html")).contains("h.supplierName()").doesNotContain("delivery.provider");
+        // the controller takes the name from SupplierLabels (DeliveryCreateControllerTest), the pages only print it
+        assertThat(template("deliveries/create/parts.html")).contains("page.supplierName()");
         // the inventory page resolves the label once per offer in InventorySearch (OfferRow#supplierLabel),
         // because a global search spans stores and has no single label map to read in the template
         assertThat(template("fragments/inventory-results.html")).contains("offer.supplierLabel()")
@@ -38,32 +35,32 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void fulfilmentCardsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
+    void fulfilmentRowsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
         // when
         String html = template("fulfilment.html");
 
-        // then
-        assertThat(html).contains("th:data-provider=\"${entry.source.provider}\"");
-        assertThat(html).contains("supplierLabels.of(entry.source.provider)");
+        // then -- the label is resolved once per offer in FulfilmentSelectPageFactory (names.of(provider))
+        assertThat(html).contains("th:data-provider=\"${e.source.provider}\"").contains("th:data-provider-label=\"${o.label()}\"");
+        assertThat(Files.readString(Path.of("src/main/java/pl/commercelink/web/fulfilment/FulfilmentSelectPageFactory.java")))
+                .contains("names.of(provider)");
+        assertThat(html).doesNotContain("<script th:inline").doesNotContain("innerHTML");
     }
 
     @Test
     void orderAndRmaFiltersUseSelectsOfConnections() throws Exception {
         // when / then
-        assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
+        assertThat(template("fragments/supplier-choice.html")).contains(": 'supplier'")
                 .contains("th:each=\"option : ${options}\"")
                 // "other supplier" reveals a text field for a supplier that is not connected to the store;
                 // the option value is a literal (Thymeleaf 3.1 forbids T() here), so keep it in sync with the constant
                 .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("data-cl-custom-option=\"" + SupplierChoice.CUSTOM + "\"")
                 .contains("name=\"customSupplier\"")
                 .contains("order.item.supplier.custom.hint");
         // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall
         // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
         assertThat(template("rma-center-form.html")).contains("${providerOptions}");
         assertThat(template("rma-centers.html")).doesNotContain("${center.provider}").contains("center.title()");
-        assertThat(template("warehouse.html"))
-                .contains("fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)");
     }
 
     @Test
@@ -76,71 +73,13 @@ class SupplierLabelTemplatesTest {
                 .doesNotContain("${row.provider");
     }
 
-    /**
-     * Connection labels and product names are operator-supplied free text, and the fulfilment
-     * screen builds several chips and rows as HTML strings assigned to innerHTML. Every such
-     * interpolation has to go through esc(); this walks each innerHTML statement in the file and
-     * fails on a raw one, so a future edit that drops the escape is caught here rather than in a
-     * penetration test.
-     */
     @Test
-    void fulfilmentEscapesEveryLabelOrNameItWritesThroughInnerHtml() throws Exception {
-        // given
-        String html = template("fulfilment.html");
-
-        // when
-        List<String> statements = innerHtmlStatements(html);
+    void theSelectionScriptWritesTextNeverHtml() throws Exception {
+        // when -- connection labels, product names and categories are operator data (spec B3)
+        String js = Files.readString(Path.of("src/main/resources/static/js/fulfilment-select.js"));
 
         // then
-        assertThat(statements).isNotEmpty();
-        for (String statement : statements) {
-            for (String token : LABEL_TOKENS) {
-                int from = 0;
-                int at;
-                while ((at = statement.indexOf(token, from)) >= 0) {
-                    assertThat(wrappedInEsc(statement, at))
-                            .as("unescaped %s in: %s", token, statement)
-                            .isTrue();
-                    from = at + token.length();
-                }
-            }
-        }
-    }
-
-    @Test
-    void theVariantChipEscapesTheLabelItRenders() throws Exception {
-        // when / then -- the chip is an HTML string that ends up inside a variant's innerHTML
-        assertThat(template("fulfilment.html")).contains("const label = esc(providerLabels()[p] || p);");
-    }
-
-    /** Tokens that carry operator-supplied text into the fulfilment screen's HTML string builds. */
-    private static final List<String> LABEL_TOKENS = List.of("labels[", "providerLabel", "winnerProv", "dataset.name");
-
-    /** Whether the operand the token at this position belongs to is the argument of an esc(...) call. */
-    private boolean wrappedInEsc(String statement, int tokenAt) {
-        int start = tokenAt;
-        while (start > 0 && (Character.isLetterOrDigit(statement.charAt(start - 1)) || ".[]_$".indexOf(statement.charAt(start - 1)) >= 0)) {
-            start--;
-        }
-        return start >= 4 && statement.startsWith("esc(", start - 4);
-    }
-
-    /** Every `x.innerHTML = ...;` statement of the template, folded onto one line. */
-    private List<String> innerHtmlStatements(String html) {
-        List<String> statements = new ArrayList<>();
-        String[] lines = html.replace("\r\n", "\n").split("\n");
-        for (int i = 0; i < lines.length; i++) {
-            if (!lines[i].contains("innerHTML")) {
-                continue;
-            }
-            StringBuilder statement = new StringBuilder(lines[i].trim());
-            int end = i;
-            while (!lines[end].trim().endsWith(";") && end + 1 < lines.length) {
-                end++;
-                statement.append(' ').append(lines[end].trim());
-            }
-            statements.add(statement.toString());
-        }
-        return statements;
+        assertThat(js).doesNotContain("innerHTML").doesNotContain("insertAdjacentHTML").doesNotContain("outerHTML")
+                .contains("textContent");
     }
 }

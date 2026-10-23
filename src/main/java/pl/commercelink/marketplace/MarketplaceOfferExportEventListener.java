@@ -2,6 +2,7 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.LinkedList;
@@ -24,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
@@ -36,6 +39,7 @@ public class MarketplaceOfferExportEventListener {
     private final Inventory inventory;
     private final MarketplaceProviderFactory providerFactory;
     private final MarketplaceExportRunService marketplaceExportRunService;
+    private final StoreActivity storeActivity;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -48,6 +52,12 @@ public class MarketplaceOfferExportEventListener {
     )
     public void handleMessage(MarketplaceOfferExportRequest payload) {
         Store store = storesRepository.findById(payload.getStoreId());
+        // an export reaching an inactive store would put back the offers its deactivation withdrew
+        if (!storeActivity.isActive(store)) {
+            log.warn("Marketplace {} offer export skipped for store {}: the store is inactive",
+                    payload.getMarketplace(), payload.getStoreId());
+            return;
+        }
         if (!store.hasActiveMarketplaceIntegration(payload.getMarketplace())) {
             return;
         }
@@ -156,11 +166,13 @@ public class MarketplaceOfferExportEventListener {
         }
 
         List<MarketplaceOfferSnapshot> previousSnapshots = loadPreviousSnapshot(store, catalog, marketplace);
-        List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, pimIdsOf(currentOffers));
+        Set<String> currentPimIds = pimIdsOf(currentOffers);
+        List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, currentPimIds);
+        List<MarketplaceOfferSnapshot> abandonedRemovals = abandonedRemovals(previousSnapshots, currentPimIds);
         List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
         boolean providerCalled = !currentOffers.isEmpty() || !pendingRemovals.isEmpty();
-        run.offers(buildNextSnapshot(retryableOrphans, currentOffers));
+        run.offers(buildNextSnapshot(retryableOrphans, abandonedRemovals, currentOffers));
 
         try {
             if (providerCalled) {
@@ -189,27 +201,52 @@ public class MarketplaceOfferExportEventListener {
 
     private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
         return previousSnapshots.stream()
-                .filter(snapshot -> !currentPimIds.contains(snapshot.pimId()))
+                .filter(snapshot -> isOrphan(snapshot, currentPimIds))
                 .filter(snapshot -> snapshot.removalAttempts() < removalRetryCount)
                 .toList();
     }
 
+    // Only a removal the marketplace refused on its last attempt is an alert: a removal it accepted is simply done.
+    private List<MarketplaceOfferSnapshot> abandonedRemovals(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
+        List<MarketplaceOfferSnapshot> abandoned = previousSnapshots.stream()
+                .filter(snapshot -> isOrphan(snapshot, currentPimIds))
+                .filter(snapshot -> snapshot.removalAttempts() > 0 && snapshot.removalAttempts() >= removalRetryCount)
+                .filter(snapshot -> MarketplaceOfferSnapshot.OUTCOME_REJECTED.equals(snapshot.outcome()))
+                .toList();
+        abandoned.forEach(snapshot -> log.error(
+                "Marketplace offer {} (EAN {}) could not be taken off after {} attempts and stays on the marketplace: {} {}",
+                snapshot.pimId(), snapshot.ean(), snapshot.removalAttempts(), snapshot.reasonCode(), snapshot.message()));
+        return abandoned;
+    }
+
+    private boolean isOrphan(MarketplaceOfferSnapshot snapshot, Set<String> currentPimIds) {
+        return !currentPimIds.contains(snapshot.pimId())
+                && !MarketplaceOfferSnapshot.OUTCOME_REMOVAL_FAILED.equals(snapshot.outcome());
+    }
+
+    // The marketplace matches an offer by its EAN, so the one it was published with has to be sent again to take it off.
     private List<MarketplaceOffer> toUnpublishOffers(List<MarketplaceOfferSnapshot> orphans) {
         return orphans.stream()
                 .map(snapshot -> new MarketplaceOffer(
-                        snapshot.pimId(), null, null, null, null, null,
+                        snapshot.pimId(), snapshot.ean(), snapshot.manufacturerCode(), null, null, null,
                         snapshot.price(), 0L, 0))
                 .toList();
     }
 
     private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans,
+                                                             List<MarketplaceOfferSnapshot> abandonedRemovals,
                                                              List<MarketplaceOffer> currentOffers) {
         Stream<MarketplaceOfferSnapshot> incrementedOrphans = retryableOrphans.stream()
                 .map(snapshot -> MarketplaceOfferSnapshot.removalPending(
-                        snapshot.pimId(), snapshot.price(), snapshot.removalAttempts() + 1));
+                        snapshot.pimId(), snapshot.price(), snapshot.removalAttempts() + 1,
+                        snapshot.ean(), snapshot.manufacturerCode()));
+        Stream<MarketplaceOfferSnapshot> failedRemovals = abandonedRemovals.stream()
+                .map(snapshot -> MarketplaceOfferSnapshot.removalFailed(
+                        snapshot.pimId(), snapshot.price(), snapshot.removalAttempts(),
+                        snapshot.reasonCode(), snapshot.message(), snapshot.ean(), snapshot.manufacturerCode()));
         Stream<MarketplaceOfferSnapshot> currentAsActive = currentOffers.stream()
                 .map(offer -> MarketplaceOfferSnapshot.published(
-                        offer.productId(), offer.price(), offer.quantity()));
-        return Stream.concat(incrementedOrphans, currentAsActive).toList();
+                        offer.productId(), offer.price(), offer.quantity(), offer.ean(), offer.manufacturerCode()));
+        return Stream.of(incrementedOrphans, failedRemovals, currentAsActive).flatMap(stream -> stream).toList();
     }
 }

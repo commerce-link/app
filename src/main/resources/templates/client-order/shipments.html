@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Dispatched parcels only (the page shows no card before the first one): carrier, the number to copy, the dates and
+       the carrier's tracking page, which opens in a new tab and says so. */-->
+<section th:fragment="shipments" class="cl-card" aria-labelledby="order-shipments-title">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-shipments-title"
+            th:text="${#lists.size(view.shipmentRows) == 1} ? #{client.order.shipment.title} : #{client.order.shipments.count(${#lists.size(view.shipmentRows)})}"></h2>
+    </div>
+    <ul class="cl-list">
+        <li th:each="row : ${view.shipmentRows}" class="cl-list-item has-icon">
+            <div>
+                <span class="cl-list-icon" aria-hidden="true"><i th:class="${row.deliveredAt() != null} ? 'fas fa-check' : 'fas fa-truck'"></i></span>
+                <div>
+                    <p class="cl-list-title"><th:block th:text="${row.carrier() != null} ? ${row.carrier()} : #{client.order.shipment.title}"></th:block>
+                        <span th:if="${row.deliveredAt() != null}" class="cl-status is-ok" th:text="#{client.order.shipment.delivered}"></span></p>
+                    <p th:if="${row.trackingNo() != null}" class="cl-list-desc"><th:block
+                            th:text="#{client.order.shipment.number(${row.trackingNo()})}"></th:block>&#8288;<button type="button"
+                            class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                            th:attr="data-cl-copy=${row.trackingNo()}, aria-label=#{client.order.shipment.copyNumber}"><span
+                            class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></p>
+                    <p th:if="${row.shippedAt() != null or row.deliveredAt() != null}" class="cl-list-desc"><th:block
+                            th:if="${row.shippedAt() != null}"
+                            th:text="#{client.order.shipment.shippedAt(${#temporals.format(row.shippedAt(), 'd MMM, HH:mm')})}"></th:block><span
+                            th:if="${row.shippedAt() != null and row.deliveredAt() != null}" class="cl-sep" aria-hidden="true">·</span><th:block
+                            th:if="${row.deliveredAt() != null}"
+                            th:text="#{client.order.shipment.deliveredAt(${#temporals.format(row.deliveredAt(), 'd MMM, HH:mm')})}"></th:block></p>
+                </div>
+            </div>
+            <div th:if="${row.trackingUrl() != null}" class="cl-list-actions">
+                <a class="cl-button" th:href="${row.trackingUrl()}" target="_blank" rel="noopener"><th:block
+                        th:text="#{client.order.shipment.track}"></th:block><i class="fas fa-external-link-alt cl-ext" aria-hidden="true"></i>
+                    <span class="cl-visually-hidden" th:text="' ' + #{client.order.shipment.track.newTab}"></span></a>
+            </div>
+        </li>
+    </ul>
+</section>
+
+</body>
+</html>

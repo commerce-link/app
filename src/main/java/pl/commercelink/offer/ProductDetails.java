@@ -4,20 +4,20 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.*;
-import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimView;
 
 import java.util.Optional;
 
 public class ProductDetails {
 
-    private final PimCatalog pimCatalog;
+    private final PimView pim;
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final InventoryView inventory;
 
-    public ProductDetails(PimCatalog pimCatalog, ProductCatalogRepository productCatalogRepository, ProductRepository productRepository, InventoryView inventory) {
-        this.pimCatalog = pimCatalog;
+    public ProductDetails(PimView pim, ProductCatalogRepository productCatalogRepository, ProductRepository productRepository, InventoryView inventory) {
+        this.pim = pim;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.inventory = inventory;
@@ -42,7 +42,7 @@ public class ProductDetails {
     }
 
     private ProductDetailsView createProductDetailsFromRecommendation(CategoryDefinition categoryDefinition, String pimId) {
-        Optional<PimEntry> pimEntry = pimCatalog.findByPimId(pimId);
+        Optional<PimEntry> pimEntry = pim.findByPimId(pimId);
         if (pimEntry.isEmpty()) {
             return null;
         }

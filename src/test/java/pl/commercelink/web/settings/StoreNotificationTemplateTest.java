@@ -36,7 +36,7 @@ class StoreNotificationTemplateTest {
         variables.put("form", form);
         variables.put("errors", errors);
         variables.put("formAction", "/dashboard/store/notification");
-        variables.put("senderPreviewName", "Sklep Demo");
+        variables.put("senderPreviewName", form.getSenderName());
         variables.put("senderEmail", "noreply@commercelink.pl");
         variables.put("templatesHref", "/dashboard/store/email-templates");
         variables.put("fulfilmentHref", "/dashboard/store/fulfilment");
@@ -54,7 +54,7 @@ class StoreNotificationTemplateTest {
     }
 
     @Test
-    void showsTheSenderFieldsAsOptionalWithWhatTheCustomerSees() {
+    void showsTheSenderFieldsAsRequiredWithWhatTheCustomerSees() {
         // given
         Store store = store();
 
@@ -70,8 +70,28 @@ class StoreNotificationTemplateTest {
         // The reply-to address is the store's, not the signed-in admin's, so the browser must not offer the latter.
         assertThat(html).contains("type=\"email\"").contains("inputmode=\"email\"").doesNotContain("autocomplete=\"email\"");
         assertThat(html).contains("aria-describedby=\"senderName-help\"");
-        assertThat(html.split("class=\"cl-optional\"", -1)).hasSize(3);
+        assertThat(html).doesNotContain("class=\"cl-optional\"");
+        assertThat(html.split("required=\"required\"", -1)).hasSize(3);
+        assertThat(html).doesNotContain("Wiadomości do klientów są wstrzymane");
         assertThat(html).doesNotContain("??").doesNotContain("store.storeId").doesNotContain("type=\"checkbox\"");
+    }
+
+    @Test
+    void warnsThatNothingIsSentUntilTheSenderIsSet() {
+        // given
+        Store store = store();
+        store.getClientNotificationsConfiguration().setReplyToEmail(null);
+        store.getClientNotificationsConfiguration().setSenderName(null);
+
+        // when
+        String html = SettingsTemplateRenderer.render("<div th:replace=\"~{store-notification :: senderForm}\"></div>",
+                page(store, NotificationSenderForm.from(store), Map.of()));
+
+        // then
+        assertThat(html).contains("cl-alert is-warn").contains("Wiadomości do klientów są wstrzymane")
+                .contains("Bez nazwy nadawcy i adresu do odpowiedzi żaden e-mail nie zostanie wysłany.");
+        assertThat(html).contains("Nazwa widoczna dla klienta przed adresem noreply@commercelink.pl, np. nazwa sklepu.")
+                .doesNotContain("Klient zobaczy nadawcę");
     }
 
     @Test

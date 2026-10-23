@@ -19,9 +19,18 @@ class NavigationModelTest {
         NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders");
 
         // then
-        assertThat(itemKeys(model)).contains("offers", "orders", "clients", "fulfilment", "deliveries", "rma",
-                "warehouse", "warehouseDocuments", "catalogs", "inventory", "payments", "reports");
+        assertThat(itemKeys(model)).contains("offers", "orders", "fulfilment", "deliveries", "rma",
+                "warehouse", "warehouseDocuments", "catalogs", "inventory", "inventoryPrices", "payments", "reports");
         assertThat(model.footer()).extracting(NavItem::key).containsExactly("settings");
+    }
+
+    @Test
+    void salesGroupHasNoClientsPage() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders");
+
+        // then
+        assertThat(itemKeys(model)).doesNotContain("clients");
     }
 
     @Test
@@ -41,7 +50,7 @@ class NavigationModelTest {
 
         // then
         assertThat(itemKeys(model)).containsExactly("fulfilmentQueue", "deliveriesQueue", "inventory",
-                "stores", "rmaCenters");
+                "inventoryPrices", "stores", "rmaCenters");
         assertThat(itemKeys(model)).doesNotContain("offers", "orders");
     }
 
@@ -103,5 +112,94 @@ class NavigationModelTest {
         assertThat(model.active()).isNull();
         assertThat(model.activeSectionMessageKey()).isNull();
         assertThat(model.activeMessageKey()).isNull();
+    }
+
+    @Test
+    void marksItemHistoryActiveUnderFulfilment() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/item/history");
+
+        // then
+        assertThat(model.activeMessageKey()).isEqualTo("nav.item.history");
+        assertThat(model.activeSectionMessageKey()).isEqualTo("nav.group.fulfilment");
+    }
+
+    @Test
+    void hidesItemHistoryFromTheSuperAdmin() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.SUPER_ADMIN, "/dashboard/item/history");
+
+        // then
+        assertThat(model.activeMessageKey()).isNull();
+    }
+
+    @Test
+    void priceComparisonFollowsTheSupplierAssortmentForEveryRoleThatSeesIt() {
+        for (UserRole role : List.of(UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN)) {
+            // when
+            NavigationModel model = NavigationModel.forRoleAndPath(role, "/dashboard/orders");
+
+            // then
+            List<String> keys = itemKeys(model);
+            assertThat(keys.indexOf("inventoryPrices")).as(role.name()).isEqualTo(keys.indexOf("inventory") + 1);
+        }
+    }
+
+    @Test
+    void priceComparisonPathLightsUpOnlyThePriceComparison() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/inventory/prices");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("inventoryPrices");
+        assertThat(model.activeMessageKey()).isEqualTo("nav.inventory.prices");
+        assertThat(model.activeSectionMessageKey()).isEqualTo("nav.group.catalog");
+    }
+
+    @Test
+    void inventoryPathAndItsFragmentsLightUpTheSupplierAssortment() {
+        // when
+        NavigationModel page = NavigationModel.forRoleAndPath(UserRole.USER, "/dashboard/inventory");
+        NavigationModel fragment = NavigationModel.forRoleAndPath(UserRole.USER, "/dashboard/inventory/browse");
+
+        // then
+        assertThat(page.active().key()).isEqualTo("inventory");
+        assertThat(fragment.active().key()).isEqualTo("inventory");
+    }
+
+    @Test
+    void theSupplierSelectionPageBelongsToFulfilment() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders/fulfilment/commitAndContinue");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("fulfilment");
+    }
+
+    @Test
+    void theSuperAdminsSupplierSelectionPageBelongsToTheFulfilmentQueue() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.SUPER_ADMIN, "/dashboard/store/uma2dqukxr/orders/fulfilment");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("fulfilmentQueue");
+    }
+
+    @Test
+    void theOrdersListStillLightsUpOrders() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/orders/abc-123");
+
+        // then
+        assertThat(model.active().key()).isEqualTo("orders");
+    }
+
+    @Test
+    void anOfferPageKeepsTheOffersListActive() {
+        // when
+        NavigationModel model = NavigationModel.forRoleAndPath(UserRole.ADMIN, "/dashboard/offer/0e000001-0000-4000-8000-000000000001");
+
+        // then
+        assertThat(model.active()).extracting(NavItem::key).isEqualTo("offers");
     }
 }

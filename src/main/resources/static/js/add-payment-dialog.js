@@ -1,5 +1,6 @@
-// The "register payment" dialog (fragments/add-payment-modal.html) on the order details, Payments and Deliveries.
-// Those pages call the public functions below from their buttons; the order page opens it with data-cl-dialog-open
+// The "register payment" dialog (fragments/add-payment-modal.html) on the order details, Payments and the delivery
+// details. Payments opens it from a[data-cl-payment-open] links (delegated click below); the order and delivery details
+// open it with data-cl-dialog-open
 // (dialog.js fires cl:dialog-open). The mode picks the fee checkboxes: "order" (autofill the difference, the amount
 // includes the fee) or "delivery" (the surplus is the fee) and the default direction. The hint under the amounts says
 // what will be booked and whether it is a full, short or over payment; its words come from the dialog's data-hint-*.
@@ -48,14 +49,6 @@
             bankEl.focus();
         } else if (!show && dialog.open) {
             dialog.close();
-        }
-    }
-
-    // Deliveries keep their Bulma edit modal (fragments/payments-section.html), opened through this public function.
-    function togglePaymentsEditModal(show) {
-        var modal = document.getElementById('paymentsEditModal');
-        if (modal) {
-            modal.classList.toggle('is-active', show);
         }
     }
 
@@ -157,32 +150,61 @@
         };
     }
 
-    function openAddPaymentModalFromButton(btn) {
-        setPaymentModalMode(btn.dataset.mode || 'order');
-        renderHint();
-        toggleAddPaymentModal(true);
-    }
-
     function openPaymentModalForOrder(orderId, expectedAmount, pending) {
         setPaymentModalMode('order');
         reset('/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment', expectedAmount, pending);
         toggleAddPaymentModal(true);
     }
 
+    // The Payments page sends the operator back to itself, with its filters, after the dialog is saved.
+    function applyTriggerOptions(btn) {
+        var field = form.querySelector('input[name="returnTo"]');
+        if (btn.dataset.returnTo) {
+            if (!field) {
+                field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = 'returnTo';
+                form.appendChild(field);
+            }
+            field.value = btn.dataset.returnTo;
+        } else if (field) {
+            field.remove();
+        }
+        if (btn.dataset.direction) {
+            directionEl.value = btn.dataset.direction;
+            renderHint();
+        }
+    }
+
     function openPaymentModalForOrderFromButton(btn) {
         openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pendingFrom(btn));
+        applyTriggerOptions(btn);
     }
 
     function openPaymentModalForDelivery(deliveryId, expectedAmount, pending) {
         setPaymentModalMode('delivery');
-        reset('/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment?redirectToPayments=true',
-            expectedAmount, pending);
+        reset('/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment', expectedAmount, pending);
         toggleAddPaymentModal(true);
     }
 
     function openPaymentModalForDeliveryFromButton(btn) {
         openPaymentModalForDelivery(btn.dataset.deliveryId, btn.dataset.unpaid, pendingFrom(btn));
+        applyTriggerOptions(btn);
     }
+
+    // Delegated, so it also works in the results block list-page.js swaps; without JS the link opens the record.
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-cl-payment-open]');
+        if (!trigger) {
+            return;
+        }
+        event.preventDefault();
+        if (trigger.dataset.orderId) {
+            openPaymentModalForOrderFromButton(trigger);
+        } else {
+            openPaymentModalForDeliveryFromButton(trigger);
+        }
+    });
 
     bankEl.addEventListener('input', function () {
         if (autofillEl.checked) {
@@ -221,18 +243,32 @@
         });
     }
 
-    // the order page: the server rendered the action, the unpaid amount and the pending payment already
+    // the order and delivery details: the server rendered the action, the unpaid amount and the pending payment already
     dialog.addEventListener('cl:dialog-open', function (event) {
         var trigger = event.detail && event.detail.trigger;
         setPaymentModalMode(trigger && trigger.dataset.mode ? trigger.dataset.mode : 'order');
         renderHint();
     });
-    // Payments and Deliveries do not load dialog.js: Cancel and a click on the backdrop close the dialog here
+    // Payments does not load dialog.js: Cancel and a click on the backdrop close the dialog here
     dialog.querySelector('[data-cl-payment-close]').addEventListener('click', function () {
         dialog.close();
     });
+    // A click is sent to the nearest element holding both ends of the press, so pressing inside the dialog (e.g. to
+    // select text) and letting go over the backdrop — or the other way round — clicks the dialog element itself, just
+    // like a click on the backdrop does. The backdrop closes the dialog only when the press both started and ended on it.
+    var pressStart = null;
+    var pressEnd = null;
+    dialog.addEventListener('pointerdown', function (event) {
+        pressStart = event.target;
+    });
+    dialog.addEventListener('pointerup', function (event) {
+        pressEnd = event.target;
+    });
     dialog.addEventListener('click', function (event) {
-        if (event.target === dialog) {
+        var onBackdrop = event.target === dialog && pressStart === dialog && pressEnd === dialog;
+        pressStart = null;
+        pressEnd = null;
+        if (onBackdrop) {
             dialog.close();
         }
     });
@@ -240,8 +276,6 @@
     setPaymentModalMode(dialog.getAttribute('data-mode') || 'order');
 
     window.toggleAddPaymentModal = toggleAddPaymentModal;
-    window.togglePaymentsEditModal = togglePaymentsEditModal;
-    window.openAddPaymentModalFromButton = openAddPaymentModalFromButton;
     window.openPaymentModalForOrder = openPaymentModalForOrder;
     window.openPaymentModalForOrderFromButton = openPaymentModalForOrderFromButton;
     window.openPaymentModalForDelivery = openPaymentModalForDelivery;

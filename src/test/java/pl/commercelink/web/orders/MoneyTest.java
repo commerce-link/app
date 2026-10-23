@@ -28,4 +28,13 @@ class MoneyTest {
         assertThat(Money.format(-12.5)).isEqualTo("\u221212,50");
         assertThat(Money.format(-0.001)).isEqualTo("0,00");
     }
+
+    @Test
+    void roundedInputKeepsWholeGroszeOnly() {
+        // when / then
+        assertThat(Money.inputRounded(10.00111)).isEqualTo("10.00");
+        assertThat(Money.inputRounded(2.675)).isEqualTo("2.68");
+        assertThat(Money.inputRounded(649)).isEqualTo("649.00");
+        assertThat(Money.input(10.00111)).isEqualTo("10.00111");
+    }
 }

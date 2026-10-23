@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -8,47 +7,24 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
-import org.springframework.ui.ConcurrentModel;
-import org.springframework.ui.Model;
-import pl.commercelink.web.dtos.DeliveryCreationForm;
-import pl.commercelink.inventory.deliveries.DeliveryItem;
-import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DropshipAssessment;
-import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipEligibility;
-import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
-import pl.commercelink.inventory.deliveries.PurchaseSubmission;
-import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
-import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.orders.FulfilmentStatus;
-import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentType;
-import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.starter.util.OperationResult;
-import pl.commercelink.stores.StoresRepository;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,343 +42,73 @@ class DropshipControllerTest {
     @Mock
     private DropshipEligibility dropshipEligibility;
     @Mock
-    private SupplierPurchaseService supplierPurchaseService;
-    @Mock
-    private DropshipPurchaseService dropshipPurchaseService;
-    @Mock
-    private DeliveryTaxResolver deliveryTaxResolver;
-    @Mock
     private MessageSource messageSource;
     @Mock
-    private org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes;
-    @Mock
-    private SupplierLabels supplierLabels;
+    private RedirectAttributes redirectAttributes;
 
     @InjectMocks
     private DropshipController controller;
-
-    @BeforeEach
-    void setUpSupplierLabels() {
-        lenient().when(supplierLabels.forStoreId(any()))
-                .thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
-    }
 
     private static Order order() {
         Order order = new Order();
         order.setStoreId(STORE_ID);
         order.setOrderId(ORDER_ID);
-        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
-        ShippingDetails details = new ShippingDetails();
-        details.setName("Jan");
-        details.setSurname("Kowalski");
-        details.setStreetAndNumber("ul. Polna 1");
-        details.setPostalCode("00-001");
-        details.setCity("Warszawa");
-        details.setCountry("PL");
-        details.setPhone("+48601234567");
-        details.setEmail("jan@example.com");
-        order.setShippingDetails(details);
-        BillingDetails billing = new BillingDetails();
-        billing.setEmail("jan@example.com");
-        order.setBillingDetails(billing);
         return order;
     }
 
-    private static OrderItem allocatedItem(String itemId, int qty) {
-        OrderItem item = new OrderItem();
-        item.setOrderId(ORDER_ID);
-        item.setItemId(itemId);
-        item.setDeliveryId(PROVIDER);
-        item.setStatus(FulfilmentStatus.Allocation);
-        item.setEan("5900000000001");
-        item.setManufacturerCode("MFN-1");
-        item.setName("Product");
-        item.setQty(qty);
-        return item;
-    }
-
-    @Test
-    void createScreenBuildsTheFormFromTheOrdersAllocations() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(
-                List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
-        Model model = new ConcurrentModel();
-
-        // when
-        String view;
+    private <T> T asStoreAdmin(Supplier<T> call) {
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+            return call.get();
         }
+    }
 
-        // then
-        assertThat(view).isEqualTo("dropshipCreate");
-        DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
-        assertThat(form.getProvider()).isEqualTo(PROVIDER);
-        assertThat(form.getItems()).hasSize(1);
-        DeliveryItem item = form.getItems().getFirst();
-        assertThat(item.getRequestedQty()).isEqualTo(2);
-        assertThat(item.getAllocations()).allMatch(allocation -> allocation.isSelected());
-        assertThat(model.getAttribute("consignee")).isSameAs(order.getShippingDetails());
+    private <T> T asSuperAdmin(Supplier<T> call) {
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+            return call.get();
+        }
     }
 
     @Test
-    void createScreenExposesThePickupShipmentAndTheBlockedReason() {
+    void oldDropshipAddressRedirectsToTheNewDeliveryPage() {
         // given
-        Order order = order();
-        Shipment shipment = new Shipment();
-        shipment.setType(ShipmentType.PickupPoint);
-        shipment.setCarrier("InPost");
-        shipment.setCollectionPointCode("WAW04A");
-        order.addShipment(shipment);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
-        when(dropshipPurchaseService.purchaseBlockedReason(STORE_ID, order, PROVIDER))
-                .thenReturn("orders.dropship.error.pickupPointUnsupported");
-        Model model = new ConcurrentModel();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order());
 
         // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
-        }
+        String view = asStoreAdmin(() -> controller.dropshipCreate(ORDER_ID, PROVIDER, redirectAttributes, Locale.ENGLISH));
 
         // then
-        assertThat(model.getAttribute("pickupShipment")).isSameAs(shipment);
-        assertThat(model.getAttribute("purchaseBlockedReason")).isEqualTo("orders.dropship.error.pickupPointUnsupported");
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/create/Acme?order=" + ORDER_ID + "&from=order");
     }
 
     @Test
-    void backFromConfirmationRestoresTheUserEnteredHeaderAndSelections() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(
-                List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
-        DeliveryCreationForm posted = new DeliveryCreationForm();
-        posted.setExternalDeliveryId("EXT-9");
-        posted.setShippingCost(15.0);
-        posted.setPaymentTerms(30);
-        Model model = new ConcurrentModel();
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.backFromDropshipConfirmation(ORDER_ID, posted, model, redirectAttributes,
-                    Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("dropshipCreate");
-        DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
-        assertThat(form.getExternalDeliveryId()).isEqualTo("EXT-9");
-        assertThat(form.getShippingCost()).isEqualTo(15.0);
-        assertThat(form.getPaymentTerms()).isEqualTo(30);
-    }
-
-    @Test
-    void purchasePostShowsTheConfirmationWithAFreshPurchaseRef() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        Model model = new ConcurrentModel();
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipPurchase(ORDER_ID, form, model, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("dropshipConfirmation");
-        assertThat(model.getAttribute("purchaseRef")).isNotNull();
-        assertThat(model.getAttribute("form")).isSameAs(form);
-    }
-
-    @Test
-    void purchasePostRejectsAFormNamingASupplierTheOrderNoLongerHas() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of("Elko")));
-        when(messageSource.getMessage(eq("orders.dropship.rejected.providerMismatch"), eq(null), any()))
-                .thenReturn("mismatch");
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        Model model = new ConcurrentModel();
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipPurchase(ORDER_ID, form, model, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(model.getAttribute("purchaseRef")).isNull();
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "mismatch");
-    }
-
-    @Test
-    void manualCreateRedirectsToTheCreatedDelivery() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        when(dropshipPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
-                .thenReturn(OperationResult.success("delivery-7"));
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-7");
-    }
-
-    @Test
-    void manualCreateWithNothingSelectedAndRemoveUnselectedReleasesTheAllocationsAndReturnsToTheOrder() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        form.setRemoveUnselected(true);
-        DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(0);
-        form.getItems().add(item);
-        when(messageSource.getMessage(eq("orders.dropship.unselectedReleased"), any(), any())).thenReturn("released");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(dropshipPurchaseService).releaseUnselected(STORE_ID, form);
-        verify(dropshipPurchaseService, never()).createManualDropship(any(), any(), any());
-        verify(redirectAttributes).addFlashAttribute("successMessage", "released");
-    }
-
-    @Test
-    void manualCreateWithNothingSelectedAndNoRemovalGoesBackToTheFormWithTheError() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        DeliveryItem item = new DeliveryItem();
-        item.setRequestedQty(0);
-        form.getItems().add(item);
-        when(dropshipPurchaseService.createManualDropship(eq(STORE_ID), same(order), same(form)))
-                .thenReturn(OperationResult.failure("orders.dropship.error.nothingSelected"));
-        when(messageSource.getMessage(eq("orders.dropship.error.nothingSelected"), any(), any())).thenReturn("nothing");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.createManualDropship(ORDER_ID, form, redirectAttributes, Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID + "/dropship?provider=" + PROVIDER);
-        verify(dropshipPurchaseService, never()).releaseUnselected(any(), any());
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "nothing");
-    }
-
-    @Test
-    void theCreateScreenExplainsWhyTheOrderCannotBeDropshipped() {
+    void oldAddressWithoutASupplierTakesTheOnlyOne() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS));
-        when(messageSource.getMessage(eq("orders.dropship.rejected.noShippingDetails"), eq(null), any()))
-                .thenReturn("no address");
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
 
         // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, null, new ConcurrentModel(), redirectAttributes, Locale.ENGLISH);
-        }
+        String view = asStoreAdmin(() -> controller.dropshipCreate(ORDER_ID, null, redirectAttributes, Locale.ENGLISH));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "no address");
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/create/Acme?order=" + ORDER_ID + "&from=order");
     }
 
     @Test
-    void theCreateScreenBuildsTheFormForTheRequestedSupplier() {
+    void oldAddressWithoutASupplierAsksOnThePreviewWhenTheOrderHasSeveral() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
-        ConcurrentModel model = new ConcurrentModel();
+        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
+        when(messageSource.getMessage(eq("orders.dropship.chooseProvider"), eq(null), any())).thenReturn("pick one");
 
         // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, "Elko", model, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("dropshipCreate");
-        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getProvider()).isEqualTo("Elko");
-    }
-
-    @Test
-    void theCreateScreenAsksForASupplierWhenTheOrderHasSeveral() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
-        when(messageSource.getMessage(eq("orders.dropship.chooseProvider"), eq(null), any()))
-                .thenReturn("pick one");
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, null, new ConcurrentModel(), redirectAttributes, Locale.ENGLISH);
-        }
+        String view = asStoreAdmin(() -> controller.dropshipCreate(ORDER_ID, null, redirectAttributes, Locale.ENGLISH));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
@@ -410,210 +116,33 @@ class DropshipControllerTest {
     }
 
     @Test
-    void theCreateScreenKeepsWorkingWithoutAProviderWhenThereIsExactlyOne() {
+    void oldAddressOfAnOrderThatCannotBeDropshippedShowsTheReasonOnTheOrder() {
         // given
         Order order = order();
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        ConcurrentModel model = new ConcurrentModel();
+                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS));
+        when(messageSource.getMessage(eq("orders.dropship.rejected.noShippingDetails"), eq(null), any())).thenReturn("no address");
 
         // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.dropshipCreate(ORDER_ID, null, model, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then
-        assertThat(view).isEqualTo("dropshipCreate");
-        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getProvider()).isEqualTo(PROVIDER);
-    }
-
-    @Test
-    void theCreateScreenTakesOnlyTheItemsOfTheChosenSupplier() {
-        // given
-        Order order = order();
-        OrderItem acmeItem = new OrderItem();
-        acmeItem.setItemId("item-1");
-        acmeItem.setDeliveryId("Acme");
-        acmeItem.setStatus(FulfilmentStatus.Allocation);
-        acmeItem.setEan("5900000000001");
-        acmeItem.setManufacturerCode("MFN-1");
-        OrderItem elkoItem = new OrderItem();
-        elkoItem.setItemId("item-2");
-        elkoItem.setDeliveryId("Elko");
-        elkoItem.setStatus(FulfilmentStatus.Allocation);
-        elkoItem.setEan("5900000000002");
-        elkoItem.setManufacturerCode("MFN-2");
-
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(acmeItem, elkoItem));
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of("Acme", "Elko")));
-        ConcurrentModel model = new ConcurrentModel();
-
-        // when
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            controller.dropshipCreate(ORDER_ID, "Elko", model, redirectAttributes, Locale.ENGLISH);
-        }
-
-        // then: the Acme item must not leak into an Elko delivery
-        DeliveryCreationForm form = (DeliveryCreationForm) model.getAttribute("form");
-        assertThat(form.getItems()).hasSize(1);
-        assertThat(form.getItems().getFirst().getMfn()).isEqualTo("MFN-2");
-    }
-
-    @Test
-    void confirmSubmitsTheDropshipAndRedirectsToTheDelivery() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
-                .thenReturn(OperationResult.success(new PurchaseSubmission("delivery-9", false)));
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
-                    Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-9");
-        verify(dropshipPurchaseService).submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1"));
-    }
-
-    @Test
-    void confirmRejectsAStaleFormWhoseAllocationMovedElsewhere() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
-                    Locale.forLanguageTag("pl"));
-        }
+        String view = asStoreAdmin(() -> controller.dropshipCreate(ORDER_ID, null, redirectAttributes, Locale.ENGLISH));
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "no address");
     }
 
     @Test
-    void confirmRejectsAFormThatNamesNoProviderAtAll() {
+    void superAdminIsRedirectedWithinTheStore() {
         // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any()))
-                .thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        when(messageSource.getMessage(eq("orders.dropship.rejected.providerMismatch"), eq(null), any()))
-                .thenReturn("mismatch");
-        DeliveryCreationForm form = new DeliveryCreationForm();
+        when(ordersRepository.findById("store-9", ORDER_ID)).thenReturn(order());
 
         // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
-                    Locale.forLanguageTag("pl"));
-        }
+        String view = asSuperAdmin(() -> controller.dropshipCreateForSuperAdmin("store-9", ORDER_ID, PROVIDER,
+                redirectAttributes, Locale.ENGLISH));
 
         // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "mismatch");
-    }
-
-    @Test
-    void confirmRejectsAFormNamingADifferentProviderThanTheAllocation() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of("Elko")));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, new ConcurrentModel(), redirectAttributes,
-                    Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        verify(dropshipPurchaseService, never()).submitDropship(any(), any(), any(), any());
-    }
-
-    @Test
-    void failedSubmissionReturnsToTheConfirmationWithTheError() {
-        // given
-        Order order = order();
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
-        when(dropshipEligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setProvider(PROVIDER);
-        when(dropshipPurchaseService.submitDropship(eq(STORE_ID), same(order), same(form), eq("ref-1")))
-                .thenReturn(OperationResult.failure("orders.dropship.error.unsupported"));
-        when(messageSource.getMessage(eq("orders.dropship.error.unsupported"), any(), any()))
-                .thenReturn("unsupported");
-        Model model = new ConcurrentModel();
-
-        // when
-        String view;
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = controller.confirmDropship(ORDER_ID, "ref-1", form, model, redirectAttributes,
-                    Locale.forLanguageTag("pl"));
-        }
-
-        // then
-        assertThat(view).isEqualTo("dropshipConfirmation");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("unsupported");
-    }
-
-    @Test
-    void everyRejectionReasonHasAMessageKeyInBothLanguageFiles() throws Exception {
-        // given: mirrors DropshipController.messageKeyFor's derivation, so a new DropshipRejection
-        // constant added without matching entries in both property files fails here instead of
-        // surfacing as a NoSuchMessageException (500) on the redirect that reports the rejection
-        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
-        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
-
-        // when / then
-        for (DropshipRejection rejection : DropshipRejection.values()) {
-            String key = messageKeyFor(rejection);
-            assertThat(pl).contains("\n" + key + "=");
-            assertThat(en).contains("\n" + key + "=");
-        }
-    }
-
-    private static String messageKeyFor(DropshipRejection rejection) {
-        String[] parts = rejection.name().toLowerCase(Locale.ROOT).split("_");
-        StringBuilder key = new StringBuilder("orders.dropship.rejected.").append(parts[0]);
-        for (int i = 1; i < parts.length; i++) {
-            key.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
-        }
-        return key.toString();
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-9/deliveries/create/Acme?order=" + ORDER_ID + "&from=order");
     }
 }

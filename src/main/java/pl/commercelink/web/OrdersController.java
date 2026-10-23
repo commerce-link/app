@@ -2,16 +2,20 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -50,25 +54,30 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
+import pl.commercelink.shipping.ShipmentsState;
+import pl.commercelink.shipping.ShippingIntegrationNames;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
-import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.orders.BulkAction;
@@ -78,6 +87,8 @@ import pl.commercelink.web.orders.CustomerView;
 import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.MoveTargetView;
+import pl.commercelink.web.orders.NewOrderForm;
+import pl.commercelink.web.orders.NewOrderPage;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
@@ -114,9 +125,17 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+
+@Slf4j
 @Controller
 public class OrdersController extends BaseController {
+
+    @Value("${app.domain}")
+    private String appDomain;
 
     @Autowired
     private Inventory inventory;
@@ -168,6 +187,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+    @Autowired
+    private ShippingIntegrationNames shippingIntegrationNames;
     @Autowired
     private OrderRealizationStepBack realizationStepBack;
 
@@ -222,20 +243,18 @@ public class OrdersController extends BaseController {
             }
         }
         OrderListQuery query = OrderListQuery.parse(params);
-        addListAttributes(model, query, locale);
+        addFilterFormAttributes(model, query.returnTo(), locale);
+        model.addAttribute("page", orderListService.fullPage(actor(), query, LocalDate.now(), locale));
         return "orders/list";
     }
 
     @GetMapping("/dashboard/orders/list")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String ordersList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
-        addListAttributes(model, OrderListQuery.parse(params), locale);
-        return "orders/list :: results";
-    }
-
-    private void addListAttributes(Model model, OrderListQuery query, Locale locale) {
+        OrderListQuery query = OrderListQuery.parse(params);
         addFilterFormAttributes(model, query.returnTo(), locale);
         model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
+        return "orders/list :: results";
     }
 
     static final String FILTERS_PATH = "/dashboard/orders/filters";
@@ -516,43 +535,62 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/new/from-basket")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model) {
-        Optional<Basket> basketOpt = basketsRepository.findById(getStoreId(), basketId);
-        if (!basketOpt.isPresent()) {
-            model.addAttribute("error", "Basket not found");
-            return "error";
-        }
-
-        Basket basket = basketOpt.get();
-        BillingDetails billingDetails = Optional.ofNullable(basket.getBillingDetails())
-                .orElseGet(BillingDetails::_default);
-        ShippingDetails shippingDetails = Optional.ofNullable(basket.getShippingDetails())
-                .orElseGet(ShippingDetails::_default);
-
+    public String submitOrderBasedOnBasket(@RequestParam("basketId") String basketId, Model model, Locale locale) {
+        Basket basket = basketsRepository.findById(getStoreId(), basketId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Store store = storesRepository.findById(getStoreId());
-        ShipmentType shipmentType = basket.resolveDeliveryOption(store)
-                .map(DeliveryOption::getType)
-                .orElse(ShipmentType.Courier);
-
-        ClientDataDto form = new ClientDataDto();
-        form.setOrderReference(basketId);
-        form.setShipmentType(shipmentType);
-        form.setBillingDetails(billingDetails);
-        form.setShippingDetails(shippingDetails);
-
-        model.addAttribute("form", form);
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("orderSourceTypes", OrderSourceType.values());
-        model.addAttribute("paymentSources", PaymentSource.values());
-
-        return "newOrder_clientDataCollection";
+        NewOrderPage page = NewOrderPage.of(basket, store);
+        // initialForm hands over the basket's own address objects; the basket is never saved here.
+        NewOrderForm form = NewOrderForm.of(NewOrderPage.initialForm(basket, store), NewOrderPage.initialShippingAddress(basket));
+        return newOrderPage(page, form, Map.of(), model, locale);
     }
 
+    /**
+     * The binding result keeps a tampered choice (shipmentType=xyz) from ending in 400: the field stays empty and the
+     * page asks for it like for a missing one. Address fields are plain strings and are checked by {@link NewOrderForm}.
+     */
     @PostMapping("/dashboard/orders/new/fulfilment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String submitOrder(@ModelAttribute ClientDataDto dto) {
-        Order order = basketOrderImporter._import(getStoreId(), dto);
+    public String submitOrder(@ModelAttribute("form") ClientDataDto dto, BindingResult bindingResult,
+                              @RequestParam(value = "shippingAddress", required = false) String shippingAddress,
+                              Model model, RedirectAttributes redirectAttributes, Locale locale) {
+        Optional<Basket> basket = StringUtils.isBlank(dto.getOrderReference())
+                ? Optional.empty()
+                : basketsRepository.findById(getStoreId(), dto.getOrderReference());
+        // A second submit or a page restored with Back: the first one already turned the basket into an order.
+        if (basket.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.new.basket.gone", null, locale));
+            return "redirect:/dashboard/orders";
+        }
+        Store store = storesRepository.findById(getStoreId());
+        NewOrderPage page = NewOrderPage.of(basket.get(), store);
+        NewOrderForm form = NewOrderForm.of(dto, shippingAddress);
+        Map<String, String> errors = new LinkedHashMap<>();
+        // The importer would fail on the missing option; the page answers with its notice instead of an error page.
+        if (page.deliveryUnknown()) {
+            errors.put(NewOrderPage.DELIVERY_FIELD, "order.new.delivery.unknown");
+        }
+        errors.putAll(form.validate());
+        if (!errors.isEmpty()) {
+            NewOrderForm shown = dto.getShippingDetails() == null ? form.withShippingOf(basket.get()) : form;
+            return newOrderPage(page, shown, errors, model, locale);
+        }
+        Order order = basketOrderImporter._import(getStoreId(), form.toImport(basket.get()));
         return "redirect:/dashboard/orders/" + order.getOrderId();
+    }
+
+    private String newOrderPage(NewOrderPage page, NewOrderForm form, Map<String, String> errors, Model model, Locale locale) {
+        model.addAttribute("page", page);
+        model.addAttribute("form", form.dto());
+        model.addAttribute("shippingAddress", form.shippingAddress());
+        model.addAttribute("billing", form.billing().withErrors(errors));
+        model.addAttribute("shipping", form.shipping().withErrors(errors));
+        model.addAttribute("errors", errors);
+        model.addAttribute("paymentOptions", Arrays.stream(PaymentSource.values())
+                .map(source -> new PickerOption(source.name(),
+                        messageSource.getMessage("PaymentSource." + source.name(), null, source.name(), locale)))
+                .toList());
+        return "newOrder_clientDataCollection";
     }
 
     @PostMapping("/dashboard/orders/new/pos")
@@ -764,6 +802,11 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
+    private String refuseToPayments(RedirectAttributes redirectAttributes, String target, String key, Locale locale) {
+        redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR, messageSource.getMessage(key, null, locale));
+        return "redirect:" + target;
+    }
+
     /** A no-JavaScript confirmation page whose texts are the dialog's: <prefix>.confirm.title / .message / .action. */
     private String confirmPage(Model model, Order order, String prefix, Object[] titleArgs, String message,
                                String actionPath, boolean destructive, Locale locale) {
@@ -847,6 +890,49 @@ public class OrdersController extends BaseController {
         return renderOrderCard(requireOrder(ordersRepository, storeId, orderId), true, model);
     }
 
+    /** One page of the orders list: the selection that prints the cards never spans pages. */
+    static final int MAX_CARDS = OrderListQuery.PAGE_SIZE;
+    // the alphabet of order ids (UUIDs, demo and test ids), the same as on the scan address (OrderScanController)
+    private static final Pattern CARD_ORDER_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+
+    /**
+     * The order cards of the orders checked on the orders list, as one document that print.js prints from its hidden
+     * frame: one print dialog for the whole batch. The cards follow the order of the ids (the list's order) and an id
+     * given twice prints once. Ids that name no order of the user's store are skipped, so another store's order never
+     * prints and an order removed since the list was shown does not stop the rest; none found answers 404. A missing,
+     * malformed or longer-than-a-page list answers 400 before anything is read. No super admin variant: a super admin
+     * has no orders list to check orders on.
+     */
+    @GetMapping("/dashboard/orders/cards")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String getOrderCards(@RequestParam(name = "ids", required = false) List<String> ids, Model model) {
+        List<String> wanted = cardIds(ids);
+        String storeId = getStoreId();
+        List<Order> orders = ordersRepository.findByIds(storeId, wanted);
+        if (orders.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        Map<String, List<OrderItem>> items = orderItemsRepository.findByOrderIds(
+                orders.stream().map(Order::getOrderId).toList());
+        SupplierLabelMap labels = supplierLabels.forStoreId(storeId).withWarehouse(warehouseLabel());
+        // every QR code carries the store's scan address, as on the single card
+        model.addAttribute("cards", orders.stream()
+                .map(order -> OrderPrintView.card(order, items.getOrDefault(order.getOrderId(), List.of()),
+                        OrderLinks.of(order, false), labels,
+                        OrderLinks.scanUrl(appDomain, storeId, order.getOrderId())))
+                .toList());
+        return "orders/cards";
+    }
+
+    /** 1..MAX_CARDS ids (counted before duplicates are dropped, so no list is unbounded work), each in CARD_ORDER_ID. */
+    private static List<String> cardIds(List<String> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > MAX_CARDS
+                || ids.stream().anyMatch(id -> id == null || !CARD_ORDER_ID.matcher(id).matches())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return ids.stream().distinct().toList();
+    }
+
     /** The store's own warehouse as the printouts name an item's supplier, in the request's language. */
     private String warehouseLabel() {
         return OrderPageModelFactory.warehouseLabel(messageSource, LocaleContextHolder.getLocale());
@@ -854,8 +940,10 @@ public class OrdersController extends BaseController {
 
     private String renderOrderCard(Order order, boolean superAdmin, Model model) {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        // the QR code always carries the store's scan address: the card is scanned in the store's warehouse
         model.addAttribute("print", OrderPrintView.card(order, orderItems, OrderLinks.of(order, superAdmin),
-                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel())));
+                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel()),
+                OrderLinks.scanUrl(appDomain, order.getStoreId(), order.getOrderId())));
         return "orders/card";
     }
 
@@ -1018,7 +1106,7 @@ public class OrdersController extends BaseController {
             }
             // Same lock as the item menu's toggle: the flag is only read when the closing invoice is issued, so after
             // that a change would silently not apply; the page shows the box disabled and the stored value stays.
-            if (order.isInvoiced() || receiptLock.locks()) {
+            if (order.hasClosingDocument() || receiptLock.locks()) {
                 updatedItem.setConsolidated(orderItem.isConsolidated());
             }
             orderItem.update(updatedItem);
@@ -1077,12 +1165,22 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
+        // The taxonomy is the source of truth for a product's EAN; the dialog offers the EAN field only once the
+        // manufacturer code missed it, so a typed EAN never overrides a known one.
         Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());
-        String ean = taxonomy != null ? taxonomy.ean() : null;
-        if (Strings.isBlank(ean)) {
-            // the refusal stays in the dialog instead of opening the item's edit page
-            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
-                    messageSource.getMessage("order.item.ean.not.found", null, locale));
+        String ean = taxonomy != null ? StringUtils.trimToNull(taxonomy.ean()) : null;
+        if (ean == null) {
+            model.addAttribute("supplierEanField", true);
+            String typedEan = StringUtils.trimToNull(form.getEan());
+            if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("product.error.ean.invalid", null, locale));
+            }
+            ean = typedEan != null ? unifyEan(typedEan) : ownEan(orderItem, form.getManufacturerCode());
+            if (ean == null) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("order.item.ean.not.found", null, locale));
+            }
         }
 
         // a gross price is turned net with the item's own VAT, as the old dialog did in the browser
@@ -1102,6 +1200,16 @@ public class OrdersController extends BaseController {
         }
         OrderFlash.saved(redirectAttributes, saved);
         return details(orderId);
+    }
+
+    /**
+     * A product outside the taxonomy (one typed by hand, not in PIM) has its EAN only on the item, so that one is kept -
+     * but only while the dialog names the same product code, so a stale EAN never follows the item to another product.
+     */
+    private String ownEan(OrderItem item, String manufacturerCode) {
+        boolean sameProduct = StringUtils.isNotBlank(manufacturerCode)
+                && Objects.equals(item.getManufacturerCode(), unifyMfn(manufacturerCode));
+        return sameProduct ? StringUtils.trimToNull(item.getEan()) : null;
     }
 
     private String refuseSupplier(String orderId, AssignSupplierForm form, Store store, boolean async,
@@ -1212,8 +1320,12 @@ public class OrdersController extends BaseController {
     public String toggleConsolidation(@PathVariable String orderId, @RequestParam String itemId,
                                       RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order has no item menu; a stale page or a hand-made request must not change it either
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // The flag is only read when the closing invoice is issued; after that a change would silently not apply.
-        if (order.isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.item.consolidation.locked", locale);
         }
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
@@ -1236,7 +1348,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
         ReceiptLock receiptLock = receiptAttemptService.receiptLock(order);
         boolean priceLocked = !order.getDocuments().isEmpty() || receiptLock.locks();
-        boolean consolidationLocked = order.isInvoiced() || receiptLock.locks();
+        boolean consolidationLocked = order.hasClosingDocument() || receiptLock.locks();
         // name, quantity and VAT rate are read-only with the reason; saveOrderItem refuses a post that changes them
         ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
         model.addAttribute("saleLock", saleLock);
@@ -1246,7 +1358,7 @@ public class OrdersController extends BaseController {
                 : saleLock != null ? saleLock.priceKey() : "order.item.form.price.locked");
         model.addAttribute("consolidationLocked", consolidationLocked);
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
-                : order.isInvoiced() ? "order.item.consolidation.locked"
+                : order.hasClosingDocument() ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
         // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
         model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
@@ -1332,9 +1444,14 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String removeSelectedItemsFromOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
                                                RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order selects no items; removeFromOrder itself would still delete its services
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // the page leaves "Usuń" out of an invoiced order (its invoice or receipt lists the items); a stale page or a
         // hand-made request must not get past that either
-        if (requireOrder(ordersRepository, getStoreId(), orderId).isInvoiced()) {
+        if (order.hasClosingDocument()) {
             return refuse(redirectAttributes, orderId, "order.items.remove.locked.invoiced", locale);
         }
         String locked = receiptLockedKey(orderId);
@@ -1650,20 +1767,24 @@ public class OrdersController extends BaseController {
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        Optional<String> back = PaymentsReturn.target(form.getReturnTo());
         // the closed page offers no "Dodaj wpłatę"; a cancelled order would drop the payment while saying it was added
         if (existingOrder.isClosed()) {
-            return refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), closedPaymentsKey(existingOrder), locale)
+                    : refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
         }
 
         String invalid = form.validate();
         if (invalid != null) {
-            return refuse(redirectAttributes, orderId, invalid, locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), invalid, locale)
+                    : refuse(redirectAttributes, orderId, invalid, locale);
         }
         PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
         // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
         // typed, and money that came in cannot be negative
         if (direction == PaymentDirection.Incoming && form.amount() < 0) {
-            return refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), "order.payments.error.negative", locale)
+                    : refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
         }
         double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
 
@@ -1690,6 +1811,12 @@ public class OrdersController extends BaseController {
         target.setBankTransactionDate(form.getBankTransactionDate());
 
         orderLifecycle.update(existingOrder);
+        if (back.isPresent()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
+                    messageSource.getMessage(direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
+                            new Object[]{existingOrder.getShortenedOrderId()}, locale));
+            return "redirect:" + back.get();
+        }
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
         return details(orderId);
     }
@@ -1904,7 +2031,11 @@ public class OrdersController extends BaseController {
                 shipmentCarriers(existingOrder), null, null, before != null && before.getExternalId() != null, null);
         // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one
         String refusal = existingOrder.isClosed() ? "order.shipments.error.closed"
-                : stale ? "order.shipments.error.stale" : null;
+                : stale ? "order.shipments.error.stale"
+                // the form rebuilds the shipment without its creation command: a late result would be dropped and a
+                // failed one, with its package, would turn into a courier order nobody can remove
+                : before != null && (before.isCreating() || before.creationFailed())
+                        ? "order.shipments.edit.locked.creating" : null;
         if (refusal != null) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1975,7 +2106,8 @@ public class OrdersController extends BaseController {
         // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index),
+                        new Object[]{integrationOf(order.getShipments().get(index).getProvider(), locale)}, locale),
                 messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
                 "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
@@ -1988,7 +2120,7 @@ public class OrdersController extends BaseController {
      * the dropship flow then fall back to their defaults, and the operator types the choice with the next shipment;
      * an order without shipments is never delivered nor completed before Delivered (Order#hasNothingLeftToDeliver).
      * Once no shipment has shipping data left, the shipping
-     * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
+     * e-mail is forgotten (as "Cancel shipment" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
      * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
      * Realization; the confirmation and the notice say so (OrderPageModelFactory.removeShipmentMessageKey).
@@ -2075,7 +2207,7 @@ public class OrdersController extends BaseController {
 
     /**
      * A shipment taken back (removed, or its shipped date cleared) that the customer was told about: once no other
-     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel courier order" does), so the
+     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel shipment" does), so the
      * shipment entered next announces itself again instead of the customer keeping the old number or pickup notice.
      */
     private void forgetShipmentEmails(Order order, Shipment takenBack) {
@@ -2224,16 +2356,46 @@ public class OrdersController extends BaseController {
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
-        String refusal = order.courierShipmentToCancel().isPresent() ? null
+        Optional<Shipment> courier = order.courierShipmentToCancel();
+        String refusal = courier.isPresent()
+                ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending"
+                        : !courier.get().allowsCancellation() ? "order.shipments.cancel.error.not.cancellable" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
+        // the integration the courier order went through, named by the texts about its cancellation
+        String integration = integrationOf(courier.map(Shipment::getProvider).orElse(null), locale);
         if (refusal != null) {
-            return refuse(redirectAttributes, orderId, refusal, locale);
+            // only the refusals about the courier order name the integration; the others have no courier order to name it by
+            return courier.isPresent() ? refuse(redirectAttributes, orderId, refusal, locale, integration)
+                    : refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
-            String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
-            OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
+            ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            switch (result.outcome()) {
+                case REQUESTED -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.requested", new Object[]{integration}, locale));
+                case RECHECKING -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.rechecking", new Object[]{integration}, locale));
+                case CANCELLED -> {
+                    // an immediate confirmation settles the shipments here, the step back included; after one in
+                    // the background the reloaded page shows the new status instead
+                    String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+                    OrderFlash.saved(redirectAttributes,
+                            result.backToRealization() ? notice + " " + backToRealizationNotice(locale) : notice);
+                }
+                case FAILED -> {
+                    String reasonKey = OrderLabels.cancellationReasonKey(result.error());
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
+                            reasonKey != null ? messageSource.getMessage(reasonKey, new Object[]{integration}, locale)
+                                    : Objects.toString(result.error(), ""), integration);
+                }
+                case GONE -> {
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
+                }
+            }
+        } catch (ShipmentCancellationInProgressException e) {
+            // a concurrent request marked the cancellation between the check above and the service's fresh read
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale, integration);
         } catch (ShippingUnavailableException e) {
             // the store's carrier authorisation was lost: nothing was cancelled nor changed
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
@@ -2243,6 +2405,25 @@ public class OrdersController extends BaseController {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
         return details(orderId);
+    }
+
+    /**
+     * Whether a shipment of the order still waits for the provider: a cancellation, a creation or a pickup order. The
+     * shipments card polls it (shipment-cancellation.js); the address keeps its name from when it reported
+     * cancellations only, so pages open during a deploy keep polling.
+     */
+    @GetMapping("/dashboard/orders/{orderId}/shipments/cancellation-state")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<ShipmentsState> shipmentsState(@PathVariable String orderId) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        LocalDateTime now = LocalDateTime.now();
+        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.awaitsProviderAnswer(now));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new ShipmentsState(inProgress));
+    }
+
+    private String integrationOf(String provider, Locale locale) {
+        return shippingIntegrationNames.of(provider, storesRepository.findById(getStoreId()), locale);
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,

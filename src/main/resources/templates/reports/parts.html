@@ -1,0 +1,264 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Title line: the closing shortcut and the download menu are the page's two actions; the period below them filters
+       what the page shows, the charts and the files alike. */-->
+<header th:fragment="header(page)" class="cl-page-header">
+    <div class="cl-page-header-row">
+        <h1 class="cl-page-title" th:text="#{reports.title}"></h1>
+        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+        <div class="cl-page-actions is-report">
+            <a class="cl-button has-state" th:href="@{${page.closingHref()}}"
+               th:title="${page.closing().lastClosed() != null} ? #{reports.closing.lastClosed(${page.closing().lastClosed()})} : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-lock"></i></span>
+                <span th:text="${page.closing().pending()} ? #{reports.closing.pending(${page.closing().month()})} : #{reports.closing.open}"></span>
+                <th:block th:if="${page.closing().pending()}">
+                    <span class="cl-dot is-warn" aria-hidden="true"></span>
+                    <span class="cl-visually-hidden" th:text="#{reports.closing.pending.sr}"></span>
+                </th:block>
+            </a>
+            <details class="cl-menu">
+                <summary class="cl-button is-primary">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-download"></i></span>
+                    <span th:text="#{reports.download}"></span>
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </summary>
+                <ul class="cl-menu-list is-files" th:attr="aria-label=#{reports.download.label}">
+                    <th:block th:each="group : ${page.files()}">
+                        <li class="cl-menu-group" aria-hidden="true" th:text="#{${group.titleKey()}}"></li>
+                        <li th:each="file : ${group.files()}">
+                            <a class="cl-menu-item" th:href="@{${file.href()}}" download>
+                                <span class="cl-menu-item-row"><i class="fas fa-file-alt" aria-hidden="true"></i><span th:text="#{${file.titleKey()}}"></span></span>
+                                <span class="cl-menu-desc" th:text="#{${file.descriptionKey()}}"></span>
+                            </a>
+                        </li>
+                    </th:block>
+                </ul>
+            </details>
+        </div>
+    </div>
+    <p class="cl-page-lead" th:text="#{reports.lead}"></p>
+</header>
+
+<div th:fragment="toolbar(page)" class="cl-report-toolbar">
+    <div class="cl-period" role="group" th:attr="aria-label=#{reports.period.label}">
+        <a class="cl-button is-icon" th:href="@{${page.previousHref()}}"
+           th:attr="aria-label=#{reports.period.previous(${page.previousLabel()})}" th:title="${page.previousLabel()}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        </a>
+        <details class="cl-filter-menu" data-cl-period-menu>
+            <summary class="cl-filter-menu-trigger">
+                <span class="cl-filter-menu-key" th:text="#{reports.period.key}"></span>
+                <span class="cl-filter-menu-value" th:text="${page.periodLabel()}"></span>
+            </summary>
+            <form method="get" th:action="@{/dashboard/reports}" class="cl-filter-menu-panel">
+                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{reports.period.presets}">
+                    <ul class="cl-date-presets">
+                        <li th:each="preset : ${page.presets()}">
+                            <a class="cl-filter-menu-item" th:href="@{${preset.href()}}"
+                               th:attr="aria-current=${preset.current()} ? 'true' : null" th:text="#{${preset.labelKey()}}"></a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="cl-filter-menu-dates">
+                    <label><span th:text="#{reports.from}"></span>
+                        <input class="cl-input" type="date" name="dateFrom" th:value="${page.dateFrom()}"
+                               th:min="${page.dateMin()}" th:max="${page.dateMax()}" required></label>
+                    <label><span th:text="#{reports.to}"></span>
+                        <input class="cl-input" type="date" name="dateTo" th:value="${page.dateTo()}"
+                               th:min="${page.dateMin()}" th:max="${page.dateMax()}" required></label>
+                </div>
+                <div class="cl-filter-menu-actions">
+                    <button type="submit" class="cl-button is-primary" th:text="#{reports.period.apply}"></button>
+                </div>
+            </form>
+        </details>
+        <a th:if="${page.nextHref() != null}" class="cl-button is-icon" th:href="@{${page.nextHref()}}"
+           th:attr="aria-label=#{reports.period.next(${page.nextLabel()})}" th:title="${page.nextLabel()}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+        </a>
+        <a th:if="${page.nextHref() == null}" class="cl-button is-icon" aria-disabled="true"
+           th:attr="aria-label=#{reports.period.nextUnavailable}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+        </a>
+    </div>
+    <p th:text="${page.rangeText()}"></p>
+    <p class="cl-loading cl-report-loading" role="status" hidden data-cl-report-loading>
+        <span class="cl-spinner" aria-hidden="true"></span><span th:text="#{reports.loading}"></span></p>
+    <p th:if="${page.shortened()}" class="cl-report-note" role="status"
+       th:text="#{reports.period.shortened(${page.maxYears()}, ${page.rangeText()})}"></p>
+</div>
+
+<section th:fragment="channels(channels)" class="cl-card cl-chart is-full" aria-labelledby="channels-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="channels-title" th:text="#{reports.channels.title}"></h2></div>
+    <p th:if="${channels.empty()}" class="cl-list-empty" th:text="#{reports.empty.orders}"></p>
+    <th:block th:unless="${channels.empty()}">
+        <ul class="cl-figures">
+            <li><span class="cl-eyebrow" th:text="#{reports.channels.sales}"></span>
+                <span class="cl-stat-value" th:text="#{general.currency.amount(${channels.totals().salesNet()})}"></span></li>
+            <li><span class="cl-eyebrow" th:text="#{reports.channels.profit}"></span>
+                <span class="cl-stat-value" th:text="#{general.currency.amount(${channels.totals().profitNet()})}"></span>
+                <span class="cl-stat-hint" th:if="${channels.totals().margin() != null}" th:text="#{reports.channels.marginHint(${channels.totals().margin()})}"></span></li>
+            <li><span class="cl-eyebrow" th:text="#{reports.channels.orders}"></span>
+                <span class="cl-stat-value" th:text="${channels.totals().ordersText()}"></span>
+                <span class="cl-stat-hint" th:text="#{reports.channels.averageHint(${channels.totals().averageOrder()})}"></span></li>
+        </ul>
+        <p th:if="${channels.missing() != null}" class="cl-card-desc cl-compare-note"
+           th:text="${channels.missing().name() == 'OWN'} ? #{reports.channels.missing.own} : #{reports.channels.missing.marketplace}"></p>
+        <div class="cl-compare">
+            <div class="cl-compare-head">
+                <span th:text="#{reports.channels.measure}"></span>
+                <span class="is-own"><span class="cl-chart-key" aria-hidden="true"></span><span th:text="#{reports.channel.own}"></span></span>
+                <span th:text="#{reports.channels.share}"></span>
+                <span class="is-mkt"><span class="cl-chart-key is-2" aria-hidden="true"></span><span th:text="#{reports.channel.marketplace}"></span></span>
+            </div>
+            <div th:each="row : ${channels.rows()}" class="cl-compare-row" th:classappend="${row.share() == null} ? 'is-plain'">
+                <span class="cl-compare-label" th:text="#{${row.labelKey()}}"></span>
+                <span class="cl-compare-val is-own" th:text="${row.own() == null} ? '—' : (${row.money()} ? #{general.currency.amount(${row.own()})} : ${row.own()})"></span>
+                <div class="cl-compare-mid">
+                    <div th:if="${row.share() != null}" class="cl-hbar-track" role="img"
+                         th:attr="aria-label=${#messages.msg('reports.channels.shareLabel', #messages.msg(row.labelKey()), row.share().ownText(), row.share().marketplaceText())}">
+                        <span th:if="${row.share().own() > 0}" class="cl-hbar-seg is-c1" th:classappend="${row.share().ownLabelled()} ? 'is-labelled'"
+                              th:style="'flex:' + ${row.share().own()}" th:title="${row.share().ownText()}"
+                              th:text="${row.share().ownLabelled()} ? ${row.share().ownText()} : ''"></span>
+                        <span th:if="${row.share().marketplace() > 0}" class="cl-hbar-seg is-c2" th:classappend="${row.share().marketplaceLabelled()} ? 'is-labelled'"
+                              th:style="'flex:' + ${row.share().marketplace()}" th:title="${row.share().marketplaceText()}"
+                              th:text="${row.share().marketplaceLabelled()} ? ${row.share().marketplaceText()} : ''"></span>
+                    </div>
+                </div>
+                <span class="cl-compare-val is-mkt" th:text="${row.marketplace() == null} ? '—' : (${row.money()} ? #{general.currency.amount(${row.marketplace()})} : ${row.marketplace()})"></span>
+            </div>
+        </div>
+        <div class="cl-compare-profiles">
+            <section th:each="profile : ${channels.profiles()}" class="cl-compare-profile"
+                     th:with="own=${profile.channel().name() == 'OWN'}, titleId=|channel-profile-${#strings.toLowerCase(profile.channel().name())}|"
+                     th:attr="aria-labelledby=${titleId}">
+                <h3 class="cl-compare-profile-title" th:id="${titleId}">
+                    <span class="cl-chart-key" th:classappend="${own} ? '' : 'is-2'" aria-hidden="true"></span>
+                    <span th:text="${own} ? #{reports.channel.own} : #{reports.channel.marketplace}"></span></h3>
+                <dl class="cl-kv is-column">
+                    <div><dt th:text="#{reports.channels.cost}"></dt>
+                        <dd class="is-numeric" th:text="#{general.currency.amount(${profile.costNet()})}"></dd></div>
+                    <div><dt th:text="#{reports.channels.margin}"></dt>
+                        <dd class="is-numeric" th:text="${profile.margin()} ?: '—'"></dd></div>
+                    <div><dt th:text="#{reports.channels.averageOrder}"></dt>
+                        <dd class="is-numeric" th:text="${profile.averageOrder() == null} ? '—' : #{general.currency.amount(${profile.averageOrder()})}"></dd></div>
+                </dl>
+            </section>
+        </div>
+    </th:block>
+</section>
+
+<!--/* All three panels are rendered: without JavaScript they stand one under another; report-charts.js keeps one and
+       turns the segmented buttons into a switch. */-->
+<section th:fragment="daily(charts, empty)" class="cl-card cl-chart is-full" aria-labelledby="daily-title" data-cl-chart>
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="daily-title" th:text="#{reports.chart.title}" data-cl-chart-heading></h2>
+        <div class="cl-segmented" role="group" th:attr="aria-label=#{reports.chart.switch}" hidden data-cl-chart-switch>
+            <button th:each="chart, iter : ${charts}" type="button" class="cl-segment"
+                    th:attr="aria-pressed=${iter.first}, data-cl-chart-show=${chart.metric().key()}, data-cl-chart-title=#{${chart.metric().titleKey()}}"
+                    th:text="#{${chart.metric().segmentKey()}}"></button>
+        </div>
+    </div>
+    <p th:if="${empty}" class="cl-list-empty" th:text="#{reports.empty.orders}"></p>
+    <div th:unless="${empty}" th:each="chart : ${charts}" class="cl-chart-panel"
+         th:attr="data-cl-chart-panel=${chart.metric().key()}">
+        <h3 class="cl-chart-panel-title" th:text="#{${chart.metric().titleKey()}}"></h3>
+        <ul class="cl-chart-legend">
+            <li><span class="cl-chart-key" aria-hidden="true"></span><span th:text="#{reports.channel.own}"></span>
+                <strong th:text="${chart.metric().money()} ? #{general.currency.amount(${chart.ownTotal()})} : ${chart.ownTotal()}"></strong></li>
+            <li><span class="cl-chart-key is-2" aria-hidden="true"></span><span th:text="#{reports.channel.marketplace}"></span>
+                <strong th:text="${chart.metric().money()} ? #{general.currency.amount(${chart.marketplaceTotal()})} : ${chart.marketplaceTotal()}"></strong></li>
+        </ul>
+        <div class="cl-chart-plot">
+            <div class="cl-chart-axis" aria-hidden="true">
+                <span th:each="tick : ${chart.axis()}" th:style="'bottom:' + ${tick.bottom()} + '%'"
+                      th:text="${tick.unitKey() != null} ? #{${tick.unitKey()}(${tick.number()})} : ${tick.number()}"></span>
+            </div>
+            <div class="cl-chart-area">
+                <span th:each="tick, iter : ${chart.axis()}" th:unless="${iter.first}" class="cl-chart-grid"
+                      th:style="'bottom:' + ${tick.bottom()} + '%'"></span>
+                <ol class="cl-chart-cols" th:attr="aria-label=#{${chart.metric().titleKey()}}">
+                    <li th:each="col : ${chart.columns()}" class="cl-chart-col" th:classappend="${col.edge()}" tabindex="0"
+                        th:with="own=${chart.metric().money()} ? #{general.currency.amount(${col.own()})} : ${col.own()},
+                                 marketplace=${chart.metric().money()} ? #{general.currency.amount(${col.marketplace()})} : ${col.marketplace()},
+                                 total=${chart.metric().money()} ? #{general.currency.amount(${col.total()})} : ${col.total()}"
+                        th:attr="aria-label=#{reports.chart.columnLabel(${col.label()}, ${own}, ${marketplace}, ${total})}">
+                        <span class="cl-chart-seg" th:style="'height:' + ${col.ownHeight()} + '%'"></span>
+                        <span class="cl-chart-seg is-2" th:style="'height:' + ${col.marketplaceHeight()} + '%'"></span>
+                        <span class="cl-chart-tip" role="tooltip">
+                            <b th:text="${col.label()}"></b>
+                            <span><th:block th:text="#{reports.channel.own}"></th:block> <strong th:text="${own}"></strong></span>
+                            <span><th:block th:text="#{reports.channel.marketplace}"></th:block> <strong th:text="${marketplace}"></strong></span>
+                            <span><th:block th:text="#{reports.chart.total}"></th:block> <strong th:text="${total}"></strong></span>
+                        </span>
+                    </li>
+                </ol>
+            </div>
+        </div>
+        <div class="cl-chart-x" aria-hidden="true"><span th:each="label : ${chart.xLabels()}" th:text="${label}"></span></div>
+        <details class="cl-disclosure">
+            <summary th:text="#{reports.chart.table}"></summary>
+            <div class="cl-disclosure-body">
+                <table class="cl-table is-compact">
+                    <thead><tr>
+                        <th scope="col" th:text="#{reports.chart.period}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{reports.channel.own}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{reports.channel.marketplace}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{reports.chart.total}"></th>
+                    </tr></thead>
+                    <tbody><tr th:each="col : ${chart.columns()}"
+                        th:with="own=${chart.metric().money()} ? #{general.currency.amount(${col.own()})} : ${col.own()},
+                                 marketplace=${chart.metric().money()} ? #{general.currency.amount(${col.marketplace()})} : ${col.marketplace()},
+                                 total=${chart.metric().money()} ? #{general.currency.amount(${col.total()})} : ${col.total()}">
+                        <th scope="row" class="cl-table-key" th:text="${col.label()}"></th>
+                        <td class="is-numeric" th:attr="data-label=#{reports.channel.own}" th:text="${own}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{reports.channel.marketplace}" th:text="${marketplace}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{reports.chart.total}" th:text="${total}"></td>
+                    </tr></tbody>
+                </table>
+            </div>
+        </details>
+    </div>
+</section>
+
+<section th:fragment="suppliers(suppliers)" class="cl-card cl-chart is-full" aria-labelledby="suppliers-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="suppliers-title" th:text="#{reports.suppliers.title}"></h2></div>
+    <p th:if="${suppliers.empty()}" class="cl-list-empty" th:text="#{reports.empty.deliveries}"></p>
+    <th:block th:unless="${suppliers.empty()}">
+        <ul class="cl-figures">
+            <li><span class="cl-eyebrow" th:text="#{reports.suppliers.count}"></span>
+                <span class="cl-stat-value" th:text="${suppliers.deliveriesText()}"></span></li>
+            <li><span class="cl-eyebrow" th:text="#{reports.suppliers.costs}"></span>
+                <span class="cl-stat-value" th:text="#{general.currency.amount(${suppliers.totalCosts()})}"></span></li>
+        </ul>
+        <p class="cl-card-desc" th:text="#{reports.suppliers.desc}"></p>
+        <table class="cl-table is-bars is-channels">
+            <thead><tr>
+                <th scope="col" th:text="#{reports.suppliers.supplier}"></th>
+                <th scope="col"><span class="cl-visually-hidden" th:text="#{reports.channels.share}"></span></th>
+                <th scope="col" class="is-numeric" th:text="#{reports.suppliers.deliveries}"></th>
+                <th scope="col" class="is-numeric" th:text="#{reports.suppliers.shipping}"></th>
+                <th scope="col" class="is-numeric" th:text="#{reports.suppliers.payment}"></th>
+            </tr></thead>
+            <tbody><tr th:each="row : ${suppliers.rows()}">
+                <th scope="row" class="cl-table-key" th:text="${row.name()} ?: #{reports.suppliers.none}"></th>
+                <td class="is-bar" aria-hidden="true"><span class="cl-meter"><span th:style="'width:' + ${row.meter()} + '%'"></span></span></td>
+                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${row.deliveriesText()}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.shipping}" th:text="#{general.currency.amount(${row.shipping()})}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.payment}" th:text="#{general.currency.amount(${row.payment()})}"></td>
+            </tr></tbody>
+            <tfoot><tr>
+                <th scope="row" class="cl-table-key" th:text="#{reports.chart.total}"></th>
+                <td class="is-bar"></td>
+                <td class="is-numeric" th:attr="data-label=#{reports.suppliers.deliveries}" th:text="${suppliers.deliveriesText()}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.shipping}" th:text="#{general.currency.amount(${suppliers.shipping()})}"></td>
+                <td class="is-numeric is-money" th:attr="data-label=#{reports.suppliers.payment}" th:text="#{general.currency.amount(${suppliers.payment()})}"></td>
+            </tr></tfoot>
+        </table>
+    </th:block>
+</section>
+
+</body>
+</html>

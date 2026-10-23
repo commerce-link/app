@@ -22,6 +22,7 @@ import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.starter.secrets.SecretsManager;
 import org.mockito.Spy;
@@ -41,6 +42,8 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -65,6 +68,8 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -87,7 +92,10 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancelResult;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShippingUnavailableException;
+import pl.commercelink.shipping.ShipmentsState;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
@@ -98,6 +106,7 @@ import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
@@ -113,6 +122,7 @@ import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.event.EventType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -127,6 +137,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -209,6 +220,10 @@ class OrdersControllerTest {
     @Spy
     private pl.commercelink.inventory.deliveries.DeliveryRedirectResolver deliveryRedirectResolver =
             new pl.commercelink.inventory.deliveries.DeliveryRedirectResolver();
+
+    @Spy
+    private pl.commercelink.shipping.ShippingIntegrationNames shippingIntegrationNames =
+            pl.commercelink.shipping.ShippingIntegrationNamesFixture.names();
 
     @InjectMocks
     private OrdersController ordersController;
@@ -1052,6 +1067,83 @@ class OrdersControllerTest {
             verifyNoInteractions(orderLifecycle);
         }
 
+        private Shipment creating(String commandId) {
+            Shipment shipment = new Shipment(ShipmentType.Courier);
+            shipment.setCreation(pl.commercelink.orders.ShipmentCreationState.pending(commandId, LocalDateTime.now()));
+            return shipment;
+        }
+
+        private Shipment withUnresolvedCancellation(Shipment shipment, String externalId) {
+            shipment.setExternalId(externalId);
+            shipment.setCancellation(pl.commercelink.orders.CourierCancellation.pending("cmd-c", LocalDateTime.now()).failed());
+            return shipment;
+        }
+
+        @Test
+        void aShipmentBeingCreatedIsNotRemoved() {
+            // given: its result still comes, and with a placeholder gone a paid label would be lost
+            Shipment shipped = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment inFlight = creating("cmd-1");
+            Order order = orderWith(shipped, inFlight);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(inFlight), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.locked.creating");
+            assertThat(order.getShipments()).containsExactly(shipped, inFlight);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aFailedCreationIsRemovedThoughItHasAPackage() {
+            // given: the package stayed unpaid in the provider's basket
+            Shipment shipped = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment failed = creating("cmd-1");
+            failed.setExternalId("EXT-9");
+            failed.setCreation(failed.getCreation().failed("Nieprawidłowy kod pocztowy"));
+            Order order = orderWith(shipped, failed);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(failed), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getShipments()).containsExactly(shipped);
+        }
+
+        @Test
+        void aShipmentBeingCreatedIsNotEdited() {
+            // given: the form rebuilds the shipment without its command, whose result would then be dropped
+            Shipment inFlight = creating("cmd-1");
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)), inFlight);
+            Shipment typed = courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0));
+
+            // when
+            save(1, OrderShipmentForm.version(inFlight), typed);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.edit.locked.creating");
+            assertThat(order.getShipments().get(1)).isSameAs(inFlight);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aFailedCreationIsNotEditedIntoAShipment() {
+            // given: its package would turn the row into a courier order nobody can remove
+            Shipment failed = creating("cmd-1");
+            failed.setExternalId("EXT-9");
+            failed.setCreation(failed.getCreation().failedWithKey("shipping.creation.unconfirmed"));
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)), failed);
+
+            // when
+            save(1, OrderShipmentForm.version(failed), courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.edit.locked.creating");
+            assertThat(order.getShipments().get(1)).isSameAs(failed);
+        }
+
         @Test
         void aForcedRemovalOfTheCreationPlaceholderIsRefusedLikeThePageOffersNoRemove() {
             // given: the shipment the order was created with, holding only the customer's pickup point
@@ -1143,7 +1235,7 @@ class OrdersControllerTest {
             // when
             ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: the next shipment with a number sends the e-mail again, as after "Cancel courier order"
+            // then: the next shipment with a number sends the e-mail again, as after "Cancel shipment"
             verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
         }
 
@@ -1199,7 +1291,7 @@ class OrdersControllerTest {
             // when
             save(0, OrderShipmentForm.version(labelled), courier("TRACK-1", null), "fetch", response, model);
 
-            // then: nothing stored, so "Cancel courier order" stays and "Book courier" does not come back
+            // then: nothing stored, so "Cancel shipment" stays and "Book courier" does not come back
             assertThat(response.getStatus()).isEqualTo(422);
             OrderShipmentForm form = (OrderShipmentForm) model.getAttribute("shipment");
             assertThat(form.errors()).containsOnly(
@@ -1396,6 +1488,44 @@ class OrdersControllerTest {
             assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
             assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
             verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void paymentFromThePaymentsPageGoesBackThereAndRefusalsToo() {
+            // given
+            orderWith(new Payment(PaymentSource.BankTransfer));
+            AddPaymentForm ok = addForm("100", "", PaymentDirection.Incoming);
+            ok.setReturnTo("/dashboard/payments?side=receivables");
+            AddPaymentForm negative = addForm("-10", "", PaymentDirection.Incoming);
+            negative.setReturnTo("/dashboard/payments?side=receivables");
+
+            // when
+            String saved = ordersController.addPayment(ORDER_ID, ok, redirect, Locale.ENGLISH);
+            String refused = ordersController.addPayment(ORDER_ID, negative, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(saved).isEqualTo("redirect:/dashboard/payments?side=receivables");
+            assertThat(refused).isEqualTo("redirect:/dashboard/payments?side=receivables");
+            assertThat(redirect.getFlashAttributes()).containsKey(PaymentsReturn.ERROR);
+        }
+
+        @Test
+        void aRefundFromThePaymentsPageSaysRefundAndAPaymentSaysPayment() {
+            // given
+            orderWith(Payment.bankTransfer("REF-1", "Jan", 260));
+            AddPaymentForm refund = addForm("60", "", PaymentDirection.Outgoing);
+            refund.setReturnTo("/dashboard/payments?side=receivables&focus=refund");
+            AddPaymentForm payment = addForm("10", "", PaymentDirection.Incoming);
+            payment.setReturnTo("/dashboard/payments?side=receivables");
+
+            // when
+            ordersController.addPayment(ORDER_ID, refund, redirect, Locale.ENGLISH);
+            Object refundNotice = redirect.getFlashAttributes().get(PaymentsReturn.NOTICE);
+            ordersController.addPayment(ORDER_ID, payment, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(refundNotice).isEqualTo("payments.notice.order.refund");
+            assertThat(redirect.getFlashAttributes().get(PaymentsReturn.NOTICE)).isEqualTo("payments.notice.order");
         }
 
         @Test
@@ -2768,7 +2898,7 @@ class OrdersControllerTest {
         private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
             return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), "", List.of(),
                     Optional.empty(), List.of(), "", java.util.Map.of(), List.of(),
-                    pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null);
+                    pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, null);
         }
 
         @BeforeEach
@@ -2780,6 +2910,7 @@ class OrdersControllerTest {
             when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
             when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of()));
             when(orderListService.page(eq(ACTOR), any(), any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(1)));
+            lenient().when(orderListService.fullPage(eq(ACTOR), any(), any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(1)));
         }
 
         @Test
@@ -4271,6 +4402,247 @@ class OrdersControllerTest {
         }
 
         @Test
+        void cancelShipmentRefusesWhileACancellationIsInProgress() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
+            sent.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending [Furgonetka]");
+        }
+
+        @Test
+        void cancelShipmentRefusesAShipmentTheIntegrationCannotCancel() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("ALLEGRO");
+            sent.setTrackingNo("A000123");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("shp-1");
+            sent.setProvider("furgonetka");
+            sent.setCancellable(false);
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    "order.shipments.cancel.error.not.cancellable [Furgonetka]");
+        }
+
+        @Test
+        void cancelShipmentRefusesWhenAConcurrentRequestMarkedTheCancellationFirst() {
+            // given: the order read here shows no cancellation, the service's fresh read finds one in progress
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            doThrow(new ShipmentCancellationInProgressException())
+                    .when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending [Furgonetka]");
+        }
+
+        private void orderWithASentShipment() {
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            sent.setProvider("furgonetka");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        }
+
+        @Test
+        void cancelShipmentReportsThatTheCancellationWasRequested() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.requested());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.requested [Furgonetka]");
+        }
+
+        @Test
+        void cancelShipmentReportsThatTheEarlierCancellationIsBeingRechecked() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.rechecking());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.rechecking [Furgonetka]");
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
+        }
+
+        @Test
+        void cancelShipmentReportsAnImmediateCancellation() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.cancelled());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.success");
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
+        }
+
+        @Test
+        void cancelShipmentReportsAnImmediateFailureWithTheProvidersReason() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenReturn(ShipmentCancelResult.failed("Przesyłka została już odebrana"));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.failed [Przesyłka została już odebrana, Furgonetka]")
+                    .doesNotContainKey(OrderFlash.ATTRIBUTE);
+        }
+
+        @Test
+        void cancelShipmentShowsTheLibrarysNotReceivedReasonInTheOperatorsLanguage() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenReturn(ShipmentCancelResult.failed("Furgonetka did not receive the cancel command"));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.failed [shipment.cancellation.reason.notReceived [Furgonetka], Furgonetka]");
+        }
+
+        @Test
+        void aCourierCancellationInAStoreThatLostItsCarrierIsRefusedWithAReason() {
+            // given
+            orderWithASentShipment();
+            doThrow(new ShippingUnavailableException(STORE_ID)).when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
+        }
+
+        @Test
+        void theCancellationStateSaysWhetherAShipmentOfTheOrderIsStillBeingCancelled() {
+            // given
+            Order pending = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setExternalId("21353832");
+            sent.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            pending.setShipments(new ArrayList<>(List.of(sent)));
+            Order settled = order(OrderStatus.Shipping);
+            Shipment failed = new Shipment(ShipmentType.Courier);
+            failed.setExternalId("21353832");
+            failed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            failed.setCancellation(failed.getCancellation().failed());
+            settled.setShipments(new ArrayList<>(List.of(failed)));
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pending);
+            ResponseEntity<ShipmentsState> inProgress = ordersController.shipmentsState(ORDER_ID);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(settled);
+            ResponseEntity<ShipmentsState> done = ordersController.shipmentsState(ORDER_ID);
+
+            // then
+            assertThat(inProgress.getBody().inProgress()).isTrue();
+            assertThat(inProgress.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertThat(done.getBody().inProgress()).isFalse();
+        }
+
+        @Test
+        void theShipmentsStateAlsoWaitsForACreationAndAPickupOrder() {
+            // given
+            Order creating = order(OrderStatus.Shipping);
+            Shipment placeholder = new Shipment(ShipmentType.Courier);
+            placeholder.setCreation(ShipmentCreationState.pending("cmd-1", LocalDateTime.now()));
+            creating.setShipments(new ArrayList<>(List.of(placeholder)));
+            Order pickup = order(OrderStatus.Shipping);
+            Shipment parcel = new Shipment(ShipmentType.Courier);
+            parcel.setExternalId("21480003");
+            parcel.setPickup(ShipmentPickup.pending("cmd-2", LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                    LocalTime.of(9, 0), LocalTime.of(17, 0)));
+            pickup.setShipments(new ArrayList<>(List.of(parcel)));
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(creating);
+            boolean whileCreating = ordersController.shipmentsState(ORDER_ID).getBody().inProgress();
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pickup);
+            boolean whileOrderingPickup = ordersController.shipmentsState(ORDER_ID).getBody().inProgress();
+
+            // then
+            assertThat(whileCreating).isTrue();
+            assertThat(whileOrderingPickup).isTrue();
+        }
+
+        @Test
+        void theCancellationStateOfAnotherStoresOrderIsNotFound() {
+            // given: the order exists only under another store; the session's store finds nothing
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.shipmentsState(ORDER_ID))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(404));
+            verify(ordersRepository).findById(STORE_ID, ORDER_ID);
+        }
+
+        @Test
         void aCourierOrderWithoutAShippedDateIsStillCancelled() {
             // given: legacy data or a date cleared before the guard; the paid label is there whatever the dates say
             Order order = order(OrderStatus.Shipping);
@@ -4280,6 +4652,7 @@ class OrdersControllerTest {
             labelled.setExternalId("PKG-1");
             order.setShipments(new ArrayList<>(List.of(labelled)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.requested());
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4291,47 +4664,34 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aCourierCancellationInAStoreThatLostItsCarrierIsRefusedWithAReason() {
-            // given
-            Order order = order(OrderStatus.Shipping);
-            Shipment labelled = new Shipment(ShipmentType.Courier);
-            labelled.setCarrier("DPD");
-            labelled.setTrackingNo("TRACK-1");
-            labelled.setShippedAt(LocalDateTime.now());
-            labelled.setExternalId("PKG-1");
-            order.setShipments(new ArrayList<>(List.of(labelled)));
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
-                    .thenThrow(new ShippingUnavailableException(STORE_ID));
-            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-            // when
-            String view = ordersController.cancelShipment(ORDER_ID, redirect, polish);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
-        }
-
-        @Test
         void cancellingTheCourierOrderThatTakesTheOrderBackToRealizationSaysSo() {
-            // given
-            Order order = order(OrderStatus.Shipping);
-            Shipment labelled = new Shipment(ShipmentType.Courier);
-            labelled.setCarrier("DPD");
-            labelled.setTrackingNo("TRACK-1");
-            labelled.setShippedAt(LocalDateTime.now());
-            labelled.setExternalId("PKG-1");
-            order.setShipments(new ArrayList<>(List.of(labelled)));
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(true);
+            // given: the provider confirmed right away and the settled order went back to Realization
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.cancelled(true));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
             ordersController.cancelShipment(ORDER_ID, redirect, polish);
 
             // then
-            assertThat(notice(redirect).text()).startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
+        }
+
+        @Test
+        void cancelShipmentReportsAShipmentThatDisappearedMeanwhile() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.gone());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.gone")
+                    .doesNotContainKey(OrderFlash.ATTRIBUTE);
         }
 
         @Test
@@ -4788,7 +5148,99 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             assertThat(model).containsKeys("orderId", "supplierForm", "suppliers");
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void aTypedEanAssignsTheSupplierWhenTheTaxonomyDoesNotKnowTheProduct() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", " 5901234567890 "), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void aTypedEanDoesNotOverrideTheTaxonomy() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
+                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "4006381333931"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theItemsOwnEanIsKeptWhenTheProductCodeIsUnchanged() {
+            // given: the EAN was typed earlier on the item's edit page
+            OrderItem item = supplierItem(1.23);
+            item.setManufacturerCode("MFN-1");
+            item.setEan("5901234567890");
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theItemsOwnEanIsNotCarriedOverToAnotherProductCode() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            item.setManufacturerCode("MFN-OLD");
+            item.setEan("5901234567890");
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), "fetch",
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), model,
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void aMalformedTypedEanIsRefusedWithTheEanFieldStillShown() {
+            // given
+            supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "590-12AB"), "fetch",
+                    new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(model.get("supplierError")).isEqualTo("product.error.ean.invalid");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             verify(orderItemsRepository, never()).save(any());
         }
 
@@ -4851,6 +5303,7 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.get("supplierError")).isNull();
+            assertThat(model.get("supplierEanField")).isNull();
             assertThat(model.get("supplierRedirect")).isEqualTo("/dashboard/orders/" + ORDER_ID);
             assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.item.supplier.assigned");
             verify(orderItemsRepository).save(item);
@@ -4858,7 +5311,13 @@ class OrdersControllerTest {
 
         // a name typed next to "Other supplier…" is accepted without a connection
         private AssignSupplierForm supplierForm(String cost, String priceType) {
-            return AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+            return supplierForm(cost, priceType, null);
+        }
+
+        private AssignSupplierForm supplierForm(String cost, String priceType, String ean) {
+            AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+            form.setEan(ean);
+            return form;
         }
 
         // --- e-receipt: the locks while it is being issued, refused on the server (never only greyed in the UI) ---
@@ -5191,6 +5650,82 @@ class OrdersControllerTest {
             assertThat(item.getName()).isEqualTo("Ryzen 9");
             assertThat(item.getQty()).isEqualTo(2);
             assertThat(item.getTax()).isEqualTo(1.08);
+        }
+
+        private Order rmaReplacement() {
+            Order order = order(OrderStatus.New);
+            order.setSource(new OrderSource("RMA", OrderSourceType.Other));
+            return order;
+        }
+
+        @Test
+        void anRmaReplacementOrderSavesAChangedNameQuantityAndVatRateThoughItCountsAsInvoiced() {
+            // given
+            Order order = rmaReplacement();
+            OrderItem item = storedNewItem(order);
+            OrderItem posted = postedUnchanged(item);
+            posted.setName("Ryzen 9");
+            posted.setQty(2);
+            posted.setTax(1.08);
+            posted.setConsolidated(true);
+            ExtendedModelMap pageModel = new ExtendedModelMap();
+
+            // when
+            ordersController.getOrderItem(ORDER_ID, "i1", pageModel);
+            String view = ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, new ExtendedModelMap());
+
+            // then
+            assertThat(order.isInvoiced()).isTrue();
+            assertThat(pageModel.getAttribute("saleLock")).isNull();
+            assertThat(pageModel.getAttribute("consolidationLocked")).isEqualTo(false);
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getName()).isEqualTo("Ryzen 9");
+            assertThat(item.getQty()).isEqualTo(2);
+            assertThat(item.getTax()).isEqualTo(1.08);
+            assertThat(item.isConsolidated()).isTrue();
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void itemsOfAnRmaReplacementOrderAreRemovedAndMergedOnInvoice() {
+            // given
+            OrderItem item = storedNewItem(rmaReplacement());
+            when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a")))
+                    .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 1, 1));
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+
+            // then
+            assertThat(flash(remove)).doesNotContainKey("errorMessage");
+            assertThat(flash(consolidate)).doesNotContainKey("errorMessage");
+            verify(ordersManager).removeFromOrder(STORE_ID, ORDER_ID, List.of("a"));
+            assertThat(item.isConsolidated()).isTrue();
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void itemsOfAClosedRmaReplacementOrderAreNeitherRemovedNorMergedEvenFromAStalePage() {
+            // given
+            Order order = rmaReplacement();
+            order.setStatus(OrderStatus.Completed);
+            OrderItem item = storedNewItem(order);
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("i1"), remove, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+
+            // then
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.item.error.closed");
+            assertThat(flash(consolidate)).containsEntry("errorMessage", "order.item.error.closed");
+            assertThat(item.isConsolidated()).isFalse();
+            verifyNoInteractions(ordersManager);
+            verify(orderItemsRepository, never()).save(any());
         }
 
         @Test

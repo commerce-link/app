@@ -9,37 +9,31 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
-import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
-import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.stores.ConnectionMode;
-import pl.commercelink.stores.FulfilmentConfiguration;
-import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
-import pl.commercelink.warehouse.api.Warehouse;
+import pl.commercelink.web.fulfilment.FulfilmentSelectPageFactory;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,8 +43,6 @@ class WarehouseControllerTest {
     private static final String STORE_ID = "store-1";
 
     @Mock
-    private Warehouse warehouse;
-    @Mock
     private WarehouseRepository warehouseRepository;
     @Mock
     private StoresRepository storesRepository;
@@ -58,8 +50,6 @@ class WarehouseControllerTest {
     private ManualWarehouseFulfilment manualWarehouseFulfilment;
     @Mock
     private RestockSuggestionService restockSuggestionService;
-    @Mock
-    private ProductCatalogRepository productCatalogRepository;
     @Mock
     private WarehouseGoodsOutService warehouseGoodsOutService;
     @Mock
@@ -75,44 +65,11 @@ class WarehouseControllerTest {
     @Mock
     private SupplierLabels supplierLabels;
 
+    @Mock
+    private FulfilmentSelectPageFactory fulfilmentSelectPageFactory;
+
     @InjectMocks
     private WarehouseController warehouseController;
-
-    @Test
-    @DisplayName("warehouseItems lists items without category first instead of failing with NPE")
-    @SuppressWarnings("unchecked")
-    void warehouseItemsListsItemsWithoutCategoryFirstInsteadOfFailing() {
-        // given
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            security.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(true);
-
-            Store store = mock(Store.class);
-            when(store.hasIntegration(IntegrationType.WMS_PROVIDER)).thenReturn(false);
-            when(storesRepository.findById(STORE_ID)).thenReturn(store);
-
-            WarehouseItem withCategory = deliveredItem("CPU", "Ryzen 7");
-            WarehouseItem withoutCategory = deliveredItem(null, "Uchwyt montazowy");
-            when(warehouseRepository.findAllFiltered(eq(STORE_ID), isNull(), anyList()))
-                    .thenReturn(List.of(withCategory, withoutCategory));
-            when(warehouseRepository.findAllCategories(STORE_ID)).thenReturn(Collections.emptySet());
-            when(productCatalogRepository.findAll(STORE_ID)).thenReturn(Collections.emptyList());
-            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labelsOfOneConnection());
-
-            Model model = new ConcurrentModel();
-
-            // when
-            String view = warehouseController.warehouseItems(null, null, false, model);
-
-            // then
-            assertThat(view).isEqualTo("warehouse");
-            List<WarehouseItem> deliveredItems = (List<WarehouseItem>) model.getAttribute("deliveredItems");
-            assertThat(deliveredItems).containsExactly(withoutCategory, withCategory);
-            assertThat((List<SupplierLabelMap.Option>) model.getAttribute("providerOptions"))
-                    .extracting(SupplierLabelMap.Option::identity)
-                    .containsExactly("AcmeB-k7f3a9c2");
-        }
-    }
 
     @Test
     @DisplayName("restock exposes supplierLabels so fulfilment.html can resolve connection labels")
@@ -131,32 +88,29 @@ class WarehouseControllerTest {
             Model model = new ConcurrentModel();
 
             // when
-            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model);
+            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model, Locale.ENGLISH, new MockHttpServletResponse());
 
             // then
             assertThat(view).isEqualTo("fulfilment");
             assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
+            verify(fulfilmentSelectPageFactory).forRestock(any(), eq(labels), eq(false), any());
         }
     }
 
-    private SupplierLabelMap labelsOfOneConnection() {
-        StoreSupplierConnection connection =
-                new StoreSupplierConnection("AcmeB-k7f3a9c2", ConnectionMode.OWN, true, true);
-        connection.setLabel("AcmeB drugie konto");
-        FulfilmentConfiguration config = new FulfilmentConfiguration();
-        config.setSupplierConnections(new ArrayList<>(List.of(connection)));
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        store.setFulfilmentConfiguration(config);
-        return new SupplierLabels(mock(StoresRepository.class)).forStore(store);
-    }
+    @Test
+    void savingARestockAlwaysReturnsToTheWarehouseWhateverTheFormSays() {
+        // given
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            FulfilmentForm form = new FulfilmentForm();
+            form.setRedirectUrl("redirect:https://evil.example");
 
-    private WarehouseItem deliveredItem(String categoryKey, String name) {
-        WarehouseItem item = new WarehouseItem();
-        item.setStoreId(STORE_ID);
-        item.setCategory(categoryKey);
-        item.setName(name);
-        item.setStatus(FulfilmentStatus.Delivered);
-        return item;
+            // when
+            String view = warehouseController.handleFulfilment(form);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/warehouse?statuses=New");
+            verify(manualWarehouseFulfilment).accept(STORE_ID, form);
+        }
     }
 }

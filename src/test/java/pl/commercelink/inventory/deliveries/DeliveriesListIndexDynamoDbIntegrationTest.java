@@ -8,17 +8,20 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.BillingMode;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.junit.jupiter.api.*;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.migration.V019_AddDeliveriesListKeyIndex;
 import pl.commercelink.migration.V020_RenameDeliveriesListSortKey;
+import pl.commercelink.testsupport.DynamoDbLocalImage;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +32,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
-            new GenericContainer<>(DockerImageName.parse("amazon/dynamodb-local:latest")).withExposedPorts(8000);
+            new GenericContainer<>(DynamoDbLocalImage.IMAGE).withExposedPorts(8000);
 
     static AmazonDynamoDB client;
     static DynamoDBMapper mapper;
@@ -54,6 +57,31 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         // the order of a real deployment: V019 (old index and listKey), then V020 replaces both
         new V019_AddDeliveriesListKeyIndex(client).execute();
         new V020_RenameDeliveriesListSortKey(client).execute();
+        // V020 creates the list index without waiting for it; until it is built a query reads nothing
+        awaitIndexesActive();
+    }
+
+    static void awaitIndexesActive() {
+        long deadline = System.currentTimeMillis() + Duration.ofMinutes(1).toMillis();
+        while (!indexesActive()) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new IllegalStateException("Deliveries indexes still building: "
+                        + client.describeTable("Deliveries").getTable().getGlobalSecondaryIndexes());
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    // dynamodb-local reports no status at all for an index that is ready
+    static boolean indexesActive() {
+        List<GlobalSecondaryIndexDescription> indexes = client.describeTable("Deliveries").getTable().getGlobalSecondaryIndexes();
+        return indexes != null && indexes.stream()
+                .allMatch(index -> index.getIndexStatus() == null || "ACTIVE".equals(index.getIndexStatus()));
     }
 
     static Delivery inTransit(String storeId, String id, LocalDate planned) {
@@ -89,9 +117,10 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         assertThat(deliveries.findInTransit("store-2")).hasSize(1);
         assertThat(deliveries.findToSettle("store-1")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0001-0000-0000-0000-000000000000");
-        assertThat(deliveries.findReceivedBetween("store-1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+        assertThat(deliveries.findReceivedSince("store-1", LocalDate.of(2026, 9, 20)))
                 .extracting(Delivery::getDeliveryId).containsExactly("bbbb0001-0000-0000-0000-000000000000");
-        assertThat(deliveries.findReceivedBetween("store-1", null, null)).hasSize(2);
+        assertThat(deliveries.findReceivedSince("store-1", LocalDate.of(2026, 9, 21))).isEmpty();
+        assertThat(deliveries.findReceivedSince("store-1", null)).hasSize(2);
         assertThat(deliveries.findByDeliveryIdPrefix("store-1", "bbbb0002")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0002-0000-0000-0000-000000000000");
         // COUNT on the active index

@@ -53,7 +53,7 @@ class DeliveryListServiceTest {
         when(repository.findInTransit(anyString())).thenAnswer(inv -> transit.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).toList());
         when(repository.findToSettle(anyString())).thenAnswer(inv -> toSettle.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).toList());
         when(repository.countToSettle(anyString())).thenAnswer(inv -> toSettle.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).count());
-        when(repository.findReceivedBetween(anyString(), any(), any())).thenAnswer(inv -> history.stream()
+        when(repository.findReceivedSince(anyString(), any())).thenAnswer(inv -> history.stream()
                 .filter(d -> d.getStoreId().equals(inv.getArgument(0)))
                 .filter(d -> inv.getArgument(1) == null || !d.getReceivedAt().toLocalDate().isBefore(inv.getArgument(1)))
                 .toList());
@@ -79,6 +79,7 @@ class DeliveryListServiceTest {
 
     static Delivery receivedOn(String storeId, String id, LocalDate day, boolean invoiced) {
         Delivery d = onItsWay(storeId, id, day);
+        d.setOrderedAt(day.minusDays(2).atTime(8, 0));
         d.setReceivedAt(day.atTime(10, 0));
         d.setInvoiced(invoiced);
         return d;
@@ -275,7 +276,8 @@ class DeliveryListServiceTest {
 
         // when / then
         assertThat(page("scope", "received", "settle", "noInvoice").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001");
-        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0002");
+        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number)
+                .containsExactlyInAnyOrder("aaaa0001", "aaaa0002");
         assertThat(page("scope", "received", "settle", "unpaid").rows()).extracting(DeliveryRow::number)
                 .containsExactlyInAnyOrder("aaaa0001", "aaaa0002");
     }
@@ -344,6 +346,59 @@ class DeliveryListServiceTest {
 
         // then
         assertThat(page.rows()).extracting(DeliveryRow::number).containsExactlyInAnyOrder("aaaa0002", "aaaa0003");
+    }
+
+    @Test
+    void receivedScopeWindowIsTheCreationDayNotTheReceptionDay() {
+        // given: created 100 days ago and received only last week, then created 85 days ago and received the same week
+        Delivery lateReceived = receivedOn("store-1", "bbbb0001", TODAY.minusDays(7), true);
+        lateReceived.setOrderedAt(TODAY.minusDays(100).atTime(8, 0));
+        history.add(lateReceived);
+        history.add(receivedOn("store-1", "bbbb0002", TODAY.minusDays(83), true));
+
+        // when
+        DeliveriesPageModel page = page("scope", "received");
+
+        // then
+        assertThat(page.rows()).extracting(DeliveryRow::number).containsExactly("bbbb0002");
+        assertThat(page.dates().key()).isEqualTo("Zamówiona");
+        assertThat(page("scope", "received", "period", "all").rows()).hasSize(2);
+    }
+
+    @Test
+    void createdDatesFilterEveryScopeInclusively() {
+        // given: everything received this week, created on the edges of 21–22.09
+        Delivery before = receivedOn("store-1", "bbbb0001", TODAY.minusDays(1), true);
+        before.setOrderedAt(LocalDateTime.of(2026, 9, 20, 23, 59));
+        Delivery first = receivedOn("store-1", "bbbb0002", TODAY.minusDays(1), true);
+        first.setOrderedAt(LocalDateTime.of(2026, 9, 21, 0, 0));
+        Delivery last = receivedOn("store-1", "bbbb0003", TODAY.minusDays(1), true);
+        last.setOrderedAt(LocalDateTime.of(2026, 9, 22, 23, 59));
+        history.addAll(List.of(before, first, last));
+        Delivery inRange = onItsWay("store-1", "aaaa0001", TODAY);
+        inRange.setOrderedAt(LocalDateTime.of(2026, 9, 22, 8, 0));
+        Delivery after = onItsWay("store-1", "aaaa0002", TODAY);
+        after.setOrderedAt(LocalDateTime.of(2026, 9, 23, 0, 0));
+        transit.addAll(List.of(inRange, after));
+
+        // then
+        assertThat(page("scope", "received", "from", "2026-09-21", "to", "2026-09-22").rows())
+                .extracting(DeliveryRow::number).containsExactlyInAnyOrder("bbbb0002", "bbbb0003");
+        assertThat(page("scope", "all", "from", "2026-09-21", "to", "2026-09-22").rows())
+                .extracting(DeliveryRow::number).containsExactlyInAnyOrder("aaaa0001", "bbbb0002", "bbbb0003");
+    }
+
+    @Test
+    void allScopeWindowLeavesOutDeliveriesOnTheirWayCreatedLongAgo() {
+        // given
+        Delivery old = onItsWay("store-1", "aaaa0001", TODAY.plusDays(2));
+        old.setOrderedAt(TODAY.minusDays(120).atTime(8, 0));
+        transit.add(old);
+        transit.add(onItsWay("store-1", "aaaa0002", TODAY.plusDays(2)));
+
+        // then: the window is the creation day here too, while "Nieodebrane" keeps showing every one on its way
+        assertThat(page("scope", "all").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0002");
+        assertThat(page().rows()).hasSize(2);
     }
 
     @Test
@@ -461,6 +516,22 @@ class DeliveryListServiceTest {
 
         // when / then
         assertThat(page("scope", "received", "settle", "noInvoice").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001");
-        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0003");
+        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number)
+                .containsExactlyInAnyOrder("aaaa0001", "aaaa0003");
+    }
+
+    @Test
+    void withoutSyncCountsOnlyTheSyncFlagNotTheInvoice() {
+        // given
+        receivedBy("aaaa0001", "Acme", false, false);
+        receivedBy("aaaa0002", "Acme", true, false);
+        receivedBy("aaaa0003", "Acme", true, true);
+        receivedBy("aaaa0004", "Acme", false, true);
+
+        // when / then: with or without an invoice, only an unsynced delivery is listed
+        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number)
+                .containsExactlyInAnyOrder("aaaa0001", "aaaa0002");
+        assertThat(page("scope", "received", "settle", "noInvoice", "settle", "noSync").rows()).extracting(DeliveryRow::number)
+                .containsExactly("aaaa0001");
     }
 }

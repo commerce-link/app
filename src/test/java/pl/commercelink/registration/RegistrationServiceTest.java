@@ -14,6 +14,7 @@ import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreSeeder;
 import pl.commercelink.stores.StoreSeedingException;
+import pl.commercelink.stores.TrialPeriod;
 import pl.commercelink.users.CognitoUserService;
 
 import java.time.Clock;
@@ -33,6 +34,7 @@ class RegistrationServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-07-08T10:00:00Z");
     private static final String PASSWORD = "Tajne1!haslo";
+    private static final int TRIAL_DAYS = 21;
 
     @Mock private CognitoUserService cognitoUserService;
     @Mock private StoreSeeder storeSeeder;
@@ -42,7 +44,11 @@ class RegistrationServiceTest {
 
     private RegistrationService service(boolean demoMode) {
         return new RegistrationService(cognitoUserService, storeSeeder, storeCreationService, storeDeletionService,
-                rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC), 14, demoMode);
+                rateLimiter, Clock.fixed(NOW, ZoneOffset.UTC), 14, TRIAL_DAYS, demoMode);
+    }
+
+    private static TrialPeriod trial(String ownerEmail) {
+        return TrialPeriod.starting(ownerEmail, NOW, TRIAL_DAYS);
     }
 
     private static Store store(String storeId) {
@@ -69,6 +75,7 @@ class RegistrationServiceTest {
         assertEquals("user@example.com", requestCaptor.getValue().demoMetadata().getOwnerEmail());
         assertEquals(NOW.toString(), requestCaptor.getValue().demoMetadata().getCreatedAt());
         assertEquals(NOW.plusSeconds(14 * 24 * 3600).toString(), requestCaptor.getValue().demoMetadata().getExpiresAt());
+        assertNull(requestCaptor.getValue().trial());
         verify(cognitoUserService).createStoreAdmin("user@example.com", "demo-store-1", PASSWORD, true);
         assertEquals("demo-store-1", result.storeId());
     }
@@ -78,7 +85,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-1"));
 
         // when
@@ -88,6 +95,28 @@ class RegistrationServiceTest {
         assertEquals("prod-store-1", result.storeId());
         verify(cognitoUserService).createStoreAdmin("user@firma.pl", "prod-store-1", PASSWORD, false);
         verifyNoInteractions(storeSeeder);
+    }
+
+    @Test
+    void createsEmptyTrialStoreEndingAfterTrialDays() {
+        // given
+        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
+        when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
+        when(storeCreationService.createStore(any(CreateStoreRequest.class))).thenReturn(store("prod-store-1"));
+        ArgumentCaptor<CreateStoreRequest> requestCaptor = ArgumentCaptor.forClass(CreateStoreRequest.class);
+
+        // when
+        service(false).register("user@firma.pl", "Moja Firma", "10.0.0.1", PASSWORD);
+
+        // then
+        verify(storeCreationService).createStore(requestCaptor.capture());
+        CreateStoreRequest request = requestCaptor.getValue();
+        assertEquals("user@firma.pl", request.trial().getOwnerEmail());
+        assertEquals(NOW.toString(), request.trial().getStartedAt());
+        assertEquals(NOW.plusSeconds(TRIAL_DAYS * 24 * 3600L).toString(), request.trial().getExpiresAt());
+        assertEquals("user@firma.pl", request.ownerEmail());
+        assertNull(request.seeder());
+        assertNull(request.demoMetadata());
     }
 
     @Test
@@ -178,7 +207,7 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-1"));
         doThrow(new RuntimeException("cognito down"))
                 .when(cognitoUserService).createStoreAdmin(anyString(), anyString(), anyString(), anyBoolean());
@@ -242,14 +271,14 @@ class RegistrationServiceTest {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-1"));
 
         // when
         service(false).register("user@firma.pl", "  Moja Firma  ", "10.0.0.1", PASSWORD);
 
         // then
-        verify(storeCreationService).createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl"));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered("Moja Firma", trial("user@firma.pl")));
     }
 
     @Test
@@ -285,9 +314,9 @@ class RegistrationServiceTest {
         String maxName = "x".repeat(60);
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.registered(minName, "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered(minName, trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-1"));
-        when(storeCreationService.createStore(CreateStoreRequest.registered(maxName, "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered(maxName, trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-2"));
 
         // when
@@ -295,8 +324,8 @@ class RegistrationServiceTest {
         service(false).register("user@firma.pl", maxName, "10.0.0.1", PASSWORD);
 
         // then
-        verify(storeCreationService).createStore(CreateStoreRequest.registered(minName, "user@firma.pl"));
-        verify(storeCreationService).createStore(CreateStoreRequest.registered(maxName, "user@firma.pl"));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered(minName, trial("user@firma.pl")));
+        verify(storeCreationService).createStore(CreateStoreRequest.registered(maxName, trial("user@firma.pl")));
     }
 
     @Test
@@ -304,9 +333,9 @@ class RegistrationServiceTest {
         // given
         RegistrationService service = new RegistrationService(cognitoUserService, storeSeeder, storeCreationService,
                 storeDeletionService, new RegistrationRateLimiter(Clock.fixed(NOW, ZoneOffset.UTC), 3, 100),
-                Clock.fixed(NOW, ZoneOffset.UTC), 14, false);
+                Clock.fixed(NOW, ZoneOffset.UTC), 14, TRIAL_DAYS, false);
         when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", "user@firma.pl")))
+        when(storeCreationService.createStore(CreateStoreRequest.registered("Moja Firma", trial("user@firma.pl"))))
                 .thenReturn(store("prod-store-1"));
 
         // when

@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.MarketplaceDefinition;
@@ -49,6 +51,7 @@ import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
+import pl.commercelink.web.catalog.ProductsAddReview;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
@@ -104,6 +107,8 @@ class CatalogProductsControllerTest {
     @Mock
     private MatchedInventory emptyInventory;
     @Mock
+    private MatchedInventory foundInventory;
+    @Mock
     private MarketplaceConnections marketplaces;
     @Mock
     private PimCategoryOptions pimCategoryOptions;
@@ -114,6 +119,8 @@ class CatalogProductsControllerTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
+    private PimView pimView;
+    @Mock
     private BrandMapper brandMapper;
     @Mock
     private MessageSource messageSource;
@@ -123,6 +130,8 @@ class CatalogProductsControllerTest {
     private Store store;
     @Mock
     private OptimisticLockingExecutor optimisticLockingExecutor;
+    @Mock
+    private CatalogPlacement catalogPlacement;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
@@ -139,6 +148,8 @@ class CatalogProductsControllerTest {
         catalog.getCategories().add(gpu);
         when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
         when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        org.mockito.Mockito.lenient().when(pimCatalog.withStoreData(org.mockito.ArgumentMatchers.any())).thenReturn(pimView);
+        org.mockito.Mockito.lenient().when(pimCatalog.withGlobalData()).thenReturn(pimView);
         lenient().when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
@@ -156,7 +167,9 @@ class CatalogProductsControllerTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, optimisticLockingExecutor)).build();
+                brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
     }
 
     @AfterEach
@@ -192,7 +205,7 @@ class CatalogProductsControllerTest {
         // The default is what the page shows without a filter in the address; the script starts from the address and
         // drops a parameter only when it equals this default, so "status=all" (and "status=disabled") stay in it.
         assertThat(result.getModelAndView().getModel().get("filterDefault")).isEqualTo("status:active feature:all label:all");
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
     }
 
     /**
@@ -234,7 +247,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getEan()).thenReturn("1");
         when(recommendation.getLowestGrossPrice()).thenReturn(2749.0);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
 
         // when
         var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
@@ -259,7 +272,7 @@ class CatalogProductsControllerTest {
         CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
         assertThat(page.hasMapping()).isFalse();
         assertThat(page.rows()).isEmpty();
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
     }
 
@@ -312,7 +325,7 @@ class CatalogProductsControllerTest {
         when(recommendation.hasPimId()).thenReturn(true);
         when(recommendation.getName()).thenReturn("MSI RTX 5070");
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
 
         // when
         var result = mvc.perform(get(categoryPath()).param("status", "all").param("feature", "marketplace"))
@@ -337,7 +350,7 @@ class CatalogProductsControllerTest {
                 recommendation("RTX 5060", "ASUS RTX 5060"),
                 recommendation("RTX 5070", "Gigabyte RTX 5070"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(engineOrder);
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(engineOrder);
 
         // when
         var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
@@ -458,6 +471,7 @@ class CatalogProductsControllerTest {
         mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "p1"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"));
         verify(productRepository).deleteWhateverItsVersion(a);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test
@@ -507,7 +521,7 @@ class CatalogProductsControllerTest {
         when(recommendation.getAlternativeEans()).thenReturn(List.of("1", "2"));
         when(recommendation.getAlternativeProductCodes()).thenReturn(List.of("MFN-1"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(recommendationEngine.getRecommendations(any(), eq(gpu), eq(inventoryView))).thenReturn(List.of(recommendation));
         when(supplierLabels.forStoreId(STORE_ID)).thenReturn(supplierLabelMap);
         when(supplierLabelMap.of("Acme")).thenReturn("Acme Parts");
 
@@ -538,7 +552,7 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("hasMapping", false))
                 .andExpect(model().attribute("rows", List.of()));
-        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(recommendationEngine, never()).getRecommendations(any(), any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
         verify(supplierLabels, never()).forStoreId(anyString());
     }
@@ -566,7 +580,7 @@ class CatalogProductsControllerTest {
         when(missing.isEmpty()).thenReturn(true);
         when(inventoryView.findByEan("1")).thenReturn(found);
         when(inventoryView.findByEan("2")).thenReturn(missing);
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1", "2"))
@@ -582,6 +596,146 @@ class CatalogProductsControllerTest {
                 .extracting(ProductsBulkAddForm.Row::getName).containsExactly("MSI RTX 5070");
     }
 
+    /** The review and the save answer a POST; a reload or Back asks for them with a GET, which is not a 405. */
+    @Test
+    void reloadOfTheReviewOrTheSaveGoesBackToTheProposals() throws Exception {
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/add/review")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
+        mvc.perform(get(categoryPath() + "/products/add/save")).andExpect(redirectedUrl(categoryPath() + "/products/add"));
+    }
+
+    @Test
+    void saveWithInventoryReturnToRedirectsBackToTheListWithANotice() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo))
+                .andExpect(flash().attribute("inventoryNotice", "inventory.browse.added"))
+                .andExpect(flash().attributeExists("inventoryNoticeHref"));
+        verify(catalogPlacement).evict(STORE_ID);
+    }
+
+    @Test
+    void saveIgnoresForeignReturnTo() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", "//evil.com"))
+                .andExpect(redirectedUrl(categoryPath()));
+    }
+
+    @Test
+    void reviewKeepsTheInventoryReturnToForTheSaveForm() throws Exception {
+        // given
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("returnTo", returnTo))
+                .andExpect(model().attribute("backHref", returnTo));
+    }
+
+    /** The review drops what the category already has, so the save alone cannot know it for the inventory notice. */
+    @Test
+    void reviewFromTheInventoryCarriesTheCountOfProductsTheCategoryAlreadyHas() throws Exception {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review")
+                        .param("eans", "1")
+                        .param("returnTo", "/dashboard/inventory?cat=11"))
+                .andExpect(model().attribute("skippedBefore", 1));
+    }
+
+    /** "Pominięto (już były)" counts the products the review dropped as well as the ones the save found again. */
+    @Test
+    void saveToTheInventoryCountsProductsSkippedByTheReview() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("skippedBefore", "2")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added.skipped"), eq(new Object[]{"GPU", 1, 2}), any(Locale.class));
+    }
+
+    /** "Pominięto (już były): 0" is noise: with nothing skipped the notice only says what was added. */
+    @Test
+    void saveToTheInventoryWithNothingSkippedLeavesTheSkippedPartOut() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default")
+                        .param("returnTo", returnTo))
+                .andExpect(redirectedUrl(returnTo));
+
+        // then
+        verify(messageSource).getMessage(eq("inventory.browse.added"), eq(new Object[]{"GPU", 1, 0}), any(Locale.class));
+    }
+
+    /** A validation round renders the review again; the count must survive it, and a forged one is not believed. */
+    @Test
+    void saveWithErrorsKeepsTheSkippedCountAndRefusesANegativeOne() throws Exception {
+        // given
+        String returnTo = "/dashboard/inventory?cat=11";
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "3")
+                        .param("returnTo", returnTo))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("skippedBefore", 3));
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "").param("products[0].ean", "5901234567890")
+                        .param("skippedBefore", "-4")
+                        .param("returnTo", returnTo))
+                .andExpect(model().attribute("skippedBefore", 0));
+    }
+
     /**
      * The category and the id are the application's to give: a product grown by the binder carries neither, and a
      * category or an id smuggled into the form would let it land on -- or overwrite -- somebody else's record.
@@ -591,7 +745,7 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         // Product normalises the identifiers it is given, so the lookup asks with the unified code.
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -618,7 +772,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -659,7 +813,7 @@ class CatalogProductsControllerTest {
                 .andExpect(flash().attribute("catalogWarning", "catalog.products.added.none"))
                 .andExpect(flash().attribute("settingsSavedMessage", nullValue()));
         verify(productRepository, never()).save(any(Product.class));
-        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtinOrMpn(any(), any());
     }
 
     /** A selection where only some rows are new: the outcome counts what was added, not what was sent. */
@@ -669,7 +823,7 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
-        when(pimCatalog.findByGtinOrMpn("5901234567891", "MFN-2")).thenReturn(Optional.empty());
+        when(pimView.findByGtinOrMpn("5901234567891", "MFN-2")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -690,7 +844,7 @@ class CatalogProductsControllerTest {
     void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-X")).thenReturn(Optional.empty());
+        when(pimView.findByGtinOrMpn("5901234567890", "MFN-X")).thenReturn(Optional.empty());
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -716,7 +870,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("5901234567899", "MFN-9")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("5901234567899", "MFN-9")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -779,7 +933,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
@@ -794,7 +948,7 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
         assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
-        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtinOrMpn(any(), any());
     }
 
     /**
@@ -810,11 +964,11 @@ class CatalogProductsControllerTest {
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
         when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
                 .thenReturn(Optional.empty());
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-5");
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-9")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("5901234567890", "MFN-9")).thenReturn(Optional.of(entry));
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -835,7 +989,7 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-7");
-        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("5901234567890", "MFN-1")).thenReturn(Optional.of(entry));
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
@@ -847,7 +1001,7 @@ class CatalogProductsControllerTest {
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-7");
-        verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
+        verify(pimView, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
@@ -855,7 +1009,7 @@ class CatalogProductsControllerTest {
     void saveBindsMoreProductsThanTheDefaultCollectionLimit() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
+        when(pimView.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
         MockHttpServletRequestBuilder request = post(categoryPath() + "/products/add/save");
         for (int index = 0; index < 300; index++) {
             request.param("products[" + index + "].name", "Product " + index)
@@ -896,10 +1050,9 @@ class CatalogProductsControllerTest {
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1"))
@@ -910,7 +1063,7 @@ class CatalogProductsControllerTest {
         // then
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).containsExactly("1");
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts()).isEmpty();
-        verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
+        verify(pimView, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
     /** D-M48: a forged way of pricing is a mistake of its field, answered like any other with the review and 422. */
@@ -972,13 +1125,12 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        MatchedInventory found = mock(MatchedInventory.class);
-        when(found.isEmpty()).thenReturn(false);
-        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
-        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
-        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
-        when(inventoryView.findByEan("1")).thenReturn(found);
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+        when(foundInventory.isEmpty()).thenReturn(false);
+        when(foundInventory.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(foundInventory.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(foundInventory.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(foundInventory);
+        when(pimView.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
         // when
         var result = mvc.perform(get(categoryPath() + "/products/new").param("ean", "1"))
@@ -1031,7 +1183,7 @@ class CatalogProductsControllerTest {
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
         PimEntry other = mock(PimEntry.class);
         lenient().when(other.pimId()).thenReturn("pim-2");
-        lenient().when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.of(other));
+        lenient().when(pimView.findByGtinOrMpn(any(), any())).thenReturn(Optional.of(other));
 
         // when
         mvc.perform(post(categoryPath() + "/products/p1")
@@ -1241,7 +1393,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -1291,7 +1443,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
+        when(pimView.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
@@ -1328,7 +1480,7 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+        when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
                 .thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
@@ -1344,7 +1496,7 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
         assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
-        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+        verify(pimView, never()).findByGtinOrMpn(any(), any());
     }
 
     @Test
@@ -1380,10 +1532,12 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(get(categoryPath() + "/products/p1/delete")).andExpect(view().name("settings-confirm"));
         verify(productRepository, never()).delete(any(Product.class));
+        verify(catalogPlacement, never()).evict(any());
         mvc.perform(post(categoryPath() + "/products/p1/delete"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.deleted"));
         verify(productRepository).deleteWhateverItsVersion(existing);
+        verify(catalogPlacement).evict(STORE_ID);
     }
 
     @Test
@@ -1671,7 +1825,9 @@ class CatalogProductsControllerTest {
                 .thenReturn("Enabled 0, skipped 1");
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create())).build();
+                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                .build();
 
         // when / then
         real.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))

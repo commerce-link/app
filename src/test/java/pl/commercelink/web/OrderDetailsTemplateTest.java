@@ -8,8 +8,10 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -23,6 +25,8 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -50,6 +54,7 @@ import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
+import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
@@ -91,10 +96,19 @@ class OrderDetailsTemplateTest {
     /** receipts: what the order's e-receipt attempts say (ReceiptAttemptService#orderState is stubbed with it). */
     static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
                                          List<OrderEvent> orderEvents, ReceiptOrderState receipts) {
+        return factory(dropshipItemIds, documentsGenerationEnabled, orderEvents, receipts, store -> { });
+    }
+
+    static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
+                                         List<OrderEvent> orderEvents, ReceiptOrderState receipts,
+                                         java.util.function.Consumer<Store> storeSetup) {
         StoresRepository stores = mock(StoresRepository.class);
         Store store = new Store();
         store.setStoreId("store-1");
         store.setName("Demo");
+        // names the integration of a shipment typed in by hand (ShippingIntegrationNames)
+        store.setConfigurationValue(pl.commercelink.stores.IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        storeSetup.accept(store);
         if (documentsGenerationEnabled) {
             pl.commercelink.stores.WarehouseConfiguration warehouse = new pl.commercelink.stores.WarehouseConfiguration();
             warehouse.setDocumentsGenerationEnabled(true);
@@ -117,15 +131,17 @@ class OrderDetailsTemplateTest {
         when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
-                receiptService, mock(ReceiptAlerts.class), courierAvailable());
+                receiptService, mock(ReceiptAlerts.class), courierAvailable(),
+                pl.commercelink.shipping.ShippingIntegrationNamesFixture.names());
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
 
-    /** A store with a courier account: the page offers "Zamów kuriera" where a shipment waits for it. */
+    /** A store with a courier account: the page offers "Nadaj przesyłkę" where a shipment waits for it. */
     static ShippingService courierAvailable() {
         ShippingService shipping = mock(ShippingService.class);
-        when(shipping.isAvailable(any())).thenReturn(true);
+        when(shipping.isAvailableFor(any(), any())).thenReturn(true);
+        when(shipping.supportsLabels(any(), any())).thenReturn(true);
         return shipping;
     }
 
@@ -186,6 +202,12 @@ class OrderDetailsTemplateTest {
 
     static String render(Order order, OrderPageModelFactory.Viewer viewer) {
         return render(order, items(order), viewer, Set.of());
+    }
+
+    static String renderWithStore(Order order, java.util.function.Consumer<Store> storeSetup) {
+        OrderPageModel page = factory(Set.of(), false, List.of(), ReceiptOrderState.NONE, storeSetup)
+                .build(order, items(order), ADMIN, PL);
+        return renderPage(page, order);
     }
 
     static final OrderPageModelFactory.Viewer ADMIN = new OrderPageModelFactory.Viewer(false, true, null);
@@ -274,7 +296,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 712,17 brutto")
+                .contains("2 × 749,00").doesNotContain("koszt 712,17 brutto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -346,19 +368,74 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theDeliveryStandsUnderTheItemStatePill() {
+    void theItemStatePillIsTheLinkToItsDelivery() {
         // given
         Order order = order(OrderStatus.Assembly);
-        OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+        OrderItem ordered = inDelivery(order, "90fd6ba3-1111-2222-3333-444455556666", FulfilmentStatus.Ordered);
 
         // when
-        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+        String cell = fulfilmentCell(page(render(order, List.of(ordered), ADMIN, Set.of())));
 
-        // then: the delivery is the cell's second line, under the pill (client request 2026-09-30: the number beside the
-        // pill read worse than under it)
-        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">"
-                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">")
-                .doesNotContain("cl-table-state");
+        // then: the pill took the link of the delivery number that stood under it (client 2026-10-06); the number is
+        // gone from sight and named for screen readers only
+        assertThat(cell).containsPattern("^<a class=\"cl-status is-info\" "
+                        + "href=\"/dashboard/deliveries/details\\?deliveryId=90fd6ba3-1111-2222-3333-444455556666\" "
+                        + "aria-label=\"Zamówiony, dostawa 90fd6ba3\">Zamówiony</a>$")
+                .doesNotContain("cl-table-sub").doesNotContain("cl-table-link");
+    }
+
+    @Test
+    void anItemWaitingForItsSupplierLinksCreatingTheDeliveryForAnAdminOnly() {
+        // given: a warehouse order's item waiting for AcmeB, not yet in a delivery
+        Order order = order(OrderStatus.Assembly);
+        OrderItem awaiting = inDelivery(order, "AcmeB", FulfilmentStatus.Allocation);
+
+        // when
+        String admin = fulfilmentCell(page(render(order, List.of(awaiting), ADMIN, Set.of())));
+        String user = fulfilmentCell(page(render(order, List.of(awaiting), USER, Set.of())));
+
+        // then: creating a delivery is the admin's; a user sees the plain pill, never the supplier's name
+        assertThat(admin).contains("href=\"/dashboard/deliveries/create/AcmeB\"")
+                .contains("aria-label=\"W alokacji, dostawca: AcmeB\"");
+        assertThat(user).isEqualTo("<span class=\"cl-status is-info\">W alokacji</span>");
+    }
+
+    @Test
+    void theStoresWarehouseAndAnItemWithoutSupplierKeepThePlainPill() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem fromWarehouse = inDelivery(order, OrderItem.GENERIC_WAREHOUSE_ORDER_NO, FulfilmentStatus.Delivered);
+        OrderItem unassigned = inDelivery(order, null, FulfilmentStatus.New);
+
+        // when
+        String warehouse = fulfilmentCell(page(render(order, List.of(fromWarehouse), ADMIN, Set.of())));
+        String none = fulfilmentCell(page(render(order, List.of(unassigned), ADMIN, Set.of())));
+
+        // then: the client wants the pill to lead to a delivery or its creation and nothing else
+        assertThat(warehouse).isEqualTo("<span class=\"cl-status is-ok\">Skompletowany</span>");
+        assertThat(none).isEqualTo("<span class=\"cl-status is-neutral\">Nowy</span>");
+    }
+
+    /** The inside of the first item's state cell, trimmed. */
+    private static String fulfilmentCell(String html) {
+        String open = "<td class=\"cl-table-fulfilment\" data-label=\"Stan\">";
+        int start = html.indexOf(open) + open.length();
+        return html.substring(start, html.indexOf("</td>", start)).strip().replaceAll("\\s+", " ");
+    }
+
+    @Test
+    void theMoreMenuLeadsADeliveredOrderToTheRmaPageWithItsId() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+
+        // when
+        String html = page(render(order, items(order), ADMIN, Set.of()));
+        String more = html.substring(html.indexOf("id=\"order-more-menu\""));
+        more = more.substring(0, more.indexOf("</ul>"));
+
+        // then
+        assertThat(more).contains("href=\"/dashboard/rma/new?q=" + order.getOrderId() + "&amp;from=order\"")
+                .contains("Zgłoś RMA");
     }
 
     @Test
@@ -452,8 +529,39 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
-        assertThat(admin).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("Koszt: 712,17 PLN brutto / szt.").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+    }
+
+    @Test
+    void theCostLineUnderThePriceBecameAMarginIconWhoseTooltipCarriesTheNumbers() {
+        // when
+        String html = page(render(order(OrderStatus.New), USER));
+
+        // then: 749,00 for 579 net + 23% (712,17 gross); the service has no cost, so its margin cannot be computed
+        assertThat(html).doesNotContain("koszt 712,17 brutto")
+                .containsPattern("<span class=\"cl-price-margin\"><span>2 × 749,00</span><span class=\"cl-mark cl-margin cl-tooltip is-lines is-end is-ok\" tabindex=\"0\" role=\"img\"")
+                .contains("data-tooltip=\"Marża: 4,9%\nZysk: 29,94 PLN netto (36,83 PLN brutto) / szt.\nKoszt: 712,17 PLN brutto / szt.\"")
+                .contains("class=\"fas fa-info-circle\"")
+                .contains("cl-mark cl-margin cl-tooltip is-lines is-end is-unknown")
+                .contains("Brak kosztu zakupu — marży nie da się policzyć.");
+    }
+
+    @Test
+    void aSaleBelowCostIsMarkedByItsGlyphNotOnlyItsColour() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem cheap = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 5", 1, 500, "MFN-5", false, 0);
+        cheap.setStatus(FulfilmentStatus.New);
+        cheap.setCost(450);
+
+        // when
+        String html = page(render(order, List.of(cheap), USER, Set.of()));
+
+        // then: 450 net + 23% = 553,50 gross against 500,00
+        assertThat(html).contains("cl-mark cl-margin cl-tooltip is-lines is-end is-loss")
+                .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
+                .contains("class=\"fas fa-exclamation-circle\"");
     }
 
     @Test
@@ -491,6 +599,21 @@ class OrderDetailsTemplateTest {
         assertThat(costs.find()).isTrue();
         assertThat(costs.group(1)).contains("<summary>Koszt i zysk</summary>").contains("Zysk (bez VAT)");
         assertThat(user).doesNotContain("cl-kv-group");
+    }
+
+    @Test
+    void orderOpenedFromTheArchiveLeadsBackToIt() {
+        // given
+        Order order = order(OrderStatus.Completed);
+        OrderPageModelFactory.Viewer fromArchive = new OrderPageModelFactory.Viewer(false, true, "/dashboard/orders/archive?q=x");
+
+        // when
+        String archive = page(render(order, fromArchive));
+        String list = page(render(order, ADMIN));
+
+        // then
+        assertThat(archive).contains("href=\"/dashboard/orders/archive?q=x\"").contains("Archiwum zamówień");
+        assertThat(list).doesNotContain("Archiwum zamówień");
     }
 
     @Test
@@ -552,7 +675,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void eachShipmentHasEditAndRemoveAndTheCardHeadAddsOne() {
-        // given: the second shipment has a courier order, cancelled with "Cancel courier order" instead of removed
+        // given: the second shipment has a courier order, cancelled with "Cancel shipment" instead of removed
         Order order = order(OrderStatus.Realization);
         Shipment labelled = new Shipment(ShipmentType.Courier);
         labelled.setCarrier("DPD");
@@ -568,14 +691,342 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(card).contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipments/new\"")
                 .contains("data-cl-dialog-open=\"shipment-dialog-new\"").contains(">Dodaj przesyłkę<")
-                .contains("data-cl-dialog-open=\"shipment-dialog-0\"").contains("aria-label=\"Edytuj przesyłkę 1\"")
-                .contains("data-cl-dialog-open=\"shipment-dialog-1\"").contains("aria-label=\"Edytuj przesyłkę 2\"")
-                .contains("/shipments/0/remove?version=" + version).contains("aria-label=\"Usuń przesyłkę 1\"")
+                .containsPattern("<a class=\"cl-menu-item\"[^>]*data-cl-dialog-open=\"shipment-dialog-0\"")
+                .containsPattern("<a class=\"cl-menu-item\"[^>]*data-cl-dialog-open=\"shipment-dialog-1\"")
+                .contains("/shipments/0/remove?version=" + version)
                 .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
                 .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia. Klient nie dostanie o tym wiadomości.\"")
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
-                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
-                .doesNotContain("shipment-1-remove-reason");
+                .contains("<span class=\"cl-menu-reason\">Najpierw anuluj przesyłkę, potem ją usuniesz.</span>");
+    }
+
+    @Test
+    void aCancellationInProgressShowsItsPillGreysTheCancelActionAndAsksThePageToPoll() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String html = render(order, ADMIN);
+        String card = card(page(html), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
+                .doesNotContain("/cancelShipment\"");
+        assertThat(html).contains("/js/shipment-cancellation.js");
+    }
+
+    @Test
+    void rowActionsAreTheLabelAndAMenuWithEditCancelAndRemove() {
+        // given: a shipment with a courier order (cancellable), on the way
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = integrationShipment(order);
+        sent.setTrackingNo("T-1");
+        sent.setExternalId("EXT-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains(">Pobierz etykietę<")
+                .containsPattern("<details class=\"cl-menu\">\\s*<summary class=\"cl-button is-icon\" aria-label=\"Więcej akcji przesyłki 1\">")
+                .containsPattern("<a class=\"cl-menu-item\"[^>]*data-cl-dialog-open=\"shipment-dialog-0\"[^>]*>Edytuj</a>")
+                .containsPattern("<a class=\"cl-menu-item is-danger\" data-cl-confirm href=\"/dashboard/orders/"
+                        + order.getOrderId() + "/cancelShipment\"[^>]*>Anuluj przesyłkę</a>")
+                .containsPattern("<button type=\"button\" class=\"cl-menu-item\" aria-disabled=\"true\">\\s*<span>Usuń</span>\\s*"
+                        + "<span class=\"cl-menu-reason\">Najpierw anuluj przesyłkę, potem ją usuniesz.</span>")
+                // the card head no longer cancels: the row does
+                .doesNotContain("id=\"shipment-cancel-reason\"");
+    }
+
+    @Test
+    void oneByAllegroShipmentHasCancelGreyedWithTheReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = integrationShipment(order);
+        sent.setProvider("allegro");
+        sent.setCarrier("ALLEGRO");
+        sent.setTrackingNo("A000123456");
+        sent.setExternalId("shp-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setCancellable(false);
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("/cancelShipment\"")
+                .containsPattern("<button type=\"button\" class=\"cl-menu-item\" aria-disabled=\"true\">\\s*"
+                        + "<span>Anuluj przesyłkę</span>\\s*<span class=\"cl-menu-reason\">Allegro nie pozwala anulować "
+                        + "przesyłek One by Allegro.</span>");
+    }
+
+    @Test
+    void cancellationInProgressGreysCancelInTheRowMenu() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = integrationShipment(order);
+        sent.setTrackingNo("T-1");
+        sent.setExternalId("EXT-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("/cancelShipment\"")
+                .contains("<span class=\"cl-menu-reason\">Anulowanie już trwa — czekamy na potwierdzenie z integracji "
+                        + "wysyłki (Furgonetka).</span>");
+    }
+
+    @Test
+    void integrationPillOnlyWhenTheStoreHasSeveralIntegrations() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = integrationShipment(order);
+        sent.setProvider("allegro");
+        sent.setExternalId("shp-1");
+        sent.setTrackingNo("A000123456");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+
+        // when
+        String single = card(page(render(order, ADMIN)), "przesylki");
+        String several = card(page(renderWithStore(order, store -> store.addAdditionalShippingIntegration("allegro"))), "przesylki");
+
+        // then
+        assertThat(single).doesNotContain("cl-status is-neutral");
+        assertThat(several).containsPattern("<p class=\"cl-list-desc\"[^>]*>\\s*<span class=\"cl-status is-neutral\">Furgonetka</span>")
+                .contains("Numer przesyłki Allegro dopisuje do zamówienia samo.");
+    }
+
+    private static Shipment integrationShipment(Order order) {
+        Shipment shipment = order.getShipments().get(0);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("DPD");
+        shipment.setPickUpAddressId("addr-1");
+        return shipment;
+    }
+
+    @Test
+    void aShipmentBeingCreatedShowsTheSpinnerLineAndThePagePolls() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<p class=\"cl-list-desc cl-loading\"><span class=\"cl-spinner is-compact\" aria-hidden=\"true\"></span><span>Nadawanie…</span></p>")
+                .doesNotContain(">Edytuj<")
+                .contains("Przesyłka jest nadawana — poczekaj na wynik.");
+    }
+
+    @Test
+    void aFailedCreationShowsTheProviderReasonWithRetryAndRemoveButNoEdit() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment failed = integrationShipment(order);
+        failed.setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now()).failed("Brak środków na koncie"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the array of arguments is spread, never printed as one value
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Brak środków na koncie</span>")
+                .doesNotContain("[Ljava")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping?provider=furgonetka\"")
+                .contains(">Spróbuj ponownie</a>")
+                .contains("/shipments/0/remove")
+                .doesNotContain(">Edytuj<")
+                .doesNotContain("data-cl-cancellation-poll");
+    }
+
+    @Test
+    void allegroShipmentShowsTheCarrierByItsNameAndRetriesThroughAllegro() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        Shipment created = order.getShipments().get(0);
+        created.setProvider("allegro");
+        created.setExternalId("shp-1");
+        created.setCarrier("ALLEGRO_ONE_KURIER");
+        created.setTrackingNo("A000123456");
+        created.setShippedAt(java.time.LocalDateTime.of(2026, 10, 8, 9, 0));
+        Shipment failed = new Shipment(ShipmentType.PickupPoint);
+        failed.setProvider("allegro");
+        failed.setCreation(ShipmentCreationState.pending("cmd-2", java.time.LocalDateTime.now()).failed("Allegro odmówiło"));
+        order.addShipment(failed);
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("One by Allegro")
+                .contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipping?provider=allegro\"");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnReasonShowsThatSentence() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.unconfirmed"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Integracja wysyłki (Furgonetka) nie potwierdziła "
+                + "nadania — sprawdź przesyłkę w jej panelu, zanim nadasz ponownie.</span>")
+                .doesNotContain("Nie udało się nadać");
+    }
+
+    @Test
+    void aFailedCreationWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given: POST /packages answered 503, nothing was created
+        Order order = order(OrderStatus.Shipping);
+        integrationShipment(order).setCreation(ShipmentCreationState.pending("cmd-1", java.time.LocalDateTime.now())
+                .failedWithKey("shipping.creation.notCreated"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się nadać: Integracja wysyłki (Furgonetka) "
+                + "nie utworzyła paczki (brak odpowiedzi lub błąd po jej stronie). Nic nie zostało opłacone — spróbuj "
+                + "ponownie za chwilę.</span>");
+    }
+
+    @Test
+    void aFailedPickupWithOurOwnCauseReadsLikeTheProvidersReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.immediate.no.windows"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Nie udało się zamówić odbioru: Przewoźnik nie podał "
+                + "terminu odbioru w najbliższych dniach.</span>");
+    }
+
+    @Test
+    void aFailedPickupWhoseSentenceStatesTheOutcomeHasNoPrefix() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting().failedWithKey("shipping.pickup.not.sent"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-warn\">Odbiór nie został zamówiony — spróbuj ponownie.</span>")
+                .doesNotContain("Nie udało się zamówić odbioru");
+    }
+
+    @Test
+    void aPackageWaitingForPickupOffersItsLabelButNoPickupButton() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.awaiting());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the pickup is ordered from the orders list, for all packages at once (client decision 2026-10-07)
+        assertThat(card).contains("<span class=\"cl-status is-neutral\">Czeka na odbiór</span>")
+                .doesNotContain("/dashboard/shipping/pickups").doesNotContain("Zamów odbiór")
+                .contains("href=\"/dashboard/shipping/labels/furgonetka/21480003?back=/dashboard/orders/" + order.getOrderId() + "\"")
+                .contains("aria-label=\"Pobierz etykietę przesyłki 1\"")
+                .contains(">Edytuj<");
+    }
+
+    @Test
+    void anOrderedPickupShowsItsDayAndHours() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = integrationShipment(order);
+        parcel.setExternalId("21480003");
+        parcel.setTrackingNo("0000123");
+        parcel.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        parcel.setPickup(ShipmentPickup.pending("cmd-2", java.time.LocalDateTime.now(), LocalDate.of(2026, 10, 8),
+                java.time.LocalTime.of(9, 0), java.time.LocalTime.of(17, 0)).ordered("P-1"));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("<span class=\"cl-status is-ok\">Odbiór: czw. 8 paź, 9:00–17:00</span>")
+                .doesNotContain("Zamów odbiór");
+    }
+
+    @Test
+    void aFailedCancellationSendsTheOperatorToTheIntegrationsPanelAndItsRemovalWarnsAboutTheLabel() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
+        sent.setCancellation(sent.getCancellation().failed());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("data-cl-cancellation-poll")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu integracji wysyłki "
+                        + "(Furgonetka)</span>")
+                .contains("/cancelShipment\"")
+                .contains("data-cl-confirm-message=\"Anulowanie w integracji wysyłki (Furgonetka) nie zostało potwierdzone. "
+                        + "Usuń przesyłkę tylko wtedy, gdy etykieta jest anulowana w panelu tej integracji — inaczej kurier "
+                        + "może ją nadal odebrać.\"")
+                .doesNotContain("shipment-cancel-reason");
+    }
+
+    @Test
+    void aRefusedCancellationShowsTheProvidersReasonAndAnOldRowKeepsTheGenericText() {
+        // given
+        Order refused = order(OrderStatus.Shipping);
+        Shipment sent = refused.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1))
+                .failed("Wybrana przesyłka nie może już być anulowana"));
+
+        // when
+        String card = card(page(render(refused, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("Anulowanie nieudane: Wybrana przesyłka nie może już być anulowana (integracja: Furgonetka)");
     }
 
     @Test
@@ -591,7 +1042,8 @@ class OrderDetailsTemplateTest {
         String bareCard = card(page(render(bare, ADMIN)), "przesylki");
 
         // then: removing it takes the customer's delivery choice with it, which the confirmation says
-        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").contains("/shipments/0/remove?version=" + version)
+        assertThat(card).containsPattern("<a class=\"cl-menu-item\"[^>]*data-cl-dialog-open=\"shipment-dialog-0\"")
+                .contains("/shipments/0/remove?version=" + version)
                 .doesNotContain("aria-disabled").doesNotContain("remove-reason")
                 .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia razem ze sposobem dostawy wybranym przez klienta")
                 .contains("data-cl-confirm-action=\"Usuń przesyłkę\"");
@@ -618,7 +1070,7 @@ class OrderDetailsTemplateTest {
 
         // then: the dialog's text is honest about the status; the row is an ordinary shipment, not the placeholder
         assertThat(card).contains("a zamówienie wróci do „W realizacji”")
-                .doesNotContain("is-placeholder").contains("aria-label=\"Usuń przesyłkę 1\"");
+                .doesNotContain("is-placeholder").contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"");
     }
 
     @Test
@@ -632,9 +1084,9 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(card).doesNotContain("/remove")
-                .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń przesyłkę 1\"[^>]*aria-describedby=\"shipment-1-remove-reason\"")
-                .contains("id=\"shipment-1-remove-reason\">Zamówienie jest dostarczone — przesyłek nie usuniesz.</p>")
-                .contains("id=\"shipment-2-remove-reason\">Zamówienie jest dostarczone — przesyłek nie usuniesz.</p>");
+                .containsPattern("<button type=\"button\" class=\"cl-menu-item\" aria-disabled=\"true\">\\s*<span>Usuń</span>\\s*"
+                        + "<span class=\"cl-menu-reason\">Zamówienie jest dostarczone — przesyłek nie usuniesz.</span>");
+        assertThat(card.split("Zamówienie jest dostarczone — przesyłek nie usuniesz\\.</span>", -1)).hasSize(3);
     }
 
     @Test
@@ -649,8 +1101,8 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(card).doesNotContain("/shipments/0/remove").contains("/shipments/1/remove?version=")
-                .contains("id=\"shipment-1-remove-reason\">Przesyłka ma datę dostarczenia — nie usuniesz jej.</p>")
-                .doesNotContain("shipment-2-remove-reason");
+                .contains("<span class=\"cl-menu-reason\">Przesyłka ma datę dostarczenia — nie usuniesz jej.</span>");
+        assertThat(card.split("cl-menu-reason", -1)).hasSize(2);
     }
 
     @Test
@@ -712,7 +1164,7 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).doesNotContain("shipment-0-carrierSelect")
                 .containsPattern("id=\"shipment-0-carrier\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
                 .containsPattern("id=\"shipment-0-trackingNo\"[^>]*value=\"T-1\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
-                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując zamówienie kuriera.</p>")
+                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując przesyłkę.</p>")
                 .containsPattern("<select[^>]*id=\"shipment-0-type\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*disabled")
                 .contains("<input type=\"hidden\" name=\"type\" value=\"Courier\">")
                 .doesNotContainPattern("id=\"shipment-0-collectionPointCode\"[^>]*readonly")
@@ -1079,7 +1531,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 712,17 brutto")
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("Koszt: 712,17 PLN brutto / szt.")
                 .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
     }
 
@@ -1453,14 +1905,14 @@ class OrderDetailsTemplateTest {
                 pl.commercelink.inventory.deliveries.DropshipAssessment.of(List.of("Acme")));
         String itemOnly = resolver.resolveFor(awaiting);
         // the fixture is only useful if the two overloads actually disagree
-        assertThat(expected).contains("/dropship?provider=");
+        assertThat(expected).contains("/dashboard/deliveries/create/Acme?order=");
         assertThat(expected).isNotEqualTo(itemOnly);
 
         // when
         String html = page(render(order, List.of(awaiting), ADMIN, Set.of()));
 
         // then: the rendered link is the order-aware one, not the item-only fallback a regression would produce
-        assertThat(html).contains("class=\"cl-table-link\"").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
+        assertThat(html).contains("<a class=\"cl-status").contains("href=\"" + expected.replace("&", "&amp;") + "\"")
                 .doesNotContain("href=\"" + itemOnly.replace("&", "&amp;") + "\"");
     }
 
@@ -1622,8 +2074,8 @@ class OrderDetailsTemplateTest {
         String withoutTracking = page(render(untracked, ADMIN));
 
         // then
-        assertThat(withTracking).contains("Śledzona w Furgonetce");
-        assertThat(withoutTracking).doesNotContain("Śledzona w Furgonetce");
+        assertThat(withTracking).contains("Śledzona (Furgonetka)");
+        assertThat(withoutTracking).doesNotContain("Śledzona");
     }
 
     @Test
@@ -1780,6 +2232,75 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("id=\"assign-supplier-dialog\"").contains("name=\"supplier\"")
                 .contains("value=\"" + SupplierChoice.CUSTOM + "\"").contains("name=\"customSupplier\"")
                 .contains("Wpisz skrót kontrahenta");
+    }
+
+    @Test
+    void theSupplierDialogAsksForNoEanUpFrontAndNamesTheCounterpartyField() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).contains("id=\"assign-supplier-dialog\"").doesNotContain("name=\"ean\"")
+                .contains(">Skrót kontrahenta w systemie fakturowym<").doesNotContain(">np. HURT-ABC<");
+    }
+
+    @Test
+    void theSupplierDialogOffersTheEanFieldOnceTheTaxonomyMissedTheCode() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        form.setEan("5901234567890");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of());
+        variables.put("supplierEanField", true);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then: the typed value survives the refusal
+        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
+                .contains("value=\"5901234567890\"").contains("data-cl-ean-field");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsTheChosenConnection() {
+        // given: the hidden counterparty field is always posted, so a connection arrives with an empty custom name
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", "Acme", "");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"Acme\" selected=\"selected\">")
+                .doesNotContain("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsATypedSupplierName() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">")
+                .contains("value=\"HURT-ABC\"").doesNotContain("<option value=\"Acme\" selected=\"selected\">");
     }
 
     static Map<String, Object> subpageVariables(Order order) {

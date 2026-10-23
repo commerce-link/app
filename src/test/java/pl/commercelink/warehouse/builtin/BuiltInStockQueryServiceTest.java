@@ -135,6 +135,24 @@ class BuiltInStockQueryServiceTest {
     }
 
     @Test
+    void searchAllAvailableOfTheStoreReadsOrderedAndDeliveredItemsWithoutACodeFilter() {
+        // given
+        WarehouseItem delivered = anAvailableItem(20.0);
+        WarehouseItem damagedOrdered = anAvailableItem(20.0);
+        damagedOrdered.setCondition(ItemCondition.Damaged);
+        damagedOrdered.setStatus(FulfilmentStatus.Ordered);
+        when(warehouseRepository.findAllFiltered("store-1", null, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered)))
+                .thenReturn(List.of(delivered, damagedOrdered));
+
+        // when
+        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository).searchAllAvailable("store-1");
+
+        // then
+        assertThat(views).extracting(WarehouseItemView::getItemId)
+                .containsExactly(delivered.getItemId(), damagedOrdered.getItemId());
+    }
+
+    @Test
     void summarizeAvailableCountsDistinctProductsAndSplitsQuantityByStatus() {
         // given
         WarehouseItem delivered = anAvailableItem(20.0);

@@ -31,14 +31,15 @@ public class DeliveriesPlanningService {
     @Autowired
     private DropshipEligibility dropshipEligibility;
 
-    public record Planning(List<Delivery> deliveries, List<DropshipCandidate> dropshipCandidates) {
+    public record Planning(List<Delivery> deliveries, List<DropshipCandidate> dropshipCandidates, Map<String, Order> orders) {
     }
 
     public Planning plan(String storeId) {
-        Partition partition = partition(storeId);
+        OrderAllocations orderAllocations = orderAllocationsManager.fetchAllWithOrders(storeId);
+        Partition partition = partition(storeId, orderAllocations);
         List<Allocation> allocations = new LinkedList<>(partition.batch());
         allocations.addAll(warehouseAllocationsManager.fetchAll(storeId));
-        return new Planning(groupIntoDeliveries(storeId, allocations), partition.candidates());
+        return new Planning(groupIntoDeliveries(storeId, allocations), partition.candidates(), orderAllocations.orders());
     }
 
     public List<Delivery> run(String storeId) {
@@ -58,18 +59,18 @@ public class DeliveriesPlanningService {
     private record ClaimedByDropship(String orderId, String provider) {
     }
 
-    private Partition partition(String storeId) {
-        List<Allocation> orderAllocations = orderAllocationsManager.fetchAll(storeId);
+    private Partition partition(String storeId, OrderAllocations orderAllocations) {
+        List<Allocation> allocations = orderAllocations.allocations();
 
-        Map<String, List<Allocation>> directToConsumerByOrderId = orderAllocations.stream()
+        Map<String, List<Allocation>> directToConsumerByOrderId = allocations.stream()
                 .filter(Allocation::isDirectToConsumer)
                 .collect(Collectors.groupingBy(allocation -> allocation.getKey().getOrderId()));
 
         List<DropshipCandidate> candidates = new LinkedList<>();
         Set<ClaimedByDropship> claimed = new HashSet<>();
-        directToConsumerByOrderId.forEach((orderId, allocations) -> {
-            DropshipAssessment assessment = assess(storeId, orderId);
-            allocations.stream()
+        directToConsumerByOrderId.forEach((orderId, orderDtcAllocations) -> {
+            DropshipAssessment assessment = assess(storeId, orderAllocations.orders().get(orderId), orderId);
+            orderDtcAllocations.stream()
                     .collect(Collectors.groupingBy(Allocation::getDeliveryId))
                     .forEach((provider, providerAllocations) -> {
                         if (assessment.supports(provider)) {
@@ -82,7 +83,7 @@ public class DeliveriesPlanningService {
 
         // Only the allocations a dropship candidate actually took are held back. What is left - warehouse items,
         // and suppliers that cannot ship to the customer - travels the ordinary route, per supplier.
-        List<Allocation> batch = orderAllocations.stream()
+        List<Allocation> batch = allocations.stream()
                 .filter(allocation -> !claimed.contains(
                         new ClaimedByDropship(allocation.getKey().getOrderId(), allocation.getDeliveryId())))
                 .toList();
@@ -93,8 +94,9 @@ public class DeliveriesPlanningService {
                 .toList());
     }
 
-    private DropshipAssessment assess(String storeId, String orderId) {
-        Order order = ordersRepository.findById(storeId, orderId);
+    private DropshipAssessment assess(String storeId, Order loaded, String orderId) {
+        // the planning already holds every order with an allocation; the read is only a fallback
+        Order order = loaded != null ? loaded : ordersRepository.findById(storeId, orderId);
         if (order == null) {
             return DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED);
         }
