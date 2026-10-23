@@ -7,6 +7,7 @@ import pl.commercelink.pim.api.PIMEntryAddedEvent;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
@@ -39,7 +40,7 @@ class StoreEntryPinning {
         if (ownerStoreId == null) {
             return;
         }
-        List<String> ownerCategoryIds = PimCatalogRegistry.categoryIdsOf(ownerStoreId, productCatalogRepository);
+        List<String> ownerCategoryIds = categoryIdsOf(ownerStoreId);
         Codes announced = Codes.of(event.eans(), event.mfnCodes());
         PimView storeView = catalog.withStoreData(ownerStoreId);
 
@@ -78,13 +79,16 @@ class StoreEntryPinning {
                 ownerStoreId, removed.eans(), removed.mfnCodes(), removed.minus(inCopy).eans(),
                 removed.minus(inCopy).mfnCodes());
         Set<String> categoryIds = Set.copyOf(ownerCategoryIds);
-        PimView globalView = catalog.withGlobalData();
         List<Product> toDetach = productRepository.findAllByPimId(pimId).stream()
                 .filter(projection -> categoryIds.contains(projection.getCategoryId()))
                 .map(projection -> productRepository.findByProductId(projection.getCategoryId(), projection.getProductId()))
                 .filter(Objects::nonNull)
                 .filter(product -> removed.matches(product) && !announced.matches(product))
                 .toList();
+        if (toDetach.isEmpty()) {
+            return 0;
+        }
+        PimView globalView = catalog.withGlobalData();
         toDetach.forEach(product -> repin(product, pinToGlobalEntry(product, pimId, globalView).orElse(null), pimId,
                 "its code was removed from the entry"));
         return toDetach.size();
@@ -127,6 +131,15 @@ class StoreEntryPinning {
         return globalView.findByGtinOrMpn(product.getEan(), product.getManufacturerCode())
                 .map(PimEntry::pimId)
                 .filter(globalPimId -> !globalPimId.equals(handledPimId));
+    }
+
+    // a store's own entry only ever pins products in the categories of that store's catalogs
+    private List<String> categoryIdsOf(String storeId) {
+        return productCatalogRepository.findAll(storeId).stream()
+                .flatMap(catalog -> catalog.getCategories().stream())
+                .map(CategoryDefinition::getCategoryId)
+                .distinct()
+                .toList();
     }
 
     private static boolean isBlank(String value) {

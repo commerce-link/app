@@ -13,8 +13,6 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
 import pl.commercelink.pim.api.PIMEntryDeletedEvent;
-import pl.commercelink.products.CategoryDefinition;
-import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.provider.EventBindingRegistrar;
@@ -174,14 +172,6 @@ public class PimCatalogRegistry {
             product.setPimId(event.pimId());
             productRepository.save(product);
         });
-    }
-
-    static List<String> categoryIdsOf(String storeId, ProductCatalogRepository productCatalogRepository) {
-        return productCatalogRepository.findAll(storeId).stream()
-                .flatMap(catalog -> catalog.getCategories().stream())
-                .map(CategoryDefinition::getCategoryId)
-                .distinct()
-                .toList();
     }
 
     static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {
