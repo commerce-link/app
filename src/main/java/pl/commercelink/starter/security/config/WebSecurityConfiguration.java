@@ -15,6 +15,7 @@ import pl.commercelink.starter.security.filter.CustomTokenRefreshFilter;
 import pl.commercelink.starter.security.handler.CustomAuthenticationSuccessHandler;
 import pl.commercelink.starter.security.handler.CustomLogoutSuccessHandler;
 import pl.commercelink.starter.security.service.CustomOAuth2UserService;
+import pl.commercelink.web.errorpage.CustomerPageErrors;
 
 import java.util.regex.Pattern;
 
@@ -48,12 +49,12 @@ public class WebSecurityConfiguration {
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
                         .addHeaderWriter(frameOptions()))
                 .authorizeHttpRequests(auth -> {
-                    // /error is public so that a customer whose page failed sees the store's error page
-                    // (PublicErrorViewResolver) instead of the dashboard login; a page that is not public still
-                    // sends an anonymous visitor to the login before it is dispatched
+                    // Only the error of a customer page is open, so its customer sees the store's error page
+                    // (PublicErrorViewResolver) instead of the dashboard login. Any other error, including those of the
+                    // shop API and the webhooks, still sends an anonymous caller to the login, as it always has.
+                    auth.requestMatchers(CustomerPageErrors.DISPATCH).permitAll();
                     auth.requestMatchers(
                             "/",
-                            "/error",
                             "/env",
                             "/Global/**",
                             "/Store/**",

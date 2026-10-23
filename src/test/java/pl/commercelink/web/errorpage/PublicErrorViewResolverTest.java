@@ -92,6 +92,20 @@ class PublicErrorViewResolverTest {
         assertThat(((PublicPage) page.getModel().get("publicPage")).storeId()).isNull();
     }
 
+    @Test
+    void aPercentEncodedCustomerPathGetsTheStoresErrorPageToo() {
+        // given: Spring Security and the controllers match the path decoded, so this is the store's offer page
+        when(storesRepository.findById("nova")).thenReturn(store());
+
+        // when
+        ModelAndView page = resolver.resolveErrorView(errorOf("/store/nova/%63lient/offer/x/nie-ma", Locale.ENGLISH),
+                HttpStatus.NOT_FOUND, Map.of());
+
+        // then
+        assertThat(page.getViewName()).isEqualTo("error/public");
+        assertThat(((PublicPage) page.getModel().get("publicPage")).storeName()).isEqualTo("Nova Tech");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"/dashboard/nie-ma", "/nie/ma", "/store/nova/settings", "/Store/nova/Catalog/x", "/store/nova",
             "/store//client/x"})

@@ -1,7 +1,11 @@
 package pl.commercelink.starter.security.config;
 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +21,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -36,9 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The error page is public: a customer whose page failed (a missing page under a public path, an exception, a bad
- * parameter) is shown the error page instead of the dashboard login. Pages that are not public still send an
- * anonymous visitor to the login before anything else.
+ * The error of a customer page is public: a customer whose page failed (a missing page under a public path, an
+ * exception, a bad parameter) is shown the error page instead of the dashboard login. Every other error, including
+ * those of the shop API and the webhooks, and pages that are not public still send an anonymous visitor to the login.
  */
 @SpringJUnitWebConfig(PublicErrorPageSecurityTest.Config.class)
 @TestPropertySource(properties = "application.env=test")
@@ -109,20 +114,58 @@ class PublicErrorPageSecurityTest {
     }
 
     @Test
-    void anAnonymousVisitorIsShownTheErrorPage() throws Exception {
+    void anAnonymousCustomerIsShownTheErrorOfACustomerPage() throws Exception {
         // when / then
-        mvc.perform(get("/error")).andExpect(status().isOk()).andExpect(content().string("error page"));
+        mvc.perform(get("/error").with(errorOf("/store/s1/client/offer/o1/nie-ma")))
+                .andExpect(status().isOk()).andExpect(content().string("error page"));
     }
 
     @Test
-    void theErrorPageAnswersAFailedPostToo() throws Exception {
+    void theErrorOfAnIndividualOfferIsShownToo() throws Exception {
         // when / then
-        mvc.perform(post("/error")).andExpect(status().isOk()).andExpect(content().string("error page"));
+        mvc.perform(get("/error").with(errorOf("/store/s1/individual/offer/o1/data")))
+                .andExpect(status().isOk()).andExpect(content().string("error page"));
+    }
+
+    @Test
+    void theErrorOfAFailedPostOnACustomerPageIsShownToo() throws Exception {
+        // when / then
+        mvc.perform(post("/error").with(errorOf("/store/s1/client/offer/o1/select-variant")))
+                .andExpect(status().isOk()).andExpect(content().string("error page"));
+    }
+
+    // the shop API and the webhooks keep answering an error the way they always have
+    @ParameterizedTest
+    @ValueSource(strings = {"/Store/s1/Basket/b1", "/Store/s1/Webhooks/Payments/p1", "/Global/x", "/register/x", "/store//client/x"})
+    void theErrorOfAnyOtherPathStillSendsAnAnonymousCallerToTheLogin(String path) throws Exception {
+        // when / then
+        mvc.perform(post("/error").with(errorOf(path)))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrlPattern("**/login"));
+    }
+
+    @Test
+    void theErrorPageOpenedDirectlyStillSendsAnAnonymousVisitorToTheLogin() throws Exception {
+        // when / then
+        mvc.perform(get("/error")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrlPattern("**/login"));
     }
 
     @Test
     void aDashboardPageStillSendsAnAnonymousVisitorToTheLogin() throws Exception {
         // when / then
         mvc.perform(get("/dashboard/orders")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrlPattern("**/login"));
+    }
+
+    @Test
+    void aStorePathOutsideThePublicPagesStillSendsAnAnonymousVisitorToTheLogin() throws Exception {
+        // when / then
+        mvc.perform(get("/store/s1/client/nie-ma")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrlPattern("**/login"));
+    }
+
+    private static RequestPostProcessor errorOf(String originalPath) {
+        return request -> {
+            request.setDispatcherType(DispatcherType.ERROR);
+            request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, originalPath);
+            return request;
+        };
     }
 }

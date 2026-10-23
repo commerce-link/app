@@ -1,6 +1,5 @@
 package pl.commercelink.web.errorpage;
 
-import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.web.servlet.error.ErrorViewResolver;
@@ -8,17 +7,14 @@ import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.support.RequestContextUtils;
-import org.springframework.web.util.UriUtils;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.publicpage.PublicPage;
 import pl.commercelink.web.publicpage.PublicPageFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Optional;
 
 /**
  * An error on a page sent to a store's customers (a missing page, an exception, a bad parameter) is shown on the store's
@@ -31,8 +27,6 @@ public class PublicErrorViewResolver implements ErrorViewResolver, Ordered {
 
     static final String VIEW = "error/public";
 
-    private static final Pattern CUSTOMER_PAGE = Pattern.compile("/store/([^/]+)/(client|individual)(/.*)?");
-
     private final StoresRepository storesRepository;
     private final ErrorViewResolver springDefault;
 
@@ -43,13 +37,13 @@ public class PublicErrorViewResolver implements ErrorViewResolver, Ordered {
 
     @Override
     public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
-        String path = originalPath(request);
-        Matcher customerPage = CUSTOMER_PAGE.matcher(path);
-        if (!customerPage.matches()) {
+        String path = CustomerPageErrors.originalPath(request);
+        Optional<String> storeId = CustomerPageErrors.storeIdOf(path);
+        if (storeId.isEmpty()) {
             return springDefault.resolveErrorView(request, status, model);
         }
         Locale locale = RequestContextUtils.getLocale(request);
-        Store store = findStore(UriUtils.decode(customerPage.group(1), StandardCharsets.UTF_8));
+        Store store = findStore(storeId.get());
         PublicPage page = store != null
                 ? PublicPageFactory.of(store, path, locale)
                 : PublicPageFactory.unknownStore(path, locale);
@@ -62,11 +56,6 @@ public class PublicErrorViewResolver implements ErrorViewResolver, Ordered {
     @Override
     public int getOrder() {
         return 0;
-    }
-
-    private static String originalPath(HttpServletRequest request) {
-        Object uri = request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
-        return uri != null ? uri.toString() : request.getRequestURI();
     }
 
     // the error may come from the database itself: the page then goes without the store's brand
