@@ -1,0 +1,66 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The five stages with the current one announced as the step, and below them only the facts that are known: planned
+       dates before dispatch, the delivery method, and when a personal collection became ready. */-->
+<section th:fragment="progress" class="cl-card" aria-labelledby="order-progress-title"
+         th:with="suffix=${view.personalCollection} ? '.collection' : '',
+                  stageName=${view.stage.name()},
+                  assemblyFact=${view.estimatedAssemblyAt != null and (stageName == 'Accepted' or stageName == 'Assembly')},
+                  dateFact=${view.beforeDispatch and (view.preferredShippingAt != null or view.estimatedShippingAt != null)},
+                  readyFact=${view.personalCollection and stageName == 'Shipping' and view.readyForCollectionAt != null}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="order-progress-title" th:text="#{client.order.progress}"></h2>
+        <span class="cl-status" th:classappend="${stageName == 'Delivered'} ? 'is-ok' : 'is-info'"
+              th:text="#{${'ClientOrderStage.' + stageName + suffix}}"></span>
+    </div>
+    <div class="cl-card-inset">
+        <ol class="cl-stages" th:aria-label="#{client.order.stages.label}">
+            <li th:each="stage, iter : ${T(pl.commercelink.orders.ClientOrderStage).values()}"
+                th:with="done=${view.isStageDone(stage)}, current=${view.isStageCurrent(stage)}"
+                class="cl-stage" th:classappend="${done} ? 'is-done' : (${current} ? 'is-current' : '')"
+                th:attr="aria-current=${current and !done ? 'step' : null}">
+                <span class="cl-stage-dot" aria-hidden="true"><i th:if="${done}" class="fas fa-check"></i><th:block
+                        th:unless="${done}" th:text="${iter.count}"></th:block></span>
+                <span class="cl-stage-text">
+                    <span th:if="${done}" class="cl-visually-hidden" th:text="#{client.order.stage.done} + ' '"></span>
+                    <span class="cl-stage-name" th:text="#{${'ClientOrderStage.' + stage.name() + suffix}}"></span>
+                    <span th:if="${stage.name() == 'Accepted' and view.orderedAt != null}" class="cl-stage-when"
+                          th:text="${#temporals.format(view.orderedAt, 'd MMM')}"></span>
+                    <span th:if="${stage.name() == 'Shipping' and view.shippedAt != null}" class="cl-stage-when"
+                          th:text="${#temporals.format(view.shippedAt, 'd MMM')}"></span>
+                    <span th:if="${stage.name() == 'Delivered' and view.deliveredAt != null}" class="cl-stage-when"
+                          th:text="${#temporals.format(view.deliveredAt, 'd MMM')}"></span>
+                </span>
+            </li>
+        </ol>
+    </div>
+    <div class="cl-card-inset" th:if="${assemblyFact or dateFact or view.beforeDispatch or readyFact}">
+        <dl class="cl-facts">
+            <div th:if="${assemblyFact}">
+                <dt th:text="#{client.order.facts.assembly}"></dt>
+                <dd th:text="${#temporals.format(view.estimatedAssemblyAt, 'EEE d MMMM')}"></dd>
+            </div>
+            <div th:if="${dateFact and view.preferredShippingAt != null}">
+                <dt th:text="${view.personalCollection} ? #{client.order.facts.chosen.collection} : #{client.order.facts.chosen.shipping}"></dt>
+                <dd th:text="${#temporals.format(view.preferredShippingAt, 'EEE d MMMM')}"></dd>
+            </div>
+            <div th:if="${dateFact and view.preferredShippingAt == null}">
+                <dt th:text="${view.personalCollection} ? #{client.order.facts.collection} : #{client.order.facts.shipping}"></dt>
+                <dd th:text="${#temporals.format(view.estimatedShippingAt, 'EEE d MMMM')}"></dd>
+            </div>
+            <div th:if="${view.beforeDispatch}">
+                <dt th:text="#{client.order.facts.method}"></dt>
+                <dd th:text="${view.deliveryMethod != null} ? ${view.deliveryMethod} : #{${'ShipmentType.' + view.shipmentType.name()}}"></dd>
+            </div>
+            <div th:if="${readyFact}">
+                <dt th:text="#{client.order.facts.ready}"></dt>
+                <dd th:text="${#temporals.format(view.readyForCollectionAt, 'EEE d MMMM, HH:mm')}"></dd>
+            </div>
+        </dl>
+    </div>
+</section>
+
+</body>
+</html>

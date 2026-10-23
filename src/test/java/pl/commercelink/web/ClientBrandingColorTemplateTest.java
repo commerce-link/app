@@ -1,8 +1,6 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import pl.commercelink.stores.Branding;
 
 import java.nio.charset.StandardCharsets;
@@ -17,11 +15,10 @@ class ClientBrandingColorTemplateTest {
 
     private static final Pattern STYLE_WITH_COLOR = Pattern.compile("th:style(?:append)?=\"([^\"]*safePrimaryColor[^\"]*)\"");
 
-    @ParameterizedTest
-    @ValueSource(strings = {"clientOrder.html", "client-return.html"})
-    void customerPagesWriteOnlyAValidatedBrandColourIntoStyles(String template) throws Exception {
+    @Test
+    void returnPageWritesOnlyAValidatedBrandColourIntoStyles() throws Exception {
         // given
-        String html = Files.readString(Path.of("src/main/resources/templates", template), StandardCharsets.UTF_8);
+        String html = Files.readString(Path.of("src/main/resources/templates", "client-return.html"), StandardCharsets.UTF_8);
 
         // when
         Matcher styles = STYLE_WITH_COLOR.matcher(html);
@@ -45,6 +42,33 @@ class ClientBrandingColorTemplateTest {
                     .doesNotContain("branding")
                     .doesNotContain("style");
         }
+    }
+
+    @Test
+    void orderPageTakesTheBrandColourOnlyFromThePublicFrame() throws Exception {
+        // when / then
+        assertThat(Files.readString(Path.of("src/main/resources/templates/clientOrder.html"), StandardCharsets.UTF_8))
+                .contains("layout:decorate=\"~{public-layout}\"");
+        for (Path source : ClientOrderTemplateRenderingTest.templateSources()) {
+            assertThat(Files.readString(source, StandardCharsets.UTF_8)).as(source.toString())
+                    .doesNotContain("branding")
+                    .doesNotContain("style");
+        }
+    }
+
+    @Test
+    void orderPageWritesTheNormalisedBrandColourOnTheBody() {
+        // given
+        ClientOrderRenderer renderer = ClientOrderRenderer.newOrder();
+        Branding branding = new Branding();
+        branding.setPrimaryColor("#2277EE");
+        renderer.store().setBranding(branding);
+
+        // when
+        String html = renderer.render();
+
+        // then
+        assertThat(html).containsPattern("<body class=\"cl-public\" style=\"--cl-brand:#2277ee;[^\"]*\"");
     }
 
     @Test
