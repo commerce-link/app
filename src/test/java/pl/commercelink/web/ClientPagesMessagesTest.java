@@ -69,7 +69,9 @@ class ClientPagesMessagesTest {
             "client.return.lead.completed", "client.return.lead.rejected.withReason", "client.return.lead.rejected.noReason",
             "client.return.form.name.required", "client.return.form.surname.required", "client.return.form.street.required",
             "client.return.form.postal.required", "client.return.form.city.required", "client.return.form.email.required",
-            "client.return.form.phone.required");
+            "client.return.form.phone.required",
+            "client.return.stage.accepted", "client.return.stage.awaitingParcel", "client.return.stage.parcelArrived",
+            "client.return.stage.reviewing", "client.return.stage.completed");
     private static final Path JAVA_SOURCES = Path.of("src/main/java");
     /** A whole key written in Java (a key prefix ends with a dot and is completed at run time, see EXPLICIT_KEYS). */
     private static final Pattern JAVA_RETURN_KEY = Pattern.compile("\"(client\\.return\\.[a-zA-Z0-9._-]*[a-zA-Z0-9_-])\"");
@@ -104,7 +106,8 @@ class ClientPagesMessagesTest {
 
         // then
         assertThat(keys).contains("client.return.notice.booked", "client.return.headline.book", "client.return.lead.book",
-                "client.return.form.tooLong", "client.return.item.status.received");
+                "client.return.form.tooLong", "client.return.item.status.received", "client.return.stage.awaitingParcel",
+                "client.return.shipment.state.checking", "client.return.shipment.label.customer");
         assertThat(missing).isEmpty();
     }
 

@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The returned products as the customer reported them; the view leaves out the resolution and the status where the
+       page shows neither (a rejected return). */-->
+<section th:fragment="items" id="return-items" class="cl-card" aria-labelledby="return-items-title"
+         th:with="rows=${view.itemRows()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="return-items-title" th:text="#{client.return.items.title(${#lists.size(rows)})}"></h2>
+    </div>
+    <ul class="cl-list is-items">
+        <li th:each="row : ${rows}" class="cl-list-item">
+            <div>
+                <p class="cl-list-title" th:text="${row.name()}"></p>
+                <p class="cl-list-desc" th:text="#{client.return.items.line(${row.qty()},
+                        ${row.desired() != null ? #messages.msg('RMAResolutionType.' + row.desired().name()) : '-'})}
+                        + (${row.actual() != null} ? ' · ' + #{client.return.items.resolution(${#messages.msg('RMAResolutionType.' + row.actual().name())})} : '')"></p>
+                <p th:if="${row.reason() != null}" class="cl-list-desc cl-muted" th:text="#{client.return.items.reason(${row.reason()})}"></p>
+            </div>
+            <span th:if="${row.statusKey() != null}" class="cl-status" th:classappend="'is-' + ${row.statusTone()}"
+                  th:text="#{${row.statusKey()}}"></span>
+        </li>
+    </ul>
+</section>
+
+</body>
+</html>

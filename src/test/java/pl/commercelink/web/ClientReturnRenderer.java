@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.RMA;
@@ -43,7 +44,7 @@ final class ClientReturnRenderer {
 
     private final Store store;
     private final RMA rma;
-    private final List<RMAItem> items;
+    private List<RMAItem> items;
     private ClientReturnNotice notice;
     private RMAReturnForm form;
     private Map<String, String> errors = Map.of();
@@ -137,6 +138,23 @@ final class ClientReturnRenderer {
         return this;
     }
 
+    ClientReturnRenderer items(RMAItem... items) {
+        this.items = List.of(items);
+        return this;
+    }
+
+    ClientReturnRenderer returnPackage(String templateId) {
+        rma.setReturnPackageTemplateId(templateId);
+        return this;
+    }
+
+    ClientReturnRenderer contactPhone(String phone) {
+        BillingDetails billing = new BillingDetails();
+        billing.setPhone(phone);
+        store.setBillingDetails(billing);
+        return this;
+    }
+
     ClientReturnRenderer rejectionReason(String reason) {
         rma.setRejectionReason(reason);
         return this;
@@ -199,7 +217,7 @@ final class ClientReturnRenderer {
         return PublicTemplateRenderer.render("client-return", locale, model);
     }
 
-    private static RMAItem item(String name, int qty, RMAResolutionType resolution) {
+    static RMAItem item(String name, int qty, RMAResolutionType resolution) {
         RMAItem item = new RMAItem();
         item.setName(name);
         item.setQty(qty);

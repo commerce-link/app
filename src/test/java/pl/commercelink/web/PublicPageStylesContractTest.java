@@ -304,6 +304,10 @@ class PublicPageStylesContractTest {
         // then
         assertThat(page).contains(".cl-client-return .cl-page-header {", ".cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }")
                 .contains("  .cl-client-return #return-form :is(.cl-input, .cl-select, .cl-button) { min-height: 44px; }")
+                .contains("  .cl-client-return .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }")
+                .contains(".cl-client-return .cl-card-inset > .cl-kv-grid + .cl-help { margin-top: 12px; }")
+                // the shared body.cl-public .cl-card-inset > .cl-alert + * already spaces a second alert
+                .doesNotContain(".cl-client-return .cl-card-inset > .cl-alert + .cl-alert")
                 .doesNotContain("!important");
     }
 

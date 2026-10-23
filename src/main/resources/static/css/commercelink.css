@@ -14480,11 +14480,20 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 .cl-client-return :is(.cl-note, .cl-alert-text) a { overflow-wrap: anywhere; }
 /* redirect targets after a notice keep a gap to the top edge */
 .cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }
-.cl-client-return .cl-card-inset > .cl-alert + .cl-alert { margin-top: 12px; }
 .cl-client-return .cl-card-inset > .cl-alert + .cl-fieldset { margin-top: 16px; }
 .cl-client-return .cl-fieldset > :is(.cl-choice-cards, .cl-note) + .cl-field-error { margin-top: 6px; }
 .cl-client-return .cl-card-footer { align-items: center; column-gap: 12px; }
 .cl-client-return .cl-card-footer .cl-help { flex: 1 1 260px; margin: 0; }
+/* shipments, pickup and products */
+.cl-client-return .cl-list-actions .cl-button { white-space: nowrap; }
+.cl-client-return .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
+.cl-client-return .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
+.cl-client-return .cl-card-inset > .cl-kv-grid + .cl-help { margin-top: 12px; }
+@media (max-width: 719px) {
+  .cl-client-return .cl-list.is-items .cl-list-item { gap: 6px; }
+  .cl-client-return .cl-list.is-items .cl-status { justify-self: start; }
+  .cl-client-return .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
+}
 @media (max-width: 1023px) {
   .cl-client-return #return-form :is(.cl-input, .cl-select, .cl-button) { min-height: 44px; }
 }

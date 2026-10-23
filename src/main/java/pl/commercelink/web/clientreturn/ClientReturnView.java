@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Everything the public return page shows, resolved once so the template carries no logic. The state decides the
@@ -185,6 +187,34 @@ public final class ClientReturnView {
         };
     }
 
+    /**
+     * Who the courier collects from, without the "null" a missing first name or surname would leave in
+     * ShippingDetails.getDisplayName; null without an address card.
+     */
+    public String addressName() {
+        ShippingDetails details = address();
+        if (details == null) {
+            return null;
+        }
+        String person = joinPresent(" ", details.getName(), details.getSurname());
+        return person != null ? person : StringUtils.trimToNull(details.getCompanyName());
+    }
+
+    /** "00-950 Warszawa, PL" from the parts the address has; null without an address card. */
+    public String addressPlace() {
+        ShippingDetails details = address();
+        if (details == null) {
+            return null;
+        }
+        return joinPresent(", ", joinPresent(" ", details.getPostalCode(), details.getCity()), details.getCountry());
+    }
+
+    private static String joinPresent(String separator, String... parts) {
+        String joined = Stream.of(parts).map(StringUtils::trimToNull).filter(Objects::nonNull)
+                .collect(Collectors.joining(separator));
+        return joined.isEmpty() ? null : joined;
+    }
+
     public String rejectionReason() {
         return state == ClientReturnState.REJECTED ? StringUtils.trimToNull(rma.getRejectionReason()) : null;
     }
@@ -253,7 +283,7 @@ public final class ClientReturnView {
         boolean settled = stateKey == null;
         String carrier = CarrierNames.forCustomer(shipment);
         return new ReturnShipmentRow(carrier,
-                carrier == null ? "ShipmentType." + shipment.getType() : null,
+                carrier == null && shipment.getType() != null ? "ShipmentType." + shipment.getType().name() : null,
                 labelKeyOf(shipment, customers),
                 settled ? StringUtils.trimToNull(shipment.getTrackingNo()) : null,
                 settled ? OrderPageModelFactory.safeWebUrl(shipment.getTrackingUrl()) : null,
@@ -279,11 +309,16 @@ public final class ClientReturnView {
     }
 
     private static String statusKeyOf(RMAItemStatus status) {
-        if (status == null || status == RMAItemStatus.New) {
+        if (status == null) {
             return null;
         }
-        String name = status.name();
-        return "client.return.item.status." + Character.toLowerCase(name.charAt(0)) + name.substring(1);
+        return switch (status) {
+            case New -> null;
+            case Received -> "client.return.item.status.received";
+            case SentForRepair -> "client.return.item.status.sentForRepair";
+            case ReturnedToClient -> "client.return.item.status.returnedToClient";
+            case MovedToWarehouse -> "client.return.item.status.movedToWarehouse";
+        };
     }
 
     private static String statusToneOf(RMAItemStatus status) {

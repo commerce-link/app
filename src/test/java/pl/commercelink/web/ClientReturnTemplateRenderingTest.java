@@ -6,8 +6,12 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCreationState;
+import pl.commercelink.orders.ShipmentPickup;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.rma.RMAItem;
+import pl.commercelink.orders.rma.RMAItemStatus;
+import pl.commercelink.orders.rma.RMAResolutionType;
 import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.stores.Parcel;
 import pl.commercelink.web.clientreturn.ClientReturnNotice;
@@ -15,7 +19,9 @@ import pl.commercelink.web.clientreturn.ClientReturnNotice;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -338,6 +344,376 @@ class ClientReturnTemplateRenderingTest {
                 .doesNotContain("??");
         assertThat(english).doesNotContain("??");
         assertThat(html.split("<h1", -1)).hasSize(2);
+    }
+
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 23, 12, 0);
+
+    private static Shipment customerReturn() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setProvider("furgonetka");
+        shipment.setCarrier("dhl");
+        return shipment;
+    }
+
+    private static Shipment trackedReturn() {
+        Shipment shipment = customerReturn();
+        shipment.setTrackingNo("00007731440201U");
+        shipment.setTrackingUrl("https://tracking.example/00007731440201U");
+        shipment.setShippedAt(LocalDateTime.of(2026, 10, 22, 10, 14));
+        shipment.setPickup(ShipmentPickup.pending("p1", NOW, LocalDate.of(2026, 10, 23), LocalTime.of(9, 0), LocalTime.of(15, 0))
+                .ordered("PICK1"));
+        return shipment;
+    }
+
+    private static ShippingDetails fullAddress() {
+        ShippingDetails details = ClientReturnRenderer.address();
+        details.setPostalCode("00-950");
+        return details;
+    }
+
+    @Test
+    void waitingShowsTheParcelFirstWithTracking() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(fullAddress())
+                .shipments(trackedReturn()).render();
+
+        // then
+        String parcel = card(html, "return-parcel");
+        assertThat(parcel).contains("<h2 class=\"cl-card-title\" id=\"return-parcel-title\">Przesyłka</h2>")
+                .contains("<p class=\"cl-list-title\">DHL</p>")
+                .contains("<p class=\"cl-list-desc\">Twoja paczka zwrotna</p>")
+                .contains("Numer: 00007731440201U")
+                .contains("data-cl-copy=\"00007731440201U\"")
+                .contains("aria-label=\"Kopiuj numer przesyłki\"")
+                .contains("<a class=\"cl-button\" href=\"https://tracking.example/00007731440201U\" target=\"_blank\" rel=\"noopener\">")
+                .contains("Śledź przesyłkę")
+                .contains("<span class=\"cl-visually-hidden\"> (otwiera się w nowej karcie)</span>")
+                .contains("nadana 22 paź, 10:14")
+                .contains("odbiór pt. 23 paź, 9:00–15:00")
+                .doesNotContain("cl-status");
+        String content = main(html);
+        assertThat(content).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
+        assertThat(content.indexOf("id=\"return-parcel\"")).isLessThan(content.indexOf("id=\"return-progress\""));
+        assertThat(content.indexOf("id=\"return-progress\"")).isLessThan(content.indexOf("id=\"return-address\""));
+        assertThat(content.indexOf("id=\"return-address\"")).isLessThan(content.indexOf("id=\"return-items\""));
+        assertThat(content.indexOf("id=\"return-items\"")).isLessThan(content.indexOf("id=\"return-help\""));
+    }
+
+    @Test
+    void twoShipmentsAreCountedAndTheStoreOneSaysWhoseItIs() {
+        // given
+        Shipment fromStore = new Shipment(ShipmentType.Courier);
+        fromStore.setProvider("furgonetka");
+        fromStore.setPickUpAddressId("warehouse");
+        fromStore.setCarrier("dpd");
+        fromStore.setDeliveredAt(LocalDateTime.of(2026, 10, 20, 14, 5));
+
+        // when
+        String parcel = card(ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems)
+                .shipments(trackedReturn(), fromStore).render(), "return-parcel");
+
+        // then
+        assertThat(parcel).contains("id=\"return-parcel-title\">Przesyłki: 2</h2>")
+                .contains("<p class=\"cl-list-desc\">Przesyłka od sklepu</p>")
+                .contains("<span class=\"cl-status is-ok\">Dostarczona</span>")
+                .contains("doręczona 20 paź, 14:05");
+    }
+
+    @Test
+    void aShipmentWithoutCarrierIsNamedByItsTypeOrGenerically() {
+        // given
+        Shipment typed = new Shipment(ShipmentType.PickupPoint);
+        Shipment untyped = new Shipment();
+        untyped.setType(null);
+
+        // when
+        String parcel = card(ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems)
+                .shipments(typed, untyped).render(), "return-parcel");
+
+        // then
+        assertThat(parcel).contains("<p class=\"cl-list-title\">Punkt odbioru</p>")
+                .contains("<p class=\"cl-list-title\">Przesyłka</p>")
+                .doesNotContain("??")
+                .doesNotContain("null");
+    }
+
+    @Test
+    void bookingShowsTheParcelBeingBooked() {
+        // given
+        Shipment booking = customerReturn();
+        booking.setCreation(ShipmentCreationState.pending("cmd", NOW));
+
+        // when
+        String html = ClientReturnRenderer.approved().savedAddress(fullAddress()).shipments(booking).render();
+
+        // then
+        String parcel = card(html, "return-parcel");
+        assertThat(parcel).contains("<p class=\"cl-list-title\">DHL <span class=\"cl-status is-info\">Zamawiamy kuriera</span></p>")
+                .contains("Numer przesyłki i termin odbioru wyślemy e-mailem.")
+                .doesNotContain("Numer:")
+                .doesNotContain("Śledź przesyłkę");
+        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
+    }
+
+    @Test
+    void checkingNeverShowsTheProvidersError() {
+        // given
+        Shipment refused = customerReturn();
+        refused.setTrackingNo("MAYBE1");
+        refused.setCreation(ShipmentCreationState.pending("cmd", NOW).failed("401 Unauthorized <script>"));
+
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).shipments(refused).render();
+
+        // then
+        String parcel = card(html, "return-parcel");
+        assertThat(parcel).contains("<span class=\"cl-status is-warn\">Sprawdzamy zamówienie kuriera</span>")
+                .contains("Nie musisz nic robić — sklep sprawdza u przewoźnika, czy kurier jest zamówiony, i odezwie się do Ciebie.")
+                .doesNotContain("MAYBE1");
+        assertThat(html).doesNotContain("401").doesNotContain("Unauthorized");
+    }
+
+    @Test
+    void parcelNoticeStandsInTheParcelCardOnce() {
+        // given
+        Shipment booking = customerReturn();
+        booking.setCreation(ShipmentCreationState.pending("cmd", NOW));
+
+        // when
+        String html = ClientReturnRenderer.approved().savedAddress(fullAddress()).shipments(booking)
+                .notice(ClientReturnNotice.ok(ClientReturnNotice.PARCEL, "Zamówiliśmy kuriera <b>.")).render();
+
+        // then
+        String parcel = card(html, "return-parcel");
+        assertThat(parcel).containsPattern("<div class=\"cl-card-inset\">\\s*<div class=\"cl-alert is-ok\" role=\"status\" tabindex=\"-1\">")
+                .contains("<p class=\"cl-alert-text\">Zamówiliśmy kuriera &lt;b&gt;.</p>");
+        assertThat(parcel.indexOf("cl-alert")).isLessThan(parcel.indexOf("<ul class=\"cl-list\">"));
+        assertThat(main(html).split("cl-alert-text", -1)).hasSize(2);
+        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
+    }
+
+    @Test
+    void stagesMarkTheCurrentOne() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).render();
+
+        // then
+        String progress = card(html, "return-progress");
+        assertThat(progress).contains("<h2 class=\"cl-card-title\" id=\"return-progress-title\">Postęp zwrotu</h2>")
+                .contains("<ol class=\"cl-stages\" aria-label=\"Etapy zwrotu\">")
+                .contains("<span class=\"cl-stage-name\">Przyjęte</span>")
+                .contains("<span class=\"cl-stage-when\">21 paź</span>")
+                .contains("<span class=\"cl-stage-name\">Czekamy na paczkę</span>")
+                .contains("<span class=\"cl-stage-name\">Paczka dotarła</span>")
+                .contains("<span class=\"cl-stage-name\">Rozpatrujemy</span>")
+                .contains("<span class=\"cl-stage-name\">Zakończone</span>")
+                .containsPattern("<li class=\"cl-stage is-current\" aria-current=\"step\">\\s*<span class=\"cl-stage-dot\" aria-hidden=\"true\">2</span>")
+                .doesNotContain("cl-status");
+        assertThat(progress.split("<li class=\"cl-stage", -1)).hasSize(6);
+        assertThat(progress.split("aria-current=\"step\"", -1)).hasSize(2);
+        assertThat(progress.split("ukończony: ", -1)).hasSize(2);
+    }
+
+    @Test
+    void completedStagesAreAllDoneWithTheArrivalDate() {
+        // given
+        Shipment arrived = trackedReturn();
+        arrived.setDeliveredAt(LocalDateTime.of(2026, 10, 23, 9, 30));
+
+        // when
+        String progress = card(ClientReturnRenderer.approved().status(RMAStatus.Completed).shipments(arrived).render(),
+                "return-progress");
+
+        // then
+        assertThat(progress.split("ukończony: ", -1)).hasSize(6);
+        assertThat(progress).doesNotContain("aria-current")
+                .contains("<span class=\"cl-stage-when\">23 paź</span>");
+    }
+
+    @Test
+    void addressIsMaskedAndHasNoNull() {
+        // given
+        ShippingDetails noName = fullAddress();
+        noName.setName(null);
+
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(fullAddress())
+                .returnPackage("t-s").render();
+        String withoutName = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(noName).render();
+
+        // then
+        String address = card(html, "return-address");
+        assertThat(address).contains("<h2 class=\"cl-card-title\" id=\"return-address-title\">Odbiór paczki</h2>")
+                .contains("<h3>Adres</h3>")
+                .contains("<span>Jan*********</span>")
+                .contains("<p>00-950 Warszawa, PL</p>")
+                .contains("<h3>Paczka</h3>")
+                .contains("<p>Karton S</p>")
+                .contains("<p class=\"cl-muted\">25 × 15 × 10 cm · 1 kg</p>")
+                .doesNotContain("Chcesz zmienić adres?");
+        assertThat(main(html)).doesNotContain("Kowalski").doesNotContain("Marszałkowska").doesNotContain("601234567")
+                .doesNotContain("jan.kowalski@poczta").doesNotContain("null");
+        String bare = card(withoutName, "return-address");
+        assertThat(bare).contains("Kow*****").doesNotContain("nul").doesNotContain("<h3>Paczka</h3>");
+    }
+
+    @Test
+    void addressCardOnlyBeforeTheParcelArrives() {
+        // when
+        String storeBooks = ClientReturnRenderer.approved().savedAddress(fullAddress()).render();
+        String arrived = ClientReturnRenderer.approved().status(RMAStatus.ItemsReceived).savedAddress(fullAddress()).render();
+        String waitingWithoutAddress = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).render();
+
+        // then
+        assertThat(card(storeBooks, "return-address"))
+                .contains("<p class=\"cl-help\">Chcesz zmienić adres? Napisz do nas, zanim kurier wyruszy.</p>");
+        assertThat(arrived).doesNotContain("id=\"return-address\"").doesNotContain("00-950");
+        assertThat(waitingWithoutAddress).doesNotContain("id=\"return-address\"");
+    }
+
+    @Test
+    void rejectedShowsTheReasonAsTextWithoutStages() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Rejected)
+                .rejectionReason("Uszkodzenie <b>mechaniczne</b>.\nDruga linia.").render();
+
+        // then
+        String reason = card(html, "return-reason");
+        assertThat(reason).contains("<h2 class=\"cl-card-title\" id=\"return-reason-title\">Powód odrzucenia</h2>")
+                .contains("<blockquote class=\"cl-quote\">Uszkodzenie &lt;b&gt;mechaniczne&lt;/b&gt;.\nDruga linia.</blockquote>")
+                .contains("<p class=\"cl-quote-source\">Wyjaśnienie od sklepu</p>");
+        String content = main(html);
+        assertThat(content).doesNotContain("cl-stages").doesNotContain("id=\"return-progress\"")
+                .doesNotContain("<b>mechaniczne");
+        assertThat(content).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-reason\"");
+        assertThat(card(html, "return-items")).doesNotContain("cl-status");
+    }
+
+    @Test
+    void rejectedWithoutReasonSaysSo() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Rejected).rejectionReason("   ").render();
+
+        // then
+        assertThat(card(html, "return-reason")).contains("<p class=\"cl-note\">Sklep nie podał powodu. Jeśli chcesz go poznać albo nie zgadzasz się z decyzją, napisz do nas — dane kontaktowe są niżej.</p>")
+                .doesNotContain("cl-quote");
+    }
+
+    @Test
+    void reasonIsNotShownOutsideRejected() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Completed).rejectionReason("Stary powód.").render();
+
+        // then
+        assertThat(html).doesNotContain("id=\"return-reason\"").doesNotContain("Stary powód.").doesNotContain("cl-quote");
+    }
+
+    @Test
+    void completedShowsResolutions() {
+        // given
+        RMAItem card = ClientReturnRenderer.item("Karta graficzna", 1, RMAResolutionType.Repair);
+        card.setActualResolution(RMAResolutionType.Replacement);
+        card.setStatus(RMAItemStatus.ReturnedToClient);
+        RMAItem memory = ClientReturnRenderer.item("Pamięć", 2, RMAResolutionType.Return);
+        memory.setStatus(RMAItemStatus.New);
+
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Completed).items(card, memory).render();
+
+        // then
+        String items = card(html, "return-items");
+        assertThat(items).contains("<h2 class=\"cl-card-title\" id=\"return-items-title\">Produkty w zwrocie: 2</h2>")
+                .contains("<ul class=\"cl-list is-items\">")
+                .contains("<p class=\"cl-list-title\">Karta graficzna</p>")
+                .contains("<p class=\"cl-list-desc\">1 szt. · Oczekujesz: Naprawa · Rozwiązanie: Wymiana</p>")
+                .contains("<p class=\"cl-list-desc\">2 szt. · Oczekujesz: Zwrot</p>")
+                .contains("<p class=\"cl-list-desc cl-muted\">„Nie działa.”</p>")
+                .contains("<span class=\"cl-status is-ok\">Odesłany do Ciebie</span>");
+        assertThat(items.split("cl-status", -1)).hasSize(2);
+        String content = main(html);
+        assertThat(content.indexOf("id=\"return-progress\"")).isLessThan(content.indexOf("id=\"return-items\""));
+    }
+
+    @Test
+    void itemsWithHtmlInNamesAreText() {
+        // given
+        RMAItem item = ClientReturnRenderer.item("Dysk <img src=x onerror=alert(1)>", 1, RMAResolutionType.Return);
+        item.setReason("<b>głośny</b>");
+
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Processing).items(item).render();
+
+        // then
+        assertThat(card(html, "return-items")).contains("Dysk &lt;img src=x onerror=alert(1)&gt;")
+                .contains("„&lt;b&gt;głośny&lt;/b&gt;”")
+                .contains("Produkty w zwrocie: 1");
+        assertThat(html).doesNotContain("<img src=x").doesNotContain("<b>głośny");
+    }
+
+    @Test
+    void contactQuotesTheReturnNumber() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.Processing).contactPhone("+48 22 390 45 10").render();
+        String noContact = ClientReturnRenderer.approved().status(RMAStatus.Processing).contactEmail(null).render();
+
+        // then
+        String help = card(html, "return-help");
+        assertThat(help).contains("<h2 class=\"cl-card-title\" id=\"return-help-title\">Masz pytanie?</h2>")
+                .contains("Napisz do nas:")
+                .contains("<a href=\"mailto:biuro@novatech.pl\">biuro@novatech.pl</a>")
+                .contains("albo zadzwoń:")
+                .contains("<a href=\"tel:+48223904510\">+48 22 390 45 10</a>")
+                .contains("i podaj numer zwrotu")
+                .contains("<strong>3f9c2a71</strong>.");
+        assertThat(noContact).doesNotContain("id=\"return-help\"");
+        assertThat(main(html).indexOf("id=\"return-help\"")).isGreaterThan(main(html).indexOf("id=\"return-items\""));
+    }
+
+    @Test
+    void noShipmentCardWithoutRows() {
+        // given
+        Shipment failedFromStore = new Shipment(ShipmentType.Courier);
+        failedFromStore.setProvider("furgonetka");
+        failedFromStore.setPickUpAddressId("warehouse");
+        failedFromStore.setCreation(ShipmentCreationState.pending("cmd", NOW).failed("refused"));
+
+        // when
+        String none = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).render();
+        String onlyFailed = ClientReturnRenderer.approved().status(RMAStatus.Completed).shipments(failedFromStore).render();
+
+        // then
+        assertThat(none).doesNotContain("id=\"return-parcel\"");
+        assertThat(onlyFailed).doesNotContain("id=\"return-parcel\"").doesNotContain("refused");
+    }
+
+    @Test
+    void englishWaitingAndRejected() {
+        // when
+        String waiting = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(fullAddress())
+                .returnPackage("t-s").shipments(trackedReturn()).locale(Locale.ENGLISH).render();
+        String rejected = ClientReturnRenderer.approved().status(RMAStatus.Rejected).rejectionReason("Mechanical damage.")
+                .locale(Locale.ENGLISH).render();
+
+        // then
+        assertThat(waiting).contains("id=\"return-parcel-title\">Shipment</h2>")
+                .contains("Your return parcel")
+                .contains("Number: 00007731440201U")
+                .contains("Track shipment")
+                .contains("(opens in a new tab)")
+                .contains("dispatched 22 Oct, 10:14")
+                .contains("pickup Fri 23 Oct, 9:00–15:00")
+                .contains("Return progress")
+                .contains("Waiting for the parcel")
+                .contains("Parcel pickup")
+                .contains("Products in the return: 2")
+                .contains("1 pc · You expect: Repair")
+                .contains("and quote the return number")
+                .doesNotContain("??");
+        assertThat(rejected).contains("Reason for rejection")
+                .contains("<blockquote class=\"cl-quote\">Mechanical damage.</blockquote>")
+                .contains("Explanation from the store")
+                .doesNotContain("cl-stages")
+                .doesNotContain("??");
     }
 
     @Test

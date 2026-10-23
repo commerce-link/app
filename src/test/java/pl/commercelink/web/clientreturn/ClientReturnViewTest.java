@@ -468,6 +468,68 @@ class ClientReturnViewTest {
     }
 
     @Test
+    void aShipmentWithoutCarrierNorTypeHasNoTypeKey() {
+        // given
+        Shipment manualEntry = new Shipment();
+        manualEntry.setType(null);
+        manualEntry.setTrackingNo("MANUAL1");
+
+        // when
+        ReturnShipmentRow row = view(rma(RMAStatus.WaitingForItems, true, manualEntry)).shipmentRows().get(0);
+
+        // then
+        assertThat(row.carrier()).isNull();
+        assertThat(row.typeKey()).isNull();
+    }
+
+    @Test
+    void aShipmentBeingCreatedHidesTheNumberItAlreadyHas() {
+        // given
+        Shipment returned = creating(customerReturn());
+        returned.setTrackingNo("EARLY1");
+        returned.setTrackingUrl("https://tracking.example/EARLY1");
+
+        // when
+        ReturnShipmentRow row = view(rma(RMAStatus.Approved, true, returned)).shipmentRows().get(0);
+
+        // then
+        assertThat(row.stateKey()).isEqualTo("client.return.shipment.state.booking");
+        assertThat(row.trackingNo()).isNull();
+        assertThat(row.trackingUrl()).isNull();
+    }
+
+    @Test
+    void addressLinesLeaveOutWhatIsMissing() {
+        // given
+        RMA full = rma(RMAStatus.WaitingForItems, true);
+        full.getShippingDetails().setSurname("Kowalski");
+        full.getShippingDetails().setPostalCode("00-950");
+        full.getShippingDetails().setCountry("PL");
+        RMA surnameOnly = rma(RMAStatus.WaitingForItems, true);
+        surnameOnly.getShippingDetails().setName(null);
+        surnameOnly.getShippingDetails().setSurname("Kowalski");
+        RMA companyOnly = rma(RMAStatus.WaitingForItems, true);
+        companyOnly.getShippingDetails().setName(" ");
+        companyOnly.getShippingDetails().setCompanyName("Nova Tech");
+        companyOnly.getShippingDetails().setCity(null);
+        companyOnly.getShippingDetails().setCountry("PL");
+
+        // when
+        ClientReturnView fullView = view(full);
+        ClientReturnView surnameView = view(surnameOnly);
+        ClientReturnView companyView = view(companyOnly);
+
+        // then
+        assertThat(fullView.addressName()).isEqualTo("Jan Kowalski");
+        assertThat(fullView.addressPlace()).isEqualTo("00-950 Warszawa, PL");
+        assertThat(surnameView.addressName()).isEqualTo("Kowalski");
+        assertThat(surnameView.addressPlace()).isEqualTo("Warszawa");
+        assertThat(companyView.addressName()).isEqualTo("Nova Tech");
+        assertThat(companyView.addressPlace()).isEqualTo("PL");
+        assertThat(view(rma(RMAStatus.Completed, true)).addressName()).isNull();
+    }
+
+    @Test
     void aCustomerReturnBeingCreatedSaysSo() {
         // given
         Shipment returned = creating(customerReturn());
