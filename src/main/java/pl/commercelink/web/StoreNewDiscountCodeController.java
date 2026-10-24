@@ -13,20 +13,24 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodesRepository;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DiscountCodeForm;
-import pl.commercelink.web.settings.DiscountCategoryGroup;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -41,6 +45,7 @@ public class StoreNewDiscountCodeController {
     private final DiscountCodesRepository discountCodesRepository;
     private final ProductCatalogRepository productCatalogRepository;
     private final PaymentGateways paymentGateways;
+    private final PricelistFinder pricelistFinder;
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard/store/discounts/new")
@@ -73,6 +78,30 @@ public class StoreNewDiscountCodeController {
                                    HttpServletRequest request, HttpServletResponse response) {
         return create(storeId, form, SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes, request,
                 response);
+    }
+
+    @GetMapping("/dashboard/store/discounts/pricelist")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseBody
+    public List<AvailabilityAndPrice> pricelist(@RequestParam String catalogId) {
+        return pricelist(CustomSecurityContext.getStoreId(), catalogId);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/discounts/pricelist")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public List<AvailabilityAndPrice> superAdminPricelist(@PathVariable String storeId, @RequestParam String catalogId) {
+        return pricelist(storeId, catalogId);
+    }
+
+    private List<AvailabilityAndPrice> pricelist(String storeId, String catalogId) {
+        requireStore(storeId);
+        if (productCatalogRepository.findById(storeId, catalogId) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return pricelistFinder.availabilityAndPrices(storeId, catalogId).stream()
+                .filter(row -> !row.isService())
+                .toList();
     }
 
     private String show(String storeId, Model model, Locale locale) {
@@ -118,7 +147,8 @@ public class StoreNewDiscountCodeController {
         model.addAttribute("backHref", listPath(storeId));
         model.addAttribute("backLabel", messageSource.getMessage("store.discounts", null, locale));
         model.addAttribute("paymentOptions", paymentGateways.paymentOptions(store));
-        model.addAttribute("categoryGroups", DiscountCategoryGroup.of(productCatalogRepository.findAll(storeId)));
+        model.addAttribute("catalogs", productCatalogRepository.findAll(storeId));
+        model.addAttribute("pricelistUrl", listPath(storeId) + "/pricelist");
         model.addAttribute("paymentsHref", SettingsPaths.store(storeId, "/payments"));
     }
 

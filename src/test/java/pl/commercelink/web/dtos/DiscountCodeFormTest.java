@@ -132,7 +132,85 @@ class DiscountCodeFormTest {
         form.setCategories(List.of(" "));
 
         // when / then
-        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required");
+        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Category");
+    }
+
+    @Test
+    void productCodeNeedsAtLeastOneProduct() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setTarget("Product");
+        form.setProducts(List.of(new TargetValue(" ", "Zestaw Gamer RTX 5070")));
+        form.setCategories(List.of("Karty graficzne"));
+
+        // when / then
+        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Product");
+    }
+
+    @Test
+    void brandCodeNeedsAtLeastOneBrand() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setTarget("Brand");
+        form.setBrands(List.of(""));
+        form.setProducts(List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
+
+        // when / then
+        assertThat(form.validate(store())).containsEntry("targetValues", "store.discounts.targetValues.required.Brand");
+    }
+
+    @Test
+    void onlyTheValuesOfTheChosenTargetAreKept() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setTarget("Brand");
+        form.setCategories(List.of("Karty graficzne"));
+        form.setProducts(List.of(new TargetValue("PIM-1", "Zestaw Gamer RTX 5070")));
+        form.setBrands(List.of("ASUS"));
+
+        // when
+        DiscountCode code = form.toDiscountCode("store-1");
+
+        // then
+        assertThat(code.getTarget()).isEqualTo(DiscountTarget.Brand);
+        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("ASUS");
+    }
+
+    @Test
+    void productsAreKeptOncePerIdWithTheirNames() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setTarget("Product");
+        form.setProducts(List.of(
+                new TargetValue("PIM-1", "Zestaw Gamer RTX 5070"),
+                new TargetValue(" PIM-2 ", " Karta graficzna ASUS Dual RTX 5070 OC "),
+                new TargetValue("PIM-1", "Zestaw Gamer RTX 5070 (kopia)"),
+                new TargetValue(),
+                new TargetValue("PIM-3", " ")));
+
+        // when
+        DiscountCode code = form.toDiscountCode("store-1");
+
+        // then
+        assertThat(code.getTarget()).isEqualTo(DiscountTarget.Product);
+        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("PIM-1", "PIM-2", "PIM-3");
+        assertThat(code.getTargetValues()).extracting(TargetValue::getName)
+                .containsExactly("Zestaw Gamer RTX 5070", "Karta graficzna ASUS Dual RTX 5070 OC", "PIM-3");
+    }
+
+    @Test
+    void brandsAreKeptOnceByName() {
+        // given
+        DiscountCodeForm form = valid();
+        form.setTarget("Brand");
+        form.setBrands(List.of("ASUS", " MSI ", "ASUS", ""));
+
+        // when
+        DiscountCode code = form.toDiscountCode("store-1");
+
+        // then
+        assertThat(code.getTargetValues()).extracting(TargetValue::getId).containsExactly("ASUS", "MSI");
+        assertThat(code.getTargetValues()).extracting(TargetValue::getName).containsExactly("ASUS", "MSI");
     }
 
     @Test

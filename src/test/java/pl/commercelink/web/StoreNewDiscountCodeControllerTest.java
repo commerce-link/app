@@ -25,6 +25,8 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 import org.springframework.web.servlet.support.SessionFlashMapManager;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodesRepository;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -33,7 +35,6 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.DiscountCodeForm;
 import pl.commercelink.web.dtos.PaymentOptionView;
-import pl.commercelink.web.settings.DiscountCategoryGroup;
 import pl.commercelink.web.settings.SettingsFlash;
 
 import java.util.List;
@@ -62,6 +63,8 @@ class StoreNewDiscountCodeControllerTest {
     private ProductCatalogRepository productCatalogRepository;
     @Mock
     private PaymentGateways paymentGateways;
+    @Mock
+    private PricelistFinder pricelistFinder;
     @Mock
     private MessageSource messageSource;
 
@@ -124,30 +127,83 @@ class StoreNewDiscountCodeControllerTest {
         assertThatThrownBy(() -> controller.superAdminCreate("missing", validForm(), null, new ExtendedModelMap(), PL,
                 new RedirectAttributesModelMap(), new MockHttpServletRequest(), new MockHttpServletResponse()))
                 .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> controller.superAdminPricelist("missing", "cat-1"))
+                .isInstanceOf(ResponseStatusException.class);
         verify(discountCodesRepository, never()).create(any());
+        verify(pricelistFinder, never()).availabilityAndPrices(anyString(), anyString());
     }
 
     @Test
-    void categoriesComeGroupedByCatalogWithEachNameOnce() {
+    void thePickDialogsGetTheStoreCatalogsAndTheirPricelistAddress() {
         // given
         store("store-1");
-        ProductCatalog parts = catalog("Podzespoły", "Karty graficzne", "Procesory");
-        ProductCatalog outlet = catalog("Outlet", "Karty graficzne", "Laptopy poleasingowe");
-        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(parts, outlet));
+        ProductCatalog parts = catalog("Podzespoły", "Karty graficzne");
+        when(productCatalogRepository.findAll("store-1")).thenReturn(List.of(parts));
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
         controller.newCode(model, PL);
 
         // then
-        @SuppressWarnings("unchecked")
-        List<DiscountCategoryGroup> groups = (List<DiscountCategoryGroup>) model.getAttribute("categoryGroups");
-        assertThat(groups).extracting(DiscountCategoryGroup::catalogName).containsExactly("Podzespoły", "Outlet");
-        assertThat(groups.get(0).categories()).extracting(DiscountCategoryGroup.Choice::name)
-                .containsExactly("Karty graficzne", "Procesory");
-        assertThat(groups.get(0).categories().get(0).alsoIn()).containsExactly("Outlet");
-        assertThat(groups.get(1).categories()).extracting(DiscountCategoryGroup.Choice::name)
-                .containsExactly("Laptopy poleasingowe");
+        assertThat(model.getAttribute("catalogs")).asList().containsExactly(parts);
+        assertThat(model.getAttribute("pricelistUrl")).isEqualTo("/dashboard/store/discounts/pricelist");
+    }
+
+    @Test
+    void theSuperAdminDialogReadsThePricelistOfTheStoreFromThePath() {
+        // given
+        authenticateAs(null, "SUPER_ADMIN");
+        store("store-2");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.superAdminNewCode("store-2", model, PL);
+
+        // then
+        assertThat(model.getAttribute("pricelistUrl")).isEqualTo("/dashboard/store/store-2/discounts/pricelist");
+    }
+
+    @Test
+    void thePricelistOfASessionStoreCatalogLeavesServicesOut() {
+        // given
+        store("store-1");
+        when(productCatalogRepository.findById("store-1", "cat-1")).thenReturn(catalog("Komputery"));
+        AvailabilityAndPrice computer = row("PIM-1", "Zestaw Gamer RTX 5070", false);
+        when(pricelistFinder.availabilityAndPrices("store-1", "cat-1"))
+                .thenReturn(List.of(computer, row("PIM-9", "Montaż i testy", true)));
+
+        // when
+        List<AvailabilityAndPrice> rows = controller.pricelist("cat-1");
+
+        // then
+        assertThat(rows).containsExactly(computer);
+    }
+
+    @Test
+    void theSuperAdminReadsThePricelistOfTheStoreFromThePath() {
+        // given
+        authenticateAs(null, "SUPER_ADMIN");
+        store("store-2");
+        when(productCatalogRepository.findById("store-2", "cat-1")).thenReturn(catalog("Komputery"));
+        AvailabilityAndPrice computer = row("PIM-1", "Zestaw Gamer RTX 5070", false);
+        when(pricelistFinder.availabilityAndPrices("store-2", "cat-1")).thenReturn(List.of(computer));
+
+        // when
+        List<AvailabilityAndPrice> rows = controller.superAdminPricelist("store-2", "cat-1");
+
+        // then
+        assertThat(rows).containsExactly(computer);
+    }
+
+    @Test
+    void aCatalogTheStoreDoesNotHaveAnswers404() {
+        // given
+        store("store-1");
+
+        // when / then
+        assertThatThrownBy(() -> controller.pricelist("cat-of-another-store"))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(pricelistFinder, never()).availabilityAndPrices(anyString(), anyString());
     }
 
     @Test
@@ -272,6 +328,11 @@ class StoreNewDiscountCodeControllerTest {
         form.setName("Kampania letnia");
         form.setValue("10");
         return form;
+    }
+
+    private static AvailabilityAndPrice row(String pimId, String name, boolean service) {
+        return new AvailabilityAndPrice(pimId, "5905562410018", "CL-GM-5070", "Madman", "Gamer", name, "Zestawy gamingowe",
+                6499, 12, 2, 6499, service);
     }
 
     private static ProductCatalog catalog(String name, String... categories) {

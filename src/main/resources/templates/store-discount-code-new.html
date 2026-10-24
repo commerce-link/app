@@ -96,12 +96,12 @@
                                             <span class="cl-choice-description" th:text="#{store.discounts.target.basket.description}"></span>
                                         </span>
                                     </label>
-                                    <label class="cl-choice">
-                                        <input type="radio" name="target" value="Category" th:checked="*{target == 'Category'}"
+                                    <label class="cl-choice" th:each="kind : ${ {'Category', 'Product', 'Brand'} }">
+                                        <input type="radio" name="target" th:value="${kind}" th:checked="${form.target == kind}"
                                                data-cl-variant-select="discount-target"/>
                                         <span class="cl-choice-text">
-                                            <span class="cl-choice-title" th:text="#{store.discounts.target.Category}"></span>
-                                            <span class="cl-choice-description" th:text="#{store.discounts.target.Category.description}"></span>
+                                            <span class="cl-choice-title" th:text="#{${'store.discounts.target.' + kind}}"></span>
+                                            <span class="cl-choice-description" th:text="#{${'store.discounts.target.' + kind + '.description'}}"></span>
                                         </span>
                                     </label>
                                 </fieldset>
@@ -111,33 +111,86 @@
                                 </p>
                                 <p class="cl-help" th:text="#{store.discounts.target.help}"></p>
                             </div>
-                            <fieldset class="cl-choice-group cl-span-6" id="targetValues"
-                                      data-cl-variant-group="discount-target" data-cl-variant="Category"
-                                      th:attr="aria-describedby=${errors['targetValues'] != null ? 'targetValues-help targetValues-error' : 'targetValues-help'}">
-                                <legend class="cl-label" th:text="#{store.discounts.categories}"></legend>
-                                <p th:if="${categoryGroups.isEmpty()}" class="cl-help" th:text="#{store.discounts.categories.none}"></p>
-                                <th:block th:each="group : ${categoryGroups}">
-                                    <p class="cl-eyebrow" th:text="${group.catalogName()}"></p>
-                                    <ul class="cl-check-columns">
-                                        <li th:each="choice : ${group.categories()}">
-                                            <label class="cl-check">
-                                                <input type="checkbox" name="categories" th:value="${choice.name()}"
-                                                       th:checked="${#lists.contains(form.categories, choice.name())}"/>
-                                                <span class="cl-check-text">
-                                                    <span th:text="${choice.name()}"></span>
-                                                    <span th:unless="${choice.alsoIn().isEmpty()}" class="cl-table-sub"
-                                                          th:text="#{store.discounts.categories.alsoIn(${#strings.listJoin(choice.alsoIn(), ', ')})}"></span>
-                                                </span>
-                                            </label>
+                            <div class="cl-span-6" id="targetValues" data-cl-variant-when="discount-target=Category|Product|Brand"
+                                 th:with="described=${errors['targetValues'] != null ? ' targetValues-error' : ''}">
+                                <fieldset class="cl-choice-group" data-cl-variant-group="discount-target" data-cl-variant="Category"
+                                          data-discount-picked="categories"
+                                          th:attr="aria-describedby=${'categories-help' + described},
+                                                   data-remove-label=#{store.discounts.picked.remove}">
+                                    <legend class="cl-label" th:text="#{store.discounts.categories}"></legend>
+                                    <ul class="cl-chip-list" data-discount-picked-list>
+                                        <li th:each="category : ${form.categories}" th:unless="${#strings.isEmpty(category)}"
+                                            class="cl-chip-tag" th:attr="data-id=${category}, data-name=${category}">
+                                            <span th:text="${category}"></span>
+                                            <input type="hidden" name="categories" th:value="${category}"/>
+                                            <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                                                    th:attr="aria-label=#{store.discounts.picked.remove(${category})}">&times;</button>
                                         </li>
                                     </ul>
-                                </th:block>
-                                <p class="cl-help" id="targetValues-help" th:text="#{store.discounts.categories.help}"></p>
+                                    <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(form.categories)}"
+                                       th:text="#{store.discounts.categories.none}"></p>
+                                    <p>
+                                        <button type="button" class="cl-button" data-discount-pick="categories" hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{store.discounts.categories.pick}"></span>
+                                        </button>
+                                    </p>
+                                    <p class="cl-help" id="categories-help" th:text="#{store.discounts.categories.help}"></p>
+                                </fieldset>
+                                <fieldset class="cl-choice-group" data-cl-variant-group="discount-target" data-cl-variant="Product"
+                                          data-discount-picked="products"
+                                          th:attr="aria-describedby=${'products-help' + described},
+                                                   data-remove-label=#{store.discounts.picked.remove}">
+                                    <legend class="cl-label" th:text="#{store.discounts.products}"></legend>
+                                    <ul class="cl-chip-list" data-discount-picked-list>
+                                        <li th:each="product, row : ${form.products}" th:if="${product != null and !#strings.isEmpty(product.id)}"
+                                            class="cl-chip-tag" th:attr="data-id=${product.id}, data-name=${product.name}">
+                                            <span th:text="${product.name}"></span>
+                                            <input type="hidden" th:name="|products[${row.index}].id|" th:value="${product.id}"/>
+                                            <input type="hidden" th:name="|products[${row.index}].name|" th:value="${product.name}"/>
+                                            <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                                                    th:attr="aria-label=#{store.discounts.picked.remove(${product.name})}">&times;</button>
+                                        </li>
+                                    </ul>
+                                    <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(form.products)}"
+                                       th:text="#{store.discounts.products.none}"></p>
+                                    <p>
+                                        <button type="button" class="cl-button" data-discount-pick="products" hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{store.discounts.products.pick}"></span>
+                                        </button>
+                                    </p>
+                                    <p class="cl-help" id="products-help" th:text="#{store.discounts.products.help}"></p>
+                                </fieldset>
+                                <fieldset class="cl-choice-group" data-cl-variant-group="discount-target" data-cl-variant="Brand"
+                                          data-discount-picked="brands"
+                                          th:attr="aria-describedby=${'brands-help' + described},
+                                                   data-remove-label=#{store.discounts.picked.remove}">
+                                    <legend class="cl-label" th:text="#{store.discounts.brands}"></legend>
+                                    <ul class="cl-chip-list" data-discount-picked-list>
+                                        <li th:each="brand : ${form.brands}" th:unless="${#strings.isEmpty(brand)}"
+                                            class="cl-chip-tag" th:attr="data-id=${brand}, data-name=${brand}">
+                                            <span th:text="${brand}"></span>
+                                            <input type="hidden" name="brands" th:value="${brand}"/>
+                                            <button type="button" class="cl-chip-tag-remove" data-discount-picked-remove
+                                                    th:attr="aria-label=#{store.discounts.picked.remove(${brand})}">&times;</button>
+                                        </li>
+                                    </ul>
+                                    <p class="cl-help" data-discount-picked-empty th:hidden="${!#lists.isEmpty(form.brands)}"
+                                       th:text="#{store.discounts.brands.none}"></p>
+                                    <p>
+                                        <button type="button" class="cl-button" data-discount-pick="brands" hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{store.discounts.brands.pick}"></span>
+                                        </button>
+                                    </p>
+                                    <p class="cl-help" id="brands-help" th:text="#{store.discounts.brands.help}"></p>
+                                </fieldset>
                                 <p th:if="${errors['targetValues'] != null}" class="cl-field-error" id="targetValues-error">
                                     <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                                     <span th:text="#{${errors['targetValues']}}"></span>
                                 </p>
-                            </fieldset>
+                            </div>
                         </div>
                     </fieldset>
 
@@ -201,7 +254,10 @@
                     <div class="cl-card-body" data-discount-summary hidden
                          th:attr="data-percentage=#{store.discounts.summary.percentage}, data-amount=#{store.discounts.summary.amount},
                                   data-basket=#{store.discounts.summary.basket}, data-categories=#{store.discounts.summary.categories},
-                                  data-no-categories=#{store.discounts.summary.categories.none}, data-minimum=#{store.discounts.summary.minimum},
+                                  data-no-categories=#{store.discounts.summary.categories.none},
+                                  data-products=#{store.discounts.summary.products}, data-no-products=#{store.discounts.summary.products.none},
+                                  data-brands=#{store.discounts.summary.brands}, data-no-brands=#{store.discounts.summary.brands.none},
+                                  data-minimum=#{store.discounts.summary.minimum},
                                   data-any-gateway=#{store.discounts.summary.anyGateway}, data-gateway=#{store.discounts.summary.gateway},
                                   data-unlimited=#{store.discounts.summary.unlimited}, data-once=#{store.discounts.summary.once},
                                   data-limit=#{store.discounts.summary.limit}, data-no-dates=#{store.discounts.summary.noDates},
@@ -222,6 +278,9 @@
                     </div>
                 </div>
             </form>
+
+            <th:block th:unless="${paymentOptions.isEmpty()}"
+                      th:insert="~{fragments/discount-target-dialog :: dialogs(${catalogs}, ${pricelistUrl})}"></th:block>
         </div>
     </section>
     <script th:if="${!errors.isEmpty() and !paymentOptions.isEmpty()}">
@@ -229,6 +288,7 @@
     </script>
     <script th:src="@{/js/async-form.js}" defer></script>
     <script th:src="@{/js/variant-fields.js}" defer></script>
+    <script th:src="@{/js/money.js}" defer></script>
     <script th:src="@{/js/discount-code-form.js}" defer></script>
 </div>
 </body>

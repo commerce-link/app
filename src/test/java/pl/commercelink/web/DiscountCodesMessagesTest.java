@@ -45,7 +45,15 @@ class DiscountCodesMessagesTest {
                     messages.getMessage("store.discounts.uses.limited", new Object[]{6, 100}, locale),
                     messages.getMessage("store.discounts.details.uses.limited", new Object[]{6, 100}, locale),
                     messages.getMessage("store.discounts.validity.range", new Object[]{"01.10.2026", "31.12.2026"}, locale),
-                    messages.getMessage("store.discounts.categories.alsoIn", new Object[]{"Outlet"}, locale));
+                    messages.getMessage("store.discounts.pick.categories.count", new Object[]{3, 12}, locale),
+                    messages.getMessage("store.discounts.picked.remove", new Object[]{"ASUS"}, locale),
+                    messages.getMessage("store.discounts.pick.choose", new Object[]{"ASUS"}, locale),
+                    messages.getMessage("store.discounts.pick.qty", new Object[]{12}, locale),
+                    messages.getMessage("store.discounts.pick.products.count", new Object[]{4, 186}, locale),
+                    messages.getMessage("store.discounts.pick.brands.count", new Object[]{2, 31}, locale),
+                    messages.getMessage("store.discounts.pick.submit.count", new Object[]{3}, locale),
+                    messages.getMessage("store.discounts.summary.products", new Object[]{3}, locale),
+                    messages.getMessage("store.discounts.summary.brands", new Object[]{"ASUS, MSI"}, locale));
 
             // then
             assertThat(texts).as(locale.toString()).noneMatch(text -> text.contains("{") || text.contains("}"));

@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Getter
@@ -32,6 +33,8 @@ public class DiscountCodeForm {
     private String value;
     private String target;
     private List<String> categories = new ArrayList<>();
+    private List<TargetValue> products = new ArrayList<>();
+    private List<String> brands = new ArrayList<>();
     private String paymentProvider;
     private String minOrderValue;
     private String maxUses;
@@ -61,7 +64,7 @@ public class DiscountCodeForm {
         if (StringUtils.isNotBlank(target) && discountTarget() == null) {
             errors.put("target", "store.discounts.target.invalid");
         } else if (discountTarget() != null && targetValues().isEmpty()) {
-            errors.put("targetValues", "store.discounts.targetValues.required");
+            errors.put("targetValues", "store.discounts.targetValues.required." + discountTarget().name());
         }
         if (StringUtils.isNotBlank(paymentProvider) && store.getPaymentIntegration(paymentProvider.trim()) == null) {
             errors.put("paymentProvider", "store.discounts.paymentProvider.invalid");
@@ -130,15 +133,40 @@ public class DiscountCodeForm {
     }
 
     private List<TargetValue> targetValues() {
-        if (discountTarget() != DiscountTarget.Category || categories == null) {
+        DiscountTarget chosen = discountTarget();
+        if (chosen == null) {
             return new ArrayList<>();
         }
-        return new ArrayList<>(categories.stream()
+        return switch (chosen) {
+            case Category -> byName(categories);
+            case Brand -> byName(brands);
+            case Product -> byId(products);
+        };
+    }
+
+    private static List<TargetValue> byName(List<String> names) {
+        if (names == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(names.stream()
                 .map(StringUtils::trimToNull)
-                .filter(StringUtils::isNotEmpty)
+                .filter(Objects::nonNull)
                 .distinct()
-                .map(category -> new TargetValue(category, category))
+                .map(name -> new TargetValue(name, name))
                 .toList());
+    }
+
+    private static List<TargetValue> byId(List<TargetValue> picked) {
+        Map<String, TargetValue> unique = new LinkedHashMap<>();
+        if (picked != null) {
+            for (TargetValue value : picked) {
+                String id = value == null ? null : StringUtils.trimToNull(value.getId());
+                if (id != null) {
+                    unique.putIfAbsent(id, new TargetValue(id, StringUtils.defaultIfBlank(StringUtils.trim(value.getName()), id)));
+                }
+            }
+        }
+        return new ArrayList<>(unique.values());
     }
 
     private DiscountType discountType() {
