@@ -11,6 +11,7 @@ import pl.commercelink.products.ProductCatalog;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -39,8 +40,7 @@ class CheckoutValidationTest {
 
         // when / then
         assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Case"))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Obudowa");
+                .isInstanceOfSatisfying(CheckoutException.class, e -> assertRequiredItemMissing(e, "Obudowa"));
     }
 
     @Test
@@ -51,8 +51,7 @@ class CheckoutValidationTest {
 
         // when / then
         assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item("Procesor"))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Obudowa");
+                .isInstanceOfSatisfying(CheckoutException.class, e -> assertRequiredItemMissing(e, "Obudowa"));
     }
 
     @Test
@@ -67,8 +66,12 @@ class CheckoutValidationTest {
 
         // when / then
         assertThatThrownBy(() -> checkout.validateOrderCompleteness(catalog, List.of(item(null))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Montaż");
+                .isInstanceOfSatisfying(CheckoutException.class, e -> assertRequiredItemMissing(e, "Montaż"));
+    }
+
+    private static void assertRequiredItemMissing(CheckoutException e, String categoryName) {
+        assertThat(e.getError()).isEqualTo(CheckoutError.RequiredItemMissing);
+        assertThat(e.getMessageArgs()).containsExactly(categoryName);
     }
 
     private ProductCatalog catalogWithRequired(String name, String category) {

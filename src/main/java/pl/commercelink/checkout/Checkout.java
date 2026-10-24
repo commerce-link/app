@@ -19,7 +19,9 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.CheckoutConfiguration;
+import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.InvoicingConfiguration;
+import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -28,6 +30,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 public class Checkout {
@@ -60,11 +64,11 @@ public class Checkout {
         CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         if (req.getBillingDetails() == null || !req.getBillingDetails().isProperlyFilled()) {
-            throw new IllegalStateException("Billing details are not properly filled.");
+            throw new CheckoutException(CheckoutError.BillingDetailsMissing, "billing details are not properly filled");
         }
 
         if (req.getShippingDetails() == null || !req.getShippingDetails().isProperlyFilled()) {
-            throw new IllegalStateException("Shipping details are not properly filled.");
+            throw new CheckoutException(CheckoutError.ShippingDetailsMissing, "shipping details are not properly filled");
         }
 
         List<CatalogProcessingResult> results = new ArrayList<>();
@@ -99,9 +103,28 @@ public class Checkout {
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
 
-        String providerName = store.getPaymentIntegrationOrDefault(paymentOptionId).getName();
+        String providerName = paymentProviderName(store, paymentOptionId);
 
-        return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
+        try {
+            return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
+        } catch (RuntimeException e) {
+            throw new CheckoutException(CheckoutError.PaymentUnavailable,
+                    "payment link of basket " + basket.getBasketId() + " via " + providerName + " failed", e);
+        }
+    }
+
+    private static String paymentProviderName(Store store, String paymentOptionId) {
+        if (isBlank(paymentOptionId)) {
+            return store.getDefaultPaymentIntegration()
+                    .map(PaymentIntegration::getName)
+                    .orElseThrow(() -> new CheckoutException(CheckoutError.PaymentUnavailable,
+                            "no default payment gateway in store " + store.getStoreId()));
+        }
+        if (store.getPaymentIntegration(paymentOptionId) == null) {
+            throw new CheckoutException(CheckoutError.PaymentOptionNotFound,
+                    "payment gateway " + paymentOptionId + " is not connected in store " + store.getStoreId());
+        }
+        return paymentOptionId;
     }
 
     private List<PaymentLineItem> buildPaymentLineItems(Store store, Basket basket) {
@@ -143,15 +166,20 @@ public class Checkout {
     }
 
     private PaymentShippingItem buildShippingOption(Store store, Basket basket) {
-        return basket.resolveDeliveryOption(store).map(opt -> {
-            DeliveryDays deliveryDays = DeliveryDays.calculate(store, basket);
-            return new PaymentShippingItem(
-                    opt.getName(),
-                    toMinorUnits(opt.getPrice()),
-                    deliveryDays.getMinEstimatedDeliveryDays(),
-                    deliveryDays.getMaxEstimatedDeliveryDays()
-            );
-        }).orElse(null);
+        String deliveryOptionId = basket.getDeliveryOptionId();
+        if (deliveryOptionId == null) {
+            return null;
+        }
+        DeliveryOption option = store.getCheckoutConfiguration().findDeliveryOptionById(deliveryOptionId)
+                .orElseThrow(() -> new CheckoutException(CheckoutError.DeliveryOptionNotFound,
+                        "delivery option " + deliveryOptionId + " not found in store " + store.getStoreId()));
+        DeliveryDays deliveryDays = DeliveryDays.calculate(store, basket);
+        return new PaymentShippingItem(
+                option.getName(),
+                toMinorUnits(option.getPrice()),
+                deliveryDays.getMinEstimatedDeliveryDays(),
+                deliveryDays.getMaxEstimatedDeliveryDays()
+        );
     }
 
     private Basket createBasket(CheckoutRequest req, Store store, List<CatalogProcessingResult> results) {
@@ -180,7 +208,8 @@ public class Checkout {
         Pricelist incompletePricelist = pricelistRepository.findTopNPricelist(store.getStoreId(), catalogId, checkoutConfiguration.getNumberOfAcceptedPricelists()).stream()
                 .filter(p -> p.getPricelistId().equals(req.getPricelistId(catalogId)))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Pricelist not found for catalog: " + catalogId));
+                .orElseThrow(() -> new CheckoutException(CheckoutError.PricelistOutdated,
+                        "pricelist " + req.getPricelistId(catalogId) + " of catalog " + catalogId + " is not among the accepted ones"));
 
         Pricelist pricelist = pricelistRepository.find(store.getStoreId(), catalogId, incompletePricelist.getPricelistId());
 
@@ -195,7 +224,8 @@ public class Checkout {
                 .filter(CategoryDefinition::isRequiredDuringOrder)
                 .forEach(category -> {
                     if (items.stream().noneMatch(item -> matchesCategory(item, category) && item.getQty() > 0)) {
-                        throw new IllegalStateException(REQUIRED_ITEM_MISSING_MESSAGE + category.getName());
+                        throw new CheckoutException(CheckoutError.RequiredItemMissing,
+                                REQUIRED_ITEM_MISSING_MESSAGE + category.getName(), category.getName());
                     }
                 });
     }
