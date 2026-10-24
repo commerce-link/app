@@ -11,7 +11,8 @@ import java.util.List;
  * overpaid order says "Nadpłata" with the amount paid over (overpaid), as the payments card does, not "Do zapłaty"
  * with a minus.
  */
-public record FinancesView(String total, String paid, String unpaid, boolean unpaidDue, boolean overpaid, Costs costs) {
+public record FinancesView(String total, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
+                           String discountCode, String discountAmount, Costs costs) {
 
     public record Costs(String itemsCost, String servicesCost, String feesCost, String profit, String profitNet) {
     }
@@ -24,6 +25,11 @@ public record FinancesView(String total, String paid, String unpaid, boolean unp
                 Money.format(financials.getTotalProfit()), Money.format(financials.getTotalProfitNet()));
         boolean overpaid = unpaid < -0.005;
         return new FinancesView(Money.format(order.getTotalPrice()), Money.format(order.getPaidAmount()),
-                Money.format(overpaid ? -unpaid : Math.max(0, unpaid)), unpaid > 0.005, overpaid, costs);
+                Money.format(overpaid ? -unpaid : Math.max(0, unpaid)), unpaid > 0.005, overpaid,
+                order.getDiscountCode(), Money.format(order.getDiscountAmount()), costs);
+    }
+
+    public boolean hasDiscount() {
+        return discountCode != null;
     }
 }

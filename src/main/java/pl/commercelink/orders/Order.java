@@ -44,6 +44,14 @@ public class Order {
     private String affiliateId;
     @DynamoDBAttribute(attributeName = "gclid")
     private String gclid;
+    @DynamoDBAttribute(attributeName = "discountCode")
+    @Getter
+    @Setter
+    private String discountCode;
+    @DynamoDBAttribute(attributeName = "discountAmount")
+    @Getter
+    @Setter
+    private double discountAmount;
     // projected from BillingDetails.email, any change in place will be overwritten
     @DynamoDBAttribute(attributeName = "email")
     private String email;
@@ -965,6 +973,8 @@ public class Order {
                     basket.getBillingDetails(), basket.getShippingDetails(), basket.getSource()
             );
             order.setGclid(basket.getGclid());
+            order.setDiscountCode(basket.getDiscountCode());
+            order.setDiscountAmount(basket.getDiscountAmount());
         }
 
         public Builder(Order original) {

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -14,7 +15,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
@@ -37,8 +40,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +59,8 @@ class BasketOrderImporterTest {
     private BasketsRepository basketsRepository;
     @Mock
     private OrdersManager ordersManager;
+    @Mock
+    private DiscountService discountService;
     @Mock
     private ClientDataDto dto;
 
@@ -104,6 +111,48 @@ class BasketOrderImporterTest {
         assertThat(deliveryLine.getPosition()).isEqualTo(PositionGroup.DELIVERY_POSITION);
         assertThat(deliveryLine.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
         assertThat(deliveryLine.getDeliveryId()).isEqualTo("Warehouse");
+    }
+
+    @Test
+    void redeemsCodeOfStoreBasket() {
+        // given
+        DeliveryOption deliveryOption = deliveryOption("Courier", 15.0);
+        Basket basket = basketWith(deliveryOption, basketItem("MFN-1"));
+        basket.setDiscountCode("LATO-10");
+        importsBasket(storeWithDeliveryOption(deliveryOption), basket);
+
+        // when
+        basketOrderImporter._import(STORE_ID, dto);
+
+        // then
+        InOrder inOrder = inOrder(ordersManager, discountService);
+        inOrder.verify(ordersManager).saveWithFulfilment(any(Order.class), any());
+        inOrder.verify(discountService).redeem(STORE_ID, "LATO-10");
+    }
+
+    @Test
+    void offerIsNotRedeemed() {
+        // given
+        DeliveryOption deliveryOption = deliveryOption("Courier", 15.0);
+        Basket storeBasket = basketWith(deliveryOption, basketItem("MFN-1"));
+        storeBasket.setDiscountCode("LATO-10");
+        Basket offer = storeBasket.deepCopy(" (oferta)", BasketType.Offer);
+        importsBasket(storeWithDeliveryOption(deliveryOption), offer);
+
+        // when
+        basketOrderImporter._import(STORE_ID, dto);
+
+        // then
+        verify(ordersManager).saveWithFulfilment(any(Order.class), any());
+        verifyNoInteractions(discountService);
+    }
+
+    private void importsBasket(Store store, Basket basket) {
+        when(dto.getOrderReference()).thenReturn(BASKET_REF);
+        when(dto.getBillingDetails()).thenReturn(BillingDetails._default());
+        when(dto.getShippingDetails()).thenReturn(ShippingDetails._default());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(basketsRepository.findById(STORE_ID, BASKET_REF)).thenReturn(Optional.of(basket));
     }
 
     private Store storeWithDeliveryOption(DeliveryOption deliveryOption) {

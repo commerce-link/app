@@ -80,6 +80,14 @@ class DiscountCodeTest {
     }
 
     @Test
+    void isOverusedOnlyAboveLimit() {
+        // when / then
+        assertThat(code(true, 0, 1000, null, null).isOverused()).isFalse();
+        assertThat(code(true, 2, 2, null, null).isOverused()).isFalse();
+        assertThat(code(true, 2, 3, null, null).isOverused()).isTrue();
+    }
+
+    @Test
     void coversEveryProductWhenNoTargetValues() {
         // given
         DiscountCode code = covering(null);

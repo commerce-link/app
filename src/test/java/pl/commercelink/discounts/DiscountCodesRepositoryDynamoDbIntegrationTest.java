@@ -16,8 +16,10 @@ import pl.commercelink.testsupport.DynamoDbLocalImage;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @Testcontainers(disabledWithoutDocker = true)
 class DiscountCodesRepositoryDynamoDbIntegrationTest {
@@ -133,6 +135,81 @@ class DiscountCodesRepositoryDynamoDbIntegrationTest {
         assertThat(stored.getMinOrderValue()).isEqualTo(500);
         assertThat(stored.getMaxUses()).isEqualTo(100);
         assertThat(stored.getValidTo()).isEqualTo(LocalDateTime.of(2026, 11, 30, 23, 59));
+    }
+
+    @Test
+    void setActiveKeepsUsedCount() {
+        // given
+        repository.create(code("store-1", "GPU-50", "Rabat na podzespoły"));
+        repository.redeem("store-1", "GPU-50");
+
+        // when
+        repository.setActive("store-1", "GPU-50", false);
+
+        // then
+        assertThat(repository.find("store-1", "GPU-50")).get().extracting(DiscountCode::getUsedCount).isEqualTo(1);
+    }
+
+    @Test
+    void redeemCountsPastTheLimit() {
+        // given
+        DiscountCode limited = code("store-1", "WITAJ-5", "Powitalny");
+        limited.setMaxUses(2);
+        repository.create(limited);
+
+        // when
+        DiscountCode first = repository.redeem("store-1", "witaj-5").orElseThrow();
+        DiscountCode second = repository.redeem("store-1", "WITAJ-5").orElseThrow();
+        DiscountCode third = repository.redeem("store-1", "WITAJ-5").orElseThrow();
+
+        // then
+        assertThat(List.of(first, second, third)).extracting(DiscountCode::getUsedCount, DiscountCode::isOverused)
+                .containsExactly(tuple(1, false), tuple(2, false), tuple(3, true));
+        assertThat(repository.find("store-1", "WITAJ-5")).get().extracting(DiscountCode::getUsedCount).isEqualTo(3);
+    }
+
+    @Test
+    void redeemWithoutLimitAlwaysCounts() {
+        // given
+        repository.create(code("store-1", "BF-2026", "Black Friday"));
+
+        // when
+        repository.redeem("store-1", "BF-2026");
+        repository.redeem("store-1", "BF-2026");
+        DiscountCode third = repository.redeem("store-1", "BF-2026").orElseThrow();
+
+        // then
+        assertThat(third.getUsedCount()).isEqualTo(3);
+        assertThat(third.isOverused()).isFalse();
+        assertThat(repository.find("store-1", "BF-2026")).get().extracting(DiscountCode::getUsedCount).isEqualTo(3);
+    }
+
+    @Test
+    void redeemReturnsTheWholeCode() {
+        // given
+        DiscountCode original = code("store-1", "GPU-50", "Rabat na podzespoły");
+        original.setMaxUses(100);
+        original.setValidTo(LocalDateTime.of(2026, 11, 30, 23, 59));
+        repository.create(original);
+
+        // when
+        DiscountCode redeemed = repository.redeem("store-1", "GPU-50").orElseThrow();
+
+        // then
+        assertThat(redeemed.getStoreId()).isEqualTo("store-1");
+        assertThat(redeemed.getCode()).isEqualTo("GPU-50");
+        assertThat(redeemed.getMaxUses()).isEqualTo(100);
+        assertThat(redeemed.getValidTo()).isEqualTo(LocalDateTime.of(2026, 11, 30, 23, 59));
+    }
+
+    @Test
+    void redeemOfMissingCodeCreatesNothing() {
+        // when
+        Optional<DiscountCode> redeemed = repository.redeem("store-1", "GONE-10");
+
+        // then
+        assertThat(redeemed).isEmpty();
+        assertThat(repository.findAll("store-1")).isEmpty();
     }
 
     @Test

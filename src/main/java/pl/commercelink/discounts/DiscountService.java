@@ -1,6 +1,7 @@
 package pl.commercelink.discounts;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.checkout.CheckoutError;
@@ -10,7 +11,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DiscountService {
@@ -56,6 +59,20 @@ public class DiscountService {
         lines.forEach(l -> l.item().setUnitPrice(l.unitPrice()));
         basket.setDiscountCode(discountCode.getCode());
         basket.setDiscountAmount(money(amount.doubleValue()).doubleValue());
+    }
+
+    public void redeem(String storeId, String code) {
+        try {
+            Optional<DiscountCode> redeemed = discountCodesRepository.redeem(storeId, code);
+            if (redeemed.isEmpty()) {
+                log.error("Discount code {} of store {} was used in an order but is gone, its use is not counted", code, storeId);
+            } else if (redeemed.get().isOverused()) {
+                log.error("Discount code {} of store {} was used {} times, over its limit of {}",
+                        code, storeId, redeemed.get().getUsedCount(), redeemed.get().getMaxUses());
+            }
+        } catch (RuntimeException e) {
+            log.error("Use of discount code {} of store {} could not be counted", code, storeId, e);
+        }
     }
 
     private static BigDecimal money(double value) {

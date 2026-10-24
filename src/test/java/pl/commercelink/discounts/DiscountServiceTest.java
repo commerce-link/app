@@ -1,5 +1,12 @@
 package pl.commercelink.discounts;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.amazonaws.AmazonServiceException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -8,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.checkout.CheckoutError;
@@ -24,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +47,23 @@ class DiscountServiceTest {
 
     @InjectMocks
     private DiscountService discountService;
+
+    private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
+
+    @BeforeEach
+    void attachLogs() {
+        logs.start();
+        serviceLogger().addAppender(logs);
+    }
+
+    @AfterEach
+    void detachLogs() {
+        serviceLogger().detachAppender(logs);
+    }
+
+    private static Logger serviceLogger() {
+        return (Logger) LoggerFactory.getLogger(DiscountService.class);
+    }
 
     static Stream<Arguments> rejections() {
         return Stream.of(
@@ -209,6 +235,71 @@ class DiscountServiceTest {
         assertThat(skipped.getUnitPrice()).isEqualTo(100.00);
         assertThat(chosen.getUnitPrice()).isEqualTo(190.00);
         assertThat(basket.getDiscountAmount()).isEqualTo(10.00);
+    }
+
+    @Test
+    void redeemWithinTheLimitLogsNothing() {
+        // given
+        when(discountCodesRepository.redeem(STORE_ID, CODE)).thenReturn(Optional.of(used(2, 2)));
+
+        // when
+        discountService.redeem(STORE_ID, CODE);
+
+        // then
+        verify(discountCodesRepository).redeem(STORE_ID, CODE);
+        assertThat(logs.list).isEmpty();
+    }
+
+    @Test
+    void redeemOverTheLimitRaisesAnError() {
+        // given
+        when(discountCodesRepository.redeem(STORE_ID, CODE)).thenReturn(Optional.of(used(2, 3)));
+
+        // when
+        discountService.redeem(STORE_ID, CODE);
+
+        // then
+        assertThat(logs.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).contains(CODE, STORE_ID, "3", "2");
+        });
+    }
+
+    @Test
+    void redeemOfMissingCodeRaisesAnError() {
+        // given
+        when(discountCodesRepository.redeem(STORE_ID, CODE)).thenReturn(Optional.empty());
+
+        // when
+        discountService.redeem(STORE_ID, CODE);
+
+        // then
+        assertThat(logs.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).contains(CODE, STORE_ID);
+        });
+    }
+
+    @Test
+    void redeemSwallowsRepositoryError() {
+        // given
+        when(discountCodesRepository.redeem(STORE_ID, CODE)).thenThrow(new AmazonServiceException("throttled"));
+
+        // when
+        discountService.redeem(STORE_ID, CODE);
+
+        // then
+        assertThat(logs.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).contains(CODE, STORE_ID);
+        });
+    }
+
+    private static DiscountCode used(int maxUses, int usedCount) {
+        DiscountCode code = percentageOnBrandAcme();
+        code.setMaxUses(maxUses);
+        code.setUsedCount(usedCount);
+        return code;
     }
 
     private static DiscountCode percentageOnBrandAcme() {

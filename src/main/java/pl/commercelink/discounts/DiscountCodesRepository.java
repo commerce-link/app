@@ -9,7 +9,9 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.DeleteItemRequest;
 import com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
+import com.amazonaws.services.dynamodbv2.model.UpdateItemResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
@@ -75,6 +77,23 @@ public class DiscountCodesRepository {
                     .addExpressionAttributeValuesEntry(":active", new AttributeValue().withBOOL(active)));
         } catch (ConditionalCheckFailedException e) {
             log.warn("Discount code {} of store {} is gone, nothing to switch", code, storeId);
+        }
+    }
+
+    public Optional<DiscountCode> redeem(String storeId, String code) {
+        try {
+            UpdateItemResult result = amazonDynamoDB.updateItem(new UpdateItemRequest()
+                    .withTableName(DiscountCode.TABLE_NAME)
+                    .withKey(key(storeId, code))
+                    .withUpdateExpression("ADD #usedCount :one")
+                    .withConditionExpression("attribute_exists(#code)")
+                    .addExpressionAttributeNamesEntry("#usedCount", USED_COUNT)
+                    .addExpressionAttributeNamesEntry("#code", CODE)
+                    .addExpressionAttributeValuesEntry(":one", new AttributeValue().withN("1"))
+                    .withReturnValues(ReturnValue.ALL_NEW));
+            return Optional.of(mapper.marshallIntoObject(DiscountCode.class, result.getAttributes()));
+        } catch (ConditionalCheckFailedException e) {
+            return Optional.empty();
         }
     }
 

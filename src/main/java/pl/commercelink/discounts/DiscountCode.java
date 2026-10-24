@@ -78,6 +78,11 @@ public class DiscountCode {
         return maxUses > 0 && usedCount >= maxUses;
     }
 
+    @DynamoDBIgnore
+    public boolean isOverused() {
+        return maxUses > 0 && usedCount > maxUses;
+    }
+
     public boolean covers(BasketItem item) {
         if (!item.isProduct()) {
             return false;

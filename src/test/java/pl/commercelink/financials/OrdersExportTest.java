@@ -74,8 +74,27 @@ class OrdersExportTest {
 
         // then
         assertThat(csv.lines().toList()).containsExactly(
-                "Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Invoiced At",
-                "order-3,,2026-09-14T10:00,Test,WebStore,B2C,Warszawa,Warszawa,,1151.10,");
+                "Order ID,Affiliate ID,Discount Code,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Discount Amount,Invoiced At",
+                "order-3,,,2026-09-14T10:00,Test,WebStore,B2C,Warszawa,Warszawa,,1151.10,0.00,");
+    }
+
+    @Test
+    void discountCodeAndAmountAreWrittenWhenPresent() {
+        // given
+        Order order = order("order-6");
+        order.setAffiliateId("aff-1");
+        order.setTotalPrice(350.73);
+        order.setDiscountCode("LATO-10");
+        order.setDiscountAmount(38.97);
+
+        when(ordersRepository.findAllOrders(eq("store-1"), any(), any())).thenReturn(List.of(order));
+
+        // when
+        String csv = ordersExport.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv.lines().skip(1).toList()).containsExactly(
+                "order-6,aff-1,LATO-10,2026-09-14T10:00,Test,WebStore,B2C,Warszawa,Warszawa,,350.73,38.97,");
     }
 
     @Test
