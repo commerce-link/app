@@ -45,6 +45,7 @@ public class Order {
     @DynamoDBAttribute(attributeName = "gclid")
     private String gclid;
     @DynamoDBAttribute(attributeName = "discountCode")
+    @DynamoDBIndexHashKey(globalSecondaryIndexName = "DiscountCodeIndex", attributeName = "discountCode")
     @Getter
     @Setter
     private String discountCode;
@@ -60,7 +61,7 @@ public class Order {
     private double totalPrice;
 
     @DynamoDBAttribute(attributeName = "orderedAt")
-    @DynamoDBIndexRangeKey(globalSecondaryIndexName = "StoreIdOrderedAtIndex", attributeName = "orderedAt")
+    @DynamoDBIndexRangeKey(globalSecondaryIndexNames = {"StoreIdOrderedAtIndex", "DiscountCodeIndex"}, attributeName = "orderedAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime orderedAt;
     @DynamoDBAttribute(attributeName = "orderRealizationDays")

@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -14,15 +15,19 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodesRepository;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.PaymentOptionView;
+import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.DiscountCodeDetailsView;
+import pl.commercelink.web.settings.DiscountCodeDetailsView.Orders;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
@@ -39,17 +44,25 @@ public class StoreDiscountCodeController {
     private final DiscountCodesRepository discountCodesRepository;
     private final PaymentGateways paymentGateways;
     private final MessageSource messageSource;
+    private final OrdersRepository ordersRepository;
 
     @GetMapping("/dashboard/store/discounts/{code}")
     @PreAuthorize("hasRole('ADMIN')")
-    public String details(@PathVariable String code, Model model, Locale locale) {
-        return show(CustomSecurityContext.getStoreId(), code, model, locale);
+    public String details(@PathVariable String code,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                          Model model, Locale locale) {
+        return show(CustomSecurityContext.getStoreId(), code, from, to, OrderListQuery.PATH, model, locale);
     }
 
+    // an order's page knows only the store of the session, so a super admin gets the orders without links
     @GetMapping("/dashboard/store/{storeId}/discounts/{code}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminDetails(@PathVariable String storeId, @PathVariable String code, Model model, Locale locale) {
-        return show(storeId, code, model, locale);
+    public String superAdminDetails(@PathVariable String storeId, @PathVariable String code,
+                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                    Model model, Locale locale) {
+        return show(storeId, code, from, to, null, model, locale);
     }
 
     @PostMapping("/dashboard/store/discounts/{code}/toggle")
@@ -92,13 +105,19 @@ public class StoreDiscountCodeController {
         return delete(storeId, code, locale, redirectAttributes);
     }
 
-    private String show(String storeId, String code, Model model, Locale locale) {
+    private String show(String storeId, String code, LocalDate from, LocalDate to, String ordersPath, Model model,
+                        Locale locale) {
         Store store = requireStore(storeId);
         DiscountCode discountCode = requireCode(storeId, code);
         Map<String, String> gatewayNames = paymentGateways.paymentOptions(store).stream()
                 .collect(Collectors.toMap(PaymentOptionView::name, PaymentOptionView::displayName, (first, second) -> first));
+        boolean reversed = from != null && to != null && from.isAfter(to);
+        LocalDate first = reversed ? to : from;
+        LocalDate last = reversed ? from : to;
+        Orders orders = Orders.of(ordersRepository.findAllByDiscountCode(storeId, discountCode.getCode(), first, last),
+                first, last, ordersPath);
         model.addAttribute("details", DiscountCodeDetailsView.of(discountCode, LocalDateTime.now(DiscountCode.ZONE),
-                gatewayNames, listPath(storeId)));
+                gatewayNames, listPath(storeId), orders));
         model.addAttribute("backHref", listPath(storeId));
         model.addAttribute("backLabel", messageSource.getMessage("store.discounts", null, locale));
         return VIEW;

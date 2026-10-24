@@ -5242,6 +5242,11 @@ a.cl-link-button:hover {
     max-width: 760px;
 }
 
+/* The same for a page whose cards are the wide stack (1040 px), e.g. the details of a discount code. */
+.cl-page .cl-page-body:has(> .cl-stack.is-wide) > .cl-page-header {
+    max-width: 1040px;
+}
+
 /* --- Catalog: Warning help text (labels outside the list) --- */
 .cl-page .cl-help.is-warn,
 .cl-page .cl-list-desc .is-warn {

@@ -19,6 +19,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.discounts.DiscountCodesRepository;
 import pl.commercelink.discounts.DiscountType;
+import pl.commercelink.orders.DiscountedOrderEntry;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -27,6 +30,8 @@ import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.DiscountCodeDetailsView;
 import pl.commercelink.web.settings.SettingsFlash;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,6 +61,8 @@ class StoreDiscountCodeControllerTest {
     private PaymentGateways paymentGateways;
     @Mock
     private MessageSource messageSource;
+    @Mock
+    private OrdersRepository ordersRepository;
 
     @InjectMocks
     private StoreDiscountCodeController controller;
@@ -81,7 +88,7 @@ class StoreDiscountCodeControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = controller.details("lato-10", model, PL);
+        String view = controller.details("lato-10", null, null, model, PL);
 
         // then
         assertThat(view).isEqualTo("store-discount-code");
@@ -104,7 +111,7 @@ class StoreDiscountCodeControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        controller.superAdminDetails("store-2", "LATO-10", model, PL);
+        controller.superAdminDetails("store-2", "LATO-10", null, null, model, PL);
 
         // then
         DiscountCodeDetailsView details = (DiscountCodeDetailsView) model.getAttribute("details");
@@ -113,19 +120,75 @@ class StoreDiscountCodeControllerTest {
     }
 
     @Test
+    void theStoreAdminSeesTheOrdersOfTheCodeWithLinksToThem() {
+        // given
+        store("store-1");
+        code("store-1", "LATO-10", true, 1);
+        when(ordersRepository.findAllByDiscountCode("store-1", "LATO-10", null, null))
+                .thenReturn(Optional.of(List.of(order("c381d457-0000-0000-0000-000000000001"))));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.details("LATO-10", null, null, model, PL);
+
+        // then
+        DiscountCodeDetailsView details = (DiscountCodeDetailsView) model.getAttribute("details");
+        assertThat(details.orders().count()).isEqualTo(1);
+        assertThat(details.orders().rows().get(0).href()).isEqualTo("/dashboard/orders/c381d457-0000-0000-0000-000000000001");
+    }
+
+    @Test
+    void theSuperAdminSeesTheOrdersWithoutLinks() {
+        // given
+        authenticateAs(null, "SUPER_ADMIN");
+        store("store-2");
+        code("store-2", "LATO-10", true, 1);
+        when(ordersRepository.findAllByDiscountCode("store-2", "LATO-10", null, null))
+                .thenReturn(Optional.of(List.of(order("c381d457-0000-0000-0000-000000000001"))));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.superAdminDetails("store-2", "LATO-10", null, null, model, PL);
+
+        // then
+        DiscountCodeDetailsView details = (DiscountCodeDetailsView) model.getAttribute("details");
+        assertThat(details.orders().rows().get(0).href()).isNull();
+    }
+
+    @Test
+    void daysGivenTheWrongWayRoundAreSwapped() {
+        // given
+        store("store-1");
+        code("store-1", "LATO-10", true, 0);
+        LocalDate first = LocalDate.of(2026, 10, 1);
+        LocalDate last = LocalDate.of(2026, 10, 31);
+        when(ordersRepository.findAllByDiscountCode("store-1", "LATO-10", first, last)).thenReturn(Optional.of(List.of()));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.details("LATO-10", last, first, model, PL);
+
+        // then
+        verify(ordersRepository).findAllByDiscountCode("store-1", "LATO-10", first, last);
+        DiscountCodeDetailsView details = (DiscountCodeDetailsView) model.getAttribute("details");
+        assertThat(details.orders().from()).isEqualTo("2026-10-01");
+        assertThat(details.orders().to()).isEqualTo("2026-10-31");
+    }
+
+    @Test
     void anUnknownStoreOrCodeAnswers404OnEveryAction() {
         // given
         store("store-1");
         when(discountCodesRepository.find("store-1", "GONE-10")).thenReturn(Optional.empty());
         List<Consumer<String>> calls = List.of(
-                code -> controller.details(code, new ExtendedModelMap(), PL),
+                code -> controller.details(code, null, null, new ExtendedModelMap(), PL),
                 code -> controller.toggle(code, false, PL, new RedirectAttributesModelMap()),
                 code -> controller.confirmDelete(code, new ExtendedModelMap(), PL));
 
         // when / then
         calls.forEach(call -> assertThatThrownBy(() -> call.accept("GONE-10")).isInstanceOf(ResponseStatusException.class));
         authenticateAs(null, "SUPER_ADMIN");
-        assertThatThrownBy(() -> controller.superAdminDetails("missing", "LATO-10", new ExtendedModelMap(), PL))
+        assertThatThrownBy(() -> controller.superAdminDetails("missing", "LATO-10", null, null, new ExtendedModelMap(), PL))
                 .isInstanceOf(ResponseStatusException.class);
         verify(discountCodesRepository, never()).setActive(anyString(), anyString(), anyBoolean());
     }
@@ -272,6 +335,11 @@ class StoreDiscountCodeControllerTest {
         // then
         verify(discountCodesRepository).delete("store-2", "BF-2026");
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-2/discounts");
+    }
+
+    private static DiscountedOrderEntry order(String orderId) {
+        return new DiscountedOrderEntry(orderId, LocalDateTime.of(2026, 10, 20, 9, 30), "ewa@example.com", 1800, 200,
+                OrderStatus.New);
     }
 
     private DiscountCode code(String storeId, String code, boolean active, int usedCount) {
