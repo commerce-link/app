@@ -20,10 +20,19 @@ public record CreatedBasketResponse(String id, String invoiceNo, List<Item> item
     }
 
     static CreatedBasketResponse of(Basket basket, Map<BasketItem, Double> listPrices, String invoiceNo) {
+        return of(basket.getBasketId(), basket, listPrices, invoiceNo);
+    }
+
+    /** A basket that was not saved: no id and no proforma to point to. */
+    static CreatedBasketResponse preview(Basket basket, Map<BasketItem, Double> listPrices) {
+        return of(null, basket, listPrices, null);
+    }
+
+    private static CreatedBasketResponse of(String id, Basket basket, Map<BasketItem, Double> listPrices, String invoiceNo) {
         List<Item> items = basket.getBasketItems().stream()
                 .map(i -> new Item(i.getId(), i.getCatalogId(), i.getQty(), listPrices.get(i), i.getUnitPrice()))
                 .toList();
-        return new CreatedBasketResponse(basket.getBasketId(), invoiceNo, items, basket.getDiscountCode(),
+        return new CreatedBasketResponse(id, invoiceNo, items, basket.getDiscountCode(),
                 basket.getDiscountAmount(), total(items, Item::unitPrice), total(items, Item::discountedUnitPrice));
     }
 

@@ -93,7 +93,7 @@ class BasketsRestApiTest {
         when(invoicingService.createProforma(any(Basket.class), any(Locale.class), eq(true))).thenReturn(result);
 
         // when
-        basketsRestApi.createBasket(req, STORE_ID);
+        basketsRestApi.createBasket(req, STORE_ID, false);
 
         // then
         ArgumentCaptor<Locale> localeCaptor = ArgumentCaptor.forClass(Locale.class);
@@ -109,7 +109,7 @@ class BasketsRestApiTest {
         when(req.getDiscountCode()).thenReturn(" lato-10 ");
 
         // when
-        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID).getBody();
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
 
         // then
         verify(basketsRepository).save(savedBasket.capture());
@@ -136,7 +136,7 @@ class BasketsRestApiTest {
         when(req.getDiscountCode()).thenReturn("  ");
 
         // when
-        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID).getBody();
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
 
         // then
         verify(basketsRepository).save(any(Basket.class));
@@ -158,7 +158,7 @@ class BasketsRestApiTest {
         when(req.isSendInvoice()).thenReturn(true);
 
         // when / then
-        assertThatThrownBy(() -> basketsRestApi.createBasket(req, STORE_ID))
+        assertThatThrownBy(() -> basketsRestApi.createBasket(req, STORE_ID, false))
                 .isInstanceOfSatisfying(CheckoutException.class,
                         e -> assertThat(e.getError()).isEqualTo(CheckoutError.DiscountCodeNotFound));
         verify(basketsRepository, never()).save(any());
@@ -176,7 +176,7 @@ class BasketsRestApiTest {
         when(req.getPaymentOptionId()).thenReturn(OTHER_PROVIDER);
 
         // when
-        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID).getBody();
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
 
         // then
         assertThat(response.discountCode()).isEqualTo(CODE);
@@ -192,7 +192,7 @@ class BasketsRestApiTest {
         when(req.getDiscountCode()).thenReturn(CODE);
 
         // when / then
-        assertThatThrownBy(() -> basketsRestApi.createBasket(req, STORE_ID))
+        assertThatThrownBy(() -> basketsRestApi.createBasket(req, STORE_ID, false))
                 .isInstanceOfSatisfying(CheckoutException.class,
                         e -> assertThat(e.getError()).isEqualTo(CheckoutError.DiscountCodePaymentMethodMismatch));
         verify(basketsRepository, never()).save(any());
@@ -211,11 +211,50 @@ class BasketsRestApiTest {
         when(invoicingService.createProforma(invoiced.capture(), any(Locale.class), eq(true))).thenReturn(result);
 
         // when
-        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID).getBody();
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
 
         // then
         assertThat(invoiced.getValue().getTotalPrice()).isEqualTo(1100.00);
         assertThat(response.invoiceNo()).isEqualTo("PRO/1/10/2026");
+    }
+
+    @Test
+    void aValidatedBasketIsPricedButNeitherSavedNorInvoiced() {
+        // given
+        givenItems();
+        givenCode(percentageOnAcme());
+        when(req.getDiscountCode()).thenReturn(CODE);
+        when(req.isSendInvoice()).thenReturn(true);
+
+        // when
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, true).getBody();
+
+        // then
+        verify(basketsRepository, never()).save(any());
+        verify(invoicingService, never()).createProforma(any(), any(), anyBoolean());
+        assertThat(response.id()).isNull();
+        assertThat(response.invoiceNo()).isNull();
+        assertThat(response.discountCode()).isEqualTo(CODE);
+        assertThat(response.discountAmount()).isEqualTo(100.00);
+        assertThat(response.items()).extracting(CreatedBasketResponse.Item::unitPrice, CreatedBasketResponse.Item::discountedUnitPrice)
+                .containsExactly(tuple(1000.00, 900.00), tuple(100.00, 100.00));
+        assertThat(response.discountedTotalPrice()).isEqualTo(1100.00);
+    }
+
+    @Test
+    void aValidatedBasketRejectsACodeAsASavedOneDoes() {
+        // given
+        givenItems();
+        DiscountCode code = percentageOnAcme();
+        code.setPaymentProvider(OTHER_PROVIDER);
+        givenCode(code);
+        when(req.getDiscountCode()).thenReturn(CODE);
+
+        // when / then
+        assertThatThrownBy(() -> basketsRestApi.createBasket(req, STORE_ID, true))
+                .isInstanceOfSatisfying(CheckoutException.class,
+                        e -> assertThat(e.getError()).isEqualTo(CheckoutError.DiscountCodePaymentMethodMismatch));
+        verify(basketsRepository, never()).save(any());
     }
 
     @Test
@@ -224,7 +263,7 @@ class BasketsRestApiTest {
         givenItems();
         givenCode(percentageOnAcme());
         when(req.getDiscountCode()).thenReturn(CODE);
-        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID).getBody();
+        CreatedBasketResponse response = basketsRestApi.createBasket(req, STORE_ID, false).getBody();
 
         // when
         JsonNode json = new ObjectMapper().valueToTree(response);

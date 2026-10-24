@@ -44,8 +44,13 @@ public class BasketsRestApi {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * validate=true prices the basket and checks its discount code as a save would, but stores nothing and issues no
+     * proforma: the storefront previews the discount without leaving a basket behind for every look.
+     */
     @PostMapping
-    public ResponseEntity<CreatedBasketResponse> createBasket(@RequestBody CheckoutRequest req,@PathVariable String storeId) {
+    public ResponseEntity<CreatedBasketResponse> createBasket(@RequestBody CheckoutRequest req, @PathVariable String storeId,
+                                                              @RequestParam(defaultValue = "false") boolean validate) {
         Store store = storesRepository.findById(storeId);
 
         Basket basket = Basket.builder(store)
@@ -56,6 +61,9 @@ public class BasketsRestApi {
         Map<BasketItem, Double> listPrices = CreatedBasketResponse.listPrices(basket);
         if (StringUtils.isNotBlank(req.getDiscountCode())) {
             discountService.apply(basket, req.getDiscountCode(), paymentProvider(store, req.getPaymentOptionId()));
+        }
+        if (validate) {
+            return ResponseEntity.ok(CreatedBasketResponse.preview(basket, listPrices));
         }
         basketsRepository.save(basket);
 
