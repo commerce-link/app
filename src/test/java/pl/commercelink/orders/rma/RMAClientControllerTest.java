@@ -350,6 +350,30 @@ class RMAClientControllerTest {
     }
 
     @Test
+    void anApprovedReturnWithoutProductsBooksNoCourier() {
+        // given: the page of such a return answers 404, so only a crafted or stale request gets here
+        RMA rma = approvedRma();
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of());
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.postClientBillingShippingForm("store-1", "rma-1", validForm("7"), model,
+                new RedirectAttributesModelMap(), response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        PublicPage page = (PublicPage) model.get("publicPage");
+        assertThat(page.storeName()).isEqualTo("Nova Tech");
+        assertThat(page.otherLanguageHref()).isEqualTo(RMA_PATH + "?lang=en");
+        assertThat(rma.getShippingDetails()).isNull();
+        verifyNoInteractions(rmaShippingService);
+        verifyNoInteractions(optimisticLockingExecutor);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
     void aSubmissionInAnUnknownStoreAnswersTheUnavailablePage() {
         // given
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -472,6 +496,7 @@ class RMAClientControllerTest {
         RMA rma = rma(RMAStatus.Approved);
         rma.setShipments(new ArrayList<>());
         when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
         when(storesRepository.findById("store-1")).thenReturn(namedStore());
         when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
         RMAReturnForm form = validForm("7");
@@ -494,6 +519,7 @@ class RMAClientControllerTest {
         RMA rma = rma(RMAStatus.Approved);
         rma.setShipments(new ArrayList<>());
         when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
         Store store = returnStore();
         store.setRmaConfiguration(null);
         when(storesRepository.findById("store-1")).thenReturn(store);
@@ -784,6 +810,7 @@ class RMAClientControllerTest {
         rma.setShipments(new ArrayList<>());
         when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
         when(storesRepository.findById("store-1")).thenReturn(returnStore());
+        lenient().when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
         lenient().when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(optimisticLockingExecutor.modifyAndSave(any(), any(), any())).thenAnswer(passThroughModifyAndSave());
         return rma;

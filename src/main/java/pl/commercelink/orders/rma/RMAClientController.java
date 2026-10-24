@@ -115,13 +115,14 @@ public class RMAClientController {
         if (rma == null || rma.getStatus() == null || rma.hasOneOfTheStatuses(RMAStatus.New)) {
             return unavailable(store, storeId, rmaId, model, response, locale);
         }
+        // a return without products has no page (GET answers 404), so it never gets a paid courier either
+        List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rma.getRmaId());
+        if (rmaItems.isEmpty()) {
+            return unavailable(store, storeId, rmaId, model, response, locale);
+        }
         if (!rma.hasOneOfTheStatuses(RMAStatus.Approved)) {
             // An old browser tab of a return the store has moved on (e.g. after a booking from another tab): the page
             // shows where the return is now, which a "form not available" page would hide; nothing is booked.
-            List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rma.getRmaId());
-            if (rmaItems.isEmpty()) {
-                return unavailable(store, storeId, rmaId, model, response, locale);
-            }
             if (rma.hasOneOfTheStatuses(RMAStatus.WaitingForItems)) {
                 redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, returnInProgress(locale)));
                 return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, rmaItems, store, LocalDateTime.now()),
@@ -139,9 +140,9 @@ public class RMAClientController {
         if (rma.getShippingDetails() != null) {
             redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL,
                     messageSource.getMessage("client.return.notice.storeBooks", null, locale)));
-            // the cards do not depend on the items; without a parcel card the notice stands above the first card, and
-            // an anchor further down would scroll it out of view
-            return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, List.of(), store, LocalDateTime.now()),
+            // without a parcel card the notice stands above the first card, and an anchor further down would scroll
+            // it out of view
+            return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, rmaItems, store, LocalDateTime.now()),
                     ClientReturnNotice.PARCEL));
         }
 
