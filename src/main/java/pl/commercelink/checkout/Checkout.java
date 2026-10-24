@@ -1,6 +1,5 @@
 package pl.commercelink.checkout;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
@@ -35,19 +34,26 @@ public class Checkout {
 
     private static final String REQUIRED_ITEM_MISSING_MESSAGE = "Required item missing: ";
 
-    @Autowired
-    private StoresRepository storesRepository;
-    @Autowired
-    private BasketsRepository basketsRepository;
-    @Autowired
-    private PricelistRepository pricelistRepository;
-    @Autowired
-    private ProductCatalogRepository productCatalogRepository;
-    @Autowired
-    private PaymentProviderFactory paymentProviderFactory;
+    private final StoresRepository storesRepository;
+    private final BasketsRepository basketsRepository;
+    private final PricelistRepository pricelistRepository;
+    private final ProductCatalogRepository productCatalogRepository;
+    private final PaymentProviderFactory paymentProviderFactory;
+    private final String appDomain;
 
-    @Value("${app.domain}")
-    private String appDomain;
+    Checkout(StoresRepository storesRepository,
+             BasketsRepository basketsRepository,
+             PricelistRepository pricelistRepository,
+             ProductCatalogRepository productCatalogRepository,
+             PaymentProviderFactory paymentProviderFactory,
+             @Value("${app.domain}") String appDomain) {
+        this.storesRepository = storesRepository;
+        this.basketsRepository = basketsRepository;
+        this.pricelistRepository = pricelistRepository;
+        this.productCatalogRepository = productCatalogRepository;
+        this.paymentProviderFactory = paymentProviderFactory;
+        this.appDomain = appDomain;
+    }
 
     public CheckoutResponse create(String storeId, CheckoutRequest req) {
         Store store = storesRepository.findById(storeId);
