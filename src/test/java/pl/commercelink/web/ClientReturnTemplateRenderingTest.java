@@ -395,9 +395,10 @@ class ClientReturnTemplateRenderingTest {
         String address = card(ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(details)
                 .shipments(trackedReturn()).render(), "return-address");
 
-        // then
-        assertThat(address).contains("<span>jan****************</span>").doesNotContain(" · ").doesNotContain("<p></p>")
-                .doesNotContain("<p class=\"cl-muted\"></p>").doesNotContain("<span>\n    \n</span>");
+        // then: the muted line keeps the masked e-mail alone, and no masked field is left empty
+        assertThat(address).containsPattern("<p class=\"cl-muted\">\\s*<span>\\s*<span>jan\\*{16}</span>\\s*</span>\\s*</p>")
+                .doesNotContain(" · ").doesNotContain("<p></p>")
+                .doesNotContain("<p class=\"cl-muted\"></p>").doesNotContainPattern("<span[^>]*>\\s*</span>");
     }
 
     @Test

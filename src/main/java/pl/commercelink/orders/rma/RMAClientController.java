@@ -112,8 +112,22 @@ public class RMAClientController {
             return unavailable(null, storeId, rmaId, model, response, locale);
         }
         RMA rma = rmaRepository.findById(storeId, rmaId);
-        if (rma == null || !rma.hasOneOfTheStatuses(RMAStatus.Approved)) {
+        if (rma == null || rma.getStatus() == null || rma.hasOneOfTheStatuses(RMAStatus.New)) {
             return unavailable(store, storeId, rmaId, model, response, locale);
+        }
+        if (!rma.hasOneOfTheStatuses(RMAStatus.Approved)) {
+            // An old browser tab of a return the store has moved on (e.g. after a booking from another tab): the page
+            // shows where the return is now, which a "form not available" page would hide; nothing is booked.
+            List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rma.getRmaId());
+            if (rmaItems.isEmpty()) {
+                return unavailable(store, storeId, rmaId, model, response, locale);
+            }
+            if (rma.hasOneOfTheStatuses(RMAStatus.WaitingForItems)) {
+                redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL, returnInProgress(locale)));
+                return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, rmaItems, store, LocalDateTime.now()),
+                        ClientReturnNotice.PARCEL));
+            }
+            return redirectTo(storeId, rmaId, "");
         }
 
         // An old browser tab may still show the form: once the store has the pickup address or the customer's return
@@ -125,7 +139,9 @@ public class RMAClientController {
         if (rma.getShippingDetails() != null) {
             redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL,
                     messageSource.getMessage("client.return.notice.storeBooks", null, locale)));
-            return redirectTo(storeId, rmaId, PARCEL_ANCHOR);
+            // the cards do not depend on the items; without a parcel card the notice stands above the first card
+            return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, List.of(), store, LocalDateTime.now()),
+                    ClientReturnNotice.PARCEL, "address"));
         }
 
         String missingConfiguration = ClientReturnView.missingConfiguration(store);
@@ -203,6 +219,7 @@ public class RMAClientController {
             redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.bad(ClientReturnNotice.FORM, unavailableText));
             return redirectTo(storeId, rmaId, FORM_ANCHOR);
         } catch (Exception e) {
+            log.error("Return shipment of RMA {} in store {} failed to start", rmaId, storeId, e);
             return refuse(redirectAttributes, rmaReturnForm, storeId, rmaId, failedText);
         }
     }
@@ -238,6 +255,16 @@ public class RMAClientController {
         redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.bad(ClientReturnNotice.FORM, reason));
         redirectAttributes.addFlashAttribute(FLASH_FORM, postedForm);
         return redirectTo(storeId, rmaId, FORM_ANCHOR);
+    }
+
+    /** The anchor of the first of the cards the page shows, or none when it shows none of them. */
+    private static String anchorOf(ClientReturnView view, String... cards) {
+        for (String card : cards) {
+            if (view.cards().contains(card)) {
+                return "#return-" + card;
+            }
+        }
+        return "";
     }
 
     private static String returnPath(String storeId, String rmaId) {

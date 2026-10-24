@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.orders.rma.RMAReturnOption;
+import pl.commercelink.orders.rma.RMAShippingService;
 import pl.commercelink.stores.PackageTemplate;
 import pl.commercelink.stores.Parcel;
 import pl.commercelink.stores.Store;
@@ -28,6 +30,26 @@ class ReturnPackageOptionsTest {
 
     private void storeHas(PackageTemplate... templates) {
         lenient().when(store.getPackageTemplates()).thenReturn(List.of(templates));
+    }
+
+    @Test
+    void offersTheSameTemplatesInTheSameOrderAsTheShippingService() {
+        // given: return templates mixed with outgoing ones, near misses of the prefix included
+        storeHas(template("out-1", "Karton wysyłkowy", false),
+                template("r-1", "RMA - komputer", false),
+                template("near-1", "RMA-bez spacji", false),
+                template("r-2", "RMA - karta graficzna", true),
+                template("near-2", "rma - mała litera", false),
+                template("out-2", "Paleta RMA - ", false),
+                template("r-3", "RMA - ", false));
+
+        // when
+        List<String> page = ReturnPackageOptions.of(store).stream().map(ReturnPackageOption::id).toList();
+        List<String> service = new RMAShippingService().getAvailableReturnOptions(store).stream()
+                .map(RMAReturnOption::getId).toList();
+
+        // then
+        assertThat(page).containsExactly("r-1", "r-2", "r-3").isEqualTo(service);
     }
 
     @Test

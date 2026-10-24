@@ -1,5 +1,9 @@
 package pl.commercelink.orders.rma;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -9,6 +13,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ExtendedModelMap;
@@ -249,23 +254,99 @@ class RMAClientControllerTest {
 
     // POST — guards before the carrier
 
-    @Test
-    void aSubmissionForAReturnNotApprovedAnswersTheUnavailablePageLinkedToTheReturnPage() {
-        // given
-        when(storesRepository.findById("store-1")).thenReturn(namedStore());
-        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma(RMAStatus.WaitingForItems));
-        ExtendedModelMap model = new ExtendedModelMap();
+    @ParameterizedTest
+    @EnumSource(value = RMAStatus.class, names = {"ItemsReceived", "Processing", "Completed", "Rejected"})
+    void aStaleSubmissionOfAReturnPastTheParcelShowsTheReturnPage(RMAStatus status) {
+        // given: an old browser tab of a return the store has moved on
+        when(storesRepository.findById("store-1")).thenReturn(returnStore());
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma(status));
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
-        String view = controller.postClientBillingShippingForm("store-1", "rma-1", new RMAReturnForm(), model,
-                new RedirectAttributesModelMap(), response, Locale.forLanguageTag("pl"));
+        String view = controller.postClientBillingShippingForm("store-1", "rma-1", validForm("7"), new ExtendedModelMap(),
+                redirect, response, Locale.forLanguageTag("pl"));
 
         // then
-        assertThat(view).isEqualTo(UNAVAILABLE);
-        assertThat(response.getStatus()).isEqualTo(404);
-        assertThat(((PublicPage) model.get("publicPage")).otherLanguageHref()).isEqualTo(RMA_PATH + "?lang=en");
-        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH);
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(redirect.getFlashAttributes()).isEmpty();
+        verifyNoInteractions(rmaShippingService);
+        verifyNoInteractions(optimisticLockingExecutor);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void aStaleSubmissionOfAReturnWaitingForItsParcelPointsAtTheParcel() {
+        // given: the booking from another tab went through and its parcel is on the RMA
+        RMA rma = rma(RMAStatus.WaitingForItems);
+        rma.setShipments(new ArrayList<>(List.of(unconfirmedReturn())));
+        when(storesRepository.findById("store-1")).thenReturn(returnStore());
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
+        when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = submit(validForm("7"), redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-parcel");
+        assertThat(redirect.getFlashAttributes().get(NOTICE))
+                .isEqualTo(ClientReturnNotice.info(ClientReturnNotice.PARCEL, "client.return.notice.inProgress"));
+        verifyNoInteractions(rmaShippingService);
+        verifyNoInteractions(optimisticLockingExecutor);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void aStaleSubmissionOfAReturnWaitingWithoutAParcelCardHasNoAnchor() {
+        // given: waiting for the items, the store arranged the parcel outside the page
+        when(storesRepository.findById("store-1")).thenReturn(returnStore());
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma(RMAStatus.WaitingForItems));
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
+        when(messageSource.getMessage(anyString(), any(), any())).thenAnswer(i -> i.getArgument(0));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = submit(validForm("7"), redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH);
+        assertThat(redirect.getFlashAttributes().get(NOTICE))
+                .isEqualTo(ClientReturnNotice.info(ClientReturnNotice.PARCEL, "client.return.notice.inProgress"));
+        verifyNoInteractions(rmaShippingService);
+        verify(rmaRepository, never()).save(any());
+    }
+
+    @Test
+    void aSubmissionForANewMissingOrItemlessReturnAnswersTheUnavailablePageLinkedToTheReturnPage() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(namedStore());
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma(RMAStatus.New));
+        when(rmaRepository.findById("store-1", "rma-2")).thenReturn(null);
+        RMA itemless = rma(RMAStatus.WaitingForItems);
+        itemless.setRmaId("rma-3");
+        when(rmaRepository.findById("store-1", "rma-3")).thenReturn(itemless);
+        when(rmaItemsRepository.findByRmaId("rma-3")).thenReturn(List.of());
+
+        for (String rmaId : List.of("rma-1", "rma-2", "rma-3")) {
+            ExtendedModelMap model = new ExtendedModelMap();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            // when
+            String view = controller.postClientBillingShippingForm("store-1", rmaId, new RMAReturnForm(), model,
+                    new RedirectAttributesModelMap(), response, Locale.forLanguageTag("pl"));
+
+            // then
+            assertThat(view).isEqualTo(UNAVAILABLE);
+            assertThat(response.getStatus()).isEqualTo(404);
+            assertThat(((PublicPage) model.get("publicPage")).otherLanguageHref())
+                    .isEqualTo("/store/store-1/client/rma/" + rmaId + "?lang=en");
+        }
+        verifyNoInteractions(rmaShippingService);
+        verify(rmaRepository, never()).save(any());
     }
 
     @Test
@@ -296,8 +377,8 @@ class RMAClientControllerTest {
         // when
         String view = submit(form, redirect);
 
-        // then
-        assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-parcel");
+        // then: the page shows no parcel card then, the notice sits above the first card and the address is below it
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-address");
         assertThat(redirect.getFlashAttributes().get(NOTICE))
                 .isEqualTo(ClientReturnNotice.info(ClientReturnNotice.PARCEL, "client.return.notice.storeBooks"));
         assertThat(rma.getShippingDetails()).isSameAs(operatorsAddress);
@@ -641,11 +722,25 @@ class RMAClientControllerTest {
         when(rmaShippingService.startReturnShipment(any(), any())).thenThrow(new IllegalStateException("boom"));
         RMAReturnForm form = validForm("7");
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+        Logger logger = (Logger) LoggerFactory.getLogger(RMAClientController.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
 
         // when
-        String view = submit(form, redirect);
+        String view;
+        try {
+            view = submit(form, redirect);
+        } finally {
+            logger.detachAppender(logs);
+        }
 
-        // then
+        // then: the operator learns of it, the customer only gets the general message
+        assertThat(logs.list).anySatisfy(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).isEqualTo("Return shipment of RMA rma-1 in store store-1 failed to start");
+            assertThat(event.getThrowableProxy().getMessage()).isEqualTo("boom");
+        });
         assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-form");
         assertThat(redirect.getFlashAttributes().get(NOTICE))
                 .isEqualTo(ClientReturnNotice.bad(ClientReturnNotice.FORM, "client.return.notice.failed"));

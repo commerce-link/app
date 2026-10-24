@@ -159,6 +159,8 @@ public final class ClientReturnView {
         String suffix = switch (state) {
             case WAITING -> "waiting." + waitingLead();
             case BOOK -> singleReturnOption ? "bookOne" : "book";
+            // another shipment being created, no address card: the lead must not say the address is saved
+            case STORE_BOOKS -> address() == null ? "storeBooks.noAddress" : "storeBooks";
             case REJECTED -> rejectionReason() == null ? "rejected.noReason" : "rejected.withReason";
             default -> state.lowerCamelName();
         };

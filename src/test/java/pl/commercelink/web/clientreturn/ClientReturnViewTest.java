@@ -196,6 +196,8 @@ class ClientReturnViewTest {
         assertThat(view.state()).isEqualTo(ClientReturnState.STORE_BOOKS);
         assertThat(view.address()).isNull();
         assertThat(view.cards()).doesNotContain("address");
+        // no address card, so the lead must not say the address is saved
+        assertThat(view.leadKey()).isEqualTo("client.return.lead.storeBooks.noAddress");
     }
 
     @Test
