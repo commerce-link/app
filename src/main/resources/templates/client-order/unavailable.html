@@ -6,17 +6,10 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-    <section class="cl-card cl-public-message">
-        <p class="cl-eyebrow" th:if="${shortId != null}" th:text="#{client.order.unavailable.eyebrow(${shortId})}"></p>
-        <h1 class="cl-page-title" th:text="#{client.order.unavailable.title}"></h1>
-        <p class="cl-page-lead">
-            <th:block th:text="#{client.order.unavailable.lead}"></th:block>
-            <th:block th:if="${publicPage.contactEmail != null}">
-                <th:block th:text="#{client.order.unavailable.contact}"></th:block>
-                <a th:href="'mailto:' + ${publicPage.contactEmail}" th:text="${publicPage.contactEmail}"></a>
-            </th:block>
-        </p>
-    </section>
+    <section th:replace="~{fragments/public-message :: card(
+            eyebrow=${shortId != null} ? #{client.order.unavailable.eyebrow(${shortId})} : null,
+            title=#{client.order.unavailable.title}, lead=#{client.order.unavailable.lead},
+            contact=#{client.order.unavailable.contact}, fallback=null)}"></section>
 </th:block>
 </body>
 </html>

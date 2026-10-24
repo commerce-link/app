@@ -3,6 +3,8 @@ package pl.commercelink.web;
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import pl.commercelink.stores.Store;
+import pl.commercelink.web.publicpage.PublicPageFactory;
 
 import java.util.Locale;
 
@@ -24,8 +26,15 @@ class TrialTemplatesRenderingTest {
 
     @Test
     void inactiveStorePageTellsTheClientWhy() {
+        // given
+        Store store = new Store();
+        store.setStoreId("s1");
+        store.setName("Nova Tech");
+        Context context = new Context(Locale.ENGLISH);
+        context.setVariable("publicPage", PublicPageFactory.of(store, "/store/s1/client/order/o1", Locale.ENGLISH));
+
         // when
-        String html = engine.process("store-inactive", new Context(Locale.ENGLISH));
+        String html = engine.process("store-inactive", context);
 
         // then
         assertThat(html).contains("This store is inactive");

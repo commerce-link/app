@@ -69,7 +69,8 @@ class ClientOfferUnavailableRenderingTest {
         String html = render(PublicPageFactory.unknownStore(PATH, PL));
 
         // then
-        assertThat(html).contains("Ta oferta nie jest już dostępna")
+        assertThat(html).contains("<title>Oferta niedostępna</title>")
+                .contains("Ta oferta nie jest już dostępna")
                 .doesNotContain("cl-public-foot")
                 .doesNotContain("mailto:");
     }
