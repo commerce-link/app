@@ -71,6 +71,8 @@ public class Checkout {
             throw new CheckoutException(CheckoutError.ShippingDetailsMissing, "shipping details are not properly filled");
         }
 
+        String providerName = paymentProviderName(store, req.getPaymentOptionId());
+
         List<CatalogProcessingResult> results = new ArrayList<>();
         for (String catalogId : req.getCatalogIds()) {
             results.add(processCatalog(req, store, checkoutConfiguration, catalogId));
@@ -78,7 +80,7 @@ public class Checkout {
 
         Basket basket = createBasket(req, store, results);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, null, req.getPaymentOptionId()));
+        return new CheckoutResponse(createPaymentLink(store, basket, null, providerName));
     }
 
     public CheckoutResponse create(String storeId, String basketId, String paymentOptionId) {
@@ -87,10 +89,10 @@ public class Checkout {
 
         String offerUrl = basket.createOfferUrl(appDomain);
 
-        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, paymentOptionId));
+        return new CheckoutResponse(createPaymentLink(store, basket, offerUrl, paymentProviderName(store, paymentOptionId)));
     }
 
-    private PaymentLink createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String paymentOptionId) {
+    private PaymentLink createPaymentLink(Store store, Basket basket, String cancelUrlOverride, String providerName) {
         CheckoutConfiguration checkoutConfiguration = store.getCheckoutConfiguration();
 
         PaymentRequest paymentRequest = new PaymentRequest(
@@ -102,8 +104,6 @@ public class Checkout {
                 cancelUrlOverride != null ? cancelUrlOverride : checkoutConfiguration.getCancelUrl(),
                 buildPaymentLineItems(store, basket),
                 buildShippingOption(store, basket));
-
-        String providerName = paymentProviderName(store, paymentOptionId);
 
         try {
             return paymentProviderFactory.get(store, providerName).createPaymentLink(paymentRequest);
