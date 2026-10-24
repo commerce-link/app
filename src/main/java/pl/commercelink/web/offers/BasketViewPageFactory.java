@@ -128,8 +128,10 @@ public class BasketViewPageFactory {
             }
         }
         double total = itemsTotal + delivery;
-        return new Summary(Money.format(itemsTotal), state, deliveryName, Money.format(delivery), Money.format(total),
-                Money.format(total / DEFAULT_VAT_RATE), Money.format(total - total / DEFAULT_VAT_RATE));
+        double discount = basket.hasDiscountCode() ? basket.getDiscountAmount() : 0;
+        return new Summary(Money.format(itemsTotal + discount), basket.getDiscountCode(),
+                basket.hasDiscountCode() ? Money.format(discount) : null, state, deliveryName, Money.format(delivery),
+                Money.format(total), Money.format(total / DEFAULT_VAT_RATE), Money.format(total - total / DEFAULT_VAT_RATE));
     }
 
     static Customer customer(Basket basket, Locale locale) {

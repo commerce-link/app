@@ -25,6 +25,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 @DynamoDBTable(tableName = "Baskets")
 public class Basket {
 
@@ -72,6 +74,10 @@ public class Basket {
 
     @DynamoDBAttribute(attributeName = "deliveryOptionId")
     private String deliveryOptionId;
+    @DynamoDBAttribute(attributeName = "discountCode")
+    private String discountCode;
+    @DynamoDBAttribute(attributeName = "discountAmount")
+    private double discountAmount;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -326,6 +332,17 @@ public class Basket {
     public String getDeliveryOptionId() { return deliveryOptionId; }
 
     public void setDeliveryOptionId(String deliveryOptionId) { this.deliveryOptionId = deliveryOptionId; }
+
+    public String getDiscountCode() { return discountCode; }
+
+    public void setDiscountCode(String discountCode) { this.discountCode = isBlank(discountCode) ? null : discountCode; }
+
+    @DynamoDBIgnore
+    public boolean hasDiscountCode() { return discountCode != null; }
+
+    public double getDiscountAmount() { return discountAmount; }
+
+    public void setDiscountAmount(double discountAmount) { this.discountAmount = discountAmount; }
 
     public ContactDetails getContactDetails() { return contactDetails; }
 

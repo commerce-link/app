@@ -1,8 +1,12 @@
 package pl.commercelink.discounts;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import pl.commercelink.baskets.BasketItem;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -73,6 +77,79 @@ class DiscountCodeTest {
         assertThat(code(true, 2, 1, null, null).isExhausted()).isFalse();
         assertThat(code(true, 2, 2, null, null).isExhausted()).isTrue();
         assertThat(code(true, 1, 3, null, null).isExhausted()).isTrue();
+    }
+
+    @Test
+    void coversEveryProductWhenNoTargetValues() {
+        // given
+        DiscountCode code = covering(null);
+
+        // when / then
+        assertThat(code.covers(product("pim-1", "Karty graficzne", "Acme"))).isTrue();
+        assertThat(code.covers(product("pim-2", "Procesory", "Globex"))).isTrue();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"Product, pim-1, pim-2", "Category, Karty graficzne, Procesory", "Brand, Acme, Globex"})
+    void coversItemMatchingTargetValue(DiscountTarget target, String matching, String other) {
+        // given
+        BasketItem item = product("pim-1", "Karty graficzne", "Acme");
+
+        // when / then
+        assertThat(covering(target, matching).covers(item)).isTrue();
+        assertThat(covering(target, other).covers(item)).isFalse();
+    }
+
+    @Test
+    void categoryCodeCoversSameNameInEveryCatalog() {
+        // given
+        BasketItem fromFirstCatalog = product("pim-1", "Karty graficzne", "Acme");
+        fromFirstCatalog.setCatalogId("catalog-1");
+        BasketItem fromSecondCatalog = product("pim-2", "Karty graficzne", "Globex");
+        fromSecondCatalog.setCatalogId("catalog-2");
+        DiscountCode code = covering(DiscountTarget.Category, "Karty graficzne");
+
+        // when / then
+        assertThat(code.covers(fromFirstCatalog)).isTrue();
+        assertThat(code.covers(fromSecondCatalog)).isTrue();
+    }
+
+    @Test
+    void coversIgnoresSurroundingSpaces() {
+        // given
+        BasketItem item = product("pim-1", "Karty graficzne ", " Acme");
+
+        // when / then
+        assertThat(covering(DiscountTarget.Category, "Karty graficzne").covers(item)).isTrue();
+        assertThat(covering(DiscountTarget.Brand, "Acme ").covers(item)).isTrue();
+    }
+
+    @Test
+    void neverCoversServiceOrShippingItem() {
+        // given
+        BasketItem service = product("srv-1", "Usługi", "Acme");
+        service.setService(true);
+        BasketItem shipping = BasketItem.shipping(15.00);
+        DiscountCode wholeBasket = covering(null);
+        DiscountCode serviceCategory = covering(DiscountTarget.Category, "Usługi");
+
+        // when / then
+        assertThat(wholeBasket.covers(service)).isFalse();
+        assertThat(wholeBasket.covers(shipping)).isFalse();
+        assertThat(serviceCategory.covers(service)).isFalse();
+    }
+
+    private static DiscountCode covering(DiscountTarget target, String... values) {
+        DiscountCode code = new DiscountCode();
+        code.setTarget(target);
+        code.setTargetValues(Arrays.stream(values).map(v -> new TargetValue(v, v)).toList());
+        return code;
+    }
+
+    private static BasketItem product(String pimId, String category, String brand) {
+        BasketItem item = new BasketItem(pimId, "Produkt " + pimId, "MFN-" + pimId, category, 100, 0, 1, "catalog-1", 2, false);
+        item.setBrand(brand);
+        return item;
     }
 
     private static DiscountCode code(boolean active, int maxUses, int usedCount, LocalDateTime validFrom,

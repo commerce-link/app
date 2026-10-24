@@ -10,6 +10,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
@@ -74,6 +76,17 @@ public class DiscountCode {
     @DynamoDBIgnore
     public boolean isExhausted() {
         return maxUses > 0 && usedCount >= maxUses;
+    }
+
+    public boolean covers(BasketItem item) {
+        if (!item.isProduct()) {
+            return false;
+        }
+        if (target == null) {
+            return true;
+        }
+        String value = StringUtils.trim(target.valueIn(item));
+        return value != null && targetValues.stream().anyMatch(v -> value.equals(StringUtils.trim(v.getId())));
     }
 
     public DiscountCodeStatus statusAt(LocalDateTime now) {

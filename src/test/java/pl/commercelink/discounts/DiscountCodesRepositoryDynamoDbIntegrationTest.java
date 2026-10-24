@@ -81,6 +81,16 @@ class DiscountCodesRepositoryDynamoDbIntegrationTest {
     }
 
     @Test
+    void findReturnsEmptyForMalformedCode() {
+        // given
+        repository.create(code("store-1", "LATO-10", "Kampania letnia"));
+
+        // when / then
+        assertThat(repository.find("store-1", "L".repeat(2000))).isEmpty();
+        assertThat(repository.find("store-1", "LATO_10")).isEmpty();
+    }
+
+    @Test
     void findAllReturnsOnlyStoreCodesInCodeOrder() {
         // given
         repository.create(code("store-1", "WITAJ-5", "Powitalny"));

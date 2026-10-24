@@ -33,8 +33,13 @@ class BasketViewRenderingTest {
     }
 
     private static Summary summary(DeliveryState state) {
-        return new Summary("7" + NBSP + "797,00", state, "Kurier InPost", "15,00", "7" + NBSP + "812,00",
+        return new Summary("7" + NBSP + "797,00", null, null, state, "Kurier InPost", "15,00", "7" + NBSP + "812,00",
                 "6" + NBSP + "351,22", "1" + NBSP + "460,78");
+    }
+
+    private static Summary discountedSummary() {
+        return new Summary("7" + NBSP + "897,00", "LATO-10", "100,00", DeliveryState.CHOSEN, "Kurier InPost", "15,00",
+                "7" + NBSP + "812,00", "6" + NBSP + "351,22", "1" + NBSP + "460,78");
     }
 
     private static BasketViewPage page(String client, int itemsCount, Pill pill, List<Row> products, List<Row> services,
@@ -113,6 +118,35 @@ class BasketViewRenderingTest {
                 .doesNotContain("Szacowany koszt i zysk")
                 .doesNotContain("basket-estimate")
                 .doesNotContain("Zysk");
+    }
+
+    @Test
+    void discountedSummaryNamesTheCodeAndTheAmount() {
+        // given
+        BasketViewPage page = page("Biuro", 3, null, List.of(laptop()), List.of(), discountedSummary(),
+                new Customer(BILLING, BILLING, true));
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(html).contains("Pozycje przed rabatem")
+                .contains("Kod rabatowy LATO-10")
+                .contains("−100,00 PLN");
+    }
+
+    @Test
+    void summaryWithoutCodeHasNoDiscountRow() {
+        // given
+        BasketViewPage page = fullPage();
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(html).contains("Pozycje")
+                .doesNotContain("przed rabatem")
+                .doesNotContain("Kod rabatowy");
     }
 
     @Test

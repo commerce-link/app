@@ -11,7 +11,6 @@ import com.amazonaws.services.dynamodbv2.model.DeleteItemRequest;
 import com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -50,7 +49,7 @@ public class DiscountCodesRepository {
 
     public Optional<DiscountCode> find(String storeId, String code) {
         String normalized = DiscountCode.normalize(code);
-        if (StringUtils.isEmpty(normalized)) {
+        if (!DiscountCode.isWellFormed(normalized)) {
             return Optional.empty();
         }
         return Optional.ofNullable(mapper.load(DiscountCode.class, storeId, normalized,

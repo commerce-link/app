@@ -1,20 +1,23 @@
 package pl.commercelink.baskets;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.checkout.CheckoutRequest;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.web.dtos.ObjectIdInvoiceNoDto;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 @RestController
@@ -29,6 +32,8 @@ public class BasketsRestApi {
     private InvoicingService invoicingService;
     @Autowired
     private PricelistRepository pricelistRepository;
+    @Autowired
+    private DiscountService discountService;
     @Value("${commercelink.localization.fallback-locale:#{null}}")
     private Locale fallbackLocale;
 
@@ -40,24 +45,29 @@ public class BasketsRestApi {
     }
 
     @PostMapping
-    public ResponseEntity<ObjectIdInvoiceNoDto> createBasket(@RequestBody CheckoutRequest req,@PathVariable String storeId) {
+    public ResponseEntity<CreatedBasketResponse> createBasket(@RequestBody CheckoutRequest req,@PathVariable String storeId) {
         Store store = storesRepository.findById(storeId);
 
         Basket basket = Basket.builder(store)
                 .withSource(new OrderSource("", OrderSourceType.WebStore))
                 .build();
 
-        processBasket(basket, req);
+        fillBasket(basket, req);
+        Map<BasketItem, Double> listPrices = CreatedBasketResponse.listPrices(basket);
+        if (StringUtils.isNotBlank(req.getDiscountCode())) {
+            discountService.apply(basket, req.getDiscountCode(), paymentProvider(store, req.getPaymentOptionId()));
+        }
+        basketsRepository.save(basket);
 
+        String invoiceNo = null;
         if (req.isSendInvoice()) {
-            InvoicingService.OperationResult result = invoicingService.createProforma(basket, fallbackLocale != null ? fallbackLocale : Locale.getDefault(), true);
-            return ResponseEntity.ok(new ObjectIdInvoiceNoDto(basket.getBasketId(), result.getInvoiceNo()));
+            invoiceNo = invoicingService.createProforma(basket, fallbackLocale != null ? fallbackLocale : Locale.getDefault(), true).getInvoiceNo();
         }
 
-        return ResponseEntity.ok(new ObjectIdInvoiceNoDto(basket.getBasketId()));
+        return ResponseEntity.ok(CreatedBasketResponse.of(basket, listPrices, invoiceNo));
     }
 
-    private void processBasket(Basket basket, CheckoutRequest req) {
+    private void fillBasket(Basket basket, CheckoutRequest req) {
         List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
 
         basket.setBasketItems(items);
@@ -70,7 +80,13 @@ public class BasketsRestApi {
         if(!Objects.isNull(req.getShippingDetails())){
             basket.setShippingDetails(req.getShippingDetails());
         }
-        basketsRepository.save(basket);
+    }
+
+    private static String paymentProvider(Store store, String paymentOptionId) {
+        if (StringUtils.isNotBlank(paymentOptionId)) {
+            return paymentOptionId;
+        }
+        return store.getDefaultPaymentIntegration().map(PaymentIntegration::getName).orElse(null);
     }
 
     @DeleteMapping("/{basketId}")

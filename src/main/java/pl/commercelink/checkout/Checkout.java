@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.orders.DeliveryDays;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
@@ -43,6 +44,7 @@ public class Checkout {
     private final PricelistRepository pricelistRepository;
     private final ProductCatalogRepository productCatalogRepository;
     private final PaymentProviderFactory paymentProviderFactory;
+    private final DiscountService discountService;
     private final String appDomain;
 
     Checkout(StoresRepository storesRepository,
@@ -50,12 +52,14 @@ public class Checkout {
              PricelistRepository pricelistRepository,
              ProductCatalogRepository productCatalogRepository,
              PaymentProviderFactory paymentProviderFactory,
+             DiscountService discountService,
              @Value("${app.domain}") String appDomain) {
         this.storesRepository = storesRepository;
         this.basketsRepository = basketsRepository;
         this.pricelistRepository = pricelistRepository;
         this.productCatalogRepository = productCatalogRepository;
         this.paymentProviderFactory = paymentProviderFactory;
+        this.discountService = discountService;
         this.appDomain = appDomain;
     }
 
@@ -78,7 +82,7 @@ public class Checkout {
             results.add(processCatalog(req, store, checkoutConfiguration, catalogId));
         }
 
-        Basket basket = createBasket(req, store, results);
+        Basket basket = createBasket(req, store, results, providerName);
 
         return new CheckoutResponse(createPaymentLink(store, basket, null, providerName));
     }
@@ -182,7 +186,7 @@ public class Checkout {
         );
     }
 
-    private Basket createBasket(CheckoutRequest req, Store store, List<CatalogProcessingResult> results) {
+    private Basket createBasket(CheckoutRequest req, Store store, List<CatalogProcessingResult> results, String providerName) {
         List<BasketItem> basketItems = results.stream()
                 .map(CatalogProcessingResult::getBasketItems)
                 .flatMap(List::stream)
@@ -196,6 +200,10 @@ public class Checkout {
                 .withBasketItems(basketItems)
                 .withDeliveryOptionId(req.getDeliveryOptionId())
                 .build();
+
+        if (!isBlank(req.getDiscountCode())) {
+            discountService.apply(basket, req.getDiscountCode(), providerName);
+        }
 
         basketsRepository.save(basket);
 
