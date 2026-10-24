@@ -279,6 +279,39 @@ class PublicPageStylesContractTest {
     }
 
     @Test
+    void choiceCardsAndQuoteAreSharedPublicComponents() throws Exception {
+        // given
+        String css = publicCss();
+        String components = css.substring(css.indexOf("/* ===== Public page components"), css.indexOf("/* ===== Client offer"));
+
+        // then — the radio stays visible, the card carries the checked state and the focus ring, touch sized below 1024 px
+        assertThat(components).contains("body.cl-public fieldset.cl-choice-cards {",
+                        "body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:checked) {",
+                        "body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:focus-visible) { outline: 2px solid var(--cl-accent);",
+                        "body.cl-public blockquote.cl-quote {", "body.cl-public p.cl-quote-source {")
+                .doesNotContain(".cl-client-return");
+        assertThat(components.substring(components.indexOf("body.cl-public fieldset.cl-choice-cards {")))
+                .contains("grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));")
+                .contains("min-height: 44px;");
+    }
+
+    @Test
+    void returnPageLayoutIsScopedToItsOwnClass() throws Exception {
+        // given
+        String css = publicCss();
+        String page = css.substring(css.indexOf("/* ===== Client return"), css.indexOf("/* ===== Public message page"));
+
+        // then
+        assertThat(page).contains(".cl-client-return .cl-page-header {", ".cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }")
+                .contains("  .cl-client-return #return-form :is(.cl-input, .cl-select, .cl-button) { min-height: 44px; }")
+                .contains("  .cl-client-return .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }")
+                .contains(".cl-client-return .cl-card-inset > .cl-kv-grid + .cl-help { margin-top: 12px; }")
+                // the shared body.cl-public .cl-card-inset > .cl-alert + * already spaces a second alert
+                .doesNotContain(".cl-client-return .cl-card-inset > .cl-alert + .cl-alert")
+                .doesNotContain("!important");
+    }
+
+    @Test
     void dayTileHoverNeedsAHoverDevice() throws Exception {
         // given
         String css = publicCss();

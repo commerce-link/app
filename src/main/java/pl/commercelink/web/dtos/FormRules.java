@@ -8,8 +8,8 @@ import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Field checks shared by the settings forms; each form decides which fields are required and in what order. */
-final class FormRules {
+/** Field checks shared by the forms (settings, public return page); each form decides which fields are required and in what order. */
+public final class FormRules {
 
     private static final Pattern POLISH_POSTAL_CODE = Pattern.compile("\\d{2}-\\d{3}");
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
@@ -26,16 +26,16 @@ final class FormRules {
         return true;
     }
 
-    static boolean isEmail(String value) {
+    public static boolean isEmail(String value) {
         return EMAIL.matcher(value.trim()).matches();
     }
 
-    static boolean isPhone(String value) {
+    public static boolean isPhone(String value) {
         return PHONE.matcher(value.trim()).matches();
     }
 
     /** The XX-XXX format applies to Polish addresses only. */
-    static boolean isPostalCodeValidFor(String postalCode, String country) {
+    public static boolean isPostalCodeValidFor(String postalCode, String country) {
         return !CountryOptions.POLAND.equals(StringUtils.trim(country))
                 || POLISH_POSTAL_CODE.matcher(postalCode.trim()).matches();
     }
