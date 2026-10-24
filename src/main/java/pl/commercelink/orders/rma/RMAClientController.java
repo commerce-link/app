@@ -139,9 +139,10 @@ public class RMAClientController {
         if (rma.getShippingDetails() != null) {
             redirectAttributes.addFlashAttribute(NOTICE, ClientReturnNotice.info(ClientReturnNotice.PARCEL,
                     messageSource.getMessage("client.return.notice.storeBooks", null, locale)));
-            // the cards do not depend on the items; without a parcel card the notice stands above the first card
+            // the cards do not depend on the items; without a parcel card the notice stands above the first card, and
+            // an anchor further down would scroll it out of view
             return redirectTo(storeId, rmaId, anchorOf(ClientReturnView.of(rma, List.of(), store, LocalDateTime.now()),
-                    ClientReturnNotice.PARCEL, "address"));
+                    ClientReturnNotice.PARCEL));
         }
 
         String missingConfiguration = ClientReturnView.missingConfiguration(store);

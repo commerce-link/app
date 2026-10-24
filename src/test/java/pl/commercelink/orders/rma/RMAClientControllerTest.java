@@ -377,8 +377,8 @@ class RMAClientControllerTest {
         // when
         String view = submit(form, redirect);
 
-        // then: the page shows no parcel card then, the notice sits above the first card and the address is below it
-        assertThat(view).isEqualTo("redirect:" + RMA_PATH + "#return-address");
+        // then: the page shows no parcel card then, so the notice sits above the first card and no anchor scrolls past it
+        assertThat(view).isEqualTo("redirect:" + RMA_PATH);
         assertThat(redirect.getFlashAttributes().get(NOTICE))
                 .isEqualTo(ClientReturnNotice.info(ClientReturnNotice.PARCEL, "client.return.notice.storeBooks"));
         assertThat(rma.getShippingDetails()).isSameAs(operatorsAddress);
