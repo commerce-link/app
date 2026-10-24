@@ -117,7 +117,7 @@ public class Checkout {
         }
         nonConsolidatedItems.stream()
                 .sorted(Comparator.comparing(BasketItem::getUnitPrice).reversed())
-                .map(item -> new PaymentLineItem(item.getName(), null, (int) (item.getUnitPrice() * 100), (int) item.getQty()))
+                .map(item -> new PaymentLineItem(item.getName(), null, toMinorUnits(item.getUnitPrice()), (int) item.getQty()))
                 .forEach(lineItems::add);
 
         return lineItems;
@@ -129,7 +129,11 @@ public class Checkout {
                 .filter(BasketItem::isProduct)
                 .map(i -> i.getQty() == 1 ? i.getName().trim() : i.getQty() + "x " + i.getName().trim())
                 .collect(Collectors.joining(", "));
-        return new PaymentLineItem(name, description, (int) (totalGross * 100), 1);
+        return new PaymentLineItem(name, description, toMinorUnits(totalGross), 1);
+    }
+
+    private static int toMinorUnits(double amount) {
+        return Math.toIntExact(Math.round(amount * 100));
     }
 
     private PaymentShippingItem buildShippingOption(Store store, Basket basket) {
@@ -137,7 +141,7 @@ public class Checkout {
             DeliveryDays deliveryDays = DeliveryDays.calculate(store, basket);
             return new PaymentShippingItem(
                     opt.getName(),
-                    (int) (opt.getPrice() * 100),
+                    toMinorUnits(opt.getPrice()),
                     deliveryDays.getMinEstimatedDeliveryDays(),
                     deliveryDays.getMaxEstimatedDeliveryDays()
             );
