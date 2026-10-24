@@ -14478,6 +14478,7 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 .cl-client-return .cl-card-head .cl-card-title { margin: 0; }
 .cl-client-return .cl-note { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: var(--cl-ink); }
 .cl-client-return :is(.cl-note, .cl-alert-text) a { overflow-wrap: anywhere; }
+.cl-client-return .cl-note a[href^="tel:"] { white-space: nowrap; }
 /* redirect targets after a notice keep a gap to the top edge */
 .cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }
 .cl-client-return .cl-card-inset > .cl-alert + .cl-fieldset { margin-top: 16px; }
