@@ -15,7 +15,7 @@ public class ExchangeRates {
 
     public static final String LOCAL_CURRENCY = "PLN";
 
-    private static final String NBP_API_URL = "http://api.nbp.pl/api/exchangerates/tables/C";
+    private static final String NBP_API_URL = "https://api.nbp.pl/api/exchangerates/tables/C";
 
     private final RestTemplate restTemplate;
 
