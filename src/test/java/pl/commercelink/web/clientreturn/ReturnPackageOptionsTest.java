@@ -53,6 +53,20 @@ class ReturnPackageOptionsTest {
     }
 
     @Test
+    void leavesOutAReturnTemplateWithoutAnId() {
+        // given: an older record the shipping settings page has not given an id yet; the booking looks templates up by id
+        storeHas(template(null, "RMA - stary karton", true),
+                template("r-1", "RMA - komputer", false));
+
+        // when
+        List<ReturnPackageOption> options = ReturnPackageOptions.of(store);
+
+        // then
+        assertThat(options).extracting(ReturnPackageOption::id).containsExactly("r-1");
+        assertThat(ReturnPackageOptions.selected(options, null)).isEqualTo("r-1");
+    }
+
+    @Test
     void stripsThePrefixAndCapitalisesTheTitle() {
         // given
         storeHas(template("a", "RMA - karta graficzna", false),

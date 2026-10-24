@@ -185,6 +185,20 @@ class ClientReturnViewTest {
     }
 
     @Test
+    void aReturnTemplateWithoutAnIdDoesNotMakeTheStoreBookable() {
+        // given
+        Store store = store(Config.CONFIGURED);
+        store.getShippingConfiguration().getPackageTemplates().get(0).setId(null);
+
+        // when
+        ClientReturnView view = ClientReturnView.of(rma(RMAStatus.Approved, false), List.of(), store, NOW);
+
+        // then
+        assertThat(view.state()).isEqualTo(ClientReturnState.BOOK_UNAVAILABLE);
+        assertThat(view.missingConfiguration()).isEqualTo("templates");
+    }
+
+    @Test
     void storeBooksWithoutAddressWhenAnotherShipmentIsBeingCreated() {
         // given
         RMA rma = rma(RMAStatus.Approved, false, parcel(Parcel.OPERATOR_CREATING));

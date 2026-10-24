@@ -9,6 +9,7 @@ import pl.commercelink.web.dtos.FormRules;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Checks the customer's return form before a paid courier is booked with the carrier: nothing invalid may reach it.
@@ -47,7 +48,7 @@ public final class ClientReturnFormCheck {
         }
 
         String packageId = form == null ? null : form.getSelectedPackageTemplateId();
-        if (packageId == null || options.stream().noneMatch(option -> option.id().equals(packageId))) {
+        if (packageId == null || options.stream().noneMatch(option -> Objects.equals(option.id(), packageId))) {
             errors.put("selectedPackageTemplateId", PACKAGE_INVALID);
         }
         return errors;

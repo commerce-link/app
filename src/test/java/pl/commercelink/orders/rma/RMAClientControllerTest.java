@@ -107,6 +107,32 @@ class RMAClientControllerTest {
     }
 
     @Test
+    void aReturnTemplateWithoutAnIdIsNotOfferedAndDoesNotBreakThePage() {
+        // given: an older record without an id next to a bookable one
+        Store store = returnStore();
+        PackageTemplate withoutId = new PackageTemplate("RMA - stary karton", List.of());
+        withoutId.setId(null);
+        withoutId.setDefault(true);
+        store.getShippingConfiguration().getPackageTemplates().add(0, withoutId);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma(RMAStatus.Approved));
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", model, response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo("client-return");
+        assertThat(response.getStatus()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        List<ReturnPackageOption> options = (List<ReturnPackageOption>) model.get("packageOptions");
+        assertThat(options).extracting(ReturnPackageOption::id).containsExactly("7");
+        assertThat(model.get("selectedPackage")).isEqualTo("7");
+    }
+
+    @Test
     void newMissingAndItemlessReturnsStayUnavailable() {
         // given
         Store store = namedStore();

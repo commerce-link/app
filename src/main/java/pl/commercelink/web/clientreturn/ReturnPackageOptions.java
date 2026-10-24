@@ -16,10 +16,15 @@ public final class ReturnPackageOptions {
     private ReturnPackageOptions() {
     }
 
-    /** Same filter and order as RMAShippingService.getAvailableReturnOptions, so both agree on what is offered. */
+    /**
+     * Same filter and order as RMAShippingService.getAvailableReturnOptions, so both agree on what is offered, except a
+     * template without an id: an older record the shipping settings page has not given one yet, which the booking cannot
+     * look up.
+     */
     public static List<ReturnPackageOption> of(Store store) {
         return store.getPackageTemplates().stream()
                 .filter(template -> StringUtils.startsWith(template.getName(), RMAShippingService.RETURN_TEMPLATE_PREFIX))
+                .filter(template -> template.getId() != null)
                 .map(ReturnPackageOptions::from)
                 .collect(Collectors.toList());
     }
@@ -36,7 +41,7 @@ public final class ReturnPackageOptions {
         if (options.isEmpty()) {
             return null;
         }
-        return options.stream().filter(option -> option.id().equals(posted)).findFirst()
+        return options.stream().filter(option -> Objects.equals(option.id(), posted)).findFirst()
                 .or(() -> options.stream().filter(ReturnPackageOption::isDefault).findFirst())
                 .orElse(options.get(0))
                 .id();
