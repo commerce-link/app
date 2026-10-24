@@ -44,7 +44,7 @@ public class PublicStoreActivityInterceptor implements HandlerInterceptor {
             return true;
         }
         if (isClientPage(request)) {
-            throw new StoreInactiveException(storeId);
+            throw new StoreInactiveException(store);
         }
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

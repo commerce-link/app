@@ -111,8 +111,11 @@ class ClientPagesMessagesTest {
         List<Path> files = Stream.of(
                         Stream.of(templates.resolve("public-layout.html"), templates.resolve("clientOffer.html"),
                                 templates.resolve("clientOrder.html"),
-                                templates.resolve("payments/payment-bridge.html")),
-                        listHtml(templates.resolve("client-offer")), listHtml(templates.resolve("client-order")))
+                                templates.resolve("payments/payment-bridge.html"), templates.resolve("store-inactive.html"),
+                                templates.resolve("fragments/public-message.html"), templates.resolve("error/public.html"),
+                                templates.resolve("error/404.html"), templates.resolve("error/403.html")),
+                        listHtml(templates.resolve("client-offer")), listHtml(templates.resolve("client-order")),
+                        listHtml(templates.resolve("client-return")))
                 .flatMap(s -> s)
                 .toList();
         for (Path file : files) {

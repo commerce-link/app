@@ -1,21 +1,14 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-narrow'">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="#{store.inactive.page.title}"></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <title th:text="#{store.inactive.page.pageTitle}">Sklep nieaktywny</title>
 </head>
 <body>
-
-<section class="section">
-    <div class="container" style="max-width: 560px;">
-        <div class="box has-text-centered p-6">
-            <h1 class="title is-4" th:text="#{store.inactive.page.title}"></h1>
-            <p th:text="#{store.inactive.page.lead}"></p>
-        </div>
-    </div>
-</section>
-
+<th:block layout:fragment="content">
+    <section th:replace="~{fragments/public-message :: card(eyebrow=null,
+            title=#{store.inactive.page.title}, lead=#{store.inactive.page.lead},
+            contact=#{store.inactive.page.contact}, fallback=#{store.inactive.page.noContact})}"></section>
+</th:block>
 </body>
 </html>

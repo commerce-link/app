@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE" th:text="${publicPage.storeName}">Store</title>
+    <!-- an unknown store has no name: the page title then stands alone instead of ending in a dangling separator -->
+    <title layout:title-pattern="$CONTENT_TITLE$LAYOUT_TITLE" th:text="${publicPage.storeName != ''} ? ' · ' + ${publicPage.storeName} : ''">Store</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <link rel="stylesheet" th:href="@{/css/commercelink.css}">
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>

@@ -5,7 +5,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.context.MessageSource;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.Shipment;
@@ -16,6 +19,7 @@ import pl.commercelink.shipping.ShipmentCreationStart;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.publicpage.PublicPage;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,8 +29,10 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static pl.commercelink.testsupport.OptimisticLockingExecutorMocks.passThroughModifyAndSave;
@@ -62,7 +68,7 @@ class RMAClientControllerTest {
 
         // when
         controller.postClientBillingShippingForm("store-1", "rma-1", form, new ExtendedModelMap(),
-                new RedirectAttributesModelMap(), Locale.forLanguageTag("pl"));
+                new RedirectAttributesModelMap(), new MockHttpServletResponse(), Locale.forLanguageTag("pl"));
 
         // then
         assertThat(rma.getReturnPackageTemplateId()).isEqualTo("7");
@@ -88,13 +94,162 @@ class RMAClientControllerTest {
 
         // when
         String view = controller.postClientBillingShippingForm("store-1", "rma-1", form, new ExtendedModelMap(),
-                redirect, Locale.forLanguageTag("pl"));
+                redirect, new MockHttpServletResponse(), Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("redirect:/store/store-1/client/rma/rma-1");
         assertThat(redirect.getFlashAttributes().get("successMessage")).isEqualTo("rma.shipment.has.been.created");
         assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
     }
+    private static final String UNAVAILABLE = "client-return/unavailable";
+    private static final String RMA_PATH = "/store/store-1/client/rma/rma-1";
+
+    @ParameterizedTest
+    @EnumSource(value = RMAStatus.class, names = {"New", "Rejected", "Completed"})
+    void aReturnThatIsNotOpenForTheCustomerAnswersTheUnavailablePageWith404(RMAStatus status) {
+        // given
+        Store store = namedStore();
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(status);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", model, response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        PublicPage page = (PublicPage) model.get("publicPage");
+        assertThat(page.storeName()).isEqualTo("Nova Tech");
+        assertThat(page.otherLanguageHref()).isEqualTo(RMA_PATH + "?lang=en");
+        assertThat(model).doesNotContainKeys("rma", "errorMessage");
+    }
+
+    @Test
+    void aMissingReturnAnswersTheSameUnavailablePage() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(namedStore());
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", model, response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(((PublicPage) model.get("publicPage")).storeName()).isEqualTo("Nova Tech");
+    }
+
+    @Test
+    void aReturnWithoutItemsAnswersTheUnavailablePage() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(namedStore());
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(RMAStatus.Approved);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", new ExtendedModelMap(), response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    void aStoreWithoutReturnSettingsAnswersTheUnavailablePageWithoutTheSettingsMessage() {
+        // given
+        Store store = namedStore();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(RMAStatus.Approved);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        when(rmaItemsRepository.findByRmaId("rma-1")).thenReturn(List.of(new RMAItem()));
+        doThrow(new InvalidReturnConfigurationException("Store return settings not configured."))
+                .when(rmaShippingService).validateStoreReturnConfiguration(store);
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", model, response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(model).doesNotContainKey("errorMessage");
+    }
+
+    @Test
+    void anUnknownStoreAnswersTheUnavailablePageWithoutABrand() {
+        // given
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.getRMAForClient("store-1", "rma-1", model, response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        PublicPage page = (PublicPage) model.get("publicPage");
+        assertThat(page.storeId()).isNull();
+        assertThat(page.storeName()).isEmpty();
+        verifyNoInteractions(rmaRepository);
+    }
+
+    @Test
+    void aSubmissionForAReturnNotApprovedAnswersTheUnavailablePageLinkedToTheReturnPage() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(namedStore());
+        RMA rma = new RMA("store-1");
+        rma.setRmaId("rma-1");
+        rma.setStatus(RMAStatus.WaitingForItems);
+        when(rmaRepository.findById("store-1", "rma-1")).thenReturn(rma);
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.postClientBillingShippingForm("store-1", "rma-1", new RMAReturnForm(), model,
+                new RedirectAttributesModelMap(), response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(((PublicPage) model.get("publicPage")).otherLanguageHref()).isEqualTo(RMA_PATH + "?lang=en");
+        verify(rmaShippingService, never()).startReturnShipment(any(), any());
+    }
+
+    @Test
+    void aSubmissionInAnUnknownStoreAnswersTheUnavailablePage() {
+        // given
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.postClientBillingShippingForm("store-1", "rma-1", new RMAReturnForm(), new ExtendedModelMap(),
+                new RedirectAttributesModelMap(), response, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(view).isEqualTo(UNAVAILABLE);
+        assertThat(response.getStatus()).isEqualTo(404);
+        verifyNoInteractions(rmaShippingService);
+    }
+
+    private static Store namedStore() {
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setName("Nova Tech");
+        return store;
+    }
+
     private RMA approvedRma() {
         RMA rma = new RMA("store-1");
         rma.setRmaId("rma-1");
@@ -121,7 +276,7 @@ class RMAClientControllerTest {
         form.setSelectedPackageTemplateId(templateId);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
         controller.postClientBillingShippingForm("store-1", "rma-1", form, new ExtendedModelMap(), redirect,
-                Locale.forLanguageTag("pl"));
+                new MockHttpServletResponse(), Locale.forLanguageTag("pl"));
         return redirect;
     }
 

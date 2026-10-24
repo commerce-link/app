@@ -14,14 +14,14 @@ class ErrorControllerTest {
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ErrorController()).build();
 
-    // Spring Security's accessDeniedPage forwards the denied request with its own method: a POST denied to a USER
+    // StoreAccessInterceptor redirects here, so the page sets 403 itself; Spring Security's accessDeniedPage forwards the denied request with its own method: a POST denied to a USER
     // (e.g. "Pobierz wpłaty z systemu fakturowego") must render the 403 page, not answer 405
     @ParameterizedTest
     @ValueSource(strings = {"GET", "POST", "PUT", "DELETE"})
-    void theAccessDeniedPageAnswersEveryMethod(String method) throws Exception {
+    void theAccessDeniedPageAnswersEveryMethodWith403(String method) throws Exception {
         // when / then
         mvc.perform(request(HttpMethod.valueOf(method), "/access-denied"))
-                .andExpect(status().isOk())
+                .andExpect(status().isForbidden())
                 .andExpect(view().name("error/403"));
     }
 }

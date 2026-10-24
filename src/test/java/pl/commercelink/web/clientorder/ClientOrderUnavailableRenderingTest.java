@@ -68,7 +68,8 @@ class ClientOrderUnavailableRenderingTest {
         String html = render(PublicPageFactory.unknownStore(PATH, PL), null, PL);
 
         // then
-        assertThat(html).contains("Ta strona zamówienia nie jest już dostępna")
+        assertThat(html).contains("<title>Zamówienie niedostępne</title>")
+                .contains("Ta strona zamówienia nie jest już dostępna")
                 .doesNotContain("cl-eyebrow")
                 .doesNotContain("cl-public-foot")
                 .doesNotContain("mailto:");

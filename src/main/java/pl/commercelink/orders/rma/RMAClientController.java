@@ -1,5 +1,6 @@
 package pl.commercelink.orders.rma;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -13,6 +14,7 @@ import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Branding;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.publicpage.PublicPageFactory;
 
 import java.util.List;
 import java.util.Locale;
@@ -21,6 +23,8 @@ import java.util.Locale;
 @Controller
 @RequestMapping("/store/{storeId}/client/rma/{rmaId}")
 public class RMAClientController {
+
+    static final String UNAVAILABLE = "client-return/unavailable";
 
     @Autowired
     private RMARepository rmaRepository;
@@ -41,24 +45,28 @@ public class RMAClientController {
     private MessageSource messageSource;
 
     @GetMapping("")
-    public String getRMAForClient(@PathVariable("storeId") String storeId, @PathVariable("rmaId") String rmaId, Model model) {
+    public String getRMAForClient(@PathVariable("storeId") String storeId, @PathVariable("rmaId") String rmaId, Model model,
+                                  HttpServletResponse response, Locale locale) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return unavailable(null, storeId, rmaId, model, response, locale);
+        }
         RMA rma = rmaRepository.findById(storeId, rmaId);
         if (rma == null || rma.hasOneOfTheStatuses(RMAStatus.New, RMAStatus.Rejected, RMAStatus.Completed)) {
-            return "error/404";
+            return unavailable(store, storeId, rmaId, model, response, locale);
         }
 
         List<RMAItem> rmaItems = rmaItemsRepository.findByRmaId(rma.getRmaId());
         if (rmaItems.isEmpty()) {
-            return "error/404";
+            return unavailable(store, storeId, rmaId, model, response, locale);
         }
-
-        Store store = storesRepository.findById(storeId);
 
         try {
             rmaShippingService.validateStoreReturnConfiguration(store);
         } catch (InvalidReturnConfigurationException e) {
-            model.addAttribute("errorMessage", e.getMessage());
-            return "error/404";
+            // the customer only learns the form is not available; the store has to fix its return settings
+            log.error("Return form of RMA {} in store {} is not available: {}", rmaId, storeId, e.getMessage());
+            return unavailable(store, storeId, rmaId, model, response, locale);
         }
 
         RMAReturnForm form = new RMAReturnForm();
@@ -78,13 +86,18 @@ public class RMAClientController {
     }
 
     @PostMapping("submit")
-    public String postClientBillingShippingForm(@PathVariable("storeId") String storeId, @PathVariable("rmaId") String rmaId, @ModelAttribute RMAReturnForm rmaReturnForm, Model model, RedirectAttributes redirectAttributes, Locale locale) {
+    public String postClientBillingShippingForm(@PathVariable("storeId") String storeId, @PathVariable("rmaId") String rmaId,
+                                                @ModelAttribute RMAReturnForm rmaReturnForm, Model model,
+                                                RedirectAttributes redirectAttributes, HttpServletResponse response,
+                                                Locale locale) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return unavailable(null, storeId, rmaId, model, response, locale);
+        }
         RMA rma = rmaRepository.findById(storeId, rmaId);
         if (rma == null || !rma.hasOneOfTheStatuses(RMAStatus.Approved)) {
-            return "error/404";
+            return unavailable(store, storeId, rmaId, model, response, locale);
         }
-
-        Store store = storesRepository.findById(storeId);
 
         RMAShipmentRequest request = new RMAShipmentRequest();
         request.setRmaId(rmaId);
@@ -139,6 +152,18 @@ public class RMAClientController {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("rma.shipment.creation.failed", null, locale));
             return "redirect:/store/" + storeId + "/client/rma/" + rmaId;
         }
+    }
+
+    // The page does not confirm that the return exists: a missing one and a closed one read the same. The language
+    // link points to the return page, also after a refused submission.
+    private static String unavailable(Store store, String storeId, String rmaId, Model model, HttpServletResponse response,
+                                      Locale locale) {
+        String path = "/store/" + storeId + "/client/rma/" + rmaId;
+        model.addAttribute("publicPage", store != null
+                ? PublicPageFactory.of(store, path, locale)
+                : PublicPageFactory.unknownStore(path, locale));
+        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+        return UNAVAILABLE;
     }
 
     /** A refusal that left the return on the RMA was not a clean refusal of the provider, which removes it. */
