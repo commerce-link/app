@@ -61,6 +61,53 @@ class OrdersExportTest {
         assertThat(csv).contains("order-2");
     }
 
+    @Test
+    void amountTakesOneColumnWithTwoDecimals() {
+        // given
+        Order order = order("order-3");
+        order.setTotalPrice(1151.1);
+
+        when(ordersRepository.findAllOrders(eq("store-1"), any(), any())).thenReturn(List.of(order));
+
+        // when
+        String csv = ordersExport.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv.lines().toList()).containsExactly(
+                "Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Invoiced At",
+                "order-3,,2026-09-14T10:00,Test,WebStore,B2C,Warszawa,Warszawa,,1151.10,");
+    }
+
+    @Test
+    void amountIsRoundedToTheGrosz() {
+        // given
+        Order order = order("order-4");
+        order.setTotalPrice(389.7000000000003);
+
+        when(ordersRepository.findAllOrders(eq("store-1"), any(), any())).thenReturn(List.of(order));
+
+        // when
+        String csv = ordersExport.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv).contains(",389.70,");
+    }
+
+    @Test
+    void affiliateIdIsWrittenWhenPresent() {
+        // given
+        Order order = order("order-5");
+        order.setAffiliateId("aff-1");
+
+        when(ordersRepository.findAllOrders(eq("store-1"), any(), any())).thenReturn(List.of(order));
+
+        // when
+        String csv = ordersExport.run("store-1", FROM, TO);
+
+        // then
+        assertThat(csv).contains("order-5,aff-1,");
+    }
+
     private Order order(String orderId) {
         Order order = new Order();
         order.setOrderId(orderId);

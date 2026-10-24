@@ -11,6 +11,7 @@ import java.io.StringWriter;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -42,7 +43,7 @@ public class OrdersExport {
                     : order.getPayments().get(0).getSource();
 
             csvWriter.append(order.getOrderId()).append(",")
-                    .append(order.getAffiliateId()).append(",")
+                    .append(Objects.toString(order.getAffiliateId(), "")).append(",")
                     .append(order.getOrderedAt().toString()).append(",")
                     .append(order.getSource().getName()).append(",")
                     .append(order.getSource().getType().name()).append(",")
@@ -50,7 +51,7 @@ public class OrdersExport {
                     .append(order.getBillingDetails().getCity()).append(",")
                     .append(order.getShippingDetails().getCity()).append(",")
                     .append(paymentSource != null ? paymentSource.name() : "").append(",")
-                    .append(String.valueOf(order.getTotalPrice()).replace('.', ',')).append(",")
+                    .append(String.format(Locale.ROOT, "%.2f", order.getTotalPrice())).append(",")
                     .append(invoicedAt(order))
                     .append("\n");
         }
