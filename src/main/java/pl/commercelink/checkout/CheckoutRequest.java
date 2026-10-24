@@ -73,8 +73,13 @@ public class CheckoutRequest {
     }
 
     private BasketItem toBasketItem(CheckoutItem checkoutItem, Pricelist pricelist) {
+        if (pricelist == null) {
+            throw new CheckoutException(CheckoutError.PricelistOutdated,
+                    "pricelist " + checkoutItem.getPricelistId() + " of catalog " + checkoutItem.getCatalogId() + " not found");
+        }
         AvailabilityAndPrice availabilityAndPrice = pricelist.findByPimId(checkoutItem.getItemId())
-                .orElseThrow(() -> new IllegalArgumentException("Item not found in pricelist: " + checkoutItem.getItemId()));
+                .orElseThrow(() -> new CheckoutException(CheckoutError.ItemNotFound,
+                        "item " + checkoutItem.getItemId() + " not found in pricelist " + pricelist.getPricelistId()));
 
         return BasketItem.of(availabilityAndPrice, checkoutItem.getQty(), checkoutItem.getCatalogId(), !checkoutItem.isListed());
     }

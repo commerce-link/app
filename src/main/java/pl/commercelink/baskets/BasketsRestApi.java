@@ -57,18 +57,6 @@ public class BasketsRestApi {
         return ResponseEntity.ok(new ObjectIdInvoiceNoDto(basket.getBasketId()));
     }
 
-    @PutMapping("/{basketId}")
-    public ResponseEntity<Void> updateBasket(@PathVariable String storeId,
-                                             @PathVariable String basketId,
-                                             @RequestBody CheckoutRequest req) {
-        return basketsRepository.findById(storeId, basketId)
-                .map(basket -> {
-                    processBasket(basket, req);
-                    return ResponseEntity.ok().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
     private void processBasket(Basket basket, CheckoutRequest req) {
         List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
 
