@@ -109,6 +109,19 @@ class ClientReturnTemplateRenderingTest {
                 .contains("<p class=\"cl-note\" id=\"selectedPackageTemplateId\">Paczka: <strong>Karton S</strong> · 25 × 15 × 10 cm · 1 kg</p>")
                 .doesNotContain("cl-choice-cards")
                 .doesNotContain("<select");
+        assertThat(renderer.render()).contains("<p class=\"cl-page-lead\">Sklep przyjął Twoje zgłoszenie. Podaj adres — kurier odbierze paczkę spod drzwi.</p>")
+                .doesNotContain("Wybierz karton");
+    }
+
+    @Test
+    void trackedParcelWithoutAnAddressCardDoesNotPointBelow() {
+        // when
+        String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).shipments(trackedReturn()).render();
+
+        // then
+        assertThat(html).contains("<p class=\"cl-page-lead\">Gdzie jest teraz paczka, sprawdzisz u przewoźnika.</p>")
+                .doesNotContain("id=\"return-address\"")
+                .doesNotContain("spod adresu niżej");
     }
 
     @Test
@@ -327,7 +340,7 @@ class ClientReturnTemplateRenderingTest {
                         "Zamawiamy kuriera po Twoją paczkę",
                         "Zapakuj produkty. Numer przesyłki i termin odbioru dostaniesz e-mailem."),
                 arguments((Supplier<ClientReturnRenderer>) () -> ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems)
-                                .shipments(tracked.get()),
+                                .savedAddress(fullAddress()).shipments(tracked.get()),
                         "Czekamy na Twoją paczkę",
                         "Kurier odbierze paczkę spod adresu niżej. Gdzie jest teraz, sprawdzisz u przewoźnika."),
                 arguments((Supplier<ClientReturnRenderer>) () -> ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems)

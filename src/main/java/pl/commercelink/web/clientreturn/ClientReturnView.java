@@ -38,6 +38,7 @@ public final class ClientReturnView {
     private final List<ReturnShipmentRow> shipmentRows;
     private final List<ReturnItemRow> itemRows;
     private final ReturnPackageOption packageOption;
+    private final boolean singleReturnOption;
 
     private ClientReturnView(RMA rma, List<RMAItem> items, Store store, LocalDateTime now) {
         this.rma = rma;
@@ -48,6 +49,7 @@ public final class ClientReturnView {
         this.missingConfiguration = state == ClientReturnState.BOOK_UNAVAILABLE ? missing : null;
         this.shipmentRows = shipments().stream().filter(this::isShown).map(this::toRow).toList();
         this.itemRows = items.stream().map(this::toRow).toList();
+        this.singleReturnOption = ReturnPackageOptions.of(store).size() == 1;
         this.packageOption = rma.getReturnPackageTemplateId() == null ? null
                 : ReturnPackageOptions.find(store, rma.getReturnPackageTemplateId()).orElse(null);
     }
@@ -156,6 +158,7 @@ public final class ClientReturnView {
     public String leadKey() {
         String suffix = switch (state) {
             case WAITING -> "waiting." + waitingLead();
+            case BOOK -> singleReturnOption ? "bookOne" : "book";
             case REJECTED -> rejectionReason() == null ? "rejected.noReason" : "rejected.withReason";
             default -> state.lowerCamelName();
         };
@@ -166,7 +169,8 @@ public final class ClientReturnView {
     private String waitingLead() {
         List<Shipment> returns = customersReturns();
         if (returns.stream().anyMatch(s -> StringUtils.isNotBlank(s.getTrackingNo()) && !s.creationFailed(now))) {
-            return "tracked";
+            // The lead must not send the customer to an address card that is not shown.
+            return address() == null ? "trackedNoAddress" : "tracked";
         }
         if (returns.stream().anyMatch(s -> s.creationFailed(now))) {
             return "checking";

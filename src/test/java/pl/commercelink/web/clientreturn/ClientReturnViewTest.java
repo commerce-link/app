@@ -359,9 +359,38 @@ class ClientReturnViewTest {
     }
 
     @Test
+    void trackedWaitingLeadDoesNotPointToAnAddressCardThatIsNotShown() {
+        // when
+        ClientReturnView withAddress = view(rma(RMAStatus.WaitingForItems, true, parcel(Parcel.RETURN_CREATED)));
+        ClientReturnView withoutAddress = view(rma(RMAStatus.Approved, false, parcel(Parcel.RETURN_CREATED)));
+
+        // then
+        assertThat(withAddress.leadKey()).isEqualTo("client.return.lead.waiting.tracked");
+        assertThat(withoutAddress.state()).isEqualTo(ClientReturnState.WAITING);
+        assertThat(withoutAddress.leadKey()).isEqualTo("client.return.lead.waiting.trackedNoAddress");
+    }
+
+    @Test
+    void bookLeadDoesNotOfferAChoiceWhenThereIsOneTemplate() {
+        // given
+        Store twoTemplates = store(Config.CONFIGURED);
+        PackageTemplate second = new PackageTemplate("RMA - Karton L", List.of());
+        second.setId("t2");
+        twoTemplates.getShippingConfiguration().getPackageTemplates().add(second);
+
+        // when
+        ClientReturnView one = view(rma(RMAStatus.Approved, false));
+        ClientReturnView many = ClientReturnView.of(rma(RMAStatus.Approved, false), List.of(new RMAItem()), twoTemplates, NOW);
+
+        // then
+        assertThat(one.leadKey()).isEqualTo("client.return.lead.bookOne");
+        assertThat(many.leadKey()).isEqualTo("client.return.lead.book");
+    }
+
+    @Test
     void leadKeysOfTheOtherStates() {
         // when / then
-        assertThat(view(rma(RMAStatus.Approved, false)).leadKey()).isEqualTo("client.return.lead.book");
+        assertThat(view(rma(RMAStatus.Approved, false)).leadKey()).isEqualTo("client.return.lead.bookOne");
         assertThat(view(rma(RMAStatus.Approved, false), Config.NO_CARRIER).leadKey()).isEqualTo("client.return.lead.bookUnavailable");
         assertThat(view(rma(RMAStatus.Approved, true)).leadKey()).isEqualTo("client.return.lead.storeBooks");
         assertThat(view(rma(RMAStatus.Approved, true, parcel(Parcel.RETURN_CREATING))).leadKey()).isEqualTo("client.return.lead.booking");
@@ -389,7 +418,7 @@ class ClientReturnViewTest {
 
         // then
         assertThat(marketplaceView.state()).isEqualTo(ClientReturnState.WAITING);
-        assertThat(marketplaceView.leadKey()).isEqualTo("client.return.lead.waiting.tracked");
+        assertThat(marketplaceView.leadKey()).isEqualTo("client.return.lead.waiting.trackedNoAddress");
         assertThat(marketplaceView.arrivedAt()).isEqualTo(NOW.minusDays(1));
         assertThat(manualView.state()).isEqualTo(ClientReturnState.BOOK);
         assertThat(manualView.arrivedAt()).isNull();

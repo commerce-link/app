@@ -63,7 +63,7 @@ class ClientPagesMessagesTest {
             "ClientOrderItemStatus.Allocation", "ClientOrderItemStatus.AwaitingDelivery", "ClientOrderItemStatus.Assembled",
             "ClientOrderItemStatus.InClaim", "ClientOrderItemStatus.Returned",
             "ShipmentType.Courier", "ShipmentType.PickupPoint", "ShipmentType.PersonalCollection",
-            "client.return.lead.book", "client.return.lead.bookUnavailable", "client.return.lead.storeBooks",
+            "client.return.lead.book", "client.return.lead.bookOne", "client.return.lead.waiting.trackedNoAddress", "client.return.lead.bookUnavailable", "client.return.lead.storeBooks",
             "client.return.lead.booking", "client.return.lead.waiting.tracked", "client.return.lead.waiting.checking",
             "client.return.lead.waiting.noParcel", "client.return.lead.arrived", "client.return.lead.reviewing",
             "client.return.lead.completed", "client.return.lead.rejected.withReason", "client.return.lead.rejected.noReason",
