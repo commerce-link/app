@@ -75,7 +75,7 @@ public class WebSecurityConfiguration {
                 })
                 .addFilterBefore(tokenRefreshFilter, OAuth2AuthorizationRequestRedirectFilter.class)
                 .oauth2Login(oauth2 -> oauth2
-                        .successHandler(successHandler)
+                        .successHandler(new ErrorPageSkippingSuccessHandler(successHandler))
                         .userInfoEndpoint(userInfo -> {
                             userInfo.userService(customOAuth2UserService);
                         })

@@ -17,6 +17,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.handler.MappedInterceptor;
 import pl.commercelink.starter.security.StoreAccessInterceptor;
 import pl.commercelink.starter.security.StoreApiKeyAuthorizationInterceptor;
+import pl.commercelink.starter.security.UserRole;
+import pl.commercelink.web.settings.StoreSettingsCatalog;
 import pl.commercelink.registration.EmailVerificationInterceptor;
 import pl.commercelink.starter.security.interceptor.ApiGatewayIdInterceptor;
 import pl.commercelink.web.activity.DashboardReadOnlyInterceptor;
@@ -57,11 +59,40 @@ class WebConfigTest {
             "GET, /dashboard/store/fulfilment",
             "GET, /dashboard/store/receipts",
             "GET, /dashboard/store/receipts/system",
-            "GET, /dashboard/store/receipts/system/disconnect"
+            "GET, /dashboard/store/receipts/system/disconnect",
+            "GET, /dashboard/store/discounts",
+            "POST, /dashboard/store/discounts",
+            "GET, /dashboard/store/discounts/LATO-10",
+            "POST, /dashboard/store/discounts/LATO-10/toggle",
+            "GET, /dashboard/store/discounts/LATO-10/delete",
+            "POST, /dashboard/store/discounts/LATO-10/delete"
     })
     void storeAccessInterceptorDoesNotGuardTheAdminStorePages(String method, String path) {
         // given / when / then
         assertThat(storeAccessGuards(new MockHttpServletRequest(method, path))).isFalse();
+    }
+
+    @Test
+    void storeAccessInterceptorDoesNotGuardAnySettingsPageOfTheStoreAdmin() {
+        // given
+        List<String> paths = StoreSettingsCatalog.sections().stream()
+                .flatMap(section -> section.tiles().stream())
+                .filter(tile -> tile.visibleFor(UserRole.ADMIN))
+                .map(tile -> StoreSettingsCatalog.HOME_PATH + tile.relativePath())
+                .toList();
+
+        // when / then
+        assertThat(paths).isNotEmpty().allSatisfy(path -> {
+            assertThat(storeAccessGuards(get(path))).as(path).isFalse();
+            assertThat(storeAccessGuards(get(path + "/subpage"))).as(path + "/subpage").isFalse();
+        });
+    }
+
+    @Test
+    void storeAccessInterceptorStillGuardsTheSuperAdminStoreDiscountsPage() {
+        // given / when / then
+        assertThat(storeAccessGuards(get("/dashboard/store/other-store/discounts"))).isTrue();
+        assertThat(storeAccessGuards(get("/dashboard/store/other-store/discounts/LATO-10"))).isTrue();
     }
 
     @Test

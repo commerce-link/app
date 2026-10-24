@@ -5,6 +5,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.baskets.Basket;
+import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
@@ -106,6 +107,12 @@ public class StoreWipeRepository {
         DailyScheduleExecutionCount key = new DailyScheduleExecutionCount();
         key.setStoreId(storeId);
         return query(DailyScheduleExecutionCount.class, key);
+    }
+
+    public List<DiscountCode> findDiscountCodes(String storeId) {
+        DiscountCode key = new DiscountCode();
+        key.setStoreId(storeId);
+        return query(DiscountCode.class, key);
     }
 
     public void deleteAll(List<?> entities) {

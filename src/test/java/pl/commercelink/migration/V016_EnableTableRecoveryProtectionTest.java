@@ -54,6 +54,21 @@ class V016_EnableTableRecoveryProtectionTest {
     }
 
     @Test
+    void protectsTheDiscountCodesTable() {
+        // given
+        pitrStatus(PointInTimeRecoveryStatus.DISABLED);
+        deletionProtection(false);
+
+        // when
+        new V016_EnableTableRecoveryProtection(dynamoDB).protectTables();
+
+        // then
+        verify(dynamoDB).updateContinuousBackups(argThat((UpdateContinuousBackupsRequest r) ->
+                "DiscountCodes".equals(r.getTableName())));
+        verify(dynamoDB).updateTable(argThat((UpdateTableRequest r) -> "DiscountCodes".equals(r.getTableName())));
+    }
+
+    @Test
     void leavesAlreadyProtectedTablesUntouched() {
         pitrStatus(PointInTimeRecoveryStatus.ENABLED);
         deletionProtection(true);

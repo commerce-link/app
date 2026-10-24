@@ -13780,6 +13780,27 @@ a.cl-link-button:hover {
     overflow-wrap: anywhere;
 }
 
+.cl-page dl.cl-kv.is-rows {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 12px 32px;
+}
+.cl-page dl.cl-kv.is-rows > div {
+    display: contents;
+}
+.cl-page dl.cl-kv.is-rows .cl-meter {
+    max-width: 200px;
+    margin-top: 6px;
+}
+@media screen and (max-width: 719px) {
+    .cl-page dl.cl-kv.is-rows {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
+    .cl-page dl.cl-kv.is-rows dd {
+        margin-bottom: 10px;
+    }
+}
+
 /* Help text that quotes what was typed (an RMA item's serial numbers): a long value without spaces breaks anywhere
    instead of widening the field and scrolling the page sideways. */
 .cl-page .cl-help.is-break {
