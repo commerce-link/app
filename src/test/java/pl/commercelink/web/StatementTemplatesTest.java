@@ -18,6 +18,8 @@ import pl.commercelink.web.settings.StatementPreview;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static pl.commercelink.web.payments.StatementPageFixtures.*;
@@ -67,6 +69,27 @@ class StatementTemplatesTest {
                 .contains("data-cl-group-count").contains("data-cl-tile-amount");
         String receivables = html.substring(html.indexOf("id=\"statement-receivables\">"), html.indexOf("</script>", html.indexOf("id=\"statement-receivables\">")));
         assertThat(receivables).contains("\"shortId\":\"3f9a2c1e\"").doesNotContain("<b>");
+        // the payout's orders are listed, each opening its order in a new tab so the reconciliation is not lost
+        assertThat(html).containsPattern("href=\"/dashboard/orders/91c2e7a0-0000-4000-8000-000000000001\" target=\"_blank\" rel=\"noopener\"\\s+"
+                + "title=\"Otwórz zamówienie 91c2e7a0 w nowej karcie\"");
+    }
+
+    @Test
+    void foldsTheOrdersOfALongPayoutAfterTheFirstThree() {
+        // given
+        Context context = new Context(PL);
+        context.setVariable("refs", IntStream.range(0, 6)
+                .mapToObj(index -> new StatementPage.OrderRef("order-" + index, "0000000" + index,
+                        "/dashboard/orders/order-" + index, "Klient " + index, null))
+                .toList());
+
+        // when
+        String html = engine.process("fragments/statement-orders", Set.of("orders"), context);
+
+        // then
+        assertThat(html).doesNotContain("??").contains("Pokaż pozostałe: 3");
+        assertThat(html.substring(0, html.indexOf("<details"))).contains("00000000", "00000002").doesNotContain("00000003");
+        assertThat(html.substring(html.indexOf("<details"))).contains("00000003", "00000005");
     }
 
     @Test

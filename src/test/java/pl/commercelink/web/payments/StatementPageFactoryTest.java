@@ -74,6 +74,21 @@ public class StatementPageFactoryTest {
     }
 
     @Test
+    void aPayoutListsEachOfItsOrdersWithWhatItPaysForIt() {
+        // when
+        StatementPage page = factory.page(store(), statement(), Map.of(), List.of(), PL);
+
+        // then
+        StatementPage.Row payout = row(page, "WB-ALLEGRO");
+        assertThat(payout.orders()).extracting(StatementPage.OrderRef::shortId).containsExactly("91c2e7a0", "5d0b8f13");
+        assertThat(payout.orders()).extracting(StatementPage.OrderRef::href)
+                .containsExactly("/dashboard/orders/" + ALLEGRO_1, "/dashboard/orders/" + ALLEGRO_2);
+        assertThat(payout.orders()).extracting(StatementPage.OrderRef::detail).containsExactly(
+                "do zapłaty 649,00 PLN · prowizja 64,90 PLN", "do zapłaty 219,00 PLN · prowizja 23,13 PLN");
+        assertThat(payout.ordersNote()).isEqualTo("Zamówienia: 2 · do zapłaty 868,00 PLN");
+    }
+
+    @Test
     void marksTheNumberTheMatchWasFoundByInTheTitle() {
         // when
         StatementPage page = factory.page(store(), statement(), Map.of(), List.of(), PL);
