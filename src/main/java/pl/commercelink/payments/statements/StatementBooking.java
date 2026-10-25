@@ -148,11 +148,11 @@ public class StatementBooking {
         Payment target;
         double keptFee = 0;
         if (!payer.isEmpty()) {
-            // read before the payment is filled: the row is chosen by the method and name the order waits with
+            // read before the payment is filled: the row is chosen by the method the order waits with
             PayoutChannel row = PayoutChannels.rowOf(payer, order).orElse(null);
             // a payer that does not deduct its fee from the transfer still charged it: the recorded fee stays
             keptFee = (row == null || !row.isNetOfFees()) && pending != null ? pending.getFee() : 0;
-            target = pending != null ? pending : added(order, PayoutChannels.sourceOf(row), row == null ? null : row.getProvider());
+            target = pending != null ? pending : added(order, PayoutChannels.sourceOf(row));
         } else {
             if (pending != null && pending.getSource() != null && pending.getSource() != PaymentSource.BankTransfer) {
                 // the customer paid by transfer instead of the method the order waited for (an online payment that
@@ -165,7 +165,7 @@ public class StatementBooking {
                 pending.setReferenceNo(null);
                 pending.setFee(0);
             }
-            target = pending != null ? pending : added(order, PaymentSource.BankTransfer, null);
+            target = pending != null ? pending : added(order, PaymentSource.BankTransfer);
             if (target.getSource() == null) {
                 target.setSource(PaymentSource.BankTransfer);
             }
@@ -181,9 +181,8 @@ public class StatementBooking {
         return Result.BOOKED;
     }
 
-    private static Payment added(Order order, PaymentSource source, String name) {
+    private static Payment added(Order order, PaymentSource source) {
         Payment payment = new Payment(source);
-        payment.setName(StringUtils.trimToNull(name));
         order.addPayment(payment);
         return payment;
     }

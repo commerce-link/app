@@ -16,9 +16,8 @@ import pl.commercelink.orders.PaymentSource;
  * for loans taken in the shop and over the phone, one gateway paying out for two marketplaces, each with its own fees).
  * <p>
  * Every criterion left empty means any: {@code orderSource} is {@link #SHOP} for the store's own orders or a
- * marketplace's name, {@code method} the payment method the order waits for, {@code provider} the name its payment
- * carries (a gateway) or a carrier of its shipments. With {@code netOfFees} the transfer is the orders' amounts less
- * the fees recorded on their payments.
+ * marketplace's name, {@code method} the payment method the order waits for. With {@code netOfFees} the transfer is
+ * the orders' amounts less the fees recorded on their payments.
  */
 @DynamoDBDocument
 @Getter
@@ -36,8 +35,6 @@ public class PayoutChannel {
     @DynamoDBAttribute(attributeName = "method")
     @DynamoDBTypeConvertedEnum
     private PaymentSource method;
-    @DynamoDBAttribute(attributeName = "provider")
-    private String provider;
     @DynamoDBAttribute(attributeName = "netOfFees")
     private boolean netOfFees;
 }

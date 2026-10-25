@@ -156,7 +156,7 @@ class StatementMatcherTest {
     @Test
     void proposesTheRunOfAPayoutChannelsOrdersThatAddsUpToTheTransfer() {
         // given
-        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, null, true);
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true);
         Order first = orderedOn(fromMarketplace(order("91c2e7a0-0000-4000-8000-000000000001", 649.00,
                 pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro"), 3);
         Order second = orderedOn(fromMarketplace(order("5d0b8f13-0000-4000-8000-000000000002", 219.00,
@@ -182,7 +182,7 @@ class StatementMatcherTest {
     @Test
     void leavesAPayoutToTheOperatorWhenNoRunAddsUp() {
         // given
-        PayoutChannel furgonetka = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, null, false);
+        PayoutChannel furgonetka = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, false);
         Order cod = order(JAN, 500.00, pending(PaymentSource.CashOnDelivery));
 
         // when
@@ -200,8 +200,8 @@ class StatementMatcherTest {
     void aBankPaysForLoansTakenInTheShopAndOverThePhoneInOneTransfer() {
         // given
         List<PayoutChannel> santander = List.of(
-                new PayoutChannel("SANTANDER", null, PaymentSource.Installments, null, false),
-                new PayoutChannel("SANTANDER", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "Santander eRaty", false));
+                new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false),
+                new PayoutChannel("SANTANDER", PayoutChannel.SHOP, PaymentSource.OnlinePayment, false));
         Order shop = orderedOn(order(JAN, 1000.00, pending(PaymentSource.OnlinePayment, "Santander eRaty", "SR-1", 0)), 3);
         Order phone = orderedOn(order(ANNA, 500.00, pending(PaymentSource.Installments)), 4);
         Order transfer = orderedOn(order("b71e04d2-0000-4000-8000-000000000003", 1500.00, pending(PaymentSource.BankTransfer)), 5);
@@ -221,8 +221,8 @@ class StatementMatcherTest {
     void oneGatewayPayingOutForTwoMarketplacesIsToldApartByTheSumAndTheirFees() {
         // given
         List<PayoutChannel> paypro = List.of(
-                new PayoutChannel("PAYPRO", "Allegro", null, null, true),
-                new PayoutChannel("PAYPRO", "Morele", null, null, false));
+                new PayoutChannel("PAYPRO", "Allegro", null, true),
+                new PayoutChannel("PAYPRO", "Morele", null, false));
         Order allegro = orderedOn(fromMarketplace(order(JAN, 100.00, pending(PaymentSource.OnlinePayment, "", "A-1", 10.00)), "Allegro"), 3);
         Order morele = orderedOn(fromMarketplace(order(ANNA, 200.00, pending(PaymentSource.OnlinePayment, "", "M-1", 20.00)), "Morele"), 4);
 
@@ -239,7 +239,7 @@ class StatementMatcherTest {
     @Test
     void aGatewayPayingOutEachPaymentLessItsFeeIsMatchedByThePaymentNumberWithTheFeeAsTheDifference() {
         // given
-        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "PayNow", true);
+        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true);
         Order order = order(JAN, 15600.00, pending(PaymentSource.OnlinePayment, "PayNow", "P53V-ON8-ZAS-ESB", 0));
         BankOperation transfer = operation("WB-1", "15564.85",
                 "MBANK S.A. PAYNOW, /OPF/X///// PLATNOSC NR: P53V-ON8-ZAS-ESB (klient@example.com)", "");

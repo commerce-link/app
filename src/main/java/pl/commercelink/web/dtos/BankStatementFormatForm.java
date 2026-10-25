@@ -18,9 +18,9 @@ import java.util.stream.Stream;
 /**
  * The CSV format of one bank account's statements, on its own settings page. The sample file is not stored: once
  * uploaded it travels with the form (sampleData, Base64) so the preview can be refreshed after a change without
- * choosing the file again. Payout rows are a payer's text and the orders it settles (their source, payment method and
- * payment provider or carrier, each blank for any) with whether it deducts its fees; a row left blank is ignored, and
- * the page always offers empty rows to add one without a script.
+ * choosing the file again. Payout rows are a payer's text and the orders it settles (their source and payment method,
+ * each blank for any) with whether it deducts its fees; a row left blank is ignored, and the page always offers empty
+ * rows to add one without a script.
  */
 @Getter
 @Setter
@@ -66,24 +66,22 @@ public class BankStatementFormatForm {
         private String match;
         private String source;
         private String method;
-        private String provider;
         private boolean netOfFees;
 
         ChannelRow(PayoutChannel channel) {
             this.match = channel.getMatch();
             this.source = channel.getOrderSource();
             this.method = channel.getMethod() == null ? null : channel.getMethod().name();
-            this.provider = channel.getProvider();
             this.netOfFees = channel.isNetOfFees();
         }
 
         boolean isBlank() {
-            return StringUtils.isAllBlank(match, source, method, provider);
+            return StringUtils.isAllBlank(match, source, method);
         }
 
-        /** A row that names no source, method or provider would offer every open order for the payer's transfers. */
+        /** A row that names no source or method would offer every open order for the payer's transfers. */
         boolean describesNoOrders() {
-            return StringUtils.isAllBlank(source, method, provider);
+            return StringUtils.isAllBlank(source, method);
         }
     }
 
@@ -246,7 +244,7 @@ public class BankStatementFormatForm {
         format.setPayoutChannels(new ArrayList<>(channels.stream()
                 .filter(channelRow -> channelRow != null && !channelRow.isBlank() && StringUtils.isNotBlank(channelRow.getMatch()))
                 .map(channelRow -> new PayoutChannel(channelRow.getMatch().trim(), StringUtils.trimToNull(channelRow.getSource()),
-                        method(channelRow.getMethod()), StringUtils.trimToNull(channelRow.getProvider()), channelRow.isNetOfFees()))
+                        method(channelRow.getMethod()), channelRow.isNetOfFees()))
                 .toList()));
         return format;
     }

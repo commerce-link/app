@@ -92,7 +92,7 @@ class StatementBookingTest {
     @Test
     void bookingAPayoutKeepsTheOnlinePaymentAndRecordsTheFeeThePayerKept() {
         // given
-        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, null, true);
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true);
         Order order = fromMarketplace(order(ORDER, 649.00, pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro");
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
         BankOperation payout = operation("WB-PAY", "584.10", "Wyplata srodkow Allegro", "ALLEGRO SP. Z O.O.");
@@ -113,7 +113,7 @@ class StatementBookingTest {
     @Test
     void aPayerThatDoesNotDeductItsFeeLeavesTheRecordedFeeInPlace() {
         // given
-        PayoutChannel gateway = new PayoutChannel("PAYPRO", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "Przelewy24", false);
+        PayoutChannel gateway = new PayoutChannel("PAYPRO", PayoutChannel.SHOP, PaymentSource.OnlinePayment, false);
         Order order = order(ORDER, 300.00, pending(PaymentSource.OnlinePayment, "Przelewy24", "P24-1", 4.50));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
 
@@ -128,7 +128,7 @@ class StatementBookingTest {
     @Test
     void aLoanFromTheCallCentreKeepsItsInstallmentsMethod() {
         // given
-        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, null, false);
+        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false);
         Order order = order(ORDER, 500.00, pending(PaymentSource.Installments));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
 
@@ -268,7 +268,7 @@ class StatementBookingTest {
     @Test
     void bookingOneOrderOfAPayoutDoesNotDependOnAnother() {
         // given
-        PayoutChannel cod = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, null, false);
+        PayoutChannel cod = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, false);
         String other = "5d0b8f13-0000-4000-8000-000000000002";
         Order first = order(ORDER, 100.00, pending(PaymentSource.CashOnDelivery));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(first);

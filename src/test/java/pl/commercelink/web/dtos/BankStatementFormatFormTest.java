@@ -55,8 +55,8 @@ class BankStatementFormatFormTest {
         form.setSeparator("TAB");
         form.setTitleColumn2("#Tytuł");
         form.setChannels(new ArrayList<>(List.of(
-                row("ALLEGRO", "Allegro", "", "", true),
-                row("", "", "", "", false))));
+                row("ALLEGRO", "Allegro", "", true),
+                row("", "", "", false))));
 
         // when
         BankStatementFormat format = form.toFormat();
@@ -71,7 +71,6 @@ class BankStatementFormatFormTest {
             assertThat(channel.getMatch()).isEqualTo("ALLEGRO");
             assertThat(channel.getOrderSource()).isEqualTo("Allegro");
             assertThat(channel.getMethod()).isNull();
-            assertThat(channel.getProvider()).isNull();
             assertThat(channel.isNetOfFees()).isTrue();
         });
         assertThat(format.isComplete()).isTrue();
@@ -85,8 +84,8 @@ class BankStatementFormatFormTest {
         // given
         BankStatementFormatForm form = filled();
         form.setChannels(new ArrayList<>(List.of(
-                row("SANTANDER", "", "Installments", "", false),
-                row("SANTANDER", "SHOP", "OnlinePayment", "Santander eRaty", false))));
+                row("SANTANDER", "", "Installments", false),
+                row("SANTANDER", "SHOP", "OnlinePayment", false))));
 
         // when
         List<PayoutChannel> channels = form.toFormat().getPayoutChannels();
@@ -96,7 +95,6 @@ class BankStatementFormatFormTest {
         assertThat(channels).extracting(PayoutChannel::getMethod)
                 .containsExactly(PaymentSource.Installments, PaymentSource.OnlinePayment);
         assertThat(channels.get(1).getOrderSource()).isEqualTo(PayoutChannel.SHOP);
-        assertThat(channels.get(1).getProvider()).isEqualTo("Santander eRaty");
         assertThat(BankStatementFormatForm.from(form.toFormat()).getChannels().get(0).getMethod()).isEqualTo("Installments");
     }
 
@@ -104,8 +102,8 @@ class BankStatementFormatFormTest {
     void asksForTheMatchAndTheChannelOfAStartedRow() {
         // given
         BankStatementFormatForm form = filled();
-        form.setChannels(new ArrayList<>(List.of(row("", "", "", "Przelewy24", false), row("PAYPRO", "", "", "", true),
-                row("PAYPRO", "", "Barter", "", false))));
+        form.setChannels(new ArrayList<>(List.of(row("", "Allegro", "", false), row("PAYPRO", "", "", true),
+                row("PAYPRO", "", "Barter", false))));
 
         // when / then
         assertThat(form.validate()).containsOnlyKeys("channel-0-match", "channel-1-source", "channel-2-method");
@@ -115,7 +113,7 @@ class BankStatementFormatFormTest {
     void aGuessKeepsTheChannelsAndTheSample() {
         // given
         BankStatementFormatForm form = BankStatementFormatForm.defaults();
-        form.setChannels(new ArrayList<>(List.of(row("ALLEGRO", "Allegro", "", "", true))));
+        form.setChannels(new ArrayList<>(List.of(row("ALLEGRO", "Allegro", "", true))));
         form.attachSample(new byte[]{1, 2, 3}, "wyciag.csv");
         BankStatementFormat guess = new BankStatementFormat();
         guess.setEncoding("UTF-8");
@@ -158,13 +156,11 @@ class BankStatementFormatFormTest {
         return form;
     }
 
-    private static BankStatementFormatForm.ChannelRow row(String match, String source, String method, String provider,
-                                                          boolean net) {
+    private static BankStatementFormatForm.ChannelRow row(String match, String source, String method, boolean net) {
         BankStatementFormatForm.ChannelRow row = new BankStatementFormatForm.ChannelRow();
         row.setMatch(match);
         row.setSource(source);
         row.setMethod(method);
-        row.setProvider(provider);
         row.setNetOfFees(net);
         return row;
     }

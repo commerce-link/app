@@ -144,7 +144,6 @@
                                     <th scope="col" th:text="#{store.payments.statement.channels.match}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.source}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.method}"></th>
-                                    <th scope="col" th:text="#{store.payments.statement.channels.provider}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.net}"></th>
                                 </tr>
                                 </thead>
@@ -152,8 +151,7 @@
                                 <tr th:each="channel, s : *{channels}"
                                     th:with="matchId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'match')},
                                              sourceId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'source')},
-                                             methodId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'method')},
-                                             providerId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'provider')}">
+                                             methodId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'method')}">
                                     <td>
                                         <input class="cl-input" type="text" autocomplete="off" th:id="${matchId}"
                                                th:name="|channels[${s.index}].match|" th:value="${channel.match}"
@@ -187,13 +185,6 @@
                                             <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                                             <span th:text="#{${errors[methodId]}}"></span>
                                         </p>
-                                    </td>
-                                    <td>
-                                        <select class="cl-select" th:id="${providerId}" th:name="|channels[${s.index}].provider|"
-                                                th:attr="aria-label=#{store.payments.statement.channels.provider}">
-                                            <option th:each="option : ${providerOptions}" th:value="${option.value()}" th:text="${option.label()}"
-                                                    th:selected="${option.value() == (channel.provider == null ? '' : channel.provider)}"></option>
-                                        </select>
                                     </td>
                                     <td>
                                         <label class="cl-check">
