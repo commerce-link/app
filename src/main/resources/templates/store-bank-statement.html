@@ -142,8 +142,6 @@
                         <div data-cl-payout-rows
                              th:attr="data-text-edit=#{store.payments.statement.channels.edit},
                                       data-text-edit-for=#{store.payments.statement.channels.edit.for('{0}')},
-                                      data-text-remove=#{store.payments.statement.channels.remove},
-                                      data-text-remove-for=#{store.payments.statement.channels.remove.for('{0}')},
                                       data-text-removed=#{store.payments.statement.channels.removed('{0}')},
                                       data-text-invalid=#{store.payments.statement.channels.invalid},
                                       data-text-net=#{store.payments.statement.channels.fees.net},
@@ -292,6 +290,8 @@
                     <div class="cl-dialog-actions">
                         <button type="submit" class="cl-button is-primary" data-cl-payout-apply></button>
                         <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                        <button type="button" class="cl-link-button is-danger cl-dialog-actions-end" data-cl-payout-remove hidden
+                                th:text="#{store.payments.statement.channels.remove}"></button>
                     </div>
                 </form>
             </dialog>

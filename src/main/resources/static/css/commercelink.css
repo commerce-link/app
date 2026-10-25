@@ -14012,8 +14012,8 @@ a.cl-link-button:hover {
     min-width: 180px;
 }
 
-/* payout-rows.js hides the row fields, the empty-list note and the fee fields of its dialog; .cl-field and the notes
-   carry display rules of their own, which would win over the browser's [hidden] */
+/* payout-rows.js hides the row fields, the empty-list note, and the fee fields and the Remove button of its dialog;
+   .cl-field, the notes and .cl-link-button carry display rules of their own, which would win over the browser's [hidden] */
 .cl-page [data-cl-payout-rows] [hidden],
 .cl-page #payout-row-dialog [hidden] {
     display: none;

@@ -322,17 +322,22 @@ public class BankStatementFormatForm {
     }
 
     /**
-     * The rates a row names, percentages above 0 and below 100 separated by semicolons or spaces ("2; 4"), or null when
-     * blank or not such a list. A few at most: every rate multiplies the ways a batch of orders can add up.
+     * The rates a row names, percentages above 0 and below 100 separated by semicolons ("2; 4,5"), or null when blank or
+     * not such a list. Only a semicolon separates them, since a comma or a dot is the decimal mark; "2 4" is refused
+     * rather than read as 24. A few at most: every rate multiplies the ways a batch of orders can add up.
      */
     private static List<Double> feeRates(String value) {
         if (StringUtils.isBlank(value)) {
             return null;
         }
         List<Double> rates = new ArrayList<>();
-        for (String part : value.trim().split("[;\\s]+")) {
+        for (String typed : value.split(";")) {
+            String part = typed.trim();
             if (part.isEmpty()) {
                 continue;
+            }
+            if (!part.matches("\\d+([.,]\\d+)?")) {
+                return null;
             }
             Double rate = FormNumbers.decimal(part).filter(read -> read > 0 && read < 100).orElse(null);
             if (rate == null) {

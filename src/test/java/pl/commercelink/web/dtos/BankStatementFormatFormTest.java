@@ -165,7 +165,8 @@ class BankStatementFormatFormTest {
         // given
         BankStatementFormatForm form = filled();
         List<BankStatementFormatForm.ChannelRow> rows = new ArrayList<>();
-        for (String rates : List.of("2; dwa", "0", "2; 150", "1; 2; 3; 4; 5; 6")) {
+        // "2 4" has no semicolon: a comma or a dot is the decimal mark, so only a semicolon separates the rates
+        for (String rates : List.of("2; dwa", "0", "2; 150", "1; 2; 3; 4; 5; 6", "2 4")) {
             BankStatementFormatForm.ChannelRow row = row("BNP PARIBAS", "SHOP", "", true);
             row.setFeeRates(rates);
             rows.add(row);
@@ -174,7 +175,7 @@ class BankStatementFormatFormTest {
 
         // when / then
         assertThat(form.validate()).containsOnlyKeys("channel-0-feeRates", "channel-1-feeRates", "channel-2-feeRates",
-                "channel-3-feeRates");
+                "channel-3-feeRates", "channel-4-feeRates");
     }
 
     @Test

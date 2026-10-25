@@ -165,7 +165,8 @@ class StatementTemplatesTest {
                 .contains("name=\"channels[0].feeRates\"");
         // with JavaScript the rows are a list edited in a dialog; the fields stay as what is posted, plus a blank row to copy
         assertThat(html).contains("id=\"payout-row-dialog\"").contains("data-cl-dialog-open=\"payout-row-dialog\"")
-                .contains("Dodaj wypłatę zbiorczą").contains("name=\"channels[@INDEX@].match\"")
+                .contains("Dodaj płatnika").contains("name=\"channels[@INDEX@].match\"")
+                .containsPattern("class=\"cl-link-button is-danger cl-dialog-actions-end\" data-cl-payout-remove hidden")
                 .contains("/js/dialog.js").contains("/js/payout-rows.js");
         // a refused row keeps its message next to its field, where the dialog reads it from
         assertThat(html).containsPattern("class=\"cl-input is-invalid\"[^>]*id=\"channel-0-match\"")

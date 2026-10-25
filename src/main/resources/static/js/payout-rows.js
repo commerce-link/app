@@ -1,6 +1,7 @@
-// The payout rows of a statement format (store-bank-statement.html) as a list edited in a dialog. The rows' fields
-// ([data-cl-payout-fields], the editable table without JavaScript) stay in the form, hidden, and are what is posted:
-// adding, editing and removing a row only change them, and the rows are saved with the format ("Zapisz format"). A row
+// The payout rows of a statement format (store-bank-statement.html) as a list edited in a dialog, which also removes a
+// row. The rows' fields ([data-cl-payout-fields], the editable table without JavaScript) stay in the form, hidden, and
+// are what is posted: adding, editing and removing a row only change them, and the rows are saved with the format
+// ("Zapisz format"). A row
 // the server refused keeps its error messages in its fields; the list marks it and its dialog shows them, and the links
 // of the error summary open it.
 (function () {
@@ -23,6 +24,7 @@
     var form = dialog.querySelector('[data-cl-payout-form]');
     var title = dialog.querySelector('.cl-dialog-title');
     var apply = dialog.querySelector('[data-cl-payout-apply]');
+    var removeButton = dialog.querySelector('[data-cl-payout-remove]');
     var PROPERTIES = ['match', 'source', 'method', 'netOfFees', 'feeRates', 'maxFeePercent'];
     var MAX_RATES = 4;
     // the row being edited; null while a new one is added
@@ -162,13 +164,7 @@
             edit.setAttribute('data-cl-dialog-open', dialog.id);
             edit.setAttribute('data-cl-payout-edit', String(index));
             edit.setAttribute('aria-label', format(root.getAttribute('data-text-edit-for'), values.match));
-            var remove = element('button', 'cl-link-button is-danger', root.getAttribute('data-text-remove'));
-            remove.type = 'button';
-            remove.setAttribute('data-cl-payout-remove', String(index));
-            remove.setAttribute('aria-label', format(root.getAttribute('data-text-remove-for'), values.match));
             actions.appendChild(edit);
-            actions.appendChild(document.createTextNode(' '));
-            actions.appendChild(remove);
             line.appendChild(actions);
             listBody.appendChild(line);
         });
@@ -186,10 +182,14 @@
         return /^\d+([.,]\d+)?$/.test(text) ? Number(text.replace(',', '.')) : NaN;
     }
 
-    // the same rules as BankStatementFormatForm.feeRates and feeLimit; the server checks them again on save
+    // the same rules as BankStatementFormatForm.feeRates and feeLimit; the server checks them again on save. Only a
+    // semicolon separates the rates: a comma or a dot is the decimal mark, so "2 4" is refused, not read as 24
     function ratesValid(text) {
         var rates = [];
-        var valid = text.split(/[;\s]+/).filter(Boolean).every(function (part) {
+        var parts = text.split(';').map(function (part) {
+            return part.trim();
+        }).filter(Boolean);
+        var valid = parts.every(function (part) {
             var rate = percent(part);
             if (rate > 0 && rate < 100) {
                 if (rates.indexOf(rate) < 0) {
@@ -263,6 +263,7 @@
         });
         title.textContent = dialog.getAttribute(editing ? 'data-title-edit' : 'data-title-add');
         apply.textContent = dialog.getAttribute(editing ? 'data-submit-edit' : 'data-submit-add');
+        removeButton.hidden = !editing;
         showErrors(editing ? serverErrors(editing) : {});
         showFees();
     });
@@ -307,21 +308,20 @@
         }
     });
 
-    listBody.addEventListener('click', function (event) {
-        var button = event.target.closest('[data-cl-payout-remove]');
-        if (!button) {
+    // nothing is deleted until the format is saved, so the row goes without a confirmation
+    removeButton.addEventListener('click', function () {
+        if (!editing) {
             return;
         }
-        var index = Number(button.getAttribute('data-cl-payout-remove'));
-        var row = rows()[index];
-        if (!row) {
-            return;
-        }
-        var match = rowValues(row).match;
-        row.remove();
+        var index = rows().indexOf(editing);
+        var match = rowValues(editing).match;
+        editing.remove();
+        editing = null;
         renumber();
         render();
         changed(format(root.getAttribute('data-text-removed'), match));
+        dialog.close();
+        // the edit button that opened the dialog is gone with its row: the focus goes to the next row, or to "Add"
         var next = listBody.querySelectorAll('[data-cl-payout-edit]');
         var target = next[Math.min(index, next.length - 1)] || list.querySelector('[data-cl-dialog-open]');
         target.focus();
