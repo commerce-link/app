@@ -14006,10 +14006,17 @@ a.cl-link-button:hover {
     min-width: 0;
 }
 
-/* the payers' rows are edited in the table: its fields keep a readable width and the table scrolls instead */
+/* without JavaScript the payers' rows are edited in the table: its fields keep a readable width and the table scrolls */
 .cl-page .cl-statement-scroll.is-fields .cl-input,
 .cl-page .cl-statement-scroll.is-fields .cl-select {
     min-width: 180px;
+}
+
+/* payout-rows.js hides the row fields, the empty-list note and the fee fields of its dialog; .cl-field and the notes
+   carry display rules of their own, which would win over the browser's [hidden] */
+.cl-page [data-cl-payout-rows] [hidden],
+.cl-page #payout-row-dialog [hidden] {
+    display: none;
 }
 
 .cl-page .cl-table.is-statement {

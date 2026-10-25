@@ -113,7 +113,8 @@ class StatementTemplatesTest {
                 messages(), PL);
         Context context = new Context(PL);
         context.setVariable("form", form);
-        context.setVariable("errors", Map.of("dateFormat", "store.payments.statement.error.dateFormat"));
+        context.setVariable("errors", Map.of("dateFormat", "store.payments.statement.error.dateFormat",
+                "channel-0-match", "store.payments.statement.error.channelMatch"));
         context.setVariable("preview", preview);
         context.setVariable("headers", preview.headers());
         context.setVariable("encodings", List.of(new PickerOption("windows-1250", "windows-1250")));
@@ -139,6 +140,13 @@ class StatementTemplatesTest {
         // a payout row is told apart by its source and method only; matching the payer by name is enough
         assertThat(html).doesNotContain("channels[0].provider").contains("name=\"channels[0].maxFeePercent\"")
                 .contains("name=\"channels[0].feeRates\"");
+        // with JavaScript the rows are a list edited in a dialog; the fields stay as what is posted, plus a blank row to copy
+        assertThat(html).contains("id=\"payout-row-dialog\"").contains("data-cl-dialog-open=\"payout-row-dialog\"")
+                .contains("Dodaj wypłatę zbiorczą").contains("name=\"channels[@INDEX@].match\"")
+                .contains("/js/dialog.js").contains("/js/payout-rows.js");
+        // a refused row keeps its message next to its field, where the dialog reads it from
+        assertThat(html).containsPattern("class=\"cl-input is-invalid\"[^>]*id=\"channel-0-match\"")
+                .containsPattern("id=\"channel-0-match\"[\\s\\S]{0,400}Podaj tekst, po którym rozpoznamy płatnika.");
         // the direction is named as on the payment dialogs
         assertThat(html).contains(">Przychodząca<").doesNotContain("Wpływ");
         // one step: the file is read as soon as it is chosen, sent with the preview button; its own button only without JavaScript
