@@ -237,7 +237,8 @@ public class StatementMatcher {
      * A payout: proposed only when exactly one set of the payer's orders adds up to the transfer, a run of them by order
      * date - payers settle a continuous period. The run is looked for among the orders of each row of the payer, and
      * among all of them together (a bank paying for loans of the shop and of the call centre in one transfer). Each
-     * order's fee counts as its first row of the payer says. Anything less certain is left to the operator.
+     * order's fee counts as its first row of the payer says: the recorded one, or one of the row's rates, each order at
+     * its own - and only one way of them adding up counts as a proposal. Anything less certain is left to the operator.
      */
     private OperationMatch payout(BankOperation operation, List<PayoutChannel> payer) {
         Map<String, PayoutChannel> rowOf = new LinkedHashMap<>();
@@ -248,27 +249,25 @@ public class StatementMatcher {
                 orders.add(receivable);
             });
         }
-        Set<List<Receivable>> proposals = new LinkedHashSet<>();
+        Set<List<Allocation>> proposals = new LinkedHashSet<>();
+        boolean decided = true;
         for (PayoutChannel row : payer) {
-            proposals.addAll(runs(orders.stream().filter(receivable -> rowOf.get(receivable.order().getOrderId()) == row).toList(),
-                    operation.amount(), rowOf));
+            decided &= addRuns(proposals, orders.stream()
+                    .filter(receivable -> rowOf.get(receivable.order().getOrderId()) == row).toList(), operation.amount(), rowOf);
         }
         if (payer.size() > 1) {
-            proposals.addAll(runs(orders, operation.amount(), rowOf));
+            decided &= addRuns(proposals, orders, operation.amount(), rowOf);
         }
         List<String> candidates = orders.stream().map(receivable -> receivable.order().getOrderId()).toList();
         OperationMatch named = namedPayout(operation, payer, rowOf, candidates);
         if (named != null) {
             return named;
         }
-        if (proposals.size() != 1) {
+        if (!decided || proposals.size() != 1) {
             return result(operation, MatchKind.PAYOUT, MatchRule.PAYOUT, List.of(), candidates, payer,
                     EnumSet.of(MatchWarning.NO_PAYOUT_PROPOSAL), null, List.of());
         }
-        List<Allocation> allocations = proposals.iterator().next().stream()
-                .map(receivable -> new Allocation(receivable.order().getOrderId(), receivable.remaining(),
-                        PayoutChannels.fee(rowOf.get(receivable.order().getOrderId()), receivable.pending())))
-                .toList();
+        List<Allocation> allocations = proposals.iterator().next();
         settle(allocations);
         return result(operation, MatchKind.PAYOUT, MatchRule.PAYOUT, allocations, candidates, payer,
                 EnumSet.noneOf(MatchWarning.class), null, List.of());
@@ -277,8 +276,9 @@ public class StatementMatcher {
     /**
      * A payout whose title names its orders by their order, document or reference number (a gateway that pays out each
      * payment on its own names the payment). Those orders are the proposal, whether the payer's rows describe them or
-     * not. One named order that owes more than a payer deducting its fees sent has had the difference kept as the fee,
-     * to check when it is above the row's fee limit; otherwise a payout that does not add up is proposed with the
+     * not. Orders whose rows have fee rates are paid out at the one combination of the rates that adds up, when there is
+     * exactly one. One named order that owes more than a payer deducting its fees sent has had the difference kept as the
+     * fee, to check when it is above the row's fee limit; otherwise a payout that does not add up is proposed with the
      * difference to check.
      */
     private OperationMatch namedPayout(BankOperation operation, List<PayoutChannel> payer, Map<String, PayoutChannel> rowOf,
@@ -308,7 +308,10 @@ public class StatementMatcher {
         Set<MatchWarning> warnings = EnumSet.noneOf(MatchWarning.class);
         BigDecimal difference = null;
         int comparison = operation.amount().compareTo(paidOut);
-        if (comparison != 0) {
+        List<Allocation> atRates = comparison == 0 ? null : withFees(named, operation.amount(), rowOf, payer.get(0));
+        if (atRates != null) {
+            allocations = atRates;
+        } else if (comparison != 0) {
             Receivable only = named.get(0);
             PayoutChannel row = rowOf.getOrDefault(only.order().getOrderId(), payer.get(0));
             if (named.size() == 1 && row.isNetOfFees() && comparison < 0) {
@@ -330,26 +333,41 @@ public class StatementMatcher {
         return result(operation, MatchKind.PAYOUT, rule, allocations, candidates, payer, warnings, difference, texts);
     }
 
-    /** At most two runs of the orders, taken by order date, whose payouts add up to the amount: two are already too many. */
-    private static List<List<Receivable>> runs(List<Receivable> orders, BigDecimal amount, Map<String, PayoutChannel> rowOf) {
-        List<List<Receivable>> runs = new ArrayList<>();
-        for (int start = 0; start < orders.size() && runs.size() < 2; start++) {
-            BigDecimal sum = ZERO;
-            for (int end = start; end < orders.size(); end++) {
+    /**
+     * Adds the runs of the orders, taken by order date, whose payouts add up to the amount, each run with the fees that
+     * make it; stops at two, as two are already too many. False when the search was given up, so nothing it found can
+     * be trusted as the only way.
+     */
+    private static boolean addRuns(Set<List<Allocation>> proposals, List<Receivable> orders, BigDecimal amount,
+                                   Map<String, PayoutChannel> rowOf) {
+        for (int start = 0; start < orders.size() && proposals.size() < 2; start++) {
+            PayoutSums sums = new PayoutSums(amount);
+            for (int end = start; end < orders.size() && !sums.exhausted(); end++) {
                 Receivable receivable = orders.get(end);
-                sum = sum.add(PayoutChannels.payout(rowOf.get(receivable.order().getOrderId()), receivable.remaining(),
-                        receivable.pending()));
-                int comparison = sum.compareTo(amount);
-                if (comparison == 0) {
-                    runs.add(List.copyOf(orders.subList(start, end + 1)));
-                    break;
+                sums.add(receivable.order().getOrderId(), receivable.remaining(),
+                        feesOf(receivable, rowOf.get(receivable.order().getOrderId())));
+                if (sums.undecided()) {
+                    return false;
                 }
-                if (comparison > 0) {
-                    break;
-                }
+                proposals.addAll(sums.exact());
             }
         }
-        return runs;
+        return true;
+    }
+
+    /** The one way the named orders, all of them, add up to the amount with the fees their rows allow, or null. */
+    private static List<Allocation> withFees(List<Receivable> named, BigDecimal amount, Map<String, PayoutChannel> rowOf,
+                                             PayoutChannel fallback) {
+        PayoutSums sums = new PayoutSums(amount);
+        for (Receivable receivable : named) {
+            sums.add(receivable.order().getOrderId(), receivable.remaining(),
+                    feesOf(receivable, rowOf.getOrDefault(receivable.order().getOrderId(), fallback)));
+        }
+        return !sums.undecided() && sums.exact().size() == 1 ? sums.exact().get(0) : null;
+    }
+
+    private static List<BigDecimal> feesOf(Receivable receivable, PayoutChannel row) {
+        return PayoutChannels.fees(row, receivable.remaining(), receivable.pending());
     }
 
     private OperationMatch byAmount(BankOperation operation) {

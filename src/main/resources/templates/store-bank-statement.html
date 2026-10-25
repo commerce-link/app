@@ -145,6 +145,7 @@
                                     <th scope="col" th:text="#{store.payments.statement.channels.source}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.method}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.net}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.feeRates}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.feeLimit}"></th>
                                 </tr>
                                 </thead>
@@ -153,6 +154,7 @@
                                     th:with="matchId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'match')},
                                              sourceId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'source')},
                                              methodId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'method')},
+                                             feeRatesId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'feeRates')},
                                              feeLimitId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'maxFeePercent')}">
                                     <td>
                                         <input class="cl-input" type="text" autocomplete="off" th:id="${matchId}"
@@ -193,6 +195,17 @@
                                             <input type="checkbox" value="true" th:name="|channels[${s.index}].netOfFees|" th:checked="${channel.netOfFees}"/>
                                             <span th:text="#{store.payments.statement.channels.net.short}"></span>
                                         </label>
+                                    </td>
+                                    <td>
+                                        <input class="cl-input is-qty" type="text" autocomplete="off" th:id="${feeRatesId}"
+                                               th:name="|channels[${s.index}].feeRates|" th:value="${channel.feeRates}"
+                                               th:placeholder="#{store.payments.statement.channels.feeRates.placeholder}"
+                                               th:classappend="${errors[feeRatesId] != null} ? 'is-invalid'"
+                                               th:attr="aria-label=#{store.payments.statement.channels.feeRates}, aria-invalid=${errors[feeRatesId] != null ? 'true' : null}"/>
+                                        <p th:if="${errors[feeRatesId] != null}" class="cl-field-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors[feeRatesId]}}"></span>
+                                        </p>
                                     </td>
                                     <td>
                                         <input class="cl-input is-qty" type="text" inputmode="decimal" autocomplete="off" th:id="${feeLimitId}"

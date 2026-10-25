@@ -152,7 +152,7 @@ public class StatementPageFactoryTest {
         // given
         Store store = store();
         store.getBankAccounts().get(0).getStatementFormat().getPayoutChannels()
-                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, null));
+                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, null, null));
         Order paid = new Order("store-1");
         paid.setOrderId("e04b3d19-0000-4000-8000-000000000009");
         paid.setTotalPrice(15600.00);
@@ -187,7 +187,7 @@ public class StatementPageFactoryTest {
         // given
         Store store = store();
         store.getBankAccounts().get(0).getStatementFormat().getPayoutChannels()
-                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, 2.0));
+                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, 2.0, null));
         Order paid = new Order("store-1");
         paid.setOrderId("e04b3d19-0000-4000-8000-000000000009");
         paid.setTotalPrice(1000.00);

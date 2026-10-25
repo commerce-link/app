@@ -68,7 +68,7 @@ public final class StatementPageFixtures {
         format.setAmountColumn("Kwota");
         format.setTitleColumns(List.of("Tytul"));
         format.setPayoutChannels(new ArrayList<>(List.of(
-                new PayoutChannel("ALLEGRO", "Allegro", null, true, null))));
+                new PayoutChannel("ALLEGRO", "Allegro", null, true, null, null))));
         account.setStatementFormat(format);
         store.setBankAccounts(new ArrayList<>(List.of(account)));
         return store;

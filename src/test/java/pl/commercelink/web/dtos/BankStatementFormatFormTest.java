@@ -144,6 +144,57 @@ class BankStatementFormatFormTest {
     }
 
     @Test
+    void storesTheFeeRatesAndShowsThemAsTyped() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow bnp = row("BNP PARIBAS", "SHOP", "Installments", true);
+        bnp.setFeeRates(" 2;4,5 ");
+        form.setChannels(new ArrayList<>(List.of(bnp)));
+
+        // when
+        BankStatementFormat format = form.toFormat();
+
+        // then
+        assertThat(form.validate()).isEmpty();
+        assertThat(format.getPayoutChannels().get(0).getFeeRates()).containsExactly(2.0, 4.5);
+        assertThat(BankStatementFormatForm.from(format).getChannels().get(0).getFeeRates()).isEqualTo("2; 4,5");
+    }
+
+    @Test
+    void refusesFeeRatesThatAreNoPercentages() {
+        // given
+        BankStatementFormatForm form = filled();
+        List<BankStatementFormatForm.ChannelRow> rows = new ArrayList<>();
+        for (String rates : List.of("2; dwa", "0", "2; 150", "1; 2; 3; 4; 5; 6")) {
+            BankStatementFormatForm.ChannelRow row = row("BNP PARIBAS", "SHOP", "", true);
+            row.setFeeRates(rates);
+            rows.add(row);
+        }
+        form.setChannels(rows);
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("channel-0-feeRates", "channel-1-feeRates", "channel-2-feeRates",
+                "channel-3-feeRates");
+    }
+
+    @Test
+    void feeRatesAndTheFeeLimitAskForATransferNetOfFees() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow rates = row("BNP PARIBAS", "SHOP", "", false);
+        rates.setFeeRates("2; 4");
+        BankStatementFormatForm.ChannelRow limit = row("PAYNOW", "SHOP", "", false);
+        limit.setMaxFeePercent("1");
+        form.setChannels(new ArrayList<>(List.of(rates, limit)));
+
+        // when / then
+        assertThat(form.validate())
+                .containsEntry("channel-0-feeRates", "store.payments.statement.error.channelNetOfFees")
+                .containsEntry("channel-1-maxFeePercent", "store.payments.statement.error.channelNetOfFees")
+                .hasSize(2);
+    }
+
+    @Test
     void aGuessKeepsTheChannelsAndTheSample() {
         // given
         BankStatementFormatForm form = BankStatementFormatForm.defaults();

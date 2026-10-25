@@ -8,6 +8,7 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.PayoutChannel;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -57,9 +58,18 @@ public final class PayoutChannels {
         return row.getMethod() == null || (payment != null && payment.getSource() == row.getMethod());
     }
 
-    /** What the payer transfers for an order that still owes remaining: less the fee it keeps, when it keeps one. */
-    public static BigDecimal payout(PayoutChannel row, BigDecimal remaining, Payment pending) {
-        return remaining.subtract(fee(row, pending));
+    /**
+     * The fees the payer may have kept from an order that owes remaining: one per rate of a row with rates, each
+     * rounded half up to the grosz as the bank rounds each loan's fee, else the one {@link #fee} gives.
+     */
+    public static List<BigDecimal> fees(PayoutChannel row, BigDecimal remaining, Payment pending) {
+        if (row == null || !row.isNetOfFees() || row.getFeeRates() == null || row.getFeeRates().isEmpty()) {
+            return List.of(fee(row, pending));
+        }
+        return row.getFeeRates().stream()
+                .map(rate -> remaining.multiply(BigDecimal.valueOf(rate)).divide(HUNDRED, 2, RoundingMode.HALF_UP))
+                .distinct()
+                .toList();
     }
 
     /** Whether a fee worked out from the difference is within the row's limit, a percentage of what the order owes. */

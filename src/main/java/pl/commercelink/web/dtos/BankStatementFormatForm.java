@@ -14,14 +14,16 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * The CSV format of one bank account's statements, on its own settings page. The sample file is not stored: once
  * uploaded it travels with the form (sampleData, Base64) so the preview can be refreshed after a change without
  * choosing the file again. Payout rows are a payer's text and the orders it settles (their source and payment method,
- * each blank for any) with whether it deducts its fees and up to what percentage of an order a difference is taken as
- * the fee; a row left blank is ignored, and the page always offers empty rows to add one without a script.
+ * each blank for any) with whether it deducts its fees, up to what percentage of an order a difference is taken as the
+ * fee and the rates it may deduct; a row left blank is ignored, and the page always offers empty rows to add one
+ * without a script.
  */
 @Getter
 @Setter
@@ -37,6 +39,7 @@ public class BankStatementFormatForm {
     public static final String DOT = "dot";
     public static final int EMPTY_CHANNEL_ROWS = 2;
     private static final int MAX_HEADER_ROW = 500;
+    private static final int MAX_FEE_RATES = 4;
     private static final int TITLE_COLUMNS = 3;
 
     private String encoding;
@@ -69,18 +72,20 @@ public class BankStatementFormatForm {
         private String method;
         private boolean netOfFees;
         private String maxFeePercent;
+        private String feeRates;
 
         ChannelRow(PayoutChannel channel) {
             this.match = channel.getMatch();
             this.source = channel.getOrderSource();
             this.method = channel.getMethod() == null ? null : channel.getMethod().name();
             this.netOfFees = channel.isNetOfFees();
-            this.maxFeePercent = channel.getMaxFeePercent() == null ? null
-                    : BigDecimal.valueOf(channel.getMaxFeePercent()).stripTrailingZeros().toPlainString().replace('.', ',');
+            this.maxFeePercent = channel.getMaxFeePercent() == null ? null : percent(channel.getMaxFeePercent());
+            this.feeRates = channel.getFeeRates() == null || channel.getFeeRates().isEmpty() ? null
+                    : channel.getFeeRates().stream().map(BankStatementFormatForm::percent).collect(Collectors.joining("; "));
         }
 
         boolean isBlank() {
-            return StringUtils.isAllBlank(match, source, method, maxFeePercent);
+            return StringUtils.isAllBlank(match, source, method, maxFeePercent, feeRates);
         }
 
         /** A row that names no source or method would offer every open order for the payer's transfers. */
@@ -221,11 +226,25 @@ public class BankStatementFormatForm {
             } else if (channelRow.describesNoOrders()) {
                 errors.put(channelField(index, "source"), "store.payments.statement.error.channelOrders");
             }
-            if (StringUtils.isNotBlank(channelRow.getMaxFeePercent()) && feeLimit(channelRow.getMaxFeePercent()) == null) {
-                errors.put(channelField(index, "maxFeePercent"), "store.payments.statement.error.channelFeeLimit");
-            }
+            validateFeeSetting(errors, index, channelRow, "maxFeePercent", channelRow.getMaxFeePercent(),
+                    feeLimit(channelRow.getMaxFeePercent()), "store.payments.statement.error.channelFeeLimit");
+            validateFeeSetting(errors, index, channelRow, "feeRates", channelRow.getFeeRates(),
+                    feeRates(channelRow.getFeeRates()), "store.payments.statement.error.channelFeeRates");
         }
         return errors;
+    }
+
+    /** A fee limit or fee rates have to be readable, and only mean something for a transfer net of fees. */
+    private static void validateFeeSetting(Map<String, String> errors, int index, ChannelRow channelRow, String property,
+                                           String typed, Object read, String unreadableKey) {
+        if (StringUtils.isBlank(typed)) {
+            return;
+        }
+        if (read == null) {
+            errors.put(channelField(index, property), unreadableKey);
+        } else if (!channelRow.isNetOfFees()) {
+            errors.put(channelField(index, property), "store.payments.statement.error.channelNetOfFees");
+        }
     }
 
     /** The format to store. Call only after {@link #validate()} found nothing. */
@@ -251,7 +270,8 @@ public class BankStatementFormatForm {
         format.setPayoutChannels(new ArrayList<>(channels.stream()
                 .filter(channelRow -> channelRow != null && !channelRow.isBlank() && StringUtils.isNotBlank(channelRow.getMatch()))
                 .map(channelRow -> new PayoutChannel(channelRow.getMatch().trim(), StringUtils.trimToNull(channelRow.getSource()),
-                        method(channelRow.getMethod()), channelRow.isNetOfFees(), feeLimit(channelRow.getMaxFeePercent())))
+                        method(channelRow.getMethod()), channelRow.isNetOfFees(), feeLimit(channelRow.getMaxFeePercent()),
+                        feeRates(channelRow.getFeeRates())))
                 .toList()));
         return format;
     }
@@ -299,6 +319,35 @@ public class BankStatementFormatForm {
     /** The percentage a row's fee limit names (above 0, up to 100), or null when blank or not such a percentage. */
     private static Double feeLimit(String value) {
         return FormNumbers.decimal(value).filter(limit -> limit > 0 && limit <= 100).orElse(null);
+    }
+
+    /**
+     * The rates a row names, percentages above 0 and below 100 separated by semicolons or spaces ("2; 4"), or null when
+     * blank or not such a list. A few at most: every rate multiplies the ways a batch of orders can add up.
+     */
+    private static List<Double> feeRates(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        List<Double> rates = new ArrayList<>();
+        for (String part : value.trim().split("[;\\s]+")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            Double rate = FormNumbers.decimal(part).filter(read -> read > 0 && read < 100).orElse(null);
+            if (rate == null) {
+                return null;
+            }
+            if (!rates.contains(rate)) {
+                rates.add(rate);
+            }
+        }
+        return rates.isEmpty() || rates.size() > MAX_FEE_RATES ? null : rates;
+    }
+
+    /** A percentage as the form shows it: "2", "1,5". */
+    private static String percent(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', ',');
     }
 
     private Integer headerRowNumber() {
