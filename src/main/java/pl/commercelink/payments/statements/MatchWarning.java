@@ -13,5 +13,7 @@ public enum MatchWarning {
     /** The title names an order that is already paid (or closed). */
     ORDER_ALREADY_PAID,
     /** The payout's orders could not be told by their sum; the operator picks them. */
-    NO_PAYOUT_PROPOSAL
+    NO_PAYOUT_PROPOSAL,
+    /** The fee worked out as the difference is above the payer row's limit: maybe a part payment rather than a fee. */
+    FEE_ABOVE_LIMIT
 }

@@ -110,6 +110,40 @@ class BankStatementFormatFormTest {
     }
 
     @Test
+    void storesTheFeeLimitAndShowsItAsTyped() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow paynow = row("PAYNOW", "SHOP", "OnlinePayment", true);
+        paynow.setMaxFeePercent("1,5");
+        form.setChannels(new ArrayList<>(List.of(paynow)));
+
+        // when
+        BankStatementFormat format = form.toFormat();
+
+        // then
+        assertThat(form.validate()).isEmpty();
+        assertThat(format.getPayoutChannels().get(0).getMaxFeePercent()).isEqualTo(1.5);
+        assertThat(BankStatementFormatForm.from(format).getChannels().get(0).getMaxFeePercent()).isEqualTo("1,5");
+    }
+
+    @Test
+    void refusesAFeeLimitThatIsNoPercentage() {
+        // given
+        BankStatementFormatForm form = filled();
+        List<BankStatementFormatForm.ChannelRow> rows = new ArrayList<>();
+        for (String limit : List.of("dwa", "0", "100,5")) {
+            BankStatementFormatForm.ChannelRow row = row("PAYNOW", "SHOP", "", true);
+            row.setMaxFeePercent(limit);
+            rows.add(row);
+        }
+        form.setChannels(rows);
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("channel-0-maxFeePercent", "channel-1-maxFeePercent",
+                "channel-2-maxFeePercent");
+    }
+
+    @Test
     void aGuessKeepsTheChannelsAndTheSample() {
         // given
         BankStatementFormatForm form = BankStatementFormatForm.defaults();

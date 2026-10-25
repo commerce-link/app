@@ -152,7 +152,7 @@ public class StatementPageFactoryTest {
         // given
         Store store = store();
         store.getBankAccounts().get(0).getStatementFormat().getPayoutChannels()
-                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true));
+                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, null));
         Order paid = new Order("store-1");
         paid.setOrderId("e04b3d19-0000-4000-8000-000000000009");
         paid.setTotalPrice(15600.00);
@@ -180,6 +180,41 @@ public class StatementPageFactoryTest {
             assertThat(ref.detail()).isEqualTo("do zapłaty 15\u00a0600,00\u00a0PLN · prowizja 35,15\u00a0PLN");
         });
         assertThat(row.paymentType()).isEqualTo("Płatność online · PayNow");
+    }
+
+    @Test
+    void aPayoutWhoseFeeIsAboveTheLimitShowsItsOrderAndWaitsForTheOperator() {
+        // given
+        Store store = store();
+        store.getBankAccounts().get(0).getStatementFormat().getPayoutChannels()
+                .add(new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, 2.0));
+        Order paid = new Order("store-1");
+        paid.setOrderId("e04b3d19-0000-4000-8000-000000000009");
+        paid.setTotalPrice(1000.00);
+        Payment pending = new Payment(PaymentSource.OnlinePayment);
+        pending.setName("PayNow");
+        pending.setReferenceNo("P53V-ON8-ZAS-ESB");
+        paid.setPayments(new ArrayList<>(List.of(pending)));
+        List<Order> orders = new ArrayList<>(openOrders());
+        orders.add(paid);
+        stub(ordersRepository, orders);
+        BankOperation transfer = operation(20, "WB-PAYNOW", "500.00", "MBANK S.A. PAYNOW, PLATNOSC NR: P53V-ON8-ZAS-ESB", "");
+        StatementPageFactory.Statement statement = new StatementPageFactory.Statement(store.getBankAccounts().get(0),
+                "paynow.csv", List.of(transfer), 0, 0, List.of());
+
+        // when
+        StatementPage page = factory.page(store, statement, Map.of(), List.of(), PL);
+
+        // then
+        StatementPage.Row row = row(page, "WB-PAYNOW");
+        assertThat(row.group()).isEqualTo("PAYOUT");
+        assertThat(row.selected()).isFalse();
+        assertThat(row.warnings()).singleElement().satisfies(pill -> {
+            assertThat(pill.label()).isEqualTo("Prowizja 500,00 PLN powyżej limitu płatnika");
+            assertThat(pill.tone()).isEqualTo("is-warn");
+        });
+        assertThat(row.orders()).singleElement().satisfies(ref ->
+                assertThat(ref.detail()).isEqualTo("do zapłaty 1 000,00 PLN · prowizja 500,00 PLN"));
     }
 
     @Test

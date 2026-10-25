@@ -16,6 +16,8 @@ import java.util.Optional;
 /** Which payout rows an operation comes from and which orders such a row settles. */
 public final class PayoutChannels {
 
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+
     private PayoutChannels() {
     }
 
@@ -58,6 +60,12 @@ public final class PayoutChannels {
     /** What the payer transfers for an order that still owes remaining: less the fee it keeps, when it keeps one. */
     public static BigDecimal payout(PayoutChannel row, BigDecimal remaining, Payment pending) {
         return remaining.subtract(fee(row, pending));
+    }
+
+    /** Whether a fee worked out from the difference is within the row's limit, a percentage of what the order owes. */
+    public static boolean withinFeeLimit(PayoutChannel row, BigDecimal fee, BigDecimal owed) {
+        Double limit = row.getMaxFeePercent();
+        return limit == null || fee.multiply(HUNDRED).compareTo(owed.multiply(BigDecimal.valueOf(limit))) <= 0;
     }
 
     public static BigDecimal fee(PayoutChannel row, Payment pending) {

@@ -137,7 +137,7 @@ class StatementTemplatesTest {
                 .contains("159,00").contains("Wczytany plik: wyciag.csv").contains("name=\"channels[0].match\"")
                 .contains("Wybierz format daty z listy.");
         // a payout row is told apart by its source and method only; matching the payer by name is enough
-        assertThat(html).doesNotContain("channels[0].provider");
+        assertThat(html).doesNotContain("channels[0].provider").contains("name=\"channels[0].maxFeePercent\"");
         // the direction is named as on the payment dialogs
         assertThat(html).contains(">Przychodząca<").doesNotContain("Wpływ");
         // one step: the file is read as soon as it is chosen, sent with the preview button; its own button only without JavaScript

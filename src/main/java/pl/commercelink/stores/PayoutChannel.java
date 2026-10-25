@@ -17,7 +17,9 @@ import pl.commercelink.orders.PaymentSource;
  * <p>
  * Every criterion left empty means any: {@code orderSource} is {@link #SHOP} for the store's own orders or a
  * marketplace's name, {@code method} the payment method the order waits for. With {@code netOfFees} the transfer is
- * the orders' amounts less the fees recorded on their payments.
+ * the orders' amounts less the fees recorded on their payments; when it names one order and brings less than that,
+ * the difference is taken as the fee, and above {@code maxFeePercent} of what the order owes (when set) it is left
+ * for the operator to check, being more likely a part payment than a fee.
  */
 @DynamoDBDocument
 @Getter
@@ -37,4 +39,6 @@ public class PayoutChannel {
     private PaymentSource method;
     @DynamoDBAttribute(attributeName = "netOfFees")
     private boolean netOfFees;
+    @DynamoDBAttribute(attributeName = "maxFeePercent")
+    private Double maxFeePercent;
 }

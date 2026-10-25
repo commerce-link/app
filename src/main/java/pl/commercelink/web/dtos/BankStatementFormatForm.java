@@ -8,6 +8,7 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.BankStatementFormat;
 import pl.commercelink.stores.PayoutChannel;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -19,8 +20,8 @@ import java.util.stream.Stream;
  * The CSV format of one bank account's statements, on its own settings page. The sample file is not stored: once
  * uploaded it travels with the form (sampleData, Base64) so the preview can be refreshed after a change without
  * choosing the file again. Payout rows are a payer's text and the orders it settles (their source and payment method,
- * each blank for any) with whether it deducts its fees; a row left blank is ignored, and the page always offers empty
- * rows to add one without a script.
+ * each blank for any) with whether it deducts its fees and up to what percentage of an order a difference is taken as
+ * the fee; a row left blank is ignored, and the page always offers empty rows to add one without a script.
  */
 @Getter
 @Setter
@@ -67,16 +68,19 @@ public class BankStatementFormatForm {
         private String source;
         private String method;
         private boolean netOfFees;
+        private String maxFeePercent;
 
         ChannelRow(PayoutChannel channel) {
             this.match = channel.getMatch();
             this.source = channel.getOrderSource();
             this.method = channel.getMethod() == null ? null : channel.getMethod().name();
             this.netOfFees = channel.isNetOfFees();
+            this.maxFeePercent = channel.getMaxFeePercent() == null ? null
+                    : BigDecimal.valueOf(channel.getMaxFeePercent()).stripTrailingZeros().toPlainString().replace('.', ',');
         }
 
         boolean isBlank() {
-            return StringUtils.isAllBlank(match, source, method);
+            return StringUtils.isAllBlank(match, source, method, maxFeePercent);
         }
 
         /** A row that names no source or method would offer every open order for the payer's transfers. */
@@ -217,6 +221,9 @@ public class BankStatementFormatForm {
             } else if (channelRow.describesNoOrders()) {
                 errors.put(channelField(index, "source"), "store.payments.statement.error.channelOrders");
             }
+            if (StringUtils.isNotBlank(channelRow.getMaxFeePercent()) && feeLimit(channelRow.getMaxFeePercent()) == null) {
+                errors.put(channelField(index, "maxFeePercent"), "store.payments.statement.error.channelFeeLimit");
+            }
         }
         return errors;
     }
@@ -244,7 +251,7 @@ public class BankStatementFormatForm {
         format.setPayoutChannels(new ArrayList<>(channels.stream()
                 .filter(channelRow -> channelRow != null && !channelRow.isBlank() && StringUtils.isNotBlank(channelRow.getMatch()))
                 .map(channelRow -> new PayoutChannel(channelRow.getMatch().trim(), StringUtils.trimToNull(channelRow.getSource()),
-                        method(channelRow.getMethod()), channelRow.isNetOfFees()))
+                        method(channelRow.getMethod()), channelRow.isNetOfFees(), feeLimit(channelRow.getMaxFeePercent())))
                 .toList()));
         return format;
     }
@@ -287,6 +294,11 @@ public class BankStatementFormatForm {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /** The percentage a row's fee limit names (above 0, up to 100), or null when blank or not such a percentage. */
+    private static Double feeLimit(String value) {
+        return FormNumbers.decimal(value).filter(limit -> limit > 0 && limit <= 100).orElse(null);
     }
 
     private Integer headerRowNumber() {

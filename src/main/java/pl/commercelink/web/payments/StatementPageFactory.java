@@ -149,7 +149,7 @@ public class StatementPageFactory {
         String note = null;
         if (booked) {
             match.candidates().forEach(id -> refs.add(orderRef(id, orders, bookedDetail(orders.get(id), operation, locale))));
-        } else if (payout && namedPayout(match)) {
+        } else if (payout && namesItsOrders(match)) {
             allocations.forEach(allocation -> refs.add(orderRef(allocation.orderId(), orders,
                     text(locale, "payments.statement.orders.payoutFee", money(locale, allocation.amount()),
                             money(locale, allocation.fee())))));
@@ -270,8 +270,12 @@ public class StatementPageFactory {
      * as an order number in a customer's transfer, so it is ticked for booking.
      */
     private static boolean namedPayout(OperationMatch match) {
-        return match.kind() == MatchKind.PAYOUT && match.rule() != MatchRule.PAYOUT && match.warnings().isEmpty()
-                && match.hasProposal();
+        return namesItsOrders(match) && match.warnings().isEmpty();
+    }
+
+    /** A payout whose title named its orders: they are shown with their fees, sure or to check. */
+    private static boolean namesItsOrders(OperationMatch match) {
+        return match.kind() == MatchKind.PAYOUT && match.rule() != MatchRule.PAYOUT && match.hasProposal();
     }
 
     /** The payer as the format names it: the text its rows look for, "SANTANDER". */
@@ -299,7 +303,8 @@ public class StatementPageFactory {
         List<Pill> pills = new ArrayList<>();
         for (MatchWarning warning : match.warnings()) {
             String label = switch (warning) {
-                case UNDERPAID, OVERPAID -> text(locale, "payments.statement.warning." + warning.name(), money(locale, match.difference()));
+                case UNDERPAID, OVERPAID, FEE_ABOVE_LIMIT ->
+                        text(locale, "payments.statement.warning." + warning.name(), money(locale, match.difference()));
                 case AMBIGUOUS -> text(locale, "payments.statement.warning.AMBIGUOUS", match.candidates().size());
                 default -> text(locale, "payments.statement.warning." + warning.name());
             };

@@ -277,8 +277,9 @@ public class StatementMatcher {
     /**
      * A payout whose title names its orders by their order, document or reference number (a gateway that pays out each
      * payment on its own names the payment). Those orders are the proposal, whether the payer's rows describe them or
-     * not. One named order that owes more than a payer deducting its fees sent has had the difference kept as the fee;
-     * otherwise a payout that does not add up is proposed with the difference to check.
+     * not. One named order that owes more than a payer deducting its fees sent has had the difference kept as the fee,
+     * to check when it is above the row's fee limit; otherwise a payout that does not add up is proposed with the
+     * difference to check.
      */
     private OperationMatch namedPayout(BankOperation operation, List<PayoutChannel> payer, Map<String, PayoutChannel> rowOf,
                                        List<String> payerOrders) {
@@ -311,8 +312,12 @@ public class StatementMatcher {
             Receivable only = named.get(0);
             PayoutChannel row = rowOf.getOrDefault(only.order().getOrderId(), payer.get(0));
             if (named.size() == 1 && row.isNetOfFees() && comparison < 0) {
-                allocations = List.of(new Allocation(only.order().getOrderId(), only.remaining(),
-                        only.remaining().subtract(operation.amount())));
+                BigDecimal fee = only.remaining().subtract(operation.amount());
+                allocations = List.of(new Allocation(only.order().getOrderId(), only.remaining(), fee));
+                if (!PayoutChannels.withinFeeLimit(row, fee, only.remaining())) {
+                    warnings.add(MatchWarning.FEE_ABOVE_LIMIT);
+                    difference = fee;
+                }
             } else {
                 warnings.add(comparison < 0 ? MatchWarning.UNDERPAID : MatchWarning.OVERPAID);
                 difference = paidOut.subtract(operation.amount()).abs();
