@@ -243,15 +243,35 @@ public final class ClientReturnView {
         return state == ClientReturnState.REJECTED ? StringUtils.trimToNull(rma.getRejectionReason()) : null;
     }
 
+    /** Every card the page shows, in page order: the main column, then the side column. */
     public List<String> cards() {
+        List<String> cards = new ArrayList<>(mainCards());
+        cards.addAll(sideCards());
+        return cards;
+    }
+
+    /**
+     * The left column, read first on a phone: the progress and the products, then the card the state asks to act on (the
+     * booking form, the customer's parcel being booked or awaited). A rejection is the news itself, so its reason leads.
+     */
+    public List<String> mainCards() {
         List<String> cards = new ArrayList<>();
         switch (state) {
-            case BOOK, BOOK_UNAVAILABLE -> add(cards, "form", "progress", "items");
-            case STORE_BOOKS -> add(cards, "progress", addressCard(), "items");
-            case BOOKING, WAITING -> add(cards, parcelCard(), "progress", addressCard(), "items");
-            case ARRIVED -> add(cards, "progress", parcelCard(), "items");
-            case REVIEWING, COMPLETED -> add(cards, "progress", "items", parcelCard());
-            case REJECTED -> add(cards, "reason", parcelCard(), "items");
+            case BOOK, BOOK_UNAVAILABLE -> add(cards, "progress", "items", "form");
+            case BOOKING, WAITING -> add(cards, "progress", "items", parcelCard());
+            case STORE_BOOKS, ARRIVED, REVIEWING, COMPLETED -> add(cards, "progress", "items");
+            case REJECTED -> add(cards, "reason", "items");
+        }
+        return cards;
+    }
+
+    /** The right column, above the seller card: shipments that are not the point of the state, and the pickup address. */
+    public List<String> sideCards() {
+        List<String> cards = new ArrayList<>();
+        switch (state) {
+            case BOOK, BOOK_UNAVAILABLE -> { }
+            case STORE_BOOKS, BOOKING, WAITING -> add(cards, addressCard());
+            case ARRIVED, REVIEWING, COMPLETED, REJECTED -> add(cards, parcelCard());
         }
         return cards;
     }

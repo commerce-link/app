@@ -258,25 +258,29 @@ class ClientReturnViewTest {
         // given
         Shipment returned = parcel(Parcel.RETURN_CREATED);
 
-        // when / then
-        assertThat(view(rma(RMAStatus.Approved, false)).cards()).containsExactly("form", "progress", "items");
-        assertThat(view(rma(RMAStatus.Approved, false), Config.NO_CARRIER).cards()).containsExactly("form", "progress", "items");
-        assertThat(view(rma(RMAStatus.Approved, true)).cards()).containsExactly("progress", "address", "items");
-        assertThat(view(rma(RMAStatus.Approved, true, parcel(Parcel.RETURN_CREATING))).cards())
-                .containsExactly("parcel", "progress", "address", "items");
-        assertThat(view(rma(RMAStatus.WaitingForItems, false)).cards()).containsExactly("progress", "items");
-        assertThat(view(rma(RMAStatus.WaitingForItems, true, returned)).cards())
-                .containsExactly("parcel", "progress", "address", "items");
-        assertThat(view(rma(RMAStatus.ItemsReceived, true, parcel(Parcel.RETURN_CREATED))).cards())
-                .containsExactly("progress", "parcel", "items");
-        assertThat(view(rma(RMAStatus.Processing, true, parcel(Parcel.RETURN_CREATED))).cards())
-                .containsExactly("progress", "items", "parcel");
-        assertThat(view(rma(RMAStatus.Completed, true, parcel(Parcel.RETURN_CREATED))).cards())
-                .containsExactly("progress", "items", "parcel");
-        assertThat(view(rma(RMAStatus.Completed, true)).cards()).containsExactly("progress", "items");
-        assertThat(view(rma(RMAStatus.Rejected, true, parcel(Parcel.OPERATOR_CREATED))).cards())
-                .containsExactly("reason", "parcel", "items");
-        assertThat(view(rma(RMAStatus.Rejected, true)).cards()).containsExactly("reason", "items");
+        // when / then: the main column (progress and products first, then the card the state asks to act on) and the side column
+        assertColumns(view(rma(RMAStatus.Approved, false)), List.of("progress", "items", "form"), List.of());
+        assertColumns(view(rma(RMAStatus.Approved, false), Config.NO_CARRIER), List.of("progress", "items", "form"), List.of());
+        assertColumns(view(rma(RMAStatus.Approved, true)), List.of("progress", "items"), List.of("address"));
+        assertColumns(view(rma(RMAStatus.Approved, true, parcel(Parcel.RETURN_CREATING))),
+                List.of("progress", "items", "parcel"), List.of("address"));
+        assertColumns(view(rma(RMAStatus.WaitingForItems, false)), List.of("progress", "items"), List.of());
+        assertColumns(view(rma(RMAStatus.WaitingForItems, true, returned)), List.of("progress", "items", "parcel"), List.of("address"));
+        assertColumns(view(rma(RMAStatus.ItemsReceived, true, parcel(Parcel.RETURN_CREATED))), List.of("progress", "items"), List.of("parcel"));
+        assertColumns(view(rma(RMAStatus.Processing, true, parcel(Parcel.RETURN_CREATED))), List.of("progress", "items"), List.of("parcel"));
+        assertColumns(view(rma(RMAStatus.Completed, true, parcel(Parcel.RETURN_CREATED))), List.of("progress", "items"), List.of("parcel"));
+        assertColumns(view(rma(RMAStatus.Completed, true)), List.of("progress", "items"), List.of());
+        assertColumns(view(rma(RMAStatus.Rejected, true, parcel(Parcel.OPERATOR_CREATED))), List.of("reason", "items"), List.of("parcel"));
+        assertColumns(view(rma(RMAStatus.Rejected, true)), List.of("reason", "items"), List.of());
+    }
+
+    /** The page shows the main column, then the side column: cards() is both, in that order. */
+    private static void assertColumns(ClientReturnView view, List<String> main, List<String> side) {
+        assertThat(view.mainCards()).containsExactlyElementsOf(main);
+        assertThat(view.sideCards()).containsExactlyElementsOf(side);
+        List<String> all = new ArrayList<>(main);
+        all.addAll(side);
+        assertThat(view.cards()).containsExactlyElementsOf(all);
     }
 
     @Test

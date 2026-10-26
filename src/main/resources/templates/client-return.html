@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{public-layout}" th:with="publicWidth='is-form'">
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-split', publicFooter=false">
 <head>
     <title th:text="#{client.return.pageTitle(${view.shortRmaId()})}">Zwrot</title>
     <script th:src="@{/js/submit-once.js}" defer></script>
@@ -8,8 +8,10 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-    <!--/* The state (ClientReturnView) decides the headline, the lead and the cards in their order. A notice stands on top of
-           its card; when the state shows no such card, above the first one, so the redirect never hides it. */-->
+    <!--/* The state (ClientReturnView) decides the headline, the lead and the cards of both columns: the main one (progress,
+           products, then the card to act on) and the side one (other shipments, the pickup address, then the seller card that
+           replaces the footer, as on the offer and order pages). A notice stands on top of its card; when the state shows no
+           such card, above the first one, so the redirect never hides it. */-->
     <div class="cl-client-return"
          th:with="cards=${view.cards()}, notice=${clientReturnNotice},
                   placedNotice=${notice != null and (notice.target() == 'form' or notice.target() == 'parcel') and cards.contains(notice.target())},
@@ -26,35 +28,32 @@
             <p class="cl-page-lead" th:text="#{${view.leadKey()}}"></p>
         </header>
 
-        <div class="cl-stack">
-            <th:block th:if="${notice != null and !placedNotice}">
-                <div th:replace="~{client-return/notice :: notice(${notice})}"></div>
-            </th:block>
-            <th:block th:each="card : ${cards}">
-                <th:block th:if="${card == 'form'}">
-                    <section th:replace="~{client-return/form :: form}"></section>
+        <div class="cl-split">
+            <div class="cl-split-main">
+                <th:block th:if="${notice != null and !placedNotice}">
+                    <div th:replace="~{client-return/notice :: notice(${notice})}"></div>
                 </th:block>
-                <th:block th:if="${card == 'parcel'}">
-                    <section th:replace="~{client-return/shipments :: shipments}"></section>
+                <th:block th:each="card : ${view.mainCards()}">
+                    <th:block th:replace="~{:: card(${card})}"></th:block>
                 </th:block>
-                <th:block th:if="${card == 'progress'}">
-                    <section th:replace="~{client-return/progress :: progress}"></section>
+            </div>
+            <aside class="cl-split-side" th:aria-label="#{client.return.side.label}">
+                <th:block th:each="card : ${view.sideCards()}">
+                    <th:block th:replace="~{:: card(${card})}"></th:block>
                 </th:block>
-                <th:block th:if="${card == 'address'}">
-                    <section th:replace="~{client-return/address :: address}"></section>
-                </th:block>
-                <th:block th:if="${card == 'reason'}">
-                    <section th:replace="~{client-return/reason :: reason}"></section>
-                </th:block>
-                <th:block th:if="${card == 'items'}">
-                    <section th:replace="~{client-return/items :: items}"></section>
-                </th:block>
-            </th:block>
-            <th:block th:if="${publicPage.hasContact()}">
                 <section th:replace="~{client-return/contact :: contact}"></section>
-            </th:block>
+            </aside>
         </div>
     </div>
+</th:block>
+<!--/* One card of a column by its name (ClientReturnView.mainCards / sideCards). */-->
+<th:block th:fragment="card(card)">
+    <th:block th:if="${card == 'form'}"><section th:replace="~{client-return/form :: form}"></section></th:block>
+    <th:block th:if="${card == 'parcel'}"><section th:replace="~{client-return/shipments :: shipments}"></section></th:block>
+    <th:block th:if="${card == 'progress'}"><section th:replace="~{client-return/progress :: progress}"></section></th:block>
+    <th:block th:if="${card == 'address'}"><section th:replace="~{client-return/address :: address}"></section></th:block>
+    <th:block th:if="${card == 'reason'}"><section th:replace="~{client-return/reason :: reason}"></section></th:block>
+    <th:block th:if="${card == 'items'}"><section th:replace="~{client-return/items :: items}"></section></th:block>
 </th:block>
 </body>
 </html>

@@ -14568,6 +14568,13 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 }
 
 /* ===== Client return (client-return.html) ===== */
+/* side column (from 1024 px, 400 px wide): a shipment row puts its action under the text, the pickup card is one column */
+@media (min-width: 1024px) {
+  .cl-client-return .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .cl-client-return .cl-split-side .cl-list-actions { justify-content: stretch; }
+  .cl-client-return .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  .cl-client-return .cl-split-side .cl-kv-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .cl-client-return .cl-page-header { margin-bottom: 20px; }
 .cl-client-return .cl-page-title { margin: 2px 0 6px; }
 .cl-client-return .cl-card-head .cl-card-title { margin: 0; }

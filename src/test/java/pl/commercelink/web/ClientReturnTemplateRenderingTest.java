@@ -64,7 +64,7 @@ class ClientReturnTemplateRenderingTest {
     }
 
     @Test
-    void bookStateShowsTheFormFirst() {
+    void bookStateShowsProgressAndProductsAboveTheForm() {
         // when
         String html = ClientReturnRenderer.approved().render();
 
@@ -92,7 +92,11 @@ class ClientReturnTemplateRenderingTest {
                 .contains("type=\"email\"")
                 .contains("type=\"tel\"")
                 .contains("maxlength=\"100\"");
-        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-form\"");
+        String left = mainColumn(html);
+        assertThat(left).containsPattern("<div class=\"cl-split-main\">\\s*<section[^>]*id=\"return-progress\"");
+        assertThat(left.indexOf("id=\"return-progress\"")).isLessThan(left.indexOf("id=\"return-items\""));
+        assertThat(left.indexOf("id=\"return-items\"")).isLessThan(left.indexOf("id=\"return-form\""));
+        assertThat(sideColumn(html)).containsPattern("<aside[^>]*>\\s*<section[^>]*cl-seller-card");
     }
 
     @Test
@@ -237,7 +241,7 @@ class ClientReturnTemplateRenderingTest {
         String withForm = renderer.render();
 
         // then
-        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<div class=\"cl-alert is-info\" role=\"status\" tabindex=\"-1\">")
+        assertThat(main(html)).containsPattern("<div class=\"cl-split-main\">\\s*<div class=\"cl-alert is-info\" role=\"status\" tabindex=\"-1\">")
                 .contains("<p class=\"cl-alert-text\">Sklep zamówi kuriera po paczkę.</p>");
         assertThat(main(withForm).indexOf("cl-alert is-info")).isPositive()
                 .isLessThan(main(withForm).indexOf("id=\"return-form\""));
@@ -417,7 +421,7 @@ class ClientReturnTemplateRenderingTest {
     }
 
     @Test
-    void waitingShowsTheParcelFirstWithTracking() {
+    void waitingShowsTheParcelAfterTheProductsWithTracking() {
         // when
         String html = ClientReturnRenderer.approved().status(RMAStatus.WaitingForItems).savedAddress(fullAddress())
                 .shipments(trackedReturn()).render();
@@ -436,12 +440,12 @@ class ClientReturnTemplateRenderingTest {
                 .contains("nadana 22 paź, 10:14")
                 .contains("odbiór pt. 23 paź, 9:00–15:00")
                 .doesNotContain("cl-status");
-        String content = main(html);
-        assertThat(content).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
-        assertThat(content.indexOf("id=\"return-parcel\"")).isLessThan(content.indexOf("id=\"return-progress\""));
-        assertThat(content.indexOf("id=\"return-progress\"")).isLessThan(content.indexOf("id=\"return-address\""));
-        assertThat(content.indexOf("id=\"return-address\"")).isLessThan(content.indexOf("id=\"return-items\""));
-        assertThat(content.indexOf("id=\"return-items\"")).isLessThan(content.indexOf("id=\"return-help\""));
+        String left = mainColumn(html);
+        assertThat(left.indexOf("id=\"return-progress\"")).isNotNegative().isLessThan(left.indexOf("id=\"return-items\""));
+        assertThat(left.indexOf("id=\"return-items\"")).isLessThan(left.indexOf("id=\"return-parcel\""));
+        String side = sideColumn(html);
+        assertThat(side.indexOf("id=\"return-address\"")).isNotNegative().isLessThan(side.indexOf("id=\"return-help\""));
+        assertThat(left).doesNotContain("id=\"return-address\"");
     }
 
     @Test
@@ -497,7 +501,8 @@ class ClientReturnTemplateRenderingTest {
                 .contains("Numer przesyłki i termin odbioru wyślemy e-mailem.")
                 .doesNotContain("Numer:")
                 .doesNotContain("Śledź przesyłkę");
-        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
+        assertThat(mainColumn(html)).contains("id=\"return-parcel\"");
+        assertThat(sideColumn(html)).doesNotContain("id=\"return-parcel\"");
     }
 
     @Test
@@ -534,7 +539,7 @@ class ClientReturnTemplateRenderingTest {
                 .contains("<p class=\"cl-alert-text\">Zamówiliśmy kuriera &lt;b&gt;.</p>");
         assertThat(parcel.indexOf("cl-alert")).isLessThan(parcel.indexOf("<ul class=\"cl-list\">"));
         assertThat(main(html).split("cl-alert-text", -1)).hasSize(2);
-        assertThat(main(html)).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-parcel\"");
+        assertThat(mainColumn(html)).contains("cl-alert-text");
     }
 
     @Test
@@ -630,7 +635,7 @@ class ClientReturnTemplateRenderingTest {
         String content = main(html);
         assertThat(content).doesNotContain("cl-stages").doesNotContain("id=\"return-progress\"")
                 .doesNotContain("<b>mechaniczne");
-        assertThat(content).containsPattern("<div class=\"cl-stack\">\\s*<section[^>]*id=\"return-reason\"");
+        assertThat(content).containsPattern("<div class=\"cl-split-main\">\\s*<section[^>]*id=\"return-reason\"");
         assertThat(card(html, "return-items")).doesNotContain("cl-status");
     }
 
@@ -710,8 +715,15 @@ class ClientReturnTemplateRenderingTest {
                 .contains("<a href=\"tel:+48223904510\">+48 22 390 45 10</a>")
                 .contains("i podaj numer zwrotu")
                 .contains("<strong>3f9c2a71</strong>.");
-        assertThat(noContact).doesNotContain("id=\"return-help\"");
-        assertThat(main(html).indexOf("id=\"return-help\"")).isGreaterThan(main(html).indexOf("id=\"return-items\""));
+        assertThat(help).contains("class=\"cl-card cl-seller-card\"").contains("aria-labelledby=\"return-help-title\"")
+                .contains("<p class=\"cl-seller-name\">");
+        // without a contact the card still names the seller, which the footer used to do
+        assertThat(card(noContact, "return-help")).contains("cl-seller-card").contains("aria-label=\"Sprzedawca\"")
+                .doesNotContain("Masz pytanie?");
+        String side = sideColumn(html);
+        assertThat(side.lastIndexOf("<section")).as("the seller card closes the side column")
+                .isEqualTo(side.lastIndexOf("<section", side.indexOf("id=\"return-help\"")));
+        assertThat(mainColumn(html)).doesNotContain("return-help");
     }
 
     @Test
@@ -784,13 +796,15 @@ class ClientReturnTemplateRenderingTest {
         String html = ClientReturnRenderer.approved().render();
 
         // then
-        assertThat(html).contains("<body class=\"cl-public\"")
-                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-form\"")
+        assertThat(html).contains("<body class=\"cl-public is-split\"")
+                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-split\"")
                 .contains("<div class=\"cl-client-return\">")
                 .contains("<header class=\"cl-page-header\">")
+                .contains("<div class=\"cl-split\">")
+                .contains("<aside class=\"cl-split-side\" aria-label=\"Przesyłki i sprzedawca\">")
                 .contains("/js/submit-once.js")
                 .contains("/js/copy-field.js")
-                .contains("<footer class=\"cl-public-foot\">")
+                .doesNotContain("cl-public-foot")
                 .doesNotContain("navbar");
     }
 
@@ -800,6 +814,20 @@ class ClientReturnTemplateRenderingTest {
             return Stream.concat(Stream.of(templates.resolve("client-return.html")),
                     fragments.filter(path -> path.toString().endsWith(".html")).sorted()).toList();
         }
+    }
+
+    /** The left column of the page (progress, products, the card to act on), up to the side column. */
+    private static String mainColumn(String html) {
+        int start = html.indexOf("<div class=\"cl-split-main\">");
+        assertThat(start).as("main column").isNotNegative();
+        return html.substring(start, html.indexOf("<aside class=\"cl-split-side\"", start));
+    }
+
+    /** The right column of the page (other shipments, the pickup address, the seller card). */
+    private static String sideColumn(String html) {
+        int start = html.indexOf("<aside class=\"cl-split-side\"");
+        assertThat(start).as("side column").isNotNegative();
+        return html.substring(start, html.indexOf("</aside>", start));
     }
 
     /** The section with the id, up to its end. */

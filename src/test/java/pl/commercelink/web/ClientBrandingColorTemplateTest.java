@@ -35,7 +35,7 @@ class ClientBrandingColorTemplateTest {
         String html = renderer.render();
 
         // then
-        assertThat(html).containsPattern("<body class=\"cl-public\" style=\"--cl-brand:#2277ee;[^\"]*\"");
+        assertThat(html).containsPattern("<body class=\"cl-public is-split\" style=\"--cl-brand:#2277ee;[^\"]*\"");
     }
 
     @Test
