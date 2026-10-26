@@ -9,6 +9,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
@@ -116,8 +117,10 @@ class StoreEntryPinning {
 
     /**
      * A product of a deleted clone goes back to the clone's source while the source is still global in the copy
-     * (R18), also when only a sibling code pinned it; otherwise, and for any other entry, the code rule applies. The
-     * copy is not refreshed yet when this runs, so it still holds the deleted entry and its source.
+     * (R18), also when only a sibling code pinned it; a product that matches the clone's own codes but none of the
+     * source's was attached by codes the store gave the clone, so it follows the code rule instead. For any other
+     * entry the code rule applies. The copy is not refreshed yet when this runs, so it still holds the deleted entry,
+     * its codes and its source.
      */
     void onEntryDeleted(String pimId, PimCatalog catalog) {
         List<Product> detached = productRepository.detachPimFromProducts(pimId);
@@ -126,13 +129,21 @@ class StoreEntryPinning {
         }
         PimView globalView = catalog.withGlobalData();
         CloneSources cloneSources = new CloneSources(pimId, catalog, globalView);
-        detached.forEach(product -> cloneSources.sourceFor(product).ifPresentOrElse(
-                sourcePimId -> repin(product, pimId, sourcePimId, pimId, "clone deleted, back to its source"),
-                () -> pinToGlobalEntry(product, pimId, globalView).ifPresentOrElse(
-                        // detachPimFromProducts already cleared the pin: the deleted entry is the old one
-                        globalPimId -> repin(product, pimId, globalPimId, pimId, "entry deleted, pinned to a global entry"),
-                        () -> log.info("PIM entry {} deleted: product {}/{} unpinned", pimId, product.getCategoryId(),
-                                product.getProductId()))));
+        for (Product product : detached) {
+            Optional<String> source = cloneSources.sourceFor(product);
+            if (source.isPresent()) {
+                repin(product, pimId, source.get(), pimId, "clone deleted, back to its source");
+                continue;
+            }
+            // detachPimFromProducts already cleared the pin: the deleted entry is the old one
+            Optional<String> global = pinToGlobalEntry(product, pimId, globalView);
+            if (global.isPresent()) {
+                repin(product, pimId, global.get(), pimId, "entry deleted, pinned to a global entry");
+            } else {
+                log.info("PIM entry {} deleted: product {}/{} unpinned", pimId, product.getCategoryId(),
+                        product.getProductId());
+            }
+        }
     }
 
     // the source of the deleted entry for the store owning a product's category; the owners are looked up once per
@@ -160,19 +171,32 @@ class StoreEntryPinning {
             if (ownerStoreId == null) {
                 return Optional.empty();
             }
-            return catalog.withStoreData(ownerStoreId).findByPimId(deletedPimId)
-                    .filter(entry -> ownerStoreId.equals(entry.ownerStoreId()))
-                    .map(PimEntry::clonedFromPimId)
-                    .filter(source -> !isBlank(source) && !source.equals(deletedPimId))
-                    .filter(source -> globalView.findByPimId(source).isPresent());
+            Optional<PimEntry> clone = catalog.withStoreData(ownerStoreId).findByPimId(deletedPimId)
+                    .filter(entry -> ownerStoreId.equals(entry.ownerStoreId()));
+            Optional<PimEntry> source = clone.map(PimEntry::clonedFromPimId)
+                    .filter(sourcePimId -> !isBlank(sourcePimId) && !sourcePimId.equals(deletedPimId))
+                    .flatMap(globalView::findByPimId);
+            if (source.isEmpty() || attachedByTheClonesOwnCodes(product, clone.get(), source.get())) {
+                return Optional.empty();
+            }
+            return source.map(PimEntry::pimId);
+        }
+
+        // the store may have changed the clone's codes, which pins its products with those codes to the clone; such a
+        // product is not the source's product, while one matching neither entry came by a sibling code (or the move)
+        private static boolean attachedByTheClonesOwnCodes(Product product, PimEntry clone, PimEntry source) {
+            return Codes.of(clone.gtins(), clone.mpns()).matchesUnified(product)
+                    && !Codes.of(source.gtins(), source.mpns()).matchesUnified(product);
         }
 
         private Map<String, String> storeOfCategory() {
             if (storeOfCategory == null) {
                 storeOfCategory = new HashMap<>();
-                productCatalogRepository.findAllOfEveryStore().forEach(productCatalog ->
-                        productCatalog.getCategories().forEach(category ->
-                                storeOfCategory.putIfAbsent(category.getCategoryId(), productCatalog.getStoreId())));
+                for (ProductCatalog productCatalog : productCatalogRepository.findAllOfEveryStore()) {
+                    for (CategoryDefinition category : productCatalog.getCategories()) {
+                        storeOfCategory.putIfAbsent(category.getCategoryId(), productCatalog.getStoreId());
+                    }
+                }
             }
             return storeOfCategory;
         }
@@ -294,6 +318,14 @@ class StoreEntryPinning {
 
         boolean isEmpty() {
             return eans.isEmpty() && mfnCodes.isEmpty();
+        }
+
+        // the product's codes unified as the entry's are, for codes stored before unification
+        boolean matchesUnified(Product product) {
+            String ean = product.getEan() == null ? null : UnifiedProductIdentifiers.unifyEan(product.getEan());
+            String mfn = product.getManufacturerCode() == null ? null
+                    : UnifiedProductIdentifiers.unifyMfn(product.getManufacturerCode());
+            return (ean != null && eans.contains(ean)) || (mfn != null && mfnCodes.contains(mfn));
         }
 
         boolean matches(Product product) {

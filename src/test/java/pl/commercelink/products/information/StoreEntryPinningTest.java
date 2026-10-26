@@ -630,6 +630,42 @@ class StoreEntryPinningTest {
     }
 
     @Test
+    void productPinnedToTheCloneByItsEditedCodesDoesNotGoToTheSource() {
+        // given: the store changed the clone's EAN from E1 to E2, which pinned an unrelated product to it; the copy
+        // is not refreshed yet when the clone is deleted
+        Product unrelated = product("p1", STORE_CATEGORY, "C", E2, null);
+        Product unrelatedWithoutGlobalMatch = product("p2", STORE_CATEGORY, "C", null, "MFN-ONLY-ON-CLONE");
+        Product fromTheSource = product("p3", STORE_CATEGORY, "C", E1, null);
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                ScopedPimCatalog.globalEntry("G", E2, null, "cat"),
+                cloneWithCodes("C", STORE, "S", List.of(E2), List.of("MFN-ONLY-ON-CLONE")));
+
+        // when
+        pinning.onEntryDeleted("C", copy);
+
+        // then: the products the clone's own codes attached follow the code rule; the source's product goes back
+        assertThat(unrelated.getPimId()).isEqualTo("G");
+        assertThat(unrelatedWithoutGlobalMatch.getPimId()).isNull();
+        assertThat(fromTheSource.getPimId()).isEqualTo("S");
+    }
+
+    @Test
+    void productMatchingBothTheCloneAndTheSourceReturnsToTheSource() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                cloneWithCodes("C", STORE, "S", List.of(E1, E2), List.of()));
+        Product product = product("p1", STORE_CATEGORY, "C", E1, null);
+
+        // when
+        pinning.onEntryDeleted("C", copy);
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("S");
+    }
+
+    @Test
     void deletingTheCloneWhenTheSourceIsGoneFallsBackToCodes() {
         // given
         PimCatalog copy = ScopedPimCatalog.of(
@@ -675,6 +711,15 @@ class StoreEntryPinningTest {
                 gtins.stream().map(gtin -> new PimIdentifier(gtin, PimIdentifierType.GTIN)),
                 mpns.stream().map(mpn -> new PimIdentifier(mpn, PimIdentifierType.MPN))).toList();
         return new PimEntry(pimId, identifiers, "Brand", "Store " + pimId, "cat", null, true, 2000, 2200, null, storeId);
+    }
+
+    private static PimEntry cloneWithCodes(String pimId, String storeId, String sourcePimId, List<String> gtins,
+                                           List<String> mpns) {
+        List<PimIdentifier> identifiers = Stream.concat(
+                gtins.stream().map(gtin -> new PimIdentifier(gtin, PimIdentifierType.GTIN)),
+                mpns.stream().map(mpn -> new PimIdentifier(mpn, PimIdentifierType.MPN))).toList();
+        return new PimEntry(pimId, identifiers, "Brand", "Clone " + pimId, "cat", null, true, 2000, 2200, null, storeId,
+                sourcePimId);
     }
 
     private static PIMEntryAddedEvent cloneEvent(String pimId, String sourcePimId, List<String> eans) {
