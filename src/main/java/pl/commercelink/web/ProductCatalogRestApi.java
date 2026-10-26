@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import pl.commercelink.products.information.StorePimAliases;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import pl.commercelink.inventory.Inventory;
@@ -12,6 +11,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.web.dtos.ObjectIdDto;
 
 import java.util.List;

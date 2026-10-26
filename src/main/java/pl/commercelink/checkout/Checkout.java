@@ -1,6 +1,5 @@
 package pl.commercelink.checkout;
 
-import pl.commercelink.products.information.StorePimAliases;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
@@ -20,6 +19,7 @@ import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.InvoicingConfiguration;

@@ -86,10 +86,6 @@ public class DiscountCode {
         return maxUses > 0 && usedCount > maxUses;
     }
 
-    public boolean covers(BasketItem item) {
-        return covers(item, Set::of);
-    }
-
     /**
      * @param productAliases the ids a product is known by in the store (itself, its source, its clone); a product
      *                       target covers the item when any of them is a target

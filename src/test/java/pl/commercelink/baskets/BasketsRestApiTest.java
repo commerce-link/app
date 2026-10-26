@@ -1,7 +1,5 @@
 package pl.commercelink.baskets;
 
-import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +24,9 @@ import pl.commercelink.discounts.DiscountTarget;
 import pl.commercelink.discounts.DiscountType;
 import pl.commercelink.discounts.TargetValue;
 import pl.commercelink.invoicing.InvoicingService;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;

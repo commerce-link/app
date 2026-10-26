@@ -18,10 +18,6 @@ public final class DiscountCalculator {
     private DiscountCalculator() {
     }
 
-    public static List<DiscountedLine> calculate(DiscountCode code, List<BasketItem> items) {
-        return calculate(code, items, Set::of);
-    }
-
     public static List<DiscountedLine> calculate(DiscountCode code, List<BasketItem> items,
                                                  Function<String, Set<String>> productAliases) {
         List<BasketItem> covered = items.stream().filter(i -> code.covers(i, productAliases)).filter(i -> i.getQty() > 0).toList();

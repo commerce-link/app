@@ -1,8 +1,6 @@
 package pl.commercelink.products;
 
 import org.junit.jupiter.api.BeforeEach;
-import pl.commercelink.pim.api.PimView;
-import pl.commercelink.products.information.StorePimAliases;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,10 +12,12 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.AvailabilityAndPriceList;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;

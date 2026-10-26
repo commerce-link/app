@@ -14,12 +14,12 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
@@ -133,7 +133,8 @@ class ProductsAddReviewScopeTest {
 
     @Test
     void addingTheCloneToACategoryHoldingTheSourceIsADuplicate() {
-        // given: the category holds the global entry "g1" (no codes of its own); the entry the codes lead to is the store's clone "c1"
+        // given: the category holds the global entry "g1", whose codes differ from the row's; the row's codes lead to the
+        // store's clone "c1" of "g1"
         PimCatalog withClone = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
                 ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN, MFN, "GPU"));
@@ -144,7 +145,8 @@ class ProductsAddReviewScopeTest {
 
     @Test
     void addingTheSourceToACategoryHoldingTheCloneIsADuplicate() {
-        // given: the category holds the clone "c1"; the codes lead to the global entry "g1" (the clone belongs to another store's view here)
+        // given: the category holds the store's clone "c1", whose codes differ from the row's; the row's codes lead to its
+        // source, the global entry "g1"
         PimCatalog withClone = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("g1", EAN, MFN, "GPU"),
                 ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN + "0", MFN + "0", "GPU"));
@@ -155,7 +157,8 @@ class ProductsAddReviewScopeTest {
 
     @Test
     void otherStoresAreUnaffected() {
-        // given: the clone belongs to s2, so s1 holding "g1" does not hold the entry it resolves to ("g2")
+        // given: the category of s1 holds "c1", a clone of s2 that s1's view does not know, so it is no alias of "g2",
+        // the entry the row's codes lead to
         PimCatalog catalog = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
                 ScopedPimCatalog.cloneEntry("c1", "s2", "g1", EAN + "0", MFN + "0", "GPU"),

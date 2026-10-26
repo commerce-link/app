@@ -16,13 +16,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.checkout.CheckoutError;
 import pl.commercelink.checkout.CheckoutException;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.time.LocalDateTime;
 import java.util.LinkedList;

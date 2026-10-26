@@ -1,16 +1,16 @@
 package pl.commercelink.checkout;
 
-import pl.commercelink.baskets.BasketItem;
-import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.List;
 import java.util.Map;

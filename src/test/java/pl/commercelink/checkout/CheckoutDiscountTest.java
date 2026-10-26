@@ -1,7 +1,5 @@
 package pl.commercelink.checkout;
 
-import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,11 +22,13 @@ import pl.commercelink.payments.api.PaymentLineItem;
 import pl.commercelink.payments.api.PaymentLink;
 import pl.commercelink.payments.api.PaymentProvider;
 import pl.commercelink.payments.api.PaymentRequest;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.FulfilmentConfiguration;

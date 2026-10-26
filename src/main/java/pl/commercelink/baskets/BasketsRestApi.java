@@ -1,6 +1,5 @@
 package pl.commercelink.baskets;
 
-import pl.commercelink.products.information.StorePimAliases;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +11,7 @@ import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;

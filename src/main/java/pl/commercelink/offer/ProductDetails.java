@@ -57,8 +57,8 @@ public class ProductDetails {
     }
 
     private ProductDetailsView createProductDetailsFromMappedProduct(String storeId, String categoryId, String pimId) {
-        // The product is stored under the id it had when it was added: the source before it moved onto the clone
-        // (a link by the clone id, or the other way round, must still find it)
+        // Moving onto the clone, or back to the source when the clone is deleted, rewrites the product's pimId, but a
+        // link may still carry the other id (shared or cached before the move), so the clone and the source are tried
         Product product = productRepository.findByPimId(categoryId, pimId);
         if (product == null) {
             product = aliases.cloneOf(storeId, pimId).map(id -> productRepository.findByPimId(categoryId, id)).orElse(null);

@@ -7,6 +7,7 @@ import pl.commercelink.baskets.BasketItem;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -93,8 +94,8 @@ class DiscountCodeTest {
         DiscountCode code = covering(null);
 
         // when / then
-        assertThat(code.covers(product("pim-1", "Karty graficzne", "Acme"))).isTrue();
-        assertThat(code.covers(product("pim-2", "Procesory", "Globex"))).isTrue();
+        assertThat(code.covers(product("pim-1", "Karty graficzne", "Acme"), Set::of)).isTrue();
+        assertThat(code.covers(product("pim-2", "Procesory", "Globex"), Set::of)).isTrue();
     }
 
     @ParameterizedTest
@@ -104,8 +105,8 @@ class DiscountCodeTest {
         BasketItem item = product("pim-1", "Karty graficzne", "Acme");
 
         // when / then
-        assertThat(covering(target, matching).covers(item)).isTrue();
-        assertThat(covering(target, other).covers(item)).isFalse();
+        assertThat(covering(target, matching).covers(item, Set::of)).isTrue();
+        assertThat(covering(target, other).covers(item, Set::of)).isFalse();
     }
 
     @Test
@@ -118,8 +119,8 @@ class DiscountCodeTest {
         DiscountCode code = covering(DiscountTarget.Category, "Karty graficzne");
 
         // when / then
-        assertThat(code.covers(fromFirstCatalog)).isTrue();
-        assertThat(code.covers(fromSecondCatalog)).isTrue();
+        assertThat(code.covers(fromFirstCatalog, Set::of)).isTrue();
+        assertThat(code.covers(fromSecondCatalog, Set::of)).isTrue();
     }
 
     @Test
@@ -128,8 +129,8 @@ class DiscountCodeTest {
         BasketItem item = product("pim-1", "Karty graficzne ", " Acme");
 
         // when / then
-        assertThat(covering(DiscountTarget.Category, "Karty graficzne").covers(item)).isTrue();
-        assertThat(covering(DiscountTarget.Brand, "Acme ").covers(item)).isTrue();
+        assertThat(covering(DiscountTarget.Category, "Karty graficzne").covers(item, Set::of)).isTrue();
+        assertThat(covering(DiscountTarget.Brand, "Acme ").covers(item, Set::of)).isTrue();
     }
 
     @Test
@@ -142,9 +143,9 @@ class DiscountCodeTest {
         DiscountCode serviceCategory = covering(DiscountTarget.Category, "Usługi");
 
         // when / then
-        assertThat(wholeBasket.covers(service)).isFalse();
-        assertThat(wholeBasket.covers(shipping)).isFalse();
-        assertThat(serviceCategory.covers(service)).isFalse();
+        assertThat(wholeBasket.covers(service, Set::of)).isFalse();
+        assertThat(wholeBasket.covers(shipping, Set::of)).isFalse();
+        assertThat(serviceCategory.covers(service, Set::of)).isFalse();
     }
 
     private static DiscountCode covering(DiscountTarget target, String... values) {
