@@ -347,7 +347,7 @@ class ClientOfferTemplateRenderingTest {
 
         // then
         String payment = html.substring(html.indexOf("id=\"client-offer-payment\""));
-        assertThat(payment).containsPattern("<div class=\"cl-pay-total\">\\s*<p class=\"cl-pay-total-label\">To pay</p>\\s*"
+        assertThat(payment).containsPattern("(?s)<div class=\"cl-pay-total\">\\s*(<!--.*?-->\\s*)?<p class=\"cl-pay-total-label\"><span>To pay</span>.*?</p>\\s*"
                         + "<p class=\"cl-pay-total-value\">5.525,99 PLN</p>")
                 .contains("<p class=\"cl-pay-total-sub\">incl. 23% VAT:");
         assertThat(html).contains("class=\"cl-card-inset cl-items-total\"");
@@ -390,6 +390,46 @@ class ClientOfferTemplateRenderingTest {
 
         // then
         assertThat(html).contains("class=\"cl-pay-total\"").contains("class=\"cl-card-inset cl-items-total\"");
+    }
+
+    @Test
+    void bankOnlyOfferShowsTheAmountAtEveryWidth() {
+        // given — no online payment: the amount by the pay button is not rendered, so the card's own total must stay visible
+        ClientOfferRenderer renderer = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing());
+        renderer.store().getPayments().clear();
+
+        // when
+        String html = renderer.render();
+        String online = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).render();
+
+        // then
+        assertThat(html).contains("<div class=\"cl-pay-total is-always\">");
+        assertThat(online).contains("<div class=\"cl-pay-total\">");
+    }
+
+    @Test
+    void expiredOfferKeepsTheFooterAndTheNarrowWidth() {
+        // given
+        ClientOfferRenderer renderer = ClientOfferRenderer.newOffer();
+        renderer.basket().setExpiresAt(LocalDateTime.of(2026, 10, 1, 12, 0));
+
+        // when
+        String html = renderer.render();
+
+        // then
+        assertThat(html).contains("cl-public-foot").contains("class=\"cl-page cl-public-main is-form\"")
+                .doesNotContain("is-split");
+    }
+
+    @Test
+    void slowUpdateSpinnerAlsoSitsByTheSideTotal() throws IOException {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+        String script = Files.readString(Path.of("src/main/resources/static/js/client-offer.js"));
+
+        // then
+        assertThat(section(html, "client-offer-payment")).contains("cl-offer-updating");
+        assertThat(script).contains("payment.classList.add('is-slow')");
     }
 
     @Test

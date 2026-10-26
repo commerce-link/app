@@ -13,9 +13,12 @@
         <h2 class="cl-card-title" id="client-offer-pay-title" th:text="#{client.offer.payment.title}"></h2>
     </div>
     <div class="cl-card-inset">
-        <!--/* Shown from 1024 px only, where the items card hides its own total row (items.html, cl-items-total). */-->
-        <div class="cl-pay-total">
-            <p class="cl-pay-total-label" th:text="#{client.offer.payment.amount}"></p>
+        <!--/* Shown from 1024 px, where the items card hides its own total row (items.html, cl-items-total); below that only
+               without online payment (is-always), since then no amount stands by a pay button and the transfer needs one. */-->
+        <div class="cl-pay-total" th:classappend="${!online} ? 'is-always'">
+            <!--/* the spinner shows only while a variant update in the background takes long (client-offer.js) */-->
+            <p class="cl-pay-total-label"><span th:text="#{client.offer.payment.amount}"></span><span
+                    class="cl-spinner is-compact cl-offer-updating" aria-hidden="true"></span></p>
             <p class="cl-pay-total-value" th:text="#{general.currency.amount(${page.total})}"></p>
             <p class="cl-pay-total-sub"
                th:text="#{client.offer.total.sub(#{general.currency.amount(${page.vat})}, #{general.currency.amount(${page.net})})}"></p>

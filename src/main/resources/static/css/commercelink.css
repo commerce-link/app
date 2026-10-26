@@ -14523,7 +14523,8 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
    methods sit side by side and the transfer details are a compact list, so the seller card under the payment stays on
    the first screen of a 1440 x 900 laptop. */
 .cl-client-offer .cl-pay-total { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--cl-line); }
-.cl-client-offer .cl-pay-total-label { margin: 0; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-client-offer .cl-pay-total-label { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-client-offer #client-offer-payment.is-slow .cl-offer-updating { display: inline-block; }
 .cl-client-offer .cl-pay-total-value { margin: 2px 0 0; font-size: 26px; font-weight: 650; line-height: 1.2; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
 .cl-client-offer .cl-pay-total-sub { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
 .cl-client-offer .cl-pay-methods.is-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
@@ -14549,7 +14550,7 @@ body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line
   .cl-client-offer .cl-split-side .cl-pay-amount { display: none; }
 }
 @media (max-width: 1023px) {
-  .cl-client-offer .cl-pay-total { display: none; }
+  .cl-client-offer .cl-pay-total:not(.is-always) { display: none; }
   .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: auto; }
 }
 @media (max-width: 719px) {

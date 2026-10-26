@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{public-layout}" th:with="publicWidth='is-split', publicFooter=false">
+      layout:decorate="~{public-layout}" th:with="publicWidth=${page.expired ? 'is-form' : 'is-split'}, publicFooter=${page.expired}">
 <head>
     <title th:text="#{client.offer.pageTitle}">Oferta</title>
     <script th:src="@{/js/variant-fields.js}" defer></script>
