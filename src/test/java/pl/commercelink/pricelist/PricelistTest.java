@@ -51,6 +51,34 @@ class PricelistTest {
         assertThat(categories).containsExactly("CPU", "Smartwatches");
     }
 
+    @Test
+    void findsTheRowByUnifiedCodesWhateverItsPimId() {
+        // given
+        Pricelist pricelist = new Pricelist("id", List.of(
+                row("other", "5900000000099", "OTHER"),
+                row("clone-C", "05900000000011", "ab-1 ")));
+
+        // when / then
+        assertThat(pricelist.findByCodes("5900000000011", "AB-1")).map(AvailabilityAndPrice::getPimId).contains("clone-C");
+        assertThat(pricelist.findByCodes("5900000000011", null)).map(AvailabilityAndPrice::getPimId).contains("clone-C");
+        assertThat(pricelist.findByCodes(null, "AB-1")).map(AvailabilityAndPrice::getPimId).contains("clone-C");
+    }
+
+    @Test
+    void doesNotMatchByCodesWhenACodeDiffersOrNoneIsShared() {
+        // given
+        Pricelist pricelist = new Pricelist("id", List.of(row("p", "5900000000011", "AB-1")));
+
+        // when / then
+        assertThat(pricelist.findByCodes("5900000000011", "OTHER")).isEmpty();
+        assertThat(pricelist.findByCodes(null, null)).isEmpty();
+        assertThat(pricelist.findByCodes("", " ")).isEmpty();
+    }
+
+    private AvailabilityAndPrice row(String pimId, String ean, String mfn) {
+        return new AvailabilityAndPrice(pimId, ean, mfn, "brand", "label", "name", "CPU", 100, 1, 1, 100, false);
+    }
+
     private AvailabilityAndPrice item(String category, String label, String name) {
         return new AvailabilityAndPrice("pim", "ean", "mfn", "brand", label, name, category, 100, 1, 1, 100, false);
     }

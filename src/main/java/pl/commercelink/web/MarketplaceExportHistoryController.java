@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import pl.commercelink.products.information.StorePimAliases;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
@@ -49,14 +50,16 @@ public class MarketplaceExportHistoryController {
     private final MarketplaceConnections marketplaces;
     private final ProductCatalogRepository catalogRepository;
     private final MessageSource messageSource;
+    private final StorePimAliases aliases;
 
     MarketplaceExportHistoryController(MarketplaceExportRunService marketplaceExportRunService,
                                        MarketplaceConnections marketplaces, ProductCatalogRepository catalogRepository,
-                                       MessageSource messageSource) {
+                                       MessageSource messageSource, StorePimAliases aliases) {
         this.marketplaceExportRunService = marketplaceExportRunService;
         this.marketplaces = marketplaces;
         this.catalogRepository = catalogRepository;
         this.messageSource = messageSource;
+        this.aliases = aliases;
     }
 
     @GetMapping("/dashboard/store/marketplaces/exports" + MARKETPLACE_PATH)
@@ -119,7 +122,7 @@ public class MarketplaceExportHistoryController {
         String searchedPimId = StringUtils.trimToNull(pimId);
         if (searchedPimId != null && !runs.isEmpty()) {
             MarketplaceExportOfferSearch search = marketplaceExportRunService.searchOffer(
-                    storeId, marketplace, searchedPimId, SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
+                    storeId, marketplace, aliases.offerIdOf(storeId, searchedPimId), SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
             model.addAttribute("search", MarketplaceExportSearchView.of(searchedPimId, search, SEARCH_HITS_LIMIT));
         }
 

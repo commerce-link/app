@@ -26,6 +26,7 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -71,6 +72,7 @@ class MarketplaceOfferExportEventListenerTest {
     @Mock private InventoryView inventoryView;
     @Mock private MarketplaceProvider provider;
     @Mock private StoreActivity storeActivity;
+    @Mock private StorePimAliases aliases;
 
     @InjectMocks
     private MarketplaceOfferExportEventListener listener;
@@ -78,6 +80,13 @@ class MarketplaceOfferExportEventListenerTest {
     @BeforeEach
     void storesAreActive() {
         lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
+    }
+
+    @BeforeEach
+    void productsHaveNoCloneByDefault() {
+        lenient().when(aliases.find(any(), any(), any())).thenAnswer(invocation ->
+                invocation.getArgument(1, Pricelist.class).findByPimId(invocation.getArgument(2)));
+        lenient().when(aliases.offerIdOf(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @BeforeEach
@@ -120,6 +129,69 @@ class MarketplaceOfferExportEventListenerTest {
         assertThat(offer.ean()).isEqualTo("EAN-A");
         assertThat(offer.quantity()).isEqualTo(10L);
         assertThat(offer.price()).isEqualTo(100L);
+    }
+
+    @Test
+    void productOnACloneIsExportedUnderTheSourceId() {
+        // given
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        List<MarketplaceOffer> published = capturePublishedOffers();
+        assertThat(published).singleElement().satisfies(offer -> {
+            assertThat(offer.productId()).isEqualTo("source-S");
+            assertThat(offer.ean()).isEqualTo("EAN-A");
+        });
+        assertThat(captureSavedRows()).singleElement()
+                .satisfies(row -> assertThat(row.pimId()).isEqualTo("source-S"));
+    }
+
+    @Test
+    void movingToTheCloneDoesNotOrphanTheOffer() {
+        // given the offer was published as S, the product now sits on the clone C (pricelist already keyed by C)
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-clone-C"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).isEmpty();
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+    }
+
+    @Test
+    void afterDeletingTheCloneTheOfferIdIsUnchanged() {
+        // given the product is back on S, the pricelist was built while the clone existed and still carries C rows
+        Product product = product("source-S", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        AvailabilityAndPrice rowOfTheClone = new AvailabilityAndPrice(
+                "clone-C", product.getEan(), product.getManufacturerCode(), "Brand", "Label", "Name",
+                "Laptops", 100, 0L, 2, 0L, false);
+        when(pricelist.findByPimId("source-S")).thenReturn(Optional.empty());
+        when(aliases.find(STORE_ID, pricelist, "source-S")).thenReturn(Optional.empty());
+        when(pricelist.findByCodes(product.getEan(), product.getManufacturerCode()))
+                .thenReturn(Optional.of(rowOfTheClone));
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-source-S"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).isEmpty();
+        assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+            assertThat(offer.productId()).isEqualTo("source-S");
+            assertThat(offer.price()).isEqualTo(100L);
+        });
     }
 
     @Test

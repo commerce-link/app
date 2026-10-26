@@ -26,6 +26,7 @@ import pl.commercelink.marketplace.MarketplaceExportRunFile;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.web.settings.MarketplaceExportRunView;
 import pl.commercelink.web.settings.MarketplaceExportSearchView;
@@ -72,8 +73,16 @@ class MarketplaceExportHistoryControllerTest {
     @Mock
     private MessageSource messageSource;
 
+    @Mock
+    private StorePimAliases aliases;
+
     @InjectMocks
     private MarketplaceExportHistoryController controller;
+
+    @BeforeEach
+    void offersKeepTheirIdByDefault() {
+        when(aliases.offerIdOf(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+    }
 
     @BeforeEach
     void loggedInAsStoreAdmin() {
@@ -338,6 +347,22 @@ class MarketplaceExportHistoryControllerTest {
         assertThat(search.pimId()).isEqualTo("pim-A");
         assertThat(search.hits()).singleElement()
                 .satisfies(hit -> assertThat(hit.offer().pimId()).isEqualTo("pim-A"));
+    }
+
+    @Test
+    void exportHistoryFindsTheOfferByTheCloneId() {
+        // given the offers are exported under the source id S, the admin types the id C of the clone
+        givenRuns(STORE_ID, headers(3));
+        givenSearch(STORE_ID, searchWithOneHit());
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("pim-A");
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, "clone-C", model, Locale.forLanguageTag("pl"));
+
+        // then
+        verify(marketplaceExportRunService).searchOffer(STORE_ID, MARKETPLACE, "pim-A", 500, 10);
+        assertThat(model.getAttribute("search")).isNotNull();
     }
 
     @Test

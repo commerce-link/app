@@ -15,6 +15,7 @@ import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.*;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -40,6 +41,7 @@ public class MarketplaceOfferExportEventListener {
     private final MarketplaceProviderFactory providerFactory;
     private final MarketplaceExportRunService marketplaceExportRunService;
     private final StoreActivity storeActivity;
+    private final StorePimAliases aliases;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -78,12 +80,13 @@ public class MarketplaceOfferExportEventListener {
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(store.getStoreId());
 
         List<MarketplaceOffer> offers = collectOffersFromCatalog(
-                catalog, payload.getMarketplace(), enrichedInventory, pricelist);
+                store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist);
 
         handleMarketplaceExport(store, catalog, payload.getMarketplace(), offers, run);
     }
 
-    private List<MarketplaceOffer> collectOffersFromCatalog(ProductCatalog catalog,
+    private List<MarketplaceOffer> collectOffersFromCatalog(String storeId,
+                                                            ProductCatalog catalog,
                                                             String marketplace,
                                                             InventoryView inventory,
                                                             Pricelist pricelist) {
@@ -101,12 +104,13 @@ public class MarketplaceOfferExportEventListener {
                 continue;
             }
 
-            offers.addAll(createMarketplaceOffers(category, marketplaceDefinition, inventory, pricelist));
+            offers.addAll(createMarketplaceOffers(storeId, category, marketplaceDefinition, inventory, pricelist));
         }
         return offers;
     }
 
-    private List<MarketplaceOffer> createMarketplaceOffers(CategoryDefinition category,
+    private List<MarketplaceOffer> createMarketplaceOffers(String storeId,
+                                                           CategoryDefinition category,
                                                            MarketplaceDefinition marketplaceDefinition,
                                                            InventoryView inventory,
                                                            Pricelist pricelist) {
@@ -116,7 +120,10 @@ public class MarketplaceOfferExportEventListener {
 
         for (Product product : productRepository.findAllProductsWithPimId(category.getCategoryId(), true)) {
 
-            Optional<AvailabilityAndPrice> priceInPricelist = pricelist.findByPimId(product.getPimId());
+            // The pricelist is keyed by the id of its build time: the source, the clone, or (when the clone was
+            // deleted after the build) a clone the product no longer points at, which only the codes still find.
+            Optional<AvailabilityAndPrice> priceInPricelist = aliases.find(storeId, pricelist, product.getPimId())
+                    .or(() -> pricelist.findByCodes(product.getEan(), product.getManufacturerCode()));
 
             if (priceInPricelist.isEmpty()) {
                 continue;
@@ -133,17 +140,20 @@ public class MarketplaceOfferExportEventListener {
 
             long qtyToPublish = marketplaceDefinition.qtyToPublish(matchedInventory);
 
-            result.add(toMarketplaceOffer(availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
+            // The offer keeps the id it was published under: a product on a clone is still offered as its source.
+            String offerId = aliases.offerIdOf(storeId, product.getPimId());
+
+            result.add(toMarketplaceOffer(offerId, availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
         }
         return result;
     }
 
-    private MarketplaceOffer toMarketplaceOffer(AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQuantity, String categoryName) {
+    private MarketplaceOffer toMarketplaceOffer(String offerId, AvailabilityAndPrice availabilityAndPrice, double marketplaceMarkup, long totalQuantity, String categoryName) {
         long marketplacePrice = Math.round(availabilityAndPrice.getPrice() * marketplaceMarkup);
         long marketplaceQuantity = Math.min(30, totalQuantity);
 
         return new MarketplaceOffer(
-                availabilityAndPrice.getPimId(),
+                offerId,
                 availabilityAndPrice.getEan(),
                 availabilityAndPrice.getManufacturerCode(),
                 availabilityAndPrice.getBrand(),
