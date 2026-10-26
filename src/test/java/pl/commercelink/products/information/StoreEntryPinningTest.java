@@ -544,6 +544,62 @@ class StoreEntryPinningTest {
     }
 
     @Test
+    void cloneMissingFromTheRefreshedCopyIsLoggedAsAWarning() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(ScopedPimCatalog.globalEntry("S", E1, null, "cat"));
+        product("p1", STORE_CATEGORY, "S", E1, null);
+
+        // when
+        try (CapturedLogs logs = CapturedLogs.of(StoreEntryPinning.class)) {
+            pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E1)), copy);
+
+            // then
+            assertThat(logs.warnings()).singleElement().asString()
+                    .contains("C", "S", STORE, "resend pim-entry-added manually after the next PIM index rebuild", "runbook");
+            assertThat(logs.infos()).isEmpty();
+        }
+    }
+
+    @Test
+    void cloneEventWithAnotherSourceMovesNothing() {
+        // given: the refreshed clone was cloned from S2, the event names S
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                ScopedPimCatalog.globalEntry("S2", E2, null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", STORE, "S2", E1, null, "cat"));
+        Product onSource = product("p1", STORE_CATEGORY, "S", E9, null);
+        Product unpinned = product("p2", STORE_CATEGORY, null, E1, null);
+
+        // when
+        pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E1)), copy);
+
+        // then
+        assertThat(onSource.getPimId()).isEqualTo("S");
+        assertThat(unpinned.getPimId()).isNull();
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void cloneOwnedByAnotherStoreThanTheEventsMovesNothing() {
+        // given: C belongs to the other store, the event names this store as the owner
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", OTHER_STORE, "S", E1, null, "cat"));
+        Product onSource = product("p1", STORE_CATEGORY, "S", E9, null);
+        Product unpinned = product("p2", STORE_CATEGORY, null, E1, null);
+        Product otherStoresOnSource = product("p3", OTHER_STORE_CATEGORY, "S", E1, null);
+
+        // when
+        pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E1)), copy);
+
+        // then
+        assertThat(onSource.getPimId()).isEqualTo("S");
+        assertThat(unpinned.getPimId()).isNull();
+        assertThat(otherStoresOnSource.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
     void deletingTheCloneReturnsProductsToTheSource() {
         // given: the copy is not refreshed yet and still holds the clone
         PimCatalog copy = ScopedPimCatalog.of(

@@ -39,6 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -578,7 +581,7 @@ class InventoryViewStoreListingsTest {
 
     // a clone (st-s-c) of the global entry PIM-1 keeps the offers of the global suppliers that sell PIM-1
     private InventoryKey cloneOfPim1() {
-        when(storePimView.findByPimId("st-s-c")).thenReturn(Optional.of(new PimEntry("st-s-c", List.of(), "Intel", "i7",
+        when(storePimView.findOwnClones()).thenReturn(List.of(new PimEntry("st-s-c", List.of(), "Intel", "i7",
                 "CPU", null, true, null, null, null, STORE_ID, "PIM-1")));
         InventoryKey cloneKey = new InventoryKey("st-s-c");
         cloneKey.addEan(EAN);
@@ -602,6 +605,24 @@ class InventoryViewStoreListingsTest {
         assertThat(listed).singleElement().satisfies(matched ->
                 assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action"));
         assertThat(stats.distinctProducts()).isEqualTo(1);
+    }
+
+    @Test
+    void cloneSourcesAreReadOncePerView() {
+        // given
+        InventoryKey cloneKey = cloneOfPim1();
+        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry));
+        stubGlobalIndex(List.of(globalGroupWithPimId()));
+
+        // when: several lookups on one view, each of them resolving the clone's source
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        view.findAllByProductCategoryIds(List.of("989"));
+        view.findByInventoryKey(cloneKey);
+        view.findByInventoryKey(cloneKey);
+
+        // then
+        verify(storePimView, times(1)).findOwnClones();
+        verify(storePimView, never()).findByPimId(any());
     }
 
     // ProductDetails resolves an automatic category product through findByInventoryKey of the store's view

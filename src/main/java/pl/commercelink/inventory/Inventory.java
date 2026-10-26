@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
@@ -118,25 +119,27 @@ public class Inventory {
         Store store = storesRepository.findById(storeId);
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
-        InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store), storeEntryKeys(storeId));
+        StoreEntryKeys storeEntries = storeEntryKeys(storeId);
+        InventorySource global = GroupInventorySource.global(globalIndex, enabledGlobalSupplier(store), storeEntries);
         InventorySource own = GroupInventorySource.own(ownIndex);
-        return view(storeId, globalIndex, ownIndex, global, own, additionalSources);
+        return view(storeEntries, globalIndex, ownIndex, global, own, additionalSources);
     }
 
     private InventoryView scopedView(String storeId, SupplierScope scope, InventorySource... additionalSources) {
         Store store = storesRepository.findById(storeId);
         InventoryIndex ownIndex = storeInventoryProvider.ownIndex(store);
         InventoryIndex globalIndex = globalInventory.index();
-        InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope), storeEntryKeys(storeId));
+        StoreEntryKeys storeEntries = storeEntryKeys(storeId);
+        InventorySource global = GroupInventorySource.global(globalIndex, scopedSupplier(store, ConnectionMode.GLOBAL, scope), storeEntries);
         InventorySource own = GroupInventorySource.own(ownIndex, scopedOwnAndManualSupplier(store, scope));
-        return view(storeId, globalIndex, ownIndex, global, own, additionalSources);
+        return view(storeEntries, globalIndex, ownIndex, global, own, additionalSources);
     }
 
-    private InventoryView view(String storeId, InventoryIndex globalIndex, InventoryIndex ownIndex,
+    private InventoryView view(StoreEntryKeys storeEntries, InventoryIndex globalIndex, InventoryIndex ownIndex,
                                InventorySource global, InventorySource own, InventorySource... additionalSources) {
         InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
                 .toArray(InventorySource[]::new);
-        return new InventoryView(globalIndex, ownIndex, storeEntryKeys(storeId), taxonomyCache, supplierRegistry, sources);
+        return new InventoryView(globalIndex, ownIndex, storeEntries, taxonomyCache, supplierRegistry, sources);
     }
 
     private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {
@@ -172,9 +175,12 @@ public class Inventory {
     }
 
     // The global catalog holds global entries only, so a PIM id it does not know belongs to a store entry (spec 4.3).
-    // A clone names the global entry it was cloned from; sourceOf reads it from the store's own view of the catalog.
+    // A clone names the global entry it was cloned from; sourceOf reads it from the store's clones, collected once per
+    // view on the first call (the lookups run inside loops over every row) and kept for the view's lifetime.
     private StoreEntryKeys storeEntryKeys(String storeId) {
         return new StoreEntryKeys() {
+            private Map<String, String> sourceByClone;
+
             @Override
             public boolean isStoreEntry(String pimId) {
                 return pimCatalog.withGlobalData().findByPimId(pimId).isEmpty();
@@ -182,9 +188,28 @@ public class Inventory {
 
             @Override
             public String sourceOf(String pimId) {
-                return pimCatalog.withStoreData(storeId).findByPimId(pimId).map(PimEntry::clonedFromPimId).orElse(null);
+                Map<String, String> sources = sourceByClone;
+                if (sources == null) {
+                    sources = clonesWithSources(storeId);
+                    sourceByClone = sources;
+                }
+                return pimId == null ? null : sources.get(pimId);
             }
         };
+    }
+
+    private Map<String, String> clonesWithSources(String storeId) {
+        if (storeId == null || storeId.isBlank()) {
+            return Map.of();
+        }
+        Map<String, String> sources = new HashMap<>();
+        for (PimEntry clone : pimCatalog.withStoreData(storeId).findOwnClones()) {
+            String source = clone.clonedFromPimId();
+            if (storeId.equals(clone.ownerStoreId()) && source != null && !source.isBlank()) {
+                sources.put(clone.pimId(), source);
+            }
+        }
+        return Map.copyOf(sources);
     }
 
     static List<String> ownConnectionFingerprint(Store store) {

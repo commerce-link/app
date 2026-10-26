@@ -36,6 +36,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
@@ -304,8 +305,31 @@ class PimCatalogRegistryTest {
         var order = inOrder(copy, productRepository);
         order.verify(copy).refresh();
         order.verify(productRepository).save(product);
-        // and the usual background refresh after the handler
-        order.verify(copy, timeout(2000)).refresh();
+        // the handler already refreshed synchronously: no background refresh follows
+        verify(copy, after(300).times(1)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void blankSourceIsAPlainStoreEvent() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1", " "));
+
+        // then: the code matching of a plain store event, then its background refresh; no move from the source
+        verify(productRepository).findAllByEanOrMfnInCategories(List.of("c1"), List.of("5900000000011"), List.of());
+        verify(copy, timeout(2000)).refresh();
+        assertThat(product.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).findAllByPimId("S");
+        verify(productRepository, never()).save(any());
     }
 
     @Test

@@ -40,8 +40,10 @@ public class PimCatalogRegistry {
     private final PimCatalog catalog;
     private final List<SqsMessageListenerContainer<?>> containers = new ArrayList<>();
 
-    // One thread: refreshes never overlap. refreshPending is true while a refresh is queued but not yet started,
-    // so a burst of events yields at most one running and one queued refresh.
+    // One thread: background refreshes never overlap one another. refreshPending is true while a refresh is queued
+    // but not yet started, so a burst of events yields at most one running and one queued refresh. The clone
+    // announcement is the exception: it refreshes on the SQS listener thread (StoreEntryPinning.onCloneAnnounced),
+    // so that refresh may run alongside a background one.
     private final ExecutorService refreshExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "pim-index-refresh");
         thread.setDaemon(true);
@@ -106,11 +108,13 @@ public class PimCatalogRegistry {
                               ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
         if (event.ownerStoreId() == null) {
             attachEntryToProducts(event, productRepository);
-        } else if (event.clonedFromPimId() != null) {
-            // the delayed announcement of a new clone refreshes the copy itself; the codes of the store entries go to
-            // the history first, as before every refresh, so a later code-change event still finds what it removed
+        } else if (event.clonedFromPimId() != null && !event.clonedFromPimId().isBlank()) {
+            // the delayed announcement of a new clone refreshes the copy itself, synchronously, so no background
+            // refresh follows; the codes of the store entries go to the history first, as before every refresh, so a
+            // later code-change event still finds what it removed
             rememberStoreEntryCodes();
             storeEntryPinning.onCloneAnnounced(event, catalog);
+            return;
         } else {
             storeEntryPinning.onStoreEntryAnnounced(event, catalog);
         }

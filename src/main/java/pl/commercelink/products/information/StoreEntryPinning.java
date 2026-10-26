@@ -68,8 +68,9 @@ class StoreEntryPinning {
     /**
      * The delayed announcement of a new clone (R17): PIM sends it once the app instances have had time to load the
      * clone into their copies, yet the copy of this instance is refreshed first, synchronously, so the clone is looked
-     * up in a copy that knows it. A refresh failure propagates and the event is redelivered. A clone missing from the
-     * refreshed copy was deleted meanwhile: nothing moves.
+     * up in a copy that knows it. A refresh failure propagates and the event is redelivered. Nothing moves when the
+     * refreshed copy has no such clone of the event's owner (deleted meanwhile, or not loaded by PIM yet: a WARN asks
+     * for a manual resend) or when the clone's source differs from the event's.
      */
     void onCloneAnnounced(PIMEntryAddedEvent event, PimCatalog catalog) {
         String ownerStoreId = event.ownerStoreId();
@@ -82,8 +83,16 @@ class StoreEntryPinning {
         Optional<PimEntry> clone = storeView.findByPimId(event.pimId())
                 .filter(entry -> ownerStoreId.equals(entry.ownerStoreId()));
         if (clone.isEmpty()) {
-            log.info("PIM clone {} of {} in store {}: not in the refreshed PIM index (deleted meanwhile), nothing moved",
+            // deleted meanwhile, or PIM's index had not loaded the clone when this instance refreshed
+            log.warn("PIM clone {} of {} in store {}: not in the refreshed PIM index, nothing moved; if the clone "
+                            + "exists, resend pim-entry-added manually after the next PIM index rebuild, see runbook",
                     event.pimId(), sourcePimId, ownerStoreId);
+            return;
+        }
+        if (!sourcePimId.equals(clone.get().clonedFromPimId())) {
+            // the event must not move the products of a source the entry was not cloned from
+            log.warn("PIM clone {} in store {}: the event names source {} but the entry was cloned from {}, nothing moved",
+                    event.pimId(), ownerStoreId, sourcePimId, clone.get().clonedFromPimId());
             return;
         }
         List<String> ownerCategoryIds = categoryIdsOf(ownerStoreId);
