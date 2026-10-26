@@ -182,6 +182,18 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
+    void selectVariantMarksOnlyTheRowAndRecounts() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then
+        assertThat(js).contains("data-cl-line-select").contains("selectVariant(");
+        String body = js.substring(js.indexOf("function selectVariant(row) {"));
+        body = body.substring(0, body.indexOf("\n    }\n"));
+        assertThat(body).contains("'variantSelected'").contains("recount()").contains("changed()");
+    }
+
+    @Test
     void clearedCostInTheItemDialogReadsZeroOnLeavingTheField() throws Exception {
         // when
         String js = read("static/js/offer-lines.js");

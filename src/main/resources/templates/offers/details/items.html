@@ -54,6 +54,7 @@
                         data-msg-margin-unknown=#{offers.details.margin.unknown},
                         data-msg-mfn-prefix=#{order.items.mfn.prefix},
                         data-msg-last-item=#{offers.details.line.menu.remove.reason},
+                        data-msg-line-selected=#{offers.details.line.selected},
                         data-msg-line-moved=#{offers.details.line.moved},
                         data-msg-line-moved-group=#{offers.details.line.moved.inGroup},
                         data-msg-group-moved=#{offers.details.group.moved}">
@@ -221,6 +222,7 @@
                 <li hidden data-cl-lines-reveal><button type="button" class="cl-menu-item" data-cl-line-move="down" th:text="#{offers.details.line.menu.down}"></button></li>
                 <!--/* shown by the page script while the row sits in a group */-->
                 <li hidden data-cl-line-ungroup-item><button type="button" class="cl-menu-item" data-cl-line-ungroup th:text="#{offers.details.line.menu.ungroup}"></button></li>
+                <li hidden data-cl-line-select-item><button type="button" class="cl-menu-item" data-cl-line-select th:text="#{offers.details.line.menu.select}"></button></li>
                 <li class="cl-menu-sep" aria-hidden="true"></li>
                 <!--/* with the page script it asks first; without it the post removes the item at once, as before */-->
                 <li th:if="${count > 1}"><button type="submit" class="cl-menu-item is-danger" form="offer-action-form"

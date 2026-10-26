@@ -387,6 +387,7 @@
             }
             row.classList.toggle('is-variant', !!group);
             row.querySelector('[data-cl-line-ungroup-item]').hidden = !group;
+            row.querySelector('[data-cl-line-select-item]').hidden = true;
         });
         groups.forEach(function (each) {
             // As the save leaves it: the incomplete items go first, then a group without its marked item takes its first
@@ -401,6 +402,7 @@
             each.items.forEach(function (row) {
                 row.classList.toggle('is-unpicked', row !== chosen);
                 row.querySelector('[data-cl-mark-selected]').hidden = row !== chosen;
+                row.querySelector('[data-cl-line-select-item]').hidden = row === chosen;
             });
             each.head.querySelector('[data-cl-group-count]').textContent = message('group-picks', { n: each.items.length });
         });
@@ -528,6 +530,24 @@
         group.foot.remove();
         var focus = group.items.length ? menuSummary(group.items[0]) : form.querySelector('[data-cl-group-add]');
         afterMove(focus);
+    }
+
+    // Marks the row as the variant the save counts and the others of its group as not; the menus and totals follow.
+    function selectVariant(row) {
+        var group = row.getAttribute('data-group');
+        rows().filter(function (each) {
+            return isItem(each) && each.getAttribute('data-group') === group;
+        }).forEach(function (each) {
+            field(each, 'variantSelected').value = each === row ? 'true' : 'false';
+        });
+        refresh(false);
+        recount();
+        changed();
+        var status = form.querySelector('[data-cl-lines-status]');
+        if (status) {
+            status.textContent = message('line-selected', [field(row, 'name').value, group]);
+        }
+        menuSummary(row).focus();
     }
 
     function takeOutOfGroup(row) {
@@ -834,6 +854,8 @@
             }
         } else if (row && target.hasAttribute('data-cl-line-ungroup')) {
             takeOutOfGroup(row);
+        } else if (row && target.hasAttribute('data-cl-line-select')) {
+            selectVariant(row);
         } else if (head && target.hasAttribute('data-cl-group-move')) {
             if (moveGroup(head, target.getAttribute('data-cl-group-move'))) {
                 afterMove(menuSummary(head), head);

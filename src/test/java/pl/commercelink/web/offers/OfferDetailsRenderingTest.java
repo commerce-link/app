@@ -276,6 +276,18 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void everyRowMenuOffersSetAsChosenHiddenUntilTheScriptDecides() {
+        // when
+        String html = html(fullOffer());
+
+        // then
+        assertThat(row(html, 3)).contains("<li hidden data-cl-line-select-item>")
+                .contains("data-cl-line-select").contains("Ustaw jako wybrany");
+        assertThat(row(html, 0)).contains("data-cl-line-select-item").contains("data-cl-line-select");
+        assertThat(html).contains("data-msg-line-selected=");
+    }
+
+    @Test
     void summaryShowsTodaysFigures() {
         // when
         String html = html(fullOffer());
