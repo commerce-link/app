@@ -371,7 +371,8 @@ class OfferDetailsScriptContractTest {
 
         // then
         assertThat(layout).contains("function showToast(message, type, action)").contains("cl-toast-action")
-                .contains("action.run()").contains("8000").contains("button.type = 'button'");
+                .contains("action.run()").contains("const CL_TOAST_ACTION_MS = 5000;").doesNotContain("8000")
+                .contains("button.type = 'button'");
         assertThat(css).contains(".cl-toast-action {").contains(".cl-toast-action:focus-visible");
     }
 }

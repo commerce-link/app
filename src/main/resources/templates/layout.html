@@ -208,8 +208,9 @@
         clToastHideTimer = setTimeout(() => { toast.style.display = 'none'; }, 300);
     }
 
-    // action ({label, run}) adds a button that runs it and hides the toast; such a toast stays 8 s instead of 2 s, and
+    // action ({label, run}) adds a button that runs it and hides the toast; such a toast stays 5 s instead of 2 s, and
     // longer while the pointer or the focus is on it, so the button can still be reached
+    const CL_TOAST_ACTION_MS = 5000;
     function showToast(message, type, action) {
         const toast = document.getElementById('clToast');
         const text = document.createElement('span');
@@ -244,9 +245,9 @@
         clearTimeout(clToastHideTimer);
         toast.style.display = 'flex';
         requestAnimationFrame(() => { toast.style.opacity = '1'; });
-        clToastHold = action ? 8000 : null;
+        clToastHold = action ? CL_TOAST_ACTION_MS : null;
         clearTimeout(clToastTimer);
-        clToastTimer = setTimeout(hideToast, action ? 8000 : 2000);
+        clToastTimer = setTimeout(hideToast, action ? CL_TOAST_ACTION_MS : 2000);
     }
 </script>
 
