@@ -106,6 +106,11 @@ public class PimCatalogRegistry {
                               ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
         if (event.ownerStoreId() == null) {
             attachEntryToProducts(event, productRepository);
+        } else if (event.clonedFromPimId() != null) {
+            // the delayed announcement of a new clone refreshes the copy itself; the codes of the store entries go to
+            // the history first, as before every refresh, so a later code-change event still finds what it removed
+            rememberStoreEntryCodes();
+            storeEntryPinning.onCloneAnnounced(event, catalog);
         } else {
             storeEntryPinning.onStoreEntryAnnounced(event, catalog);
         }

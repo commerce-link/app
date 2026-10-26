@@ -41,6 +41,12 @@ public final class ScopedPimCatalog {
                 null, storeId);
     }
 
+    public static PimEntry cloneEntry(String pimId, String storeId, String sourcePimId, String gtin, String mpn,
+                                      String category) {
+        return new PimEntry(pimId, identifiers(gtin, mpn), "Brand", "Clone " + pimId, category, null, true, 2000, 2200,
+                null, storeId, sourcePimId);
+    }
+
     public static List<PimIdentifier> identifiers(String gtin, String mpn) {
         return mpn == null
                 ? List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN))
