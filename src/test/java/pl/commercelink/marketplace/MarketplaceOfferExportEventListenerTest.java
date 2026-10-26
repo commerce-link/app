@@ -316,6 +316,58 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
+    void aDeadPinWithNoPreviousOfferIsExportedOnEveryRun() {
+        // given a product pinned to an entry no index copy knows, with nothing in the previous export (a new
+        // marketplace or category, or a previous export that could not be read)
+        Product product = product("dead-D", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "dead-D")).thenReturn(false);
+        List<List<String>> removedPerRun = chainRuns();
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            for (int run = 1; run <= 5; run++) {
+                listener.handleMessage(request());
+            }
+
+            // then it is never held back, as before stores had clones; each run warns once to re-pin it
+            assertThat(removedPerRun).containsOnly(List.of());
+            assertThat(publishedPerRun).hasSize(5).allSatisfy(offers -> assertThat(offers)
+                    .extracting(MarketplaceOffer::productId).containsExactly("dead-D"));
+            assertThat(logs.errors()).isEmpty();
+            assertThat(logs.warnings()).hasSize(5).allSatisfy(warning -> assertThat(warning)
+                    .contains(product.getProductId()).contains("dead-D").contains("re-pin"));
+        }
+    }
+
+    @Test
+    void aDeadPinSharingTheEanOfAnOrphanIsHeldOnlyWhileTheShieldLasts() {
+        // given no offer under the product's own id, but a previous offer with its EAN that no product offers now
+        Product product = product("dead-D", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "dead-D")).thenReturn(false);
+        List<List<String>> removedPerRun = chainRuns(
+                MarketplaceOfferSnapshot.published("pim-GONE", 80L, 2L, "5900000000011", "MFN-GONE"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            for (int run = 1; run <= 6; run++) {
+                listener.handleMessage(request());
+            }
+
+            // then held while the shield lasts, reported once when it ends, exported under its own id afterwards
+            assertThat(removedPerRun).containsExactly(
+                    List.of(), List.of(), List.of(), List.of("pim-GONE"), List.of("pim-GONE"), List.of("pim-GONE"));
+            assertThat(publishedPerRun).extracting(offers -> offers.stream().map(MarketplaceOffer::productId).toList())
+                    .containsExactly(List.of(), List.of(), List.of(), List.of(), List.of("dead-D"), List.of("dead-D"));
+            assertThat(logs.errors()).singleElement().satisfies(error -> assertThat(error)
+                    .contains("dead-D").contains("pim-GONE"));
+        }
+    }
+
+    @Test
     void aRemovedProductsOfferIsNotKeptAliveByADeadPinSharingItsEan() {
         // given pim-GONE left the catalog; the dead-pinned product carries its EAN and has its own previous offer
         Product product = product("dead-D", "5900000000011");

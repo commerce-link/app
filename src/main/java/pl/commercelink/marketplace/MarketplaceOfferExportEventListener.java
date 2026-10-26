@@ -22,6 +22,7 @@ import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -92,7 +93,7 @@ public class MarketplaceOfferExportEventListener {
         List<MarketplaceOfferSnapshot> previousExport = loadPreviousSnapshot(store, catalog, payload.getMarketplace());
 
         ExportCandidates candidates = collectOffersFromCatalog(
-                store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist, pimIdsOfRows(previousExport));
+                store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist, previousExport);
 
         handleMarketplaceExport(store, payload.getMarketplace(), candidates, previousExport, run);
     }
@@ -108,7 +109,7 @@ public class MarketplaceOfferExportEventListener {
                                                       String marketplace,
                                                       InventoryView inventory,
                                                       Pricelist pricelist,
-                                                      Set<String> previousOfferIds) {
+                                                      List<MarketplaceOfferSnapshot> previousExport) {
         List<CategoryDefinition> categories = new LinkedList<>();
         List<MarketplaceDefinition> definitions = new LinkedList<>();
         List<List<Product>> productsPerCategory = new LinkedList<>();
@@ -129,26 +130,97 @@ public class MarketplaceOfferExportEventListener {
         }
 
         Map<String, MarketplaceOffer> offersByOfferId = new LinkedHashMap<>();
-        SkippedProducts skipped = new SkippedProducts();
+        List<UnknownEntryOffer> unknown = new ArrayList<>();
         for (int i = 0; i < categories.size(); i++) {
-            for (MarketplaceOffer offer : createMarketplaceOffers(storeId, categories.get(i), definitions.get(i),
-                    productsPerCategory.get(i), exportedPimIds, inventory, pricelist, previousOfferIds, skipped)) {
-                MarketplaceOffer kept = offersByOfferId.putIfAbsent(offer.productId(), offer);
-                if (kept == null) {
-                    continue;
+            String categoryName = categories.get(i).getName();
+            for (Candidate candidate : createMarketplaceOffers(storeId, categories.get(i), definitions.get(i),
+                    productsPerCategory.get(i), exportedPimIds, inventory, pricelist)) {
+                if (candidate.entryKnown()) {
+                    addOffer(offersByOfferId, candidate.offer(), marketplace, storeId, categoryName);
+                } else {
+                    unknown.add(new UnknownEntryOffer(candidate.product(), candidate.offer(), categoryName));
                 }
-                // the offer with stock wins, so the marketplace does not show 0 while the other product has some; a
-                // replaced value keeps its place in the map, so the offer order stays the catalog order
-                MarketplaceOffer winner = offer.quantity() > kept.quantity() ? offer : kept;
-                MarketplaceOffer loser = winner == offer ? kept : offer;
-                offersByOfferId.put(offer.productId(), winner);
-                log.warn("Marketplace {} export of store {}: more than one product maps to offer id {} (category {}); "
-                                + "keeping the one with quantity {} and skipping the one with quantity {}",
-                        marketplace, storeId, offer.productId(), categories.get(i).getName(), winner.quantity(),
-                        loser.quantity());
             }
         }
+        SkippedProducts skipped = holdBackOrExport(storeId, marketplace, unknown, offersByOfferId, previousExport);
         return new ExportCandidates(new LinkedList<>(offersByOfferId.values()), skipped);
+    }
+
+    // the offer with stock wins, so the marketplace does not show 0 while the other product has some; a replaced value
+    // keeps its place in the map, so the offer order stays the catalog order
+    private static void addOffer(Map<String, MarketplaceOffer> offersByOfferId, MarketplaceOffer offer, String marketplace,
+                                 String storeId, String categoryName) {
+        MarketplaceOffer kept = offersByOfferId.putIfAbsent(offer.productId(), offer);
+        if (kept == null) {
+            return;
+        }
+        MarketplaceOffer winner = offer.quantity() > kept.quantity() ? offer : kept;
+        MarketplaceOffer loser = winner == offer ? kept : offer;
+        offersByOfferId.put(offer.productId(), winner);
+        log.warn("Marketplace {} export of store {}: more than one product maps to offer id {} (category {}); "
+                        + "keeping the one with quantity {} and skipping the one with quantity {}",
+                marketplace, storeId, offer.productId(), categoryName, winner.quantity(), loser.quantity());
+    }
+
+    /**
+     * A product whose PIM entry the index copy does not know gets its own pimId as the offer id. An index copy older
+     * than the product's entry (a clone made moments ago) cannot tell the real offer id, the source's, so the product
+     * is held back while the previous export has an offer it would protect: one with its codes that no product of this
+     * run offers, still on the marketplace and within the bound (see handleMarketplaceExport, which keeps it for that
+     * many runs and then reports and removes it). In every other case (a dead pin: the entry was deleted and the
+     * delete event lost; an offer already under the product's own id; nothing to protect) the product is exported
+     * under its own pimId, as before stores had clones, with a WARN to re-pin it.
+     */
+    private SkippedProducts holdBackOrExport(String storeId,
+                                             String marketplace,
+                                             List<UnknownEntryOffer> unknown,
+                                             Map<String, MarketplaceOffer> offersByOfferId,
+                                             List<MarketplaceOfferSnapshot> previousExport) {
+        Set<String> previousOfferIds = pimIdsOfRows(previousExport);
+        // products already published under their own id go first, so the offers they keep are never protected again
+        List<UnknownEntryOffer> ordered = new ArrayList<>(unknown);
+        ordered.sort(Comparator.comparing(entry -> !previousOfferIds.contains(entry.offer().productId())));
+        SkippedProducts skipped = new SkippedProducts();
+        for (UnknownEntryOffer entry : ordered) {
+            Product product = entry.product();
+            boolean ownOffer = previousOfferIds.contains(entry.offer().productId());
+            if (!ownOffer && protectsAPreviousOffer(product, offersByOfferId.keySet(), previousExport)) {
+                log.warn("Marketplace export of store {}: product {} skipped for this run, the index copy does not "
+                        + "know its PIM entry {} yet", storeId, product.getProductId(), product.getPimId());
+                skipped.add(product);
+                continue;
+            }
+            log.warn("Marketplace export of store {}: product {} is pinned to PIM entry {}, which the index copy does "
+                            + "not know; it is exported under that id as before, re-pin the product to a live PIM entry",
+                    storeId, product.getProductId(), product.getPimId());
+            addOffer(offersByOfferId, entry.offer(), marketplace, storeId, entry.categoryName());
+        }
+        return skipped;
+    }
+
+    private boolean protectsAPreviousOffer(Product product, Set<String> currentOfferIds,
+                                           List<MarketplaceOfferSnapshot> previousExport) {
+        return previousExport.stream().anyMatch(snapshot -> !currentOfferIds.contains(snapshot.pimId())
+                && isLiveOffer(snapshot)
+                && snapshot.waitingRuns() <= unknownEntryMaxWaitingRuns
+                && sharesCodes(product, snapshot));
+    }
+
+    // as SkippedProducts matches: by EAN, or by MFN when the previous offer has no EAN
+    private static boolean sharesCodes(Product product, MarketplaceOfferSnapshot snapshot) {
+        Optional<String> ean = unifiedEan(snapshot.ean());
+        if (ean.isPresent()) {
+            return ean.equals(unifiedEan(product.getEan()));
+        }
+        Optional<String> mfn = unifiedMfn(snapshot.manufacturerCode());
+        return mfn.isPresent() && mfn.equals(unifiedMfn(product.getManufacturerCode()));
+    }
+
+    /** A product's offer, and whether the index copy knows its PIM entry. */
+    private record Candidate(Product product, MarketplaceOffer offer, boolean entryKnown) {
+    }
+
+    private record UnknownEntryOffer(Product product, MarketplaceOffer offer, String categoryName) {
     }
 
     /** The offers of this run, and the products skipped because the index copy does not know their entry. */
@@ -182,16 +254,14 @@ public class MarketplaceOfferExportEventListener {
         }
     }
 
-    private List<MarketplaceOffer> createMarketplaceOffers(String storeId,
+    private List<Candidate> createMarketplaceOffers(String storeId,
                                                            CategoryDefinition category,
                                                            MarketplaceDefinition marketplaceDefinition,
                                                            List<Product> products,
                                                            Set<String> exportedPimIds,
                                                            InventoryView inventory,
-                                                           Pricelist pricelist,
-                                                           Set<String> previousOfferIds,
-                                                           SkippedProducts skipped) {
-        List<MarketplaceOffer> result = new LinkedList<>();
+                                                           Pricelist pricelist) {
+        List<Candidate> result = new LinkedList<>();
 
         String categoryName = category.getName();
 
@@ -213,25 +283,8 @@ public class MarketplaceOfferExportEventListener {
             }
 
             // The offer keeps the id it was published under: a product on a clone is still offered as its source.
-            // For an entry the index copy does not know, this is the product's own pimId.
+            // For an entry the index copy does not know, this is the product's own pimId (see holdBackOrExport).
             String offerId = aliases.offerIdOf(storeId, product.getPimId());
-
-            if (!aliases.knows(storeId, product.getPimId())) {
-                // An index copy older than the product's entry (a clone made moments ago) cannot tell the offer id,
-                // which would come out as the clone's own id: the product waits for a run on a fresher copy, and the
-                // offer it was published under is kept meanwhile, for a bounded number of runs (see
-                // handleMarketplaceExport). An offer already published under the product's own id cannot be such a
-                // fresh clone: it is a dead pin (the entry was deleted and the delete event lost), exported as before.
-                if (!previousOfferIds.contains(offerId)) {
-                    log.warn("Marketplace export of store {}: product {} skipped for this run, the index copy does not "
-                            + "know its PIM entry {} yet", storeId, product.getProductId(), product.getPimId());
-                    skipped.add(product);
-                    continue;
-                }
-                log.warn("Marketplace export of store {}: product {} is pinned to PIM entry {}, which the index copy "
-                                + "does not know; its offer under that id is exported as before, re-pin the product to a "
-                                + "live PIM entry", storeId, product.getProductId(), product.getPimId());
-            }
 
             AvailabilityAndPrice availabilityAndPrice = priceInPricelist.get();
             MatchedInventory matchedInventory =
@@ -239,7 +292,9 @@ public class MarketplaceOfferExportEventListener {
 
             long qtyToPublish = marketplaceDefinition.qtyToPublish(matchedInventory);
 
-            result.add(toMarketplaceOffer(offerId, availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName));
+            result.add(new Candidate(product,
+                    toMarketplaceOffer(offerId, availabilityAndPrice, marketplaceDefinition.getMarkup(), qtyToPublish, categoryName),
+                    aliases.knows(storeId, product.getPimId())));
         }
         return result;
     }
