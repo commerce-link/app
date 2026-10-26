@@ -41,7 +41,7 @@
         <form th:if="${online}" method="post" data-cl-submit-once th:action="@{|${page.offerPath}/checkout|}">
             <fieldset th:if="${pay.options.size() > 1}" class="cl-pay-methods is-row" th:classappend="${locked} ? 'is-locked'"
                       th:attr="aria-describedby=${locked ? 'client-offer-pay-lock' : null}">
-                <legend th:text="#{client.offer.payment.methods}"></legend>
+                <legend class="cl-visually-hidden" th:text="#{client.offer.payment.methods}"></legend>
                 <label class="cl-choice" th:each="option : ${pay.options}">
                     <input type="radio" name="paymentOptionId" th:value="${option.name()}"
                            th:checked="${option.name() == pay.defaultOption}" th:disabled="${locked}">

@@ -14542,6 +14542,8 @@ body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line
 .cl-client-offer .cl-proforma .cl-help { margin-top: 2px; }
 .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; justify-content: center; }
 @media (min-width: 1024px) {
+  /* a pointer is likely here: the link-like proforma button keeps a 28 px target (WCAG 2.5.8 asks for 24) */
+  .cl-client-offer .cl-link-button { min-height: 28px; align-items: center; }
   .cl-client-offer .cl-items-total { display: none; }
   .cl-client-offer .cl-split-side .cl-pay-row { display: block; }
   .cl-client-offer .cl-split-side .cl-pay-amount { display: none; }
@@ -14552,6 +14554,8 @@ body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line
 }
 @media (max-width: 719px) {
   .cl-client-offer .cl-pay-methods.is-row { grid-template-columns: minmax(0, 1fr); }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin-bottom: 8px; }
   .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; }
 }
 
@@ -14561,4 +14565,11 @@ body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line
 @media (min-width: 1024px) {
   body.cl-public .cl-order-page .cl-split-side .cl-date-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   body.cl-public .cl-order-page .cl-split-side .cl-date-grid .is-wide { grid-column: 1 / -1; }
+  /* 400 px is too narrow for a row beside its action or a label beside an IBAN: they stack as they do on a phone */
+  body.cl-public .cl-order-page .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions { justify-content: stretch; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dt { font-size: 12.5px; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dd { margin-bottom: 8px; }
 }
