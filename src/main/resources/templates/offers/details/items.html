@@ -48,10 +48,8 @@
                         data-msg-line-no-cost=#{offers.details.line.noCost},
                         data-msg-line-margin=#{offers.details.line.margin},
                         data-msg-line-margin-unknown=#{offers.details.line.marginUnknown},
-                        data-msg-line-margin-low=#{offers.details.line.marginLow},
                         data-msg-line-cost-estimated=#{offers.details.line.costEstimated},
                         data-msg-line-margin-estimated=#{offers.details.line.marginEstimated},
-                        data-msg-line-margin-estimated-low=#{offers.details.line.marginEstimatedLow},
                         data-msg-margin-estimated=#{offers.details.margin.estimated},
                         data-msg-margin-ok=#{offers.details.margin.ok},
                         data-msg-margin-loss=#{offers.details.margin.loss},
@@ -229,13 +227,12 @@
             <th:block th:unless="${it.service()}">
                 <span th:if="${it.margin().percent() == null}" class="cl-line-margin is-low" data-cl-line-margin
                       th:text="#{offers.details.line.marginUnknown}"></span>
-                <!--/* a low margin says so in words, not only by its colour */-->
+                <!--/* a low margin is shown by its tone only: a word next to it pushed the line past the value column */-->
                 <span th:unless="${it.margin().percent() == null}" class="cl-line-margin" data-cl-line-margin
                       th:with="low=${it.margin().tone().name() != 'LOSS' and (it.unitPrice() - it.costForMargin()) * 10 < it.unitPrice()}"
                       th:classappend="${it.margin().tone().name() == 'LOSS'} ? 'is-bad' : (${low} ? 'is-low')"
-                      th:text="${it.costEstimated()}
-                          ? (${low} ? #{offers.details.line.marginEstimatedLow(${it.margin().percent()})} : #{offers.details.line.marginEstimated(${it.margin().percent()})})
-                          : (${low} ? #{offers.details.line.marginLow(${it.margin().percent()})} : #{offers.details.line.margin(${it.margin().percent()})})"></span>
+                      th:text="${it.costEstimated()} ? #{offers.details.line.marginEstimated(${it.margin().percent()})}
+                          : #{offers.details.line.margin(${it.margin().percent()})}"></span>
             </th:block>
             <span class="cl-line-margin cl-line-outside" th:text="#{offers.details.line.outside}"></span>
         </span>

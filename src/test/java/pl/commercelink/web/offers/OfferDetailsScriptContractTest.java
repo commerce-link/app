@@ -260,8 +260,9 @@ class OfferDetailsScriptContractTest {
         // then
         assertThat(js).contains("data-median-cost").contains("function costOf(")
                 .contains("'line-cost-estimated'").contains("'line-margin-estimated'")
-                .contains("'line-margin-estimated-low'").contains("'margin-estimated'")
-                .contains("data-cl-sum-estimated");
+                .contains("'margin-estimated'").contains("data-cl-sum-estimated");
+        // a low margin is shown by its tone only: the "· niska" texts pushed the line past the value column
+        assertThat(js).doesNotContain("'line-margin-low'").doesNotContain("'line-margin-estimated-low'");
         assertThat(recountRow).contains("costOf(");
         assertThat(recount).contains("costOf(");
     }

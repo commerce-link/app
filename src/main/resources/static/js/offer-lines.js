@@ -251,11 +251,10 @@
 
         var margin = marginOf(price, cost);
         var label = row.querySelector('[data-cl-line-margin]');
-        // a low margin says so in words too: the tone alone is barely apart from the plain text
+        // a low margin is shown by its tone only (OfferDetailsPage row): words pushed the line past the value column
         var low = margin.percent !== null && margin.tone !== 'loss' && (price - cost) * 10 < price;
         label.textContent = margin.percent === null ? message('line-margin-unknown')
-            : message(counted.estimated ? (low ? 'line-margin-estimated-low' : 'line-margin-estimated')
-                : (low ? 'line-margin-low' : 'line-margin'), [margin.percent]);
+            : message(counted.estimated ? 'line-margin-estimated' : 'line-margin', [margin.percent]);
         label.classList.toggle('is-bad', margin.percent !== null && margin.tone === 'loss');
         label.classList.toggle('is-low', margin.percent === null || low);
 

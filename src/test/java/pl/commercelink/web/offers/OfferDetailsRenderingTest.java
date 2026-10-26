@@ -259,7 +259,7 @@ class OfferDetailsRenderingTest {
         String html = html(estimated);
 
         // then
-        assertThat(row(html, 1)).contains("koszt ≈ 1" + NBSP + "721,40 (mediana u dostawców)").contains("marża ≈ ")
+        assertThat(row(html, 1)).contains("koszt ≈ 1" + NBSP + "721,40<").contains("marża ≈ ")
                 .contains("data-tooltip=\"Szacowana marża:").contains("data-median-cost=\"1721.4\"")
                 .contains("data-cost=\"0.0\"").doesNotContain("brak kosztu");
         assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("≈").doesNotContain("Szacowana marża");
