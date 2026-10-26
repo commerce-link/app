@@ -14252,6 +14252,29 @@ body.cl-public .cl-toast { top: 16px; }
   body.cl-public .cl-toast { top: 8px; }
 }
 
+/* ===== Public page in two columns (offer, order): content on the left, payment and the seller card on the right ===== */
+body.cl-public.is-split, .cl-public-main.is-split { --cl-public-width: 1200px; }
+body.cl-public .cl-split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+body.cl-public .cl-split-main, body.cl-public .cl-split-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+body.cl-public .cl-seller-id { text-align: center; }
+body.cl-public .cl-seller-logo { display: block; margin: 0 auto 10px; max-width: 220px; max-height: 140px; width: auto; height: auto; }
+body.cl-public .cl-seller-name { margin: 0; font-size: 15px; font-weight: 650; color: var(--cl-ink); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-line { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 12px 0 0;
+  padding-top: 12px; border-top: 1px solid var(--cl-line); font-size: 14px; }
+body.cl-public .cl-seller-contact a { display: inline-flex; gap: 8px; align-items: center; overflow-wrap: anywhere; }
+body.cl-public .cl-seller-help { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--cl-line); }
+body.cl-public .cl-seller-help .cl-card-title { margin: 0 0 4px; }
+/* below 1024 px the side column falls under the content: the logo moves up into a larger header instead */
+@media (max-width: 1023px) {
+  body.cl-public .cl-split { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body.cl-public.is-split .cl-public-bar { min-height: 72px; }
+  body.cl-public.is-split .cl-public-logo { max-height: 52px; max-width: 220px; }
+  body.cl-public .cl-seller-logo { display: none; }
+  body.cl-public .cl-seller-id { text-align: left; }
+  body.cl-public .cl-seller-contact { align-items: flex-start; }
+}
+
 /* ===== Public page components (offer, order) ===== */
 body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
 body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
