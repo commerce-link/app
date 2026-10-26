@@ -345,7 +345,11 @@
         if (skipped > 0) {
             texts.push(meta.getAttribute('data-message'));
         }
-        showToast(texts.join(' '), skipped > 0 ? 'warning' : 'info');
+        var dropped = parseInt(meta.getAttribute('data-dropped'), 10) || 0;
+        if (dropped > 0) {
+            texts.push(meta.getAttribute('data-dropped-message'));
+        }
+        showToast(texts.join(' '), skipped > 0 || dropped > 0 ? 'warning' : 'info');
     }
 
     document.addEventListener('cl:item-add-submit', function (event) {
@@ -480,6 +484,11 @@
     if (form.querySelector('[data-cl-offer-conflict]')) {
         document.addEventListener('DOMContentLoaded', function () {
             window.CL_markDirty(form);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            var alert = form.querySelector('[data-cl-offer-conflict]');
+            alert.focus();
+            alert.scrollIntoView({ block: 'center' });
         });
     }
 

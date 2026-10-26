@@ -257,7 +257,8 @@
        price list or at the suppliers); message is set only then. */-->
 <th:block th:fragment="itemsDraft" th:with="p=${page}">
     <section th:replace="~{offers/details/items :: card(${p})}"></section>
-    <template data-cl-draft-meta th:attr="data-skipped=${skipped}, data-requested=${requested},
+    <template data-cl-draft-meta th:attr="data-skipped=${skipped}, data-requested=${requested}, data-dropped=${dropped},
+              data-dropped-message=${dropped > 0} ? #{offers.details.items.droppedDraft(${dropped})} : null,
               data-message=${skipped > 0} ? #{offers.details.items.skipped(${skipped}, ${requested})} : null"></template>
 </th:block>
 </body>

@@ -318,7 +318,7 @@ class OfferDetailsControllerHttpTest {
         storedOffer().setVersion(8L);
 
         // when
-        mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "7").param("overwrite", "true")
+        mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "8").param("overwrite", "true")
                         .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
                         .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
                         .param("basketItems[0].unitPrice", "10"))

@@ -723,7 +723,7 @@ class OfferDetailsControllerTest {
         form.setBasketItems(List.of(item("MFN-MINE", 2)));
 
         // when
-        String view = controller.saveItems(OFFER_ID, form, 4L, true, null, new ExtendedModelMap(),
+        String view = controller.saveItems(OFFER_ID, form, 5L, true, null, new ExtendedModelMap(),
                 new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
 
         // then
@@ -731,6 +731,25 @@ class OfferDetailsControllerTest {
         assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
         assertThat(saved.getVersion()).isEqualTo(5L);
         assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+    }
+
+    @Test
+    void overwriteStillRefusesAVersionThatMovedAgain() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(6L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        controller.saveItems(OFFER_ID, form, 5L, true, null, new ExtendedModelMap(), response,
+                new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        verify(basketsRepository, never()).save(any());
     }
 
     @Test
@@ -836,6 +855,21 @@ class OfferDetailsControllerTest {
         assertThat(model.get("skipped")).isEqualTo(1);
         assertThat(model.get("requested")).isEqualTo(2);
         verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void theDraftCountsTheIncompleteRowsItLeavesOut() {
+        // given
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(fullOffer(BasketType.Offer)));
+        Basket table = new Basket();
+        table.setBasketItems(List.of(item("MFN-A", 1), item("MFN-ZERO", 0), item("", 1)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.draftItems(OFFER_ID, table, new AddItemsForm(), null, model, LOCALE);
+
+        // then
+        assertThat(model.get("dropped")).isEqualTo(2);
     }
 
     @Test

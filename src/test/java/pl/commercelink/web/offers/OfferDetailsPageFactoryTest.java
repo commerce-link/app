@@ -172,6 +172,19 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
+    void aNegativeOwnCostIsTheCostForMarginWithoutAMedian() {
+        // given
+        Basket basket = basket(item("A", 1, 100, -10));
+
+        // when
+        Item line = (Item) build(basket).lines().get(0);
+
+        // then
+        assertThat(line.costEstimated()).isFalse();
+        assertThat(line.costForMargin()).isEqualTo(-10);
+    }
+
+    @Test
     void anItemWithoutSupplierOffersStaysUnknown() {
         // given
         Basket basket = basket(item("A", 1, 2199, 0));

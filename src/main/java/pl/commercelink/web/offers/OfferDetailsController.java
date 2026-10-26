@@ -86,7 +86,8 @@ public class OfferDetailsController {
     /**
      * Only the items of the table; every other field stays as stored. version is the record's version the page was
      * opened at: when the record changed since (another operator, the client choosing a variant on their page), nothing
-     * is saved and the page comes back, 409, with the posted items and the choice to overwrite. No version (a page from
+     * is saved and the page comes back, 409, with the posted items and the choice to overwrite; that choice posts the
+     * stored version the conflict page carries, so a further change made meanwhile is a conflict again. No version (a page from
      * before this check) saves as before.
      */
     @PostMapping("/dashboard/offer/{offerId}")
@@ -95,9 +96,11 @@ public class OfferDetailsController {
                      @RequestParam(required = false) String returnTo, Model model, HttpServletResponse response,
                      RedirectAttributes redirectAttributes, Locale locale) {
         Basket offer = requireOffer(offerId);
+        // the check runs for "Overwrite" too: its page carries the stored version, so a change made after the conflict
+        // page was shown is a conflict again; overwrite only marks the intent
         boolean changedSince = version != null && !version.equals(offer.getVersion());
         setPostedItems(offer, form);
-        if (changedSince && !overwrite) {
+        if (changedSince) {
             // the page is built from the stored record with the posted items, so its hidden version is the stored one
             // and "Overwrite" posts that
             model.addAttribute("page", pageFactory.buildDraft(offer, returnTo, locale, LocalDateTime.now()));
@@ -121,21 +124,23 @@ public class OfferDetailsController {
                       @ModelAttribute("addItemsForm") AddItemsForm added, @RequestParam(required = false) String returnTo,
                       Model model, Locale locale) {
         Basket offer = requireOffer(offerId);
-        setPostedItems(offer, form);
+        int dropped = setPostedItems(offer, form);
         int skipped = offerItemsDraft.add(offer, added);
         model.addAttribute("page", pageFactory.buildDraft(offer, returnTo, locale, LocalDateTime.now()));
         model.addAttribute("returnTo", safeReturnTo(returnTo));
         model.addAttribute("skipped", skipped);
+        model.addAttribute("dropped", dropped);
         model.addAttribute("requested", added.entries().size());
         return VIEW + " :: itemsDraft";
     }
 
     /** Only the items are taken from the bound form: its other fields (the version among them) never reach the record. */
-    private static void setPostedItems(Basket offer, Basket form) {
+    /** Returns how many posted rows were incomplete and left out. */
+    private static int setPostedItems(Basket offer, Basket form) {
         List<BasketItem> posted = form.getBasketItems() == null ? List.of() : form.getBasketItems();
-        offer.setBasketItems(OfferController.normalizeBlankCategories(posted.stream()
-                .filter(BasketItem::isComplete)
-                .collect(Collectors.toList())));
+        List<BasketItem> kept = posted.stream().filter(BasketItem::isComplete).collect(Collectors.toList());
+        offer.setBasketItems(OfferController.normalizeBlankCategories(kept));
+        return posted.size() - kept.size();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/terms")

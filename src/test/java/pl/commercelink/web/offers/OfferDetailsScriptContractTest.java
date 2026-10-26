@@ -347,7 +347,8 @@ class OfferDetailsScriptContractTest {
 
         // then
         assertThat(js).contains("response.status === 409").contains("HTMLFormElement.prototype.submit.call(form)")
-                .contains("[data-cl-offer-conflict]").contains("window.CL_markDirty(form)");
+                .contains("[data-cl-offer-conflict]").contains("window.CL_markDirty(form)")
+                .contains("alert.focus()").contains("alert.scrollIntoView");
         assertThat(guard).contains("window.CL_markDirty = function (form)").contains("state.forced");
     }
 

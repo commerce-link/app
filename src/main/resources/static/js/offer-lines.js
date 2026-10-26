@@ -216,7 +216,8 @@
         if (field(row, 'service').value !== 'true' && isFinite(median) && median > 0) {
             return { cost: median, estimated: true };
         }
-        return { cost: 0, estimated: false };
+        // as OfferDetailsPageFactory.item: without a median the cost stays what is typed, a negative one included
+        return { cost: own, estimated: false };
     }
 
     // what the table save drops (OfferDetailsPageFactory.droppedOnSave)
