@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Who sells, for the side column of a two-column public page: the large logo (shown from 1024 px; below that the column
+       falls under the content and the logo is in the header), the company or the store name, and the address with the tax id.
+       Every line is left out when its data is missing. */-->
+<div th:fragment="identity" class="cl-seller-id">
+    <img th:if="${publicPage.logoUrl != null}" class="cl-seller-logo" th:src="${publicPage.logoUrl}" th:alt="${publicPage.storeName}">
+    <p class="cl-seller-name" th:text="${publicPage.hasSeller()} ? ${publicPage.sellerName} : ${publicPage.storeName}"></p>
+    <p th:if="${publicPage.sellerAddress != null or publicPage.sellerTaxId != null}" class="cl-seller-line"
+       th:text="${publicPage.sellerAddress != null and publicPage.sellerTaxId != null}
+            ? ${publicPage.sellerAddress} + ' · ' + #{public.taxId(${publicPage.sellerTaxId})}
+            : (${publicPage.sellerAddress != null} ? ${publicPage.sellerAddress} : #{public.taxId(${publicPage.sellerTaxId})})"></p>
+</div>
+
+<p th:fragment="contactLinks" th:if="${publicPage.hasContact()}" class="cl-seller-contact">
+    <a th:if="${publicPage.contactEmail != null}" th:href="'mailto:' + ${publicPage.contactEmail}"><i class="far fa-envelope"
+            aria-hidden="true"></i> <span th:text="${publicPage.contactEmail}"></span></a>
+    <a th:if="${publicPage.contactPhone != null}" th:href="'tel:' + ${#strings.replace(publicPage.contactPhone, ' ', '')}"><i
+            class="fas fa-phone" aria-hidden="true"></i> <span th:text="${publicPage.contactPhone}"></span></a>
+</p>
+
+<section th:fragment="card" class="cl-card cl-seller-card" th:aria-label="#{public.seller.card}">
+    <div class="cl-card-inset">
+        <div th:replace="~{fragments/public-seller :: identity}"></div>
+        <p th:replace="~{fragments/public-seller :: contactLinks}"></p>
+    </div>
+</section>
+
+</body>
+</html>

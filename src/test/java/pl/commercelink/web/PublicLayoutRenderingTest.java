@@ -38,6 +38,10 @@ class PublicLayoutRenderingTest {
             + "<head><title>Oferta</title></head>"
             + "<body><div layout:fragment=\"content\">PAGE_CONTENT</div></body></html>";
 
+    private static final String SPLIT_PAGE = DECORATING_PAGE
+            .replace("<html ", "<html th:with=\"publicWidth='is-split', publicFooter=false\" ")
+            .replace("PAGE_CONTENT", "<div th:replace=\"~{fragments/public-seller :: card}\"></div>");
+
     @Test
     void headerShowsOnlyTheLogoWhenThereIsOne() {
         // given
@@ -163,6 +167,68 @@ class PublicLayoutRenderingTest {
                 .doesNotContain("Sortable").doesNotContain("notification is-");
     }
 
+    @Test
+    void splitWidthMarksTheBodyAndHidesTheFooter() {
+        // when
+        String html = renderTemplate(PublicPageFactory.of(store("Nova Tech"), PATH, PL), SPLIT_PAGE);
+
+        // then
+        assertThat(html).contains("<body class=\"cl-public is-split\"")
+                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-split\"")
+                .doesNotContain("cl-public-foot");
+    }
+
+    @Test
+    void otherPagesKeepTheFooterAndNarrowWidth() {
+        // when
+        String html = render(PublicPageFactory.of(store("Nova Tech"), PATH, PL), "is-form");
+
+        // then
+        assertThat(html).contains("<body class=\"cl-public\"").doesNotContain("is-split").contains("cl-public-foot");
+    }
+
+    @Test
+    void sellerCardShowsLogoCompanyAddressAndContact() {
+        // given
+        Store store = store("Nova Tech");
+        Branding branding = new Branding();
+        branding.setLogo("logo.png");
+        branding.setLogoVersion(7L);
+        store.setBranding(branding);
+        BillingDetails billing = new BillingDetails();
+        billing.setCompanyName("Nova Tech sp. z o.o.");
+        billing.setTaxId("5252814410");
+        billing.setStreetAndNumber("ul. Prosta 12");
+        billing.setPostalCode("00-850");
+        billing.setCity("Warszawa");
+        billing.setPhone("+48 22 123 45 67");
+        billing.setEmail("biuro@nova.pl");
+        store.setBillingDetails(billing);
+
+        // when
+        String html = renderTemplate(PublicPageFactory.of(store, PATH, PL), SPLIT_PAGE);
+
+        // then
+        String card = html.substring(html.indexOf("cl-seller-card"));
+        assertThat(card).contains("class=\"cl-seller-logo\"").contains("src=\"/StoreLogo/s1?v=7\"")
+                .contains("<p class=\"cl-seller-name\">Nova Tech sp. z o.o.</p>")
+                .contains("ul. Prosta 12, 00-850 Warszawa · NIP 5252814410")
+                .contains("href=\"mailto:biuro@nova.pl\"")
+                .contains("href=\"tel:+48221234567\"");
+    }
+
+    @Test
+    void sellerCardWithoutLogoAndBillingShowsOnlyTheStoreName() {
+        // when
+        String html = renderTemplate(PublicPageFactory.of(store("Sklep Kowalski"), PATH, PL), SPLIT_PAGE);
+
+        // then
+        String card = html.substring(html.indexOf("cl-seller-card"));
+        assertThat(card).contains("<p class=\"cl-seller-name\">Sklep Kowalski</p>")
+                .doesNotContain("cl-seller-logo").doesNotContain("cl-seller-line")
+                .doesNotContain("cl-seller-contact").doesNotContain("null");
+    }
+
     private static Store store(String name) {
         Store store = new Store();
         store.setStoreId("s1");
@@ -181,6 +247,14 @@ class PublicLayoutRenderingTest {
         context.setVariable("publicPage", page);
         String template = width == null ? DECORATING_PAGE
                 : DECORATING_PAGE.replace("<html ", "<html th:with=\"publicWidth='" + width + "'\" ");
+        return templateEngine().process(template, context);
+    }
+
+    private String renderTemplate(PublicPage page, String template) {
+        JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
+        IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
+        WebContext context = new WebContext(exchange, PL);
+        context.setVariable("publicPage", page);
         return templateEngine().process(template, context);
     }
 

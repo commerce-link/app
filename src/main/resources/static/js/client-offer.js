@@ -95,6 +95,10 @@
             if (items) {
                 items.classList.add('is-slow');
             }
+            // from 1024 px the items card hides its total, so the side total carries the spinner too
+            if (payment) {
+                payment.classList.add('is-slow');
+            }
         }, SLOW_MS);
 
         fetch(form.action, {
