@@ -24,6 +24,8 @@ public class BasketItem {
     @DynamoDBAttribute(attributeName = "mfn")
     private String mfn;
     private String category;
+    @DynamoDBAttribute(attributeName = "brand")
+    private String brand;
     @DynamoDBAttribute(attributeName = "qty")
     private  long qty;
     @DynamoDBAttribute(attributeName = "unitPrice")
@@ -82,6 +84,14 @@ public class BasketItem {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public void setBrand(String brand) {
+        this.brand = brand;
     }
 
     public double getUnitPrice() {
@@ -235,6 +245,7 @@ public class BasketItem {
                 consolidated
         );
         item.setService(availabilityAndPrice.isService());
+        item.setBrand(availabilityAndPrice.getBrand());
         return item;
     }
 

@@ -8,12 +8,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
@@ -29,7 +31,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +47,7 @@ class PaymentWebhookRegistryTest {
     @Mock private BasketsRepository basketsRepository;
     @Mock private OrdersManager ordersManager;
     @Mock private StoreActivity storeActivity;
+    @Mock private DiscountService discountService;
 
     private final Store store = new Store();
     private final Basket basket = new Basket();
@@ -60,7 +65,7 @@ class PaymentWebhookRegistryTest {
         when(paymentProviderFactory.availableProviders()).thenReturn(List.of());
         when(basketsRepository.findById(STORE_ID, BASKET_ID)).thenReturn(Optional.of(basket));
         registry = new PaymentWebhookRegistry(paymentProviderFactory, storesRepository, basketsRepository,
-                ordersManager, storeActivity);
+                ordersManager, storeActivity, discountService);
         logs.start();
         registryLogger().addAppender(logs);
     }
@@ -98,6 +103,34 @@ class PaymentWebhookRegistryTest {
         // then
         verify(ordersManager).saveWithFulfilment(argThat(order -> BASKET_ID.equals(order.getOrderId())), any());
         assertThat(logs.list).isEmpty();
+    }
+
+    @Test
+    void redeemsCodeAfterSavingOrder() {
+        // given
+        basket.setDiscountCode("LATO-10");
+        when(storeActivity.isActive(store)).thenReturn(true);
+
+        // when
+        createOrder();
+
+        // then
+        InOrder inOrder = inOrder(ordersManager, discountService, basketsRepository);
+        inOrder.verify(ordersManager).saveWithFulfilment(any(), any());
+        inOrder.verify(discountService).redeem(STORE_ID, "LATO-10");
+        inOrder.verify(basketsRepository).delete(basket);
+    }
+
+    @Test
+    void noRedeemWithoutCode() {
+        // given
+        when(storeActivity.isActive(store)).thenReturn(true);
+
+        // when
+        createOrder();
+
+        // then
+        verifyNoInteractions(discountService);
     }
 
     private void createOrder() {

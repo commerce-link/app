@@ -156,7 +156,7 @@ class StatementMatcherTest {
     @Test
     void proposesTheRunOfAPayoutChannelsOrdersThatAddsUpToTheTransfer() {
         // given
-        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, null, true);
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true, null, null);
         Order first = orderedOn(fromMarketplace(order("91c2e7a0-0000-4000-8000-000000000001", 649.00,
                 pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro"), 3);
         Order second = orderedOn(fromMarketplace(order("5d0b8f13-0000-4000-8000-000000000002", 219.00,
@@ -182,7 +182,7 @@ class StatementMatcherTest {
     @Test
     void leavesAPayoutToTheOperatorWhenNoRunAddsUp() {
         // given
-        PayoutChannel furgonetka = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, null, false);
+        PayoutChannel furgonetka = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, false, null, null);
         Order cod = order(JAN, 500.00, pending(PaymentSource.CashOnDelivery));
 
         // when
@@ -200,8 +200,8 @@ class StatementMatcherTest {
     void aBankPaysForLoansTakenInTheShopAndOverThePhoneInOneTransfer() {
         // given
         List<PayoutChannel> santander = List.of(
-                new PayoutChannel("SANTANDER", null, PaymentSource.Installments, null, false),
-                new PayoutChannel("SANTANDER", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "Santander eRaty", false));
+                new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false, null, null),
+                new PayoutChannel("SANTANDER", PayoutChannel.SHOP, PaymentSource.OnlinePayment, false, null, null));
         Order shop = orderedOn(order(JAN, 1000.00, pending(PaymentSource.OnlinePayment, "Santander eRaty", "SR-1", 0)), 3);
         Order phone = orderedOn(order(ANNA, 500.00, pending(PaymentSource.Installments)), 4);
         Order transfer = orderedOn(order("b71e04d2-0000-4000-8000-000000000003", 1500.00, pending(PaymentSource.BankTransfer)), 5);
@@ -218,11 +218,72 @@ class StatementMatcherTest {
     }
 
     @Test
+    void aBankBatchIsMatchedByTryingEachLoansFeeRate() {
+        // given
+        PayoutChannel bnp = new PayoutChannel("BNP PARIBAS", PayoutChannel.SHOP, PaymentSource.Installments, true, null,
+                List.of(2.0, 4.0));
+        Order first = orderedOn(order(JAN, 1234.25, pending(PaymentSource.Installments)), 3);
+        Order second = orderedOn(order(ANNA, 2500.00, pending(PaymentSource.Installments)), 4);
+        Order later = orderedOn(order("d48c0b57-0000-4000-8000-000000000004", 799.99, pending(PaymentSource.Installments)), 5);
+        StatementMatcher matcher = new StatementMatcher(List.of(first, second, later), List.of(bnp), token -> List.of());
+
+        // when
+        OperationMatch match = matcher.match(List.of(operation("WB-1", "3609.56", "Wyplata kredytow",
+                "BNP PARIBAS BANK POLSKA SA"))).get(0);
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.PAYOUT);
+        assertThat(match.warnings()).isEmpty();
+        // 2% of 1234,25 is 24,685: rounded half up to the grosz
+        assertThat(match.allocations()).containsExactly(
+                new Allocation(JAN, new BigDecimal("1234.25"), new BigDecimal("24.69")),
+                new Allocation(ANNA, new BigDecimal("2500.00"), new BigDecimal("100.00")));
+    }
+
+    @Test
+    void aBankBatchThatAlsoFitsWithTheRatesSwappedIsLeftToTheOperator() {
+        // given
+        PayoutChannel bnp = new PayoutChannel("BNP PARIBAS", PayoutChannel.SHOP, PaymentSource.Installments, true, null,
+                List.of(2.0, 4.0));
+        Order first = orderedOn(order(JAN, 1000.00, pending(PaymentSource.Installments)), 3);
+        Order second = orderedOn(order(ANNA, 1000.00, pending(PaymentSource.Installments)), 4);
+
+        // when
+        OperationMatch match = new StatementMatcher(List.of(first, second), List.of(bnp), token -> List.of())
+                .match(List.of(operation("WB-1", "1940.00", "Wyplata kredytow", "BNP PARIBAS BANK POLSKA SA"))).get(0);
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.PAYOUT);
+        assertThat(match.allocations()).isEmpty();
+        assertThat(match.warnings()).containsExactly(MatchWarning.NO_PAYOUT_PROPOSAL);
+    }
+
+    @Test
+    void aBankBatchNamingItsLoansIsMatchedWithEachLoansFeeRate() {
+        // given
+        PayoutChannel bnp = new PayoutChannel("BNP PARIBAS", PayoutChannel.SHOP, PaymentSource.Installments, true, null,
+                List.of(2.0, 4.0));
+        Order first = order(JAN, 1000.00, pending(PaymentSource.Installments, "BNP", "BNP-778812", 0));
+        Order second = order(ANNA, 500.00, pending(PaymentSource.Installments, "BNP", "BNP-778813", 0));
+
+        // when
+        OperationMatch match = new StatementMatcher(List.of(first, second), List.of(bnp), token -> List.of())
+                .match(List.of(operation("WB-1", "1450.00", "Wyplata BNP-778812 BNP-778813", "BNP PARIBAS BANK POLSKA SA"))).get(0);
+
+        // then
+        assertThat(match.rule()).isEqualTo(MatchRule.REFERENCE_NUMBER);
+        assertThat(match.warnings()).isEmpty();
+        assertThat(match.allocations()).containsExactly(
+                new Allocation(JAN, new BigDecimal("1000.00"), new BigDecimal("40.00")),
+                new Allocation(ANNA, new BigDecimal("500.00"), new BigDecimal("10.00")));
+    }
+
+    @Test
     void oneGatewayPayingOutForTwoMarketplacesIsToldApartByTheSumAndTheirFees() {
         // given
         List<PayoutChannel> paypro = List.of(
-                new PayoutChannel("PAYPRO", "Allegro", null, null, true),
-                new PayoutChannel("PAYPRO", "Morele", null, null, false));
+                new PayoutChannel("PAYPRO", "Allegro", null, true, null, null),
+                new PayoutChannel("PAYPRO", "Morele", null, false, null, null));
         Order allegro = orderedOn(fromMarketplace(order(JAN, 100.00, pending(PaymentSource.OnlinePayment, "", "A-1", 10.00)), "Allegro"), 3);
         Order morele = orderedOn(fromMarketplace(order(ANNA, 200.00, pending(PaymentSource.OnlinePayment, "", "M-1", 20.00)), "Morele"), 4);
 
@@ -239,7 +300,7 @@ class StatementMatcherTest {
     @Test
     void aGatewayPayingOutEachPaymentLessItsFeeIsMatchedByThePaymentNumberWithTheFeeAsTheDifference() {
         // given
-        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "PayNow", true);
+        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, null, null);
         Order order = order(JAN, 15600.00, pending(PaymentSource.OnlinePayment, "PayNow", "P53V-ON8-ZAS-ESB", 0));
         BankOperation transfer = operation("WB-1", "15564.85",
                 "MBANK S.A. PAYNOW, /OPF/X///// PLATNOSC NR: P53V-ON8-ZAS-ESB (klient@example.com)", "");
@@ -253,6 +314,38 @@ class StatementMatcherTest {
         assertThat(match.warnings()).isEmpty();
         assertThat(match.allocations()).containsExactly(new Allocation(JAN, new BigDecimal("15600.00"), new BigDecimal("35.15")));
         assertThat(match.matchedTexts()).containsExactly("P53V-ON8-ZAS-ESB");
+    }
+
+    @Test
+    void aGatewayFeeWithinTheRowsLimitIsProposedAsSure() {
+        // given
+        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, 0.5, null);
+        Order order = order(JAN, 1000.00, pending(PaymentSource.OnlinePayment, "PayNow", "P53V-ON8-ZAS-ESB", 0));
+        BankOperation transfer = operation("WB-1", "995.00", "PAYNOW PLATNOSC NR: P53V-ON8-ZAS-ESB", "");
+
+        // when
+        OperationMatch match = new StatementMatcher(List.of(order), List.of(paynow), token -> List.of()).match(List.of(transfer)).get(0);
+
+        // then
+        assertThat(match.warnings()).isEmpty();
+        assertThat(match.allocations()).containsExactly(new Allocation(JAN, new BigDecimal("1000.00"), new BigDecimal("5.00")));
+    }
+
+    @Test
+    void aDifferenceAboveTheRowsFeeLimitIsProposedAsAFeeToCheck() {
+        // given
+        PayoutChannel paynow = new PayoutChannel("PAYNOW", PayoutChannel.SHOP, PaymentSource.OnlinePayment, true, 0.5, null);
+        Order order = order(JAN, 1000.00, pending(PaymentSource.OnlinePayment, "PayNow", "P53V-ON8-ZAS-ESB", 0));
+        BankOperation partPayment = operation("WB-1", "500.00", "PAYNOW PLATNOSC NR: P53V-ON8-ZAS-ESB", "");
+
+        // when
+        OperationMatch match = new StatementMatcher(List.of(order), List.of(paynow), token -> List.of()).match(List.of(partPayment)).get(0);
+
+        // then
+        assertThat(match.kind()).isEqualTo(MatchKind.PAYOUT);
+        assertThat(match.warnings()).containsExactly(MatchWarning.FEE_ABOVE_LIMIT);
+        assertThat(match.difference()).isEqualByComparingTo("500.00");
+        assertThat(match.allocations()).containsExactly(new Allocation(JAN, new BigDecimal("1000.00"), new BigDecimal("500.00")));
     }
 
     @Test

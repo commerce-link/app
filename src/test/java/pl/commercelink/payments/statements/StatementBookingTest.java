@@ -92,7 +92,7 @@ class StatementBookingTest {
     @Test
     void bookingAPayoutKeepsTheOnlinePaymentAndRecordsTheFeeThePayerKept() {
         // given
-        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, null, true);
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true, null, null);
         Order order = fromMarketplace(order(ORDER, 649.00, pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro");
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
         BankOperation payout = operation("WB-PAY", "584.10", "Wyplata srodkow Allegro", "ALLEGRO SP. Z O.O.");
@@ -113,7 +113,7 @@ class StatementBookingTest {
     @Test
     void aPayerThatDoesNotDeductItsFeeLeavesTheRecordedFeeInPlace() {
         // given
-        PayoutChannel gateway = new PayoutChannel("PAYPRO", PayoutChannel.SHOP, PaymentSource.OnlinePayment, "Przelewy24", false);
+        PayoutChannel gateway = new PayoutChannel("PAYPRO", PayoutChannel.SHOP, PaymentSource.OnlinePayment, false, null, null);
         Order order = order(ORDER, 300.00, pending(PaymentSource.OnlinePayment, "Przelewy24", "P24-1", 4.50));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
 
@@ -128,7 +128,7 @@ class StatementBookingTest {
     @Test
     void aLoanFromTheCallCentreKeepsItsInstallmentsMethod() {
         // given
-        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, null, false);
+        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false, null, null);
         Order order = order(ORDER, 500.00, pending(PaymentSource.Installments));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
 
@@ -210,8 +210,51 @@ class StatementBookingTest {
         Payment payment = order.getPayments().get(0);
         assertThat(payment.getSource()).isEqualTo(PaymentSource.BankTransfer);
         assertThat(payment.getName()).isNull();
-        assertThat(payment.getFee()).isZero();
+        assertThat(payment.getFee()).isEqualTo(5.00);
         assertThat(payment.getReferenceNo()).isEqualTo("Zamowienie 3f9a2c1e");
+    }
+
+    @Test
+    void aDirectTransferKeepsTheCommissionRecordedOnTheOrder() {
+        // given
+        Order order = fromMarketplace(order(ORDER, 1249.00, pending(PaymentSource.BankTransfer, "", "282937034", 49.00)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", TRANSFER, List.of(allocation("1249.00", "0")), List.of());
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(49.00);
+    }
+
+    @Test
+    void aFeeGivenOnTheReconciliationPageReplacesTheRecordedOne() {
+        // given
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true, null, null);
+        Order order = fromMarketplace(order(ORDER, 649.00, pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+        BankOperation payout = operation("WB-PAY", "619.00", "Wyplata srodkow Allegro", "ALLEGRO SP. Z O.O.");
+
+        // when
+        booking.book("store-1", payout, List.of(allocation("649.00", "30.00")), List.of(allegro));
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(30.00);
+    }
+
+    @Test
+    void aPayerMarkedAsDeductingThatSentTheFullAmountKeepsTheRecordedCommission() {
+        // given
+        PayoutChannel gateway = new PayoutChannel("PAYPRO", "Allegro", null, true, null, null);
+        Order order = fromMarketplace(order(ORDER, 6982.00, pending(PaymentSource.OnlinePayment, "", "282937034", 49.00)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", operation("WB-P24", "6982.00", "P24W-389339 BATCH 34713971", "PAYPRO SA"),
+                List.of(allocation("6982.00", "0")), List.of(gateway));
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(49.00);
     }
 
     @Test
@@ -268,7 +311,7 @@ class StatementBookingTest {
     @Test
     void bookingOneOrderOfAPayoutDoesNotDependOnAnother() {
         // given
-        PayoutChannel cod = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, null, false);
+        PayoutChannel cod = new PayoutChannel("FURGONETKA", null, PaymentSource.CashOnDelivery, false, null, null);
         String other = "5d0b8f13-0000-4000-8000-000000000002";
         Order first = order(ORDER, 100.00, pending(PaymentSource.CashOnDelivery));
         when(ordersRepository.findById("store-1", ORDER)).thenReturn(first);

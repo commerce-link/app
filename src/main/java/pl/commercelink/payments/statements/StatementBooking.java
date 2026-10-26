@@ -56,7 +56,10 @@ public class StatementBooking {
     /**
      * payer holds the payout rows of the payer that sent the operation, or nothing for a direct transfer from the
      * customer; each order of a payout is booked as its first row of the payer says. A direct
-     * transfer carries no fees and makes the payment a bank transfer.
+     * transfer deducts no fee and makes the payment a bank transfer. A fee given for an order on the reconciliation
+     * page (proposed or typed) replaces the one recorded on its payment; without one the recorded fee stays, as it may
+     * have come from elsewhere (a marketplace's commission, a gateway's fee, one typed in) and a payer marked wrongly
+     * must not wipe it.
      */
     public Outcome book(String storeId, BankOperation operation, List<Allocation> allocations, List<PayoutChannel> payer) {
         String refusal = refusal(operation, allocations, payer);
@@ -146,13 +149,9 @@ public class StatementBooking {
         }
         Payment pending = order.getPendingPayment();
         Payment target;
-        double keptFee = 0;
         if (!payer.isEmpty()) {
-            // read before the payment is filled: the row is chosen by the method and name the order waits with
-            PayoutChannel row = PayoutChannels.rowOf(payer, order).orElse(null);
-            // a payer that does not deduct its fee from the transfer still charged it: the recorded fee stays
-            keptFee = (row == null || !row.isNetOfFees()) && pending != null ? pending.getFee() : 0;
-            target = pending != null ? pending : added(order, PayoutChannels.sourceOf(row), row == null ? null : row.getProvider());
+            target = pending != null ? pending
+                    : added(order, PayoutChannels.sourceOf(PayoutChannels.rowOf(payer, order).orElse(null)));
         } else {
             if (pending != null && pending.getSource() != null && pending.getSource() != PaymentSource.BankTransfer) {
                 // the customer paid by transfer instead of the method the order waited for (an online payment that
@@ -163,16 +162,17 @@ public class StatementBooking {
                 pending.setSource(PaymentSource.BankTransfer);
                 pending.setName(null);
                 pending.setReferenceNo(null);
-                pending.setFee(0);
             }
-            target = pending != null ? pending : added(order, PaymentSource.BankTransfer, null);
+            target = pending != null ? pending : added(order, PaymentSource.BankTransfer);
             if (target.getSource() == null) {
                 target.setSource(PaymentSource.BankTransfer);
             }
         }
         target.setDirection(PaymentDirection.Incoming);
         target.setAmount(allocation.amount().doubleValue());
-        target.setFee(StatementAmounts.of(keptFee).add(allocation.fee()).doubleValue());
+        if (allocation.fee().signum() > 0) {
+            target.setFee(allocation.fee().doubleValue());
+        }
         if (StringUtils.isBlank(target.getReferenceNo())) {
             target.setReferenceNo(StringUtils.trimToNull(StringUtils.abbreviate(operation.title(), REFERENCE_LIMIT)));
         }
@@ -181,9 +181,8 @@ public class StatementBooking {
         return Result.BOOKED;
     }
 
-    private static Payment added(Order order, PaymentSource source, String name) {
+    private static Payment added(Order order, PaymentSource source) {
         Payment payment = new Payment(source);
-        payment.setName(StringUtils.trimToNull(name));
         order.addPayment(payment);
         return payment;
     }

@@ -53,6 +53,10 @@
                        data-text-selected=#{payments.statement.selected('{0}', '{1}', '{2}')},
                        data-text-assigned=#{payments.statement.orders.assigned('{0}')},
                        data-text-payout=#{payments.statement.orders.payout('{0}', '{1}')},
+                       data-text-payout-fee=#{payments.statement.orders.payoutFee('{0}', '{1}')},
+                       data-text-owed=#{payments.statement.orders.owed('{0}')},
+                       data-text-orders-more=#{payments.statement.orders.more('{0}')},
+                       data-text-open-order=#{payments.statement.orders.open('{0}')},
                        data-text-unassigned=#{payments.statement.orders.none},
                        data-text-no-payment=#{payments.statement.payment.none},
                        data-text-payment-orders=#{payments.statement.payment.orders('{0}')},
@@ -121,11 +125,7 @@
                                 </span>
                             </td>
                             <td data-cl-statement-orders>
-                                <div th:each="ref : ${row.orders()}" class="cl-statement-order">
-                                    <a class="cl-table-code" th:href="@{${ref.href()}}" th:text="${ref.shortId()}"></a>
-                                    <span th:if="${ref.client() != null}" th:text="${ref.client()}"></span>
-                                    <span th:if="${ref.detail() != null}" class="cl-table-sub" th:text="${ref.detail()}"></span>
-                                </div>
+                                <th:block th:replace="~{fragments/statement-orders :: orders(${row.orders()})}"></th:block>
                                 <span th:if="${row.ordersNote() != null}" class="cl-table-sub" th:text="${row.ordersNote()}"></span>
                             </td>
                             <td data-cl-statement-payment>

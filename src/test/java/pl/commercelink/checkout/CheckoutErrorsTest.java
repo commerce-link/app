@@ -32,6 +32,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -174,6 +176,31 @@ class CheckoutErrorsTest {
 
         // when / then
         assertCheckoutError(validRequest(), CheckoutError.PaymentUnavailable);
+    }
+
+    @Test
+    void unknownPaymentOptionSavesNoBasket() {
+        // given
+        Map<String, Object> body = validRequest();
+        body.put("paymentOptionId", "gateway-gone");
+
+        // when
+        assertCheckoutError(body, CheckoutError.PaymentOptionNotFound);
+
+        // then
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void storeWithoutDefaultGatewaySavesNoBasket() {
+        // given
+        store.setPayments(List.of(new PaymentIntegration(PROVIDER, false)));
+
+        // when
+        assertCheckoutError(validRequest(), CheckoutError.PaymentUnavailable);
+
+        // then
+        verify(basketsRepository, never()).save(any());
     }
 
     @Test

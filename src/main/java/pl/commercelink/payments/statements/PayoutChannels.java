@@ -5,10 +5,10 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
-import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.PayoutChannel;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
@@ -16,6 +16,8 @@ import java.util.Optional;
 
 /** Which payout rows an operation comes from and which orders such a row settles. */
 public final class PayoutChannels {
+
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private PayoutChannels() {
     }
@@ -39,8 +41,8 @@ public final class PayoutChannels {
     }
 
     /**
-     * Whether the row describes the order: its source (the shop or a marketplace), the method its payment waits for,
-     * and the name that payment carries or a carrier of its shipments. A criterion left empty takes any order.
+     * Whether the row describes the order: its source (the shop or a marketplace) and the method its payment waits
+     * for. A criterion left empty takes any order.
      */
     public static boolean pays(PayoutChannel row, Order order) {
         Payment payment = paymentOf(order);
@@ -53,23 +55,27 @@ public final class PayoutChannels {
                 return false;
             }
         }
-        if (row.getMethod() != null && (payment == null || payment.getSource() != row.getMethod())) {
-            return false;
-        }
-        String provider = StringUtils.trimToNull(row.getProvider());
-        if (provider != null) {
-            boolean named = payment != null && StringUtils.equalsIgnoreCase(StringUtils.trim(payment.getName()), provider);
-            boolean carried = order.getShipments().stream()
-                    .map(Shipment::getProvider)
-                    .anyMatch(carrier -> StringUtils.equalsIgnoreCase(carrier, provider));
-            return named || carried;
-        }
-        return true;
+        return row.getMethod() == null || (payment != null && payment.getSource() == row.getMethod());
     }
 
-    /** What the payer transfers for an order that still owes remaining: less the fee it keeps, when it keeps one. */
-    public static BigDecimal payout(PayoutChannel row, BigDecimal remaining, Payment pending) {
-        return remaining.subtract(fee(row, pending));
+    /**
+     * The fees the payer may have kept from an order that owes remaining: one per rate of a row with rates, each
+     * rounded half up to the grosz as the bank rounds each loan's fee, else the one {@link #fee} gives.
+     */
+    public static List<BigDecimal> fees(PayoutChannel row, BigDecimal remaining, Payment pending) {
+        if (row == null || !row.isNetOfFees() || row.getFeeRates() == null || row.getFeeRates().isEmpty()) {
+            return List.of(fee(row, pending));
+        }
+        return row.getFeeRates().stream()
+                .map(rate -> remaining.multiply(BigDecimal.valueOf(rate)).divide(HUNDRED, 2, RoundingMode.HALF_UP))
+                .distinct()
+                .toList();
+    }
+
+    /** Whether a fee worked out from the difference is within the row's limit, a percentage of what the order owes. */
+    public static boolean withinFeeLimit(PayoutChannel row, BigDecimal fee, BigDecimal owed) {
+        Double limit = row.getMaxFeePercent();
+        return limit == null || fee.multiply(HUNDRED).compareTo(owed.multiply(BigDecimal.valueOf(limit))) <= 0;
     }
 
     public static BigDecimal fee(PayoutChannel row, Payment pending) {

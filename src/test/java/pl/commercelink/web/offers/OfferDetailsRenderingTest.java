@@ -21,41 +21,48 @@ class OfferDetailsRenderingTest {
     private static final String PAGE = "<section th:replace=\"~{offers/details :: page}\"></section>";
     private static final String ID = "4b1e9c55-8f3a-4d7a-9c55-1e0b6a2f7d10";
     private static final String NBSP = "\u00A0";
+    private static final Long VERSION = 7L;
     private static final AddressBlock BILLING = new AddressBlock("Marta Zielińska", "Biuro Zielińska", "6762468313",
             "ul. Wielicka 28/4", "30-552 Kraków", "Polska", "biuro@x.pl", "+48 601");
 
     private static Item laptop(int index) {
         return new Item(index, "id-" + index, "cat-1", "Laptop Lenovo T14", "Laptopy", "21ML003RPB", 3, "6899.00",
-                "5810.00", 6899, 5810, false, null, false, false, 5, false, ItemMargin.of(6899, 5810, 1.23),
+                "5810.00", 6899, 5810, 5810, false, 5949, false, null, false, false, 5, false, ItemMargin.of(6899, 5810, 1.23),
                 new Market(false, "5" + NBSP + "810,00", "5" + NBSP + "949,00", 5, 41), "Action", "Elko, AB", 2, 7);
     }
 
     private static Item dock(int index) {
         return new Item(index, "id-" + index, "cat-1", "Stacja dokująca", "Akcesoria", "40AY0090EU", 3, "799.00",
-                "0.00", 799, 0, false, null, false, false, null, false, ItemMargin.of(799, 0, 1.23),
+                "0.00", 799, 0, 0, false, 642, false, null, false, false, null, false, ItemMargin.of(799, 0, 1.23),
                 new Market(false, "611,00", "642,00", 4, 22), "Action", "", 1, 1);
+    }
+
+    private static Item estimatedDock(int index) {
+        return new Item(index, "id-" + index, "cat-1", "Stacja dokująca", "Akcesoria", "40AY0090EU", 3, "799.00",
+                "0.00", 799, 0, 1721.4, true, 1721.4, false, null, false, false, null, false, ItemMargin.of(799, 1721.4, 1.23),
+                new Market(false, "611,00", "1" + NBSP + "721,40", 4, 22), "Action", "", 1, 1);
     }
 
     private static Item monitor(int index, String name, boolean selected) {
         return new Item(index, "id-" + index, "cat-1", name, "Monitory", "MON-" + index, 3, "1749.00", "1402.00",
-                1749, 1402, false, "Monitor", selected, false, null, false, ItemMargin.of(1749, 1402, 1.23),
+                1749, 1402, 1402, false, 0, false, "Monitor", selected, false, null, false, ItemMargin.of(1749, 1402, 1.23),
                 Market.none(), null, null, 0, 0);
     }
 
     private static Item service(int index) {
         return new Item(index, "id-" + index, null, "Konfiguracja systemu", null, "SRV-1", 3, "199.00", "0.00", 199,
-                0, false, null, false, true, null, false, null, null, null, null, 0, 0);
+                0, 0, false, 0, false, null, false, true, null, false, null, null, null, null, 0, 0);
     }
 
     private static Item withoutQuantity(int index) {
         return new Item(index, "id-" + index, "cat-1", "Mysz", "Myszy", "910-006559", 0, "449.00", "338.00", 449,
-                338, true, null, false, false, null, true, ItemMargin.of(449, 338, 1.23), Market.none(), null, null, 0, 0);
+                338, 338, false, 0, true, null, false, false, null, true, ItemMargin.of(449, 338, 1.23), Market.none(), null, null, 0, 0);
     }
 
     private static Summary summary(boolean removed) {
         return new Summary("33" + NBSP + "882,00", removed ? null : "Kurier InPost", removed, removed ? "0,00" : "19,99",
                 removed ? 0 : 19.99, "33" + NBSP + "901,99", "27" + NBSP + "562,59", "26" + NBSP + "655,00",
-                "7" + NBSP + "246,99", "5" + NBSP + "891,86", true);
+                "7" + NBSP + "246,99", "5" + NBSP + "891,86", true, false);
     }
 
     private static Customer customer(boolean billing, boolean contact) {
@@ -78,10 +85,10 @@ class OfferDetailsRenderingTest {
                         "33" + NBSP + "901,99", 4),
                 lines, List.of(new StoreCategories.Group("Komputery", List.of("Laptopy", "Akcesoria"))), List.of(),
                 summary, terms(), customer, "Zadzwonić w poniedziałek", "https://app.test/store/s/client/offer/" + ID,
-                proforma, customer.contactFilled(), "Stanowiska dla biura", "WarehouseFulfilment");
+                proforma, customer.contactFilled(), "Stanowiska dla biura", "WarehouseFulfilment", VERSION);
     }
 
-    private static OfferDetailsPage fullOffer() {
+    static OfferDetailsPage fullOffer() {
         return offer(List.of(laptop(0), dock(1), new GroupHead("Monitor", 2), monitor(2, "Monitor Dell", true),
                         monitor(3, "Monitor LG", false), service(4)),
                 summary(false), customer(true, true), true);
@@ -93,12 +100,12 @@ class OfferDetailsRenderingTest {
                 new Meta(null, null, "02.09.2026, 10:00", "Anna Kowalska", "7" + NBSP + "698,00", 2),
                 List.of(laptop(0), service(1)), List.of(), List.of(),
                 new Summary("7" + NBSP + "698,00", null, false, "0,00", 0, "7" + NBSP + "698,00", "6" + NBSP + "258,54",
-                        "5" + NBSP + "810,00", "1" + NBSP + "888,00", "1" + NBSP + "535,28", false),
+                        "5" + NBSP + "810,00", "1" + NBSP + "888,00", "1" + NBSP + "535,28", false, false),
                 new Terms(null, null, null, List.of(), true, "store.fulfilment.type.WarehouseFulfilment", null),
-                customer(false, false), null, null, false, false, "Stanowisko biurowe", "WarehouseFulfilment");
+                customer(false, false), null, null, false, false, "Stanowisko biurowe", "WarehouseFulfilment", VERSION);
     }
 
-    private static Map<String, Object> model(OfferDetailsPage page) {
+    static Map<String, Object> model(OfferDetailsPage page) {
         Map<String, Object> model = new HashMap<>();
         model.put("page", page);
         model.put("termsForm", new OfferTermsForm());
@@ -244,6 +251,44 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void anEstimatedCostReadsAsApproximate() {
+        // given
+        OfferDetailsPage estimated = offer(List.of(laptop(0), estimatedDock(1)), estimatedSummary(true), customer(true, true), true);
+
+        // when
+        String html = html(estimated);
+
+        // then
+        assertThat(row(html, 1)).contains("koszt ≈ 1" + NBSP + "721,40<").contains("marża ≈ ")
+                .contains("data-tooltip=\"Szacowana marża:").contains("data-median-cost=\"1721.4\"")
+                .contains("data-cost=\"0.0\"").doesNotContain("brak kosztu");
+        assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("≈").doesNotContain("Szacowana marża");
+        assertThat(row(html, 1)).contains("name=\"basketItems[1].unitCost\" value=\"0.00\"");
+        assertThat(summaryCard(html)).contains("w tym szacowany koszt pozycji bez kosztu");
+        assertThat(summaryCard(html)).containsPattern("<span[^>]*data-cl-sum-estimated[^>]*>").doesNotContainPattern("<span[^>]*\\bhidden\\b[^>]*data-cl-sum-estimated");
+        assertThat(summaryCard(html(fullOffer()))).containsPattern("<span[^>]*\\bhidden\\b[^>]*>w tym szacowany koszt");
+    }
+
+    @Test
+    void anItemWithoutAnyMedianHasNoMedianAttribute() {
+        // when
+        String row = row(html(fullOffer()), 4);
+
+        // then
+        assertThat(row).doesNotContain("data-median-cost");
+    }
+
+    private static Summary estimatedSummary(boolean estimated) {
+        Summary base = summary(false);
+        return new Summary(base.itemsTotal(), base.deliveryName(), false, base.deliveryPrice(), base.deliveryPriceValue(),
+                base.total(), base.net(), base.cost(), base.profitGross(), base.profitNet(), base.variantsNote(), estimated);
+    }
+
+    private static String summaryCard(String html) {
+        return html.substring(html.indexOf("id=\"summary\""), html.indexOf("id=\"offer-terms-card\""));
+    }
+
+    @Test
     void incompleteItemWarnsItWillBeRemoved() {
         // given
         OfferDetailsPage page = offer(List.of(laptop(0), withoutQuantity(1)), summary(false), customer(true, true), true);
@@ -273,6 +318,41 @@ class OfferDetailsRenderingTest {
                 .contains("data-cl-mark-selected hidden=\"hidden\">");
         assertThat(html).contains("class=\"cl-line is-variant is-unpicked\"");
         assertThat(row(html, 4)).contains("Usługa").doesNotContain("cl-line-hint");
+    }
+
+    @Test
+    void theTableShowsAServicesSectionOnlyWhenThereAreServices() {
+        // given
+        OfferDetailsPage withoutServices = offer(List.of(laptop(0), dock(1)), summary(false), customer(true, true), true);
+
+        // when
+        String html = html(fullOffer());
+        String productsOnly = html(withoutServices);
+
+        // then
+        String products = html.substring(html.indexOf("data-cl-lines-section=\"products\""), html.indexOf("data-cl-lines-section=\"services\""));
+        String services = html.substring(html.indexOf("data-cl-lines-section=\"services\""), html.indexOf("</tbody>", html.indexOf("data-cl-lines-section=\"services\"")));
+        assertThat(products).contains("data-index=\"0\"").contains("data-index=\"3\"").doesNotContain("data-index=\"4\"")
+                .contains("value=\"Monitor\"");
+        assertThat(services).contains("<tr class=\"cl-table-group\" data-cl-section-head>")
+                .contains("<th scope=\"rowgroup\" colspan=\"6\"><span class=\"cl-eyebrow\">Usługi</span></th>")
+                .contains("data-index=\"4\"").contains("Usługa");
+        assertThat(services.indexOf("data-cl-section-head")).isLessThan(services.indexOf("data-index=\"4\""));
+        // both sections are always there, so a draft that brings the first service has its place
+        assertThat(productsOnly).contains("data-cl-lines-section=\"products\"").contains("data-cl-lines-section=\"services\"")
+                .doesNotContain("data-cl-section-head").doesNotContain("<span class=\"cl-eyebrow\">Usługi</span>");
+    }
+
+    @Test
+    void everyRowMenuOffersSetAsChosenHiddenUntilTheScriptDecides() {
+        // when
+        String html = html(fullOffer());
+
+        // then
+        assertThat(row(html, 3)).contains("<li hidden data-cl-line-select-item>")
+                .contains("data-cl-line-select").contains("Ustaw jako wybrany");
+        assertThat(row(html, 0)).contains("data-cl-line-select-item").contains("data-cl-line-select");
+        assertThat(html).contains("data-msg-line-selected=");
     }
 
     @Test
@@ -342,6 +422,24 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void theClientLinkIsCopiedOnlyFromTheMoreMenu() {
+        // given
+        String clientUrl = "https://app.test/store/s/client/offer/" + ID;
+
+        // when
+        String html = html(fullOffer());
+
+        // then
+        String copyAttribute = "data-cl-copy=\"" + clientUrl + "\"";
+        int menuStart = html.indexOf("id=\"offer-more-menu\"");
+        String menu = html.substring(menuStart, html.indexOf("</ul>", menuStart));
+        assertThat(count(html, copyAttribute)).isEqualTo(1);
+        assertThat(menu).contains(copyAttribute);
+        assertThat(html).doesNotContain("Otwórz jak klient").doesNotContain("Link dla klienta")
+                .doesNotContain("href=\"" + clientUrl + "\"");
+    }
+
+    @Test
     void contactlessOfferHidesCopyWithContact() {
         // given
         OfferDetailsPage page = offer(List.of(laptop(0)), summary(false), customer(false, false), false);
@@ -407,7 +505,7 @@ class OfferDetailsRenderingTest {
         // then
         assertThat(row(single, 0)).contains("Oferta musi mieć co najmniej jedną pozycję").contains("aria-disabled=\"true\"")
                 .doesNotContain("/remove-item/");
-        assertThat(row(many, 1)).contains("formaction=\"/dashboard/offer/" + ID + "/remove-item/1\"")
+        assertThat(row(many, 1)).contains("formaction=\"/dashboard/offer/" + ID + "/remove-item/1?itemId=id-1\"")
                 .contains("form=\"offer-action-form\"");
     }
 
@@ -533,10 +631,114 @@ class OfferDetailsRenderingTest {
                 .contains("<p class=\"cl-help\">Brak notatki</p>");
     }
 
+    @Test
+    void theItemsFormCarriesTheVersionItWasOpenedAt() {
+        // when
+        String html = html(fullOffer());
+
+        // then
+        String form = html.substring(html.indexOf("id=\"offer-items\""), html.indexOf("class=\"cl-layout-aside\""));
+        assertThat(form).contains("<input type=\"hidden\" name=\"version\" value=\"7\" data-cl-offer-version data-cl-dirty-ignore>");
+        assertThat(html).doesNotContain("data-cl-offer-conflict");
+    }
+
+    @Test
+    void aConflictAsksToOverwriteOrLoadTheCurrentVersion() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("conflict", true);
+        model.put("returnTo", "/dashboard/offers?segment=expired");
+
+        // when
+        String html = render(PAGE, model);
+
+        // then
+        String form = html.substring(html.indexOf("id=\"offer-items\""), html.indexOf("class=\"cl-layout-aside\""));
+        assertThat(form).contains("data-cl-offer-conflict", "Oferta zmieniła się od otwarcia strony",
+                "Twoje zmiany w pozycjach nie zostały zapisane — są niżej.",
+                "name=\"overwrite\" value=\"true\"", "Nadpisz moimi zmianami", "Wczytaj aktualną wersję",
+                "<a class=\"cl-button\" href=\"/dashboard/offer/" + ID + "?returnTo=");
+    }
+
+    @Test
+    void theRefreshOfADialogCarriesTheNewVersion() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+
+        // when
+        String html = render("<template th:replace=\"~{offers/details :: refresh}\"></template>", model);
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" data-cl-offer-version value=\"7\">");
+    }
+
+    @Test
+    void theScriptRemovesARowFromTheTableWithoutAskingAndCanUndoIt() {
+        // when
+        String single = html(offer(List.of(laptop(0)), summary(false), customer(true, true), true));
+        String many = html(fullOffer());
+
+        // then
+        assertThat(row(many, 1)).contains("data-cl-line-remove").doesNotContain("data-cl-offer-action")
+                .doesNotContain("data-cl-confirm-title").contains("type=\"submit\"");
+        assertThat(row(many, 1)).contains("class=\"cl-menu-reason\" id=\"offer-line-1-remove-reason\" hidden");
+        assertThat(row(single, 0)).contains("data-cl-line-remove").contains("type=\"button\"")
+                .contains("aria-describedby=\"offer-line-0-remove-reason\"");
+        assertThat(many).contains("data-msg-line-removed-draft=\"Usunięto „{0}” — zmiana nie jest zapisana\"")
+                .contains("data-msg-undo=\"Cofnij\"")
+                .contains("data-msg-items-added-draft=\"Dodano {0} — zmiany nie są zapisane\"")
+                .contains("data-msg-items-title=\"Pozycje: {n}\"");
+    }
+
+    @Test
+    void removingAnItemNamesItById() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("returnTo", "/dashboard/offers");
+
+        // when
+        String html = render(PAGE, model);
+
+        // then
+        assertThat(row(html, 1)).contains("formaction=\"/dashboard/offer/" + ID
+                + "/remove-item/1?itemId=id-1&amp;returnTo=/dashboard/offers\"");
+    }
+
+    @Test
+    void theDraftAnswersTheItemsCardAndWhatWasSkipped() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("skipped", 1);
+        model.put("requested", 3);
+
+        // when
+        String html = render("<th:block th:replace=\"~{offers/details :: itemsDraft}\"></th:block>", model);
+
+        // then
+        assertThat(html).contains("id=\"pozycje\"", "data-cl-line").doesNotContain("id=\"offer-items\"");
+        assertThat(html).contains("<template data-cl-draft-meta data-skipped=\"1\" data-requested=\"3\" "
+                + "data-message=\"Nie dodano 1 z 3 pozycji — produktu nie ma już w cenniku ani u dostawców.\"></template>");
+    }
+
+    @Test
+    void aDraftWithNothingSkippedHasNoMessage() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("skipped", 0);
+        model.put("requested", 2);
+
+        // when
+        String html = render("<th:block th:replace=\"~{offers/details :: itemsDraft}\"></th:block>", model);
+
+        // then
+        assertThat(html).contains("<template data-cl-draft-meta data-skipped=\"0\" data-requested=\"2\"></template>");
+    }
+
     private static OfferDetailsPage withoutNote() {
         OfferDetailsPage p = offer(List.of(laptop(0)), summary(false), customer(false, false), false);
         return new OfferDetailsPage(p.offerId(), p.storeId(), p.shortId(), p.template(), p.title(), p.backHref(), p.backLabelKey(),
                 p.validity(), p.meta(), p.lines(), p.categoryGroups(), p.catalogs(), p.summary(), p.terms(), p.customer(), null,
-                p.clientUrl(), p.proformaAvailable(), p.copyWithContactAvailable(), p.recordName(), p.fulfilmentType());
+                p.clientUrl(), p.proformaAvailable(), p.copyWithContactAvailable(), p.recordName(), p.fulfilmentType(),
+                p.version());
     }
 }

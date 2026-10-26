@@ -9,6 +9,7 @@
     <div class="cl-collapse-body" id="finances-body">
         <dl class="cl-kv is-column">
             <div class="cl-kv-total"><dt th:text="#{order.finances.total}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.total()})}"></dd></div>
+            <div th:if="${f.hasDiscount()}"><dt th:text="#{order.finances.discount(${f.discountCode()})}"></dt><dd class="is-numeric" th:text="'−' + #{general.currency.amount(${f.discountAmount()})}"></dd></div>
             <div><dt th:text="#{order.finances.paid}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.paid()})}"></dd></div>
             <div><dt th:text="${f.overpaid()} ? #{order.finances.overpaid} : #{order.finances.unpaid}"></dt>
                 <dd class="is-numeric" th:classappend="${f.unpaidDue()} ? 'is-bad' : ''"

@@ -18,6 +18,8 @@ import pl.commercelink.web.settings.StatementPreview;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static pl.commercelink.web.payments.StatementPageFixtures.*;
@@ -67,6 +69,27 @@ class StatementTemplatesTest {
                 .contains("data-cl-group-count").contains("data-cl-tile-amount");
         String receivables = html.substring(html.indexOf("id=\"statement-receivables\">"), html.indexOf("</script>", html.indexOf("id=\"statement-receivables\">")));
         assertThat(receivables).contains("\"shortId\":\"3f9a2c1e\"").doesNotContain("<b>");
+        // the payout's orders are listed, each opening its order in a new tab so the reconciliation is not lost
+        assertThat(html).containsPattern("href=\"/dashboard/orders/91c2e7a0-0000-4000-8000-000000000001\" target=\"_blank\" rel=\"noopener\"\\s+"
+                + "title=\"Otwórz zamówienie 91c2e7a0 w nowej karcie\"");
+    }
+
+    @Test
+    void foldsTheOrdersOfALongPayoutAfterTheFirstThree() {
+        // given
+        Context context = new Context(PL);
+        context.setVariable("refs", IntStream.range(0, 6)
+                .mapToObj(index -> new StatementPage.OrderRef("order-" + index, "0000000" + index,
+                        "/dashboard/orders/order-" + index, "Klient " + index, null))
+                .toList());
+
+        // when
+        String html = engine.process("fragments/statement-orders", Set.of("orders"), context);
+
+        // then
+        assertThat(html).doesNotContain("??").contains("Pokaż pozostałe: 3");
+        assertThat(html.substring(0, html.indexOf("<details"))).contains("00000000", "00000002").doesNotContain("00000003");
+        assertThat(html.substring(html.indexOf("<details"))).contains("00000003", "00000005");
     }
 
     @Test
@@ -113,7 +136,8 @@ class StatementTemplatesTest {
                 messages(), PL);
         Context context = new Context(PL);
         context.setVariable("form", form);
-        context.setVariable("errors", Map.of("dateFormat", "store.payments.statement.error.dateFormat"));
+        context.setVariable("errors", Map.of("dateFormat", "store.payments.statement.error.dateFormat",
+                "channel-0-match", "store.payments.statement.error.channelMatch"));
         context.setVariable("preview", preview);
         context.setVariable("headers", preview.headers());
         context.setVariable("encodings", List.of(new PickerOption("windows-1250", "windows-1250")));
@@ -123,8 +147,6 @@ class StatementTemplatesTest {
         context.setVariable("sourceOptions", List.of(new PickerOption("", "Dowolne"), new PickerOption("SHOP", "Sklep"),
                 new PickerOption("Allegro", "Allegro")));
         context.setVariable("methodOptions", List.of(new PickerOption("", "Dowolna"), new PickerOption("Installments", "Raty")));
-        context.setVariable("providerOptions", List.of(new PickerOption("", "Dowolny"),
-                new PickerOption("Santander eRaty", "Bramka: Santander eRaty")));
         context.setVariable("formAction", "/dashboard/store/payments/bank-accounts/account-1/statement");
         context.setVariable("pageTitle", "Format wyciągu: mBank");
         context.setVariable("paymentsHref", "/dashboard/store/payments");
@@ -138,6 +160,17 @@ class StatementTemplatesTest {
         assertThat(html).contains("Format wyciągu: mBank").contains("<option value=\"Kwota\">").contains("zakupy")
                 .contains("159,00").contains("Wczytany plik: wyciag.csv").contains("name=\"channels[0].match\"")
                 .contains("Wybierz format daty z listy.");
+        // a payout row is told apart by its source and method only; matching the payer by name is enough
+        assertThat(html).doesNotContain("channels[0].provider").contains("name=\"channels[0].maxFeePercent\"")
+                .contains("name=\"channels[0].feeRates\"");
+        // with JavaScript the rows are a list edited in a dialog; the fields stay as what is posted, plus a blank row to copy
+        assertThat(html).contains("id=\"payout-row-dialog\"").contains("data-cl-dialog-open=\"payout-row-dialog\"")
+                .contains("Dodaj płatnika").contains("name=\"channels[@INDEX@].match\"")
+                .containsPattern("class=\"cl-link-button is-danger cl-dialog-actions-end\" data-cl-payout-remove hidden")
+                .contains("/js/dialog.js").contains("/js/payout-rows.js");
+        // a refused row keeps its message next to its field, where the dialog reads it from
+        assertThat(html).containsPattern("class=\"cl-input is-invalid\"[^>]*id=\"channel-0-match\"")
+                .containsPattern("id=\"channel-0-match\"[\\s\\S]{0,400}Podaj tekst, po którym rozpoznamy płatnika.");
         // the direction is named as on the payment dialogs
         assertThat(html).contains(">Przychodząca<").doesNotContain("Wpływ");
         // one step: the file is read as soon as it is chosen, sent with the preview button; its own button only without JavaScript

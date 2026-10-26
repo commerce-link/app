@@ -1,16 +1,19 @@
 // The offer details page around its items table (offers/details.html, spec docs/active/offer-details-redesign-v2 §4).
-// - Actions on the saved offer ([data-cl-offer-action]: create the order, proforma, recalculation, copies, removing an
-//   item) run here. An action with its own confirmation (data-cl-confirm-*, fragments/confirm-dialog) asks only that;
+// - Actions on the saved offer ([data-cl-offer-action]: create the order, proforma, recalculation, copies) run here.
+//   An action with its own confirmation (data-cl-confirm-*, fragments/confirm-dialog) asks only that;
 //   with unsaved changes in the table the confirmation says so and its "Zapisz i …" saves the items first. The others
 //   ask first only when the table has unsaved changes (dialog#offer-unsaved-dialog). The items form is posted in the
 //   background, then the action runs exactly as on a clean page. A failed save stays on the page, still unsaved. A table
 //   that cannot be saved (a group name, a quantity the browser refuses) opens no dialog: its field is shown instead.
-// - The add-items dialog saves the table the same way before it posts its items (cl:item-add-submit), and its button
-//   says so while the table is dirty.
+//   A save over an offer changed since the page was opened is refused (409): the form is then sent the ordinary way, so
+//   the page shows the conflict with the operator's table, and the action is dropped. That page starts dirty.
+// - The table is a draft until it is saved: the add-items dialog (cl:item-add-submit) hands its entries to the server's
+//   draft (POST …/items/draft), which answers the table with them added and saves nothing; its rows replace the table's.
 // - The terms, client and note dialogs (form[data-cl-async]) close once saved. On a clean page it reloads; with unsaved
 //   items the parts the dialog changed are swapped in from the answer's template[data-cl-offer-refresh] (header, card,
-//   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept.
-// - "Kopiuj link" and "Otwórz jak klient" say that the customer sees the saved version while the table is dirty.
+//   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept. The
+//   dialog's save raised the offer's version, which the table's next save must name.
+// - "Kopiuj link" says that the customer sees the saved version while the table is dirty.
 // - The peek ([data-cl-peek]) follows the summary's own "Zapisz pozycje" at any width: shown while that button is out of
 //   view (a long table under a sticky side column, or the summary below the table), hidden while it is fully in view,
 //   but never while the focus is inside the peek.
@@ -26,8 +29,6 @@
     var actionForm = document.getElementById('offer-action-form');
     var addDialog = document.getElementById('item-add-dialog');
     var CARD_FORMS = ['offer-terms-form', 'offer-client-form', 'offer-note-form'];
-    // the table saved by this script: the rows on screen may include items the save dropped
-    var savedHere = false;
     var busy = false;
     var pending = null;
 
@@ -97,6 +98,13 @@
             redirect: 'follow'
         }).then(function (response) {
             var landed = response.url ? new URL(response.url).pathname : '';
+            if (response.status === 409) {
+                // the offer changed since the page was opened: the conflict page shows this table against it, and the
+                // action that asked for the save never runs (the promise stays pending while the page goes)
+                window.CL_markClean(form);
+                HTMLFormElement.prototype.submit.call(form);
+                return new Promise(function () {});
+            }
             if (response.status === 403 && /^text\/plain/.test(response.headers.get('Content-Type') || '')) {
                 // the dashboard of an inactive store is read-only (DashboardReadOnlyInterceptor): its answer says so,
                 // as the page does after a plain save
@@ -109,7 +117,6 @@
             if (!response.ok || landed !== new URL(form.action, window.location.href).pathname) {
                 throw new Error('items not saved: ' + response.status + ' ' + landed);
             }
-            savedHere = true;
             window.CL_markClean(form);
             return true;
         }).catch(function (error) {
@@ -121,24 +128,8 @@
         });
     }
 
-    // The address of the action. Removing an item names it by its position in the saved offer; once this script has
-    // saved the table that position is counted from the screen, and null means the save already dropped the item.
     function actionUrl(element) {
-        var url = element.getAttribute('data-action-url');
-        var row = element.closest('tr[data-cl-line]');
-        if (!row || !savedHere || !window.CL_offerLines) {
-            return url;
-        }
-        var index = window.CL_offerLines.savedIndex(row);
-        return index < 0 ? null : url.replace(/\/remove-item\/\d+/, '/remove-item/' + index);
-    }
-
-    // Removing an item after a save: the save drops the incomplete items first, so the offer could end up with none,
-    // which the menu refuses on a saved offer ("Oferta musi mieć co najmniej jedną pozycję").
-    function leavesNoItem(element) {
-        var row = element.closest('tr[data-cl-line]');
-        return !!row && !!window.CL_offerLines && /\/remove-item\//.test(element.getAttribute('data-action-url') || '')
-            && window.CL_offerLines.keptWithout(row) === 0;
+        return element.getAttribute('data-action-url');
     }
 
     function hasOwnConfirm(element) {
@@ -183,13 +174,6 @@
                     window.location.reload();
                     return;
                 }
-                // an item's position is known only now that the table is saved (moved and dropped rows)
-                var savedUrl = actionUrl(element);
-                if (savedUrl === null) {
-                    window.location.reload();
-                    return;
-                }
-                confirmForm.action = savedUrl;
                 HTMLFormElement.prototype.submit.call(confirmForm);
             });
         }
@@ -216,9 +200,7 @@
 
     function run(element) {
         var url = actionUrl(element);
-        if (url === null) {
-            window.location.reload();
-        } else if (hasOwnConfirm(element)) {
+        if (hasOwnConfirm(element)) {
             confirmThen(element, url, false);
         } else if (element.getAttribute('data-action-method') === 'get') {
             window.location.assign(url);
@@ -250,8 +232,6 @@
         var field = isDirty() ? fieldToFix() : null;
         if (field) {
             showFieldToFix(field);
-        } else if (isDirty() && leavesNoItem(element)) {
-            showToast(window.CL_offerLines.lastItemMessage(), 'danger');
         } else if (isDirty() && hasOwnConfirm(element)) {
             confirmThen(element, actionUrl(element), true);
         } else if (isDirty()) {
@@ -298,7 +278,7 @@
 
     // --- the add-items dialog
 
-    // its "Zapisz i dodaj" saves the table first, which a field to fix would refuse behind the modal dialog
+    // a table that cannot be sent (a group name) cannot take a draft either: its field is shown before the dialog opens
     document.addEventListener('click', function (event) {
         var opener = event.target.closest && event.target.closest('[data-cl-dialog-open="item-add-dialog"]');
         var field = opener && isDirty() ? fieldToFix() : null;
@@ -309,49 +289,102 @@
         }
     }, true);
 
-    document.addEventListener('cl:item-add-submit', function (event) {
-        if (!isDirty()) {
-            return;
+    function closeAddDialog() {
+        if (addDialog && addDialog.open) {
+            addDialog.close();
         }
+    }
+
+    // The table on screen plus the picked entries go to the draft, which answers the items card with them added and
+    // saves nothing; its rows take the table's place.
+    function addToDraft(params) {
+        var data = new URLSearchParams(new FormData(form));
+        Object.keys(params).forEach(function (name) {
+            data.append(name, params[name]);
+        });
+        return fetch(new URL(form.action, window.location.href).pathname + '/items/draft', {
+            method: 'POST',
+            body: data
+        }).then(function (response) {
+            if (response.status === 403 && /^text\/plain/.test(response.headers.get('Content-Type') || '')) {
+                return response.text().then(function (reason) {
+                    var refused = new Error('draft refused: 403');
+                    refused.reason = reason;
+                    throw refused;
+                });
+            }
+            if (!response.ok) {
+                throw new Error('draft failed: ' + response.status);
+            }
+            return response.text();
+        }).then(function (html) {
+            var answer = document.createElement('template');
+            answer.innerHTML = html;
+            // the table's sections: the products, then the services
+            var fresh = answer.content.querySelectorAll('tbody[data-cl-lines]');
+            var meta = answer.content.querySelector('template[data-cl-draft-meta]');
+            // an expired session lands on the login page instead
+            if (!fresh.length || !meta) {
+                throw new Error('draft failed: no table in the answer');
+            }
+            window.CL_offerLines.reinit(Array.prototype.map.call(fresh, function (section) {
+                return document.importNode(section, true);
+            }));
+            return meta;
+        });
+    }
+
+    // how many were added, that nothing is saved, and what was skipped
+    function showAdded(meta) {
+        var skipped = parseInt(meta.getAttribute('data-skipped'), 10) || 0;
+        var added = (parseInt(meta.getAttribute('data-requested'), 10) || 0) - skipped;
+        var texts = [];
+        if (added > 0) {
+            texts.push(window.CL_offerLines.message('items-added-draft', [added]));
+        }
+        if (skipped > 0) {
+            texts.push(meta.getAttribute('data-message'));
+        }
+        var dropped = parseInt(meta.getAttribute('data-dropped'), 10) || 0;
+        if (dropped > 0) {
+            texts.push(meta.getAttribute('data-dropped-message'));
+        }
+        showToast(texts.join(' '), skipped > 0 || dropped > 0 ? 'warning' : 'info');
+    }
+
+    document.addEventListener('cl:item-add-submit', function (event) {
         event.preventDefault();
         var detail = event.detail;
-        saveItems().then(function (saved) {
-            if (saved) {
-                detail.proceed();
-            } else {
-                // the message of the failed save shows on the page, which the modal dialog would cover; the picked
-                // items stay in the dialog for the next try
-                detail.abort();
-                if (addDialog && addDialog.open) {
-                    addDialog.close();
-                }
+        var field = fieldToFix();
+        if (field || busy || !window.CL_offerLines) {
+            detail.abort();
+            if (field) {
+                showFieldAfterDialogs(field);
             }
+            return;
+        }
+        busy = true;
+        form.setAttribute('aria-busy', 'true');
+        addToDraft(detail.params).then(function (meta) {
+            detail.done();
+            closeAddDialog();
+            showAdded(meta);
+        }).catch(function (error) {
+            // the message shows on the page, which the modal dialog would cover; the picked items stay in the dialog
+            // for the next try
+            detail.abort();
+            closeAddDialog();
+            showToast((error && error.reason) || unsaved.getAttribute('data-add-failed'), 'danger');
+        }).finally(function () {
+            busy = false;
+            form.removeAttribute('aria-busy');
         });
     });
-
-    // the list the page was opened from, kept by the add-items post as by the other actions
-    (function keepReturnTo() {
-        var back = form.querySelector('input[type=hidden][name="returnTo"]');
-        if (addDialog && back && back.value) {
-            var url = new URL(addDialog.getAttribute('data-add-items-url'), window.location.href);
-            url.searchParams.set('returnTo', back.value);
-            addDialog.setAttribute('data-add-items-url', url.pathname + url.search);
-        }
-    })();
-
-    var addLabels = addDialog && {
-        label: addDialog.getAttribute('data-submit-label'),
-        count: addDialog.getAttribute('data-submit-count')
-    };
 
     function showDirtyState(dirty) {
         document.querySelectorAll('[data-cl-saved-version-note]').forEach(function (note) {
             note.hidden = !dirty;
         });
-        if (addDialog) {
-            addDialog.setAttribute('data-submit-label', dirty ? unsaved.getAttribute('data-add-label') : addLabels.label);
-            addDialog.setAttribute('data-submit-count', dirty ? unsaved.getAttribute('data-add-count') : addLabels.count);
-        }
     }
 
     form.addEventListener('cl:dirty-changed', function (event) {
@@ -424,6 +457,11 @@
             keepTermsForTemplate(saved);
         }
         if (template) {
+            var version = template.content.querySelector('[data-cl-offer-version]');
+            var tableVersion = form.querySelector('input[name="version"]');
+            if (version && tableVersion) {
+                tableVersion.value = version.value;
+            }
             swapRefreshed(template);
             showDirtyState(true);
             if (window.CL_offerLines) {
@@ -441,6 +479,19 @@
             dialog.close();
         }
     });
+    // The conflict page shows the operator's table, which is not saved: leaving it asks first, as with any unsaved change.
+    // After dirty-form.js has taken the form's state, on the same DOMContentLoaded.
+    if (form.querySelector('[data-cl-offer-conflict]')) {
+        document.addEventListener('DOMContentLoaded', function () {
+            window.CL_markDirty(form);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            var alert = form.querySelector('[data-cl-offer-conflict]');
+            alert.focus();
+            alert.scrollIntoView({ block: 'center' });
+        });
+    }
+
     // The save stays in sight at any width (spec D1): without this, CSS shows the peek below 1366 px only.
     (function followSummarySave() {
         var peek = form.querySelector('[data-cl-peek]');

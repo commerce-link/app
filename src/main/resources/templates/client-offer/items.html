@@ -69,7 +69,8 @@
             <span th:if="${page.showPrices}" class="cl-list-amount" th:text="#{general.currency.amount(${page.delivery.price})}"></span>
         </li>
     </ul>
-    <div class="cl-card-inset">
+    <!--/* From 1024 px the total opens the payment card in the side column instead (payment.html, cl-pay-total). */-->
+    <div class="cl-card-inset cl-items-total">
         <dl class="cl-offer-total">
             <div class="cl-offer-total-row">
                 <!--/* the spinner shows only while a variant update in the background takes long (client-offer.js) */-->

@@ -33,6 +33,19 @@ class BasketItemTest {
     }
 
     @Test
+    void ofCopiesBrandFromPricelistRow() {
+        // given
+        AvailabilityAndPrice row = new AvailabilityAndPrice("pim-1", "EAN", "MFN", "Acme",
+                "Label", "Karta graficzna", "Karty graficzne", 100, 1, 1, 100, false);
+
+        // when
+        BasketItem item = BasketItem.of(row, 1, "cat-1", false);
+
+        // then
+        assertThat(item.getBrand()).isEqualTo("Acme");
+    }
+
+    @Test
     void legacyServicesCategoryStringAloneDoesNotMakeItemAService() {
         // given
         BasketItem item = new BasketItem("id", "name", "mfn", "Services", 100, 80, 1, null, 1, false);

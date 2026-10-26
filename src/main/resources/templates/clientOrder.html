@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{public-layout}" th:with="publicWidth='is-form'">
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-split', publicFooter=false">
 <head>
     <title th:text="#{client.order.pageTitle(${view.shortOrderId})}">Zamówienie</title>
     <script th:src="@{/js/submit-once.js}" defer></script>
@@ -8,9 +8,11 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-    <!--/* The card order is fixed (spec §5): progress, shipments, payment when something is due, delivery, date, payment
-           otherwise, items, contact. During an address change, or after a message about the address, the delivery card
-           moves to the top so the form or the message is the first thing a phone shows. */-->
+    <!--/* Two columns from 1024 px, each in a fixed order. Main: progress, then the items right under it (the store asked for
+           that), then delivery. Side: payment when something is due, shipments, date, payment otherwise, and the seller card
+           that replaces the footer. During an address change, or after a message about the address, the delivery card moves
+           to the top of the main column so the form or the message is the first thing a phone shows. Below 1024 px the DOM
+           order is the reading order: the side cards follow the main column. */-->
     <div class="cl-order-page"
          th:with="orderPath=@{/store/{storeId}/client/order/{orderId}(storeId=${publicPage.storeId},orderId=${view.orderId})},
                   deliveryFirst=${addressStep != null or (clientOrderNotice != null and clientOrderNotice.target() == 'delivery')},
@@ -33,41 +35,44 @@
             </p>
         </header>
 
-        <div class="cl-stack">
-            <div th:if="${view.cancelled}" class="cl-alert is-bad" role="status">
-                <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
-                <div>
-                    <p class="cl-alert-title" th:text="#{client.order.cancelled.title}"></p>
-                    <p class="cl-alert-text" th:text="#{client.order.cancelled.text}"></p>
+        <div class="cl-split">
+            <div class="cl-split-main">
+                <div th:if="${view.cancelled}" class="cl-alert is-bad" role="status">
+                    <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
+                    <div>
+                        <p class="cl-alert-title" th:text="#{client.order.cancelled.title}"></p>
+                        <p class="cl-alert-text" th:text="#{client.order.cancelled.text}"></p>
+                    </div>
                 </div>
+
+                <th:block th:if="${deliveryFirst}">
+                    <section th:replace="~{client-order/delivery :: delivery}"></section>
+                </th:block>
+                <th:block th:unless="${view.cancelled}">
+                    <section th:replace="~{client-order/progress :: progress}"></section>
+                </th:block>
+                <section th:replace="~{client-order/items :: items}"></section>
+                <!--/* A cancelled order has nothing left to deliver: the card stays only to carry a message about the address. */-->
+                <th:block th:if="${!deliveryFirst and !view.cancelled}">
+                    <section th:replace="~{client-order/delivery :: delivery}"></section>
+                </th:block>
             </div>
 
-            <th:block th:if="${deliveryFirst}">
-                <section th:replace="~{client-order/delivery :: delivery}"></section>
-            </th:block>
-            <th:block th:unless="${view.cancelled}">
-                <section th:replace="~{client-order/progress :: progress}"></section>
-            </th:block>
-            <th:block th:if="${view.shipmentsVisible and !#lists.isEmpty(view.shipmentRows)}">
-                <section th:replace="~{client-order/shipments :: shipments}"></section>
-            </th:block>
-            <th:block th:if="${!view.cancelled and view.paymentDue}">
-                <section th:replace="~{client-order/payment :: payment}"></section>
-            </th:block>
-            <!--/* A cancelled order has nothing left to deliver: the card stays only to carry a message about the address. */-->
-            <th:block th:if="${!deliveryFirst and !view.cancelled}">
-                <section th:replace="~{client-order/delivery :: delivery}"></section>
-            </th:block>
-            <th:block th:if="${dateVisible}">
-                <section th:replace="~{client-order/date :: date}"></section>
-            </th:block>
-            <th:block th:if="${!view.cancelled and !view.paymentDue}">
-                <section th:replace="~{client-order/payment :: payment}"></section>
-            </th:block>
-            <section th:replace="~{client-order/items :: items}"></section>
-            <th:block th:if="${publicPage.hasContact()}">
+            <aside class="cl-split-side" th:aria-label="#{client.order.side.label}">
+                <th:block th:if="${!view.cancelled and view.paymentDue}">
+                    <section th:replace="~{client-order/payment :: payment}"></section>
+                </th:block>
+                <th:block th:if="${view.shipmentsVisible and !#lists.isEmpty(view.shipmentRows)}">
+                    <section th:replace="~{client-order/shipments :: shipments}"></section>
+                </th:block>
+                <th:block th:if="${dateVisible}">
+                    <section th:replace="~{client-order/date :: date}"></section>
+                </th:block>
+                <th:block th:if="${!view.cancelled and !view.paymentDue}">
+                    <section th:replace="~{client-order/payment :: payment}"></section>
+                </th:block>
                 <section th:replace="~{client-order/contact :: contact}"></section>
-            </th:block>
+            </aside>
         </div>
     </div>
 </th:block>

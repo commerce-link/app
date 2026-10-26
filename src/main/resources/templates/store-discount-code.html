@@ -1,0 +1,180 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page" th:with="code=${details.summary()}">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: record(${backHref}, ${backLabel}, ${code.code()}, null, ~{::codeStatus}, ~{::codeMeta}, ~{::codeActions})}">
+                <th:block th:fragment="codeStatus">
+                    <span class="cl-status" th:classappend="${code.statusTone()}"
+                          th:text="#{${'store.discounts.status.' + code.status().name()}}"></span>
+                </th:block>
+                <th:block th:fragment="codeMeta">
+                    <p class="cl-page-lead" th:text="${code.name()}"></p>
+                    <p th:unless="${details.deletable()}" class="cl-help" id="discount-delete-help"
+                       th:text="#{store.discounts.delete.used}"></p>
+                </th:block>
+                <th:block th:fragment="codeActions">
+                    <form method="post" th:action="@{${details.toggleHref()}}">
+                        <input type="hidden" name="active" th:value="${!details.active()}"/>
+                        <button type="submit" class="cl-button"
+                                th:text="${details.active()} ? #{store.discounts.toggle.off} : #{store.discounts.toggle.on}"></button>
+                    </form>
+                    <a th:if="${details.deletable()}" class="cl-button is-danger-outline" th:href="@{${details.deleteHref()}}"
+                       data-cl-confirm
+                       th:attr="data-cl-confirm-title=#{store.discounts.delete.title(${code.code()})},
+                                data-cl-confirm-message=#{store.discounts.delete.message},
+                                data-cl-confirm-action=#{store.discounts.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{store.discounts.delete}"></span></a>
+                    <button th:unless="${details.deletable()}" type="button" class="cl-button is-danger-outline" disabled
+                            aria-describedby="discount-delete-help">
+                        <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                        <span th:text="#{store.discounts.delete}"></span>
+                    </button>
+                </th:block>
+            </div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div class="cl-stack is-wide">
+                <section class="cl-card" aria-labelledby="discount-params-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="discount-params-title" th:text="#{store.discounts.details.params}"></h2>
+                    </div>
+                    <dl class="cl-kv is-rows cl-card-inset">
+                        <div>
+                            <dt th:text="#{store.discounts.details.discount}"></dt>
+                            <dd>
+                                <span class="cl-tabular" th:text="${code.percentage()} ? #{store.discounts.list.percent(${code.value()})} : #{store.discounts.list.amount(${code.value()})}"></span>
+                                <span class="cl-kv-sub" th:text="${code.percentage()} ? #{store.discounts.details.discount.percentage} : #{store.discounts.details.discount.amount}"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.discounts.target}"></dt>
+                            <dd th:if="${code.target() == null}" th:text="#{store.discounts.target.basket}"></dd>
+                            <dd th:if="${code.target() != null}">
+                                <ul>
+                                    <li th:each="value : ${details.targetValues()}">
+                                        <span th:text="${value.name}"></span>
+                                        <span th:if="${code.target().name() == 'Product'}" class="cl-kv-sub"
+                                              th:text="#{store.discounts.details.productId(${value.id})}"></span>
+                                    </li>
+                                </ul>
+                                <span class="cl-kv-sub" th:text="#{${'store.discounts.target.' + code.target().name()}}"></span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.discounts.paymentProvider}"></dt>
+                            <dd th:text="${code.paymentProvider() != null} ? ${code.paymentProvider()} : #{store.discounts.gateway.any}"></dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.discounts.details.minimum}"></dt>
+                            <dd class="cl-tabular" th:text="${code.minOrderValue() != null} ? #{store.discounts.details.minimum.value(${code.minOrderValue()})} : #{store.discounts.details.none}"></dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.discounts.details.uses}"></dt>
+                            <dd th:if="${code.limited()}">
+                                <span class="cl-tabular" th:text="#{store.discounts.details.uses.limited(${code.usedCount()}, ${code.maxUses()})}"></span>
+                                <span class="cl-meter" aria-hidden="true"><span th:style="'width: ' + ${code.usagePercent()} + '%'"></span></span>
+                            </dd>
+                            <dd th:unless="${code.limited()}" class="cl-tabular"
+                                th:text="#{store.discounts.details.uses.unlimited(${code.usedCount()})}"></dd>
+                        </div>
+                        <div>
+                            <dt th:text="#{store.discounts.details.validity}"></dt>
+                            <dd class="cl-tabular"
+                                th:text="${details.validFrom() != null and details.validTo() != null} ? #{store.discounts.validity.range(${details.validFrom()}, ${details.validTo()})}
+                                        : (${details.validFrom() != null} ? #{store.discounts.validity.from(${details.validFrom()})}
+                                        : (${details.validTo() != null} ? #{store.discounts.validity.to(${details.validTo()})} : #{store.discounts.validity.none}))"></dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="cl-card" aria-labelledby="discount-orders-title" th:with="orders=${details.orders()}">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="discount-orders-title" th:text="#{store.discounts.orders.title}"></h2>
+                        <div th:if="${orders.available()}" class="cl-card-actions">
+                            <details class="cl-filter-menu is-end">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="#{store.discounts.orders.period}"></span>
+                                    <span class="cl-filter-menu-value"
+                                          th:text="${orders.fromLabel() != null and orders.toLabel() != null} ? #{store.discounts.orders.period.range(${orders.fromLabel()}, ${orders.toLabel()})}
+                                                  : (${orders.fromLabel() != null} ? #{store.discounts.orders.period.from(${orders.fromLabel()})}
+                                                  : (${orders.toLabel() != null} ? #{store.discounts.orders.period.to(${orders.toLabel()})} : #{store.discounts.orders.period.all}))"></span>
+                                </summary>
+                                <form method="get" th:action="@{${code.href()}}" class="cl-filter-menu-panel">
+                                    <div class="cl-filter-menu-dates">
+                                        <label><span th:text="#{store.discounts.orders.from}"></span>
+                                            <input class="cl-input" type="date" name="from" th:value="${orders.from()}"/></label>
+                                        <label><span th:text="#{store.discounts.orders.to}"></span>
+                                            <input class="cl-input" type="date" name="to" th:value="${orders.to()}"/></label>
+                                    </div>
+                                    <div class="cl-filter-menu-actions">
+                                        <button type="submit" class="cl-button is-primary" th:text="#{store.discounts.orders.apply}"></button>
+                                    </div>
+                                </form>
+                            </details>
+                            <a th:if="${orders.narrowed()}" class="cl-link-button" th:href="@{${code.href()}}"
+                               th:text="#{store.discounts.orders.period.all}"></a>
+                        </div>
+                    </div>
+
+                    <p th:unless="${orders.available()}" class="cl-list-empty" th:text="#{store.discounts.orders.unavailable}"></p>
+
+                    <th:block th:if="${orders.available()}">
+                        <ul class="cl-figures">
+                            <li><span class="cl-eyebrow" th:text="#{store.discounts.orders.count}"></span>
+                                <span class="cl-stat-value" th:text="${orders.count()}"></span></li>
+                            <li><span class="cl-eyebrow" th:text="#{store.discounts.orders.discount}"></span>
+                                <span class="cl-stat-value" th:text="#{store.discounts.orders.amount(${orders.discount()})}"></span></li>
+                            <li><span class="cl-eyebrow" th:text="#{store.discounts.orders.value}"></span>
+                                <span class="cl-stat-value" th:text="#{store.discounts.orders.amount(${orders.value()})}"></span></li>
+                            <li><span class="cl-eyebrow" th:text="#{store.discounts.orders.average}"></span>
+                                <span class="cl-stat-value" th:text="${orders.average() != null} ? #{store.discounts.orders.amount(${orders.average()})} : '—'"></span></li>
+                        </ul>
+                        <p class="cl-card-desc" th:text="#{store.discounts.orders.desc}"></p>
+
+                        <p th:if="${orders.rows().isEmpty()}" class="cl-list-empty"
+                           th:text="${orders.narrowed()} ? #{store.discounts.orders.empty.range} : #{store.discounts.orders.empty}"></p>
+
+                        <table th:unless="${orders.rows().isEmpty()}" class="cl-table" aria-labelledby="discount-orders-title">
+                            <thead>
+                            <tr>
+                                <th scope="col" th:text="#{store.discounts.orders.column.order}"></th>
+                                <th scope="col" th:text="#{store.discounts.orders.column.date}"></th>
+                                <th scope="col" th:text="#{store.discounts.orders.column.email}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{store.discounts.orders.column.value}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{store.discounts.orders.column.discount}"></th>
+                                <th scope="col" th:text="#{store.discounts.orders.column.status}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${orders.rows()}">
+                                <th scope="row" class="cl-table-key" th:attr="data-label=#{store.discounts.orders.column.order}">
+                                    <a th:if="${row.href() != null}" class="cl-tabular" th:href="@{${row.href()}}" th:text="${row.shortId()}"></a>
+                                    <span th:unless="${row.href() != null}" class="cl-tabular" th:text="${row.shortId()}"></span>
+                                </th>
+                                <td class="cl-tabular" th:attr="data-label=#{store.discounts.orders.column.date}" th:text="${row.orderedAt()}"></td>
+                                <td th:attr="data-label=#{store.discounts.orders.column.email}" th:text="${row.email()}"></td>
+                                <td class="is-numeric" th:attr="data-label=#{store.discounts.orders.column.value}"
+                                    th:text="#{store.discounts.orders.amount(${row.value()})}"></td>
+                                <td class="is-numeric" th:attr="data-label=#{store.discounts.orders.column.discount}"
+                                    th:text="#{store.discounts.orders.amount(${row.discount()})}"></td>
+                                <td th:attr="data-label=#{store.discounts.orders.column.status}">
+                                    <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </th:block>
+                </section>
+            </div>
+
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>

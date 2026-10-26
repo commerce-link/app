@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
+import org.springframework.context.MessageSource;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import pl.commercelink.baskets.Basket;
@@ -148,8 +149,7 @@ final class ClientOfferRenderer {
     }
 
     String render() {
-        ClientOfferPage page = new ClientOfferPageFactory(mock(PaymentProviderFactory.class))
-                .build(basket, store, canEdit, locale);
+        ClientOfferPage page = pageFactory().build(basket, store, canEdit, locale);
         Context context = new Context(locale);
         context.setVariable("publicPage", PublicPageFactory.of(store, basket.createOfferUrl(""), locale));
         context.setVariable("page", page);
@@ -167,9 +167,12 @@ final class ClientOfferRenderer {
     /** The answer to a variant chosen in the background: the controller puts only the page model. */
     String renderVariantUpdate() {
         Context context = new Context(locale);
-        context.setVariable("page", new ClientOfferPageFactory(mock(PaymentProviderFactory.class))
-                .build(basket, store, canEdit, locale));
+        context.setVariable("page", pageFactory().build(basket, store, canEdit, locale));
         return engine(locale).process("client-offer/variant-update", context);
+    }
+
+    private static ClientOfferPageFactory pageFactory() {
+        return new ClientOfferPageFactory(new PaymentGateways(mock(PaymentProviderFactory.class), mock(MessageSource.class), ""));
     }
 
     private static TemplateEngine engine(Locale locale) {

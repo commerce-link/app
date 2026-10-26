@@ -2473,6 +2473,32 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theFinancesCardShowsTheDiscountCodeBelowTheTotal() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.setDiscountCode("LATO-10");
+        order.setDiscountAmount(38.97);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String totals = html.substring(html.indexOf("id=\"finances-title\""), html.indexOf("id=\"finances-costs\""));
+        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(totals).results().map(m -> m.group(1)).toList())
+                .containsExactly("Razem", "Kod rabatowy LATO-10", "Wpłacono", "Do zapłaty");
+        assertThat(totals).contains("−38,97 PLN");
+    }
+
+    @Test
+    void theFinancesCardHasNoDiscountRowWithoutACode() {
+        // when
+        String html = page(render(order(OrderStatus.Realization), ADMIN));
+
+        // then
+        assertThat(card(html, "finances-title")).doesNotContain("Kod rabatowy");
+    }
+
+    @Test
     void anOverpaidOrderSaysOverpaymentInTheFinancesCard() {
         // given
         Order order = order(OrderStatus.Realization);

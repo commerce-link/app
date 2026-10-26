@@ -1,0 +1,142 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, ~{::discountActions})}">
+                <th:block th:fragment="discountActions">
+                    <a th:if="${newCodeHref != null}" class="cl-button is-primary" th:href="@{${newCodeHref}}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{store.discounts.add}"></span>
+                    </a>
+                </th:block>
+            </div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div th:if="${newCodeHref == null}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <div>
+                    <p class="cl-alert-title" th:text="#{store.discounts.noGateway.title}"></p>
+                    <p class="cl-alert-text" th:text="#{store.discounts.noGateway.text}"></p>
+                    <p><a class="cl-button" th:href="@{${paymentsHref}}" th:text="#{store.discounts.noGateway.action}"></a></p>
+                </div>
+            </div>
+
+            <section class="cl-card" aria-labelledby="discount-codes-title">
+                <h2 class="cl-visually-hidden" id="discount-codes-title" th:text="#{store.discounts.list.title}"></h2>
+
+                <p th:if="${codes.total() == 0}" class="cl-list-empty">
+                    <span th:text="#{store.discounts.list.empty}"></span>
+                    <a th:if="${newCodeHref != null}" class="cl-link-button" th:href="@{${newCodeHref}}"
+                       th:text="#{store.discounts.list.addFirst}"></a>
+                </p>
+
+                <div th:if="${codes.total() > 0}" class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{store.discounts.filter.label}">
+                            <a class="cl-segment" th:each="s : ${codes.segments()}" th:href="@{${s.href()}}"
+                               th:attr="aria-current=${s.active()} ? 'page' : null, data-count=${s.count()}"><span
+                                    th:text="#{${s.labelKey()}}"></span><span class="cl-segment-sep">: </span><span
+                                    class="cl-segment-count" th:text="${s.count()}"></span></a>
+                        </nav>
+                        <form method="get" th:action="@{${listPath}}" class="cl-search-form" role="search">
+                            <input type="hidden" name="status" th:if="${!codes.status().isEmpty()}" th:value="${codes.status()}"/>
+                            <input type="hidden" name="target" th:if="${!codes.target().isEmpty()}" th:value="${codes.target()}"/>
+                            <label class="cl-visually-hidden" for="discount-search" th:text="#{store.discounts.search.label}"></label>
+                            <div class="cl-search-field">
+                                <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <input class="cl-input cl-table-search" type="search" id="discount-search" name="q" autocomplete="off"
+                                       th:value="${codes.query()}" th:attr="placeholder=#{store.discounts.search.placeholder}"/>
+                            </div>
+                            <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                            </button>
+                        </form>
+                    </div>
+                    <form method="get" th:action="@{${listPath}}" class="cl-toolbar-filters">
+                        <input type="hidden" name="status" th:if="${!codes.status().isEmpty()}" th:value="${codes.status()}"/>
+                        <input type="hidden" name="q" th:if="${codes.query() != null}" th:value="${codes.query()}"/>
+                        <label class="cl-visually-hidden" for="discount-target-filter" th:text="#{store.discounts.filter.target.label}"></label>
+                        <select class="cl-select is-compact" id="discount-target-filter" name="target" data-cl-submit-on-change>
+                            <option value="" th:selected="${codes.target().isEmpty()}" th:text="#{store.discounts.filter.target.all}"></option>
+                            <option value="basket" th:selected="${codes.target() == 'basket'}" th:text="#{store.discounts.target.basket}"></option>
+                            <option value="category" th:selected="${codes.target() == 'category'}" th:text="#{store.discounts.target.Category}"></option>
+                            <option value="product" th:selected="${codes.target() == 'product'}" th:text="#{store.discounts.target.Product}"></option>
+                            <option value="brand" th:selected="${codes.target() == 'brand'}" th:text="#{store.discounts.target.Brand}"></option>
+                        </select>
+                        <noscript><button type="submit" class="cl-button" th:text="#{general.filter}"></button></noscript>
+                    </form>
+                </div>
+
+                <p th:if="${codes.total() > 0 and codes.rows().isEmpty()}" class="cl-list-empty">
+                    <span th:text="#{store.discounts.list.noMatch}"></span>
+                    <a class="cl-link-button" th:href="@{${listPath}}" th:text="#{general.clear.filters}"></a>
+                </p>
+
+                <table th:unless="${codes.rows().isEmpty()}" class="cl-table" aria-labelledby="discount-codes-title">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{store.discounts.column.code}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.discount}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.target}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.gateway}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.uses}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.validity}"></th>
+                        <th scope="col" th:text="#{store.discounts.column.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${codes.rows()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{store.discounts.column.code}">
+                            <a class="cl-tabular" th:href="@{${row.href()}}" th:text="${row.code()}"></a>
+                            <span class="cl-table-sub" th:text="${row.name()}"></span>
+                        </th>
+                        <td th:attr="data-label=#{store.discounts.column.discount}">
+                            <span class="cl-tabular" th:text="${row.percentage()} ? #{store.discounts.list.percent(${row.value()})} : #{store.discounts.list.amount(${row.value()})}"></span>
+                            <span th:if="${row.minOrderValue() != null}" class="cl-table-sub"
+                                  th:text="#{store.discounts.list.minimum(${row.minOrderValue()})}"></span>
+                        </td>
+                        <td th:attr="data-label=#{store.discounts.column.target}">
+                            <span th:if="${row.target() == null}" th:text="#{store.discounts.target.basket}"></span>
+                            <th:block th:if="${row.target() != null}"
+                                      th:with="targetLabel=${#messages.msg('store.discounts.target.' + row.target().name())}">
+                                <span th:text="${#strings.listJoin(row.targetNames(), ', ')}"></span>
+                                <span class="cl-table-sub" th:text="${row.moreTargets() > 0}
+                                        ? ${#messages.msg('store.discounts.list.targetMore', targetLabel, row.moreTargets())}
+                                        : ${targetLabel}"></span>
+                            </th:block>
+                        </td>
+                        <td th:attr="data-label=#{store.discounts.column.gateway}"
+                            th:text="${row.paymentProvider() != null} ? ${row.paymentProvider()} : #{store.discounts.gateway.any}"></td>
+                        <td th:attr="data-label=#{store.discounts.column.uses}">
+                            <th:block th:if="${row.limited()}">
+                                <span class="cl-tabular" th:text="#{store.discounts.uses.limited(${row.usedCount()}, ${row.maxUses()})}"></span>
+                                <span class="cl-meter" aria-hidden="true"><span th:style="'width: ' + ${row.usagePercent()} + '%'"></span></span>
+                            </th:block>
+                            <th:block th:unless="${row.limited()}">
+                                <span class="cl-tabular" th:text="${row.usedCount()}"></span>
+                                <span class="cl-table-sub" th:text="#{store.discounts.uses.unlimited}"></span>
+                            </th:block>
+                        </td>
+                        <td class="cl-tabular" th:attr="data-label=#{store.discounts.column.validity}"
+                            th:text="${row.validFrom() != null and row.validTo() != null} ? #{store.discounts.validity.range(${row.validFrom()}, ${row.validTo()})}
+                                    : (${row.validFrom() != null} ? #{store.discounts.validity.from(${row.validFrom()})}
+                                    : (${row.validTo() != null} ? #{store.discounts.validity.to(${row.validTo()})} : #{store.discounts.validity.none}))"></td>
+                        <td th:attr="data-label=#{store.discounts.column.status}">
+                            <span class="cl-status" th:classappend="${row.statusTone()}"
+                                  th:text="#{${'store.discounts.status.' + row.status().name()}}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+        </div>
+    </section>
+    <script th:src="@{/js/submit-on-change.js}" defer></script>
+</div>
+</body>
+</html>

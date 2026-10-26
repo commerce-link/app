@@ -9,18 +9,20 @@ import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Store;
+import pl.commercelink.web.PaymentGateways;
 import pl.commercelink.web.clientoffer.ClientOfferPage.ShippingMode;
+import pl.commercelink.web.dtos.PaymentOptionView;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ClientOfferPageFactoryTest {
@@ -28,7 +30,7 @@ class ClientOfferPageFactoryTest {
     private static final Locale PL = Locale.forLanguageTag("pl-PL");
 
     @Mock
-    private PaymentProviderFactory paymentProviderFactory;
+    private PaymentGateways paymentGateways;
 
     @Test
     void amountsAreFormattedWithoutCurrency() {
@@ -224,6 +226,23 @@ class ClientOfferPageFactoryTest {
     }
 
     @Test
+    void paymentOptionsComeFromTheStoreGatewaysWithTheDefaultPreselected() {
+        // given
+        Basket basket = basket(item("MFN-1", "CPU", 100.0, 1, null));
+        Store store = new Store();
+        List<PaymentOptionView> gateways = List.of(new PaymentOptionView("gw-a", "Bramka A", false),
+                new PaymentOptionView("gw-b", "Bramka B", true));
+        when(paymentGateways.paymentOptions(store)).thenReturn(gateways);
+
+        // when
+        ClientOfferPage.Payment payment = factory().build(basket, store, false, PL).payment();
+
+        // then
+        assertThat(payment.options()).isEqualTo(gateways);
+        assertThat(payment.defaultOption()).isEqualTo("gw-b");
+    }
+
+    @Test
     void validUntilIsFormattedInTheGivenLocale() {
         // given
         Basket basket = basket(item("MFN-1", "CPU", 100.0, 1, null));
@@ -239,7 +258,7 @@ class ClientOfferPageFactoryTest {
     }
 
     private ClientOfferPageFactory factory() {
-        return new ClientOfferPageFactory(paymentProviderFactory);
+        return new ClientOfferPageFactory(paymentGateways);
     }
 
     private static Basket basket(BasketItem... items) {

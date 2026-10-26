@@ -143,24 +143,42 @@
         });
     }
 
+    // as fragments/statement-orders.html: each order links to its page in a new tab (leaving would lose the
+    // reconciliation), and a payout of many orders shows the first three and folds the rest
+    function orderLine(ref) {
+        var order = byId[ref.orderId] || {shortId: ref.orderId.substring(0, 8), client: ''};
+        var line = element('div', 'cl-statement-order');
+        var link = element('a', 'cl-table-code', order.shortId);
+        link.href = '/dashboard/orders/' + encodeURIComponent(ref.orderId);
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.title = format(form.getAttribute('data-text-open-order'), [order.shortId]);
+        line.appendChild(link);
+        if (order.client) {
+            line.appendChild(document.createTextNode(' '));
+            line.appendChild(element('span', null, order.client));
+        }
+        if (ref.detail) {
+            line.appendChild(element('span', 'cl-table-sub', ref.detail));
+        }
+        return line;
+    }
+
     function orderCell(row, refs, note) {
         var cell = row.querySelector('[data-cl-statement-orders]');
         cell.textContent = '';
-        refs.forEach(function (ref) {
-            var order = byId[ref.orderId] || {shortId: ref.orderId.substring(0, 8), client: ''};
-            var line = element('div', 'cl-statement-order');
-            var link = element('a', 'cl-table-code', order.shortId);
-            link.href = '/dashboard/orders/' + encodeURIComponent(ref.orderId);
-            line.appendChild(link);
-            if (order.client) {
-                line.appendChild(document.createTextNode(' '));
-                line.appendChild(element('span', null, order.client));
-            }
-            if (ref.detail) {
-                line.appendChild(element('span', 'cl-table-sub', ref.detail));
-            }
-            cell.appendChild(line);
+        var folded = refs.length > 4;
+        refs.slice(0, folded ? 3 : refs.length).forEach(function (ref) {
+            cell.appendChild(orderLine(ref));
         });
+        if (folded) {
+            var more = element('details', 'cl-row-disclosure');
+            more.appendChild(element('summary', null, format(form.getAttribute('data-text-orders-more'), [refs.length - 3])));
+            refs.slice(3).forEach(function (ref) {
+                more.appendChild(orderLine(ref));
+            });
+            cell.appendChild(more);
+        }
         if (note) {
             cell.appendChild(element('span', 'cl-table-sub', note));
         }
@@ -700,8 +718,13 @@
         var chosen = pickedIds().map(function (id) {
             return {orderId: id, amount: byId[id].unpaid, fee: feeOf(id)};
         });
-        var note = format(form.getAttribute('data-text-payout'), [chosen.length, money(sums.gross)]);
-        accept(payoutState.row, chosen, [], note);
+        var refs = chosen.map(function (allocation) {
+            return {orderId: allocation.orderId, detail: allocation.fee > 0
+                ? format(form.getAttribute('data-text-payout-fee'), [money(allocation.amount), money(allocation.fee)])
+                : format(form.getAttribute('data-text-owed'), [money(allocation.amount)])};
+        });
+        var note = chosen.length > 1 ? format(form.getAttribute('data-text-payout'), [chosen.length, money(sums.gross)]) : null;
+        accept(payoutState.row, chosen, refs, note);
         payout.close();
     });
 

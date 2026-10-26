@@ -29,6 +29,23 @@ class BasketTest {
     }
 
     @Test
+    void blankDiscountCodeIsStoredAsNull() {
+        // given
+        Basket blank = new Basket();
+        Basket withCode = new Basket();
+
+        // when
+        blank.setDiscountCode("  ");
+        withCode.setDiscountCode("LATO-10");
+
+        // then
+        assertThat(blank.getDiscountCode()).isNull();
+        assertThat(blank.hasDiscountCode()).isFalse();
+        assertThat(withCode.getDiscountCode()).isEqualTo("LATO-10");
+        assertThat(withCode.hasDiscountCode()).isTrue();
+    }
+
+    @Test
     @DisplayName("hoursToExpiry is zero for an already expired or undated basket")
     void hoursToExpiryIsZeroForExpiredOrUndatedBasket() {
         // given

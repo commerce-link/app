@@ -62,7 +62,7 @@ class MbankOperationsListTest {
         List<BankOperation> incoming = BankStatementParser.parse(file(), format, "PL61").incoming();
         Order seeded = order("00000000-1000-0000-0000-000000000001", 3998.00, pending(PaymentSource.BankTransfer));
         Order loan = order("c42d91f0-1111-4222-8333-444455556666", 2150.00, pending(PaymentSource.Installments));
-        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, null, false);
+        PayoutChannel santander = new PayoutChannel("SANTANDER", null, PaymentSource.Installments, false, null, null);
 
         // when
         List<OperationMatch> matches = new StatementMatcher(List.of(seeded, loan), List.of(santander), token -> List.of())

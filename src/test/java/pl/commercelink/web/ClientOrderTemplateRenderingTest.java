@@ -42,7 +42,7 @@ class ClientOrderTemplateRenderingTest {
                 .contains("Planowana wysyłka: piątek 23 października.");
         assertThat(polish.split("<h1", -1)).hasSize(2);
         assertThat(english).contains("<h1 class=\"cl-page-title\">We are assembling your order</h1>")
-                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-form\"");
+                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-split\"");
     }
 
     @Test
@@ -259,7 +259,7 @@ class ClientOrderTemplateRenderingTest {
 
         // then
         assertThat(html.split("style=\"", -1)).hasSize(2);
-        assertThat(html).containsPattern("<body class=\"cl-public\" style=\"")
+        assertThat(html).containsPattern("<body class=\"cl-public is-split\" style=\"")
                 .doesNotContain("<style")
                 .doesNotContainPattern("<script(?![^>]*\\ssrc=)[^>]*>");
         for (Path source : templateSources()) {
@@ -281,7 +281,8 @@ class ClientOrderTemplateRenderingTest {
 
         // then
         assertThat(html.indexOf("class=\"cl-public-logo\"")).isPositive().isLessThan(html.indexOf("id=\"clContent\""));
-        assertThat(html.split("/StoreLogo/", -1)).hasSize(2);
+        assertThat(html.indexOf("class=\"cl-seller-logo\"")).isGreaterThan(html.indexOf("class=\"cl-split-side\""));
+        assertThat(html.split("/StoreLogo/", -1)).hasSize(3);
     }
 
     @Test
@@ -290,9 +291,10 @@ class ClientOrderTemplateRenderingTest {
         String html = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Zaliczka", 3000.0)).locale(PL).render();
 
         // then
-        assertThat(html.indexOf("id=\"payment\"")).isPositive().isLessThan(html.indexOf("id=\"delivery\""));
-        assertThat(html.indexOf("id=\"delivery\"")).isLessThan(html.indexOf("id=\"date\""));
-        assertThat(html.indexOf("id=\"date\"")).isLessThan(html.indexOf("order-items-title"));
+        String side = side(html);
+        assertThat(side).startsWith("<section id=\"payment\"");
+        assertThat(side.indexOf("id=\"payment\"")).isLessThan(side.indexOf("id=\"date\""));
+        assertThat(main(html)).contains("id=\"delivery\"").doesNotContain("id=\"payment\"");
     }
 
     @Test
@@ -301,9 +303,9 @@ class ClientOrderTemplateRenderingTest {
         String html = ClientOrderRenderer.newOrder().locale(PL).render();
 
         // then
-        assertThat(html.indexOf("id=\"date\"")).isPositive().isLessThan(html.indexOf("id=\"payment\""));
-        assertThat(html.indexOf("id=\"payment\"")).isLessThan(html.indexOf("order-items-title"));
-        assertThat(html.indexOf("order-items-title")).isLessThan(html.indexOf("order-help-title"));
+        String side = side(html);
+        assertThat(side.indexOf("id=\"date\"")).isPositive().isLessThan(side.indexOf("id=\"payment\""));
+        assertThat(side.indexOf("id=\"payment\"")).isLessThan(side.indexOf("order-help-title"));
     }
 
     @Test
@@ -776,8 +778,8 @@ class ClientOrderTemplateRenderingTest {
         String overpaid = ClientOrderRenderer.newOrder().payments(Payment.bankTransfer("REF-1", "Całość", 6445.99)).locale(PL).render();
 
         // then
-        assertThat(due.indexOf("id=\"payment\"")).isPositive().isLessThan(due.indexOf("id=\"delivery\""));
-        assertThat(overpaid.indexOf("id=\"payment\"")).isGreaterThan(overpaid.indexOf("id=\"date\""));
+        assertThat(side(due).indexOf("id=\"payment\"")).isLessThan(side(due).indexOf("id=\"date\""));
+        assertThat(side(overpaid).indexOf("id=\"payment\"")).isGreaterThan(side(overpaid).indexOf("id=\"date\""));
     }
 
     @Test
@@ -788,6 +790,62 @@ class ClientOrderTemplateRenderingTest {
 
         // then
         assertThat(html).doesNotContain("id=\"payment\"").doesNotContain("cl-kv is-bank").doesNotContain("cl-amounts");
+    }
+
+    @Test
+    void progressThenItemsThenDeliveryInTheMainColumn() {
+        // when
+        String html = ClientOrderRenderer.newOrder().locale(PL).render();
+
+        // then
+        String main = main(html);
+        assertThat(main.indexOf("order-progress-title")).isPositive().isLessThan(main.indexOf("order-items-title"));
+        assertThat(main.indexOf("order-items-title")).isLessThan(main.indexOf("id=\"delivery\""));
+        assertThat(html.indexOf("class=\"cl-split-main\"")).isLessThan(html.indexOf("class=\"cl-split-side\""));
+        assertThat(html).contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-split\"").doesNotContain("cl-public-foot");
+    }
+
+    @Test
+    void sideColumnHoldsPaymentDateShipmentsAndSellerLast() {
+        // when
+        String html = ClientOrderRenderer.newOrder()
+                .shipments(ClientOrderRenderer.shipment("DPD", "0001", "https://track.example/0001", LocalDateTime.of(2026, 10, 22, 12, 0), null))
+                .locale(PL).render();
+
+        // then
+        String side = side(html);
+        assertThat(side).contains("id=\"payment\"").contains("cl-seller-card");
+        assertThat(side.indexOf("cl-seller-card")).isGreaterThan(side.indexOf("id=\"payment\""));
+        assertThat(main(html)).doesNotContain("cl-seller-card").doesNotContain("id=\"payment\"");
+    }
+
+    @Test
+    void sellerCardIsThereEvenWithoutContact() {
+        // when
+        String html = ClientOrderRenderer.newOrder().contactEmail(null).locale(PL).render();
+
+        // then
+        assertThat(side(html)).contains("cl-seller-card").contains("<p class=\"cl-seller-name\">Nova Tech</p>")
+                .doesNotContain("order-help-title");
+    }
+
+    @Test
+    void cancelledKeepsSellerCardWithoutPaymentAndDate() {
+        // when
+        String html = ClientOrderRenderer.newOrder().status(OrderStatus.Cancelled).locale(PL).render();
+
+        // then
+        assertThat(main(html)).contains("cl-alert is-bad");
+        assertThat(side(html)).contains("cl-seller-card").doesNotContain("id=\"payment\"").doesNotContain("id=\"date\"");
+    }
+
+    private static String main(String html) {
+        return html.substring(html.indexOf("class=\"cl-split-main\""), html.indexOf("class=\"cl-split-side\""));
+    }
+
+    private static String side(String html) {
+        String side = html.substring(html.indexOf("class=\"cl-split-side\""));
+        return side.substring(side.indexOf("<section"));
     }
 
     static List<Path> templateSources() throws IOException {

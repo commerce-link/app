@@ -9,13 +9,11 @@ import pl.commercelink.invoicing.api.SplitPaymentPolicy;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.payments.PaymentProviderFactory;
-import pl.commercelink.payments.api.PaymentProviderDescriptor;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.Iban;
-import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.web.PaymentGateways;
 import pl.commercelink.web.clientoffer.ClientOfferPage.ShippingMode;
 import pl.commercelink.web.dtos.ClientOfferLine;
 import pl.commercelink.web.dtos.PaymentOptionView;
@@ -41,7 +39,7 @@ public class ClientOfferPageFactory {
     private static final int SHORT_ID_LENGTH = 8;
     private static final String VARIANT_ANCHOR = "variant-";
 
-    private final PaymentProviderFactory paymentProviderFactory;
+    private final PaymentGateways paymentGateways;
 
     public ClientOfferPage build(Basket basket, Store store, boolean canEdit, Locale locale) {
         List<ClientOfferLine> offerLines = ClientOfferLine.from(basket);
@@ -160,7 +158,7 @@ public class ClientOfferPageFactory {
     }
 
     private ClientOfferPage.Payment toPayment(Basket basket, Store store, boolean submitted) {
-        List<PaymentOptionView> options = store.getPayments().stream().map(this::toPaymentOptionView).toList();
+        List<PaymentOptionView> options = paymentGateways.paymentOptions(store);
         BillingDetails billing = basket.getBillingDetails();
         boolean splitPayment = billing != null && SplitPaymentPolicy.isRequired(
                 billing.toBillingParty(),
@@ -187,12 +185,6 @@ public class ClientOfferPageFactory {
                 .map(PaymentOptionView::name)
                 .findFirst()
                 .orElseGet(() -> paymentOptions.isEmpty() ? null : paymentOptions.get(0).name());
-    }
-
-    private PaymentOptionView toPaymentOptionView(PaymentIntegration integration) {
-        PaymentProviderDescriptor descriptor = paymentProviderFactory.getDescriptor(integration.getName());
-        String displayName = descriptor != null ? descriptor.displayName() : integration.getName();
-        return new PaymentOptionView(integration.getName(), displayName, integration.is_default());
     }
 
     private static String shortId(String id) {
