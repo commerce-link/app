@@ -83,10 +83,10 @@ public class MarketplaceOfferExportEventListener {
 
         InventoryView enrichedInventory = inventory.withEnabledSuppliersAndWarehouseData(store.getStoreId());
 
-        List<MarketplaceOffer> offers = collectOffersFromCatalog(
+        ExportCandidates candidates = collectOffersFromCatalog(
                 store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist);
 
-        handleMarketplaceExport(store, catalog, payload.getMarketplace(), offers, run);
+        handleMarketplaceExport(store, catalog, payload.getMarketplace(), candidates, run);
     }
 
     /**
@@ -94,11 +94,11 @@ public class MarketplaceOfferExportEventListener {
      * source S in one category and the store's clone of S in another), and the marketplace takes one offer per id, so
      * the first one wins: categories in catalog order, products in repository order within a category.
      */
-    private List<MarketplaceOffer> collectOffersFromCatalog(String storeId,
-                                                            ProductCatalog catalog,
-                                                            String marketplace,
-                                                            InventoryView inventory,
-                                                            Pricelist pricelist) {
+    private ExportCandidates collectOffersFromCatalog(String storeId,
+                                                      ProductCatalog catalog,
+                                                      String marketplace,
+                                                      InventoryView inventory,
+                                                      Pricelist pricelist) {
         List<CategoryDefinition> categories = new LinkedList<>();
         List<MarketplaceDefinition> definitions = new LinkedList<>();
         List<List<Product>> productsPerCategory = new LinkedList<>();
@@ -119,9 +119,10 @@ public class MarketplaceOfferExportEventListener {
         }
 
         Map<String, MarketplaceOffer> offersByOfferId = new LinkedHashMap<>();
+        Set<String> skippedEans = new HashSet<>();
         for (int i = 0; i < categories.size(); i++) {
             for (MarketplaceOffer offer : createMarketplaceOffers(storeId, categories.get(i), definitions.get(i),
-                    productsPerCategory.get(i), exportedPimIds, inventory, pricelist)) {
+                    productsPerCategory.get(i), exportedPimIds, inventory, pricelist, skippedEans)) {
                 if (offersByOfferId.putIfAbsent(offer.productId(), offer) != null) {
                     log.warn("Marketplace {} export of store {}: more than one product maps to offer id {}; "
                             + "keeping the first and skipping the product of category {}",
@@ -129,7 +130,14 @@ public class MarketplaceOfferExportEventListener {
                 }
             }
         }
-        return new LinkedList<>(offersByOfferId.values());
+        return new ExportCandidates(new LinkedList<>(offersByOfferId.values()), skippedEans);
+    }
+
+    /**
+     * The offers of this run, and the unified EANs of the products skipped because this instance's index copy does not
+     * know their entry yet (see {@link #createMarketplaceOffers}).
+     */
+    private record ExportCandidates(List<MarketplaceOffer> offers, Set<String> skippedEans) {
     }
 
     private List<MarketplaceOffer> createMarketplaceOffers(String storeId,
@@ -138,7 +146,8 @@ public class MarketplaceOfferExportEventListener {
                                                            List<Product> products,
                                                            Set<String> exportedPimIds,
                                                            InventoryView inventory,
-                                                           Pricelist pricelist) {
+                                                           Pricelist pricelist,
+                                                           Set<String> skippedEans) {
         List<MarketplaceOffer> result = new LinkedList<>();
 
         String categoryName = category.getName();
@@ -157,6 +166,16 @@ public class MarketplaceOfferExportEventListener {
 
             if (marketplaceDefinition.isExportSelectedProducts()
                     && !product.isApprovedForMarketplace(marketplaceDefinition.getName())) {
+                continue;
+            }
+
+            // An index copy older than the product's entry (a clone made moments ago) cannot tell the offer id, which
+            // would come out as the clone's own id: the product waits for a run on a fresher copy, and the offer it was
+            // published under is kept until then (see handleMarketplaceExport).
+            if (!aliases.knows(storeId, product.getPimId())) {
+                log.warn("Marketplace export of store {}: product {} skipped for this run, the index copy does not "
+                        + "know its PIM entry {} yet", storeId, product.getProductId(), product.getPimId());
+                unifiedEan(product.getEan()).ifPresent(skippedEans::add);
                 continue;
             }
 
@@ -194,21 +213,30 @@ public class MarketplaceOfferExportEventListener {
     private void handleMarketplaceExport(Store store,
                                          ProductCatalog catalog,
                                          String marketplace,
-                                         List<MarketplaceOffer> currentOffers,
+                                         ExportCandidates candidates,
                                          MarketplaceExportRun run) {
         MarketplaceProvider provider = providerFactory.get(store, marketplace);
         if (provider == null) {
             return;
         }
 
-        List<MarketplaceOfferSnapshot> previousSnapshots = loadPreviousSnapshot(store, catalog, marketplace);
-        CurrentOffers currentPimIds = CurrentOffers.of(currentOffers);
+        List<MarketplaceOffer> currentOffers = candidates.offers();
+        Set<String> currentPimIds = pimIdsOf(currentOffers);
+
+        // A previous offer with the EAN of a skipped product is most likely that product's offer under the id the
+        // stale copy cannot produce: it is carried over as it was, neither taken off nor counted as an attempt.
+        Map<Boolean, List<MarketplaceOfferSnapshot>> byWaiting = loadPreviousSnapshot(store, catalog, marketplace).stream()
+                .collect(Collectors.partitioningBy(snapshot -> !currentPimIds.contains(snapshot.pimId())
+                        && unifiedEan(snapshot.ean()).filter(candidates.skippedEans()::contains).isPresent()));
+        List<MarketplaceOfferSnapshot> waiting = byWaiting.get(true);
+        List<MarketplaceOfferSnapshot> previousSnapshots = byWaiting.get(false);
+
         List<MarketplaceOfferSnapshot> retryableOrphans = retryableOrphans(previousSnapshots, currentPimIds);
         List<MarketplaceOfferSnapshot> abandonedRemovals = abandonedRemovals(previousSnapshots, currentPimIds);
         List<MarketplaceOffer> pendingRemovals = toUnpublishOffers(retryableOrphans);
 
         boolean providerCalled = !currentOffers.isEmpty() || !pendingRemovals.isEmpty();
-        run.offers(buildNextSnapshot(retryableOrphans, abandonedRemovals, currentOffers));
+        run.offers(buildNextSnapshot(waiting, retryableOrphans, abandonedRemovals, currentOffers));
 
         try {
             if (providerCalled) {
@@ -230,36 +258,21 @@ public class MarketplaceOfferExportEventListener {
     }
 
     /**
-     * What this run publishes. A previous snapshot is covered, so neither an orphan nor unpublished, when a current
-     * offer has its id, or its unified EAN (its unified MFN when the snapshot has no EAN): the marketplace matches an
-     * offer by EAN, so taking the old one off would take the current one down. This happens when an instance with a
-     * fresher index copy exports a product under another id (the clone's) than the one the offer was published with.
+     * The offer ids of this run. A previous offer is an orphan, to be taken off, when no current offer has its id: every
+     * marketplace keys an offer by our id (Allegro external id, CS-Cart product code, Empik shop SKU, Morele product id),
+     * so another product with the same EAN does not keep it alive.
      */
-    private record CurrentOffers(Set<String> ids, Set<String> eans, Set<String> mfns) {
-
-        static CurrentOffers of(List<MarketplaceOffer> offers) {
-            return new CurrentOffers(
-                    offers.stream().map(MarketplaceOffer::productId).collect(Collectors.toSet()),
-                    offers.stream().map(offer -> UnifiedProductIdentifiers.unifyEan(offer.ean()))
-                            .filter(code -> code != null && !code.isBlank()).collect(Collectors.toSet()),
-                    offers.stream().map(offer -> UnifiedProductIdentifiers.unifyMfn(offer.manufacturerCode()))
-                            .filter(code -> code != null && !code.isBlank()).collect(Collectors.toSet()));
-        }
-
-        boolean covers(MarketplaceOfferSnapshot snapshot) {
-            if (ids.contains(snapshot.pimId())) {
-                return true;
-            }
-            String ean = UnifiedProductIdentifiers.unifyEan(snapshot.ean());
-            if (ean != null && !ean.isBlank()) {
-                return eans.contains(ean);
-            }
-            String mfn = UnifiedProductIdentifiers.unifyMfn(snapshot.manufacturerCode());
-            return mfn != null && !mfn.isBlank() && mfns.contains(mfn);
-        }
+    private Set<String> pimIdsOf(List<MarketplaceOffer> offers) {
+        return offers.stream()
+                .map(MarketplaceOffer::productId)
+                .collect(Collectors.toSet());
     }
 
-    private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, CurrentOffers currentPimIds) {
+    private static Optional<String> unifiedEan(String ean) {
+        return Optional.ofNullable(UnifiedProductIdentifiers.unifyEan(ean)).filter(code -> !code.isBlank());
+    }
+
+    private List<MarketplaceOfferSnapshot> retryableOrphans(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
         return previousSnapshots.stream()
                 .filter(snapshot -> isOrphan(snapshot, currentPimIds))
                 .filter(snapshot -> snapshot.removalAttempts() < removalRetryCount)
@@ -267,7 +280,7 @@ public class MarketplaceOfferExportEventListener {
     }
 
     // Only a removal the marketplace refused on its last attempt is an alert: a removal it accepted is simply done.
-    private List<MarketplaceOfferSnapshot> abandonedRemovals(List<MarketplaceOfferSnapshot> previousSnapshots, CurrentOffers currentPimIds) {
+    private List<MarketplaceOfferSnapshot> abandonedRemovals(List<MarketplaceOfferSnapshot> previousSnapshots, Set<String> currentPimIds) {
         List<MarketplaceOfferSnapshot> abandoned = previousSnapshots.stream()
                 .filter(snapshot -> isOrphan(snapshot, currentPimIds))
                 .filter(snapshot -> snapshot.removalAttempts() > 0 && snapshot.removalAttempts() >= removalRetryCount)
@@ -279,8 +292,8 @@ public class MarketplaceOfferExportEventListener {
         return abandoned;
     }
 
-    private boolean isOrphan(MarketplaceOfferSnapshot snapshot, CurrentOffers currentPimIds) {
-        return !currentPimIds.covers(snapshot)
+    private boolean isOrphan(MarketplaceOfferSnapshot snapshot, Set<String> currentPimIds) {
+        return !currentPimIds.contains(snapshot.pimId())
                 && !MarketplaceOfferSnapshot.OUTCOME_REMOVAL_FAILED.equals(snapshot.outcome());
     }
 
@@ -293,7 +306,8 @@ public class MarketplaceOfferExportEventListener {
                 .toList();
     }
 
-    private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> retryableOrphans,
+    private List<MarketplaceOfferSnapshot> buildNextSnapshot(List<MarketplaceOfferSnapshot> waiting,
+                                                             List<MarketplaceOfferSnapshot> retryableOrphans,
                                                              List<MarketplaceOfferSnapshot> abandonedRemovals,
                                                              List<MarketplaceOffer> currentOffers) {
         Stream<MarketplaceOfferSnapshot> incrementedOrphans = retryableOrphans.stream()
@@ -307,6 +321,6 @@ public class MarketplaceOfferExportEventListener {
         Stream<MarketplaceOfferSnapshot> currentAsActive = currentOffers.stream()
                 .map(offer -> MarketplaceOfferSnapshot.published(
                         offer.productId(), offer.price(), offer.quantity(), offer.ean(), offer.manufacturerCode()));
-        return Stream.of(incrementedOrphans, failedRemovals, currentAsActive).flatMap(stream -> stream).toList();
+        return Stream.of(waiting.stream(), incrementedOrphans, failedRemovals, currentAsActive).flatMap(stream -> stream).toList();
     }
 }

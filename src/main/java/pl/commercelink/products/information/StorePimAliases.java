@@ -72,6 +72,20 @@ public class StorePimAliases {
         return clones;
     }
 
+    /**
+     * Whether this instance's index copy resolves {@code pimId} at all, as a global entry or as an entry the store
+     * sees. A copy older than an entry (a fresh clone) does not, and the store's data pinned to it cannot be read yet.
+     */
+    public boolean knows(String storeId, String pimId) {
+        if (isBlank(pimId)) {
+            return false;
+        }
+        if (catalog.withGlobalData().findByPimId(pimId).isPresent()) {
+            return true;
+        }
+        return !isBlank(storeId) && catalog.withStoreData(storeId).findByPimId(pimId).isPresent();
+    }
+
     /** The id an offer of the product is published under: a clone keeps its source's offer id. */
     public String offerIdOf(String storeId, String pimId) {
         return sourceOf(storeId, pimId).orElse(pimId);

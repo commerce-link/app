@@ -73,6 +73,21 @@ class StorePimAliasesTest {
         assertThat(aliases.find(OTHER_STORE, new Pricelist("p", List.of(row("S"))), "S")).isPresent();
     }
 
+    @Test
+    void knowsGlobalEntriesAndTheStoresOwnEntriesOnly() {
+        // when / then
+        assertThat(aliases.knows(STORE, "S")).isTrue();
+        assertThat(aliases.knows(STORE, "C")).isTrue();
+        assertThat(aliases.knows(STORE, "X")).isTrue();
+        assertThat(aliases.knows(OTHER_STORE, "S")).isTrue();
+        assertThat(aliases.knows(OTHER_STORE, "C")).isFalse();
+        assertThat(aliases.knows(null, "S")).isTrue();
+        assertThat(aliases.knows(null, "C")).isFalse();
+        assertThat(aliases.knows(STORE, "unknown")).isFalse();
+        assertThat(aliases.knows(STORE, null)).isFalse();
+        assertThat(aliases.knows(STORE, " ")).isFalse();
+    }
+
     private static AvailabilityAndPrice row(String pimId) {
         return new AvailabilityAndPrice(pimId, "5900000000011", "M1", "Brand", "", "Name", "cat", 100L, 5L, 1, 0L, false);
     }

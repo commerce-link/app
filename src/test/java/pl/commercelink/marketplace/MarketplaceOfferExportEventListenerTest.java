@@ -87,6 +87,7 @@ class MarketplaceOfferExportEventListenerTest {
         lenient().when(aliases.find(any(), any(), any())).thenAnswer(invocation ->
                 invocation.getArgument(1, Pricelist.class).findByPimId(invocation.getArgument(2)));
         lenient().when(aliases.offerIdOf(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(aliases.knows(any(), any())).thenReturn(true);
     }
 
     @BeforeEach
@@ -189,20 +190,78 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
-    void doesNotUnpublishAPreviousOfferWhoseEanIsInACurrentOffer() {
-        // given an instance with a fresher index copy exports the product under the clone's id C
-        Product product = product("clone-C", "EAN-A");
+    void aProductLeavingTheCatalogIsUnpublishedEvenWhenAnotherProductSharesItsEan() {
+        // given pim-B left the catalog; pim-A, still exported, carries the same EAN (the marketplace keys offers by id)
+        Product product = product("pim-A", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
         priceFor(product, 100, 2);
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-source-S"));
+        previousSnapshotContains(
+                MarketplaceOfferSnapshot.published("pim-A", 100L, 10L, "EAN-A", "MFN-pim-A"),
+                MarketplaceOfferSnapshot.published("pim-B", 90L, 4L, "EAN-A", "MFN-pim-B"));
 
         // when
         listener.handleMessage(request());
 
-        // then the old offer is not taken off (the marketplace matches by EAN, it would take the new one down)
-        assertThat(captureRemovedOffers()).isEmpty();
-        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("clone-C");
-        assertThat(captureSavedRows()).extracting(MarketplaceOfferSnapshot::pimId).containsExactly("clone-C");
+        // then
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-B");
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-A");
+    }
+
+    @Test
+    void aProductRepinnedToAnotherEntryWithTheSameEanUnpublishesTheOldOffer() {
+        // given the offer was published as pim-OLD; the product is now pinned to pim-NEW with the same EAN
+        Product product = product("pim-NEW", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("pim-OLD", 100L, 10L, "EAN-A", "MFN-pim-NEW"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-OLD");
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-NEW");
+        assertThat(captureSavedRows()).extracting(MarketplaceOfferSnapshot::pimId)
+                .containsExactlyInAnyOrder("pim-OLD", "pim-NEW");
+    }
+
+    @Test
+    void aProductTheIndexCopyDoesNotKnowIsSkippedAndItsOfferKept() {
+        // given the product moved onto the clone C, but this instance's index copy predates the clone
+        Product product = product("clone-C", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        // the snapshot carries the same EAN in its GTIN-14 form: the two match once unified
+        MarketplaceOfferSnapshot published = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "05900000000011", "MFN-S");
+        previousSnapshotContains(published);
+
+        // when
+        listener.handleMessage(request());
+
+        // then neither C is published nor S taken off; S waits unchanged for a run with a fresher copy
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).containsExactly(published);
+    }
+
+    @Test
+    void aSkippedProductShieldsOnlySnapshotsWithItsEan() {
+        // given
+        Product unknown = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), unknown, 10);
+        priceFor(unknown, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        MarketplaceOfferSnapshot pending = MarketplaceOfferSnapshot.removalPending("source-S", 100L, 1, "EAN-A", "MFN-S");
+        previousSnapshotContains(pending, MarketplaceOfferSnapshot.published("pim-Z", 50L, 3L, "EAN-Z", "MFN-Z"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-Z");
+        assertThat(capturePublishedOffers()).isEmpty();
+        assertThat(captureSavedRows()).contains(pending)
+                .extracting(MarketplaceOfferSnapshot::pimId).containsExactlyInAnyOrder("source-S", "pim-Z");
     }
 
     @Test
@@ -218,21 +277,6 @@ class MarketplaceOfferExportEventListenerTest {
 
         // then
         assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
-    }
-
-    @Test
-    void matchesAPreviousOfferWithoutEanByManufacturerCode() {
-        // given
-        Product product = product("clone-C", "EAN-A");
-        configureCategoryWith(warehouseDefinition(5), product, 10);
-        priceFor(product, 100, 2);
-        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, "mfn-clone-c"));
-
-        // when
-        listener.handleMessage(request());
-
-        // then
-        assertThat(captureRemovedOffers()).isEmpty();
     }
 
     @Test
