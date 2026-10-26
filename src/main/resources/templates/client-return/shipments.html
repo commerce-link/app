@@ -1,0 +1,59 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Every shipment of the return in the customer's words (ClientReturnView.shipmentRows): whose parcel it is, the number
+       to copy, the dates and the carrier's tracking page, which opens in a new tab and says so. A creation under way or
+       in doubt shows only its state, never the provider's reason. */-->
+<section th:fragment="shipments" id="return-parcel" class="cl-card" aria-labelledby="return-parcel-title"
+         th:with="rows=${view.shipmentRows()},
+                  notice=${clientReturnNotice != null and clientReturnNotice.target() == 'parcel' ? clientReturnNotice : null}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="return-parcel-title"
+            th:text="${#lists.size(rows) == 1} ? #{client.return.shipment.title} : #{client.return.shipment.count(${#lists.size(rows)})}"></h2>
+    </div>
+    <div class="cl-card-inset" th:if="${notice != null}">
+        <div th:replace="~{client-return/notice :: notice(${notice})}"></div>
+    </div>
+    <ul class="cl-list">
+        <li th:each="row : ${rows}" class="cl-list-item has-icon">
+            <div>
+                <span class="cl-list-icon" aria-hidden="true"><i th:class="${row.deliveredAt() != null} ? 'fas fa-check' : 'fas fa-truck'"></i></span>
+                <div>
+                    <p class="cl-list-title"><th:block th:text="${row.carrier() != null} ? ${row.carrier()}
+                            : (${row.typeKey() != null} ? #{${row.typeKey()}} : #{client.return.shipment.title})"></th:block><th:block
+                            th:if="${row.stateKey() != null}"> <span class="cl-status" th:classappend="'is-' + ${row.stateTone()}"
+                            th:text="#{${row.stateKey()}}"></span></th:block><th:block
+                            th:if="${row.stateKey() == null and row.deliveredAt() != null}"> <span class="cl-status is-ok"
+                            th:text="#{client.return.shipment.delivered}"></span></th:block></p>
+                    <p th:if="${row.labelKey() != null}" class="cl-list-desc" th:text="#{${row.labelKey()}}"></p>
+                    <p th:if="${row.helpKey() != null}" class="cl-list-desc" th:text="#{${row.helpKey()}}"></p>
+                    <p th:if="${row.trackingNo() != null}" class="cl-list-desc"><th:block
+                            th:text="#{client.return.shipment.number(${row.trackingNo()})}"></th:block>&#8288;<button type="button"
+                            class="cl-copy-inline is-icon" hidden data-cl-copy-reveal
+                            th:attr="data-cl-copy=${row.trackingNo()}, aria-label=#{client.return.shipment.copyNumber}"><span
+                            class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></p>
+                    <!--/* The pickup window matters only until the parcel is delivered. */-->
+                    <th:block th:with="pickup=${row.deliveredAt() == null and row.pickupWindow() != null}">
+                    <p th:if="${row.shippedAt() != null or row.deliveredAt() != null or pickup}" class="cl-list-desc"><th:block
+                            th:if="${row.shippedAt() != null}"
+                            th:text="#{client.return.shipment.shippedAt(${#temporals.format(row.shippedAt(), 'd MMM, HH:mm')})}"></th:block><span
+                            th:if="${row.shippedAt() != null and (row.deliveredAt() != null or pickup)}" class="cl-sep" aria-hidden="true">·</span><th:block
+                            th:if="${row.deliveredAt() != null}"
+                            th:text="#{client.return.shipment.deliveredAt(${#temporals.format(row.deliveredAt(), 'd MMM, HH:mm')})}"></th:block><th:block
+                            th:if="${pickup}"
+                            th:text="#{client.return.shipment.pickup(${row.pickupWindow().formatDay(#locale)}, ${row.pickupWindow().formatFrom()}, ${row.pickupWindow().formatTo()})}"></th:block></p>
+                    </th:block>
+                </div>
+            </div>
+            <div th:if="${row.trackingUrl() != null}" class="cl-list-actions">
+                <a class="cl-button" th:href="${row.trackingUrl()}" target="_blank" rel="noopener"><th:block
+                        th:text="#{client.return.shipment.track}"></th:block><i class="fas fa-external-link-alt cl-ext" aria-hidden="true"></i>
+                    <span class="cl-visually-hidden" th:text="' ' + #{client.return.shipment.track.newTab}"></span></a>
+            </div>
+        </li>
+    </ul>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The seller card of the side column, as on the order page: who sells (logo, company, address) and, when the store has a
+       contact, how to ask about the return with its number. The sentence is put together from escaped pieces. */-->
+<section th:fragment="contact" id="return-help" class="cl-card cl-seller-card"
+         th:attr="aria-labelledby=${publicPage.hasContact() ? 'return-help-title' : null}, aria-label=${publicPage.hasContact() ? null : #messages.msg('public.seller.card')}"
+         th:with="email=${publicPage.contactEmail}, phone=${publicPage.contactPhone}">
+    <div class="cl-card-inset">
+        <div th:replace="~{fragments/public-seller :: identity}"></div>
+        <div th:if="${publicPage.hasContact()}" class="cl-seller-help">
+            <h2 class="cl-card-title" id="return-help-title" th:text="#{client.return.contact.title}"></h2>
+            <p class="cl-note">
+                <th:block th:if="${email != null}">
+                    <th:block th:text="#{client.return.contact.write}"></th:block>
+                    <a th:href="'mailto:' + ${email}" th:text="${email}"></a>
+                    <th:block th:if="${phone != null}" th:text="#{client.return.contact.orCall}"></th:block>
+                </th:block>
+                <th:block th:if="${email == null}" th:text="#{client.return.contact.call}"></th:block>
+                <a th:if="${phone != null}" th:href="'tel:' + ${#strings.replace(phone, ' ', '')}" th:text="${phone}"></a>
+                <th:block th:text="#{client.return.contact.quote}"></th:block>
+                <strong th:text="${view.shortRmaId()}"></strong>.
+            </p>
+        </div>
+    </div>
+</section>
+
+</body>
+</html>

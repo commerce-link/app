@@ -14314,7 +14314,7 @@ body.cl-public .cl-seller-help .cl-card-title { margin: 0 0 4px; }
   body.cl-public .cl-seller-contact { align-items: flex-start; }
 }
 
-/* ===== Public page components (offer, order) ===== */
+/* ===== Public page components (offer, order, return) ===== */
 body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
 body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
 body.cl-public .cl-card-head.has-step .cl-card-title { margin: 0; }
@@ -14361,6 +14361,30 @@ body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-in
   body.cl-public dl.cl-kv.is-bank { grid-template-columns: 1fr; gap: 0; }
   body.cl-public dl.cl-kv.is-bank dd { margin-bottom: 8px; }
 }
+
+/* one of a few options compared side by side, each a card with a title and a description (the box of a return):
+   fieldset.cl-choice-cards > legend + label.cl-choice > input[radio] + .cl-choice-text > .cl-choice-title + .cl-choice-description.
+   The radio stays visible; the card carries the checked state and the focus ring. */
+body.cl-public fieldset.cl-choice-cards { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+body.cl-public fieldset.cl-choice-cards > legend { margin: 0 0 6px; padding: 0; font-size: 13.5px; font-weight: 500;
+  color: var(--cl-ink-2); }
+body.cl-public fieldset.cl-choice-cards .cl-choice { align-items: flex-start; gap: 12px; margin: 0; padding: 12px 14px; min-height: 44px;
+  border: 1px solid var(--cl-line); border-radius: var(--cl-radius); background: var(--cl-surface); }
+@media (hover: hover) {
+  body.cl-public fieldset.cl-choice-cards .cl-choice:hover { border-color: var(--cl-ink-3); }
+}
+body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:checked) { border-color: var(--cl-accent); background: var(--cl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--cl-accent); }
+body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:focus-visible) { outline: 2px solid var(--cl-accent); outline-offset: 2px; }
+body.cl-public fieldset.cl-choice-cards .cl-choice input { margin: 3px 0 0; }
+body.cl-public fieldset.cl-choice-cards .cl-choice input:focus-visible { outline: none; }
+body.cl-public fieldset.cl-choice-cards .cl-choice-title { font-size: 15px; }
+body.cl-public fieldset.cl-choice-cards .cl-choice-description { color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+/* a text written by the store and quoted to the customer (the reason for a rejection): keeps its line breaks */
+body.cl-public blockquote.cl-quote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--cl-line); border-radius: 0 6px 6px 0;
+  background: var(--cl-surface-2); font-size: 15px; line-height: 1.55; color: var(--cl-ink); white-space: pre-line; overflow-wrap: anywhere; }
+body.cl-public p.cl-quote-source { margin: 6px 0 0; font-size: 12.5px; color: var(--cl-ink-2); }
 
 /* ===== Client offer (clientOffer.html) ===== */
 /* variant choice */
@@ -14541,6 +14565,40 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
   .cl-order-page .cl-help .cl-link-button { min-height: 44px; margin-block: -14px; }
   .cl-order-page #delivery :is(.cl-input, .cl-button) { min-height: 44px; }
   body.cl-public .cl-date-actions .cl-button { min-height: 44px; }
+}
+
+/* ===== Client return (client-return.html) ===== */
+/* side column (from 1024 px, 400 px wide): a shipment row puts its action under the text, the pickup card is one column */
+@media (min-width: 1024px) {
+  .cl-client-return .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .cl-client-return .cl-split-side .cl-list-actions { justify-content: stretch; }
+  .cl-client-return .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  .cl-client-return .cl-split-side .cl-kv-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.cl-client-return .cl-page-header { margin-bottom: 20px; }
+.cl-client-return .cl-page-title { margin: 2px 0 6px; }
+.cl-client-return .cl-card-head .cl-card-title { margin: 0; }
+.cl-client-return .cl-note { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: var(--cl-ink); }
+.cl-client-return :is(.cl-note, .cl-alert-text) a { overflow-wrap: anywhere; }
+.cl-client-return .cl-note a[href^="tel:"] { white-space: nowrap; }
+/* redirect targets after a notice keep a gap to the top edge */
+.cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }
+.cl-client-return .cl-card-inset > .cl-alert + .cl-fieldset { margin-top: 16px; }
+.cl-client-return .cl-fieldset > :is(.cl-choice-cards, .cl-note) + .cl-field-error { margin-top: 6px; }
+.cl-client-return .cl-card-footer { align-items: center; column-gap: 12px; }
+.cl-client-return .cl-card-footer .cl-help { flex: 1 1 260px; margin: 0; }
+/* shipments, pickup and products */
+.cl-client-return .cl-list-actions .cl-button { white-space: nowrap; }
+.cl-client-return .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
+.cl-client-return .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
+.cl-client-return .cl-card-inset > .cl-kv-grid + .cl-help { margin-top: 12px; }
+@media (max-width: 719px) {
+  .cl-client-return .cl-list.is-items .cl-list-item { gap: 6px; }
+  .cl-client-return .cl-list.is-items .cl-status { justify-self: start; }
+  .cl-client-return .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
+}
+@media (max-width: 1023px) {
+  .cl-client-return #return-form :is(.cl-input, .cl-select, .cl-button) { min-height: 44px; }
 }
 
 /* ===== Public message page (client-offer/unavailable.html): one card with eyebrow, title and lead ===== */

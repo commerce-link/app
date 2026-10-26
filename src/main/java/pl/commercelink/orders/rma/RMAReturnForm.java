@@ -2,7 +2,13 @@ package pl.commercelink.orders.rma;
 
 import pl.commercelink.orders.ShippingDetails;
 
-public class RMAReturnForm {
+import java.io.Serializable;
+
+// A refused return form travels back to the customer as a flash attribute, i.e. in the HTTP session, and session
+// attributes are expected to be serializable.
+public class RMAReturnForm implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private ShippingDetails shippingDetails;
     private String selectedPackageTemplateId;
