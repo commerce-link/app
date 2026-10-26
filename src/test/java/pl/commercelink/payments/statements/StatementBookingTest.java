@@ -210,8 +210,51 @@ class StatementBookingTest {
         Payment payment = order.getPayments().get(0);
         assertThat(payment.getSource()).isEqualTo(PaymentSource.BankTransfer);
         assertThat(payment.getName()).isNull();
-        assertThat(payment.getFee()).isZero();
+        assertThat(payment.getFee()).isEqualTo(5.00);
         assertThat(payment.getReferenceNo()).isEqualTo("Zamowienie 3f9a2c1e");
+    }
+
+    @Test
+    void aDirectTransferKeepsTheCommissionRecordedOnTheOrder() {
+        // given
+        Order order = fromMarketplace(order(ORDER, 1249.00, pending(PaymentSource.BankTransfer, "", "282937034", 49.00)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", TRANSFER, List.of(allocation("1249.00", "0")), List.of());
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(49.00);
+    }
+
+    @Test
+    void aFeeGivenOnTheReconciliationPageReplacesTheRecordedOne() {
+        // given
+        PayoutChannel allegro = new PayoutChannel("ALLEGRO", "Allegro", null, true, null, null);
+        Order order = fromMarketplace(order(ORDER, 649.00, pending(PaymentSource.OnlinePayment, "", "7f2c9e10", 64.90)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+        BankOperation payout = operation("WB-PAY", "619.00", "Wyplata srodkow Allegro", "ALLEGRO SP. Z O.O.");
+
+        // when
+        booking.book("store-1", payout, List.of(allocation("649.00", "30.00")), List.of(allegro));
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(30.00);
+    }
+
+    @Test
+    void aPayerMarkedAsDeductingThatSentTheFullAmountKeepsTheRecordedCommission() {
+        // given
+        PayoutChannel gateway = new PayoutChannel("PAYPRO", "Allegro", null, true, null, null);
+        Order order = fromMarketplace(order(ORDER, 6982.00, pending(PaymentSource.OnlinePayment, "", "282937034", 49.00)), "Allegro");
+        when(ordersRepository.findById("store-1", ORDER)).thenReturn(order);
+
+        // when
+        booking.book("store-1", operation("WB-P24", "6982.00", "P24W-389339 BATCH 34713971", "PAYPRO SA"),
+                List.of(allocation("6982.00", "0")), List.of(gateway));
+
+        // then
+        assertThat(order.getPayments().get(0).getFee()).isEqualTo(49.00);
     }
 
     @Test
