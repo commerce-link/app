@@ -614,7 +614,7 @@ class InventoryViewStoreListingsTest {
         storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
 
-        // when: several lookups on one view, each of them resolving the clone's source
+        // when: several lookups on one view, each of them resolving the clone's source (read once, when the view is built)
         InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
         view.findAllByProductCategoryIds(List.of("989"));
         view.findByInventoryKey(cloneKey);

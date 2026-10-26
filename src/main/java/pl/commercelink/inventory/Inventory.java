@@ -174,28 +174,26 @@ public class Inventory {
         });
     }
 
-    // The global catalog holds global entries only, so a PIM id it does not know belongs to a store entry (spec 4.3).
-    // A clone names the global entry it was cloned from; sourceOf reads it from the store's clones, collected once per
-    // view on the first call (the lookups run inside loops over every row) and kept for the view's lifetime.
+    // The store's clones are read once, when the view is built: the lookups run inside loops over every row.
     private StoreEntryKeys storeEntryKeys(String storeId) {
-        return new StoreEntryKeys() {
-            private Map<String, String> sourceByClone;
+        return new StoreClones(pimCatalog, clonesWithSources(storeId));
+    }
 
-            @Override
-            public boolean isStoreEntry(String pimId) {
-                return pimCatalog.withGlobalData().findByPimId(pimId).isEmpty();
-            }
+    /**
+     * The global catalog holds global entries only, so a PIM id it does not know belongs to a store entry (spec 4.3).
+     * A clone names the global entry it was cloned from.
+     */
+    private record StoreClones(PimCatalog pimCatalog, Map<String, String> sourceByClone) implements StoreEntryKeys {
 
-            @Override
-            public String sourceOf(String pimId) {
-                Map<String, String> sources = sourceByClone;
-                if (sources == null) {
-                    sources = clonesWithSources(storeId);
-                    sourceByClone = sources;
-                }
-                return pimId == null ? null : sources.get(pimId);
-            }
-        };
+        @Override
+        public boolean isStoreEntry(String pimId) {
+            return pimCatalog.withGlobalData().findByPimId(pimId).isEmpty();
+        }
+
+        @Override
+        public String sourceOf(String pimId) {
+            return pimId == null ? null : sourceByClone.get(pimId);
+        }
     }
 
     private Map<String, String> clonesWithSources(String storeId) {
