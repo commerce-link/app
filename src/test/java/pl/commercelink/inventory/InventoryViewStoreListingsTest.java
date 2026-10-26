@@ -70,6 +70,8 @@ class InventoryViewStoreListingsTest {
     @Mock
     private PimView globalPimView;
     @Mock
+    private PimView storePimView;
+    @Mock
     private ProductRepository productRepository;
 
     @InjectMocks
@@ -79,6 +81,7 @@ class InventoryViewStoreListingsTest {
     @BeforeEach
     void globalCatalogKnowsPim1() {
         when(pimCatalog.withGlobalData()).thenReturn(globalPimView);
+        when(pimCatalog.withStoreData(STORE_ID)).thenReturn(storePimView);
         when(globalPimView.findByPimId("PIM-1")).thenReturn(Optional.of(
                 new PimEntry("PIM-1", List.of(), "Intel", "i7", "CPU", null, true, null, null)));
     }
@@ -571,5 +574,49 @@ class InventoryViewStoreListingsTest {
                 .filter(matched -> "st-s-1".equals(matched.getInventoryKey().getId())).findFirst().orElseThrow();
         assertThat(storeEntryRow.getSuppliers()).containsExactly("Action");
         assertThat(stats.distinctProducts()).isEqualTo(2);
+    }
+
+    // a clone (st-s-c) of the global entry PIM-1 keeps the offers of the global suppliers that sell PIM-1
+    private InventoryKey cloneOfPim1() {
+        when(storePimView.findByPimId("st-s-c")).thenReturn(Optional.of(new PimEntry("st-s-c", List.of(), "Intel", "i7",
+                "CPU", null, true, null, null, null, STORE_ID, "PIM-1")));
+        InventoryKey cloneKey = new InventoryKey("st-s-c");
+        cloneKey.addEan(EAN);
+        cloneKey.addManufacturerCode(MFN);
+        return cloneKey;
+    }
+
+    @Test
+    void cloneRowIsListedOnceWithGlobalOffers() {
+        // given
+        InventoryKey cloneKey = cloneOfPim1();
+        storeWithGlobalAbAndOwnIndex(new MatchedInventory(cloneKey, List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry));
+        stubGlobalIndex(List.of(globalGroupWithPimId()));
+
+        // when
+        InventoryView view = inventory.withEnabledSuppliersOnly(STORE_ID);
+        Collection<MatchedInventory> listed = view.findAllByProductCategoryIds(List.of("989")).get("989");
+        InventoryStatistics stats = inventory.storeStatistics(STORE_ID);
+
+        // then
+        assertThat(listed).singleElement().satisfies(matched ->
+                assertThat(matched.getSuppliers()).containsExactlyInAnyOrder("AB Group", "Action"));
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+    }
+
+    // ProductDetails resolves an automatic category product through findByInventoryKey of the store's view
+    @Test
+    void productDetailsOfACloneInAnAutomaticCategoryShowGlobalOffers() {
+        // given
+        InventoryKey cloneKey = cloneOfPim1();
+        storeWithGlobalAbAndOwnIndex();
+        stubGlobalIndex(List.of(globalGroupWithPimId()));
+
+        // when
+        MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByInventoryKey(cloneKey);
+
+        // then
+        assertThat(matched.getSuppliers()).containsExactly("AB Group");
+        assertThat(matched.getInventoryKey().getId()).isEqualTo("st-s-c");
     }
 }
