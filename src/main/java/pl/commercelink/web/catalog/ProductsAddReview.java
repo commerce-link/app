@@ -56,6 +56,7 @@ public class ProductsAddReview {
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
     private final CatalogPlacement catalogPlacement;
+    private final StorePimAliases pimAliases;
 
     /**
      * @param resetRows rows whose label or pricing group, kept from the previous category, the new one does not offer and
@@ -207,7 +208,7 @@ public class ProductsAddReview {
      * it. A category holding the clone already holds the source, and the other way round.
      */
     public Set<String> aliasesOf(String storeId, String pimId) {
-        return new StorePimAliases(pimCatalog).aliasesOf(storeId, pimId);
+        return pimAliases.aliasesOf(storeId, pimId);
     }
 
     private boolean holdsAny(Set<String> pimIds, String storeId, String pimId) {

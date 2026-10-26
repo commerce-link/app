@@ -14,6 +14,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -53,7 +55,7 @@ class ProductsAddReviewScopeTest {
         when(matched.getTaxonomy()).thenReturn(new Taxonomy(EAN, MFN, "Brand", "Taxonomy name", "GPU", 1, null, null));
         when(matched.getLowestPrice()).thenReturn(Price.fromGross(1000));
         when(view.findByEan(EAN)).thenReturn(matched);
-        return new ProductsAddReview(productRepository, inventory, catalog, brandMapper, messageSource, catalogPlacement);
+        return new ProductsAddReview(productRepository, inventory, catalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(catalog));
     }
 
     private static PimCatalog catalog() {
@@ -86,7 +88,7 @@ class ProductsAddReviewScopeTest {
         product.setManufacturerCode(MFN);
         MatchedInventory unknown = mock(MatchedInventory.class);
         when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(org.mockito.ArgumentMatchers.any())).thenReturn(unknown);
+        when(view.findByInventoryKey(any())).thenReturn(unknown);
 
         // when
         Optional<?> owner = review.pimEntryOf("s1", view, InventoryKey.fromProduct(product), product);
@@ -104,7 +106,7 @@ class ProductsAddReviewScopeTest {
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         MatchedInventory unknown = mock(MatchedInventory.class);
         when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(org.mockito.ArgumentMatchers.any())).thenReturn(unknown);
+        when(view.findByInventoryKey(any())).thenReturn(unknown);
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
                 new Product(null, null, EAN, "OTHER-1", "Brand", "L", "First", "Default"),
                 new Product(null, null, "5900000000999", MFN, "Brand", "L", "Second", "Default")));
@@ -118,25 +120,59 @@ class ProductsAddReviewScopeTest {
                 p -> "s1-2".equals(p.getPimId())));
     }
 
+    private int addToCategoryHolding(String heldPimId, PimCatalog catalog) {
+        ProductsAddReview review = review(catalog);
+        when(productRepository.findAll(anyString())).thenReturn(List.of(new Product(null, heldPimId, null, null, "Brand", "L", "Held", "Default")));
+        MatchedInventory unknown = mock(MatchedInventory.class);
+        when(unknown.isEmpty()).thenReturn(true);
+        when(view.findByInventoryKey(any())).thenReturn(unknown);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
+        return review.save("s1", category, form);
+    }
+
     @Test
-    void addingTheSourceToACategoryHoldingTheCloneIsADuplicate() {
-        // given: the category holds the global entry "g1" (no codes of its own); the store has cloned it as "c1"
+    void addingTheCloneToACategoryHoldingTheSourceIsADuplicate() {
+        // given: the category holds the global entry "g1" (no codes of its own); the entry the codes lead to is the store's clone "c1"
         PimCatalog withClone = ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
                 ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN, MFN, "GPU"));
-        ProductsAddReview review = review(withClone);
-        when(productRepository.findAll(anyString())).thenReturn(List.of(new Product(null, "g1", null, null, "Brand", "L", "Held", "Default")));
-        MatchedInventory unknown = mock(MatchedInventory.class);
-        when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(org.mockito.ArgumentMatchers.any())).thenReturn(unknown);
-        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
-        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
 
-        // when
-        int added = review.save("s1", category, form);
+        // when / then
+        assertThat(addToCategoryHolding("g1", withClone)).isZero();
+    }
 
-        // then
-        assertThat(added).isZero();
+    @Test
+    void addingTheSourceToACategoryHoldingTheCloneIsADuplicate() {
+        // given: the category holds the clone "c1"; the codes lead to the global entry "g1" (the clone belongs to another store's view here)
+        PimCatalog withClone = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", EAN, MFN, "GPU"),
+                ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN + "0", MFN + "0", "GPU"));
+
+        // when / then
+        assertThat(addToCategoryHolding("c1", withClone)).isZero();
+    }
+
+    @Test
+    void otherStoresAreUnaffected() {
+        // given: the clone belongs to s2, so s1 holding "g1" does not hold the entry it resolves to ("g2")
+        PimCatalog catalog = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
+                ScopedPimCatalog.cloneEntry("c1", "s2", "g1", EAN + "0", MFN + "0", "GPU"),
+                ScopedPimCatalog.globalEntry("g2", EAN, MFN, "GPU"));
+
+        // when / then
+        assertThat(addToCategoryHolding("c1", catalog)).isEqualTo(1);
+    }
+
+    @Test
+    void aliasesComeFromTheStoresViewOnly() {
+        // given
+        ProductsAddReview review = review(ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
+                ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN, MFN, "GPU")));
+
+        // when / then
         assertThat(review.aliasesOf("s1", "c1")).containsExactlyInAnyOrder("c1", "g1");
         assertThat(review.aliasesOf("s2", "c1")).containsExactly("c1");
     }

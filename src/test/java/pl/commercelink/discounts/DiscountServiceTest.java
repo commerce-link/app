@@ -212,6 +212,26 @@ class DiscountServiceTest {
     }
 
     @Test
+    void codeOfStoreAsSourceProductDoesNotCoverTheSameIdInAnotherStore() {
+        // given: the clone exists in store-1 only; store-2's basket holds "pim-GPU" (an unrelated product of that store)
+        DiscountCode code = new DiscountCode();
+        code.setActive(true);
+        code.setCode(CODE);
+        code.setType(DiscountType.Percentage);
+        code.setValue(10);
+        code.setTarget(DiscountTarget.Product);
+        code.setTargetValues(List.of(new TargetValue("pim-GPU-source", "GPU")));
+        when(discountCodesRepository.find("store-2", CODE)).thenReturn(Optional.of(code));
+        Basket basket = basket();
+        basket.setStoreId("store-2");
+
+        // when / then
+        assertThatThrownBy(() -> discountService.apply(basket, CODE, PROVIDER))
+                .isInstanceOfSatisfying(CheckoutException.class,
+                        e -> assertThat(e.getError()).isEqualTo(CheckoutError.DiscountCodeNotApplicable));
+    }
+
+    @Test
     void applyDiscountsItemsAndStoresAmount() {
         // given
         when(discountCodesRepository.find(STORE_ID, CODE)).thenReturn(Optional.of(percentageOnBrandAcme()));

@@ -1,19 +1,17 @@
 package pl.commercelink.offer;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
-import pl.commercelink.pim.ScopedPimCatalog;
-import pl.commercelink.products.information.StorePimAliases;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -21,12 +19,15 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static pl.commercelink.pim.ScopedPimCatalog.cloneEntry;
 
@@ -37,9 +38,6 @@ class ProductDetailsTest {
     private static final String CATALOG_ID = "catalog-1";
     private static final String CATEGORY_ID = "category-1";
     private static final String PIM_ID = "pim-1";
-
-    @Mock
-    private PimView pimView;
 
     @Spy
     private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of(pimEntry()));
@@ -139,7 +137,7 @@ class ProductDetailsTest {
 
         // then
         assertThat(view.getPimId()).isEqualTo("pim-clone");
-        org.mockito.Mockito.verify(inventory).findByInventoryKey(org.mockito.ArgumentMatchers.argThat(
+        verify(inventory).findByInventoryKey(argThat(
                 key -> "pim-clone".equals(key.getId())));
     }
 
@@ -157,7 +155,7 @@ class ProductDetailsTest {
     }
 
     private ProductDetails detailsWithClone(String ownerStoreId) {
-        return new ProductDetails(pimView, productCatalogRepository, productRepository, inventory,
+        return new ProductDetails(productCatalogRepository, productRepository, inventory,
                 new StorePimAliases(ScopedPimCatalog.of(pimEntry(),
                         cloneEntry("pim-clone", ownerStoreId, PIM_ID, "5900000000001", "MFN-1", "GPU"))));
     }

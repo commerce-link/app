@@ -36,7 +36,7 @@ class CheckoutRequestTest {
         CheckoutRequest request = requestFor("pim-1");
 
         // when / then
-        assertThatThrownBy(() -> request.toBasketItems(STORE_ID, pricelistRepository))
+        assertThatThrownBy(() -> request.toBasketItems(STORE_ID, pricelistRepository, aliases))
                 .isInstanceOfSatisfying(CheckoutException.class,
                         e -> assertThat(e.getError()).isEqualTo(CheckoutError.PricelistOutdated));
     }
@@ -49,7 +49,7 @@ class CheckoutRequestTest {
         CheckoutRequest request = requestFor("pim-gone");
 
         // when / then
-        assertThatThrownBy(() -> request.toBasketItems(STORE_ID, pricelistRepository))
+        assertThatThrownBy(() -> request.toBasketItems(STORE_ID, pricelistRepository, aliases))
                 .isInstanceOfSatisfying(CheckoutException.class,
                         e -> assertThat(e.getError()).isEqualTo(CheckoutError.ItemNotFound));
     }

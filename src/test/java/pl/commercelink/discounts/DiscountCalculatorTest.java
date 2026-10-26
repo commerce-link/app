@@ -4,7 +4,10 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -41,8 +44,8 @@ class DiscountCalculatorTest {
         assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS())).isEmpty();
     }
 
-    private static java.util.function.Function<String, java.util.Set<String>> aliasesOfS() {
-        return id -> new java.util.HashSet<>(java.util.List.of(id, "pim-S", "pim-C"));
+    private static Function<String, Set<String>> aliasesOfS() {
+        return id -> new HashSet<>(List.of(id, "pim-S", "pim-C"));
     }
 
     @Test

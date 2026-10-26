@@ -27,6 +27,7 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -168,7 +169,7 @@ class CatalogProductsControllerTest {
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor, catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
                 .build();
     }
 
@@ -1826,7 +1827,7 @@ class CatalogProductsControllerTest {
         MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, RetryingOptimisticLockingExecutor.create(), catalogPlacement,
-                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement)))
+                new ProductsAddReview(productRepository, inventory, pimCatalog, brandMapper, messageSource, catalogPlacement, new StorePimAliases(pimCatalog))))
                 .build();
 
         // when / then

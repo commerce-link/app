@@ -27,6 +27,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.PimCategoryOptions;
@@ -191,6 +192,6 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
                 messageSource, mock(OptimisticLockingExecutor.class), placement,
-                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement));
+                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement, new StorePimAliases(pimCatalog)));
     }
 }

@@ -13,7 +13,6 @@ import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -48,11 +47,7 @@ public class CheckoutRequest {
         return getCheckoutItems(catalogId).iterator().next().getPricelistId();
     }
 
-    public List<BasketItem> toBasketItems(String catalogId, Pricelist pricelist) {
-        return toBasketItems(catalogId, pricelist, null, null);
-    }
-
-    /** As above; an item whose id is the source or the clone of a pricelist row of the store is found by that row. */
+    /** An item whose id is the source or the clone of a pricelist row of the store is found by that row. */
     public List<BasketItem> toBasketItems(String catalogId, Pricelist pricelist, String storeId, StorePimAliases aliases) {
         return getCheckoutItems(catalogId).stream()
                 .map(i -> toBasketItem(storeId, i, pricelist, aliases))
@@ -69,11 +64,7 @@ public class CheckoutRequest {
                 .collect(Collectors.toList());
     }
 
-    public List<BasketItem> toBasketItems(String storeId, PricelistRepository pricelistRepository) {
-        return toBasketItems(storeId, pricelistRepository, null);
-    }
-
-    /** As above; an item whose id is the source or the clone of a pricelist row of the store is found by that row. */
+    /** An item whose id is the source or the clone of a pricelist row of the store is found by that row. */
     public List<BasketItem> toBasketItems(String storeId, PricelistRepository pricelistRepository, StorePimAliases aliases) {
         return checkoutItems.stream()
                 .map(i -> toBasketItem(storeId, i, pricelistRepository, aliases))
@@ -91,10 +82,7 @@ public class CheckoutRequest {
             throw new CheckoutException(CheckoutError.PricelistOutdated,
                     "pricelist " + checkoutItem.getPricelistId() + " of catalog " + checkoutItem.getCatalogId() + " not found");
         }
-        Optional<AvailabilityAndPrice> found = aliases == null
-                ? pricelist.findByPimId(checkoutItem.getItemId())
-                : aliases.find(storeId, pricelist, checkoutItem.getItemId());
-        AvailabilityAndPrice availabilityAndPrice = found
+        AvailabilityAndPrice availabilityAndPrice = aliases.find(storeId, pricelist, checkoutItem.getItemId())
                 .orElseThrow(() -> new CheckoutException(CheckoutError.ItemNotFound,
                         "item " + checkoutItem.getItemId() + " not found in pricelist " + pricelist.getPricelistId()));
 

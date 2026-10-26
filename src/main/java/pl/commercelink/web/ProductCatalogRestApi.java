@@ -78,7 +78,7 @@ public class ProductCatalogRestApi {
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId,
             @PathVariable("productId") String productId) {
-        return new ProductDetails(pimCatalog.withStoreData(storeId), productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId), pimAliases)
+        return new ProductDetails(productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId), pimAliases)
                 .generate(storeId, catalogId, categoryId, productId);
     }
 

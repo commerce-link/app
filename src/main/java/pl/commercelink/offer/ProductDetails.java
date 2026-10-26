@@ -5,23 +5,20 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.*;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.pim.api.PimView;
 import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.Optional;
 
 public class ProductDetails {
 
-    private final PimView pim;
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final InventoryView inventory;
     private final StorePimAliases aliases;
 
-    public ProductDetails(PimView pim, ProductCatalogRepository productCatalogRepository, ProductRepository productRepository,
+    public ProductDetails(ProductCatalogRepository productCatalogRepository, ProductRepository productRepository,
                           InventoryView inventory, StorePimAliases aliases) {
         this.aliases = aliases;
-        this.pim = pim;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.inventory = inventory;
