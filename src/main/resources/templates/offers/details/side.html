@@ -105,20 +105,6 @@
            class="cl-help" th:text="#{offers.details.client.empty}"></p>
     </div>
     <div class="cl-address">
-        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.link}"></span></div>
-        <div class="cl-copy-actions">
-            <button type="button" class="cl-button" hidden data-cl-copy-reveal th:attr="data-cl-copy=${p.clientUrl()}">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-copy"></i></span>
-                <span th:text="#{offers.details.client.copyLink}"></span>
-            </button>
-            <a class="cl-button" th:href="${p.clientUrl()}" target="_blank" rel="noopener">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
-                <span th:text="#{offers.details.client.open}"></span>
-            </a>
-        </div>
-        <p class="cl-help" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></p>
-    </div>
-    <div class="cl-address">
         <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.billing}"></span></div>
         <th:block th:if="${c.billing() != null}"><th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block></th:block>
         <p th:if="${c.billing() == null}" class="cl-help" th:text="#{offers.details.client.notSent}"></p>

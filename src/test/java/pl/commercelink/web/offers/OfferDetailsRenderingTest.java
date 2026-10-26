@@ -342,6 +342,24 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void theClientLinkIsCopiedOnlyFromTheMoreMenu() {
+        // given
+        String clientUrl = "https://app.test/store/s/client/offer/" + ID;
+
+        // when
+        String html = html(fullOffer());
+
+        // then
+        String copyAttribute = "data-cl-copy=\"" + clientUrl + "\"";
+        int menuStart = html.indexOf("id=\"offer-more-menu\"");
+        String menu = html.substring(menuStart, html.indexOf("</ul>", menuStart));
+        assertThat(count(html, copyAttribute)).isEqualTo(1);
+        assertThat(menu).contains(copyAttribute);
+        assertThat(html).doesNotContain("Otwórz jak klient").doesNotContain("Link dla klienta")
+                .doesNotContain("href=\"" + clientUrl + "\"");
+    }
+
+    @Test
     void contactlessOfferHidesCopyWithContact() {
         // given
         OfferDetailsPage page = offer(List.of(laptop(0)), summary(false), customer(false, false), false);

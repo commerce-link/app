@@ -10,7 +10,7 @@
 // - The terms, client and note dialogs (form[data-cl-async]) close once saved. On a clean page it reloads; with unsaved
 //   items the parts the dialog changed are swapped in from the answer's template[data-cl-offer-refresh] (header, card,
 //   the summary's delivery line) and the summary is recounted with the new delivery price, so the table is kept.
-// - "Kopiuj link" and "Otwórz jak klient" say that the customer sees the saved version while the table is dirty.
+// - "Kopiuj link" says that the customer sees the saved version while the table is dirty.
 // - The peek ([data-cl-peek]) follows the summary's own "Zapisz pozycje" at any width: shown while that button is out of
 //   view (a long table under a sticky side column, or the summary below the table), hidden while it is fully in view,
 //   but never while the focus is inside the peek.
