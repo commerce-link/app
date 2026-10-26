@@ -119,6 +119,10 @@ A store is active unless `Store.active` is `false` (no value means active) or it
 
 `StoreLifecycleSweep` (hourly: `store-lifecycle-sweep-queue` sent by EventBridge Scheduler in prod, `StoreLifecycleSweepScheduler` locally) takes a store whose trial ended through the steps recorded in `Store.deactivation` (`StoreDeactivation`): it is marked `TRIAL_ENDED`, its owner gets one e-mail from CommerceLink (`TrialEndedNotice`, in Polish), and `app.registration.trial-retention-days` (14) after the trial end the store is deleted with `StoreDeletionService.Guard.TRIAL_ONLY`. A failed step stays unrecorded and the next sweep tries it again; a store switched off by hand has no such steps. Marketplace offers are never touched, by the customer's decision: neither the deactivation nor the deletion changes or removes them, and since exports and order imports of an inactive store are skipped, its offers keep their last exported price and stock while the orders they bring are not imported.
 
+### Store PIM Entries and Clones
+
+A store can clone a global PIM entry; the store's products on the source then move onto the clone (`StoreEntryPinning`), so the same product is known by two ids. Every new reader keyed by `pimId` (price lists, baskets, discounts, price history, links) resolves it through `StorePimAliases` (`find`, `aliasesOf`, `sourceOf`, `cloneOf`), and inventory lookups through `StoreEntryKeys`; reading by the raw id misses the other one. The marketplace offer id always comes from `StorePimAliases.offerIdOf`, so a product on a clone keeps the offer published under its source. In the offer export, a product whose `pimId` the index copy does not know is skipped and keeps the previous offers with its codes for at most `marketplace.export.unknown-entry-max-waiting-runs` runs (a fresh clone on a stale copy) only when the previous export has no offer under its own id; otherwise (a dead pin) it is exported under that id as before, with a WARN to re-pin it.
+
 ### DynamoDB Tables
 
 All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annotations. Repositories extend `DynamoDbRepository<T>`. Tables are created by Mongock migrations.
