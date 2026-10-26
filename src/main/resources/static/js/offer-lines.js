@@ -8,7 +8,8 @@
 //   counting only the items the save keeps; the others are outside the total.
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
-//   (qty × cost, the median for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate; amounts rounded half up to grosze as Money.format.
+//   (qty × cost, the median for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate;
+//   amounts rounded half up to grosze as Money.format.
 //   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
@@ -217,8 +218,9 @@
             return;
         }
         var text = (margin.tone === 'unknown' ? message('margin-unknown')
-            : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone, [margin.percent === null ? '—' : margin.percent,
-                window.CL_formatMoney(margin.profit), window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
+            : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone,
+                [margin.percent === null ? '—' : margin.percent, window.CL_formatMoney(margin.profit),
+                    window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
             + '\n' + (mark.getAttribute('data-cl-market-text') || '');
         mark.setAttribute('data-tooltip', text);
         mark.setAttribute('aria-label', text);

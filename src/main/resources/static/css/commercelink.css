@@ -14128,6 +14128,8 @@ html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
 .cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
+/* display: block above would beat the hidden attribute of the estimated-cost note the script toggles */
+.cl-page .cl-kv-sub[hidden] { display: none; }
 .cl-page .cl-item-market { margin: 0; font-size: 14px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 /* the internal note reads like the values of the cards above it */
 .cl-page.cl-offer-page .cl-card-inset > .cl-note-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }

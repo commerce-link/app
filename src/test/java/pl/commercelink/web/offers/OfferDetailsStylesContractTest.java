@@ -93,4 +93,13 @@ class OfferDetailsStylesContractTest {
         assertThat(afterShown).contains("@media screen and (max-width: 719px) {\n    html:has(.cl-summary-peek.is-action),\n"
                 + "    html:has(.cl-summary-peek.is-action[data-cl-peek-state=\"shown\"]) { scroll-padding-bottom: 112px; }");
     }
+
+    @Test
+    void theHiddenEstimatedNoteStaysHiddenDespiteTheBlockDisplay() throws Exception {
+        // when
+        String block = block();
+
+        // then
+        assertThat(block).contains(".cl-page .cl-kv-sub[hidden] { display: none; }");
+    }
 }
