@@ -78,10 +78,25 @@
                 <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.details.items.column.actions}"></span></th>
             </tr>
             </thead>
-            <tbody data-cl-lines>
-            <th:block th:each="line, stat : ${p.lines()}">
+            <!--/* Products, then services under their heading, as on the order page. Two sections so a row never leaves
+                   its own (offer-lines.js sorts each apart); the services one is there even when empty, so a draft that
+                   brings the first service has its place. The save posts them in this order (Basket bands the
+                   positions the same way). */-->
+            <tbody data-cl-lines data-cl-lines-section="products">
+            <th:block th:each="line, stat : ${p.productLines()}">
                 <th:block th:if="${!(line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item))}"><tr
                     th:replace="~{offers/details/items :: group(${line}, ${stat.index})}"></tr></th:block>
+                <th:block th:if="${line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)}"><tr
+                    th:replace="~{offers/details/items :: row(${p}, ${line}, ${#lists.size(items)})}"></tr></th:block>
+            </th:block>
+            </tbody>
+            <tbody data-cl-lines data-cl-lines-section="services" th:with="services=${p.serviceLines()}">
+            <tr th:if="${!services.isEmpty()}" class="cl-table-group" data-cl-section-head>
+                <th scope="rowgroup" colspan="6"><span class="cl-eyebrow" th:text="#{offers.details.items.section.services}"></span></th>
+            </tr>
+            <th:block th:each="line, stat : ${services}">
+                <th:block th:if="${!(line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item))}"><tr
+                    th:replace="~{offers/details/items :: group(${line}, |s${stat.index}|)}"></tr></th:block>
                 <th:block th:if="${line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)}"><tr
                     th:replace="~{offers/details/items :: row(${p}, ${line}, ${#lists.size(items)})}"></tr></th:block>
             </th:block>

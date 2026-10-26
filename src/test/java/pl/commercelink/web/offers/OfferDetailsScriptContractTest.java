@@ -279,7 +279,9 @@ class OfferDetailsScriptContractTest {
                 .contains("detail.done()").contains("detail.abort()")
                 .doesNotContain("proceed(").doesNotContain("form.submit").doesNotContain("saveItems(");
         assertThat(handler.indexOf("event.preventDefault();")).isLessThan(handler.indexOf("addToDraft("));
-        assertThat(js).contains("+ '/items/draft'").contains("window.CL_offerLines.reinit(document.importNode(fresh, true))")
+        assertThat(js).contains("+ '/items/draft'").contains("querySelectorAll('tbody[data-cl-lines]')")
+                .contains("window.CL_offerLines.reinit(Array.prototype.map.call(fresh, function (section) {")
+                .contains("document.importNode(section, true)")
                 .contains("template[data-cl-draft-meta]").contains("'data-skipped'")
                 .doesNotContain("data-add-label").doesNotContain("data-add-count");
         assertThat(dialog).contains("params: params").contains("done: () =>").contains("proceed: () => form.submit()");
@@ -315,6 +317,26 @@ class OfferDetailsScriptContractTest {
         assertThat(js).contains("reinit: reinit").contains("function reinit(fresh)").contains("function setUp()")
                 .contains("sortable.destroy()").contains("table.addEventListener('click'")
                 .doesNotContain("body.addEventListener(");
+    }
+
+    @Test
+    void rowsMoveOnlyWithinTheirSection() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String items = read("templates/offers/details/items.html");
+
+        // then
+        assertThat(items).contains("data-cl-lines data-cl-lines-section=\"products\"")
+                .contains("data-cl-lines data-cl-lines-section=\"services\"").contains("data-cl-section-head");
+        assertThat(js).contains("querySelectorAll('tbody[data-cl-lines]')").contains("'data-cl-lines-section'")
+                // one Sortable per section, each in a group of its own that neither gives nor takes rows
+                .contains("sortables = bodies.map(function (section)")
+                .contains("group: { name: 'offer-lines-' + section.getAttribute('data-cl-lines-section'), pull: false, put: false }")
+                .contains("draggable: 'tr:not([data-cl-section-head])'")
+                .doesNotContain("new Sortable(body,");
+        // the moves stop at the section's heading, a new group goes to the products and a removed row comes back home
+        assertThat(js).contains("function previousRow(row)").contains("productsBody().append(head, createFoot())")
+                .contains("parent.isConnected");
     }
 
     @Test

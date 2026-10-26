@@ -320,13 +320,16 @@
         }).then(function (html) {
             var answer = document.createElement('template');
             answer.innerHTML = html;
-            var fresh = answer.content.querySelector('tbody[data-cl-lines]');
+            // the table's sections: the products, then the services
+            var fresh = answer.content.querySelectorAll('tbody[data-cl-lines]');
             var meta = answer.content.querySelector('template[data-cl-draft-meta]');
             // an expired session lands on the login page instead
-            if (!fresh || !meta) {
+            if (!fresh.length || !meta) {
                 throw new Error('draft failed: no table in the answer');
             }
-            window.CL_offerLines.reinit(document.importNode(fresh, true));
+            window.CL_offerLines.reinit(Array.prototype.map.call(fresh, function (section) {
+                return document.importNode(section, true);
+            }));
             return meta;
         });
     }

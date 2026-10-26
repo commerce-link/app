@@ -14,6 +14,9 @@
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
 //   quantity or price becomes 0, as it does when the field is left.
+// - Two sections, as on the order page: the products, then the services under their heading (tbody[data-cl-lines]
+//   each, data-cl-lines-section). A row never leaves its section: each is sorted apart, the moves stop at its edge and a
+//   new group goes to the products. A variant group sits in the section of its first item, even an old one mixing both.
 // - The table is a draft until it is saved: "Usuń" takes the row off the table at once, without asking, and the toast's
 //   "Cofnij" puts it back where it was. The item that would leave no item the save keeps cannot be removed; its menu
 //   says why, counted from the rows on screen.
@@ -23,18 +26,18 @@
     'use strict';
 
     var form = document.getElementById('offer-items');
-    // replaced by reinit(fresh): every listener sits on the table, which stays
-    var body = form && form.querySelector('tbody[data-cl-lines]');
-    if (!body) {
+    // the sections, replaced by reinit(fresh): every listener sits on the table, which stays
+    var bodies = form ? Array.prototype.slice.call(form.querySelectorAll('tbody[data-cl-lines]')) : [];
+    if (!bodies.length) {
         return;
     }
-    var table = body.closest('table');
+    var table = bodies[0].closest('table');
     var summary = document.getElementById('summary');
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     var addedGroups = 0;
     var draftRows = 0;
-    var sortable = null;
-    var fallbackObserver = null;
+    var sortables = [];
+    var fallbackObservers = [];
 
     function fill(text, values) {
         return (text || '').replace(/\{(\w+)\}/g, function (whole, key) {
@@ -46,8 +49,43 @@
         return fill(table.getAttribute('data-msg-' + name), values);
     }
 
+    function isSectionHead(row) {
+        return row.hasAttribute('data-cl-section-head');
+    }
+
+    function sectionRows(section) {
+        return Array.prototype.slice.call(section.children).filter(function (row) {
+            return !isSectionHead(row);
+        });
+    }
+
+    // every row of both sections, in the order the save posts them
     function rows() {
-        return Array.prototype.slice.call(body.children);
+        return bodies.reduce(function (all, section) {
+            return all.concat(sectionRows(section));
+        }, []);
+    }
+
+    function productsBody() {
+        return bodies.filter(function (section) {
+            return section.getAttribute('data-cl-lines-section') === 'products';
+        })[0] || bodies[0];
+    }
+
+    // the row above in its own section: the services heading is the section's edge
+    function previousRow(row) {
+        var previous = row.previousElementSibling;
+        return previous && !isSectionHead(previous) ? previous : null;
+    }
+
+    // the services heading shows while the section has a row: a removed last service takes it away, "Cofnij" brings it back
+    function updateSectionHeads() {
+        bodies.forEach(function (section) {
+            var head = section.querySelector('[data-cl-section-head]');
+            if (head) {
+                head.hidden = !sectionRows(section).length;
+            }
+        });
     }
 
     function isItem(row) {
@@ -89,9 +127,9 @@
     }
 
     function headOf(foot) {
-        var row = foot.previousElementSibling;
+        var row = previousRow(foot);
         while (row && !isHead(row)) {
-            row = row.previousElementSibling;
+            row = previousRow(row);
         }
         return row;
     }
@@ -325,10 +363,10 @@
     function updateMoves() {
         rows().forEach(function (row) {
             if (isItem(row)) {
-                setDisabled(row.querySelector('[data-cl-line-move="up"]'), !row.previousElementSibling);
+                setDisabled(row.querySelector('[data-cl-line-move="up"]'), !previousRow(row));
                 setDisabled(row.querySelector('[data-cl-line-move="down"]'), !row.nextElementSibling);
             } else if (isHead(row)) {
-                setDisabled(row.querySelector('[data-cl-group-move="up"]'), !row.previousElementSibling);
+                setDisabled(row.querySelector('[data-cl-group-move="up"]'), !previousRow(row));
                 setDisabled(row.querySelector('[data-cl-group-move="down"]'), !groupOf(row).foot.nextElementSibling);
             }
         });
@@ -398,7 +436,13 @@
     function refresh(withTotals) {
         var group = null;
         var groups = [];
+        var section = null;
         rows().forEach(function (row) {
+            // a group ends with its section, whatever the rows say
+            if (row.parentNode !== section) {
+                section = row.parentNode;
+                group = null;
+            }
             if (isHead(row)) {
                 group = { head: row, name: nameInput(row).value.trim(), items: [] };
                 row.setAttribute('data-group', group.name);
@@ -443,6 +487,7 @@
         validateGroups();
         updateMoves();
         updateRemoves();
+        updateSectionHeads();
         var title = form.querySelector('#items-title');
         if (title) {
             title.textContent = message('items-title', { n: rows().filter(isItem).length });
@@ -485,8 +530,8 @@
 
     function moveItem(row, direction) {
         // one step over whatever is next: an item swaps, a group's head or end lets the item out of or into the group
-        if (direction === 'up' && row.previousElementSibling) {
-            row.previousElementSibling.before(row);
+        if (direction === 'up' && previousRow(row)) {
+            previousRow(row).before(row);
             return true;
         }
         if (direction === 'down' && row.nextElementSibling) {
@@ -500,7 +545,7 @@
         var group = groupOf(head);
         var block = [head].concat(group.items, [group.foot]);
         if (direction === 'up') {
-            var before = head.previousElementSibling;
+            var before = previousRow(head);
             if (!before) {
                 return false;
             }
@@ -555,7 +600,8 @@
         });
         var input = nameInput(head);
         input.value = uniqueGroupName(message('group-new'));
-        body.append(head, createFoot());
+        // a new group starts among the products: a service joins a group only in its own section
+        productsBody().append(head, createFoot());
         labelGroup(head);
         refresh(false);
         head.scrollIntoView({ block: 'nearest' });
@@ -628,28 +674,21 @@
         });
     }
 
+    // the next item of the table, across the sections, else the one before
     function nearestItem(row) {
-        var after = row.nextElementSibling;
-        while (after && !isItem(after)) {
-            after = after.nextElementSibling;
-        }
-        if (after) {
-            return after;
-        }
-        var before = row.previousElementSibling;
-        while (before && !isItem(before)) {
-            before = before.previousElementSibling;
-        }
-        return before;
+        var all = rows();
+        var at = all.indexOf(row);
+        var after = all.slice(at + 1).filter(isItem)[0];
+        return after || all.slice(0, at).filter(isItem).pop() || null;
     }
 
-    // The row is kept with its neighbours, so "Cofnij" puts it back where it was; after the table was rebuilt from a
-    // draft (reinit) there is nothing to put it back into, and the toast with the button is gone by then.
+    // The row is kept with its neighbours and its section, so "Cofnij" puts it back where it was; after the table was
+    // rebuilt from a draft (reinit) there is nothing to put it back into, and the toast with the button is gone by then.
     function removeRow(row) {
         var name = field(row, 'name').value;
         var next = row.nextElementSibling;
         var previous = row.previousElementSibling;
-        var parent = body;
+        var parent = row.parentNode;
         var focus = nearestItem(row);
         row.querySelector('details.cl-menu').open = false;
         row.remove();
@@ -659,15 +698,16 @@
         showToast(message('line-removed-draft', [name]), 'info', {
             label: message('undo'),
             run: function () {
-                if (body !== parent || row.isConnected) {
+                // back into its own section, unless a draft has replaced the sections since
+                if (!parent.isConnected || row.isConnected) {
                     return;
                 }
-                if (next && next.parentNode === body) {
+                if (next && next.parentNode === parent) {
                     next.before(row);
-                } else if (previous && previous.parentNode === body) {
+                } else if (previous && previous.parentNode === parent) {
                     previous.after(row);
                 } else {
-                    body.append(row);
+                    parent.append(row);
                 }
                 refresh(true);
                 changed();
@@ -680,10 +720,12 @@
         if (typeof window.Sortable !== 'function') {
             return;
         }
-        if (sortable) {
+        sortables.forEach(function (sortable) {
             sortable.destroy();
-            fallbackObserver.disconnect();
-        }
+        });
+        fallbackObservers.forEach(function (observer) {
+            observer.disconnect();
+        });
         // an item dropped next to a group's rows lands in the group: only an item may, a group never goes into another
         function insideGroup(related, willInsertAfter) {
             if (isItem(related)) {
@@ -706,59 +748,70 @@
                 cell.style.width = hold ? cell.getBoundingClientRect().width + 'px' : '';
             });
         }
-        fallbackObserver = new MutationObserver(function (records) {
-            records.forEach(function (record) {
-                Array.prototype.forEach.call(record.addedNodes, function (node) {
-                    if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
-                        node.style.opacity = '1';
-                    }
+        fallbackObservers = bodies.map(function (section) {
+            var observer = new MutationObserver(function (records) {
+                records.forEach(function (record) {
+                    Array.prototype.forEach.call(record.addedNodes, function (node) {
+                        if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
+                            node.style.opacity = '1';
+                        }
+                    });
                 });
             });
+            observer.observe(section, { childList: true });
+            return observer;
         });
-        fallbackObserver.observe(body, { childList: true });
-        sortable = new Sortable(body, {
-            handle: '[data-cl-drag]',
-            draggable: 'tr',
-            filter: '[data-cl-group-foot]',
-            animation: reducedMotion.matches ? 0 : 150,
-            forceFallback: true,
-            // a click on the handle is not a drag
-            fallbackTolerance: 4,
-            onChoose: function (event) {
-                holdWidths(event.item, true);
-            },
-            onUnchoose: function (event) {
-                holdWidths(event.item, false);
-            },
-            onStart: function (event) {
-                table.classList.add('is-dragging');
-                document.documentElement.classList.add('cl-dragging-rows');
-                if (!isHead(event.item)) {
-                    return;
-                }
-                var group = groupOf(event.item);
-                group.items.concat([group.foot]).forEach(function (row) {
-                    row.hidden = true;
-                    row.setAttribute('data-cl-drag-hidden', '');
-                });
-            },
-            onMove: function (event) {
-                return isHead(event.dragged) ? !insideGroup(event.related, event.willInsertAfter) : true;
-            },
-            onEnd: function (event) {
-                table.classList.remove('is-dragging');
-                document.documentElement.classList.remove('cl-dragging-rows');
-                if (isHead(event.item)) {
-                    var anchor = event.item;
-                    body.querySelectorAll('[data-cl-drag-hidden]').forEach(function (row) {
-                        row.hidden = false;
-                        row.removeAttribute('data-cl-drag-hidden');
-                        anchor.after(row);
-                        anchor = row;
+        // one per section, in a group of its own that neither gives rows to the other section nor takes them from it;
+        // the services heading is not a row to drag nor a place to drop above
+        sortables = bodies.map(function (section) {
+            return new Sortable(section, {
+                group: { name: 'offer-lines-' + section.getAttribute('data-cl-lines-section'), pull: false, put: false },
+                handle: '[data-cl-drag]',
+                draggable: 'tr:not([data-cl-section-head])',
+                filter: '[data-cl-group-foot]',
+                animation: reducedMotion.matches ? 0 : 150,
+                forceFallback: true,
+                // a click on the handle is not a drag
+                fallbackTolerance: 4,
+                onChoose: function (event) {
+                    holdWidths(event.item, true);
+                },
+                onUnchoose: function (event) {
+                    holdWidths(event.item, false);
+                },
+                onStart: function (event) {
+                    table.classList.add('is-dragging');
+                    document.documentElement.classList.add('cl-dragging-rows');
+                    if (!isHead(event.item)) {
+                        return;
+                    }
+                    var group = groupOf(event.item);
+                    group.items.concat([group.foot]).forEach(function (row) {
+                        row.hidden = true;
+                        row.setAttribute('data-cl-drag-hidden', '');
                     });
+                },
+                onMove: function (event) {
+                    if (isSectionHead(event.related)) {
+                        return false;
+                    }
+                    return isHead(event.dragged) ? !insideGroup(event.related, event.willInsertAfter) : true;
+                },
+                onEnd: function (event) {
+                    table.classList.remove('is-dragging');
+                    document.documentElement.classList.remove('cl-dragging-rows');
+                    if (isHead(event.item)) {
+                        var anchor = event.item;
+                        table.querySelectorAll('[data-cl-drag-hidden]').forEach(function (row) {
+                            row.hidden = false;
+                            row.removeAttribute('data-cl-drag-hidden');
+                            anchor.after(row);
+                            anchor = row;
+                        });
+                    }
+                    afterMove(null);
                 }
-                afterMove(null);
-            }
+            });
         });
     }
 
@@ -1020,7 +1073,7 @@
         form.querySelectorAll('[data-cl-lines-reveal][hidden]').forEach(function (control) {
             control.hidden = false;
         });
-        body.querySelectorAll('[data-cl-line-remove]').forEach(function (button) {
+        table.querySelectorAll('[data-cl-line-remove]').forEach(function (button) {
             button.type = 'button';
             button.removeAttribute('form');
             button.removeAttribute('formaction');
@@ -1053,7 +1106,9 @@
             return isItem(row) && !dropped(row);
         });
         var next = 0;
-        Array.prototype.slice.call(fresh.children).filter(isItem).forEach(function (row) {
+        fresh.reduce(function (all, section) {
+            return all.concat(Array.prototype.slice.call(section.children));
+        }, []).filter(isItem).forEach(function (row) {
             var key = rowKey(row);
             for (var k = next; k < posted.length; k++) {
                 if (rowKey(posted[k]) === key) {
@@ -1072,16 +1127,22 @@
                     });
                 });
         });
-        body.replaceWith(fresh);
-        body = fresh;
+        bodies.forEach(function (section, index) {
+            if (index === 0) {
+                section.before.apply(section, fresh);
+            }
+            section.remove();
+        });
+        bodies = fresh;
     }
 
-    // fresh: a tbody[data-cl-lines] the server built for a draft, put in place of the table's; the form stays dirty
+    // fresh: the sections (tbody[data-cl-lines], products then services) the server built for a draft, put in place of
+    // the table's; the form stays dirty
     function reinit(fresh) {
-        if (fresh) {
+        if (fresh && fresh.length) {
             adopt(fresh);
         }
-        body.querySelectorAll('[data-cl-group-foot]').forEach(function (foot) {
+        table.querySelectorAll('[data-cl-group-foot]').forEach(function (foot) {
             foot.remove();
         });
         setUp();

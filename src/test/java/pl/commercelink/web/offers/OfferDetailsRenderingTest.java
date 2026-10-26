@@ -321,6 +321,29 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void theTableShowsAServicesSectionOnlyWhenThereAreServices() {
+        // given
+        OfferDetailsPage withoutServices = offer(List.of(laptop(0), dock(1)), summary(false), customer(true, true), true);
+
+        // when
+        String html = html(fullOffer());
+        String productsOnly = html(withoutServices);
+
+        // then
+        String products = html.substring(html.indexOf("data-cl-lines-section=\"products\""), html.indexOf("data-cl-lines-section=\"services\""));
+        String services = html.substring(html.indexOf("data-cl-lines-section=\"services\""), html.indexOf("</tbody>", html.indexOf("data-cl-lines-section=\"services\"")));
+        assertThat(products).contains("data-index=\"0\"").contains("data-index=\"3\"").doesNotContain("data-index=\"4\"")
+                .contains("value=\"Monitor\"");
+        assertThat(services).contains("<tr class=\"cl-table-group\" data-cl-section-head>")
+                .contains("<th scope=\"rowgroup\" colspan=\"6\"><span class=\"cl-eyebrow\">Usługi</span></th>")
+                .contains("data-index=\"4\"").contains("Usługa");
+        assertThat(services.indexOf("data-cl-section-head")).isLessThan(services.indexOf("data-index=\"4\""));
+        // both sections are always there, so a draft that brings the first service has its place
+        assertThat(productsOnly).contains("data-cl-lines-section=\"products\"").contains("data-cl-lines-section=\"services\"")
+                .doesNotContain("data-cl-section-head").doesNotContain("<span class=\"cl-eyebrow\">Usługi</span>");
+    }
+
+    @Test
     void everyRowMenuOffersSetAsChosenHiddenUntilTheScriptDecides() {
         // when
         String html = html(fullOffer());

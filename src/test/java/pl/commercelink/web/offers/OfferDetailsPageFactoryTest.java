@@ -275,6 +275,53 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
+    void servicesAreListedApartFromProducts() {
+        // given
+        BasketItem dell = item("Dell", 1, 1200, 900);
+        dell.setVariantGroupId("Monitor");
+        dell.setVariantSelected(true);
+        BasketItem lg = item("LG", 1, 1100, 850);
+        lg.setVariantGroupId("Monitor");
+        BasketItem samsung = item("Samsung", 1, 1150, 870);
+        samsung.setVariantGroupId("Monitor");
+        BasketItem assembly = item("Montaz", 1, 300, 0);
+        assembly.setService(true);
+        Basket basket = basket(item("Laptop", 1, 6899, 5810), dell, lg, samsung, assembly, item("Mysz", 2, 99, 50),
+                item("Kabel", 3, 19, 8));
+
+        // when
+        OfferDetailsPage page = build(basket);
+
+        // then
+        assertThat(page.lines()).hasSize(8);
+        assertThat(page.productLines()).hasSize(7);
+        assertThat(page.productLines()).filteredOn(Item.class::isInstance).hasSize(6);
+        assertThat(page.productLines()).filteredOn(GroupHead.class::isInstance).containsExactly(new GroupHead("Monitor", 3));
+        assertThat(page.serviceLines()).singleElement().isInstanceOf(Item.class)
+                .extracting(line -> ((Item) line).name()).isEqualTo("Montaz");
+        assertThat(((Item) page.serviceLines().get(0)).index()).isEqualTo(4);
+    }
+
+    @Test
+    void aGroupMixingProductsAndServicesStaysWholeInTheSectionOfItsFirstItem() {
+        // given
+        BasketItem service = item("Gwarancja", 1, 200, 0);
+        service.setService(true);
+        service.setVariantGroupId("Opieka");
+        BasketItem product = item("Gwarancja produkt", 1, 250, 100);
+        product.setVariantGroupId("Opieka");
+        Basket basket = basket(item("Laptop", 1, 6899, 5810), service, product);
+
+        // when
+        OfferDetailsPage page = build(basket);
+
+        // then
+        assertThat(page.productLines()).singleElement().extracting(line -> ((Item) line).name()).isEqualTo("Laptop");
+        assertThat(page.serviceLines()).hasSize(3);
+        assertThat(page.serviceLines().get(0)).isEqualTo(new GroupHead("Opieka", 2));
+    }
+
+    @Test
     void variantGroupProducesHeadThenItems() {
         // given
         BasketItem first = item("A", 1, 100, 50);

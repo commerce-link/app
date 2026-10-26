@@ -14090,6 +14090,9 @@ a.cl-link-button:hover {
    edited in place (.is-line-editor: quantity and price in the row, the cost as a line under the price, the value with
    its margin, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
 .cl-page .cl-table.is-line-editor { table-layout: fixed; }
+/* The products and the services are two tbody sections (offers/details/items.html): the last product keeps its rule
+   above the services heading, as the rows of the order page's single tbody do. */
+.cl-page .cl-table.is-line-editor tbody:has(+ tbody > tr:not([hidden])) > tr:last-child > * { border-bottom: 1px solid var(--cl-line); }
 /* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
 .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
 .cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }

@@ -5,7 +5,10 @@ import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.orders.AddressBlock;
 import pl.commercelink.web.orders.ItemMargin;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The offer details page (/dashboard/offer/{id}): every text resolved, amounts formatted without the currency (the
@@ -20,6 +23,38 @@ public record OfferDetailsPage(String offerId, String storeId, String shortId, b
                                Customer customer, String note, String clientUrl, boolean proformaAvailable,
                                boolean copyWithContactAvailable, String recordName, String fulfilmentType,
                                Long version) {
+
+    /** The lines of the products section, in the record's order: every item not a service, with their group heads. */
+    public List<Line> productLines() {
+        return section(false);
+    }
+
+    /** The lines of the services section ("Usługi"), in the record's order. */
+    public List<Line> serviceLines() {
+        return section(true);
+    }
+
+    // A variant group belongs to the section of its first item: an old record mixing products and services in one
+    // group shows it whole there (decided with the client), so a group is never split across the sections.
+    private List<Line> section(boolean services) {
+        Map<String, Boolean> groupIsService = new HashMap<>();
+        for (Line line : lines) {
+            if (line instanceof Item item && item.variantGroupId() != null) {
+                groupIsService.putIfAbsent(item.variantGroupId(), item.service());
+            }
+        }
+        List<Line> section = new ArrayList<>();
+        for (Line line : lines) {
+            boolean service = switch (line) {
+                case GroupHead head -> groupIsService.getOrDefault(head.name(), false);
+                case Item item -> item.variantGroupId() != null ? groupIsService.get(item.variantGroupId()) : item.service();
+            };
+            if (service == services) {
+                section.add(line);
+            }
+        }
+        return section;
+    }
 
     /** A category of none of the catalogs (an old item, an import) stays selectable as an extra option. */
     public boolean knownCategory(String category) {

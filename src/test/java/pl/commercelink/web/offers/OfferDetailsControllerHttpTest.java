@@ -270,7 +270,9 @@ class OfferDetailsControllerHttpTest {
                 .andReturn().getResponse().getContentAsString();
 
         // then
-        assertThat(html).contains("<tr class=\"cl-line\" data-cl-line", "data-cl-draft-meta data-skipped=\"1\" data-requested=\"2\"");
+        assertThat(html).contains("<tr class=\"cl-line\" data-cl-line", "data-cl-draft-meta data-skipped=\"1\" data-requested=\"2\"")
+                // both sections of the table, which offer-lines.js puts in place of its own
+                .contains("data-cl-lines-section=\"products\"", "data-cl-lines-section=\"services\"");
         ArgumentCaptor<AddItemsForm> added = ArgumentCaptor.forClass(AddItemsForm.class);
         ArgumentCaptor<Basket> drafted = ArgumentCaptor.forClass(Basket.class);
         verify(offerItemsDraft).add(drafted.capture(), added.capture());
