@@ -33,12 +33,12 @@ class ClientOfferTemplateRenderingTest {
 
         // then
         assertThat(html).contains("<title>Offer · Nova Tech</title>")
-                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-form\"")
+                .contains("<main id=\"clContent\" class=\"cl-page cl-public-main is-split\"")
                 .contains("<h1 class=\"cl-page-title\">Your offer</h1>")
                 .contains("cl-step-badge is-locked")
                 .contains("<form id=\"client-offer-data\"")
                 .contains("action=\"" + OFFER_PATH + "/submit\"")
-                .contains("Payment unlocks once you save your details in step 2.");
+                .contains("Payment unlocks once you save your details.");
         assertThat(html.split("<h1", -1)).hasSize(2);
         assertThat(html.split("class=\"cl-step-badge", -1)).hasSize(4);
         assertThat(payButton(html)).contains("disabled").contains("aria-describedby=\"client-offer-pay-lock\"");
@@ -259,7 +259,7 @@ class ClientOfferTemplateRenderingTest {
         assertThat(html).contains("action=\"" + OFFER_PATH + "/checkout\"")
                 .containsPattern("name=\"paymentOptionId\" value=\"Paynow\"[^>]*checked")
                 .contains("Recommended")
-                .contains("or a traditional bank transfer");
+                .contains("or a bank transfer");
     }
 
     @Test
@@ -324,6 +324,72 @@ class ClientOfferTemplateRenderingTest {
                 .contains("action=\"" + OFFER_PATH + "/send-proforma-invoice\"")
                 .contains("Send a proforma invoice to")
                 .contains("Every request issues a new proforma invoice.");
+    }
+
+    @Test
+    void itemsSitInTheMainColumnAndPaymentWithSellerInTheSide() {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+
+        // then
+        assertThat(html.indexOf("class=\"cl-split-main")).isPositive().isLessThan(html.indexOf("id=\"client-offer-items\""));
+        assertThat(html.indexOf("id=\"client-offer-items\"")).isLessThan(html.indexOf("id=\"client-offer-data\""));
+        assertThat(html.indexOf("id=\"client-offer-data\"")).isLessThan(html.indexOf("class=\"cl-split-side\""));
+        assertThat(html.indexOf("class=\"cl-split-side\"")).isLessThan(html.indexOf("id=\"client-offer-payment\""));
+        assertThat(html.indexOf("id=\"client-offer-payment\"")).isLessThan(html.indexOf("cl-seller-card"));
+        assertThat(html).contains("<body class=\"cl-public is-split\"").doesNotContain("cl-public-foot");
+    }
+
+    @Test
+    void paymentCardOpensWithTheTotal() {
+        // when
+        String html = ClientOfferRenderer.newOffer().render();
+
+        // then
+        String payment = html.substring(html.indexOf("id=\"client-offer-payment\""));
+        assertThat(payment).containsPattern("<div class=\"cl-pay-total\">\\s*<p class=\"cl-pay-total-label\">To pay</p>\\s*"
+                        + "<p class=\"cl-pay-total-value\">5.525,99 PLN</p>")
+                .contains("<p class=\"cl-pay-total-sub\">incl. 23% VAT:");
+        assertThat(html).contains("class=\"cl-card-inset cl-items-total\"");
+    }
+
+    @Test
+    void bankTransferHasNoAmountRowAndCompactList() {
+        // when
+        String html = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).render();
+
+        // then
+        assertThat(html).contains("<dl class=\"cl-kv is-bank is-compact\">").doesNotContain("<dt>Amount</dt>");
+    }
+
+    @Test
+    void methodsSitSideBySideWithRecommendedUnderTheName() {
+        // when
+        String html = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).render();
+
+        // then
+        assertThat(html).contains("<fieldset class=\"cl-pay-methods is-row\"")
+                .containsPattern("<span class=\"cl-choice-title\">Paynow</span>\\s*<span class=\"cl-choice-description\">Recommended</span>");
+    }
+
+    @Test
+    void proformaIsALinkButtonWithItsHelp() {
+        // when
+        String html = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).render();
+
+        // then
+        String proforma = html.substring(html.indexOf("class=\"cl-proforma\""));
+        assertThat(proforma).containsPattern("<button class=\"cl-link-button\" type=\"submit\"")
+                .contains("Every request issues a new proforma invoice.");
+    }
+
+    @Test
+    void variantUpdateFragmentCarriesThePaymentTotal() {
+        // when
+        String html = ClientOfferRenderer.newOffer().submitted(ClientOfferRenderer.billing()).renderVariantUpdate();
+
+        // then
+        assertThat(html).contains("class=\"cl-pay-total\"").contains("class=\"cl-card-inset cl-items-total\"");
     }
 
     @Test

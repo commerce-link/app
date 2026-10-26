@@ -1,6 +1,6 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{public-layout}" th:with="publicWidth='is-form'">
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-split', publicFooter=false">
 <head>
     <title th:text="#{client.offer.pageTitle}">Oferta</title>
     <script th:src="@{/js/variant-fields.js}" defer></script>
@@ -52,10 +52,17 @@
 
         <!--/* client-offer.js reads the new total here after a variant update in the background */-->
         <p th:unless="${page.expired}" id="client-offer-live" class="cl-visually-hidden" role="status" aria-live="polite"></p>
-        <div th:unless="${page.expired}" class="cl-stack">
-            <section th:replace="~{client-offer/items :: items}"></section>
-            <section th:replace="~{client-offer/data :: data}"></section>
-            <section th:replace="~{client-offer/payment :: payment}"></section>
+        <!--/* Two columns from 1024 px: the items and the customer's data on the left, the payment and the seller on the
+               right; below that the DOM order is the reading order. */-->
+        <div th:unless="${page.expired}" class="cl-split">
+            <div class="cl-split-main">
+                <section th:replace="~{client-offer/items :: items}"></section>
+                <section th:replace="~{client-offer/data :: data}"></section>
+            </div>
+            <aside class="cl-split-side" th:aria-label="#{client.offer.payment.title}">
+                <section th:replace="~{client-offer/payment :: payment}"></section>
+                <section th:replace="~{fragments/public-seller :: card}"></section>
+            </aside>
         </div>
     </div>
 </th:block>
