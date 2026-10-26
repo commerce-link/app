@@ -4,7 +4,9 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -52,6 +54,20 @@ public class StorePimAliases {
         sourceOf(storeId, pimId).ifPresent(aliases::add);
         cloneOf(storeId, pimId).ifPresent(aliases::add);
         return Set.copyOf(aliases);
+    }
+
+    /** Every clone the store owns, mapped to the global entry it was cloned from. */
+    public Map<String, String> clonesWithSources(String storeId) {
+        if (isBlank(storeId)) {
+            return Map.of();
+        }
+        Map<String, String> clones = new LinkedHashMap<>();
+        for (PimEntry entry : catalog.withStoreData(storeId).findAll()) {
+            if (storeId.equals(entry.ownerStoreId()) && !isBlank(entry.clonedFromPimId())) {
+                clones.put(entry.pimId(), entry.clonedFromPimId());
+            }
+        }
+        return clones;
     }
 
     /** The id an offer of the product is published under: a clone keeps its source's offer id. */

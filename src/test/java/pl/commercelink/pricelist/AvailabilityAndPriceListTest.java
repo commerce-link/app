@@ -57,6 +57,9 @@ class AvailabilityAndPriceListTest {
     private SellingPriceHistoryRepository sellingPriceHistoryRepository;
 
     @Mock
+    private pl.commercelink.products.information.StorePimAliases aliases;
+
+    @Mock
     private ProductCatalog catalog;
 
     @Mock
@@ -82,6 +85,7 @@ class AvailabilityAndPriceListTest {
                 recommendationEngine,
                 rollingPriceAggregateRepository,
                 sellingPriceHistoryRepository,
+                aliases,
                 "store-1"
         );
 
@@ -144,6 +148,66 @@ class AvailabilityAndPriceListTest {
         // then
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getCategory()).isEqualTo("Obudowa");
+    }
+
+    @Test
+    void lowestPriceOfThirtyDaysIsTheSameAfterTheMoveToTheClone() {
+        // given: history only under the source, the row already carries the clone
+        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        SellingPriceHistory ofSource = new SellingPriceHistory("pim-1", Map.of(day, 800L));
+        when(sellingPriceHistoryRepository.load("store-1", "catalog-1")).thenReturn(Map.of("pim-1", ofSource));
+        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(java.util.Optional.of("pim-1"));
+        product.setPimId("pim-c");
+        singleManagedProduct();
+
+        // when
+        List<AvailabilityAndPrice> result = availabilityAndPriceList.generate("store-1", "catalog-1");
+
+        // then
+        assertThat(result.get(0).getLowest30DaysPrice()).isEqualTo(800);
+    }
+
+    @Test
+    void automaticCategoryRowOfACloneReadsTheSourceHistoryAndItsOwn() {
+        // given: days under both ids, the lower one wins
+        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        Map<String, SellingPriceHistory> histories = Map.of(
+                "pim-1", new SellingPriceHistory("pim-1", Map.of(day, 800L)),
+                "pim-c", new SellingPriceHistory("pim-c", Map.of(day, 700L)));
+        when(sellingPriceHistoryRepository.load("store-1", "catalog-1")).thenReturn(histories);
+        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(java.util.Optional.of("pim-1"));
+        product.setPimId("pim-c");
+        when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(true);
+        when(pimCatalog.withStoreData(any())).thenReturn(pim);
+        when(recommendationEngine.getRecommendationsForMappedProducts(pim, categoryDefinition, inventory)).thenReturn(List.of(recommendation));
+        when(recommendation.toProduct()).thenReturn(product);
+
+        // when
+        List<AvailabilityAndPrice> result = availabilityAndPriceList.generate("store-1", "catalog-1");
+
+        // then
+        assertThat(result.get(0).getLowest30DaysPrice()).isEqualTo(700);
+    }
+
+    @Test
+    void plainProductsAreUnchanged() {
+        // given
+        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        when(sellingPriceHistoryRepository.load("store-1", "catalog-1"))
+                .thenReturn(Map.of("pim-1", new SellingPriceHistory("pim-1", Map.of(day, 900L))));
+        singleManagedProduct();
+
+        // when
+        List<AvailabilityAndPrice> result = availabilityAndPriceList.generate("store-1", "catalog-1");
+
+        // then
+        assertThat(result.get(0).getLowest30DaysPrice()).isEqualTo(900);
+    }
+
+    private void singleManagedProduct() {
+        when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(false);
+        when(categoryDefinition.getCategoryId()).thenReturn("cat-1");
+        when(productRepository.findAllProductsWithPimId("cat-1", true)).thenReturn(List.of(product));
     }
 
     private void mockCatalogWithSingleDefinition() {

@@ -118,6 +118,7 @@ class DynamicCategoryPricelistTest {
                 recommendationEngine,
                 rollingPriceAggregateRepository,
                 sellingPriceHistoryRepository,
+                mock(pl.commercelink.products.information.StorePimAliases.class),
                 STORE_ID
         );
 

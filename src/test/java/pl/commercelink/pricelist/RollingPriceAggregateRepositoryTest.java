@@ -31,6 +31,9 @@ class RollingPriceAggregateRepositoryTest {
     @Mock
     private FileStorage fileStorage;
 
+    @Mock
+    private pl.commercelink.products.information.StorePimAliases aliases;
+
     @InjectMocks
     private RollingPriceAggregateRepository repository;
 
@@ -79,6 +82,36 @@ class RollingPriceAggregateRepositoryTest {
 
         // then
         assertEquals(100, result.get("pim-1").getMedianLowestPrice30d());
+    }
+
+    @Test
+    void stopLossAndRestockPricesUseTheSourceAggregateForAClone() throws IOException {
+        // given
+        globalAggregate(aggregate("pim-1", 100), aggregate("pim-2", 200));
+        storeAggregate("store-1");
+        when(aliases.clonesWithSources("store-1")).thenReturn(Map.of("clone-1", "pim-1", "clone-9", "missing"));
+
+        // when
+        Map<String, RollingPriceAggregate> result = repository.loadForStore("store-1");
+
+        // then
+        assertEquals(100, result.get("clone-1").getMedianLowestPrice30d());
+        assertEquals(100, result.get("pim-1").getMedianLowestPrice30d());
+        assertTrue(!result.containsKey("clone-9"));
+    }
+
+    @Test
+    void cloneWithItsOwnAggregateKeepsIt() throws IOException {
+        // given
+        globalAggregate(aggregate("pim-1", 100));
+        storeAggregate("store-1", aggregate("clone-1", 80));
+        when(aliases.clonesWithSources("store-1")).thenReturn(Map.of("clone-1", "pim-1"));
+
+        // when
+        Map<String, RollingPriceAggregate> result = repository.loadForStore("store-1");
+
+        // then
+        assertEquals(80, result.get("clone-1").getMedianLowestPrice30d());
     }
 
     @Test
