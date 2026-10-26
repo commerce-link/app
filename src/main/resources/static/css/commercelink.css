@@ -14555,3 +14555,10 @@ body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line
   .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; }
 }
 
+
+/* Order in two columns: the day tiles get four to a row in the 400 px side column (auto-fill at 92 px would leave three
+   and a ragged last row); "as soon as possible" spans the row. */
+@media (min-width: 1024px) {
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid .is-wide { grid-column: 1 / -1; }
+}
