@@ -69,11 +69,26 @@ public class OfferDetailsPageFactory {
     /** Never saves: a template shows prices recalculated on open and an offer the reloaded ones, as the page always did. */
     public OfferDetailsPage build(Basket basket, String returnTo, Locale locale, LocalDateTime now) {
         boolean template = basket.hasType(BasketType.OfferTemplate);
-        List<OfferItem> offerItems = template ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket);
+        return build(basket, template ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket),
+                returnTo, locale, now);
+    }
+
+    /**
+     * Never saves: the items are the ones the operator posted (a draft of the table, or a save refused over a changed
+     * version), so their prices are kept as posted, a template's too; only the market figures are read.
+     */
+    public OfferDetailsPage buildDraft(Basket basket, String returnTo, Locale locale, LocalDateTime now) {
+        return build(basket, offerItemReloader.reload(basket), returnTo, locale, now);
+    }
+
+    private OfferDetailsPage build(Basket basket, List<OfferItem> offerItems, String returnTo, Locale locale,
+                                   LocalDateTime now) {
+        boolean template = basket.hasType(BasketType.OfferTemplate);
         Store store = storesRepository.findById(basket.getStoreId());
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(basket.getStoreId());
 
-        Summary summary = summary(basket, store);
+        List<Line> lines = lines(basket, offerItems);
+        Summary summary = summary(basket, store, lines);
         ContactDetails contact = basket.getContactDetails();
         boolean contactFilled = contact != null && contact.isProperlyFilled();
         BasketViewPage.Customer addresses = BasketViewPageFactory.customer(basket, locale);
@@ -85,7 +100,7 @@ public class OfferDetailsPageFactory {
                 template ? new Pill("offers.details.pill.template", null, "is-neutral")
                         : new Pill("offers.list.pill." + validity.param(), null, OfferRowMapper.tone(validity)),
                 meta(basket, template, validity, summary, contact, locale, now),
-                lines(basket, offerItems), storeCategories.groups(catalogs), catalogs, summary,
+                lines, storeCategories.groups(catalogs), catalogs, summary,
                 terms(basket, store, template, validity, locale, now),
                 new Customer(contact == null ? null : contact.getName(), contact == null ? null : contact.getSurname(),
                         contact == null ? null : contact.getCompanyName(), contact == null ? null : contact.getEmail(),
@@ -94,7 +109,7 @@ public class OfferDetailsPageFactory {
                         addresses.hasShipping() ? addresses.shipping() : null, addresses.sameAddress()),
                 basket.getComment(), template ? null : basket.createOfferUrl(appDomain),
                 basket.getBillingDetails() != null, contactFilled, basket.getName(),
-                basket.getFulfilmentType() == null ? null : basket.getFulfilmentType().name());
+                basket.getFulfilmentType() == null ? null : basket.getFulfilmentType().name(), basket.getVersion());
     }
 
     /** The list's address when it is one (OfferController.safeReturnTo keeps it), else the segment the record belongs to. */
@@ -159,11 +174,14 @@ public class OfferDetailsPageFactory {
                 : known ? new Market(false, Money.format(offer.getLowestCost()), Money.format(offer.getMedianCost()),
                 offer.getSupplierCount(), offer.getTotalQty())
                 : Market.none();
+        double median = known && offer.getMedianCost() > 0 ? offer.getMedianCost() : 0;
+        boolean estimated = !service && item.getUnitCost() <= 0 && median > 0;
+        double costForMargin = estimated ? median : item.getUnitCost();
         return new Item(index, item.getId(), item.getCatalogId(), item.getName(), item.getCategory(), item.getMfn(),
                 item.getQty(), Money.inputRounded(item.getUnitPrice()), Money.inputRounded(item.getUnitCost()),
-                item.getUnitPrice(), item.getUnitCost(), item.isConsolidated(), item.getVariantGroupId(),
+                item.getUnitPrice(), item.getUnitCost(), costForMargin, estimated, median, item.isConsolidated(), item.getVariantGroupId(),
                 item.isVariantSelected(), service, item.getEstimatedDeliveryDays(), droppedOnSave(item),
-                service ? null : ItemMargin.of(item.getUnitPrice(), item.getUnitCost(), DEFAULT_VAT_RATE), market,
+                service ? null : ItemMargin.of(item.getUnitPrice(), costForMargin, DEFAULT_VAT_RATE), market,
                 known ? offer.getMedianCostProviders() : null, known ? offer.getRemainingProviders() : null,
                 known ? offer.getLowestCostQty() : 0, known ? offer.getMedianCostQty() : 0);
     }
@@ -177,8 +195,11 @@ public class OfferDetailsPageFactory {
                 || item.getUnitPrice() < 0;
     }
 
-    /** The formulas of OfferController.showEditOfferForm, unchanged: chosen variants plus delivery, and the profit from it. */
-    private Summary summary(Basket basket, Store store) {
+    /**
+     * The formulas of OfferController.showEditOfferForm: chosen variants plus delivery, and the profit from it; the cost
+     * of an item without one is the suppliers' median (estimated), which Basket.getTotalCost does not know.
+     */
+    private Summary summary(Basket basket, Store store, List<Line> lines) {
         Optional<DeliveryOption> option = deliveryOption(basket, store);
         boolean removed = basket.getDeliveryOptionId() != null && option.isEmpty();
         if (removed) {
@@ -187,13 +208,22 @@ public class OfferDetailsPageFactory {
         }
         double delivery = option.map(DeliveryOption::getPrice).orElse(0.0);
         double total = basket.getTotalPrice() + delivery;
-        double cost = basket.getTotalCost();
+        Map<BasketItem, Item> rows = new IdentityHashMap<>();
+        for (Line line : lines) {
+            if (line instanceof Item row) {
+                rows.put(basket.getBasketItems().get(row.index()), row);
+            }
+        }
+        // the chosen items are the ones Basket counts in its totals, so the figures stay in step with getTotalPrice
+        List<BasketItem> chosen = basket.getEffectiveBasketItems();
+        double cost = chosen.stream().mapToDouble(i -> i.getQty() * rows.get(i).costForMargin()).sum();
+        boolean estimated = chosen.stream().anyMatch(i -> rows.get(i).costEstimated());
         double profitGross = total - cost;
         double profitNet = profitGross / DEFAULT_VAT_RATE;
         return new Summary(Money.format(basket.getTotalPrice()), option.map(DeliveryOption::getName).orElse(null),
                 removed, Money.format(delivery), delivery, Money.format(total), Money.format(total / DEFAULT_VAT_RATE),
                 Money.format(cost), Money.format(Math.round(profitGross * 100.0) / 100.0),
-                Money.format(Math.round(profitNet * 100.0) / 100.0), basket.hasVariantGroups());
+                Money.format(Math.round(profitNet * 100.0) / 100.0), basket.hasVariantGroups(), estimated);
     }
 
     /** Looked up in the configured options instead of Basket.getDeliveryPrice, which throws for a removed one. */

@@ -44,6 +44,8 @@ import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.offers.OfferItemsDraft;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
@@ -54,6 +56,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -103,6 +106,8 @@ class OfferControllerTest {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
         securityStub.when(CustomSecurityContext::getLoggedInUserName).thenReturn("test-user");
+        ReflectionTestUtils.setField(offerController, "offerItemsDraft",
+                new OfferItemsDraft(pricelistFinder, inventory, productCatalogRepository));
     }
 
     @AfterEach
@@ -170,7 +175,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -191,7 +197,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -214,7 +221,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -240,7 +248,8 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -274,7 +283,8 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -295,7 +305,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -319,7 +330,8 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
         // when
-        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -339,7 +351,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        String view = offerController.removeOfferItem(OFFER_ID, 0, null);
+        String view = offerController.removeOfferItem(OFFER_ID, 0, null, null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/offer/" + OFFER_ID);
@@ -371,7 +384,8 @@ class OfferControllerTest {
         offerController.addOfferItems(OFFER_ID, form(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
                 AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1),
-                AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null);
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)), null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -382,8 +396,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItems rejects the whole batch when one pricelist entry is unknown")
-    void addOfferItemsRejectsWholeBatchWhenPricelistEntryUnknown() {
+    @DisplayName("addOfferItems adds what it can and says how many entries are no longer in the pricelist")
+    void addOfferItemsSkipsAnEntryNoLongerInThePricelistAndSaysSo() {
         // given
         AvailabilityAndPrice laptop = new AvailabilityAndPrice(
                 "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Laptop",
@@ -391,14 +405,88 @@ class OfferControllerTest {
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
         when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-missing")).thenReturn(Optional.empty());
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basketBase()));
+        when(messageSource.getMessage(eq("offers.details.items.skipped"), any(), any(Locale.class))).thenReturn("skipped 1 of 2");
         AddItemsForm form = form(
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1),
                 AddItemsForm.Entry.fromPricelist("cat-1", "pim-missing", 1));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        // when / then
-        assertThatThrownBy(() -> offerController.addOfferItems(OFFER_ID, form, null))
-                .isInstanceOf(ResponseStatusException.class);
+        // when
+        offerController.addOfferItems(OFFER_ID, form, null, redirect, Locale.ENGLISH);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-1");
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("skipped 1 of 2");
+    }
+
+    @Test
+    void removingAnItemThatMovedRemovesNothing() {
+        // given
+        Basket basket = basketBase();
+        basket.setBasketItems(List.of(basketItemWithId("a", "MFN-A"), basketItemWithId("b", "MFN-B")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(messageSource.getMessage(eq("offers.details.line.removed.stale"), any(), any(Locale.class))).thenReturn("stale");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = offerController.removeOfferItem(OFFER_ID, 1, "a", null, redirect, Locale.ENGLISH);
+
+        // then
         verify(basketsRepository, never()).save(any());
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("stale");
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/" + OFFER_ID);
+    }
+
+    @Test
+    void removingByIndexOutOfRangeRemovesNothing() {
+        // given
+        Basket basket = basketBase();
+        basket.setBasketItems(List.of(basketItemWithId("a", "MFN-A"), basketItemWithId("b", "MFN-B")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+        when(messageSource.getMessage(eq("offers.details.line.removed.stale"), any(), any(Locale.class))).thenReturn("stale");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        offerController.removeOfferItem(OFFER_ID, 2, null, null, redirect, Locale.ENGLISH);
+        offerController.removeOfferItem(OFFER_ID, -1, null, null, redirect, Locale.ENGLISH);
+
+        // then
+        verify(basketsRepository, never()).save(any());
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("stale");
+    }
+
+    @Test
+    void removingTheSameItemRemovesIt() {
+        // given
+        Basket basket = basketBase();
+        basket.setBasketItems(List.of(basketItemWithId("a", "MFN-A"), basketItemWithId("b", "MFN-B")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        offerController.removeOfferItem(OFFER_ID, 1, "b", null, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+    }
+
+    @Test
+    void removingAnItemOfAnOldRecordWithoutIdsRemovesByIndex() {
+        // given
+        Basket basket = basketBase();
+        basket.setBasketItems(List.of(basketItemWithId(null, "MFN-A"), basketItemWithId("", "MFN-B")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        offerController.removeOfferItem(OFFER_ID, 1, "x", null, new RedirectAttributesModelMap(), Locale.ENGLISH);
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        assertThat(basketCaptor.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
     }
 
     private AddItemsForm form(AddItemsForm.Entry... entries) {
@@ -541,6 +629,12 @@ class OfferControllerTest {
         return basket;
     }
 
+    private BasketItem basketItemWithId(String id, String mfn) {
+        BasketItem item = basketItem(mfn);
+        item.setId(id);
+        return item;
+    }
+
     private BasketItem basketItem(String mfn) {
         return basketItem(mfn, "Laptops");
     }
@@ -573,7 +667,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        String view = offerController.removeOfferItem(OFFER_ID, 0, "/dashboard/offers?segment=expired");
+        String view = offerController.removeOfferItem(OFFER_ID, 0, null, "/dashboard/offers?segment=expired",
+                new RedirectAttributesModelMap(), Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/offer/" + OFFER_ID + "?returnTo=%2Fdashboard%2Foffers%3Fsegment%3Dexpired");
@@ -585,7 +680,8 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, "missing")).thenReturn(Optional.empty());
 
         // when / then
-        assertThatThrownBy(() -> offerController.removeOfferItem("missing", 0, null))
+        assertThatThrownBy(() -> offerController.removeOfferItem("missing", 0, null, null,
+                new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         assertThatThrownBy(() -> offerController.recalculateOffer("missing", null, new RedirectAttributesModelMap(), Locale.ENGLISH))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));

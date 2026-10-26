@@ -36,6 +36,8 @@ import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.testsupport.SecurityContextLogin;
 import pl.commercelink.web.activity.DashboardReadOnlyInterceptor;
+import pl.commercelink.web.dtos.AddItemsForm;
+import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -51,6 +53,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -80,6 +83,7 @@ class OfferDetailsControllerHttpTest {
     @Mock private OfferDetailsPageFactory pageFactory;
     @Mock private MessageSource messages;
     @Mock private OfferItemReloader offerItemReloader;
+    @Mock private OfferItemsDraft offerItemsDraft;
     @Mock private StoresRepository storesRepository;
     @Mock private StoreTrialService storeTrialService;
     @Mock private StoreActivity storeActivity;
@@ -96,9 +100,10 @@ class OfferDetailsControllerHttpTest {
         when(messages.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         DashboardReadOnlyInterceptor readOnly = new DashboardReadOnlyInterceptor(storesRepository, storeTrialService,
                 storeActivity, messages, "/dashboard");
-        mvc = MockMvcBuilders.standaloneSetup(new OfferDetailsController(basketsRepository, pageFactory, messages, offerItemReloader))
+        mvc = MockMvcBuilders.standaloneSetup(new OfferDetailsController(basketsRepository, pageFactory, messages,
+                        offerItemReloader, offerItemsDraft))
                 .addMappedInterceptors(new String[]{"/dashboard/**"}, readOnly)
-                .setViewResolvers(new RenderingNothing())
+                .setViewResolvers(new RenderingTheOfferPage())
                 .build();
     }
 
@@ -246,6 +251,89 @@ class OfferDetailsControllerHttpTest {
     }
 
     @Test
+    void theDraftAnswersTheRowsAndWhatWasSkippedWithoutSaving() throws Exception {
+        // given
+        storedOffer();
+        when(offerItemsDraft.add(any(), any())).thenReturn(1);
+        when(pageFactory.buildDraft(any(), any(), any(), any())).thenReturn(OfferDetailsRenderingTest.fullOffer());
+
+        // when
+        String html = mvc.perform(post("/dashboard/offer/" + OFFER_ID + "/items/draft")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
+                        .param("basketItems[0].unitPrice", "10")
+                        .param("items[0].source", "pricelist").param("items[0].catalogId", "cat-1")
+                        .param("items[0].pimId", "pim-1").param("items[0].qty", "2")
+                        .param("items[1].source", "inventory").param("items[1].mfn", "GONE-1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("offers/details :: itemsDraft"))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(html).contains("<tr class=\"cl-line\" data-cl-line", "data-cl-draft-meta data-skipped=\"1\" data-requested=\"2\"")
+                // both sections of the table, which offer-lines.js puts in place of its own
+                .contains("data-cl-lines-section=\"products\"", "data-cl-lines-section=\"services\"");
+        ArgumentCaptor<AddItemsForm> added = ArgumentCaptor.forClass(AddItemsForm.class);
+        ArgumentCaptor<Basket> drafted = ArgumentCaptor.forClass(Basket.class);
+        verify(offerItemsDraft).add(drafted.capture(), added.capture());
+        assertThat(added.getValue().entries()).extracting(AddItemsForm.Entry::getPimId).containsExactly("pim-1", null);
+        assertThat(added.getValue().entries().get(0).getQty()).isEqualTo(2);
+        assertThat(drafted.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("M-1");
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void theDraftOfAnUnknownOfferIsNotFound() throws Exception {
+        // given
+        when(basketsRepository.findById(STORE_ID, "missing")).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post("/dashboard/offer/missing/items/draft")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aSaveOverAChangedVersionAnswersConflictWithTheAlert() throws Exception {
+        // given
+        storedOffer().setVersion(8L);
+        when(pageFactory.buildDraft(any(), any(), any(), any())).thenReturn(OfferDetailsRenderingTest.fullOffer());
+
+        // when
+        String html = mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "7")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
+                        .param("basketItems[0].unitPrice", "10"))
+                .andExpect(status().isConflict())
+                .andExpect(view().name("offers/details"))
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(html).contains("data-cl-offer-conflict", "Oferta zmieniła się od otwarcia strony",
+                "name=\"overwrite\" value=\"true\"");
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void overwriteAndABlankVersionSave() throws Exception {
+        // given
+        storedOffer().setVersion(8L);
+
+        // when
+        mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "8").param("overwrite", "true")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
+                        .param("basketItems[0].unitPrice", "10"))
+                .andExpect(status().isFound());
+        mvc.perform(post("/dashboard/offer/" + OFFER_ID).param("version", "")
+                        .param("basketItems[0].name", "CPU").param("basketItems[0].mfn", "M-1")
+                        .param("basketItems[0].category", "CPU").param("basketItems[0].qty", "1")
+                        .param("basketItems[0].unitPrice", "10"))
+                .andExpect(status().isFound());
+
+        // then
+        verify(basketsRepository, times(2)).save(any());
+    }
+
+    @Test
     void everyAddressOfThePageRefusesTheSuperAdmin() {
         // when
         PreAuthorize rule = OfferDetailsController.class.getAnnotation(PreAuthorize.class);
@@ -282,9 +370,12 @@ class OfferDetailsControllerHttpTest {
         return captor.getValue();
     }
 
-    /** Resolves the views by name without rendering the templates; a redirect stays a redirect. */
-    private static final class RenderingNothing extends UrlBasedViewResolver {
-        RenderingNothing() {
+    /**
+     * Resolves the views by name; a redirect stays a redirect. The offer page and its draft fragment are rendered from
+     * the real templates when the model has a page (as the controller builds it), anything else renders nothing.
+     */
+    private static final class RenderingTheOfferPage extends UrlBasedViewResolver {
+        RenderingTheOfferPage() {
             setViewClass(InternalResourceView.class);
         }
 
@@ -293,10 +384,19 @@ class OfferDetailsControllerHttpTest {
             if (viewName.startsWith(REDIRECT_URL_PREFIX)) {
                 return super.createView(viewName, locale);
             }
+            String markup = switch (viewName) {
+                case "offers/details" -> "<section th:replace=\"~{offers/details :: page}\"></section>";
+                case "offers/details :: itemsDraft" -> "<th:block th:replace=\"~{offers/details :: itemsDraft}\"></th:block>";
+                default -> null;
+            };
             return new AbstractView() {
                 @Override
                 protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request,
-                                                       HttpServletResponse response) {
+                                                       HttpServletResponse response) throws Exception {
+                    if (markup != null && model.get("page") != null) {
+                        response.setCharacterEncoding("UTF-8");
+                        response.getWriter().write(SettingsTemplateRenderer.render(markup, model));
+                    }
                 }
             };
         }
