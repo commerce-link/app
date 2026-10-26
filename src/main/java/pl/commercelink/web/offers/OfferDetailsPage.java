@@ -10,13 +10,16 @@ import java.util.List;
 /**
  * The offer details page (/dashboard/offer/{id}): every text resolved, amounts formatted without the currency (the
  * template adds it through general.currency.amount). storeId, recordName and fulfilmentType are the raw record values
- * for the hidden fields of the items form; catalogs feed the shared add-items dialog.
+ * for the hidden fields of the items form; catalogs feed the shared add-items dialog. version = the record's optimistic
+ * lock version the page was built from (null for a record never saved with one): the table's save names it, so a save
+ * over a record changed since is refused.
  */
 public record OfferDetailsPage(String offerId, String storeId, String shortId, boolean template, String title, String backHref,
                                String backLabelKey, Pill validity, Meta meta, List<Line> lines,
                                List<StoreCategories.Group> categoryGroups, List<ProductCatalog> catalogs, Summary summary, Terms terms,
                                Customer customer, String note, String clientUrl, boolean proformaAvailable,
-                               boolean copyWithContactAvailable, String recordName, String fulfilmentType) {
+                               boolean copyWithContactAvailable, String recordName, String fulfilmentType,
+                               Long version) {
 
     /** A category of none of the catalogs (an old item, an import) stays selectable as an extra option. */
     public boolean knownCategory(String category) {

@@ -21,6 +21,7 @@ class OfferDetailsRenderingTest {
     private static final String PAGE = "<section th:replace=\"~{offers/details :: page}\"></section>";
     private static final String ID = "4b1e9c55-8f3a-4d7a-9c55-1e0b6a2f7d10";
     private static final String NBSP = "\u00A0";
+    private static final Long VERSION = 7L;
     private static final AddressBlock BILLING = new AddressBlock("Marta Zielińska", "Biuro Zielińska", "6762468313",
             "ul. Wielicka 28/4", "30-552 Kraków", "Polska", "biuro@x.pl", "+48 601");
 
@@ -84,10 +85,10 @@ class OfferDetailsRenderingTest {
                         "33" + NBSP + "901,99", 4),
                 lines, List.of(new StoreCategories.Group("Komputery", List.of("Laptopy", "Akcesoria"))), List.of(),
                 summary, terms(), customer, "Zadzwonić w poniedziałek", "https://app.test/store/s/client/offer/" + ID,
-                proforma, customer.contactFilled(), "Stanowiska dla biura", "WarehouseFulfilment");
+                proforma, customer.contactFilled(), "Stanowiska dla biura", "WarehouseFulfilment", VERSION);
     }
 
-    private static OfferDetailsPage fullOffer() {
+    static OfferDetailsPage fullOffer() {
         return offer(List.of(laptop(0), dock(1), new GroupHead("Monitor", 2), monitor(2, "Monitor Dell", true),
                         monitor(3, "Monitor LG", false), service(4)),
                 summary(false), customer(true, true), true);
@@ -101,10 +102,10 @@ class OfferDetailsRenderingTest {
                 new Summary("7" + NBSP + "698,00", null, false, "0,00", 0, "7" + NBSP + "698,00", "6" + NBSP + "258,54",
                         "5" + NBSP + "810,00", "1" + NBSP + "888,00", "1" + NBSP + "535,28", false, false),
                 new Terms(null, null, null, List.of(), true, "store.fulfilment.type.WarehouseFulfilment", null),
-                customer(false, false), null, null, false, false, "Stanowisko biurowe", "WarehouseFulfilment");
+                customer(false, false), null, null, false, false, "Stanowisko biurowe", "WarehouseFulfilment", VERSION);
     }
 
-    private static Map<String, Object> model(OfferDetailsPage page) {
+    static Map<String, Object> model(OfferDetailsPage page) {
         Map<String, Object> model = new HashMap<>();
         model.put("page", page);
         model.put("termsForm", new OfferTermsForm());
@@ -481,7 +482,7 @@ class OfferDetailsRenderingTest {
         // then
         assertThat(row(single, 0)).contains("Oferta musi mieć co najmniej jedną pozycję").contains("aria-disabled=\"true\"")
                 .doesNotContain("/remove-item/");
-        assertThat(row(many, 1)).contains("formaction=\"/dashboard/offer/" + ID + "/remove-item/1\"")
+        assertThat(row(many, 1)).contains("formaction=\"/dashboard/offer/" + ID + "/remove-item/1?itemId=id-1\"")
                 .contains("form=\"offer-action-form\"");
     }
 
@@ -607,10 +608,96 @@ class OfferDetailsRenderingTest {
                 .contains("<p class=\"cl-help\">Brak notatki</p>");
     }
 
+    @Test
+    void theItemsFormCarriesTheVersionItWasOpenedAt() {
+        // when
+        String html = html(fullOffer());
+
+        // then
+        String form = html.substring(html.indexOf("id=\"offer-items\""), html.indexOf("class=\"cl-layout-aside\""));
+        assertThat(form).contains("<input type=\"hidden\" name=\"version\" value=\"7\" data-cl-offer-version data-cl-dirty-ignore>");
+        assertThat(html).doesNotContain("data-cl-offer-conflict");
+    }
+
+    @Test
+    void aConflictAsksToOverwriteOrLoadTheCurrentVersion() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("conflict", true);
+        model.put("returnTo", "/dashboard/offers?segment=expired");
+
+        // when
+        String html = render(PAGE, model);
+
+        // then
+        String form = html.substring(html.indexOf("id=\"offer-items\""), html.indexOf("class=\"cl-layout-aside\""));
+        assertThat(form).contains("data-cl-offer-conflict", "Oferta zmieniła się od otwarcia strony",
+                "Twoje zmiany w pozycjach nie zostały zapisane — są niżej.",
+                "name=\"overwrite\" value=\"true\"", "Nadpisz moimi zmianami", "Wczytaj aktualną wersję",
+                "<a class=\"cl-button\" href=\"/dashboard/offer/" + ID + "?returnTo=");
+    }
+
+    @Test
+    void theRefreshOfADialogCarriesTheNewVersion() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+
+        // when
+        String html = render("<template th:replace=\"~{offers/details :: refresh}\"></template>", model);
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" data-cl-offer-version value=\"7\">");
+    }
+
+    @Test
+    void removingAnItemNamesItById() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("returnTo", "/dashboard/offers");
+
+        // when
+        String html = render(PAGE, model);
+
+        // then
+        assertThat(row(html, 1)).contains("formaction=\"/dashboard/offer/" + ID
+                + "/remove-item/1?itemId=id-1&amp;returnTo=/dashboard/offers\"");
+    }
+
+    @Test
+    void theDraftAnswersTheItemsCardAndWhatWasSkipped() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("skipped", 1);
+        model.put("requested", 3);
+
+        // when
+        String html = render("<th:block th:replace=\"~{offers/details :: itemsDraft}\"></th:block>", model);
+
+        // then
+        assertThat(html).contains("id=\"pozycje\"", "data-cl-line").doesNotContain("id=\"offer-items\"");
+        assertThat(html).contains("<template data-cl-draft-meta data-skipped=\"1\" data-requested=\"3\" "
+                + "data-message=\"Nie dodano 1 z 3 pozycji — produktu nie ma już w cenniku ani u dostawców.\"></template>");
+    }
+
+    @Test
+    void aDraftWithNothingSkippedHasNoMessage() {
+        // given
+        Map<String, Object> model = model(fullOffer());
+        model.put("skipped", 0);
+        model.put("requested", 2);
+
+        // when
+        String html = render("<th:block th:replace=\"~{offers/details :: itemsDraft}\"></th:block>", model);
+
+        // then
+        assertThat(html).contains("<template data-cl-draft-meta data-skipped=\"0\" data-requested=\"2\"></template>");
+    }
+
     private static OfferDetailsPage withoutNote() {
         OfferDetailsPage p = offer(List.of(laptop(0)), summary(false), customer(false, false), false);
         return new OfferDetailsPage(p.offerId(), p.storeId(), p.shortId(), p.template(), p.title(), p.backHref(), p.backLabelKey(),
                 p.validity(), p.meta(), p.lines(), p.categoryGroups(), p.catalogs(), p.summary(), p.terms(), p.customer(), null,
-                p.clientUrl(), p.proformaAvailable(), p.copyWithContactAvailable(), p.recordName(), p.fulfilmentType());
+                p.clientUrl(), p.proformaAvailable(), p.copyWithContactAvailable(), p.recordName(), p.fulfilmentType(),
+                p.version());
     }
 }

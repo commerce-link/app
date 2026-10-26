@@ -27,6 +27,7 @@ import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.dtos.AddItemsForm;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +61,8 @@ class OfferDetailsControllerTest {
     private MessageSource messages;
     @Mock
     private OfferItemReloader offerItemReloader;
+    @Mock
+    private OfferItemsDraft offerItemsDraft;
 
     @InjectMocks
     private OfferDetailsController controller;
@@ -96,7 +99,7 @@ class OfferDetailsControllerTest {
         form.setFulfilmentType(FulfilmentType.WarehouseFulfilment);
 
         // when
-        String view = controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+        String view = saveItems(form, null);
 
         // then
         Basket saved = savedBasket();
@@ -121,7 +124,7 @@ class OfferDetailsControllerTest {
         form.setBasketItems(List.of(item("MFN-OK", 1), item("MFN-ZERO", 0)));
 
         // when
-        controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+        saveItems(form, null);
 
         // then
         assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-OK");
@@ -136,7 +139,7 @@ class OfferDetailsControllerTest {
         form.setBasketItems(List.of(item("MFN-B", 1), item("MFN-A", 1), item("MFN-C", 1)));
 
         // when
-        controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+        saveItems(form, null);
 
         // then
         List<BasketItem> saved = savedBasket().getBasketItems();
@@ -156,7 +159,7 @@ class OfferDetailsControllerTest {
         form.setBasketItems(List.of(service, product));
 
         // when
-        controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+        saveItems(form, null);
 
         // then
         List<BasketItem> saved = savedBasket().getBasketItems();
@@ -177,7 +180,7 @@ class OfferDetailsControllerTest {
         form.setBasketItems(List.of(service, product));
 
         // when
-        controller.saveItems(OFFER_ID, form, null, new RedirectAttributesModelMap(), LOCALE);
+        saveItems(form, null);
 
         // then
         List<BasketItem> saved = savedBasket().getBasketItems();
@@ -208,7 +211,7 @@ class OfferDetailsControllerTest {
                 "/dashboard/offers?q=a\r\nLocation: https://evil.example")) {
             // when
             List<String> views = List.of(
-                    controller.saveItems(OFFER_ID, itemsForm, hostile, new RedirectAttributesModelMap(), LOCALE),
+                    saveItems(itemsForm, hostile),
                     controller.saveTerms(OFFER_ID, terms, hostile, null, new ExtendedModelMap(), LOCALE,
                             new RedirectAttributesModelMap(), new MockHttpServletResponse()),
                     controller.saveClient(OFFER_ID, contact, hostile, null, new ExtendedModelMap(), LOCALE,
@@ -471,7 +474,7 @@ class OfferDetailsControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.empty());
 
         // when / then
-        assertThatThrownBy(() -> controller.saveItems(OFFER_ID, new Basket(), null, new RedirectAttributesModelMap(), LOCALE))
+        assertThatThrownBy(() -> saveItems(new Basket(), null))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(basketsRepository, never()).save(any());
@@ -681,6 +684,175 @@ class OfferDetailsControllerTest {
         // then
         verify(offerItemReloader, never()).recalculate(any());
         assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getUnitPrice).containsExactly(100.0, 100.0);
+    }
+
+    @Test
+    void aStaleVersionIsAConflictAndSavesNothing() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(5L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.saveItems(OFFER_ID, form, 4L, false, null, model, response,
+                new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        verify(basketsRepository, never()).save(any());
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(view).isEqualTo("offers/details");
+        assertThat(model.get("conflict")).isEqualTo(true);
+        ArgumentCaptor<Basket> shown = ArgumentCaptor.forClass(Basket.class);
+        verify(pageFactory).buildDraft(shown.capture(), any(), any(), any());
+        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(shown.getValue().getVersion()).isEqualTo(5L);
+        verify(offerItemReloader, never()).recalculate(any());
+    }
+
+    @Test
+    void overwriteSavesOverAStaleVersion() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(5L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+
+        // when
+        String view = controller.saveItems(OFFER_ID, form, 4L, true, null, new ExtendedModelMap(),
+                new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        Basket saved = savedBasket();
+        assertThat(saved.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(saved.getVersion()).isEqualTo(5L);
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+    }
+
+    @Test
+    void theSameVersionSaves() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(5L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+
+        // when
+        String view = controller.saveItems(OFFER_ID, form, 5L, false, null, new ExtendedModelMap(),
+                new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+    }
+
+    @Test
+    void noVersionSavesAsBefore() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(5L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+
+        // when
+        String view = saveItems(form, null);
+
+        // then
+        assertThat(savedBasket().getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-MINE");
+        assertThat(view).isEqualTo("redirect:/dashboard/offer/offer-1");
+    }
+
+    @Test
+    void theVersionPostedWithTheTableNeverReachesTheRecord() {
+        // given
+        Basket stored = fullOffer(BasketType.Offer);
+        stored.setVersion(5L);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket form = new Basket();
+        form.setVersion(99L);
+        form.setBasketItems(List.of(item("MFN-MINE", 2)));
+
+        // when
+        controller.saveItems(OFFER_ID, form, 5L, false, null, new ExtendedModelMap(),
+                new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
+
+        // then
+        assertThat(savedBasket().getVersion()).isEqualTo(5L);
+    }
+
+    @Test
+    void theDraftAddsItemsWithoutSaving() {
+        // given
+        Basket stored = fullOffer(BasketType.OfferTemplate);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(stored));
+        Basket table = new Basket();
+        table.setBasketItems(List.of(item("MFN-A", 1), item("MFN-B", 1)));
+        AddItemsForm added = new AddItemsForm();
+        added.setItems(List.of(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
+        when(offerItemsDraft.add(any(), any())).thenAnswer(call -> {
+            call.<Basket>getArgument(0).addBasketItem(item("MFN-NEW", 1));
+            return 0;
+        });
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.draftItems(OFFER_ID, table, added, null, model, LOCALE);
+
+        // then
+        assertThat(view).isEqualTo("offers/details :: itemsDraft");
+        ArgumentCaptor<Basket> shown = ArgumentCaptor.forClass(Basket.class);
+        verify(pageFactory).buildDraft(shown.capture(), any(), any(), any());
+        assertThat(shown.getValue().getBasketItems()).extracting(BasketItem::getMfn)
+                .containsExactlyInAnyOrder("MFN-A", "MFN-B", "MFN-NEW");
+        verify(basketsRepository, never()).save(any());
+        verify(pageFactory, never()).build(any(), any(), any(), any());
+        verify(offerItemReloader, never()).recalculate(any());
+        assertThat(model.get("skipped")).isEqualTo(0);
+        assertThat(model.get("requested")).isEqualTo(1);
+    }
+
+    @Test
+    void theDraftReportsSkippedEntries() {
+        // given
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(fullOffer(BasketType.Offer)));
+        Basket table = new Basket();
+        table.setBasketItems(List.of(item("MFN-A", 1)));
+        AddItemsForm added = new AddItemsForm();
+        added.setItems(List.of(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1),
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-gone", 1)));
+        when(offerItemsDraft.add(any(), any())).thenReturn(1);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.draftItems(OFFER_ID, table, added, null, model, LOCALE);
+
+        // then
+        assertThat(model.get("skipped")).isEqualTo(1);
+        assertThat(model.get("requested")).isEqualTo(2);
+        verify(basketsRepository, never()).save(any());
+    }
+
+    @Test
+    void theDraftOfAnUnknownOfferIsNotFound() {
+        // given
+        when(basketsRepository.findById(STORE_ID, "missing")).thenReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> controller.draftItems("missing", new Basket(), new AddItemsForm(), null,
+                new ExtendedModelMap(), LOCALE))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    private String saveItems(Basket form, String returnTo) {
+        return controller.saveItems(OFFER_ID, form, null, false, returnTo, new ExtendedModelMap(),
+                new MockHttpServletResponse(), new RedirectAttributesModelMap(), LOCALE);
     }
 
     private Basket savedBasket() {

@@ -259,6 +259,22 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
+    void aDraftOfATemplateKeepsThePostedPricesAndCarriesTheVersion() {
+        // given
+        Basket template = basket(item("A", 1, 10, 5));
+        template.setType(BasketType.OfferTemplate);
+        template.setVersion(3L);
+
+        // when
+        OfferDetailsPage page = factory.buildDraft(template, null, PL, NOW);
+
+        // then
+        verify(offerItemReloader).reload(template);
+        verify(offerItemReloader, never()).recalculate(any());
+        assertThat(page.version()).isEqualTo(3L);
+    }
+
+    @Test
     void variantGroupProducesHeadThenItems() {
         // given
         BasketItem first = item("A", 1, 100, 50);

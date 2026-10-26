@@ -2175,6 +2175,14 @@ body.cl-drawer-open .cl-sidebar {
     text-decoration: underline;
 }
 
+/* An alert that asks for a decision: its choices sit under the text, the primary one first. */
+.cl-page .cl-alert .cl-alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 0;
+}
+
 /* Destructive actions */
 .cl-button.is-danger {
     border-color: var(--cl-bad);

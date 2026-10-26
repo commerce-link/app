@@ -69,7 +69,21 @@ public class OfferDetailsPageFactory {
     /** Never saves: a template shows prices recalculated on open and an offer the reloaded ones, as the page always did. */
     public OfferDetailsPage build(Basket basket, String returnTo, Locale locale, LocalDateTime now) {
         boolean template = basket.hasType(BasketType.OfferTemplate);
-        List<OfferItem> offerItems = template ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket);
+        return build(basket, template ? offerItemReloader.recalculate(basket) : offerItemReloader.reload(basket),
+                returnTo, locale, now);
+    }
+
+    /**
+     * Never saves: the items are the ones the operator posted (a draft of the table, or a save refused over a changed
+     * version), so their prices are kept as posted, a template's too; only the market figures are read.
+     */
+    public OfferDetailsPage buildDraft(Basket basket, String returnTo, Locale locale, LocalDateTime now) {
+        return build(basket, offerItemReloader.reload(basket), returnTo, locale, now);
+    }
+
+    private OfferDetailsPage build(Basket basket, List<OfferItem> offerItems, String returnTo, Locale locale,
+                                   LocalDateTime now) {
+        boolean template = basket.hasType(BasketType.OfferTemplate);
         Store store = storesRepository.findById(basket.getStoreId());
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(basket.getStoreId());
 
@@ -95,7 +109,7 @@ public class OfferDetailsPageFactory {
                         addresses.hasShipping() ? addresses.shipping() : null, addresses.sameAddress()),
                 basket.getComment(), template ? null : basket.createOfferUrl(appDomain),
                 basket.getBillingDetails() != null, contactFilled, basket.getName(),
-                basket.getFulfilmentType() == null ? null : basket.getFulfilmentType().name());
+                basket.getFulfilmentType() == null ? null : basket.getFulfilmentType().name(), basket.getVersion());
     }
 
     /** The list's address when it is one (OfferController.safeReturnTo keeps it), else the segment the record belongs to. */

@@ -33,6 +33,22 @@
             <input type="hidden" name="name" th:value="${p.recordName() ?: ''}" data-cl-dirty-ignore>
             <input type="hidden" name="fulfilmentType" th:value="${p.fulfilmentType() ?: ''}" data-cl-dirty-ignore>
             <input th:if="${returnTo != null}" type="hidden" name="returnTo" th:value="${returnTo}">
+            <!--/* The version the table was opened at: a save over a record changed since then is refused (409) with the
+                   conflict alert below; after a conflict it is the stored version, so "Overwrite" saves over it. */-->
+            <input type="hidden" name="version" th:value="${p.version()}" data-cl-offer-version data-cl-dirty-ignore>
+            <div th:if="${conflict == true}" class="cl-alert is-warn" role="alert" tabindex="-1" data-cl-offer-conflict>
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <div>
+                    <p class="cl-alert-title" th:text="#{offers.details.conflict.title}"></p>
+                    <p class="cl-alert-text" th:text="#{offers.details.conflict.message}"></p>
+                    <p class="cl-alert-actions">
+                        <button type="submit" class="cl-button is-primary" name="overwrite" value="true"
+                                th:text="#{offers.details.conflict.overwrite}"></button>
+                        <a class="cl-button" th:href="@{|/dashboard/offer/${p.offerId()}${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|}"
+                           th:text="#{offers.details.conflict.reload}"></a>
+                    </p>
+                </div>
+            </div>
             <!--/* The columns have their own grid: the sticky side column stops at its end, above the peek, instead of
                    sliding under it at the bottom of the page. */-->
             <div class="cl-layout-aside">
@@ -227,11 +243,22 @@
 <!--/* What a dialog saved while the table has unsaved changes: offer-details.js swaps each element by its id and takes the
        delivery price for the live summary, instead of reloading the page and losing the table. Built from the saved record. */-->
 <template th:fragment="refresh" data-cl-offer-refresh th:with="p=${page}">
+    <!--/* the dialog's save raised the record's version: the table's next save must name the new one */-->
+    <input type="hidden" data-cl-offer-version th:value="${p.version()}">
     <div th:replace="~{offers/details/header :: header(${p})}"></div>
     <section th:replace="~{offers/details/side :: terms(${p})}"></section>
     <th:block th:unless="${p.template()}"><section th:replace="~{offers/details/side :: client(${p})}"></section></th:block>
     <section th:replace="~{offers/details/side :: note(${p})}"></section>
     <th:block th:unless="${p.template()}"><div th:replace="~{offers/details/side :: deliveryRow(${p.summary()})}"></div></th:block>
 </template>
+
+<!--/* The items table after a draft change (OfferDetailsController.draftItems): built from the posted table and the added
+       entries, never saved. The meta template says how many of the requested entries were skipped (no longer in the
+       price list or at the suppliers); message is set only then. */-->
+<th:block th:fragment="itemsDraft" th:with="p=${page}">
+    <section th:replace="~{offers/details/items :: card(${p})}"></section>
+    <template data-cl-draft-meta th:attr="data-skipped=${skipped}, data-requested=${requested},
+              data-message=${skipped > 0} ? #{offers.details.items.skipped(${skipped}, ${requested})} : null"></template>
+</th:block>
 </body>
 </html>

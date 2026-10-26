@@ -233,10 +233,11 @@
                 <li hidden data-cl-line-ungroup-item><button type="button" class="cl-menu-item" data-cl-line-ungroup th:text="#{offers.details.line.menu.ungroup}"></button></li>
                 <li hidden data-cl-line-select-item><button type="button" class="cl-menu-item" data-cl-line-select th:text="#{offers.details.line.menu.select}"></button></li>
                 <li class="cl-menu-sep" aria-hidden="true"></li>
-                <!--/* with the page script it asks first; without it the post removes the item at once, as before */-->
+                <!--/* with the page script it asks first; without it the post removes the item at once, as before. itemId
+                       names the item: when the offer changed and another item sits at that position, nothing is removed */-->
                 <li th:if="${count > 1}"><button type="submit" class="cl-menu-item is-danger" form="offer-action-form"
-                        th:attr="formaction=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
-                                 data-action-url=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
+                        th:with="removeUrl=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}?itemId=${#uris.escapeQueryParam(it.id() ?: '')}${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|}"
+                        th:attr="formaction=${removeUrl}, data-action-url=${removeUrl},
                                  data-label=#{offers.details.line.menu.remove.then},
                                  data-cl-confirm-title=#{offers.details.line.remove.confirm.title(${it.name()})},
                                  data-cl-confirm-message=#{offers.details.line.remove.confirm.message},
