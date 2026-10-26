@@ -249,4 +249,20 @@ class OfferDetailsScriptContractTest {
                 .contains(".cl-page .cl-table.is-line-editor tr.sortable-fallback { display: table; table-layout: fixed;")
                 .contains("html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }");
     }
+
+    @Test
+    void theLiveRecountUsesTheMedianWhenTheCostIsEmpty() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String recountRow = js.substring(js.indexOf("function recountRow("), js.indexOf("function recount()"));
+        String recount = js.substring(js.indexOf("function recount()"), js.indexOf("var totalTimer"));
+
+        // then
+        assertThat(js).contains("data-median-cost").contains("function costOf(")
+                .contains("'line-cost-estimated'").contains("'line-margin-estimated'")
+                .contains("'line-margin-estimated-low'").contains("'margin-estimated'")
+                .contains("data-cl-sum-estimated");
+        assertThat(recountRow).contains("costOf(");
+        assertThat(recount).contains("costOf(");
+    }
 }

@@ -8,7 +8,7 @@
 //   counting only the items the save keeps; the others are outside the total.
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
-//   (qty × cost), gross profit = total − cost, net = gross / VAT rate; amounts rounded half up to grosze as Money.format.
+//   (qty × cost, the median for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate; amounts rounded half up to grosze as Money.format.
 //   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
@@ -159,6 +159,20 @@
         };
     }
 
+    // The cost a row counts (OfferDetailsPageFactory.item): its own when entered, else the suppliers' median gross cost
+    // (data-median-cost, also on rows with a cost) for an item that is not a service; estimated tells which one it is.
+    function costOf(row) {
+        var own = number(field(row, 'unitCost'));
+        if (own > 0) {
+            return { cost: own, estimated: false };
+        }
+        var median = parseFloat(row.getAttribute('data-median-cost'));
+        if (field(row, 'service').value !== 'true' && isFinite(median) && median > 0) {
+            return { cost: median, estimated: true };
+        }
+        return { cost: 0, estimated: false };
+    }
+
     // what the table save drops (OfferDetailsPageFactory.droppedOnSave)
     function dropped(row) {
         return !field(row, 'name').value.trim() || !field(row, 'mfn').value.trim() || qtyOf(row) <= 0
@@ -168,7 +182,8 @@
     function recountRow(row) {
         var qty = qtyOf(row);
         var price = number(priceInput(row));
-        var cost = number(field(row, 'unitCost'));
+        var counted = costOf(row);
+        var cost = counted.cost;
         row.querySelector('[data-cl-line-total]').textContent = amount(qty * price);
         // a hidden element still counts in a description, so the field points at the warning only while it shows
         var warn = row.querySelector('[data-cl-line-warn]');
@@ -182,7 +197,9 @@
             return;
         }
         var hint = row.querySelector('[data-cl-line-cost]');
-        hint.textContent = cost > 0 ? message('line-cost', [window.CL_formatAmount(roundHalfUp(cost))]) : message('line-no-cost');
+        hint.textContent = cost > 0
+            ? message(counted.estimated ? 'line-cost-estimated' : 'line-cost', [window.CL_formatAmount(roundHalfUp(cost))])
+            : message('line-no-cost');
         hint.classList.toggle('is-warn', !(cost > 0));
 
         var margin = marginOf(price, cost);
@@ -190,7 +207,8 @@
         // a low margin says so in words too: the tone alone is barely apart from the plain text
         var low = margin.percent !== null && margin.tone !== 'loss' && (price - cost) * 10 < price;
         label.textContent = margin.percent === null ? message('line-margin-unknown')
-            : message(low ? 'line-margin-low' : 'line-margin', [margin.percent]);
+            : message(counted.estimated ? (low ? 'line-margin-estimated-low' : 'line-margin-estimated')
+                : (low ? 'line-margin-low' : 'line-margin'), [margin.percent]);
         label.classList.toggle('is-bad', margin.percent !== null && margin.tone === 'loss');
         label.classList.toggle('is-low', margin.percent === null || low);
 
@@ -199,7 +217,7 @@
             return;
         }
         var text = (margin.tone === 'unknown' ? message('margin-unknown')
-            : message('margin-' + margin.tone, [margin.percent === null ? '—' : margin.percent,
+            : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone, [margin.percent === null ? '—' : margin.percent,
                 window.CL_formatMoney(margin.profit), window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
             + '\n' + (mark.getAttribute('data-cl-market-text') || '');
         mark.setAttribute('data-tooltip', text);
@@ -228,6 +246,7 @@
         }
         var items = 0;
         var cost = 0;
+        var estimated = false;
         rows().filter(isItem).forEach(function (row) {
             // the total the save will leave: no variant outside it, no item the save drops
             if (row.classList.contains('is-unpicked') || dropped(row)) {
@@ -235,7 +254,9 @@
             }
             var qty = qtyOf(row);
             items += qty * number(priceInput(row));
-            cost += qty * number(field(row, 'unitCost'));
+            var counted = costOf(row);
+            cost += qty * counted.cost;
+            estimated = estimated || counted.estimated;
         });
         var deliveryHolder = document.querySelector('[data-cl-delivery-price]');
         var delivery = deliveryHolder ? parseFloat(deliveryHolder.getAttribute('data-cl-delivery-price')) || 0 : 0;
@@ -250,6 +271,9 @@
             profitGross: window.CL_formatMoney(Math.round(profitGross * 100) / 100),
             profitNet: window.CL_formatMoney(Math.round(profitGross / vatRate() * 100) / 100)
         };
+        document.querySelectorAll('[data-cl-sum-estimated]').forEach(function (note) {
+            note.hidden = !estimated;
+        });
         var shown = summary.querySelector('output[data-cl-sum="total"]');
         // a move or a dialog saved recounts too: only a total that changed is worth hearing
         var changedTotal = !shown || shown.textContent !== values.total;

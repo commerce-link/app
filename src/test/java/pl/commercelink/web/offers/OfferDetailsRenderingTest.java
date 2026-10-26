@@ -264,7 +264,8 @@ class OfferDetailsRenderingTest {
         assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("≈").doesNotContain("Szacowana marża");
         assertThat(row(html, 1)).contains("name=\"basketItems[1].unitCost\" value=\"0.00\"");
         assertThat(summaryCard(html)).contains("w tym szacowany koszt pozycji bez kosztu");
-        assertThat(summaryCard(html(fullOffer()))).doesNotContain("szacowany koszt");
+        assertThat(summaryCard(html)).containsPattern("<span[^>]*data-cl-sum-estimated[^>]*>").doesNotContainPattern("<span[^>]*\\bhidden\\b[^>]*data-cl-sum-estimated");
+        assertThat(summaryCard(html(fullOffer()))).containsPattern("<span[^>]*\\bhidden\\b[^>]*>w tym szacowany koszt");
     }
 
     @Test
