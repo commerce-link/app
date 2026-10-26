@@ -68,11 +68,6 @@
                             <span th:text="#{offers.details.action.copyLink}"></span>
                             <span class="cl-menu-desc" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></span>
                         </button></li>
-                        <li><a class="cl-menu-item" th:href="${p.clientUrl()}" target="_blank" rel="noopener">
-                            <span th:text="#{offers.details.action.openAsClient}"></span>
-                            <span class="cl-menu-desc" th:text="#{offers.details.action.openAsClient.desc}"></span>
-                            <span class="cl-menu-desc" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></span>
-                        </a></li>
                         <li class="cl-menu-sep" aria-hidden="true"></li>
                         <!--/* Without the customer's invoice details the invoicing system refuses the proforma: said here
                                instead. Each click makes a new proforma, so offer-details.js confirms it (data-cl-confirm-*

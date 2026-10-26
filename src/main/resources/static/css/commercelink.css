@@ -632,6 +632,30 @@ body.cl-drawer-open .cl-sidebar {
     --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
 }
 
+/* The action of a toast (showToast's third argument, e.g. "Cofnij"): a text button in the toast's tone at its end. */
+.cl-toast-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-height: 32px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--cl-toast-tone) 40%, transparent);
+    border-radius: var(--cl-radius);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--cl-toast-tone);
+    cursor: pointer;
+}
+
+.cl-toast-action:hover {
+    background: color-mix(in srgb, var(--cl-toast-tone) 10%, transparent);
+}
+
+.cl-toast-action:focus-visible {
+    outline: 2px solid var(--cl-toast-tone);
+    outline-offset: 2px;
+}
+
 @media screen and (max-width: 719px) {
     .cl-toast {
         top: calc(var(--cl-topbar-height) + 8px);
@@ -2173,6 +2197,14 @@ body.cl-drawer-open .cl-sidebar {
 .cl-page .cl-alert .cl-alert-text a {
     color: var(--cl-accent-ink);
     text-decoration: underline;
+}
+
+/* An alert that asks for a decision: its choices sit under the text, the primary one first. */
+.cl-page .cl-alert .cl-alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 0;
 }
 
 /* Destructive actions */
@@ -10753,7 +10785,9 @@ a.cl-link-button:hover {
 /* the margin of an order item (ItemMargin tones); its tooltip is end-anchored (.is-end): the price column stands right
    of the middle and a centred box hid the state pill */
 .cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
-.cl-page .cl-margin.is-unknown { opacity: .55; }
+/* only the icon is dimmed: the tooltip is drawn by the mark itself (::before/::after) and would inherit its opacity,
+   letting the rows below show through */
+.cl-page .cl-margin.is-unknown > * { opacity: .55; }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); }
 
 /* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
@@ -14044,6 +14078,9 @@ a.cl-link-button:hover {
    edited in place (.is-line-editor: quantity and price in the row, the cost as a line under the price, the value with
    its margin, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
 .cl-page .cl-table.is-line-editor { table-layout: fixed; }
+/* The products and the services are two tbody sections (offers/details/items.html): the last product keeps its rule
+   above the services heading, as the rows of the order page's single tbody do. */
+.cl-page .cl-table.is-line-editor tbody:has(+ tbody > tr:not([hidden])) > tr:last-child > * { border-bottom: 1px solid var(--cl-line); }
 /* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
 .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
 .cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }
@@ -14114,6 +14151,8 @@ html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
 .cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
+/* display: block above would beat the hidden attribute of the estimated-cost note the script toggles */
+.cl-page .cl-kv-sub[hidden] { display: none; }
 .cl-page .cl-item-market { margin: 0; font-size: 14px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 /* the internal note reads like the values of the cards above it */
 .cl-page.cl-offer-page .cl-card-inset > .cl-note-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }

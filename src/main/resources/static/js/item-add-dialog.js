@@ -1,7 +1,7 @@
 // Add-items dialog shared by the order details and the offer details (fragments/item-add-modal.html): pricelist tab
 // (catalog, category, label, search, sortable name and price), inventory tab (EAN and/or manufacturer code), the list of
-// picked entries with quantities, and a submit that posts items[i].* to data-add-items-url. Both pages open it with
-// data-cl-dialog-open (dialog.js), which fires cl:dialog-open.
+// picked entries with quantities, and a submit that posts items[i].* to data-add-items-url (or hands them to the page:
+// cl:item-add-submit). Both pages open it with data-cl-dialog-open (dialog.js), which fires cl:dialog-open.
 (function () {
     'use strict';
 
@@ -434,13 +434,21 @@
             form.appendChild(input);
         });
         document.body.appendChild(form);
-        // A page with unsaved changes of its own (the offer's items table) cancels this, saves them, then proceeds;
-        // abort hands the dialog back when that save fails. Without a listener the post goes on as before.
+        // A page that adds the items itself (the offer's draft table) cancels this and sends params on its own: done
+        // empties the dialog once they are added, abort hands it back as it was when they are not, and proceed posts
+        // as without a listener. Without a listener the post goes on as before (the order page).
         const submitting = new CustomEvent('cl:item-add-submit', {
             bubbles: true,
             cancelable: true,
             detail: {
+                params: params,
                 proceed: () => form.submit(),
+                done: () => {
+                    form.remove();
+                    itemAdd.pending = false;
+                    itemAdd.picked = [];
+                    renderItemAddTable();
+                },
                 abort: () => {
                     form.remove();
                     itemAdd.pending = false;

@@ -25,6 +25,7 @@ import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.OfferController;
+import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsPaths;
 
@@ -39,8 +40,10 @@ import java.util.stream.Collectors;
 /**
  * The offer details page. Each save writes only what sits next to its button: the table saves the items, the
  * dialogs of the side cards save the terms, the client and the note, each on a fresh read of the record, so one never
- * overwrites another. Everything else on the page (copy, template, recalculation, proforma, adding and removing
- * items) stays in {@link OfferController}.
+ * overwrites another. The table is a draft until its save: adding items renders it from the posted rows without saving
+ * (draftItems), and the save is refused over a record changed since the page was opened. Everything else on the page
+ * (copy, template, recalculation, proforma, and adding and removing items without JavaScript) stays in
+ * {@link OfferController}.
  */
 @Controller
 @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -55,6 +58,7 @@ public class OfferDetailsController {
     private final OfferDetailsPageFactory pageFactory;
     private final MessageSource messages;
     private final OfferItemReloader offerItemReloader;
+    private final OfferItemsDraft offerItemsDraft;
 
     /** What a dialog answer needs besides the record: the list to return to, whether the script asked, the model. */
     private record Answer(String returnTo, boolean async, Model model, Locale locale) {
@@ -79,18 +83,64 @@ public class OfferDetailsController {
         return VIEW;
     }
 
-    /** Only the items of the table; every other field stays as stored. */
+    /**
+     * Only the items of the table; every other field stays as stored. version is the record's version the page was
+     * opened at: when the record changed since (another operator, the client choosing a variant on their page), nothing
+     * is saved and the page comes back, 409, with the posted items and the choice to overwrite; that choice posts the
+     * stored version the conflict page carries, so a further change made meanwhile is a conflict again. No version (a page from
+     * before this check) saves as before.
+     */
     @PostMapping("/dashboard/offer/{offerId}")
     public String saveItems(@PathVariable String offerId, @ModelAttribute Basket form,
-                     @RequestParam(required = false) String returnTo, RedirectAttributes redirectAttributes,
-                     Locale locale) {
+                     @RequestParam(required = false) Long version, @RequestParam(defaultValue = "false") boolean overwrite,
+                     @RequestParam(required = false) String returnTo, Model model, HttpServletResponse response,
+                     RedirectAttributes redirectAttributes, Locale locale) {
         Basket offer = requireOffer(offerId);
-        List<BasketItem> posted = form.getBasketItems() == null ? List.of() : form.getBasketItems();
-        offer.setBasketItems(OfferController.normalizeBlankCategories(posted.stream()
-                .filter(BasketItem::isComplete)
-                .collect(Collectors.toList())));
+        // the check runs for "Overwrite" too: its page carries the stored version, so a change made after the conflict
+        // page was shown is a conflict again; overwrite only marks the intent
+        boolean changedSince = version != null && !version.equals(offer.getVersion());
+        setPostedItems(offer, form);
+        if (changedSince) {
+            // the page is built from the stored record with the posted items, so its hidden version is the stored one
+            // and "Overwrite" posts that
+            model.addAttribute("page", pageFactory.buildDraft(offer, returnTo, locale, LocalDateTime.now()));
+            model.addAttribute("returnTo", safeReturnTo(returnTo));
+            fillDialogs(model, DialogForms.of(offer), Map.of(), null);
+            model.addAttribute("conflict", true);
+            response.setStatus(HttpStatus.CONFLICT.value());
+            return VIEW;
+        }
         save(offer);
         return savedRedirect(offer, "offers.details.saved.items", returnTo, redirectAttributes, locale);
+    }
+
+    /**
+     * The table as posted plus the entries picked in the "add items" dialog, rendered as the items card and never saved:
+     * the table stays a draft until "Zapisz zmiany". The meta template says how many entries were skipped (no longer in
+     * the price list or at the suppliers).
+     */
+    @PostMapping("/dashboard/offer/{offerId}/items/draft")
+    public String draftItems(@PathVariable String offerId, @ModelAttribute Basket form,
+                      @ModelAttribute("addItemsForm") AddItemsForm added, @RequestParam(required = false) String returnTo,
+                      Model model, Locale locale) {
+        Basket offer = requireOffer(offerId);
+        int dropped = setPostedItems(offer, form);
+        int skipped = offerItemsDraft.add(offer, added);
+        model.addAttribute("page", pageFactory.buildDraft(offer, returnTo, locale, LocalDateTime.now()));
+        model.addAttribute("returnTo", safeReturnTo(returnTo));
+        model.addAttribute("skipped", skipped);
+        model.addAttribute("dropped", dropped);
+        model.addAttribute("requested", added.entries().size());
+        return VIEW + " :: itemsDraft";
+    }
+
+    /** Only the items are taken from the bound form: its other fields (the version among them) never reach the record. */
+    /** Returns how many posted rows were incomplete and left out. */
+    private static int setPostedItems(Basket offer, Basket form) {
+        List<BasketItem> posted = form.getBasketItems() == null ? List.of() : form.getBasketItems();
+        List<BasketItem> kept = posted.stream().filter(BasketItem::isComplete).collect(Collectors.toList());
+        offer.setBasketItems(OfferController.normalizeBlankCategories(kept));
+        return posted.size() - kept.size();
     }
 
     @PostMapping("/dashboard/offer/{offerId}/terms")

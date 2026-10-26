@@ -19,7 +19,8 @@
             <dd class="is-numeric"><output data-cl-sum="total" aria-live="off" th:text="#{general.currency.amount(${s.total()})}"></output>
                 <span class="cl-kv-sub"><span th:text="#{offers.details.summary.net}"></span> <output data-cl-sum="net" aria-live="off" th:text="#{general.currency.amount(${s.net()})}"></output></span></dd></div>
         <div><dt th:text="#{offers.details.summary.cost}"></dt>
-            <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output></dd></div>
+            <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output>
+                <span th:hidden="${!s.costEstimated()}" class="cl-kv-sub" data-cl-sum-estimated th:text="#{offers.details.summary.costEstimated}"></span></dd></div>
         <div><dt th:text="#{offers.details.summary.profitGross}"></dt>
             <dd class="is-numeric"><output data-cl-sum="profitGross" aria-live="off" th:text="#{general.currency.amount(${s.profitGross()})}"></output></dd></div>
         <div><dt th:text="#{offers.details.summary.profitNet}"></dt>
@@ -103,20 +104,6 @@
         </th:block>
         <p th:if="${#strings.isEmpty(person) and #strings.isEmpty(c.company()) and #strings.isEmpty(c.email()) and #strings.isEmpty(c.phone())}"
            class="cl-help" th:text="#{offers.details.client.empty}"></p>
-    </div>
-    <div class="cl-address">
-        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.link}"></span></div>
-        <div class="cl-copy-actions">
-            <button type="button" class="cl-button" hidden data-cl-copy-reveal th:attr="data-cl-copy=${p.clientUrl()}">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-copy"></i></span>
-                <span th:text="#{offers.details.client.copyLink}"></span>
-            </button>
-            <a class="cl-button" th:href="${p.clientUrl()}" target="_blank" rel="noopener">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
-                <span th:text="#{offers.details.client.open}"></span>
-            </a>
-        </div>
-        <p class="cl-help" hidden data-cl-saved-version-note th:text="#{offers.details.action.savedVersion}"></p>
     </div>
     <div class="cl-address">
         <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{offers.details.client.billing}"></span></div>

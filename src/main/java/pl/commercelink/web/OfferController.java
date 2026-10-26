@@ -13,24 +13,18 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.baskets.*;
-import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.offer.imports.OfferImporter;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.pricelist.PricelistFinder;
-import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.OfferCreationDto;
+import pl.commercelink.web.offers.OfferItemsDraft;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.net.URLEncoder;
@@ -51,16 +45,10 @@ public class OfferController {
     private BasketsRepository basketsRepository;
 
     @Autowired
-    private ProductCatalogRepository productCatalogRepository;
-
-    @Autowired
-    private PricelistFinder pricelistFinder;
+    private OfferItemsDraft offerItemsDraft;
 
     @Autowired
     private OfferItemReloader offerItemReloader;
-
-    @Autowired
-    private Inventory inventory;
 
     @Autowired
     private InvoicingService invoicingService;
@@ -315,43 +303,46 @@ public class OfferController {
         return "redirect:" + op.getInvoiceUrl();
     }
 
+    /** Without JavaScript the dialog posts here and the entries are saved at once; with it the table drafts them. */
     @PostMapping("/dashboard/offer/{offerId}/add-items")
     public String addOfferItems(@PathVariable String offerId, @ModelAttribute AddItemsForm form,
-                                @RequestParam(required = false) String returnTo) {
+                                @RequestParam(required = false) String returnTo, RedirectAttributes redirectAttributes,
+                                Locale locale) {
         Basket basket = requireBasket(offerId);
-        boolean consolidated = !basket.isShowPrices();
-        InventoryView inventoryView = inventory.withEnabledSuppliersOnly(getStoreId());
-        Map<String, Map<String, Integer>> sequenceNumbersByCatalog = new HashMap<>();
-
-        for (AddItemsForm.Entry entry : form.entries()) {
-            if (entry.isFromPricelist()) {
-                AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), entry.getCatalogId(), entry.getPimId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-                BasketItem basketItem = BasketItem.of(availabilityAndPrice, entry.getQty(), entry.getCatalogId(), consolidated);
-                basket.addBasketItemInCategoryOrder(basketItem,
-                        sequenceNumbersByCatalog.computeIfAbsent(entry.getCatalogId(), this::catalogCategorySequenceNumbers));
-            } else {
-                MatchedInventory matchedInventory = inventoryView.findByInventoryKey(entry.inventoryKey());
-                basket.addBasketItem(BasketItem.of(matchedInventory, entry.getQty(), consolidated));
-            }
-        }
+        int skipped = offerItemsDraft.add(basket, form);
         save(basket);
-
+        if (skipped > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("offers.details.items.skipped",
+                    new Object[]{skipped, form.entries().size()}, locale));
+        }
         return "redirect:" + offerPageHref(offerId, returnTo);
     }
 
-    private Map<String, Integer> catalogCategorySequenceNumbers(String catalogId) {
-        ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        return catalog == null ? Map.of() : catalog.getCategorySequenceNumbers();
-    }
-
+    /**
+     * index is the item's position when the page was rendered and itemId the item that sat there: when the offer changed
+     * since and the position is gone or holds another item, nothing is removed. A blank id on either side (a page from
+     * before the check, an old item without one) removes by the position alone, as before.
+     */
     @PostMapping("/dashboard/offer/{offerId}/remove-item/{index}")
     public String removeOfferItem(@PathVariable String offerId, @PathVariable int index,
-                                  @RequestParam(required = false) String returnTo) {
+                                  @RequestParam(required = false) String itemId,
+                                  @RequestParam(required = false) String returnTo,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         Basket offer = requireBasket(offerId);
+        List<BasketItem> items = offer.getBasketItems();
+        boolean inRange = index >= 0 && index < items.size();
+        if (!inRange || otherItem(items.get(index), itemId)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("offers.details.line.removed.stale", null, locale));
+            return "redirect:" + offerPageHref(offerId, returnTo);
+        }
         offer.removeBasketItem(index);
         save(offer);
         return "redirect:" + offerPageHref(offerId, returnTo);
+    }
+
+    private static boolean otherItem(BasketItem item, String itemId) {
+        return StringUtils.isNotBlank(itemId) && StringUtils.isNotBlank(item.getId()) && !itemId.equals(item.getId());
     }
 
     @PostMapping("/dashboard/offer/new/csv")
