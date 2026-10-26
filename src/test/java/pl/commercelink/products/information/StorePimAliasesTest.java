@@ -75,4 +75,21 @@ class StorePimAliasesTest {
         assertThat(aliases.effectiveEntry("", "S")).isEmpty();
         assertThat(aliases.effectiveEntry(STORE, null)).isEmpty();
     }
+
+    @Test
+    void clonesWithSourcesListsOnlyTheStoresOwnClones() {
+        // given: another store's clone, a plain store entry (no source) and the store's clone
+        StorePimAliases withOtherClone = new StorePimAliases(ScopedPimCatalog.of(
+                globalEntry("S", "5900000000011", "M1", "cat"),
+                cloneEntry("C", STORE, "S", "5900000000011", "M1", "cat"),
+                cloneEntry("C2", OTHER_STORE, "S", "5900000000011", "M1", "cat"),
+                storeEntry("X", STORE, "5900000000033", null, "cat")));
+
+        // when / then
+        assertThat(withOtherClone.clonesWithSources(STORE)).containsExactly(java.util.Map.entry("C", "S"));
+        assertThat(withOtherClone.clonesWithSources(OTHER_STORE)).containsExactly(java.util.Map.entry("C2", "S"));
+        assertThat(withOtherClone.clonesWithSources("unknown")).isEmpty();
+        assertThat(withOtherClone.clonesWithSources(" ")).isEmpty();
+        assertThat(withOtherClone.clonesWithSources(null)).isEmpty();
+    }
 }

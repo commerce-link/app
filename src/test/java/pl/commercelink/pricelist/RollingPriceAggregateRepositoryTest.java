@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.csv.CSVWriter;
 import pl.commercelink.starter.storage.FileStorage;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,7 +34,7 @@ class RollingPriceAggregateRepositoryTest {
     private FileStorage fileStorage;
 
     @Mock
-    private pl.commercelink.products.information.StorePimAliases aliases;
+    private StorePimAliases aliases;
 
     @InjectMocks
     private RollingPriceAggregateRepository repository;
@@ -97,7 +99,7 @@ class RollingPriceAggregateRepositoryTest {
         // then
         assertEquals(100, result.get("clone-1").getMedianLowestPrice30d());
         assertEquals(100, result.get("pim-1").getMedianLowestPrice30d());
-        assertTrue(!result.containsKey("clone-9"));
+        assertFalse(result.containsKey("clone-9"));
     }
 
     @Test

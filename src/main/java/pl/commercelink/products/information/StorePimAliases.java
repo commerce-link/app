@@ -62,7 +62,7 @@ public class StorePimAliases {
             return Map.of();
         }
         Map<String, String> clones = new LinkedHashMap<>();
-        for (PimEntry entry : catalog.withStoreData(storeId).findAll()) {
+        for (PimEntry entry : catalog.withStoreData(storeId).findOwnClones()) {
             if (storeId.equals(entry.ownerStoreId()) && !isBlank(entry.clonedFromPimId())) {
                 clones.put(entry.pimId(), entry.clonedFromPimId());
             }

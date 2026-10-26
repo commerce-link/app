@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.products.information.StorePimAliases;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -29,7 +30,7 @@ class SellingPriceHistoryServiceTest {
     private ArgumentCaptor<Collection<SellingPriceHistory>> saved;
 
     @Test
-    void historyIsWrittenUnderCloneAndSource() throws java.io.IOException {
+    void historyIsWrittenUnderCloneAndSource() throws IOException {
         // given
         when(repository.load("store-1", "cat")).thenReturn(new HashMap<>());
         when(aliases.sourceOf("store-1", "clone")).thenReturn(Optional.of("source"));
@@ -44,7 +45,7 @@ class SellingPriceHistoryServiceTest {
     }
 
     @Test
-    void afterDeletingTheCloneTheSourceHistoryIsComplete() throws java.io.IOException {
+    void afterDeletingTheCloneTheSourceHistoryIsComplete() throws IOException {
         // given: yesterday under the source, today only the clone was priced
         Map<String, SellingPriceHistory> histories = new HashMap<>();
         histories.put("source", new SellingPriceHistory("source", Map.of(LocalDate.now().minusDays(1), 600L)));
@@ -61,7 +62,23 @@ class SellingPriceHistoryServiceTest {
     }
 
     @Test
-    void plainProductsAreUnchanged() throws java.io.IOException {
+    void sourceWithItsOwnRowOnTheSameDayKeepsTheMinimum() throws IOException {
+        // given: the source and its clone are both in today's pricelist
+        when(repository.load("store-1", "cat")).thenReturn(new HashMap<>());
+        when(aliases.sourceOf("store-1", "clone")).thenReturn(Optional.of("source"));
+        when(aliases.sourceOf("store-1", "source")).thenReturn(Optional.empty());
+
+        // when
+        new SellingPriceHistoryService(repository, aliases)
+                .update("store-1", "cat", List.of(row("clone", 500), row("source", 450)));
+
+        // then
+        assertEquals(450L, lowestByPimId().get("source"));
+        assertEquals(500L, lowestByPimId().get("clone"));
+    }
+
+    @Test
+    void plainProductsAreUnchanged() throws IOException {
         // given
         when(repository.load("store-1", "cat")).thenReturn(new HashMap<>());
         when(aliases.sourceOf("store-1", "plain")).thenReturn(Optional.empty());
@@ -73,7 +90,7 @@ class SellingPriceHistoryServiceTest {
         assertEquals(Map.of("plain", 500L), lowestByPimId());
     }
 
-    private Map<String, Long> lowestByPimId() throws java.io.IOException {
+    private Map<String, Long> lowestByPimId() throws IOException {
         verify(repository).save(eq("store-1"), eq("cat"), saved.capture());
         Map<String, Long> result = new HashMap<>();
         saved.getValue().forEach(h -> result.put(h.getPimId(), h.getLowestPrice30d()));

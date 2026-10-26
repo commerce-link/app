@@ -18,10 +18,13 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.information.StorePimAliases;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,7 +60,7 @@ class AvailabilityAndPriceListTest {
     private SellingPriceHistoryRepository sellingPriceHistoryRepository;
 
     @Mock
-    private pl.commercelink.products.information.StorePimAliases aliases;
+    private StorePimAliases aliases;
 
     @Mock
     private ProductCatalog catalog;
@@ -153,10 +156,10 @@ class AvailabilityAndPriceListTest {
     @Test
     void lowestPriceOfThirtyDaysIsTheSameAfterTheMoveToTheClone() {
         // given: history only under the source, the row already carries the clone
-        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        LocalDate day = LocalDate.of(2026, 10, 1);
         SellingPriceHistory ofSource = new SellingPriceHistory("pim-1", Map.of(day, 800L));
         when(sellingPriceHistoryRepository.load("store-1", "catalog-1")).thenReturn(Map.of("pim-1", ofSource));
-        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(java.util.Optional.of("pim-1"));
+        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(Optional.of("pim-1"));
         product.setPimId("pim-c");
         singleManagedProduct();
 
@@ -170,12 +173,12 @@ class AvailabilityAndPriceListTest {
     @Test
     void automaticCategoryRowOfACloneReadsTheSourceHistoryAndItsOwn() {
         // given: days under both ids, the lower one wins
-        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        LocalDate day = LocalDate.of(2026, 10, 1);
         Map<String, SellingPriceHistory> histories = Map.of(
                 "pim-1", new SellingPriceHistory("pim-1", Map.of(day, 800L)),
                 "pim-c", new SellingPriceHistory("pim-c", Map.of(day, 700L)));
         when(sellingPriceHistoryRepository.load("store-1", "catalog-1")).thenReturn(histories);
-        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(java.util.Optional.of("pim-1"));
+        when(aliases.sourceOf("store-1", "pim-c")).thenReturn(Optional.of("pim-1"));
         product.setPimId("pim-c");
         when(categoryDefinition.hasType(CategoryDefinitionType.Dynamic)).thenReturn(true);
         when(pimCatalog.withStoreData(any())).thenReturn(pim);
@@ -192,7 +195,7 @@ class AvailabilityAndPriceListTest {
     @Test
     void plainProductsAreUnchanged() {
         // given
-        java.time.LocalDate day = java.time.LocalDate.of(2026, 10, 1);
+        LocalDate day = LocalDate.of(2026, 10, 1);
         when(sellingPriceHistoryRepository.load("store-1", "catalog-1"))
                 .thenReturn(Map.of("pim-1", new SellingPriceHistory("pim-1", Map.of(day, 900L))));
         singleManagedProduct();

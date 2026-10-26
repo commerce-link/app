@@ -2,6 +2,7 @@ package pl.commercelink.products;
 
 import org.junit.jupiter.api.BeforeEach;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.information.StorePimAliases;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -118,7 +119,7 @@ class DynamicCategoryPricelistTest {
                 recommendationEngine,
                 rollingPriceAggregateRepository,
                 sellingPriceHistoryRepository,
-                mock(pl.commercelink.products.information.StorePimAliases.class),
+                mock(StorePimAliases.class),
                 STORE_ID
         );
 
