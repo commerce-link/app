@@ -1,5 +1,6 @@
 package pl.commercelink.checkout;
 
+import pl.commercelink.products.information.StorePimAliases;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
@@ -45,6 +46,7 @@ public class Checkout {
     private final ProductCatalogRepository productCatalogRepository;
     private final PaymentProviderFactory paymentProviderFactory;
     private final DiscountService discountService;
+    private final StorePimAliases aliases;
     private final String appDomain;
 
     Checkout(StoresRepository storesRepository,
@@ -53,6 +55,7 @@ public class Checkout {
              ProductCatalogRepository productCatalogRepository,
              PaymentProviderFactory paymentProviderFactory,
              DiscountService discountService,
+             StorePimAliases aliases,
              @Value("${app.domain}") String appDomain) {
         this.storesRepository = storesRepository;
         this.basketsRepository = basketsRepository;
@@ -60,6 +63,7 @@ public class Checkout {
         this.productCatalogRepository = productCatalogRepository;
         this.paymentProviderFactory = paymentProviderFactory;
         this.discountService = discountService;
+        this.aliases = aliases;
         this.appDomain = appDomain;
     }
 
@@ -221,7 +225,7 @@ public class Checkout {
 
         Pricelist pricelist = pricelistRepository.find(store.getStoreId(), catalogId, incompletePricelist.getPricelistId());
 
-        List<BasketItem> basketItems = req.toBasketItems(catalogId, pricelist);
+        List<BasketItem> basketItems = req.toBasketItems(catalogId, pricelist, store.getStoreId(), aliases);
         validateOrderCompleteness(productCatalog, basketItems);
 
         return new CatalogProcessingResult(catalogId, basketItems);

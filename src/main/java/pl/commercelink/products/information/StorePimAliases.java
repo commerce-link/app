@@ -3,6 +3,8 @@ package pl.commercelink.products.information;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.Pricelist;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -73,6 +75,23 @@ public class StorePimAliases {
     /** The id an offer of the product is published under: a clone keeps its source's offer id. */
     public String offerIdOf(String storeId, String pimId) {
         return sourceOf(storeId, pimId).orElse(pimId);
+    }
+
+    /**
+     * The pricelist row of the product {@code pimId} for the store: the row with exactly that id, else the row of the
+     * store's clone of it, else the row of the global entry it was cloned from. A pricelist built before a product moved
+     * onto its clone is keyed by the source, one built after it by the clone, and a cart or offer may hold either id.
+     */
+    public Optional<AvailabilityAndPrice> find(String storeId, Pricelist pricelist, String pimId) {
+        if (pricelist == null || isBlank(pimId)) {
+            return Optional.empty();
+        }
+        Optional<AvailabilityAndPrice> exact = pricelist.findByPimId(pimId);
+        if (exact.isPresent()) {
+            return exact;
+        }
+        return cloneOf(storeId, pimId).flatMap(pricelist::findByPimId)
+                .or(() -> sourceOf(storeId, pimId).flatMap(pricelist::findByPimId));
     }
 
     /** The entry the store uses for {@code pimId}: the store's clone of that id, else the entry the store sees by id. */

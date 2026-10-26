@@ -12,6 +12,40 @@ import static org.assertj.core.api.Assertions.tuple;
 class DiscountCalculatorTest {
 
     @Test
+    void discountForTheSourceCoversTheClone() {
+        // given: the code names the global entry, the basket holds the store's clone
+        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-S");
+        BasketItem clone = product("C", 100, 1);
+
+        // when
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(clone), aliasesOfS());
+
+        // then
+        assertThat(lines).hasSize(1);
+        assertThat(DiscountCalculator.calculate(code, List.of(clone))).isEmpty();
+    }
+
+    @Test
+    void discountForTheCloneCoversTheSource() {
+        // given
+        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-C");
+        BasketItem source = product("S", 100, 1);
+
+        // when / then
+        assertThat(DiscountCalculator.calculate(code, List.of(source), aliasesOfS())).hasSize(1);
+    }
+
+    @Test
+    void discountForAnUnrelatedProductCoversNeither() {
+        // when / then
+        assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS())).isEmpty();
+    }
+
+    private static java.util.function.Function<String, java.util.Set<String>> aliasesOfS() {
+        return id -> new java.util.HashSet<>(java.util.List.of(id, "pim-S", "pim-C"));
+    }
+
+    @Test
     void percentageRoundsHalfUp() {
         // given
         DiscountCode code = percentage(15);

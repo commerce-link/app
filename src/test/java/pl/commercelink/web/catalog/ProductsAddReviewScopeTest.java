@@ -117,4 +117,27 @@ class ProductsAddReviewScopeTest {
         org.mockito.Mockito.verify(productRepository, org.mockito.Mockito.times(1)).save(org.mockito.ArgumentMatchers.argThat(
                 p -> "s1-2".equals(p.getPimId())));
     }
+
+    @Test
+    void addingTheSourceToACategoryHoldingTheCloneIsADuplicate() {
+        // given: the category holds the global entry "g1" (no codes of its own); the store has cloned it as "c1"
+        PimCatalog withClone = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, "M-590", "GPU"),
+                ScopedPimCatalog.cloneEntry("c1", "s1", "g1", EAN, MFN, "GPU"));
+        ProductsAddReview review = review(withClone);
+        when(productRepository.findAll(anyString())).thenReturn(List.of(new Product(null, "g1", null, null, "Brand", "L", "Held", "Default")));
+        MatchedInventory unknown = mock(MatchedInventory.class);
+        when(unknown.isEmpty()).thenReturn(true);
+        when(view.findByInventoryKey(org.mockito.ArgumentMatchers.any())).thenReturn(unknown);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
+
+        // when
+        int added = review.save("s1", category, form);
+
+        // then
+        assertThat(added).isZero();
+        assertThat(review.aliasesOf("s1", "c1")).containsExactlyInAnyOrder("c1", "g1");
+        assertThat(review.aliasesOf("s2", "c1")).containsExactly("c1");
+    }
 }

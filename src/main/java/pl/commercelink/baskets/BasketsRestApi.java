@@ -1,5 +1,6 @@
 package pl.commercelink.baskets;
 
+import pl.commercelink.products.information.StorePimAliases;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,8 @@ public class BasketsRestApi {
     private PricelistRepository pricelistRepository;
     @Autowired
     private DiscountService discountService;
+    @Autowired
+    private StorePimAliases aliases;
     @Value("${commercelink.localization.fallback-locale:#{null}}")
     private Locale fallbackLocale;
 
@@ -76,7 +79,7 @@ public class BasketsRestApi {
     }
 
     private void fillBasket(Basket basket, CheckoutRequest req) {
-        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
+        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository, aliases);
 
         basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());

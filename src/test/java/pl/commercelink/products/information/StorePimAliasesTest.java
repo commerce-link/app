@@ -4,6 +4,10 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.Pricelist;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static pl.commercelink.pim.ScopedPimCatalog.cloneEntry;
@@ -42,6 +46,35 @@ class StorePimAliasesTest {
         assertThat(aliases.aliasesOf(OTHER_STORE, "S")).containsExactly("S");
         assertThat(aliases.offerIdOf(OTHER_STORE, "C")).isEqualTo("C");
         assertThat(aliases.effectiveEntry(OTHER_STORE, "S")).map(PimEntry::pimId).contains("S");
+    }
+
+    @Test
+    void findPrefersTheExactRowThenTheCloneThenTheSource() {
+        // given
+        Pricelist withSource = new Pricelist("p", List.of(row("S")));
+        Pricelist withClone = new Pricelist("p", List.of(row("C")));
+        Pricelist withBoth = new Pricelist("p", List.of(row("S"), row("C")));
+
+        // when / then
+        assertThat(aliases.find(STORE, withSource, "S")).map(AvailabilityAndPrice::getPimId).contains("S");
+        assertThat(aliases.find(STORE, withSource, "C")).map(AvailabilityAndPrice::getPimId).contains("S");
+        assertThat(aliases.find(STORE, withClone, "S")).map(AvailabilityAndPrice::getPimId).contains("C");
+        assertThat(aliases.find(STORE, withClone, "C")).map(AvailabilityAndPrice::getPimId).contains("C");
+        assertThat(aliases.find(STORE, withBoth, "S")).map(AvailabilityAndPrice::getPimId).contains("S");
+        assertThat(aliases.find(STORE, withSource, "G")).isEmpty();
+        assertThat(aliases.find(STORE, null, "S")).isEmpty();
+    }
+
+    @Test
+    void otherStoresAreUnaffected() {
+        // when / then
+        assertThat(aliases.find(OTHER_STORE, new Pricelist("p", List.of(row("C"))), "S")).isEmpty();
+        assertThat(aliases.find(OTHER_STORE, new Pricelist("p", List.of(row("S"))), "C")).isEmpty();
+        assertThat(aliases.find(OTHER_STORE, new Pricelist("p", List.of(row("S"))), "S")).isPresent();
+    }
+
+    private static AvailabilityAndPrice row(String pimId) {
+        return new AvailabilityAndPrice(pimId, "5900000000011", "M1", "Brand", "", "Name", "cat", 100L, 5L, 1, 0L, false);
     }
 
     @Test

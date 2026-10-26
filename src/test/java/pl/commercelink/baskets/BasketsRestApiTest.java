@@ -1,5 +1,7 @@
 package pl.commercelink.baskets;
 
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,11 +78,11 @@ class BasketsRestApiTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(basketsRestApi, "discountService", new DiscountService(discountCodesRepository));
+        ReflectionTestUtils.setField(basketsRestApi, "discountService", new DiscountService(discountCodesRepository, new StorePimAliases(ScopedPimCatalog.of())));
         when(store.getStoreId()).thenReturn(STORE_ID);
         when(store.getDefaultPaymentIntegration()).thenReturn(Optional.of(new PaymentIntegration(DEFAULT_PROVIDER, true)));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(req.toBasketItems(STORE_ID, pricelistRepository)).thenReturn(Collections.emptyList());
+        when(req.toBasketItems(eq(STORE_ID), eq(pricelistRepository), any())).thenReturn(Collections.emptyList());
     }
 
     @Test
@@ -281,7 +283,7 @@ class BasketsRestApiTest {
         gpu.setBrand("Acme");
         BasketItem ram = new BasketItem("pim-ram", "Pamięć RAM", "MFN-RAM", "Pamięci", 100, 0, 2, "catalog-1", 2, false);
         ram.setBrand("Globex");
-        when(req.toBasketItems(STORE_ID, pricelistRepository)).thenReturn(List.of(gpu, ram));
+        when(req.toBasketItems(eq(STORE_ID), eq(pricelistRepository), any())).thenReturn(List.of(gpu, ram));
     }
 
     private void givenCode(DiscountCode code) {

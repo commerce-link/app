@@ -6,6 +6,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.*;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.Optional;
 
@@ -15,8 +16,11 @@ public class ProductDetails {
     private final ProductCatalogRepository productCatalogRepository;
     private final ProductRepository productRepository;
     private final InventoryView inventory;
+    private final StorePimAliases aliases;
 
-    public ProductDetails(PimView pim, ProductCatalogRepository productCatalogRepository, ProductRepository productRepository, InventoryView inventory) {
+    public ProductDetails(PimView pim, ProductCatalogRepository productCatalogRepository, ProductRepository productRepository,
+                          InventoryView inventory, StorePimAliases aliases) {
+        this.aliases = aliases;
         this.pim = pim;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
@@ -35,14 +39,15 @@ public class ProductDetails {
         }
 
         if (categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
-            return createProductDetailsFromRecommendation(categoryDefinition, pimId);
+            return createProductDetailsFromRecommendation(storeId, categoryDefinition, pimId);
         } else {
-            return createProductDetailsFromMappedProduct(categoryId, pimId);
+            return createProductDetailsFromMappedProduct(storeId, categoryId, pimId);
         }
     }
 
-    private ProductDetailsView createProductDetailsFromRecommendation(CategoryDefinition categoryDefinition, String pimId) {
-        Optional<PimEntry> pimEntry = pim.findByPimId(pimId);
+    private ProductDetailsView createProductDetailsFromRecommendation(String storeId, CategoryDefinition categoryDefinition, String pimId) {
+        // A link to the global entry shows the store's clone of it, as the category itself does
+        Optional<PimEntry> pimEntry = aliases.effectiveEntry(storeId, pimId);
         if (pimEntry.isEmpty()) {
             return null;
         }
@@ -54,8 +59,17 @@ public class ProductDetails {
         return createProductDetailsView(recommendation.toProduct());
     }
 
-    private ProductDetailsView createProductDetailsFromMappedProduct(String categoryId, String pimId) {
-        return createProductDetailsView(productRepository.findByPimId(categoryId, pimId));
+    private ProductDetailsView createProductDetailsFromMappedProduct(String storeId, String categoryId, String pimId) {
+        // The product is stored under the id it had when it was added: the source before it moved onto the clone
+        // (a link by the clone id, or the other way round, must still find it)
+        Product product = productRepository.findByPimId(categoryId, pimId);
+        if (product == null) {
+            product = aliases.cloneOf(storeId, pimId).map(id -> productRepository.findByPimId(categoryId, id)).orElse(null);
+        }
+        if (product == null) {
+            product = aliases.sourceOf(storeId, pimId).map(id -> productRepository.findByPimId(categoryId, id)).orElse(null);
+        }
+        return createProductDetailsView(product);
     }
 
     private ProductDetailsView createProductDetailsView(pl.commercelink.products.Product product) {

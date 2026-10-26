@@ -5,6 +5,9 @@ import pl.commercelink.pim.api.PimView;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
@@ -25,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static pl.commercelink.pim.ScopedPimCatalog.cloneEntry;
 
 @ExtendWith(MockitoExtension.class)
 class ProductDetailsTest {
@@ -36,6 +40,9 @@ class ProductDetailsTest {
 
     @Mock
     private PimView pimView;
+
+    @Spy
+    private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of(pimEntry()));
 
     @Mock
     private ProductCatalogRepository productCatalogRepository;
@@ -75,7 +82,6 @@ class ProductDetailsTest {
     void dynamicDefinitionBuildsDetailsFromRecommendation() {
         // given
         dynamicDefinition("Karty graficzne");
-        when(pimView.findByPimId(PIM_ID)).thenReturn(Optional.of(pimEntry()));
         when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
         when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
         when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
@@ -88,6 +94,72 @@ class ProductDetailsTest {
         assertThat(view.getCategoryId()).isEqualTo(CATEGORY_ID);
         assertThat(view.getPimId()).isEqualTo(PIM_ID);
         assertThat(view.getName()).isEqualTo("Gigabyte RTX 5070");
+    }
+
+    @Test
+    void publicDetailsByTheSourceIdShowTheCloneInAManagedCategory() {
+        // given: the product was added while the global entry was current, the store has cloned it since
+        managedDefinition();
+        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(null);
+        when(productRepository.findByPimId(CATEGORY_ID, "pim-clone")).thenReturn(
+                new Product(CATEGORY_ID, "pim-clone", "5900000000001", "MFN-1", "Gigabyte", "RTX 5070", "Clone", "default"));
+
+        // when
+        ProductDetailsView view = detailsWithClone(STORE_ID).generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
+
+        // then
+        assertThat(view.getPimId()).isEqualTo("pim-clone");
+    }
+
+    @Test
+    void publicDetailsByTheCloneIdFindAProductStillStoredUnderTheSource() {
+        // given
+        managedDefinition();
+        when(productRepository.findByPimId(CATEGORY_ID, "pim-clone")).thenReturn(null);
+        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product());
+
+        // when
+        ProductDetailsView view = detailsWithClone(STORE_ID).generate(STORE_ID, CATALOG_ID, CATEGORY_ID, "pim-clone");
+
+        // then
+        assertThat(view.getPimId()).isEqualTo(PIM_ID);
+    }
+
+    @Test
+    void publicDetailsByTheSourceIdShowTheCloneInAnAutomaticCategory() {
+        // given
+        dynamicDefinition("Karty graficzne");
+        when(inventory.findByInventoryKey(any())).thenReturn(matchedInventory);
+        when(matchedInventory.getTaxonomy()).thenReturn(taxonomy());
+        when(matchedInventory.getLowestPrice()).thenReturn(new Price(1000, 1230));
+        when(matchedInventory.getInventoryKey()).thenReturn(new InventoryKey("pim-clone"));
+
+        // when
+        ProductDetailsView view = detailsWithClone(STORE_ID).generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
+
+        // then
+        assertThat(view.getPimId()).isEqualTo("pim-clone");
+        org.mockito.Mockito.verify(inventory).findByInventoryKey(org.mockito.ArgumentMatchers.argThat(
+                key -> "pim-clone".equals(key.getId())));
+    }
+
+    @Test
+    void anotherStoreKeepsLookingUpTheSource() {
+        // given: the clone belongs to a different store
+        managedDefinition();
+        when(productRepository.findByPimId(CATEGORY_ID, PIM_ID)).thenReturn(product());
+
+        // when
+        ProductDetailsView view = detailsWithClone("other-store").generate(STORE_ID, CATALOG_ID, CATEGORY_ID, PIM_ID);
+
+        // then
+        assertThat(view.getPimId()).isEqualTo(PIM_ID);
+    }
+
+    private ProductDetails detailsWithClone(String ownerStoreId) {
+        return new ProductDetails(pimView, productCatalogRepository, productRepository, inventory,
+                new StorePimAliases(ScopedPimCatalog.of(pimEntry(),
+                        cloneEntry("pim-clone", ownerStoreId, PIM_ID, "5900000000001", "MFN-1", "GPU"))));
     }
 
     private void managedDefinition() {

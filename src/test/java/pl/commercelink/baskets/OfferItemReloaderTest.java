@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -39,6 +42,11 @@ class OfferItemReloaderTest {
     @Mock
     private InventoryView inventoryView;
 
+    @Spy
+    private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of(
+            ScopedPimCatalog.globalEntry("pim-source", "EAN-1", "MFN-1", "cat"),
+            ScopedPimCatalog.cloneEntry("pim-clone", STORE_ID, "pim-source", "EAN-1", "MFN-1", "cat")));
+
     @InjectMocks
     private OfferItemReloader offerItemReloader;
 
@@ -65,6 +73,23 @@ class OfferItemReloaderTest {
         offerItemReloader.recalculate(basket);
 
         // then
+        assertThat(item.getUnitPrice()).isEqualTo(250.0);
+        assertThat(item.getMfn()).isEqualTo("NEW-MFN");
+    }
+
+    @Test
+    void basketReloadFindsTheMovedProduct() {
+        // given: the basket holds the source id, the newest pricelist is keyed by the store's clone
+        BasketItem item = basketItemWithCatalog("pim-source", "cat-1", "OLD-MFN", 100.0);
+        AvailabilityAndPrice fresh = new AvailabilityAndPrice(
+                "pim-clone", "EAN-1", "NEW-MFN", "Brand", "Label", "Test Product", "Laptops", 250L, 5L, 3, 0L, false);
+        when(pricelistRepository.findNewestPricelistIdCached(STORE_ID, "cat-1")).thenReturn("pricelist-1");
+        when(pricelistRepository.find(STORE_ID, "cat-1", "pricelist-1")).thenReturn(new Pricelist("pricelist-1", List.of(fresh)));
+
+        // when
+        offerItemReloader.recalculate(basketWith(item));
+
+        // then: the price is updated, not left stale
         assertThat(item.getUnitPrice()).isEqualTo(250.0);
         assertThat(item.getMfn()).isEqualTo("NEW-MFN");
     }

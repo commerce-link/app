@@ -1,5 +1,7 @@
 package pl.commercelink.checkout;
 
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,13 +82,14 @@ class CheckoutDiscountTest {
     @Captor
     private ArgumentCaptor<Basket> savedBasket;
 
+    private final StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of());
     private Checkout checkout;
     private Store store;
 
     @BeforeEach
     void setUp() {
         checkout = new Checkout(storesRepository, basketsRepository, pricelistRepository, productCatalogRepository,
-                paymentProviderFactory, new DiscountService(discountCodesRepository), "https://app.example");
+                paymentProviderFactory, new DiscountService(discountCodesRepository, aliases), aliases, "https://app.example");
 
         store = new Store();
         store.setStoreId(STORE_ID);

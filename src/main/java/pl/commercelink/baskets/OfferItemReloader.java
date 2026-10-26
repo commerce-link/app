@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.SupplierScope;
 
 import java.util.*;
@@ -23,10 +24,12 @@ public class OfferItemReloader {
 
     private final Inventory inventory;
     private final PricelistRepository pricelistRepository;
+    private final StorePimAliases aliases;
 
-    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository) {
+    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, StorePimAliases aliases) {
         this.inventory = inventory;
         this.pricelistRepository = pricelistRepository;
+        this.aliases = aliases;
     }
 
     public List<OfferItem> reload(Basket basket) {
@@ -85,7 +88,7 @@ public class OfferItemReloader {
                     Pricelist pricelist = pricelistRepository.find(storeId, i.getCatalogId(), newestPricelistId);
                     if (pricelist == null) return;
 
-                    Optional<AvailabilityAndPrice> op = pricelist.findByPimId(i.getId());
+                    Optional<AvailabilityAndPrice> op = aliases.find(storeId, pricelist, i.getId());
                     if (op.isPresent()) {
                         AvailabilityAndPrice availability = op.get();
 

@@ -14,6 +14,9 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import pl.commercelink.baskets.Basket;
@@ -44,6 +47,11 @@ class DiscountServiceTest {
 
     @Mock
     private DiscountCodesRepository discountCodesRepository;
+
+    @Spy
+    private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of(
+            ScopedPimCatalog.globalEntry("pim-GPU-source", "5900000000011", "M1", "cat"),
+            ScopedPimCatalog.cloneEntry("pim-GPU", STORE_ID, "pim-GPU-source", "5900000000011", "M1", "cat")));
 
     @InjectMocks
     private DiscountService discountService;
@@ -180,6 +188,27 @@ class DiscountServiceTest {
 
         // then
         assertThat(basket.getDiscountCode()).isEqualTo(CODE);
+    }
+
+    @Test
+    void codeForTheSourceProductDiscountsTheClonePositionInTheBasket() {
+        // given: the code was made for the global entry; the basket holds the store's clone (id "pim-GPU")
+        DiscountCode code = new DiscountCode();
+        code.setActive(true);
+        code.setCode(CODE);
+        code.setType(DiscountType.Percentage);
+        code.setValue(10);
+        code.setTarget(DiscountTarget.Product);
+        code.setTargetValues(List.of(new TargetValue("pim-GPU-source", "GPU")));
+        when(discountCodesRepository.find(STORE_ID, CODE)).thenReturn(Optional.of(code));
+        Basket basket = basket();
+
+        // when
+        discountService.apply(basket, CODE, PROVIDER);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getName, BasketItem::getUnitPrice)
+                .contains(tuple("GPU", 116.91), tuple("RAM", 50.00));
     }
 
     @Test
