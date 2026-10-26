@@ -14291,6 +14291,29 @@ body.cl-public .cl-toast { top: 16px; }
   body.cl-public .cl-toast { top: 8px; }
 }
 
+/* ===== Public page in two columns (offer, order): content on the left, payment and the seller card on the right ===== */
+body.cl-public.is-split, .cl-public-main.is-split { --cl-public-width: 1200px; }
+body.cl-public .cl-split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+body.cl-public .cl-split-main, body.cl-public .cl-split-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+body.cl-public .cl-seller-id { text-align: center; }
+body.cl-public .cl-seller-logo { display: block; margin: 0 auto 10px; max-width: 220px; max-height: 140px; width: auto; height: auto; }
+body.cl-public .cl-seller-name { margin: 0; font-size: 15px; font-weight: 650; color: var(--cl-ink); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-line { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 12px 0 0;
+  padding-top: 12px; border-top: 1px solid var(--cl-line); font-size: 14px; }
+body.cl-public .cl-seller-contact a { display: inline-flex; gap: 8px; align-items: center; overflow-wrap: anywhere; }
+body.cl-public .cl-seller-help { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--cl-line); }
+body.cl-public .cl-seller-help .cl-card-title { margin: 0 0 4px; }
+/* below 1024 px the side column falls under the content: the logo moves up into a larger header instead */
+@media (max-width: 1023px) {
+  body.cl-public .cl-split { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body.cl-public.is-split .cl-public-bar { min-height: 72px; }
+  body.cl-public.is-split .cl-public-logo { max-height: 52px; max-width: 220px; }
+  body.cl-public .cl-seller-logo { display: none; }
+  body.cl-public .cl-seller-id { text-align: left; }
+  body.cl-public .cl-seller-contact { align-items: flex-start; }
+}
+
 /* ===== Public page components (offer, order) ===== */
 body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
 body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
@@ -14369,10 +14392,10 @@ body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-in
 .cl-client-offer .cl-offer-total-row dt { display: inline-flex; align-items: center; gap: 8px; }
 .cl-client-offer .cl-offer-updating { display: none; }
 .cl-client-offer #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }
-.cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, dl.cl-kv.is-bank dd) {
+.cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, .cl-pay-total-value, .cl-pay-total-sub, dl.cl-kv.is-bank dd) {
   opacity: .45; transition: opacity .15s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, dl.cl-kv.is-bank dd) { transition: none; }
+  .cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, .cl-pay-total-value, .cl-pay-total-sub, dl.cl-kv.is-bank dd) { transition: none; }
 }
 .cl-client-offer .cl-offer-total-row dd { margin: 0; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--cl-ink); }
 .cl-client-offer .cl-offer-total-sub { margin: 2px 0 0; text-align: right; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
@@ -14534,3 +14557,61 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 .cl-bridge .cl-page-title { margin-top: 0; }
 .cl-bridge .cl-page-lead { margin-bottom: 0; }
 .cl-bridge .cl-button.is-primary { width: 100%; min-height: 48px; justify-content: center; margin-top: 20px; }
+
+/* Offer in two columns: the total opens the payment card from 1024 px (the items card hides its own total row there), the
+   methods sit side by side and the transfer details are a compact list, so the seller card under the payment stays on
+   the first screen of a 1440 x 900 laptop. */
+.cl-client-offer .cl-pay-total { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--cl-line); }
+.cl-client-offer .cl-pay-total-label { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-client-offer #client-offer-payment.is-slow .cl-offer-updating { display: inline-block; }
+.cl-client-offer .cl-pay-total-value { margin: 2px 0 0; font-size: 26px; font-weight: 650; line-height: 1.2; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+.cl-client-offer .cl-pay-total-sub { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+.cl-client-offer .cl-pay-methods.is-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.cl-client-offer .cl-pay-methods.is-row legend { grid-column: 1 / -1; }
+.cl-client-offer .cl-pay-methods.is-row .cl-choice { padding: 10px 12px; min-height: 56px; }
+.cl-client-offer .cl-pay-methods.is-row .cl-choice-title { font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.cl-client-offer .cl-pay-methods .cl-choice-description { font-size: 12px; font-weight: 600; color: var(--cl-accent); }
+/* 13 px and a 10 px gap keep a grouped IBAN and its copy button (shown by copy-field.js) on one line in the 400 px column */
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact { grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; margin: 0; padding: 0; font-size: 13px; }
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact :is(dt, dd) { font-size: 13px; }
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line-height: 1.45; }
+.cl-client-offer .cl-pay-or { margin: 14px 0 8px; }
+.cl-client-offer .cl-link-button { display: inline-flex; align-items: baseline; gap: 6px; border: 0; background: none; padding: 0; font: inherit;
+  font-size: 13.5px; color: var(--cl-accent); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.cl-client-offer .cl-link-button:hover:not(:disabled) { text-decoration: underline; }
+.cl-client-offer .cl-link-button:disabled { color: var(--cl-ink-2); cursor: not-allowed; }
+.cl-client-offer .cl-link-button:focus-visible { outline: 2px solid var(--cl-accent); outline-offset: 2px; border-radius: 2px; }
+.cl-client-offer .cl-proforma .cl-help { margin-top: 2px; }
+.cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; justify-content: center; }
+@media (min-width: 1024px) {
+  /* a pointer is likely here: the link-like proforma button keeps a 28 px target (WCAG 2.5.8 asks for 24) */
+  .cl-client-offer .cl-link-button { min-height: 28px; align-items: center; }
+  .cl-client-offer .cl-items-total { display: none; }
+  .cl-client-offer .cl-split-side .cl-pay-row { display: block; }
+  .cl-client-offer .cl-split-side .cl-pay-amount { display: none; }
+}
+@media (max-width: 1023px) {
+  .cl-client-offer .cl-pay-total:not(.is-always) { display: none; }
+  .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: auto; }
+}
+@media (max-width: 719px) {
+  .cl-client-offer .cl-pay-methods.is-row { grid-template-columns: minmax(0, 1fr); }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin-bottom: 8px; }
+  .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; }
+}
+
+
+/* Order in two columns: the day tiles get four to a row in the 400 px side column (auto-fill at 92 px would leave three
+   and a ragged last row); "as soon as possible" spans the row. */
+@media (min-width: 1024px) {
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid .is-wide { grid-column: 1 / -1; }
+  /* 400 px is too narrow for a row beside its action or a label beside an IBAN: they stack as they do on a phone */
+  body.cl-public .cl-order-page .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions { justify-content: stretch; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dt { font-size: 12.5px; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dd { margin-bottom: 8px; }
+}

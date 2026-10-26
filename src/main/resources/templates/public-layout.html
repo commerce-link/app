@@ -10,7 +10,7 @@
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
 </head>
-<body class="cl-public" th:style="${publicPage.brand.style()}" th:attr="data-cl-copied=#{public.copied}">
+<body class="cl-public" th:classappend="${publicWidth == 'is-split'} ? 'is-split'" th:style="${publicPage.brand.style()}" th:attr="data-cl-copied=#{public.copied}">
 <th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
 
 <a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>
@@ -33,7 +33,9 @@
     <th:block layout:fragment="content"></th:block>
 </main>
 
-<footer class="cl-public-foot" th:if="${publicPage.storeName != ''}">
+<!--/* Two-column pages carry the seller and contact in a card of their own (fragments/public-seller), so they turn the
+       footer off with publicFooter=false instead of repeating it. */-->
+<footer class="cl-public-foot" th:if="${publicPage.storeName != '' and publicFooter != false}">
     <div class="cl-public-foot-inner">
         <p class="cl-public-foot-store" th:text="${publicPage.storeName}"></p>
         <p th:if="${publicPage.hasSeller()}"
