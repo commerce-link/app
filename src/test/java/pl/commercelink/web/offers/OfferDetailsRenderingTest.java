@@ -650,6 +650,24 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
+    void theScriptRemovesARowFromTheTableWithoutAskingAndCanUndoIt() {
+        // when
+        String single = html(offer(List.of(laptop(0)), summary(false), customer(true, true), true));
+        String many = html(fullOffer());
+
+        // then
+        assertThat(row(many, 1)).contains("data-cl-line-remove").doesNotContain("data-cl-offer-action")
+                .doesNotContain("data-cl-confirm-title").contains("type=\"submit\"");
+        assertThat(row(many, 1)).contains("class=\"cl-menu-reason\" id=\"offer-line-1-remove-reason\" hidden");
+        assertThat(row(single, 0)).contains("data-cl-line-remove").contains("type=\"button\"")
+                .contains("aria-describedby=\"offer-line-0-remove-reason\"");
+        assertThat(many).contains("data-msg-line-removed-draft=\"Usunięto „{0}” — zmiana nie jest zapisana\"")
+                .contains("data-msg-undo=\"Cofnij\"")
+                .contains("data-msg-items-added-draft=\"Dodano {0} — zmiany nie są zapisane\"")
+                .contains("data-msg-items-title=\"Pozycje: {n}\"");
+    }
+
+    @Test
     void removingAnItemNamesItById() {
         // given
         Map<String, Object> model = model(fullOffer());

@@ -632,6 +632,30 @@ body.cl-drawer-open .cl-sidebar {
     --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
 }
 
+/* The action of a toast (showToast's third argument, e.g. "Cofnij"): a text button in the toast's tone at its end. */
+.cl-toast-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-height: 32px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--cl-toast-tone) 40%, transparent);
+    border-radius: var(--cl-radius);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--cl-toast-tone);
+    cursor: pointer;
+}
+
+.cl-toast-action:hover {
+    background: color-mix(in srgb, var(--cl-toast-tone) 10%, transparent);
+}
+
+.cl-toast-action:focus-visible {
+    outline: 2px solid var(--cl-toast-tone);
+    outline-offset: 2px;
+}
+
 @media screen and (max-width: 719px) {
     .cl-toast {
         top: calc(var(--cl-topbar-height) + 8px);

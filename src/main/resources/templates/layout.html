@@ -196,18 +196,57 @@
 <script th:inline="javascript">
     const CL_TOAST_COPIED = /*[[#{general.copied}]]*/ 'Skopiowano';
     let clToastTimer = null;
+    let clToastHideTimer = null;
+    // set while a toast with an action shows: how long it stays once the pointer and the focus have left it
+    let clToastHold = null;
 
-    function showToast(message, type) {
+    function hideToast() {
         const toast = document.getElementById('clToast');
-        toast.textContent = message;
+        clearTimeout(clToastTimer);
+        clToastHold = null;
+        toast.style.opacity = '0';
+        clToastHideTimer = setTimeout(() => { toast.style.display = 'none'; }, 300);
+    }
+
+    // action ({label, run}) adds a button that runs it and hides the toast; such a toast stays 8 s instead of 2 s, and
+    // longer while the pointer or the focus is on it, so the button can still be reached
+    function showToast(message, type, action) {
+        const toast = document.getElementById('clToast');
+        const text = document.createElement('span');
+        text.textContent = message;
+        toast.replaceChildren(text);
+        if (action) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'cl-toast-action';
+            button.textContent = action.label;
+            button.addEventListener('click', () => {
+                hideToast();
+                action.run();
+            });
+            toast.append(button);
+        }
+        if (!toast.hasAttribute('data-cl-toast-hold')) {
+            toast.setAttribute('data-cl-toast-hold', '');
+            ['mouseenter', 'focusin'].forEach(type => toast.addEventListener(type, () => {
+                if (clToastHold) {
+                    clearTimeout(clToastTimer);
+                }
+            }));
+            ['mouseleave', 'focusout'].forEach(type => toast.addEventListener(type, (event) => {
+                if (clToastHold && !toast.contains(event.relatedTarget) && !toast.matches(':hover')) {
+                    clearTimeout(clToastTimer);
+                    clToastTimer = setTimeout(hideToast, clToastHold);
+                }
+            }));
+        }
         toast.className = 'cl-toast' + (type ? ' is-' + type : '');
+        clearTimeout(clToastHideTimer);
         toast.style.display = 'flex';
         requestAnimationFrame(() => { toast.style.opacity = '1'; });
+        clToastHold = action ? 8000 : null;
         clearTimeout(clToastTimer);
-        clToastTimer = setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => { toast.style.display = 'none'; }, 300);
-        }, 2000);
+        clToastTimer = setTimeout(hideToast, action ? 8000 : 2000);
     }
 </script>
 

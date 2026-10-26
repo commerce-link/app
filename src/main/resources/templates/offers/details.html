@@ -91,10 +91,10 @@
     <!--/* Asked by offer-details.js before an action without a confirmation of its own while the table has unsaved
            changes: "Zapisz i {action}" saves the items, then runs the action as it runs on a clean page. Also carries the
            texts the page script needs elsewhere: the note an action's own confirmation gets while the table is dirty,
-           the add-items dialog's button and a failed save. */-->
+           a failed save and a failed draft of added items. */-->
     <dialog class="cl-dialog" id="offer-unsaved-dialog" aria-labelledby="offer-unsaved-title" aria-describedby="offer-unsaved-message"
             th:attr="data-save-label=#{offers.details.unsaved.save}, data-failed=#{offers.details.unsaved.failed},
-                     data-add-label=#{offers.details.add.dirty}, data-add-count=#{offers.details.add.dirty.count},
+                     data-add-failed=#{offers.details.items.addFailed},
                      data-confirm-note=#{offers.details.unsaved.confirmNote}">
         <form method="dialog">
             <h2 class="cl-dialog-title" id="offer-unsaved-title" th:text="#{offers.details.unsaved.title}"></h2>

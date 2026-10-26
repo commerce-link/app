@@ -61,7 +61,11 @@
                         data-msg-line-selected=#{offers.details.line.selected},
                         data-msg-line-moved=#{offers.details.line.moved},
                         data-msg-line-moved-group=#{offers.details.line.moved.inGroup},
-                        data-msg-group-moved=#{offers.details.group.moved}">
+                        data-msg-group-moved=#{offers.details.group.moved},
+                        data-msg-line-removed-draft=#{offers.details.line.removedDraft},
+                        data-msg-undo=#{offers.details.line.undo},
+                        data-msg-items-added-draft=#{offers.details.items.addedDraft},
+                        data-msg-items-title=#{offers.details.items.title('{n}')}">
             <caption class="cl-visually-hidden" th:text="${p.template()} ? #{offers.details.items.caption.template} : #{offers.details.items.caption.offer}"></caption>
             <colgroup><col class="cl-col-drag"><col><col class="cl-col-qty-in"><col class="cl-col-money-in"><col class="cl-col-value"><col class="cl-col-menu"></colgroup>
             <thead>
@@ -233,20 +237,17 @@
                 <li hidden data-cl-line-ungroup-item><button type="button" class="cl-menu-item" data-cl-line-ungroup th:text="#{offers.details.line.menu.ungroup}"></button></li>
                 <li hidden data-cl-line-select-item><button type="button" class="cl-menu-item" data-cl-line-select th:text="#{offers.details.line.menu.select}"></button></li>
                 <li class="cl-menu-sep" aria-hidden="true"></li>
-                <!--/* with the page script it asks first; without it the post removes the item at once, as before. itemId
-                       names the item: when the offer changed and another item sits at that position, nothing is removed */-->
-                <li th:if="${count > 1}"><button type="submit" class="cl-menu-item is-danger" form="offer-action-form"
-                        th:with="removeUrl=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}?itemId=${#uris.escapeQueryParam(it.id() ?: '')}${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|}"
-                        th:attr="formaction=${removeUrl}, data-action-url=${removeUrl},
-                                 data-label=#{offers.details.line.menu.remove.then},
-                                 data-cl-confirm-title=#{offers.details.line.remove.confirm.title(${it.name()})},
-                                 data-cl-confirm-message=#{offers.details.line.remove.confirm.message},
-                                 data-cl-confirm-action=#{offers.details.line.menu.remove}"
-                        data-cl-offer-action data-action-method="post" th:text="#{offers.details.line.menu.remove}"></button></li>
-                <li th:unless="${count > 1}"><button type="button" class="cl-menu-item is-danger" aria-disabled="true"
-                        th:attr="aria-describedby=|offer-line-${i}-remove-reason|">
+                <!--/* With the page script the row leaves the table at once and comes back with "Cofnij" in the toast: the
+                       table is a draft until "Zapisz zmiany", and the script refuses the item that would leave no kept item.
+                       Without it the post removes the item at once, as before; itemId names the item: when the offer
+                       changed and another item sits at that position, nothing is removed. */-->
+                <li><button th:type="${count > 1} ? 'submit' : 'button'" class="cl-menu-item is-danger" data-cl-line-remove
+                        th:with="removeUrl=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}?itemId=${#uris.escapeQueryParam(it.id() ?: '')}${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|},
+                                 reasonId=|offer-line-${i}-remove-reason|"
+                        th:attr="form=${count > 1} ? 'offer-action-form' : null, formaction=${count > 1} ? ${removeUrl} : null,
+                                 aria-disabled=${count > 1} ? null : 'true', aria-describedby=${count > 1} ? null : ${reasonId}">
                     <span th:text="#{offers.details.line.menu.remove}"></span>
-                    <span class="cl-menu-reason" th:id="|offer-line-${i}-remove-reason|" th:text="#{offers.details.line.menu.remove.reason}"></span>
+                    <span class="cl-menu-reason" th:id="${reasonId}" th:hidden="${count > 1}" th:text="#{offers.details.line.menu.remove.reason}"></span>
                 </button></li>
             </ul>
         </details>

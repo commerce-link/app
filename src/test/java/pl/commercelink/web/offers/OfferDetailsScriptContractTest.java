@@ -220,7 +220,7 @@ class OfferDetailsScriptContractTest {
 
         // then
         assertThat(js).contains("if (!confirmDialog.open) {\n                    window.location.reload();\n                    return;");
-        assertThat(js.indexOf("if (!confirmDialog.open) {")).isLessThan(js.indexOf("var savedUrl = actionUrl(element);"));
+        assertThat(js.indexOf("if (!confirmDialog.open) {")).isLessThan(js.indexOf("HTMLFormElement.prototype.submit.call(confirmForm);"));
     }
 
     @Test
@@ -264,5 +264,90 @@ class OfferDetailsScriptContractTest {
                 .contains("data-cl-sum-estimated");
         assertThat(recountRow).contains("costOf(");
         assertThat(recount).contains("costOf(");
+    }
+
+    @Test
+    void addingItemsPostsTheDraftAndSwapsTheTable() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String dialog = read("static/js/item-add-dialog.js");
+        String handler = js.substring(js.indexOf("addEventListener('cl:item-add-submit'"));
+        handler = handler.substring(0, handler.indexOf("\n    });\n"));
+
+        // then
+        assertThat(handler).contains("event.preventDefault();").contains("addToDraft(detail.params)")
+                .contains("detail.done()").contains("detail.abort()")
+                .doesNotContain("proceed(").doesNotContain("form.submit").doesNotContain("saveItems(");
+        assertThat(handler.indexOf("event.preventDefault();")).isLessThan(handler.indexOf("addToDraft("));
+        assertThat(js).contains("+ '/items/draft'").contains("window.CL_offerLines.reinit(document.importNode(fresh, true))")
+                .contains("template[data-cl-draft-meta]").contains("'data-skipped'")
+                .doesNotContain("data-add-label").doesNotContain("data-add-count");
+        assertThat(dialog).contains("params: params").contains("done: () =>").contains("proceed: () => form.submit()");
+    }
+
+    @Test
+    void removingARowDoesNotPost() throws Exception {
+        // when
+        String details = read("static/js/offer-details.js");
+        String lines = read("static/js/offer-lines.js");
+        String items = read("templates/offers/details/items.html");
+
+        // then
+        assertThat(items).contains("data-cl-line-remove").doesNotContain("offers.details.line.remove.confirm")
+                .contains("data-msg-line-removed-draft=#{offers.details.line.removedDraft}")
+                .contains("data-msg-undo=#{offers.details.line.undo}");
+        assertThat(details).doesNotContain("remove-item").doesNotContain("savedIndex").doesNotContain("leavesNoItem");
+        assertThat(lines).contains("hasAttribute('data-cl-line-remove')").contains("function removeRow(")
+                .contains("keptWithout(row) === 0").contains("'line-removed-draft'").contains("'undo'")
+                .doesNotContain("savedIndex");
+        String removeRow = lines.substring(lines.indexOf("function removeRow("));
+        removeRow = removeRow.substring(0, removeRow.indexOf("\n    }\n"));
+        assertThat(removeRow).contains("row.remove()").contains("refresh(true)").contains("changed()")
+                .contains("next.before(row)").doesNotContain("fetch(").doesNotContain("submit");
+    }
+
+    @Test
+    void theTableCanBeSetUpAgainForAFreshBody() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then
+        assertThat(js).contains("reinit: reinit").contains("function reinit(fresh)").contains("function setUp()")
+                .contains("sortable.destroy()").contains("table.addEventListener('click'")
+                .doesNotContain("body.addEventListener(");
+    }
+
+    @Test
+    void aConflictFallsBackToAnOrdinarySubmit() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String guard = read("static/js/dirty-form.js");
+
+        // then
+        assertThat(js).contains("response.status === 409").contains("HTMLFormElement.prototype.submit.call(form)")
+                .contains("[data-cl-offer-conflict]").contains("window.CL_markDirty(form)");
+        assertThat(guard).contains("window.CL_markDirty = function (form)").contains("state.forced");
+    }
+
+    @Test
+    void aDialogSaveCarriesTheNewVersion() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then
+        assertThat(js).contains("template.content.querySelector('[data-cl-offer-version]')")
+                .contains("form.querySelector('input[name=\"version\"]')");
+    }
+
+    @Test
+    void theToastCanCarryAnAction() throws Exception {
+        // when
+        String layout = read("templates/layout.html");
+        String css = read("static/css/commercelink.css");
+
+        // then
+        assertThat(layout).contains("function showToast(message, type, action)").contains("cl-toast-action")
+                .contains("action.run()").contains("8000").contains("button.type = 'button'");
+        assertThat(css).contains(".cl-toast-action {").contains(".cl-toast-action:focus-visible");
     }
 }

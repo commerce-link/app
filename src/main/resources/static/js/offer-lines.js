@@ -14,12 +14,16 @@
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
 //   quantity or price becomes 0, as it does when the field is left.
+// - The table is a draft until it is saved: "Usuń" takes the row off the table at once, without asking, and the toast's
+//   "Cofnij" puts it back where it was. The item that would leave no item the save keeps cannot be removed; its menu
+//   says why, counted from the rows on screen.
 // window.CL_offerLines gives offer-details.js the same preparation for a save it sends itself, the recount after a
-// new delivery price and the position an item will have once the server has saved the table.
+// new delivery price and reinit(fresh): the rows of a draft the server built (items added) set up as on load.
 (function () {
     'use strict';
 
     var form = document.getElementById('offer-items');
+    // replaced by reinit(fresh): every listener sits on the table, which stays
     var body = form && form.querySelector('tbody[data-cl-lines]');
     if (!body) {
         return;
@@ -28,6 +32,9 @@
     var summary = document.getElementById('summary');
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     var addedGroups = 0;
+    var draftRows = 0;
+    var sortable = null;
+    var fallbackObserver = null;
 
     function fill(text, values) {
         return (text || '').replace(/\{(\w+)\}/g, function (whole, key) {
@@ -238,6 +245,7 @@
     }
 
     function recount() {
+        updateRemoves();
         if (!summary) {
             return;
         }
@@ -434,6 +442,11 @@
         });
         validateGroups();
         updateMoves();
+        updateRemoves();
+        var title = form.querySelector('#items-title');
+        if (title) {
+            title.textContent = message('items-title', { n: rows().filter(isItem).length });
+        }
         if (withTotals) {
             recount();
         }
@@ -587,9 +600,89 @@
         }
     }
 
+    // --- removing a row (a draft change, undone from the toast)
+
+    // the items a save keeps besides this row
+    function keptWithout(row) {
+        return rows().filter(function (each) {
+            return isItem(each) && each !== row && !dropped(each);
+        }).length;
+    }
+
+    // the item that would leave the offer without an item the save keeps cannot be removed: its menu says why
+    function updateRemoves() {
+        rows().filter(isItem).forEach(function (row) {
+            var button = row.querySelector('[data-cl-line-remove]');
+            var reason = button && button.querySelector('.cl-menu-reason');
+            if (!reason) {
+                return;
+            }
+            var refused = keptWithout(row) === 0;
+            setDisabled(button, refused);
+            reason.hidden = !refused;
+            if (refused) {
+                button.setAttribute('aria-describedby', reason.id);
+            } else {
+                button.removeAttribute('aria-describedby');
+            }
+        });
+    }
+
+    function nearestItem(row) {
+        var after = row.nextElementSibling;
+        while (after && !isItem(after)) {
+            after = after.nextElementSibling;
+        }
+        if (after) {
+            return after;
+        }
+        var before = row.previousElementSibling;
+        while (before && !isItem(before)) {
+            before = before.previousElementSibling;
+        }
+        return before;
+    }
+
+    // The row is kept with its neighbours, so "Cofnij" puts it back where it was; after the table was rebuilt from a
+    // draft (reinit) there is nothing to put it back into, and the toast with the button is gone by then.
+    function removeRow(row) {
+        var name = field(row, 'name').value;
+        var next = row.nextElementSibling;
+        var previous = row.previousElementSibling;
+        var parent = body;
+        var focus = nearestItem(row);
+        row.querySelector('details.cl-menu').open = false;
+        row.remove();
+        refresh(true);
+        changed();
+        (focus ? menuSummary(focus) : form.querySelector('[data-cl-dialog-open="item-add-dialog"]') || table).focus();
+        showToast(message('line-removed-draft', [name]), 'info', {
+            label: message('undo'),
+            run: function () {
+                if (body !== parent || row.isConnected) {
+                    return;
+                }
+                if (next && next.parentNode === body) {
+                    next.before(row);
+                } else if (previous && previous.parentNode === body) {
+                    previous.after(row);
+                } else {
+                    body.append(row);
+                }
+                refresh(true);
+                changed();
+                menuSummary(row).focus();
+            }
+        });
+    }
+
     function initSortable() {
         if (typeof window.Sortable !== 'function') {
             return;
+        }
+        if (sortable) {
+            sortable.destroy();
+            fallbackObserver.disconnect();
         }
         // an item dropped next to a group's rows lands in the group: only an item may, a group never goes into another
         function insideGroup(related, willInsertAfter) {
@@ -613,7 +706,7 @@
                 cell.style.width = hold ? cell.getBoundingClientRect().width + 'px' : '';
             });
         }
-        new MutationObserver(function (records) {
+        fallbackObserver = new MutationObserver(function (records) {
             records.forEach(function (record) {
                 Array.prototype.forEach.call(record.addedNodes, function (node) {
                     if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
@@ -621,8 +714,9 @@
                     }
                 });
             });
-        }).observe(body, { childList: true });
-        new Sortable(body, {
+        });
+        fallbackObserver.observe(body, { childList: true });
+        sortable = new Sortable(body, {
             handle: '[data-cl-drag]',
             draggable: 'tr',
             filter: '[data-cl-group-foot]',
@@ -841,7 +935,7 @@
 
     // --- wiring
 
-    body.addEventListener('input', function (event) {
+    table.addEventListener('input', function (event) {
         var row = event.target.closest('tr[data-cl-line]');
         if (row && (event.target === qtyInput(row) || event.target === priceInput(row))) {
             recountRow(row);
@@ -859,7 +953,7 @@
     });
 
     // an emptied quantity or price is 0, as before
-    body.addEventListener('focusout', function (event) {
+    table.addEventListener('focusout', function (event) {
         var row = event.target.closest('tr[data-cl-line]');
         if (row && (event.target === qtyInput(row) || event.target === priceInput(row)) && event.target.value === '') {
             event.target.value = '0';
@@ -867,14 +961,17 @@
         }
     });
 
-    body.addEventListener('click', function (event) {
+    table.addEventListener('click', function (event) {
         var target = event.target.closest && event.target.closest('button');
         if (!target || target.getAttribute('aria-disabled') === 'true') {
             return;
         }
         var row = target.closest('tr[data-cl-line]');
         var head = target.closest('tr[data-cl-line-group]');
-        if (row && target.hasAttribute('data-cl-line-move')) {
+        if (row && target.hasAttribute('data-cl-line-remove')) {
+            event.preventDefault();
+            removeRow(row);
+        } else if (row && target.hasAttribute('data-cl-line-move')) {
             if (moveItem(row, target.getAttribute('data-cl-line-move'))) {
                 afterMove(menuSummary(row), row);
             }
@@ -892,7 +989,7 @@
     });
 
     // the handle moves its row (or group) with the arrow keys too, and keeps the focus
-    body.addEventListener('keydown', function (event) {
+    table.addEventListener('keydown', function (event) {
         var handle = event.target.closest && event.target.closest('[data-cl-drag]');
         if (!handle || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {
             return;
@@ -917,19 +1014,84 @@
         }
     });
 
-    form.querySelectorAll('[data-cl-lines-reveal][hidden]').forEach(function (control) {
-        control.hidden = false;
-    });
-    rows().filter(isHead).forEach(function (head) {
-        var name = head.getAttribute('data-group');
-        var last = head;
-        while (last.nextElementSibling && isItem(last.nextElementSibling)
-            && last.nextElementSibling.getAttribute('data-group') === name) {
-            last = last.nextElementSibling;
+    // what the server's rows need from the script, on load and for the rows of a draft: the controls that wait for it,
+    // the removal kept on the page and the ends of the groups
+    function setUp() {
+        form.querySelectorAll('[data-cl-lines-reveal][hidden]').forEach(function (control) {
+            control.hidden = false;
+        });
+        body.querySelectorAll('[data-cl-line-remove]').forEach(function (button) {
+            button.type = 'button';
+            button.removeAttribute('form');
+            button.removeAttribute('formaction');
+        });
+        rows().filter(isHead).forEach(function (head) {
+            var name = head.getAttribute('data-group');
+            var last = head;
+            while (last.nextElementSibling && isItem(last.nextElementSibling)
+                && last.nextElementSibling.getAttribute('data-group') === name) {
+                last = last.nextElementSibling;
+            }
+            last.after(createFoot());
+        });
+        rows().filter(isHead).forEach(labelGroup);
+    }
+
+    // values only, as dirty-form compares them, with numbers read as numbers: the server writes "6899.00" back for "6899"
+    function rowKey(row) {
+        return Array.prototype.map.call(row.querySelectorAll('input[name]'), function (input) {
+            var value = input.value.trim();
+            return value !== '' && isFinite(Number(value)) ? String(Number(value)) : value;
+        }).join('\u0001');
+    }
+
+    // The draft's rows are the posted ones, in their order, with the added items among them (the save drops the
+    // incomplete ones). A posted row stays the row on screen, so the unsaved-changes count and the focus see only what
+    // changed; the new rows get ids of their own, as their positions may repeat those of the rows kept.
+    function adopt(fresh) {
+        var posted = rows().filter(function (row) {
+            return isItem(row) && !dropped(row);
+        });
+        var next = 0;
+        Array.prototype.slice.call(fresh.children).filter(isItem).forEach(function (row) {
+            var key = rowKey(row);
+            for (var k = next; k < posted.length; k++) {
+                if (rowKey(posted[k]) === key) {
+                    row.replaceWith(posted[k]);
+                    next = k + 1;
+                    return;
+                }
+            }
+            var prefix = 'offer-line-draft' + (++draftRows) + '-';
+            [row].concat(Array.prototype.slice.call(row.querySelectorAll('[id], [for], [aria-describedby]')))
+                .forEach(function (element) {
+                    ['id', 'for', 'aria-describedby'].forEach(function (attribute) {
+                        if (element.hasAttribute(attribute)) {
+                            element.setAttribute(attribute, element.getAttribute(attribute).replace(/offer-line-\d+-/g, prefix));
+                        }
+                    });
+                });
+        });
+        body.replaceWith(fresh);
+        body = fresh;
+    }
+
+    // fresh: a tbody[data-cl-lines] the server built for a draft, put in place of the table's; the form stays dirty
+    function reinit(fresh) {
+        if (fresh) {
+            adopt(fresh);
         }
-        last.after(createFoot());
-    });
-    rows().filter(isHead).forEach(labelGroup);
+        body.querySelectorAll('[data-cl-group-foot]').forEach(function (foot) {
+            foot.remove();
+        });
+        setUp();
+        refresh(false);
+        recount();
+        initSortable();
+        changed();
+    }
+
+    setUp();
     // the server rendered the totals from the stored amounts: they are recounted once something changes
     var shownAsStored = true;
     refresh(false);
@@ -939,27 +1101,7 @@
     window.CL_offerLines = {
         prepare: prepare,
         recount: recount,
-        // the items a save keeps besides this row
-        keptWithout: function (row) {
-            return rows().filter(function (each) {
-                return isItem(each) && each !== row && !dropped(each);
-            }).length;
-        },
-        lastItemMessage: function () {
-            return message('last-item');
-        },
-        // the index the item will have in the saved offer (the save drops incomplete items), or -1 when it is dropped
-        savedIndex: function (row) {
-            if (dropped(row)) {
-                return -1;
-            }
-            var index = 0;
-            for (var before = body.firstElementChild; before && before !== row; before = before.nextElementSibling) {
-                if (isItem(before) && !dropped(before)) {
-                    index++;
-                }
-            }
-            return index;
-        }
+        reinit: reinit,
+        message: message
     };
 })();

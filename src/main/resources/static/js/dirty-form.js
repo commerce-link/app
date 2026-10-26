@@ -8,9 +8,10 @@
 // - [data-cl-discard] (a link reloading the page) shows while dirty and asks data-discard-confirm of the form first.
 // A dirty form makes the browser ask before the page is left; a submit nobody prevented lets the page go. A page
 // script that saves the form itself calls window.CL_markClean(form). window.CL_isDirty(form) answers the state, and
-// the form receives cl:dirty-changed (detail: dirty, count) whenever it changes. A script that changes the form without
-// an input or change event (reordering rows) dispatches cl:lines-changed on it. A field marked data-cl-dirty-ignore is
-// not compared: a copy of a value saved elsewhere, which a page script keeps up to date.
+// the form receives cl:dirty-changed (detail: dirty, count) whenever it changes. window.CL_markDirty(form) keeps it dirty
+// until it is marked clean: a page that shows values the server refused to save as the form's own. A script that
+// changes the form without an input or change event (reordering rows) dispatches cl:lines-changed on it. A field marked
+// data-cl-dirty-ignore is not compared: a copy of a value saved elsewhere, which a page script keeps up to date.
 (function () {
     'use strict';
 
@@ -45,7 +46,7 @@
         rowsOf(form).forEach(function (row, index) {
             rows.set(row, { index: index, values: rowValues(row) });
         });
-        return { rows: rows, others: otherValues(form), dirty: false, count: 0, leaving: false };
+        return { rows: rows, others: otherValues(form), dirty: false, count: 0, leaving: false, forced: false };
     }
 
     // The rows of the longest increasing run of original positions kept their order; every other row was moved.
@@ -119,7 +120,7 @@
             return;
         }
         var count = changedRows(form, state);
-        var dirty = count > 0 || otherValues(form) !== state.others;
+        var dirty = state.forced || count > 0 || otherValues(form) !== state.others;
         var changed = dirty !== state.dirty || count !== state.count;
         state.dirty = dirty;
         state.count = count;
@@ -153,6 +154,14 @@
     window.CL_isDirty = function (form) {
         var state = form && states.get(form);
         return !!state && state.dirty;
+    };
+
+    window.CL_markDirty = function (form) {
+        var state = form && states.get(form);
+        if (state) {
+            state.forced = true;
+            update(form);
+        }
     };
 
     window.CL_markClean = function (form) {
