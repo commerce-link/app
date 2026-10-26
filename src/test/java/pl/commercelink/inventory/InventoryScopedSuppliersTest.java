@@ -1,16 +1,15 @@
 package pl.commercelink.inventory;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Answers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -53,12 +52,14 @@ class InventoryScopedSuppliersTest {
     @Mock
     private GlobalMatchedInventory globalInventory;
 
-    // the views read the store's clones from the PIM index copy; a deep stub answers with none
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-    private PimCatalog pimCatalog;
-
-    @InjectMocks
     private Inventory inventory;
+
+    // the views read the store's clones from the PIM index copy: an empty one, with no entries and no clones
+    @BeforeEach
+    void createInventory() {
+        inventory = new Inventory(warehouse, storesRepository, autoDiscovery, taxonomyCache, supplierRegistry,
+                storeInventoryProvider, globalInventory, ScopedPimCatalog.of());
+    }
 
     private Store storeWith(StoreSupplierConnection... connections) {
         FulfilmentConfiguration config = new FulfilmentConfiguration();
