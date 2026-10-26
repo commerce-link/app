@@ -20,10 +20,11 @@ final class MarketplaceExportRunCsv {
 
     private static final String[] HEADERS =
             {"pimId", "price", "quantity", "removalAttempts", "outcome", "reasonCode", "message",
-                    "ean", "manufacturerCode"};
+                    "ean", "manufacturerCode", "waitingRuns"};
     private static final String FAILED_SUFFIX = "-failed";
     private static final int MAX_MESSAGE_CHARACTERS = 1000;
     private static final String TRUNCATION_MARKER = "\u2026";
+    private static final int COLUMNS_WITH_WAITING_RUNS = 10;
     private static final int COLUMNS_WITH_IDENTIFIERS = 9;
     private static final int FULL_COLUMNS = 7;
     private static final int COLUMNS_WITH_REMOVAL_ATTEMPTS = 4;
@@ -90,7 +91,9 @@ final class MarketplaceExportRunCsv {
                 row.length >= FULL_COLUMNS ? row[5] : "",
                 row.length >= FULL_COLUMNS ? row[6] : "",
                 row.length >= COLUMNS_WITH_IDENTIFIERS ? StringUtils.trimToNull(row[7]) : null,
-                row.length >= COLUMNS_WITH_IDENTIFIERS ? StringUtils.trimToNull(row[8]) : null);
+                row.length >= COLUMNS_WITH_IDENTIFIERS ? StringUtils.trimToNull(row[8]) : null,
+                row.length >= COLUMNS_WITH_WAITING_RUNS && StringUtils.isNotBlank(row[9])
+                        ? Integer.parseInt(row[9].trim()) : 0);
     }
 
     private record CsvRow(MarketplaceOfferSnapshot snapshot) implements CSVReady {
@@ -106,7 +109,8 @@ final class MarketplaceExportRunCsv {
                     snapshot.reasonCode(),
                     normalizeMessage(snapshot.message()),
                     snapshot.ean(),
-                    snapshot.manufacturerCode()
+                    snapshot.manufacturerCode(),
+                    String.valueOf(snapshot.waitingRuns())
             };
         }
     }

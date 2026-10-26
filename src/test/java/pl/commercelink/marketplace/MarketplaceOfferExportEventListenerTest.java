@@ -1,5 +1,9 @@
 package pl.commercelink.marketplace;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
@@ -31,8 +36,10 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -93,6 +100,7 @@ class MarketplaceOfferExportEventListenerTest {
     @BeforeEach
     void setUpDefaults() {
         ReflectionTestUtils.setField(listener, "removalRetryCount", 3);
+        ReflectionTestUtils.setField(listener, "unknownEntryMaxWaitingRuns", 3);
 
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
@@ -241,7 +249,7 @@ class MarketplaceOfferExportEventListenerTest {
 
         // then neither C is published nor S taken off; S waits unchanged for a run with a fresher copy
         verify(provider, never()).exportOffers(any(), any(), any());
-        assertThat(captureSavedRows()).containsExactly(published);
+        assertThat(captureSavedRows()).containsExactly(published.withWaitingRuns(1));
     }
 
     @Test
@@ -260,8 +268,94 @@ class MarketplaceOfferExportEventListenerTest {
         // then
         assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-Z");
         assertThat(capturePublishedOffers()).isEmpty();
-        assertThat(captureSavedRows()).contains(pending)
+        assertThat(captureSavedRows()).contains(pending.withWaitingRuns(1))
                 .extracting(MarketplaceOfferSnapshot::pimId).containsExactlyInAnyOrder("source-S", "pim-Z");
+    }
+
+    @Test
+    void aProductUnknownForSeveralRunsStopsShieldingAndIsReported() {
+        // given a product pinned to an entry no index copy will ever know (a lost delete event, a dead pimId)
+        Product product = product("dead-D", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "dead-D")).thenReturn(false);
+        List<List<String>> removedPerRun = chainRuns(
+                MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "5900000000011", "MFN-S"));
+
+        try (LogCapture logs = LogCapture.start()) {
+            // when
+            for (int run = 1; run <= 5; run++) {
+                listener.handleMessage(request());
+            }
+
+            // then three runs keep the offer, the fourth takes it off and reports it once, the fifth retries the removal
+            assertThat(removedPerRun).containsExactly(List.of(), List.of(), List.of(), List.of("source-S"), List.of("source-S"));
+            assertThat(logs.errors()).singleElement().satisfies(error -> assertThat(error)
+                    .contains(STORE_ID).contains(product.getProductId()).contains("dead-D").contains("source-S")
+                    .contains("5900000000011"));
+        }
+    }
+
+    @Test
+    void aProductKnownAgainIsPublishedUnderItsOfferIdAndTheWaitingCounterIsGone() {
+        // given the offer waited two runs; the copy now knows the clone
+        Product product = product("clone-C", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "5900000000011", "MFN-S")
+                .withWaitingRuns(2));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).isEmpty();
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+        assertThat(captureSavedRows()).singleElement().satisfies(row -> {
+            assertThat(row.pimId()).isEqualTo("source-S");
+            assertThat(row.outcome()).isEqualTo(MarketplaceOfferSnapshot.OUTCOME_PUBLISHED);
+            assertThat(row.waitingRuns()).isZero();
+        });
+    }
+
+    @Test
+    void aSkippedProductWithoutEanShieldsAPreviousOfferWithoutEanByManufacturerCode() {
+        // given
+        Product product = product("clone-C", null);
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        MarketplaceOfferSnapshot withoutEan = MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, " mfn-clone-c ");
+        previousSnapshotContains(withoutEan,
+                // a snapshot with an EAN is matched by its EAN only, even when the manufacturer code is the same
+                MarketplaceOfferSnapshot.published("pim-Y", 100L, 10L, "5900000000099", "MFN-clone-C"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-Y");
+        assertThat(captureSavedRows()).contains(withoutEan.withWaitingRuns(1));
+    }
+
+    @Test
+    void aRemovedProductSharingAnEanWithASkippedProductIsKeptUntilTheShieldExpires() {
+        // given pim-GONE really left the catalog, but a skipped product carries its EAN: the accepted cost of the shield
+        Product product = product("clone-C", "5900000000011");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        when(aliases.knows(STORE_ID, "clone-C")).thenReturn(false);
+        List<List<String>> removedPerRun = chainRuns(
+                MarketplaceOfferSnapshot.published("pim-GONE", 80L, 2L, "5900000000011", "MFN-GONE"));
+
+        // when
+        for (int run = 1; run <= 4; run++) {
+            listener.handleMessage(request());
+        }
+
+        // then
+        assertThat(removedPerRun).containsExactly(List.of(), List.of(), List.of(), List.of("pim-GONE"));
     }
 
     @Test
@@ -814,6 +908,53 @@ class MarketplaceOfferExportEventListenerTest {
     private void previousSnapshotContains(MarketplaceOfferSnapshot... snapshots) {
         when(marketplaceExportRunService.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE))
                 .thenReturn(List.of(snapshots));
+    }
+
+    /**
+     * Feeds every saved run back as the previous export of the next one, starting with {@code initial}; returns the
+     * offer ids taken off in each run (an empty list for a run that did not call the marketplace).
+     */
+    private List<List<String>> chainRuns(MarketplaceOfferSnapshot... initial) {
+        AtomicReference<List<MarketplaceOfferSnapshot>> previous = new AtomicReference<>(List.of(initial));
+        List<List<String>> removedPerRun = new ArrayList<>();
+        when(marketplaceExportRunService.loadPreviousExport(STORE_ID, CATALOG_ID, MARKETPLACE))
+                .thenAnswer(invocation -> {
+                    removedPerRun.add(new ArrayList<>());
+                    return previous.get();
+                });
+        doAnswer(invocation -> {
+            List<MarketplaceOffer> removals = invocation.getArgument(1);
+            removedPerRun.get(removedPerRun.size() - 1).addAll(removals.stream().map(MarketplaceOffer::productId).toList());
+            return null;
+        }).when(provider).exportOffers(any(), any(), any());
+        doAnswer(invocation -> {
+            previous.set(invocation.getArgument(0, MarketplaceExportRun.class).toRows());
+            return null;
+        }).when(marketplaceExportRunService).saveRun(any());
+        return removedPerRun;
+    }
+
+    private static final class LogCapture implements AutoCloseable {
+
+        private final Logger logger = (Logger) LoggerFactory.getLogger(MarketplaceOfferExportEventListener.class);
+        private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+        static LogCapture start() {
+            LogCapture capture = new LogCapture();
+            capture.appender.start();
+            capture.logger.addAppender(capture.appender);
+            return capture;
+        }
+
+        List<String> errors() {
+            return appender.list.stream().filter(event -> event.getLevel() == Level.ERROR)
+                    .map(ILoggingEvent::getFormattedMessage).toList();
+        }
+
+        @Override
+        public void close() {
+            logger.detachAppender(appender);
+        }
     }
 
     private void noCategoriesConfigured() {
