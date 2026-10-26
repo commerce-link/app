@@ -366,6 +366,26 @@ class MarketplaceExportHistoryControllerTest {
     }
 
     @Test
+    void exportHistoryFallsBackToTheOtherAliasesWhenTheOfferIdFindsNothing() {
+        // given nothing under the offer id, one hit under the typed id itself
+        givenRuns(STORE_ID, headers(3));
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+        when(aliases.aliasesOf(STORE_ID, "clone-C")).thenReturn(java.util.Set.of("clone-C", "source-S"));
+        when(marketplaceExportRunService.searchOffer(STORE_ID, MARKETPLACE, "source-S", 500, 10))
+                .thenReturn(new MarketplaceExportOfferSearch(List.of(), 3, 0, null));
+        when(marketplaceExportRunService.searchOffer(STORE_ID, MARKETPLACE, "clone-C", 500, 10))
+                .thenReturn(searchWithOneHit());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.exportHistory(MARKETPLACE, "clone-C", model, Locale.forLanguageTag("pl"));
+
+        // then
+        MarketplaceExportSearchView search = (MarketplaceExportSearchView) model.getAttribute("search");
+        assertThat(search.hits()).hasSize(1);
+    }
+
+    @Test
     void historyPageDoesNotSearchWithoutAPimId() {
         // given
         givenRuns(STORE_ID, headers(3));

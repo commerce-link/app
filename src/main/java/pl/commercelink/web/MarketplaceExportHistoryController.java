@@ -8,7 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
-import pl.commercelink.products.information.StorePimAliases;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
@@ -21,6 +20,7 @@ import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.settings.MarketplaceExportRunView;
 import pl.commercelink.web.settings.MarketplaceExportSearchView;
@@ -115,14 +115,33 @@ public class MarketplaceExportHistoryController {
         return renderRunFile(storeId, marketplace, catalogId, runId);
     }
 
+    // Offers are exported under the offer id (the source's); an id the typed one only relates to is tried next.
+    private MarketplaceExportOfferSearch searchOffer(String storeId, String marketplace, String typedPimId) {
+        String offerId = aliases.offerIdOf(storeId, typedPimId);
+        MarketplaceExportOfferSearch search = marketplaceExportRunService.searchOffer(
+                storeId, marketplace, offerId, SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
+        if (!search.hits().isEmpty()) {
+            return search;
+        }
+        for (String alias : aliases.aliasesOf(storeId, typedPimId)) {
+            if (!alias.equals(offerId)) {
+                MarketplaceExportOfferSearch viaAlias = marketplaceExportRunService.searchOffer(
+                        storeId, marketplace, alias, SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
+                if (!viaAlias.hits().isEmpty()) {
+                    return viaAlias;
+                }
+            }
+        }
+        return search;
+    }
+
     private String renderHistory(String storeId, String marketplace, String pimId, Model model, Locale locale) {
         List<MarketplaceExportRunHeader> runs =
                 marketplaceExportRunService.findRuns(storeId, marketplace, LISTED_RUNS_LIMIT);
 
         String searchedPimId = StringUtils.trimToNull(pimId);
         if (searchedPimId != null && !runs.isEmpty()) {
-            MarketplaceExportOfferSearch search = marketplaceExportRunService.searchOffer(
-                    storeId, marketplace, aliases.offerIdOf(storeId, searchedPimId), SEARCHED_RUNS_LIMIT, SEARCH_HITS_LIMIT);
+            MarketplaceExportOfferSearch search = searchOffer(storeId, marketplace, searchedPimId);
             model.addAttribute("search", MarketplaceExportSearchView.of(searchedPimId, search, SEARCH_HITS_LIMIT));
         }
 

@@ -171,16 +171,10 @@ class MarketplaceOfferExportEventListenerTest {
 
     @Test
     void afterDeletingTheCloneTheOfferIdIsUnchanged() {
-        // given the product is back on S, the pricelist was built while the clone existed and still carries C rows
+        // given the product is back on S, the pricelist was built while the clone existed and still carries a C row
         Product product = product("source-S", "EAN-A");
         configureCategoryWith(warehouseDefinition(5), product, 10);
-        AvailabilityAndPrice rowOfTheClone = new AvailabilityAndPrice(
-                "clone-C", product.getEan(), product.getManufacturerCode(), "Brand", "Label", "Name",
-                "Laptops", 100, 0L, 2, 0L, false);
-        when(pricelist.findByPimId("source-S")).thenReturn(Optional.empty());
-        when(aliases.find(STORE_ID, pricelist, "source-S")).thenReturn(Optional.empty());
-        when(pricelist.findByCodes(product.getEan(), product.getManufacturerCode()))
-                .thenReturn(Optional.of(rowOfTheClone));
+        usePricelist(new Pricelist(PRICELIST_ID, List.of(row("clone-C", product, 100))));
         previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-source-S"));
 
         // when
@@ -192,6 +186,102 @@ class MarketplaceOfferExportEventListenerTest {
             assertThat(offer.productId()).isEqualTo("source-S");
             assertThat(offer.price()).isEqualTo(100L);
         });
+    }
+
+    @Test
+    void doesNotUnpublishAPreviousOfferWhoseEanIsInACurrentOffer() {
+        // given an instance with a fresher index copy exports the product under the clone's id C
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-source-S"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then the old offer is not taken off (the marketplace matches by EAN, it would take the new one down)
+        assertThat(captureRemovedOffers()).isEmpty();
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("clone-C");
+        assertThat(captureSavedRows()).extracting(MarketplaceOfferSnapshot::pimId).containsExactly("clone-C");
+    }
+
+    @Test
+    void stillUnpublishesAPreviousOfferWhoseEanIsInNoCurrentOffer() {
+        // given
+        Product product = product("pim-B", "EAN-B");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, "EAN-A", "MFN-source-S"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).extracting(MarketplaceOffer::productId).containsExactly("source-S");
+    }
+
+    @Test
+    void matchesAPreviousOfferWithoutEanByManufacturerCode() {
+        // given
+        Product product = product("clone-C", "EAN-A");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        previousSnapshotContains(MarketplaceOfferSnapshot.published("source-S", 100L, 10L, null, "mfn-clone-c"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(captureRemovedOffers()).isEmpty();
+    }
+
+    @Test
+    void exportsOneOfferPerOfferIdTheFirstProductWins() {
+        // given a product still on S in category A and the store's clone of S in category B
+        Product onSource = product("source-S", "EAN-A");
+        Product onClone = product("clone-C", "EAN-A");
+        CategoryDefinition categoryA = category("A", null, List.of(warehouseDefinition(5)));
+        categoryA.setCategoryId("cat-A");
+        CategoryDefinition categoryB = category("B", null, List.of(warehouseDefinition(5)));
+        categoryB.setCategoryId("cat-B");
+        when(catalog.getCategories()).thenReturn(List.of(categoryA, categoryB));
+        when(productRepository.findAllProductsWithPimId("cat-A", true)).thenReturn(List.of(onSource));
+        when(productRepository.findAllProductsWithPimId("cat-B", true)).thenReturn(List.of(onClone));
+        MatchedInventory matched = mockMatchedInventoryWithWarehouseQuantity(10);
+        when(inventoryView.findByProduct(onSource)).thenReturn(matched);
+        when(inventoryView.findByProduct(onClone)).thenReturn(matched);
+        priceFor(onSource, 100, 2);
+        priceFor(onClone, 110, 2);
+        when(aliases.offerIdOf(STORE_ID, "clone-C")).thenReturn("source-S");
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).singleElement().satisfies(offer -> {
+            assertThat(offer.productId()).isEqualTo("source-S");
+            assertThat(offer.price()).isEqualTo(100L);
+        });
+    }
+
+    @Test
+    void aProductAbsentFromThePricelistDoesNotTakeAnotherProductsRowByCodes() {
+        // given pim-B has no row; its EAN and MFN are on the row of pim-A, a product of this export with its own row
+        Product absent = product("pim-B", "EAN-A");
+        Product other = product("pim-A", "EAN-A");
+        ReflectionTestUtils.setField(absent, "manufacturerCode", other.getManufacturerCode());
+        when(catalog.getCategories()).thenReturn(List.of(category("A", null, List.of(warehouseDefinition(5)))));
+        when(productRepository.findAllProductsWithPimId(CATEGORY_ID, true)).thenReturn(List.of(absent, other));
+        MatchedInventory matched = mockMatchedInventoryWithWarehouseQuantity(10);
+        when(inventoryView.findByProduct(absent)).thenReturn(matched);
+        when(inventoryView.findByProduct(other)).thenReturn(matched);
+        usePricelist(new Pricelist(PRICELIST_ID, List.of(row("pim-A", other, 100))));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-A");
     }
 
     @Test
@@ -626,6 +716,15 @@ class MarketplaceOfferExportEventListenerTest {
         when(matchedInventory.atPricePoint(anyLong())).thenReturn(matchedInventory);
         when(matchedInventory.getTotalAvailableQtyFromSupplier(SupplierRegistry.WAREHOUSE)).thenReturn((long) warehouseQuantity);
         return matchedInventory;
+    }
+
+    private void usePricelist(Pricelist real) {
+        when(pricelistRepository.find(STORE_ID, CATALOG_ID, PRICELIST_ID)).thenReturn(real);
+    }
+
+    private AvailabilityAndPrice row(String pimId, Product product, long price) {
+        return new AvailabilityAndPrice(pimId, product.getEan(), product.getManufacturerCode(), "Brand", "Label",
+                "Name", "Laptops", price, 0L, 2, 0L, false);
     }
 
     private void priceFor(Product product, long price, int deliveryDays) {

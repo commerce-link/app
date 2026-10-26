@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class Pricelist {
@@ -32,28 +33,25 @@ public class Pricelist {
 
     /**
      * The row of the product with the given EAN and manufacturer code, for a pricelist whose rows carry another pimId
-     * than the product now has (built before a clone was deleted, so its rows still carry the clone's id). Codes are
-     * compared in their unified form. Every code present on both sides has to match and at least one has to be present
-     * on both, so a product is never matched on a missing code and a shared EAN alone does not join two products that
-     * differ in manufacturer code.
+     * than the product now has (built before a clone was deleted, so its rows still carry the clone's id).
+     *
+     * <p>The strictest rule the data supports: BOTH codes must be present on the product and on the row and equal in
+     * their unified form. An EAN alone is shared by different products (bundles, regional variants) and an MFN alone
+     * by different brands, and a product deliberately absent from the pricelist must not take another row's price.
+     * Rows whose pimId is in {@code excludedPimIds} (other products of the same export, which have their own row) are
+     * never taken. The first matching row in pricelist order wins.
      */
-    public Optional<AvailabilityAndPrice> findByCodes(String ean, String mfn) {
+    public Optional<AvailabilityAndPrice> findByCodes(String ean, String mfn, Set<String> excludedPimIds) {
         String wantedEan = UnifiedProductIdentifiers.unifyEan(ean);
         String wantedMfn = UnifiedProductIdentifiers.unifyMfn(mfn);
-        return availabilityAndPrices.stream()
-                .filter(row -> codesMatch(wantedEan, wantedMfn, row))
-                .findFirst();
-    }
-
-    private static boolean codesMatch(String wantedEan, String wantedMfn, AvailabilityAndPrice row) {
-        String rowEan = UnifiedProductIdentifiers.unifyEan(row.getEan());
-        String rowMfn = UnifiedProductIdentifiers.unifyMfn(row.getManufacturerCode());
-        boolean compareEan = !isBlank(wantedEan) && !isBlank(rowEan);
-        boolean compareMfn = !isBlank(wantedMfn) && !isBlank(rowMfn);
-        if (!compareEan && !compareMfn) {
-            return false;
+        if (isBlank(wantedEan) || isBlank(wantedMfn)) {
+            return Optional.empty();
         }
-        return (!compareEan || wantedEan.equals(rowEan)) && (!compareMfn || wantedMfn.equals(rowMfn));
+        return availabilityAndPrices.stream()
+                .filter(row -> excludedPimIds == null || !excludedPimIds.contains(row.getPimId()))
+                .filter(row -> wantedEan.equals(UnifiedProductIdentifiers.unifyEan(row.getEan()))
+                        && wantedMfn.equals(UnifiedProductIdentifiers.unifyMfn(row.getManufacturerCode())))
+                .findFirst();
     }
 
     private static boolean isBlank(String value) {
