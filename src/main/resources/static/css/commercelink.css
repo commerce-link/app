@@ -10765,7 +10765,9 @@ a.cl-link-button:hover {
 /* the margin of an order item (ItemMargin tones); its tooltip is end-anchored (.is-end): the price column stands right
    of the middle and a centred box hid the state pill */
 .cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
-.cl-page .cl-margin.is-unknown { opacity: .55; }
+/* only the icon is dimmed: the tooltip is drawn by the mark itself (::before/::after) and would inherit its opacity,
+   letting the rows below show through */
+.cl-page .cl-margin.is-unknown > * { opacity: .55; }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); }
 
 /* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
