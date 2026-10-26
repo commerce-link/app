@@ -12,6 +12,7 @@ import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.ContactDetails;
+import pl.commercelink.baskets.OfferItem;
 import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -22,6 +23,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.offers.OfferDetailsPage.GroupHead;
 import pl.commercelink.web.offers.OfferDetailsPage.Item;
+import pl.commercelink.web.orders.ItemMargin;
 import pl.commercelink.web.orders.Money;
 
 import java.time.LocalDateTime;
@@ -31,6 +33,7 @@ import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,6 +120,124 @@ class OfferDetailsPageFactoryTest {
         assertThat(summary.deliveryName()).isEqualTo("Kurier InPost");
         assertThat(summary.deliveryPriceValue()).isEqualTo(19.99);
         assertThat(summary.deliveryRemoved()).isFalse();
+    }
+
+    private OfferItem offerFor(BasketItem item, double median) {
+        OfferItem offer = mock(OfferItem.class);
+        when(offer.getBasketItem()).thenReturn(item);
+        when(offer.isExistInInventory()).thenReturn(true);
+        when(offer.getLowestCost()).thenReturn(median - 100);
+        when(offer.getMedianCost()).thenReturn(median);
+        when(offer.getSupplierCount()).thenReturn(3);
+        return offer;
+    }
+
+    private OfferDetailsPage buildWithMarket(Basket basket, OfferItem... offers) {
+        when(offerItemReloader.reload(any())).thenReturn(List.of(offers));
+        return build(basket);
+    }
+
+    @Test
+    void anItemWithoutCostTakesTheSuppliersMedianForItsMargin() {
+        // given
+        BasketItem noCost = item("A", 1, 2199, 0);
+        Basket basket = basket(noCost);
+
+        // when
+        Item line = (Item) buildWithMarket(basket, offerFor(noCost, 1721.40)).lines().get(0);
+
+        // then
+        assertThat(line.costEstimated()).isTrue();
+        assertThat(line.costForMargin()).isEqualTo(1721.40);
+        assertThat(line.medianCost()).isEqualTo(1721.40);
+        assertThat(line.unitCost()).isZero();
+        assertThat(line.margin().percent()).isEqualTo(ItemMargin.of(2199, 1721.40, 1.23).percent());
+        assertThat(line.margin().tone()).isEqualTo(ItemMargin.Tone.OK);
+        assertThat(noCost.getUnitCost()).isZero();
+    }
+
+    @Test
+    void anItemWithItsOwnCostIgnoresTheMedian() {
+        // given
+        BasketItem costed = item("A", 1, 2199, 1534.17);
+        Basket basket = basket(costed);
+
+        // when
+        Item line = (Item) buildWithMarket(basket, offerFor(costed, 1721.40)).lines().get(0);
+
+        // then
+        assertThat(line.costEstimated()).isFalse();
+        assertThat(line.costForMargin()).isEqualTo(1534.17);
+        assertThat(line.medianCost()).isEqualTo(1721.40);
+    }
+
+    @Test
+    void anItemWithoutSupplierOffersStaysUnknown() {
+        // given
+        Basket basket = basket(item("A", 1, 2199, 0));
+
+        // when
+        Item line = (Item) build(basket).lines().get(0);
+
+        // then
+        assertThat(line.costEstimated()).isFalse();
+        assertThat(line.costForMargin()).isZero();
+        assertThat(line.medianCost()).isZero();
+        assertThat(line.margin().tone()).isEqualTo(ItemMargin.Tone.UNKNOWN);
+    }
+
+    @Test
+    void aServiceNeverGetsAnEstimate() {
+        // given
+        BasketItem service = item("S", 1, 199, 0);
+        service.setService(true);
+        Basket basket = basket(service);
+
+        // when
+        Item line = (Item) buildWithMarket(basket, offerFor(service, 100)).lines().get(0);
+
+        // then
+        assertThat(line.margin()).isNull();
+        assertThat(line.costEstimated()).isFalse();
+        assertThat(line.medianCost()).isZero();
+    }
+
+    @Test
+    void theSummaryCostCountsTheEstimateOfChosenItemsOnly() {
+        // given
+        BasketItem chosen = item("A", 1, 100, 50);
+        chosen.setVariantGroupId("Monitor");
+        chosen.setVariantSelected(true);
+        BasketItem unpicked = item("B", 1, 100, 0);
+        unpicked.setVariantGroupId("Monitor");
+        BasketItem counted = item("C", 2, 300, 0);
+        Basket basket = basket(chosen, unpicked, counted);
+
+        // when
+        OfferDetailsPage.Summary summary = buildWithMarket(basket, offerFor(unpicked, 70), offerFor(counted, 120)).summary();
+
+        // then
+        assertThat(summary.cost()).isEqualTo(Money.format(50 + 2 * 120));
+        assertThat(summary.profitGross()).isEqualTo(Money.format(700 - 290));
+        assertThat(summary.costEstimated()).isTrue();
+    }
+
+    @Test
+    void theSummaryIsNotEstimatedWhenOnlyAnUnpickedVariantLacksCost() {
+        // given
+        BasketItem chosen = item("A", 1, 100, 50);
+        chosen.setVariantGroupId("Monitor");
+        chosen.setVariantSelected(true);
+        BasketItem unpicked = item("B", 1, 100, 0);
+        unpicked.setVariantGroupId("Monitor");
+        Basket basket = basket(chosen, unpicked, item("C", 1, 10, 5));
+
+        // when
+        OfferDetailsPage.Summary summary = buildWithMarket(basket, offerFor(unpicked, 70)).summary();
+
+        // then
+        assertThat(summary.cost()).isEqualTo(Money.format(55));
+        assertThat(summary.costEstimated()).isFalse();
     }
 
     @Test

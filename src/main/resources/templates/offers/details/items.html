@@ -49,6 +49,10 @@
                         data-msg-line-margin=#{offers.details.line.margin},
                         data-msg-line-margin-unknown=#{offers.details.line.marginUnknown},
                         data-msg-line-margin-low=#{offers.details.line.marginLow},
+                        data-msg-line-cost-estimated=#{offers.details.line.costEstimated},
+                        data-msg-line-margin-estimated=#{offers.details.line.marginEstimated},
+                        data-msg-line-margin-estimated-low=#{offers.details.line.marginEstimatedLow},
+                        data-msg-margin-estimated=#{offers.details.margin.estimated},
                         data-msg-margin-ok=#{offers.details.margin.ok},
                         data-msg-margin-loss=#{offers.details.margin.loss},
                         data-msg-margin-unknown=#{offers.details.margin.unknown},
@@ -136,6 +140,7 @@
              rt=${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}"
     th:classappend="${grouped} ? (${it.variantSelected()} ? 'is-variant' : 'is-variant is-unpicked')"
     th:attr="data-index=${i}, data-price=${it.unitPrice()}, data-cost=${it.unitCost()}, data-qty=${it.qty()},
+             data-median-cost=${it.medianCost() > 0} ? ${it.medianCost()} : null,
              data-group=${it.variantGroupId() ?: ''}, data-selected=${it.variantSelected()}, data-service=${it.service()},
              data-market=${it.market() != null and !it.market().missing()} ? #{offers.details.margin.market(
                  #{general.currency.amount(${it.market().low()})}, #{general.currency.amount(${it.market().median()})})} : null,
@@ -191,7 +196,9 @@
         <th:block th:unless="${it.service()}">
             <span th:if="${it.unitCost() > 0}" class="cl-line-hint" data-cl-line-cost
                   th:text="#{offers.details.line.cost(${money.format(it.unitCost())})}"></span>
-            <span th:unless="${it.unitCost() > 0}" class="cl-line-hint is-warn" data-cl-line-cost
+            <span th:if="${it.costEstimated()}" class="cl-line-hint" data-cl-line-cost
+                  th:text="#{offers.details.line.costEstimated(${money.format(it.costForMargin())})}"></span>
+            <span th:unless="${it.unitCost() > 0 or it.costEstimated()}" class="cl-line-hint is-warn" data-cl-line-cost
                   th:text="#{offers.details.line.noCost}"></span>
         </th:block>
     </td>
@@ -205,9 +212,11 @@
                       th:text="#{offers.details.line.marginUnknown}"></span>
                 <!--/* a low margin says so in words, not only by its colour */-->
                 <span th:unless="${it.margin().percent() == null}" class="cl-line-margin" data-cl-line-margin
-                      th:with="low=${it.margin().tone().name() != 'LOSS' and (it.unitPrice() - it.unitCost()) * 10 < it.unitPrice()}"
+                      th:with="low=${it.margin().tone().name() != 'LOSS' and (it.unitPrice() - it.costForMargin()) * 10 < it.unitPrice()}"
                       th:classappend="${it.margin().tone().name() == 'LOSS'} ? 'is-bad' : (${low} ? 'is-low')"
-                      th:text="${low} ? #{offers.details.line.marginLow(${it.margin().percent()})} : #{offers.details.line.margin(${it.margin().percent()})}"></span>
+                      th:text="${it.costEstimated()}
+                          ? (${low} ? #{offers.details.line.marginEstimatedLow(${it.margin().percent()})} : #{offers.details.line.marginEstimated(${it.margin().percent()})})
+                          : (${low} ? #{offers.details.line.marginLow(${it.margin().percent()})} : #{offers.details.line.margin(${it.margin().percent()})})"></span>
             </th:block>
             <span class="cl-line-margin cl-line-outside" th:text="#{offers.details.line.outside}"></span>
         </span>
@@ -248,7 +257,7 @@
 <span th:fragment="margin(it)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:with="m=${it.margin()}, mk=${it.market()}, nl=${#strings.unescapeJava('\n')},
                marginText=${m.tone().name() == 'UNKNOWN'} ? #{offers.details.margin.unknown}
-                   : #{${'offers.details.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
+                   : #{${it.costEstimated() ? 'offers.details.margin.estimated' : 'offers.details.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
                        ${#messages.msg('general.currency.amount', m.profit())},
                        ${#messages.msg('general.currency.amount', m.cost())},
                        ${#messages.msg('general.currency.amount', m.profitNet())})},

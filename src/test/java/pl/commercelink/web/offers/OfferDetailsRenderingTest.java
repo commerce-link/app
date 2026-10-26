@@ -26,36 +26,42 @@ class OfferDetailsRenderingTest {
 
     private static Item laptop(int index) {
         return new Item(index, "id-" + index, "cat-1", "Laptop Lenovo T14", "Laptopy", "21ML003RPB", 3, "6899.00",
-                "5810.00", 6899, 5810, false, null, false, false, 5, false, ItemMargin.of(6899, 5810, 1.23),
+                "5810.00", 6899, 5810, 5810, false, 5949, false, null, false, false, 5, false, ItemMargin.of(6899, 5810, 1.23),
                 new Market(false, "5" + NBSP + "810,00", "5" + NBSP + "949,00", 5, 41), "Action", "Elko, AB", 2, 7);
     }
 
     private static Item dock(int index) {
         return new Item(index, "id-" + index, "cat-1", "Stacja dokująca", "Akcesoria", "40AY0090EU", 3, "799.00",
-                "0.00", 799, 0, false, null, false, false, null, false, ItemMargin.of(799, 0, 1.23),
+                "0.00", 799, 0, 0, false, 642, false, null, false, false, null, false, ItemMargin.of(799, 0, 1.23),
                 new Market(false, "611,00", "642,00", 4, 22), "Action", "", 1, 1);
+    }
+
+    private static Item estimatedDock(int index) {
+        return new Item(index, "id-" + index, "cat-1", "Stacja dokująca", "Akcesoria", "40AY0090EU", 3, "799.00",
+                "0.00", 799, 0, 1721.4, true, 1721.4, false, null, false, false, null, false, ItemMargin.of(799, 1721.4, 1.23),
+                new Market(false, "611,00", "1" + NBSP + "721,40", 4, 22), "Action", "", 1, 1);
     }
 
     private static Item monitor(int index, String name, boolean selected) {
         return new Item(index, "id-" + index, "cat-1", name, "Monitory", "MON-" + index, 3, "1749.00", "1402.00",
-                1749, 1402, false, "Monitor", selected, false, null, false, ItemMargin.of(1749, 1402, 1.23),
+                1749, 1402, 1402, false, 0, false, "Monitor", selected, false, null, false, ItemMargin.of(1749, 1402, 1.23),
                 Market.none(), null, null, 0, 0);
     }
 
     private static Item service(int index) {
         return new Item(index, "id-" + index, null, "Konfiguracja systemu", null, "SRV-1", 3, "199.00", "0.00", 199,
-                0, false, null, false, true, null, false, null, null, null, null, 0, 0);
+                0, 0, false, 0, false, null, false, true, null, false, null, null, null, null, 0, 0);
     }
 
     private static Item withoutQuantity(int index) {
         return new Item(index, "id-" + index, "cat-1", "Mysz", "Myszy", "910-006559", 0, "449.00", "338.00", 449,
-                338, true, null, false, false, null, true, ItemMargin.of(449, 338, 1.23), Market.none(), null, null, 0, 0);
+                338, 338, false, 0, true, null, false, false, null, true, ItemMargin.of(449, 338, 1.23), Market.none(), null, null, 0, 0);
     }
 
     private static Summary summary(boolean removed) {
         return new Summary("33" + NBSP + "882,00", removed ? null : "Kurier InPost", removed, removed ? "0,00" : "19,99",
                 removed ? 0 : 19.99, "33" + NBSP + "901,99", "27" + NBSP + "562,59", "26" + NBSP + "655,00",
-                "7" + NBSP + "246,99", "5" + NBSP + "891,86", true);
+                "7" + NBSP + "246,99", "5" + NBSP + "891,86", true, false);
     }
 
     private static Customer customer(boolean billing, boolean contact) {
@@ -93,7 +99,7 @@ class OfferDetailsRenderingTest {
                 new Meta(null, null, "02.09.2026, 10:00", "Anna Kowalska", "7" + NBSP + "698,00", 2),
                 List.of(laptop(0), service(1)), List.of(), List.of(),
                 new Summary("7" + NBSP + "698,00", null, false, "0,00", 0, "7" + NBSP + "698,00", "6" + NBSP + "258,54",
-                        "5" + NBSP + "810,00", "1" + NBSP + "888,00", "1" + NBSP + "535,28", false),
+                        "5" + NBSP + "810,00", "1" + NBSP + "888,00", "1" + NBSP + "535,28", false, false),
                 new Terms(null, null, null, List.of(), true, "store.fulfilment.type.WarehouseFulfilment", null),
                 customer(false, false), null, null, false, false, "Stanowisko biurowe", "WarehouseFulfilment");
     }
@@ -241,6 +247,43 @@ class OfferDetailsRenderingTest {
 
         // then
         assertThat(row).contains("<span class=\"cl-line-hint is-warn\"").contains("brak kosztu").contains("marża: ?");
+    }
+
+    @Test
+    void anEstimatedCostReadsAsApproximate() {
+        // given
+        OfferDetailsPage estimated = offer(List.of(laptop(0), estimatedDock(1)), estimatedSummary(true), customer(true, true), true);
+
+        // when
+        String html = html(estimated);
+
+        // then
+        assertThat(row(html, 1)).contains("koszt ≈ 1" + NBSP + "721,40 (mediana u dostawców)").contains("marża ≈ ")
+                .contains("data-tooltip=\"Szacowana marża:").contains("data-median-cost=\"1721.4\"")
+                .contains("data-cost=\"0.0\"").doesNotContain("brak kosztu");
+        assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("≈").doesNotContain("Szacowana marża");
+        assertThat(row(html, 1)).contains("name=\"basketItems[1].unitCost\" value=\"0.00\"");
+        assertThat(summaryCard(html)).contains("w tym szacowany koszt pozycji bez kosztu");
+        assertThat(summaryCard(html(fullOffer()))).doesNotContain("szacowany koszt");
+    }
+
+    @Test
+    void anItemWithoutAnyMedianHasNoMedianAttribute() {
+        // when
+        String row = row(html(fullOffer()), 4);
+
+        // then
+        assertThat(row).doesNotContain("data-median-cost");
+    }
+
+    private static Summary estimatedSummary(boolean estimated) {
+        Summary base = summary(false);
+        return new Summary(base.itemsTotal(), base.deliveryName(), false, base.deliveryPrice(), base.deliveryPriceValue(),
+                base.total(), base.net(), base.cost(), base.profitGross(), base.profitNet(), base.variantsNote(), estimated);
+    }
+
+    private static String summaryCard(String html) {
+        return html.substring(html.indexOf("id=\"summary\""), html.indexOf("id=\"offer-terms-card\""));
     }
 
     @Test

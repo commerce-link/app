@@ -19,7 +19,8 @@
             <dd class="is-numeric"><output data-cl-sum="total" aria-live="off" th:text="#{general.currency.amount(${s.total()})}"></output>
                 <span class="cl-kv-sub"><span th:text="#{offers.details.summary.net}"></span> <output data-cl-sum="net" aria-live="off" th:text="#{general.currency.amount(${s.net()})}"></output></span></dd></div>
         <div><dt th:text="#{offers.details.summary.cost}"></dt>
-            <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output></dd></div>
+            <dd class="is-numeric"><output data-cl-sum="cost" aria-live="off" th:text="#{general.currency.amount(${s.cost()})}"></output>
+                <span th:if="${s.costEstimated()}" class="cl-kv-sub" data-cl-sum-estimated th:text="#{offers.details.summary.costEstimated}"></span></dd></div>
         <div><dt th:text="#{offers.details.summary.profitGross}"></dt>
             <dd class="is-numeric"><output data-cl-sum="profitGross" aria-live="off" th:text="#{general.currency.amount(${s.profitGross()})}"></output></dd></div>
         <div><dt th:text="#{offers.details.summary.profitNet}"></dt>
