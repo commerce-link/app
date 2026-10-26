@@ -555,7 +555,9 @@ class StoreEntryPinningTest {
 
             // then
             assertThat(logs.warnings()).singleElement().asString()
-                    .contains("C", "S", STORE, "resend pim-entry-added manually after the next PIM index rebuild", "runbook");
+                    .contains("C", "S", STORE, "not in the PIM index copy after the refresh attempt",
+                            "resend pim-entry-added manually after the next PIM index rebuild", "runbook")
+                    .doesNotContain("refreshed PIM index");
             assertThat(logs.infos()).isEmpty();
         }
     }

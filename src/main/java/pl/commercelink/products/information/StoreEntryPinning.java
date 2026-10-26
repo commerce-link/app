@@ -84,9 +84,11 @@ class StoreEntryPinning {
         Optional<PimEntry> clone = storeView.findByPimId(event.pimId())
                 .filter(entry -> ownerStoreId.equals(entry.ownerStoreId()));
         if (clone.isEmpty()) {
-            // deleted meanwhile, or PIM's index had not loaded the clone when this instance refreshed
-            log.warn("PIM clone {} of {} in store {}: not in the refreshed PIM index, nothing moved; if the clone "
-                            + "exists, resend pim-entry-added manually after the next PIM index rebuild, see runbook",
+            // deleted meanwhile, PIM's index had not loaded the clone when this instance refreshed, or (outside prod,
+            // where the adapter swallows a failure) the refresh itself failed
+            log.warn("PIM clone {} of {} in store {}: not in the PIM index copy after the refresh attempt, nothing "
+                            + "moved; if the clone exists, resend pim-entry-added manually after the next PIM index "
+                            + "rebuild, see runbook",
                     event.pimId(), sourcePimId, ownerStoreId);
             return;
         }
