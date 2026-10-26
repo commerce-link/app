@@ -17,13 +17,11 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivationService;
-import pl.commercelink.stores.StoreCopyService;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoreTrialService;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.web.dtos.StoreCopyForm;
 import pl.commercelink.web.dtos.StoreCreateForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -46,7 +44,6 @@ public class SuperAdminController {
 
     private final StoresRepository storesRepository;
     private final MessageSource messageSource;
-    private final StoreCopyService storeCopyService;
     private final OrphanedProductCleanupService orphanedProductCleanupService;
     private final StoreDeletionService storeDeletionService;
     private final StoreCreationService storeCreationService;
@@ -209,73 +206,6 @@ public class SuperAdminController {
 
     private static boolean sameName(Store store, String name) {
         return Objects.equals(StringUtils.strip(store.getName()), name);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/copy")
-    public String copyStorePage(@PathVariable String storeId, @RequestParam(required = false) String back, Model model,
-                                Locale locale) {
-        Store source = existing(storeId);
-        StoreCopyForm form = StoreCopyForm.of(message("store.copy.name.suggested", locale, StoresListPageFactory.displayName(source)),
-                storeCreationService.freeStoreId());
-        return renderCopy(source, form, Map.of(), null, back, model, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/copy")
-    public String copyStore(@PathVariable String storeId, @ModelAttribute("form") StoreCopyForm form,
-                            @RequestParam(required = false) String back, Model model, Locale locale,
-                            RedirectAttributes redirectAttributes) {
-        Store source = existing(storeId);
-        if (!form.hasWellFormedId()) {
-            form.setNewStoreId(storeCreationService.freeStoreId());
-        }
-        Map<String, String> errors = form.validate();
-        if (!errors.isEmpty()) {
-            return renderCopy(source, form, errors, null, back, model, locale);
-        }
-        Store taken = storesRepository.findById(form.getNewStoreId());
-        if (taken != null) {
-            return copyAlreadyMade(source, taken, form, back, model, locale, redirectAttributes);
-        }
-        try {
-            Store copy = storeCopyService.copyStore(storeId, form.getNewStoreId(), form.trimmedName());
-            SettingsFlash.onRedirect(redirectAttributes, message("store.copy.success", locale, copy.getName(), StoresListPageFactory.displayName(source)));
-            return "redirect:/dashboard/store/" + copy.getStoreId();
-        } catch (ConditionalCheckFailedException e) {
-            // the store is saved before its catalogs, so the request that lost the race copied nothing
-            Store raced = storesRepository.findByIdConsistently(form.getNewStoreId());
-            if (raced != null) {
-                return copyAlreadyMade(source, raced, form, back, model, locale, redirectAttributes);
-            }
-            log.error("Copy id {} refused as taken but not readable", form.getNewStoreId(), e);
-            return renderCopy(source, form, Map.of(), "store.copy.error", back, model, locale);
-        } catch (RuntimeException e) {
-            log.error("Failed to copy store {} as {}", storeId, form.getNewStoreId(), e);
-            return renderCopy(source, form, Map.of(), "store.copy.error", back, model, locale);
-        }
-    }
-
-    private String copyAlreadyMade(Store source, Store taken, StoreCopyForm form, String back, Model model, Locale locale,
-                                   RedirectAttributes redirectAttributes) {
-        if (sameName(taken, form.trimmedName())) {
-            SettingsFlash.onRedirect(redirectAttributes, message("store.copy.duplicate", locale, taken.getName()));
-            return "redirect:/dashboard/store/" + taken.getStoreId();
-        }
-        form.setNewStoreId(storeCreationService.freeStoreId());
-        return renderCopy(source, form, Map.of(), "store.copy.error.stale", back, model, locale);
-    }
-
-    /** Without back the page was opened from the source store's settings, so it goes back there. */
-    private String renderCopy(Store source, StoreCopyForm form, Map<String, String> errors, String formError, String back,
-                              Model model, Locale locale) {
-        model.addAttribute("source", source);
-        model.addAttribute("sourceName", StoresListPageFactory.displayName(source));
-        model.addAttribute("form", form);
-        model.addAttribute("errors", errors);
-        model.addAttribute("formError", formError);
-        model.addAttribute("back", back == null ? null : StoresListQuery.safeBack(back));
-        model.addAttribute("backHref", back == null ? "/dashboard/store/" + source.getStoreId() : StoresListQuery.safeBack(back));
-        model.addAttribute("backLabel", message(back == null ? "store.title" : "nav.stores", locale));
-        return "store-copy";
     }
 
     @PostMapping("/dashboard/store/{storeId}/delete")
