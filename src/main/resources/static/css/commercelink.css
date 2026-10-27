@@ -10801,6 +10801,8 @@ a.cl-link-button:hover {
    letting the rows below show through */
 .cl-page .cl-margin.is-unknown > * { opacity: .55; }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); }
+/* a margin under 10 % (offer items only): the mark in the warning tone, the old margin line's colour */
+.cl-page .cl-margin.is-low { color: var(--cl-warn); }
 
 /* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
 .cl-page .cl-subnav {
@@ -14087,8 +14089,8 @@ a.cl-link-button:hover {
 }
 
 /* --- Offer details (/dashboard/offer/{id}, spec docs/active/offer-details-redesign-v2, variant A4): the items table
-   edited in place (.is-line-editor: quantity and price in the row, the cost as a line under the price, the value with
-   its margin, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
+   edited in place (.is-line-editor: quantity and price in the row, the value with its margin mark under the price, the
+   "Połącz na FV" tick in its own column, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
 .cl-page .cl-table.is-line-editor { table-layout: fixed; }
 /* The products and the services are two tbody sections (offers/details/items.html): the last product keeps its rule
    above the services heading, as the rows of the order page's single tbody do. */
@@ -14096,15 +14098,26 @@ a.cl-link-button:hover {
 /* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
 .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
 .cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }
-/* "99 999,99" whole inside the field, with the cell's and the field's insets */
-.cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 144px; }
-.cl-page .cl-table.is-line-editor col.cl-col-value { width: 124px; }
+/* "99 999,99" whole inside the field, and "wartość 99 999,99" with the margin mark on the line under it */
+.cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 176px; }
 .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 52px; }
 .cl-page .cl-table.is-line-editor :is(td, th) { vertical-align: top; }
-/* a name without spaces breaks inside the fixed column instead of running out of the page; a code longer than the whole
-   column is cut with an ellipsis (the dialog shows it in full), a shorter one still moves to the next line unbroken */
+/* a name without spaces breaks inside the fixed column instead of running out of the page. The category and the code
+   stay on one line (client 2026-10-27: a long MFN ran over two). The category gives way faster than the code (the code is
+   what gets copied) down to a few letters; the code is then cut with an ellipsis, its copy icon always shown after it; the
+   button copies it whole and its title shows it on hover. th.cl-table-key outweighs the card rule that makes it a block. */
 .cl-page .cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }
-.cl-page .cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+/* contain: the line takes the cell's width instead of giving the table a minimum as wide as the whole code (the phone
+   cards lay the table out with table-layout: auto, so an uncut 90-character code pushed the card past the screen) */
+.cl-page .cl-table.is-line-editor tbody th.cl-table-key .cl-table-sub { display: flex; align-items: baseline; gap: 0 4px; min-width: 0; white-space: nowrap; contain: inline-size; }
+.cl-page .cl-table.is-line-editor .cl-table-sub > [data-cl-line-category] { flex: 0 4 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; }
+.cl-page .cl-table.is-line-editor .cl-table-sub > .cl-table-sep { flex: none; }
+.cl-page .cl-table.is-line-editor .cl-line-code { display: flex; flex: 0 1 auto; align-items: baseline; min-width: 0; }
+.cl-page .cl-table.is-line-editor .cl-line-code > :not(.cl-copy-inline) { flex: none; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-inline { display: flex; min-width: 0; overflow-wrap: normal; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-code { display: flex; align-items: baseline; min-width: 0; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-icon { flex: none; }
 .cl-page .cl-table.is-line-editor .cl-input.is-qty { width: 100%; text-align: right; }
 .cl-page .cl-table.is-line-editor .cl-input.is-money { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
 /* the number fields without the browser's spin buttons, which took the room of the digits (WebKit always, Chromium on
@@ -14115,15 +14128,12 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor .cl-line-warn { margin: var(--cl-gap-attached) 0 0; font-size: 12.5px; line-height: 1.3; }
 .cl-page .cl-line-hint { display: block; width: max-content; max-width: 100%; margin: var(--cl-gap-attached) 0 0 auto; font-size: 12.5px; color: var(--cl-ink-2); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cl-page .cl-line-hint.is-warn { color: var(--cl-warn); }
-.cl-page .cl-line-value { display: grid; justify-items: end; gap: 2px; padding-top: 7px; font-variant-numeric: tabular-nums; }
-.cl-page .cl-line-margin { font-size: 12.5px; color: var(--cl-ink-2); }
-.cl-page .cl-line-margin.is-low { color: var(--cl-warn); }
-.cl-page .cl-line-margin.is-bad { color: var(--cl-bad); }
-/* a variant outside the total: the amount muted with "poza sumą" instead of the margin (no strike-through) */
+.cl-page .cl-line-amount { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: var(--cl-gap-attached); font-size: 12.5px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-line-amount .cl-line-total { color: var(--cl-ink); font-weight: 600; }
+/* a variant outside the total: the value muted with "poza sumą" instead of the margin mark (no strike-through) */
 .cl-page .cl-table.is-line-editor .cl-line-outside { display: none; }
 .cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-outside { display: block; }
-.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-margin,
-.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-line-margin:not(.cl-line-outside) { display: none; }
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-amount .cl-margin { display: none; }
 .cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-total { color: var(--cl-ink-3); }
 .cl-page .cl-table.is-line-editor .cl-drag { display: inline-grid; place-items: center; width: 28px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--cl-ink-3); cursor: grab; }
 .cl-page .cl-table.is-line-editor .cl-drag:hover { color: var(--cl-accent-ink); background: var(--cl-accent-soft); }
@@ -14215,13 +14225,13 @@ html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-paddin
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-drag { display: none; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-qty { grid-column: 1; grid-row: 2; display: block; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-price { grid-column: 2; grid-row: 2; display: block; }
-    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-value { grid-column: 1 / -1; grid-row: 3; display: block; text-align: left; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-table-flag:not(.is-empty) { grid-column: 1 / -1; grid-row: 3; display: block; padding: 0; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-menu { grid-column: 3; grid-row: 1; display: block; }
     /* one line each, so the two fields stay side by side at 320 px */
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(td.cl-cell-qty, td.cl-cell-price)::before { content: attr(data-label); display: block; margin-bottom: var(--cl-gap-attached); font-size: 12.5px; color: var(--cl-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* a grid cell grows to its content unless told otherwise: a long code is cut inside the card, as in the table */
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(th, td) { min-width: 0; }
-    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-value { justify-items: start; padding-top: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-amount { justify-content: flex-start; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-hint { margin-left: 0; text-align: left; white-space: normal; }
     .cl-page.cl-offer-page .cl-visibility { white-space: normal; }
     /* two fields side by side on a 320 px screen: a narrower inset keeps "99 999,00" inside the field */

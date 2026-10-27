@@ -240,33 +240,20 @@
         } else {
             qtyInput(row).setAttribute('aria-describedby', warn.id);
         }
-        if (field(row, 'service').value === 'true') {
-            return;
-        }
-        var hint = row.querySelector('[data-cl-line-cost]');
-        hint.textContent = cost > 0
-            ? message(counted.estimated ? 'line-cost-estimated' : 'line-cost', [window.CL_formatAmount(roundHalfUp(cost))])
-            : message('line-no-cost');
-        hint.classList.toggle('is-warn', !(cost > 0));
-
-        var margin = marginOf(price, cost);
-        var label = row.querySelector('[data-cl-line-margin]');
-        // a low margin is shown by its tone only (OfferDetailsPage row): words pushed the line past the value column
-        var low = margin.percent !== null && margin.tone !== 'loss' && (price - cost) * 10 < price;
-        label.textContent = margin.percent === null ? message('line-margin-unknown')
-            : message(counted.estimated ? 'line-margin-estimated' : 'line-margin', [margin.percent]);
-        label.classList.toggle('is-bad', margin.percent !== null && margin.tone === 'loss');
-        label.classList.toggle('is-low', margin.percent === null || low);
-
+        // a service has no mark: its value is all the row shows
         var mark = row.querySelector('.cl-margin');
-        if (!mark) {
+        if (field(row, 'service').value === 'true' || !mark) {
             return;
         }
+        var margin = marginOf(price, cost);
+        // under 10 % colours the mark (the items.html margin fragment's low)
+        var low = margin.tone === 'ok' && (price - cost) * 10 < price;
+        // the margin block, an empty line, the suppliers' blocks the server wrote (items.html margin fragment)
         var text = (margin.tone === 'unknown' ? message('margin-unknown')
             : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone,
                 [margin.percent === null ? '—' : margin.percent, window.CL_formatMoney(margin.profit),
                     window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
-            + '\n' + (mark.getAttribute('data-cl-market-text') || '');
+            + '\n\n' + (mark.getAttribute('data-cl-market-text') || '');
         mark.setAttribute('data-tooltip', text);
         mark.setAttribute('aria-label', text);
         var loss = margin.tone === 'loss';
@@ -280,6 +267,7 @@
         ['ok', 'loss', 'unknown'].forEach(function (tone) {
             mark.classList.toggle('is-' + tone, tone === margin.tone);
         });
+        mark.classList.toggle('is-low', low);
     }
 
     function recount() {
@@ -918,7 +906,7 @@
             field(row, 'unitCost').value = input('unitCost').value === '' ? '0' : input('unitCost').value;
             field(row, 'consolidated').value = input('consolidated').checked ? 'true' : 'false';
             renderSub(row);
-            row.querySelector('[data-cl-mark-consolidated]').hidden = !input('consolidated').checked;
+            showConsolidated(row);
             labelRow(row);
             recountRow(row);
             recount();
@@ -945,14 +933,47 @@
                 separator.textContent = '·';
                 sub.append(' ', separator, ' ');
             }
+            // the items.html row: the code cut to one line, its copy icon always after it
             var code = document.createElement('span');
-            code.className = 'cl-code-nowrap';
+            code.className = 'cl-copy-text';
             code.setAttribute('data-cl-line-mfn', '');
             code.textContent = mfn;
+            var icon = document.createElement('span');
+            icon.className = 'cl-copy-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.innerHTML = '<i class="far fa-copy"></i>';
+            var shown = document.createElement('span');
+            shown.className = 'cl-copy-code';
+            shown.append(code, icon);
+            var copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'cl-copy-inline';
+            copy.setAttribute('data-cl-copy', mfn);
+            copy.title = mfn;
+            copy.setAttribute('aria-label', message('copy-mfn', [mfn]));
+            copy.append(shown);
             var wrap = document.createElement('span');
-            wrap.append(message('mfn-prefix') + ' ', code);
+            wrap.className = 'cl-line-code';
+            wrap.append(message('mfn-prefix') + '\u00a0', copy);
             sub.append(wrap);
         }
+    }
+
+    // "Połącz na FV": the column's tick and the menu entry follow the hidden field
+    function showConsolidated(row) {
+        var on = field(row, 'consolidated').value === 'true';
+        row.querySelector('[data-cl-line-consolidated]').hidden = !on;
+        row.querySelector('[data-cl-line-consolidated-cell]').classList.toggle('is-empty', !on);
+        row.querySelector('[data-cl-line-consolidate]').textContent = message(on ? 'deconsolidate' : 'consolidate');
+    }
+
+    function toggleConsolidated(row) {
+        var consolidated = field(row, 'consolidated');
+        consolidated.value = consolidated.value === 'true' ? 'false' : 'true';
+        showConsolidated(row);
+        row.querySelector('details.cl-menu').open = false;
+        changed();
+        menuSummary(row).focus();
     }
 
     // --- before a save
@@ -1032,6 +1053,8 @@
             takeOutOfGroup(row);
         } else if (row && target.hasAttribute('data-cl-line-select')) {
             selectVariant(row);
+        } else if (row && target.hasAttribute('data-cl-line-consolidate')) {
+            toggleConsolidated(row);
         } else if (head && target.hasAttribute('data-cl-group-move')) {
             if (moveGroup(head, target.getAttribute('data-cl-group-move'))) {
                 afterMove(menuSummary(head), head);
