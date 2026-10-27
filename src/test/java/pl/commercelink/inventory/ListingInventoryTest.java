@@ -20,7 +20,7 @@ class ListingInventoryTest {
     private SupplierRegistry supplierRegistry;
 
     // store entries in these tests carry an "-s-" id; every other id is a global PIM entry
-    private static final java.util.function.Predicate<String> STORE_ENTRY = id -> id.contains("-s-");
+    private static final StoreEntryKeys STORE_ENTRY = id -> id.contains("-s-");
 
     private MatchedInventory group(InventoryKey key) {
         return new MatchedInventory(key, taxonomyCache, supplierRegistry);
@@ -120,5 +120,44 @@ class ListingInventoryTest {
 
         // when / then
         assertThat(listing.keys()).containsExactly(globalKey, unrelatedGlobalKey, ownKey);
+    }
+
+    // a store entry "clone" cloned from the global entry "source"; other "-s-" ids are plain store entries
+    private static StoreEntryKeys cloneOf(String clone, String source) {
+        return new StoreEntryKeys() {
+            @Override
+            public boolean isStoreEntry(String pimId) {
+                return pimId.contains("-s-");
+            }
+
+            @Override
+            public String sourceOf(String pimId) {
+                return clone.equals(pimId) ? source : null;
+            }
+        };
+    }
+
+    @Test
+    void cloneRowIsListedOnceWithGlobalOffers() {
+        // given
+        InventoryKey globalKey = pimKey("g-1", "5900000000031", "SRC-1");
+        InventoryKey cloneKey = pimKey("st-s-c", "5900000000031", "SRC-1");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(cloneKey))), cloneOf("st-s-c", "g-1"));
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey);
+    }
+
+    @Test
+    void cloneIsListedApartFromAnotherGlobalEntryItDoesNotCloneFrom() {
+        // given
+        InventoryKey globalKey = pimKey("g-2", "5900000000031", "SRC-1");
+        InventoryKey cloneKey = pimKey("st-s-c", "5900000000032", "SRC-1");
+        ListingInventory listing = new ListingInventory(InventoryIndex.of(List.of(group(globalKey))),
+                InventoryIndex.of(List.of(group(cloneKey))), cloneOf("st-s-c", "g-1"));
+
+        // when / then
+        assertThat(listing.keys()).containsExactly(globalKey, cloneKey);
     }
 }

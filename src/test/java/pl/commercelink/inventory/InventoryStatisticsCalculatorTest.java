@@ -22,7 +22,7 @@ class InventoryStatisticsCalculatorTest {
     private SupplierRegistry supplierRegistry;
 
     // store entries in these tests carry an "-s-" id; every other id is a global PIM entry
-    private static final java.util.function.Predicate<String> STORE_ENTRY = id -> id.contains("-s-");
+    private static final StoreEntryKeys STORE_ENTRY = id -> id.contains("-s-");
 
     private MatchedInventory group(String ean, String mfn, InventoryItem... items) {
         return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), taxonomyCache, supplierRegistry);
@@ -162,5 +162,35 @@ class InventoryStatisticsCalculatorTest {
         assertThat(stats.distinctProducts()).isEqualTo(1);
         assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
         assertThat(stats.bySupplier().get("Elko")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
+
+    // a store entry "clone" cloned from the global entry "source"; other "-s-" ids are plain store entries
+    private static StoreEntryKeys cloneOf(String clone, String source) {
+        return new StoreEntryKeys() {
+            @Override
+            public boolean isStoreEntry(String pimId) {
+                return pimId.contains("-s-");
+            }
+
+            @Override
+            public String sourceOf(String pimId) {
+                return clone.equals(pimId) ? source : null;
+            }
+        };
+    }
+
+    @Test
+    void statisticsCountTheSourceGroupForTheClone() {
+        // given
+        MatchedInventory globalGroup = pimGroup("g-1", "5900000000031", "SRC-1", item("5900000000031", "SRC-1", "Elko", 5));
+        MatchedInventory cloneGroup = pimGroup("st-s-c", "5900000000031", "SRC-1", item("5900000000031", "SRC-1", "Kosatec", 3));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(InventoryIndex.of(List.of(globalGroup)),
+                Set.of("Elko")::contains, InventoryIndex.of(List.of(cloneGroup)), cloneOf("st-s-c", "g-1"));
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(1);
+        assertThat(stats.bySupplier()).containsOnlyKeys("Elko", "Kosatec");
     }
 }

@@ -31,4 +31,9 @@ public class ProductCatalogRepository extends DynamoDbRepository<ProductCatalog>
 
         return dynamoDBMapper.scan(ProductCatalog.class, scanExpression);
     }
+
+    /** Every catalog of every store: a full scan, for rare lookups such as the store owning a category. */
+    public List<ProductCatalog> findAllOfEveryStore() {
+        return dynamoDBMapper.scan(ProductCatalog.class, new DynamoDBScanExpression());
+    }
 }

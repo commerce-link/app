@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 public final class DiscountCalculator {
@@ -16,8 +18,9 @@ public final class DiscountCalculator {
     private DiscountCalculator() {
     }
 
-    public static List<DiscountedLine> calculate(DiscountCode code, List<BasketItem> items) {
-        List<BasketItem> covered = items.stream().filter(code::covers).filter(i -> i.getQty() > 0).toList();
+    public static List<DiscountedLine> calculate(DiscountCode code, List<BasketItem> items,
+                                                 Function<String, Set<String>> productAliases) {
+        List<BasketItem> covered = items.stream().filter(i -> code.covers(i, productAliases)).filter(i -> i.getQty() > 0).toList();
         List<BigDecimal> prices = code.getType() == DiscountType.Amount ? amount(code, covered) : percentage(code, covered);
         return IntStream.range(0, covered.size())
                 .filter(i -> prices.get(i).compareTo(price(covered.get(i))) < 0)

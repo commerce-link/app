@@ -31,6 +31,13 @@ final class CapturedLogs implements AutoCloseable {
                 .toList();
     }
 
+    List<String> warnings() {
+        return appender.list.stream()
+                .filter(e -> e.getLevel() == Level.WARN)
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+    }
+
     List<String> errors() {
         return appender.list.stream()
                 .filter(e -> e.getLevel() == Level.ERROR)

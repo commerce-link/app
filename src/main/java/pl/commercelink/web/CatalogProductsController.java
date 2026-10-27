@@ -469,11 +469,11 @@ public class CatalogProductsController {
         if (form.identifiersChanged() || joined.isPresent()) {
             // Corrected codes, or the entry they lead to, must not be another product's of the category: the category
             // would list it twice and the price list would price it twice.
-            String joinedPimId = joined.map(PimEntry::pimId).orElse(null);
+            Set<String> joinedPimIds = joined.map(entry -> review.aliasesOf(storeId(), entry.pimId())).orElse(Set.of());
             boolean taken = productRepository.findAll(category.getCategoryId()).stream()
                     .filter(other -> !other.getProductId().equals(product.getProductId()))
                     .anyMatch(other -> key.matches(InventoryKey.fromProduct(other))
-                            || (joinedPimId != null && joinedPimId.equals(other.getPimId())));
+                            || joinedPimIds.contains(other.getPimId()));
             if (taken) {
                 return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(),
                         Map.of("ean", DUPLICATE), null, currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);

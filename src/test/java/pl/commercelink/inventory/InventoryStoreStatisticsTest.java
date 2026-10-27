@@ -58,6 +58,8 @@ class InventoryStoreStatisticsTest {
     private PimCatalog pimCatalog;
     @Mock
     private PimView globalPimView;
+    @Mock
+    private PimView storePimView;
 
     @InjectMocks
     private Inventory inventory;
@@ -65,6 +67,7 @@ class InventoryStoreStatisticsTest {
     @BeforeEach
     void globalViewOfTheCatalog() {
         when(pimCatalog.withGlobalData()).thenReturn(globalPimView);
+        when(pimCatalog.withStoreData(STORE_ID)).thenReturn(storePimView);
     }
 
     private Store store;

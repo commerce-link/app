@@ -18,7 +18,7 @@ final class InventoryStatisticsCalculator {
     }
 
     static InventoryStatistics calculate(InventoryIndex globalIndex, Predicate<String> enabledGlobalSupplier, InventoryIndex ownIndex,
-                                         Predicate<String> isStoreEntry) {
+                                         StoreEntryKeys storeEntries) {
         Tally tally = new Tally();
         boolean hasOwn = !ownIndex.all().isEmpty();
         // an own group's key unions the eans/mfns of all its items, so it can match several global groups;
@@ -33,7 +33,7 @@ final class InventoryStatisticsCalculator {
             }
             if (hasOwn) {
                 for (MatchedInventory own : ownIndex.findMatching(group.getInventoryKey())) {
-                    if (sharesPimEntry(group, own, isStoreEntry) && claimedOwnGroups.add(own)) {
+                    if (sharesPimEntry(group, own, storeEntries) && claimedOwnGroups.add(own)) {
                         items.addAll(own.getInventoryItems());
                     }
                 }
@@ -41,7 +41,7 @@ final class InventoryStatisticsCalculator {
             tally.add(items);
         }
         for (MatchedInventory own : ownIndex.all()) {
-            if (!globalIndex.covers(own.getInventoryKey(), isStoreEntry)) {
+            if (!globalIndex.covers(own.getInventoryKey(), storeEntries)) {
                 tally.add(own.getInventoryItems());
             }
         }
@@ -50,10 +50,10 @@ final class InventoryStatisticsCalculator {
 
     // An own group of a store entry joins only a global group of that same entry or one without any entry (see
     // InventoryIndex.covers); any other own group joins the global group it matches by id, EAN or code.
-    private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own, Predicate<String> isStoreEntry) {
+    private static boolean sharesPimEntry(MatchedInventory global, MatchedInventory own, StoreEntryKeys storeEntries) {
         InventoryKey ownKey = own.getInventoryKey();
-        return !InventoryIndex.isStoreEntryKey(ownKey, isStoreEntry)
-                || InventoryIndex.sameOrNoEntry(global.getInventoryKey(), ownKey.getId());
+        return !InventoryIndex.isStoreEntryKey(ownKey, storeEntries)
+                || InventoryIndex.sameOrNoEntry(global.getInventoryKey(), ownKey.getId(), storeEntries.sourceOf(ownKey.getId()));
     }
 
     private static final class Tally {

@@ -11,6 +11,7 @@ import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -34,6 +35,8 @@ public class BasketsRestApi {
     private PricelistRepository pricelistRepository;
     @Autowired
     private DiscountService discountService;
+    @Autowired
+    private StorePimAliases aliases;
     @Value("${commercelink.localization.fallback-locale:#{null}}")
     private Locale fallbackLocale;
 
@@ -76,7 +79,7 @@ public class BasketsRestApi {
     }
 
     private void fillBasket(Basket basket, CheckoutRequest req) {
-        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository);
+        List<BasketItem> items = req.toBasketItems(basket.getStoreId(), pricelistRepository, aliases);
 
         basket.setBasketItems(items);
         basket.setDeliveryOptionId(req.getDeliveryOptionId());

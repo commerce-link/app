@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -49,6 +50,50 @@ class PricelistTest {
 
         // then
         assertThat(categories).containsExactly("CPU", "Smartwatches");
+    }
+
+    @Test
+    void findsTheRowByBothUnifiedCodesWhateverItsPimId() {
+        // given
+        Pricelist pricelist = new Pricelist("id", List.of(
+                row("other", "5900000000099", "OTHER"),
+                row("clone-C", "05900000000011", "ab-1 ")));
+
+        // when / then
+        assertThat(pricelist.findByCodes("5900000000011", "AB-1", Set.of())).map(AvailabilityAndPrice::getPimId)
+                .contains("clone-C");
+    }
+
+    @Test
+    void doesNotMatchByASingleCodeOrWhenACodeDiffers() {
+        // given
+        Pricelist pricelist = new Pricelist("id", List.of(row("p", "5900000000011", "AB-1")));
+
+        // when / then
+        assertThat(pricelist.findByCodes("5900000000011", "OTHER", Set.of())).isEmpty();
+        assertThat(pricelist.findByCodes("5900000000099", "AB-1", Set.of())).isEmpty();
+        assertThat(pricelist.findByCodes("5900000000011", null, Set.of())).isEmpty();
+        assertThat(pricelist.findByCodes(null, "AB-1", Set.of())).isEmpty();
+        assertThat(pricelist.findByCodes("", " ", Set.of())).isEmpty();
+    }
+
+    @Test
+    void neverTakesTheRowOfAnExcludedPimId() {
+        // given the same codes on the row of another product of the export and on the stale row of a deleted clone
+        Pricelist pricelist = new Pricelist("id", List.of(
+                row("pim-A", "5900000000011", "AB-1"),
+                row("clone-C", "5900000000011", "AB-1")));
+
+        // when / then
+        assertThat(pricelist.findByCodes("5900000000011", "AB-1", Set.of("pim-A"))).map(AvailabilityAndPrice::getPimId)
+                .contains("clone-C");
+        assertThat(pricelist.findByCodes("5900000000011", "AB-1", Set.of("pim-A", "clone-C"))).isEmpty();
+        assertThat(pricelist.findByCodes("5900000000011", "AB-1", Set.of())).map(AvailabilityAndPrice::getPimId)
+                .contains("pim-A");
+    }
+
+    private AvailabilityAndPrice row(String pimId, String ean, String mfn) {
+        return new AvailabilityAndPrice(pimId, ean, mfn, "brand", "label", "name", "CPU", 100, 1, 1, 100, false);
     }
 
     private AvailabilityAndPrice item(String category, String label, String name) {

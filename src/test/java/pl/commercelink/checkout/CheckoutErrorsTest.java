@@ -5,12 +5,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.payments.PaymentProviderFactory;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.payments.api.PaymentLink;
 import pl.commercelink.payments.api.PaymentProvider;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -18,6 +20,7 @@ import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.InvoicingConfiguration;
@@ -58,6 +61,9 @@ class CheckoutErrorsTest {
     private PaymentProviderFactory paymentProviderFactory;
     @Mock
     private PaymentProvider paymentProvider;
+
+    @Spy
+    private StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of());
 
     @InjectMocks
     private Checkout checkout;

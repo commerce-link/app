@@ -9,6 +9,7 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.Collection;
 import java.util.List;
@@ -46,9 +47,10 @@ public class CheckoutRequest {
         return getCheckoutItems(catalogId).iterator().next().getPricelistId();
     }
 
-    public List<BasketItem> toBasketItems(String catalogId, Pricelist pricelist) {
+    /** An item whose id is the source or the clone of a pricelist row of the store is found by that row. */
+    public List<BasketItem> toBasketItems(String catalogId, Pricelist pricelist, String storeId, StorePimAliases aliases) {
         return getCheckoutItems(catalogId).stream()
-                .map(i -> toBasketItem(i, pricelist))
+                .map(i -> toBasketItem(storeId, i, pricelist, aliases))
                 .collect(Collectors.toList());
     }
 
@@ -62,24 +64,25 @@ public class CheckoutRequest {
                 .collect(Collectors.toList());
     }
 
-    public List<BasketItem> toBasketItems(String storeId, PricelistRepository pricelistRepository) {
+    /** An item whose id is the source or the clone of a pricelist row of the store is found by that row. */
+    public List<BasketItem> toBasketItems(String storeId, PricelistRepository pricelistRepository, StorePimAliases aliases) {
         return checkoutItems.stream()
-                .map(i -> toBasketItem(storeId, i, pricelistRepository))
+                .map(i -> toBasketItem(storeId, i, pricelistRepository, aliases))
                 .collect(Collectors.toList());
     }
 
-    private BasketItem toBasketItem(String storeId, CheckoutItem checkoutItem, PricelistRepository pricelistRepository) {
+    private BasketItem toBasketItem(String storeId, CheckoutItem checkoutItem, PricelistRepository pricelistRepository, StorePimAliases aliases) {
         Pricelist pricelist = pricelistRepository.find(storeId, checkoutItem.getCatalogId(), checkoutItem.getPricelistId());
 
-        return toBasketItem(checkoutItem, pricelist);
+        return toBasketItem(storeId, checkoutItem, pricelist, aliases);
     }
 
-    private BasketItem toBasketItem(CheckoutItem checkoutItem, Pricelist pricelist) {
+    private BasketItem toBasketItem(String storeId, CheckoutItem checkoutItem, Pricelist pricelist, StorePimAliases aliases) {
         if (pricelist == null) {
             throw new CheckoutException(CheckoutError.PricelistOutdated,
                     "pricelist " + checkoutItem.getPricelistId() + " of catalog " + checkoutItem.getCatalogId() + " not found");
         }
-        AvailabilityAndPrice availabilityAndPrice = pricelist.findByPimId(checkoutItem.getItemId())
+        AvailabilityAndPrice availabilityAndPrice = aliases.find(storeId, pricelist, checkoutItem.getItemId())
                 .orElseThrow(() -> new CheckoutException(CheckoutError.ItemNotFound,
                         "item " + checkoutItem.getItemId() + " not found in pricelist " + pricelist.getPricelistId()));
 

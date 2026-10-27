@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.csv.CSVWriter;
 import pl.commercelink.starter.storage.FileStorage;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +32,9 @@ class RollingPriceAggregateRepositoryTest {
 
     @Mock
     private FileStorage fileStorage;
+
+    @Mock
+    private StorePimAliases aliases;
 
     @InjectMocks
     private RollingPriceAggregateRepository repository;
@@ -79,6 +84,36 @@ class RollingPriceAggregateRepositoryTest {
 
         // then
         assertEquals(100, result.get("pim-1").getMedianLowestPrice30d());
+    }
+
+    @Test
+    void stopLossAndRestockPricesUseTheSourceAggregateForAClone() throws IOException {
+        // given
+        globalAggregate(aggregate("pim-1", 100), aggregate("pim-2", 200));
+        storeAggregate("store-1");
+        when(aliases.clonesWithSources("store-1")).thenReturn(Map.of("clone-1", "pim-1", "clone-9", "missing"));
+
+        // when
+        Map<String, RollingPriceAggregate> result = repository.loadForStore("store-1");
+
+        // then
+        assertEquals(100, result.get("clone-1").getMedianLowestPrice30d());
+        assertEquals(100, result.get("pim-1").getMedianLowestPrice30d());
+        assertFalse(result.containsKey("clone-9"));
+    }
+
+    @Test
+    void cloneWithItsOwnAggregateKeepsIt() throws IOException {
+        // given
+        globalAggregate(aggregate("pim-1", 100));
+        storeAggregate("store-1", aggregate("clone-1", 80));
+        when(aliases.clonesWithSources("store-1")).thenReturn(Map.of("clone-1", "pim-1"));
+
+        // when
+        Map<String, RollingPriceAggregate> result = repository.loadForStore("store-1");
+
+        // then
+        assertEquals(80, result.get("clone-1").getMedianLowestPrice30d());
     }
 
     @Test

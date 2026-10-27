@@ -136,7 +136,6 @@
                             </summary>
                             <ul class="cl-menu-list">
                                 <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}(id=${row.storeId()})}" th:text="#{stores.list.menu.open}"></a></li>
-                                <li><a class="cl-menu-item" th:href="@{/dashboard/store/{id}/copy(id=${row.storeId()}, back=${back})}" th:text="#{stores.list.menu.copy}"></a></li>
                                 <li class="cl-menu-sep" aria-hidden="true"></li>
                                 <li th:if="${row.canConvert()}"><a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
                                        th:href="@{/dashboard/store/{id}/trial/convert(id=${row.storeId()}, back=${back})}"

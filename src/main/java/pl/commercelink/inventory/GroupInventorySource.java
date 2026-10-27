@@ -12,18 +12,18 @@ class GroupInventorySource implements InventorySource {
 
     private final InventoryIndex index;
     private final Predicate<String> enabledSupplier;
-    private final Predicate<String> isStoreEntry;
+    private final StoreEntryKeys storeEntries;
 
     static GroupInventorySource global(InventoryIndex index, Predicate<String> enabledSupplier) {
-        return global(index, enabledSupplier, pimId -> false);
+        return global(index, enabledSupplier, StoreEntryKeys.none());
     }
 
     /**
      * A global source that never merges a group of another PIM entry into the row of a store entry: a global feed
      * row may share a code with the store entry while belonging to a different product (spec 4.3, c-own).
      */
-    static GroupInventorySource global(InventoryIndex index, Predicate<String> enabledSupplier, Predicate<String> isStoreEntry) {
-        return new GroupInventorySource(index, enabledSupplier, isStoreEntry);
+    static GroupInventorySource global(InventoryIndex index, Predicate<String> enabledSupplier, StoreEntryKeys storeEntries) {
+        return new GroupInventorySource(index, enabledSupplier, storeEntries);
     }
 
     static GroupInventorySource own(InventoryIndex index) {
@@ -31,7 +31,7 @@ class GroupInventorySource implements InventorySource {
     }
 
     static GroupInventorySource own(InventoryIndex index, Predicate<String> enabledSupplier) {
-        return new GroupInventorySource(index, enabledSupplier, pimId -> false);
+        return new GroupInventorySource(index, enabledSupplier, StoreEntryKeys.none());
     }
 
     @Override
@@ -50,11 +50,12 @@ class GroupInventorySource implements InventorySource {
 
     private List<MatchedInventory> candidates(InventoryKey lookupKey) {
         List<MatchedInventory> matches = index.findMatching(lookupKey);
-        if (!InventoryIndex.isStoreEntryKey(lookupKey, isStoreEntry)) {
+        if (!InventoryIndex.isStoreEntryKey(lookupKey, storeEntries)) {
             return matches;
         }
         return matches.stream()
-                .filter(group -> InventoryIndex.sameOrNoEntry(group.getInventoryKey(), lookupKey.getId()))
+                .filter(group -> InventoryIndex.sameOrNoEntry(group.getInventoryKey(), lookupKey.getId(),
+                        storeEntries.sourceOf(lookupKey.getId())))
                 .toList();
     }
 

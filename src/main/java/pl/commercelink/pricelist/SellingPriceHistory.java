@@ -30,6 +30,15 @@ public class SellingPriceHistory {
         dailyLowestPrices.merge(date, price, Math::min);
     }
 
+    /** A new history holding the lowest price of every day found in this or the other history; a null other is a copy. */
+    public SellingPriceHistory mergedWith(SellingPriceHistory other) {
+        SellingPriceHistory merged = new SellingPriceHistory(pimId, dailyLowestPrices);
+        if (other != null) {
+            other.dailyLowestPrices.forEach(merged::recordPrice);
+        }
+        return merged;
+    }
+
     public void evictOlderThan(LocalDate cutoff) {
         dailyLowestPrices.entrySet().removeIf(e -> e.getKey().isBefore(cutoff));
     }

@@ -3,7 +3,10 @@ package pl.commercelink.products.information;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
 import pl.commercelink.pim.api.PIMEntryDeletedEvent;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
@@ -33,6 +36,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
@@ -279,6 +283,97 @@ class PimCatalogRegistryTest {
 
         // then
         verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cloneEventRefreshesBeforeMoving() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1", "S"));
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("C");
+        var order = inOrder(copy, productRepository);
+        order.verify(copy).refresh();
+        order.verify(productRepository).save(product);
+        // the handler already refreshed synchronously: no background refresh follows
+        verify(copy, after(300).times(1)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void blankSourceIsAPlainStoreEvent() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1", " "));
+
+        // then: the code matching of a plain store event, then its background refresh; no move from the source
+        verify(productRepository).findAllByEanOrMfnInCategories(List.of("c1"), List.of("5900000000011"), List.of());
+        verify(copy, timeout(2000)).refresh();
+        assertThat(product.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).findAllByPimId("S");
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void codeChangeEventOfACloneIsAPlainStoreEvent() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1"));
+
+        // then
+        verify(copy, timeout(2000)).refresh();
+        assertThat(product.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).findAllByPimId("S");
+        verify(productRepository, never()).save(any());
+    }
+
+    // a product of store s1 (category c1) pinned to pimId, by a sibling code no entry has
+    private Product storeProduct(String pimId) {
+        Product product = new Product();
+        product.setCategoryId("c1");
+        product.setProductId("p1");
+        product.setPimId(pimId);
+        product.setEan("5900000000099");
+        Product projection = new Product();
+        projection.setCategoryId("c1");
+        projection.setProductId("p1");
+        projection.setPimId(pimId);
+        when(productRepository.findAllByPimId(pimId)).thenReturn(List.of(projection));
+        when(productRepository.findByProductId("c1", "p1")).thenReturn(product);
+        ProductCatalog catalog = new ProductCatalog();
+        catalog.setStoreId("s1");
+        CategoryDefinition category = new CategoryDefinition();
+        category.setCategoryId("c1");
+        catalog.getCategories().add(category);
+        when(productCatalogRepository.findAll("s1")).thenReturn(List.of(catalog));
+        return product;
     }
 
     private static PimCatalogDescriptor descriptor(String name) {
