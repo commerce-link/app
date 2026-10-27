@@ -24,6 +24,8 @@ import pl.commercelink.web.orders.ItemMargin;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderLabels;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -174,16 +176,30 @@ public class OfferDetailsPageFactory {
                 : known ? new Market(false, Money.format(offer.getLowestCost()), Money.format(offer.getMedianCost()),
                 offer.getSupplierCount(), offer.getTotalQty())
                 : Market.none();
-        double median = known && offer.getMedianCost() > 0 ? offer.getMedianCost() : 0;
-        boolean estimated = !service && item.getUnitCost() <= 0 && median > 0;
-        double costForMargin = estimated ? median : item.getUnitCost();
+        double estimate = known ? estimatedCost(offer) : 0;
+        boolean estimated = !service && item.getUnitCost() <= 0 && estimate > 0;
+        double costForMargin = estimated ? estimate : item.getUnitCost();
         return new Item(index, item.getId(), item.getCatalogId(), item.getName(), item.getCategory(), item.getMfn(),
                 item.getQty(), Money.inputRounded(item.getUnitPrice()), Money.inputRounded(item.getUnitCost()),
-                item.getUnitPrice(), item.getUnitCost(), costForMargin, estimated, median, item.isConsolidated(), item.getVariantGroupId(),
+                item.getUnitPrice(), item.getUnitCost(), costForMargin, estimated, estimate, item.isConsolidated(), item.getVariantGroupId(),
                 item.isVariantSelected(), service, item.getEstimatedDeliveryDays(), droppedOnSave(item),
                 service ? null : ItemMargin.of(item.getUnitPrice(), costForMargin, DEFAULT_VAT_RATE), market,
                 known ? offer.getMedianCostProviders() : null, known ? offer.getRemainingProviders() : null,
                 known ? offer.getLowestCostQty() : 0, known ? offer.getMedianCostQty() : 0);
+    }
+
+    /**
+     * The cost the page assumes for an item without its own: halfway between the suppliers' lowest and median gross cost
+     * (client 2026-10-27: buying at the median is rare, at the lowest not always possible), rounded to grosze. 0 when
+     * either is unknown. Display only: "Przelicz z cennika" and items added from the inventory store their own cost as
+     * before (the median and the lowest price).
+     */
+    static double estimatedCost(OfferItem offer) {
+        if (offer.getLowestCost() <= 0 || offer.getMedianCost() <= 0) {
+            return 0;
+        }
+        return BigDecimal.valueOf(offer.getLowestCost()).add(BigDecimal.valueOf(offer.getMedianCost()))
+                .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**
@@ -197,7 +213,7 @@ public class OfferDetailsPageFactory {
 
     /**
      * The formulas of OfferController.showEditOfferForm: chosen variants plus delivery, and the profit from it; the cost
-     * of an item without one is the suppliers' median (estimated), which Basket.getTotalCost does not know.
+     * of an item without one is the estimate (estimatedCost), which Basket.getTotalCost does not know.
      */
     private Summary summary(Basket basket, Store store, List<Line> lines) {
         Optional<DeliveryOption> option = deliveryOption(basket, store);

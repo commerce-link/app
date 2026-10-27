@@ -12,7 +12,8 @@ import java.util.Locale;
  * so the gross and the net margin are the same number.
  *
  * <p>tone: {@link Tone#UNKNOWN} when the item has no purchase cost yet (a New item, a service without one) — a 100%
- * margin would be a lie; {@link Tone#LOSS} when the price does not cover the cost. percent is null when it cannot be
+ * margin would be a lie; {@link Tone#LOSS} when the price does not cover the cost or leaves nothing (client 2026-10-27: a margin of 0 or less is
+ * red; no other threshold, since what counts as a good margin depends on the trade and the category). percent is null when it cannot be
  * computed (no cost, or a price of zero); profit is gross, profitNet the same profit without the item's VAT (taxRate as
  * stored on the item, e.g. 1.23).
  */
@@ -37,7 +38,7 @@ public record ItemMargin(Tone tone, String percent, String profit, String profit
                 ? profit.multiply(BigDecimal.valueOf(100)).divide(price, 1, RoundingMode.HALF_UP)
                 : null;
         BigDecimal profitNet = taxRate > 0 ? profit.divide(BigDecimal.valueOf(taxRate), 2, RoundingMode.HALF_UP) : profit;
-        return new ItemMargin(profit.signum() < 0 ? Tone.LOSS : Tone.OK, margin == null ? null : percent(margin),
+        return new ItemMargin(profit.signum() <= 0 ? Tone.LOSS : Tone.OK, margin == null ? null : percent(margin),
                 Money.format(profit.doubleValue()), Money.format(profitNet.doubleValue()), Money.format(cost.doubleValue()));
     }
 

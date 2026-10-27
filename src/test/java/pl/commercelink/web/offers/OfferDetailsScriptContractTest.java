@@ -251,19 +251,19 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
-    void theLiveRecountUsesTheMedianWhenTheCostIsEmpty() throws Exception {
+    void theLiveRecountUsesTheEstimateWhenTheCostIsEmpty() throws Exception {
         // when
         String js = read("static/js/offer-lines.js");
         String recountRow = js.substring(js.indexOf("function recountRow("), js.indexOf("function recount()"));
         String recount = js.substring(js.indexOf("function recount()"), js.indexOf("var totalTimer"));
 
         // then
-        assertThat(js).contains("data-median-cost").contains("function costOf(")
+        assertThat(js).contains("data-estimated-cost").doesNotContain("data-median-cost").contains("function costOf(")
                 .contains("'margin-estimated'").contains("data-cl-sum-estimated");
-        // client 2026-10-27: the cost and margin lines went, the tooltip carries them; a low margin colours the mark
-        assertThat(js).doesNotContain("'line-cost").doesNotContain("'line-margin").doesNotContain("data-cl-line-cost");
-        assertThat(recountRow).contains("mark.classList.toggle('is-low', low);")
-                .contains("+ '\\n\\n' + (mark.getAttribute('data-cl-market-text') || '')");
+        // client 2026-10-27: the cost and margin lines went, the tooltip carries them; red only at a margin of 0 or less
+        assertThat(js).doesNotContain("'line-cost").doesNotContain("'line-margin").doesNotContain("data-cl-line-cost")
+                .doesNotContain("is-low").contains("tone: profit <= 0 ? 'loss' : 'ok',");
+        assertThat(recountRow).contains("+ '\\n\\n' + (mark.getAttribute('data-cl-market-text') || '')");
         assertThat(recountRow).contains("costOf(");
         assertThat(recount).contains("costOf(");
     }

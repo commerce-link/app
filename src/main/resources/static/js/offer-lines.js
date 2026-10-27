@@ -8,7 +8,7 @@
 //   counting only the items the save keeps; the others are outside the total.
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
-//   (qty × cost, the median for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate;
+//   (qty × cost, the estimate for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate;
 //   amounts rounded half up to grosze as Money.format.
 //   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
@@ -197,7 +197,7 @@
         var costCents = Math.round(roundHalfUp(cost) * 100);
         var profit = priceCents - costCents;
         return {
-            tone: profit < 0 ? 'loss' : 'ok',
+            tone: profit <= 0 ? 'loss' : 'ok',
             percent: priceCents > 0 ? percent(divideHalfUp(profit * 1000, priceCents)) : null,
             profit: profit / 100,
             net: divideHalfUp(profit * 100, Math.round(vatRate() * 100)) / 100,
@@ -205,18 +205,19 @@
         };
     }
 
-    // The cost a row counts (OfferDetailsPageFactory.item): its own when entered, else the suppliers' median gross cost
-    // (data-median-cost, also on rows with a cost) for an item that is not a service; estimated tells which one it is.
+    // The cost a row counts (OfferDetailsPageFactory.item): its own when entered, else the estimate halfway between the
+    // suppliers' lowest and median gross cost (data-estimated-cost, also on rows with a cost) for an item that is not a
+    // service; estimated tells which one it is.
     function costOf(row) {
         var own = number(field(row, 'unitCost'));
         if (own > 0) {
             return { cost: own, estimated: false };
         }
-        var median = parseFloat(row.getAttribute('data-median-cost'));
-        if (field(row, 'service').value !== 'true' && isFinite(median) && median > 0) {
-            return { cost: median, estimated: true };
+        var estimate = parseFloat(row.getAttribute('data-estimated-cost'));
+        if (field(row, 'service').value !== 'true' && isFinite(estimate) && estimate > 0) {
+            return { cost: estimate, estimated: true };
         }
-        // as OfferDetailsPageFactory.item: without a median the cost stays what is typed, a negative one included
+        // as OfferDetailsPageFactory.item: without an estimate the cost stays what is typed, a negative one included
         return { cost: own, estimated: false };
     }
 
@@ -246,8 +247,6 @@
             return;
         }
         var margin = marginOf(price, cost);
-        // under 10 % colours the mark (the items.html margin fragment's low)
-        var low = margin.tone === 'ok' && (price - cost) * 10 < price;
         // the margin block, an empty line, the suppliers' blocks the server wrote (items.html margin fragment)
         var text = (margin.tone === 'unknown' ? message('margin-unknown')
             : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone,
@@ -267,7 +266,6 @@
         ['ok', 'loss', 'unknown'].forEach(function (tone) {
             mark.classList.toggle('is-' + tone, tone === margin.tone);
         });
-        mark.classList.toggle('is-low', low);
     }
 
     function recount() {
