@@ -11,6 +11,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.web.dtos.ObjectIdDto;
 
 import java.util.List;
@@ -29,6 +30,7 @@ public class ProductCatalogRestApi {
     private final ProductRecommendationEngine recommendationEngine;
     private final PricelistRepository pricelistRepository;
     private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    private final StorePimAliases pimAliases;
 
     @GetMapping("/PricelistId")
     public ObjectIdDto getNewestPricelistId(@PathVariable("storeId") String storeId,
@@ -76,7 +78,7 @@ public class ProductCatalogRestApi {
             @PathVariable("catalogId") String catalogId,
             @PathVariable("categoryId") String categoryId,
             @PathVariable("productId") String productId) {
-        return new ProductDetails(pimCatalog.withStoreData(storeId), productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId))
+        return new ProductDetails(productCatalogRepository, productRepository, inventory.withEnabledSuppliersAndWarehouseData(storeId), pimAliases)
                 .generate(storeId, catalogId, categoryId, productId);
     }
 

@@ -5,6 +5,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.*;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,6 +19,8 @@ public class AvailabilityAndPriceList {
     private final ProductRecommendationEngine recommendationEngine;
     private final ProductPricingStrategy pricing;
     private final SellingPriceHistoryRepository sellingPriceHistoryRepository;
+    private final StorePimAliases aliases;
+    private final String storeId;
 
     public AvailabilityAndPriceList(
             InventoryView inventory,
@@ -27,6 +30,7 @@ public class AvailabilityAndPriceList {
             ProductRecommendationEngine recommendationEngine,
             RollingPriceAggregateRepository rollingPriceAggregateRepository,
             SellingPriceHistoryRepository sellingPriceHistoryRepository,
+            StorePimAliases aliases,
             String storeId
     ) {
         this.inventory = inventory;
@@ -35,6 +39,8 @@ public class AvailabilityAndPriceList {
         this.productRepository = productRepository;
         this.recommendationEngine = recommendationEngine;
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
+        this.aliases = aliases;
+        this.storeId = storeId;
 
         Map<String, RollingPriceAggregate> priceAggregates = rollingPriceAggregateRepository.loadForStore(storeId);
         this.pricing = new ProductPricingStrategy(inventory, priceAggregates);
@@ -105,7 +111,7 @@ public class AvailabilityAndPriceList {
                 : matchedInventory.getEstimatedDeliveryDays(grossPrice);
         long totalAvailableQty = matchedInventory.atPricePoint(grossPrice).getTotalAvailableQty();
 
-        SellingPriceHistory history = histories.get(p.getPimId());
+        SellingPriceHistory history = historyOf(p.getPimId(), histories);
         long lowest30DaysPrice = history != null ? history.getLowestPriceOtherThan(grossPrice) : grossPrice;
 
         return new AvailabilityAndPrice(
@@ -122,6 +128,16 @@ public class AvailabilityAndPriceList {
                 lowest30DaysPrice,
                 p.isService()
         );
+    }
+
+    /** A clone continues its source's history, also while its row is already the clone's and the history still the source's. */
+    private SellingPriceHistory historyOf(String pimId, Map<String, SellingPriceHistory> histories) {
+        SellingPriceHistory own = histories.get(pimId);
+        SellingPriceHistory ofSource = aliases.sourceOf(storeId, pimId).map(histories::get).orElse(null);
+        if (ofSource == null) {
+            return own;
+        }
+        return own != null ? own.mergedWith(ofSource) : ofSource;
     }
 
     private List<AvailabilityAndPrice> sortByPrice(List<AvailabilityAndPrice> availabilityAndPrices) {

@@ -43,7 +43,6 @@ class SettingsPageTest {
         assertThat(SettingsPage.forRequest(UserRole.ADMIN, "/dashboard/store/rma-centers/new")).isNull();
         assertThat(SettingsPage.forRequest(UserRole.ADMIN, "/dashboard/store")).isNull();
         assertThat(SettingsPage.forRequest(UserRole.SUPER_ADMIN, "/dashboard/store/store-1")).isNull();
-        assertThat(SettingsPage.forRequest(UserRole.SUPER_ADMIN, "/dashboard/store/store-1/copy")).isNull();
         assertThat(SettingsPage.forRequest(UserRole.ADMIN, "/dashboard/orders")).isNull();
         assertThat(SettingsPage.forRequest(null, "/dashboard/store/warehouse")).isNull();
     }

@@ -36,6 +36,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.StoresRepository;
@@ -191,6 +192,6 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
                 mock(ProductRecommendationEngine.class), inventory, mock(MarketplaceConnections.class),
                 mock(PimCategoryOptions.class), mock(SupplierLabels.class), pimCatalog, brandMapper,
                 messageSource, mock(OptimisticLockingExecutor.class), placement,
-                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement));
+                new ProductsAddReview(products, inventory, pimCatalog, brandMapper, messageSource, placement, new StorePimAliases(pimCatalog)));
     }
 }

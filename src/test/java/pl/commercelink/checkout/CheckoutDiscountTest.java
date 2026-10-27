@@ -22,11 +22,13 @@ import pl.commercelink.payments.api.PaymentLineItem;
 import pl.commercelink.payments.api.PaymentLink;
 import pl.commercelink.payments.api.PaymentProvider;
 import pl.commercelink.payments.api.PaymentRequest;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -80,13 +82,14 @@ class CheckoutDiscountTest {
     @Captor
     private ArgumentCaptor<Basket> savedBasket;
 
+    private final StorePimAliases aliases = new StorePimAliases(ScopedPimCatalog.of());
     private Checkout checkout;
     private Store store;
 
     @BeforeEach
     void setUp() {
         checkout = new Checkout(storesRepository, basketsRepository, pricelistRepository, productCatalogRepository,
-                paymentProviderFactory, new DiscountService(discountCodesRepository), "https://app.example");
+                paymentProviderFactory, new DiscountService(discountCodesRepository, aliases), aliases, "https://app.example");
 
         store = new Store();
         store.setStoreId(STORE_ID);

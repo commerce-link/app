@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.checkout.CheckoutError;
 import pl.commercelink.checkout.CheckoutException;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,6 +20,7 @@ import java.util.Optional;
 public class DiscountService {
 
     private final DiscountCodesRepository discountCodesRepository;
+    private final StorePimAliases aliases;
 
     public void apply(Basket basket, String code, String paymentProvider) {
         String normalized = DiscountCode.normalize(code);
@@ -47,7 +49,8 @@ public class DiscountService {
                     detail(basket, normalized, "needs a basket of " + minimum), minimum);
         }
 
-        List<DiscountedLine> lines = DiscountCalculator.calculate(discountCode, basket.getEffectiveBasketItems());
+        List<DiscountedLine> lines = DiscountCalculator.calculate(discountCode, basket.getEffectiveBasketItems(),
+                id -> aliases.aliasesOf(basket.getStoreId(), id));
         if (lines.isEmpty()) {
             throw refusal(CheckoutError.DiscountCodeNotApplicable, basket, normalized, "covers nothing in the basket");
         }

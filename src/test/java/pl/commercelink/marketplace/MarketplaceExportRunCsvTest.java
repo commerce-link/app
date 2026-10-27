@@ -15,6 +15,7 @@ class MarketplaceExportRunCsvTest {
         List<MarketplaceOfferSnapshot> rows = List.of(
                 MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L, "EAN-A", "MFN-A"),
                 MarketplaceOfferSnapshot.removalPending("pim-B", 999L, 2, "EAN-B", null),
+                MarketplaceOfferSnapshot.published("pim-D", 300L, 2L, "EAN-D", "MFN-D").withWaitingRuns(2),
                 MarketplaceOfferSnapshot.published("pim-C", 500L, 1L).rejected("VALIDATION", "price too low"),
                 MarketplaceOfferSnapshot.exportAborted("java.lang.IllegalStateException: marketplace unavailable"));
 
@@ -28,19 +29,19 @@ class MarketplaceExportRunCsvTest {
                         row.outcome(),
                         row.reasonCode() == null ? "" : row.reasonCode(),
                         row.message() == null ? "" : row.message(),
-                        row.ean(), row.manufacturerCode()))
+                        row.ean(), row.manufacturerCode(), row.waitingRuns()))
                 .toList());
     }
 
     @Test
-    void writesTheNineColumnHeader() {
+    void writesTheTenColumnHeader() {
         // when
         String csv = new String(MarketplaceExportRunCsv.toBytes(
                 List.of(MarketplaceOfferSnapshot.published("pim-A", 1999L, 7L))), StandardCharsets.UTF_8);
 
         // then
         assertThat(csv.lines().findFirst()).hasValue(
-                "\"pimId\";\"price\";\"quantity\";\"removalAttempts\";\"outcome\";\"reasonCode\";\"message\";\"ean\";\"manufacturerCode\"");
+                "\"pimId\";\"price\";\"quantity\";\"removalAttempts\";\"outcome\";\"reasonCode\";\"message\";\"ean\";\"manufacturerCode\";\"waitingRuns\"");
     }
 
     @Test
@@ -143,6 +144,22 @@ class MarketplaceExportRunCsvTest {
         assertThat(rows.get(0).removalAttempts()).isEqualTo(2);
         assertThat(rows.get(0).ean()).isNull();
         assertThat(rows.get(0).manufacturerCode()).isNull();
+    }
+
+    @Test
+    void readsNineColumnRowsWrittenBeforeWaitingRunsWereRecordedWithZeroWaitingRuns() {
+        // given
+        byte[] content = ("pimId;price;quantity;removalAttempts;outcome;reasonCode;message;ean;manufacturerCode\n"
+                + "pim-1;1999;7;0;PUBLISHED;;;5900000000011;M1\n").getBytes(StandardCharsets.UTF_8);
+
+        // when
+        List<MarketplaceOfferSnapshot> rows = MarketplaceExportRunCsv.parse(content);
+
+        // then
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.ean()).isEqualTo("5900000000011");
+            assertThat(row.waitingRuns()).isZero();
+        });
     }
 
     @Test

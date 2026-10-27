@@ -2,6 +2,7 @@ package pl.commercelink.pricelist;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +12,7 @@ import java.util.Optional;
 public class PricelistFinder {
 
     private final PricelistRepository pricelistRepository;
+    private final StorePimAliases aliases;
 
     public List<AvailabilityAndPrice> availabilityAndPrices(String storeId, String catalogId) {
         Pricelist pricelist = newestPricelist(storeId, catalogId);
@@ -19,7 +21,7 @@ public class PricelistFinder {
 
     public Optional<AvailabilityAndPrice> findByPimId(String storeId, String catalogId, String pimId) {
         Pricelist pricelist = newestPricelist(storeId, catalogId);
-        return pricelist == null ? Optional.empty() : pricelist.findByPimId(pimId);
+        return pricelist == null ? Optional.empty() : aliases.find(storeId, pricelist, pimId);
     }
 
     private Pricelist newestPricelist(String storeId, String catalogId) {

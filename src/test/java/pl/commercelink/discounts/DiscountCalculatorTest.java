@@ -4,12 +4,49 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.baskets.BasketItem;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 class DiscountCalculatorTest {
+
+    @Test
+    void discountForTheSourceCoversTheClone() {
+        // given: the code names the global entry, the basket holds the store's clone
+        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-S");
+        BasketItem clone = product("C", 100, 1);
+
+        // when
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(clone), aliasesOfS());
+
+        // then
+        assertThat(lines).hasSize(1);
+        assertThat(DiscountCalculator.calculate(code, List.of(clone), Set::of)).isEmpty();
+    }
+
+    @Test
+    void discountForTheCloneCoversTheSource() {
+        // given
+        DiscountCode code = percentage(10, DiscountTarget.Product, "pim-C");
+        BasketItem source = product("S", 100, 1);
+
+        // when / then
+        assertThat(DiscountCalculator.calculate(code, List.of(source), aliasesOfS())).hasSize(1);
+    }
+
+    @Test
+    void discountForAnUnrelatedProductCoversNeither() {
+        // when / then
+        assertThat(DiscountCalculator.calculate(percentage(10, DiscountTarget.Product, "pim-G"), List.of(product("C", 100, 1)), aliasesOfS())).isEmpty();
+    }
+
+    private static Function<String, Set<String>> aliasesOfS() {
+        return id -> new HashSet<>(List.of(id, "pim-S", "pim-C"));
+    }
 
     @Test
     void percentageRoundsHalfUp() {
@@ -19,7 +56,7 @@ class DiscountCalculatorTest {
         BasketItem cable = product("Kabel", 0.10, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, cable));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, cable), Set::of);
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -34,7 +71,7 @@ class DiscountCalculatorTest {
         BasketItem pad = product("Podkładka", 1.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(sticker, pad));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(sticker, pad), Set::of);
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -49,7 +86,7 @@ class DiscountCalculatorTest {
         BasketItem ram = product("RAM", 50.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(ram, gpu));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(ram, gpu), Set::of);
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -63,7 +100,7 @@ class DiscountCalculatorTest {
         BasketItem fans = product("Wentylator", 100.00, 3);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(fans));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(fans), Set::of);
 
         // then
         assertThat(lines).extracting(DiscountedLine::unitPrice).containsExactly(96.67);
@@ -77,7 +114,7 @@ class DiscountCalculatorTest {
         BasketItem ram = product("RAM", 50.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, ram));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu, ram), Set::of);
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -97,7 +134,7 @@ class DiscountCalculatorTest {
         service.setService(true);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(acme, globex, service));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(acme, globex, service), Set::of);
 
         // then
         assertThat(lines).extracting(l -> l.item().getName(), DiscountedLine::unitPrice)
@@ -111,7 +148,7 @@ class DiscountCalculatorTest {
         BasketItem gpu = product("GPU", 100.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gpu), Set::of);
 
         // then
         assertThat(lines).isEmpty();
@@ -124,7 +161,7 @@ class DiscountCalculatorTest {
         BasketItem gift = product("Gratis", 0.00, 1);
 
         // when
-        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gift));
+        List<DiscountedLine> lines = DiscountCalculator.calculate(code, List.of(gift), Set::of);
 
         // then
         assertThat(lines).isEmpty();

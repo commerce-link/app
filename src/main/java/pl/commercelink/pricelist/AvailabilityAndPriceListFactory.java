@@ -7,6 +7,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.information.StorePimAliases;
 
 @Component
 public class AvailabilityAndPriceListFactory {
@@ -17,6 +18,7 @@ public class AvailabilityAndPriceListFactory {
     private final ProductRecommendationEngine recommendationEngine;
     private final RollingPriceAggregateRepository rollingPriceAggregateRepository;
     private final SellingPriceHistoryRepository sellingPriceHistoryRepository;
+    private final StorePimAliases aliases;
 
     @Autowired
     public AvailabilityAndPriceListFactory(
@@ -25,13 +27,15 @@ public class AvailabilityAndPriceListFactory {
             ProductRepository productRepository,
             ProductRecommendationEngine recommendationEngine,
             RollingPriceAggregateRepository rollingPriceAggregateRepository,
-            SellingPriceHistoryRepository sellingPriceHistoryRepository) {
+            SellingPriceHistoryRepository sellingPriceHistoryRepository,
+            StorePimAliases aliases) {
         this.pimCatalog = pimCatalog;
         this.productCatalogRepository = productCatalogRepository;
         this.productRepository = productRepository;
         this.recommendationEngine = recommendationEngine;
         this.rollingPriceAggregateRepository = rollingPriceAggregateRepository;
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
+        this.aliases = aliases;
     }
 
     public AvailabilityAndPriceList create(InventoryView inventory, String storeId) {
@@ -43,6 +47,7 @@ public class AvailabilityAndPriceListFactory {
                 recommendationEngine,
                 rollingPriceAggregateRepository,
                 sellingPriceHistoryRepository,
+                aliases,
                 storeId
         );
     }

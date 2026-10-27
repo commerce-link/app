@@ -77,8 +77,26 @@ class StoreSettingsTemplateTest {
 
         // then
         assertThat(html).contains("Ustawienia sklepu: Sklep Demo");
-        assertThat(html).contains("href=\"/dashboard/store/store-1/copy\"");
         assertThat(html).contains("cl-tile-grid");
         assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void storePageHasNoCopyButton() {
+        // given
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setName("Sklep Demo");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("form", new StoreForm(store));
+        variables.put("isSuperAdmin", true);
+        variables.put("overview", new StoreSettingsOverview(sections()));
+        variables.put("navigation", null);
+
+        // when
+        String html = SettingsTemplateRenderer.render("store", variables);
+
+        // then
+        assertThat(html).doesNotContain("/copy").doesNotContain("fa-copy");
     }
 }
