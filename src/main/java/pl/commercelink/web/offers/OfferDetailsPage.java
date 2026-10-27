@@ -79,13 +79,13 @@ public record OfferDetailsPage(String offerId, String storeId, String shortId, b
     /**
      * market null = a service; margin null = a service. index is the position in the record's item list (the form
      * binding). incomplete = the table save would drop it (BasketItem.isComplete on what the row posts).
-     * costForMargin = the item's own cost, else the suppliers' median (costEstimated); 0 when neither is known.
-     * medianCost = the gross median at the suppliers, 0 when there is none (a service, no offers). Shown only: the
-     * stored unitCost never takes the estimate.
+     * costForMargin = the item's own cost, else estimatedCost (costEstimated); 0 when neither is known.
+     * estimatedCost = halfway between the suppliers' lowest and median gross cost, 0 when there is none (a service, no
+     * offers). Shown only: the stored unitCost never takes the estimate.
      */
     public record Item(int index, String id, String catalogId, String name, String category, String mfn, long qty,
                        String unitPriceInput, String unitCostInput, double unitPrice, double unitCost,
-                       double costForMargin, boolean costEstimated, double medianCost, boolean consolidated, String variantGroupId, boolean variantSelected, boolean service,
+                       double costForMargin, boolean costEstimated, double estimatedCost, boolean consolidated, String variantGroupId, boolean variantSelected, boolean service,
                        Integer estimatedDeliveryDays, boolean incomplete, ItemMargin margin, Market market,
                        String medianProviders, String otherProviders, long lowestQty, long medianQty) implements Line {
     }

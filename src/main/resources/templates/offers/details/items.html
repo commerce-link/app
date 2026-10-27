@@ -153,7 +153,7 @@
              rt=${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}"
     th:classappend="${grouped} ? (${it.variantSelected()} ? 'is-variant' : 'is-variant is-unpicked')"
     th:attr="data-index=${i}, data-price=${it.unitPrice()}, data-cost=${it.unitCost()}, data-qty=${it.qty()},
-             data-median-cost=${it.medianCost() > 0} ? ${it.medianCost()} : null,
+             data-estimated-cost=${it.estimatedCost() > 0} ? ${it.estimatedCost()} : null,
              data-group=${it.variantGroupId() ?: ''}, data-selected=${it.variantSelected()}, data-service=${it.service()},
              data-market=${it.market() != null and !it.market().missing()} ? #{offers.details.margin.market(
                  #{general.currency.amount(${it.market().low()})}, #{general.currency.amount(${it.market().median()})})} : null,
@@ -207,13 +207,12 @@
                th:name="|basketItems[${i}].unitPrice|" th:value="${it.unitPriceInput()}"
                th:attr="aria-label=#{offers.details.line.price(${it.name()})}">
         <!--/* the row's value with its margin mark (client 2026-10-27: the value column and the cost and margin lines went,
-               the numbers are in the mark's tooltip); a low margin colours the mark, as a loss does */-->
+               the numbers are in the mark's tooltip). A variant outside the total has its value muted and no mark. */-->
         <span class="cl-line-amount">
             <span class="cl-line-total-label"><span th:text="#{offers.details.line.value}"></span>&nbsp;<span class="cl-line-total"
                   data-cl-line-total th:text="${money.format(it.qty() * it.unitPrice())}"></span></span><th:block
                   th:if="${it.margin() != null}"><th:block th:replace="~{offers/details/items :: margin(${it})}"></th:block></th:block>
         </span>
-        <span class="cl-line-hint cl-line-outside" th:text="#{offers.details.line.outside}"></span>
     </td>
     <!--/* display only, toggled by the row menu or "Edytuj pozycję", as on the order page; an empty cell is not shown as a card */-->
     <td class="cl-table-flag" th:classappend="${it.consolidated()} ? '' : 'is-empty'" data-cl-line-consolidated-cell
@@ -253,10 +252,10 @@
 
 <!--/* The order's margin mark (Ikona marży z dymkiem) with the offer's own facts in three blocks, as the client drew them
        (2026-10-27): the margin, cost and profit of one unit, the suppliers' lowest and median price with their stock, and
-       the suppliers (those of the median | the others). low = under 10 %, coloured like the old margin line. */-->
+       the suppliers (those of the median | the others). Red (is-loss) at a margin of 0 or less, grey otherwise: no other
+       threshold (client 2026-10-27). */-->
 <span th:fragment="margin(it)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:with="m=${it.margin()}, mk=${it.market()}, nl=${#strings.unescapeJava('\n')},
-               low=${m.tone().name() == 'OK' and (it.unitPrice() - it.costForMargin()) * 10 < it.unitPrice()},
                marginText=${m.tone().name() == 'UNKNOWN'} ? #{offers.details.margin.unknown}
                    : #{${it.costEstimated() ? 'offers.details.margin.estimated' : 'offers.details.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
                        ${#messages.msg('general.currency.amount', m.profit())},
@@ -269,7 +268,7 @@
                        #{general.currency.amount(${mk.median()})}, ${it.medianQty()})},
                marketText=${availability + (#strings.isEmpty(providers) ? '' : nl + nl + #messages.msg('offers.details.margin.distributors', providers))},
                text=${marginText + nl + nl + marketText}"
-      th:classappend="|is-${#strings.toLowerCase(m.tone().name())}${low ? ' is-low' : ''}|"
+      th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
       th:attr="data-tooltip=${text}, aria-label=${text}, data-cl-market-text=${marketText}"><i aria-hidden="true" class="fas"
       th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>
 

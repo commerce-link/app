@@ -278,18 +278,21 @@ class OfferDetailsRenderingTest {
     }
 
     @Test
-    void aMarginUnderTenPercentColoursTheMark() {
+    void onlyAMarginOfZeroOrLessIsRed() {
         // given
         Item thin = new Item(0, "id-0", "cat-1", "Zasilacz", "Zasilacze", "EY7A012", 1, "500.00", "470.00", 500, 470, 470,
                 false, 0, false, null, false, false, null, false, ItemMargin.of(500, 470, 1.23), Market.none(), null, null, 0, 0);
-        OfferDetailsPage page = offer(List.of(thin, laptop(1)), summary(false), customer(true, true), true);
+        Item even = new Item(1, "id-1", "cat-1", "Wentylator", "Wentylatory", "BL093", 1, "77.10", "77.10", 77.10, 77.10, 77.10,
+                false, 0, false, null, false, false, null, false, ItemMargin.of(77.10, 77.10, 1.23), Market.none(), null, null, 0, 0);
+        OfferDetailsPage page = offer(List.of(thin, even), summary(false), customer(true, true), true);
 
         // when
         String html = html(page);
 
         // then
-        assertThat(row(html, 0)).contains("cl-margin cl-tooltip is-lines is-end is-ok is-low\"");
-        assertThat(row(html, 1)).contains("cl-margin cl-tooltip is-lines is-end is-ok\"");
+        // then — client 2026-10-27: a 6 % margin read as red with the former < 10 % tone; grey above 0, red at 0 or less
+        assertThat(row(html, 0)).contains("cl-margin cl-tooltip is-lines is-end is-ok\"").doesNotContain("is-low");
+        assertThat(row(html, 1)).contains("cl-margin cl-tooltip is-lines is-end is-loss\"").contains("fa-exclamation-circle");
     }
 
     @Test
@@ -333,10 +336,10 @@ class OfferDetailsRenderingTest {
         String html = html(estimated);
 
         // then
-        assertThat(row(html, 1)).contains("data-tooltip=\"Szacunki na sztukę\n").contains("– koszt: 1" + NBSP + "721,40 PLN (mediana)\n")
-                .contains("data-median-cost=\"1721.4\"").contains("data-cost=\"0.0\"")
+        assertThat(row(html, 1)).contains("data-tooltip=\"Szacunki na sztukę\n").contains("– koszt: 1" + NBSP + "721,40 PLN (średnia z najniższej i mediany)\n")
+                .contains("data-estimated-cost=\"1721.4\"").contains("data-cost=\"0.0\"")
                 .doesNotContain("koszt ≈").doesNotContain("marża ≈").doesNotContain("brak kosztu");
-        assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("Szacunki");
+        assertThat(row(html, 0)).contains("data-estimated-cost=\"5949.0\"").doesNotContain("Szacunki");
         assertThat(row(html, 1)).contains("name=\"basketItems[1].unitCost\" value=\"0.00\"");
         assertThat(summaryCard(html)).contains("w tym szacowany koszt pozycji bez kosztu");
         assertThat(summaryCard(html)).containsPattern("<span[^>]*data-cl-sum-estimated[^>]*>").doesNotContainPattern("<span[^>]*\\bhidden\\b[^>]*data-cl-sum-estimated");
@@ -349,7 +352,7 @@ class OfferDetailsRenderingTest {
         String row = row(html(fullOffer()), 4);
 
         // then
-        assertThat(row).doesNotContain("data-median-cost");
+        assertThat(row).doesNotContain("data-estimated-cost");
     }
 
     private static Summary estimatedSummary(boolean estimated) {
@@ -387,7 +390,8 @@ class OfferDetailsRenderingTest {
         assertThat(count(html, "data-cl-mark-selected>wybrany — w sumie")).isEqualTo(1);
         assertThat(row(html, 2)).contains("data-cl-mark-selected>wybrany — w sumie").contains("data-group=\"Monitor\"")
                 .contains("data-selected=\"true\"");
-        assertThat(row(html, 3)).contains("poza sumą").contains("data-selected=\"false\"")
+        // client 2026-10-27: no "poza sumą" words; the value is muted by the row's is-unpicked class
+        assertThat(row(html, 3)).doesNotContain("poza sumą").contains("data-selected=\"false\"")
                 .contains("data-cl-mark-selected hidden=\"hidden\">");
         assertThat(html).contains("class=\"cl-line is-variant is-unpicked\"");
         // client 2026-10-27: a service under "Usługi" needs no pill nor "usługa" under its value, and has no margin

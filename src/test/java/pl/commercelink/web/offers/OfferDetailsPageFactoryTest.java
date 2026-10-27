@@ -122,11 +122,16 @@ class OfferDetailsPageFactoryTest {
         assertThat(summary.deliveryRemoved()).isFalse();
     }
 
+    /** The lowest cost 100 under the median, so the estimate is the median − 50. */
     private OfferItem offerFor(BasketItem item, double median) {
+        return offerFor(item, median - 100, median);
+    }
+
+    private OfferItem offerFor(BasketItem item, double lowest, double median) {
         OfferItem offer = mock(OfferItem.class);
         when(offer.getBasketItem()).thenReturn(item);
         when(offer.isExistInInventory()).thenReturn(true);
-        when(offer.getLowestCost()).thenReturn(median - 100);
+        when(offer.getLowestCost()).thenReturn(lowest);
         when(offer.getMedianCost()).thenReturn(median);
         when(offer.getSupplierCount()).thenReturn(3);
         return offer;
@@ -138,26 +143,26 @@ class OfferDetailsPageFactoryTest {
     }
 
     @Test
-    void anItemWithoutCostTakesTheSuppliersMedianForItsMargin() {
+    void anItemWithoutCostTakesHalfwayBetweenTheLowestAndTheMedianForItsMargin() {
         // given
         BasketItem noCost = item("A", 1, 2199, 0);
         Basket basket = basket(noCost);
 
         // when
-        Item line = (Item) buildWithMarket(basket, offerFor(noCost, 1721.40)).lines().get(0);
+        Item line = (Item) buildWithMarket(basket, offerFor(noCost, 1621.40, 1721.40)).lines().get(0);
 
-        // then
+        // then — client 2026-10-27: buying at the median is rare, so the estimate sits between the lowest and the median
         assertThat(line.costEstimated()).isTrue();
-        assertThat(line.costForMargin()).isEqualTo(1721.40);
-        assertThat(line.medianCost()).isEqualTo(1721.40);
+        assertThat(line.costForMargin()).isEqualTo(1671.40);
+        assertThat(line.estimatedCost()).isEqualTo(1671.40);
         assertThat(line.unitCost()).isZero();
-        assertThat(line.margin().percent()).isEqualTo(ItemMargin.of(2199, 1721.40, 1.23).percent());
+        assertThat(line.margin().percent()).isEqualTo(ItemMargin.of(2199, 1671.40, 1.23).percent());
         assertThat(line.margin().tone()).isEqualTo(ItemMargin.Tone.OK);
         assertThat(noCost.getUnitCost()).isZero();
     }
 
     @Test
-    void anItemWithItsOwnCostIgnoresTheMedian() {
+    void anItemWithItsOwnCostIgnoresTheEstimate() {
         // given
         BasketItem costed = item("A", 1, 2199, 1534.17);
         Basket basket = basket(costed);
@@ -168,7 +173,31 @@ class OfferDetailsPageFactoryTest {
         // then
         assertThat(line.costEstimated()).isFalse();
         assertThat(line.costForMargin()).isEqualTo(1534.17);
-        assertThat(line.medianCost()).isEqualTo(1721.40);
+        assertThat(line.estimatedCost()).isEqualTo(1671.40);
+    }
+
+    @Test
+    void theEstimateIsRoundedHalfUpToGrosze() {
+        // given
+        BasketItem noCost = item("A", 1, 20, 0);
+
+        // when
+        Item line = (Item) buildWithMarket(basket(noCost), offerFor(noCost, 10.01, 10.02)).lines().get(0);
+
+        // then
+        assertThat(line.estimatedCost()).isEqualTo(10.02);
+    }
+
+    @Test
+    void withOneSupplierTheEstimateIsItsCost() {
+        // given — MatchedInventory.getMedianPrice is the lowest price when fewer than two suppliers offer the item
+        BasketItem noCost = item("A", 1, 500, 0);
+
+        // when
+        Item line = (Item) buildWithMarket(basket(noCost), offerFor(noCost, 412.30, 412.30)).lines().get(0);
+
+        // then
+        assertThat(line.costForMargin()).isEqualTo(412.30);
     }
 
     @Test
@@ -195,7 +224,7 @@ class OfferDetailsPageFactoryTest {
         // then
         assertThat(line.costEstimated()).isFalse();
         assertThat(line.costForMargin()).isZero();
-        assertThat(line.medianCost()).isZero();
+        assertThat(line.estimatedCost()).isZero();
         assertThat(line.margin().tone()).isEqualTo(ItemMargin.Tone.UNKNOWN);
     }
 
@@ -212,7 +241,7 @@ class OfferDetailsPageFactoryTest {
         // then
         assertThat(line.margin()).isNull();
         assertThat(line.costEstimated()).isFalse();
-        assertThat(line.medianCost()).isZero();
+        assertThat(line.estimatedCost()).isZero();
     }
 
     @Test
@@ -230,8 +259,8 @@ class OfferDetailsPageFactoryTest {
         OfferDetailsPage.Summary summary = buildWithMarket(basket, offerFor(unpicked, 70), offerFor(counted, 120)).summary();
 
         // then
-        assertThat(summary.cost()).isEqualTo(Money.format(50 + 2 * 120));
-        assertThat(summary.profitGross()).isEqualTo(Money.format(700 - 290));
+        assertThat(summary.cost()).isEqualTo(Money.format(50 + 2 * 70));
+        assertThat(summary.profitGross()).isEqualTo(Money.format(700 - 190));
         assertThat(summary.costEstimated()).isTrue();
     }
 

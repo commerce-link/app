@@ -560,7 +560,7 @@ class OrderDetailsTemplateTest {
 
         // then: 450 net + 23% = 553,50 gross against 500,00
         assertThat(html).contains("cl-mark cl-margin cl-tooltip is-lines is-end is-loss")
-                .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
+                .contains("Sprzedaż bez zysku: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
                 .contains("class=\"fas fa-exclamation-circle\"");
     }
 
