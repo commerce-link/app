@@ -236,18 +236,92 @@ class OfferDetailsRenderingTest {
                 .contains("name=\"basketItems[0].consolidated\" value=\"false\"")
                 .contains("name=\"basketItems[0].estimatedDeliveryDays\" value=\"5\"")
                 .contains("name=\"basketItems[0].variantGroupId\" value=\"\"")
-                .contains("koszt 5" + NBSP + "810,00").contains("marża 15,8 %").contains("20" + NBSP + "697,00")
+                .containsPattern(">wartość</span>&nbsp;<span class=\"cl-line-total\"\\s+data-cl-line-total>20" + NBSP + "697,00</span>")
+                .doesNotContain("koszt 5" + NBSP + "810,00").doesNotContain("marża 15,8 %")
                 .contains("href=\"/dashboard/offer/" + ID + "/items/0\"").contains("data-cl-dialog-open=\"item-edit-dialog\"")
                 .contains("Koszt u dostawców: 5" + NBSP + "810,00 PLN → 5" + NBSP + "949,00 PLN (najniższy → mediana)");
     }
 
     @Test
-    void zeroCostShowsWarningLine() {
+    void aMissingCostIsToldInTheMarginTooltipOnly() {
         // when
         String row = row(html(fullOffer()), 1);
 
+        // then — client 2026-10-27: the cost and margin lines under the price and the value went, the tooltip says it
+        assertThat(row).contains("cl-margin cl-tooltip is-lines is-end is-unknown\"")
+                .contains("data-tooltip=\"Brak kosztu — marży nie da się policzyć.")
+                .doesNotContain("brak kosztu").doesNotContain("marża: ?").doesNotContain("cl-line-hint is-warn");
+    }
+
+    @Test
+    void theMarginTooltipHasTheUnitFiguresTheSuppliersAndTheirNamesInBlocks() {
+        // when
+        String row = row(html(fullOffer()), 0);
+        String tooltip = row.substring(row.indexOf("data-tooltip=\"") + 14, row.indexOf('"', row.indexOf("data-tooltip=\"") + 14));
+
+        // then — the client's drawing: margin, cost, profit; lowest and median price with stock; median | other suppliers
+        assertThat(tooltip).isEqualTo("Na sztukę\n– marża: 15,8 %\n– koszt: 5" + NBSP + "810,00 PLN\n"
+                + "– zysk: 1" + NBSP + "089,00 PLN brutto (885,37 PLN netto)\n\n"
+                + "Dostępność\n– cena najniższa: 5" + NBSP + "810,00 PLN (2 szt.)\n– cena mediana: 5" + NBSP + "949,00 PLN (7 szt.)\n\n"
+                + "Dystrybutorzy\nAction | Elko, AB");
+        // the script rebuilds the margin block and keeps the suppliers' blocks the server wrote
+        assertThat(row).contains("data-cl-market-text=\"Dostępność\n");
+    }
+
+    @Test
+    void anItemNoSupplierOffersSaysSoInTheTooltip() {
+        // when
+        String row = row(html(fullOffer()), 2);
+
         // then
-        assertThat(row).contains("<span class=\"cl-line-hint is-warn\"").contains("brak kosztu").contains("marża: ?");
+        assertThat(row).contains("Dostępność\n– brak ofert u dostawców\"").doesNotContain("Dystrybutorzy");
+    }
+
+    @Test
+    void aMarginUnderTenPercentColoursTheMark() {
+        // given
+        Item thin = new Item(0, "id-0", "cat-1", "Zasilacz", "Zasilacze", "EY7A012", 1, "500.00", "470.00", 500, 470, 470,
+                false, 0, false, null, false, false, null, false, ItemMargin.of(500, 470, 1.23), Market.none(), null, null, 0, 0);
+        OfferDetailsPage page = offer(List.of(thin, laptop(1)), summary(false), customer(true, true), true);
+
+        // when
+        String html = html(page);
+
+        // then
+        assertThat(row(html, 0)).contains("cl-margin cl-tooltip is-lines is-end is-ok is-low\"");
+        assertThat(row(html, 1)).contains("cl-margin cl-tooltip is-lines is-end is-ok\"");
+    }
+
+    @Test
+    void aLongCodeIsOneCopyButtonAfterItsLabel() {
+        // when
+        String row = row(html(fullOffer()), 0);
+
+        // then — client 2026-10-27: a long MFN ran over two lines; it is cut to one and copies whole, as on the order page
+        assertThat(row).containsPattern("<span class=\"cl-line-code\"><span>MFN</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\"\\s+"
+                        + "data-cl-copy=\"21ML003RPB\" title=\"21ML003RPB\" aria-label=\"Kopiuj kod producenta 21ML003RPB\">")
+                .contains("<span class=\"cl-copy-text\" data-cl-line-mfn>21ML003RPB</span>")
+                .doesNotContain("cl-code-nowrap");
+    }
+
+    @Test
+    void mergingOnTheInvoiceIsAColumnAndAMenuEntryLikeOnTheOrderPage() {
+        // given
+        OfferDetailsPage page = offer(List.of(laptop(0), withoutQuantity(1)), summary(false), customer(true, true), true);
+
+        // when
+        String html = html(page);
+
+        // then — the pill went; the tick sits in its own column and the row menu toggles it
+        assertThat(html).contains("<th scope=\"col\" class=\"cl-table-flag\">Połącz na" + NBSP + "FV</th>")
+                .contains("<col class=\"cl-col-money-in\"><col class=\"cl-col-flag\"><col class=\"cl-col-menu\">")
+                .doesNotContain("Wartość (PLN)").doesNotContain("data-cl-mark-consolidated");
+        assertThat(row(html, 1)).contains("class=\"cl-table-flag\" data-cl-line-consolidated-cell")
+                .containsPattern("<span data-cl-line-consolidated><span\\s+class=\"cl-table-flag-mark\" aria-hidden=\"true\">✓</span>")
+                .contains("data-cl-line-consolidate>Rozłącz na fakturze</button>");
+        assertThat(row(html, 0)).contains("class=\"cl-table-flag is-empty\" data-cl-line-consolidated-cell")
+                .contains("<span data-cl-line-consolidated hidden=\"hidden\">")
+                .contains("<li hidden data-cl-lines-reveal><button type=\"button\" class=\"cl-menu-item\" data-cl-line-consolidate>Połącz na fakturze</button></li>");
     }
 
     @Test
@@ -259,10 +333,10 @@ class OfferDetailsRenderingTest {
         String html = html(estimated);
 
         // then
-        assertThat(row(html, 1)).contains("koszt ≈ 1" + NBSP + "721,40<").contains("marża ≈ ")
-                .contains("data-tooltip=\"Szacowana marża:").contains("data-median-cost=\"1721.4\"")
-                .contains("data-cost=\"0.0\"").doesNotContain("brak kosztu");
-        assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("≈").doesNotContain("Szacowana marża");
+        assertThat(row(html, 1)).contains("data-tooltip=\"Szacunki na sztukę\n").contains("– koszt: 1" + NBSP + "721,40 PLN (mediana)\n")
+                .contains("data-median-cost=\"1721.4\"").contains("data-cost=\"0.0\"")
+                .doesNotContain("koszt ≈").doesNotContain("marża ≈").doesNotContain("brak kosztu");
+        assertThat(row(html, 0)).contains("data-median-cost=\"5949.0\"").doesNotContain("Szacunki");
         assertThat(row(html, 1)).contains("name=\"basketItems[1].unitCost\" value=\"0.00\"");
         assertThat(summaryCard(html)).contains("w tym szacowany koszt pozycji bez kosztu");
         assertThat(summaryCard(html)).containsPattern("<span[^>]*data-cl-sum-estimated[^>]*>").doesNotContainPattern("<span[^>]*\\bhidden\\b[^>]*data-cl-sum-estimated");
@@ -297,8 +371,7 @@ class OfferDetailsRenderingTest {
         String html = html(page);
 
         // then
-        assertThat(row(html, 1)).contains("Pozycja zniknie przy zapisie").doesNotContain("data-cl-line-warn hidden")
-                .contains("Połącz na FV");
+        assertThat(row(html, 1)).contains("Pozycja zniknie przy zapisie").doesNotContain("data-cl-line-warn hidden");
         assertThat(row(html, 0)).contains("data-cl-line-warn hidden");
     }
 
@@ -317,7 +390,9 @@ class OfferDetailsRenderingTest {
         assertThat(row(html, 3)).contains("poza sumą").contains("data-selected=\"false\"")
                 .contains("data-cl-mark-selected hidden=\"hidden\">");
         assertThat(html).contains("class=\"cl-line is-variant is-unpicked\"");
-        assertThat(row(html, 4)).contains("Usługa").doesNotContain("cl-line-hint");
+        // client 2026-10-27: a service under "Usługi" needs no pill nor "usługa" under its value, and has no margin
+        assertThat(row(html, 4)).doesNotContain(">Usługa<").doesNotContain(">usługa<").doesNotContain("cl-margin")
+                .contains(">wartość</span>");
     }
 
     @Test
@@ -336,7 +411,7 @@ class OfferDetailsRenderingTest {
                 .contains("value=\"Monitor\"");
         assertThat(services).contains("<tr class=\"cl-table-group\" data-cl-section-head>")
                 .contains("<th scope=\"rowgroup\" colspan=\"6\"><span class=\"cl-eyebrow\">Usługi</span></th>")
-                .contains("data-index=\"4\"").contains("Usługa");
+                .contains("data-index=\"4\"").doesNotContain(">Usługa<");
         assertThat(services.indexOf("data-cl-section-head")).isLessThan(services.indexOf("data-index=\"4\""));
         // both sections are always there, so a draft that brings the first service has its place
         assertThat(productsOnly).contains("data-cl-lines-section=\"products\"").contains("data-cl-lines-section=\"services\"")

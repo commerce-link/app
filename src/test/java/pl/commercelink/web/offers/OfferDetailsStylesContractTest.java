@@ -78,9 +78,14 @@ class OfferDetailsStylesContractTest {
         // when
         String block = block();
 
-        // then — the fixed table layout let a 200-character code or a name without spaces run past the page edge
+        // then — the fixed table layout let a 200-character code or a name without spaces run past the page edge, and a
+        // long code ran over two lines (client 2026-10-27): it is cut on one line, its copy icon kept after it
         assertThat(block).contains(".cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }")
-                .contains(".cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;");
+                .contains(".cl-table.is-line-editor tbody th.cl-table-key .cl-table-sub { display: flex; align-items: baseline; gap: 0 4px; min-width: 0; white-space: nowrap; contain: inline-size; }")
+                .contains(".cl-table.is-line-editor .cl-table-sub > [data-cl-line-category] { flex: 0 4 auto; min-width: 3em;")
+                .contains(".cl-table.is-line-editor .cl-line-code .cl-copy-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }")
+                .contains(".cl-table.is-line-editor .cl-line-code .cl-copy-icon { flex: none; }")
+                .doesNotContain("cl-code-nowrap");
     }
 
     @Test

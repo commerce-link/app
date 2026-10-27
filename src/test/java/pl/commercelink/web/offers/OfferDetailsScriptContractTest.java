@@ -259,12 +259,39 @@ class OfferDetailsScriptContractTest {
 
         // then
         assertThat(js).contains("data-median-cost").contains("function costOf(")
-                .contains("'line-cost-estimated'").contains("'line-margin-estimated'")
                 .contains("'margin-estimated'").contains("data-cl-sum-estimated");
-        // a low margin is shown by its tone only: the "· niska" texts pushed the line past the value column
-        assertThat(js).doesNotContain("'line-margin-low'").doesNotContain("'line-margin-estimated-low'");
+        // client 2026-10-27: the cost and margin lines went, the tooltip carries them; a low margin colours the mark
+        assertThat(js).doesNotContain("'line-cost").doesNotContain("'line-margin").doesNotContain("data-cl-line-cost");
+        assertThat(recountRow).contains("mark.classList.toggle('is-low', low);")
+                .contains("+ '\\n\\n' + (mark.getAttribute('data-cl-market-text') || '')");
         assertThat(recountRow).contains("costOf(");
         assertThat(recount).contains("costOf(");
+    }
+
+    @Test
+    void theRowMenuTogglesMergingOnTheInvoiceInTheDraft() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String toggle = js.substring(js.indexOf("function toggleConsolidated("), js.indexOf("// --- before a save"));
+
+        // then — written into the hidden field like any edit, so it waits for "Zapisz zmiany"
+        assertThat(js).contains("target.hasAttribute('data-cl-line-consolidate')").contains("toggleConsolidated(row);");
+        assertThat(toggle).contains("consolidated.value = consolidated.value === 'true' ? 'false' : 'true';")
+                .contains("showConsolidated(row);").contains("changed();");
+        assertThat(js).contains("message(on ? 'deconsolidate' : 'consolidate')")
+                .doesNotContain("data-cl-mark-consolidated");
+    }
+
+    @Test
+    void anEditedCodeIsRenderedAsTheCopyButtonTheServerDraws() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String renderSub = js.substring(js.indexOf("function renderSub("), js.indexOf("function showConsolidated("));
+
+        // then
+        assertThat(renderSub).contains("copy.className = 'cl-copy-inline';").contains("copy.setAttribute('data-cl-copy', mfn);")
+                .contains("code.className = 'cl-copy-text';").contains("wrap.className = 'cl-line-code';")
+                .contains("message('copy-mfn', [mfn])").doesNotContain("cl-code-nowrap");
     }
 
     @Test
