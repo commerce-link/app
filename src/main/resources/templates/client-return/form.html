@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The courier booking (state BOOK), or only the reason it cannot be booked yet (BOOK_UNAVAILABLE). The server checks
+       the form before the carrier is called (novalidate), and a refused one comes back flashed with the typed values and
+       the errors of its fields. */-->
+<section th:fragment="form" id="return-form" class="cl-card" aria-labelledby="return-form-title"
+         th:with="unavailable=${view.state().name() == 'BOOK_UNAVAILABLE'},
+                  notice=${clientReturnNotice != null and clientReturnNotice.target() == 'form' ? clientReturnNotice : null},
+                  details=${form.shippingDetails},
+                  packageError=${errors['selectedPackageTemplateId']}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="return-form-title" th:text="#{client.return.form.title}"></h2>
+    </div>
+
+    <!--/* The only notice that reaches this state says the same as the alert, so the alert stands alone. */-->
+    <div class="cl-card-inset" th:if="${unavailable}" th:with="email=${publicPage.contactEmail}">
+        <div class="cl-alert is-warn">
+            <span class="cl-alert-icon" aria-hidden="true"><i class="fas fa-exclamation-triangle"></i></span>
+            <div>
+                <p class="cl-alert-title" th:text="#{client.return.form.unavailable.title}"></p>
+                <p class="cl-alert-text" th:if="${email != null}"><th:block th:text="#{client.return.form.unavailable.write}"></th:block>
+                    <a th:href="'mailto:' + ${email}" th:text="${email}"></a>
+                    <th:block th:text="#{client.return.form.unavailable.writeEnd}"></th:block></p>
+                <p class="cl-alert-text" th:if="${email == null}" th:text="#{client.return.form.unavailable.noContact}"></p>
+            </div>
+        </div>
+    </div>
+
+    <form th:unless="${unavailable}" method="post" novalidate data-cl-submit-once th:action="@{|${returnPath}/submit|}">
+        <div class="cl-card-inset"
+             th:with="labels=${ {'shippingDetails.name': #messages.msg('order.address.name'),
+                                 'shippingDetails.surname': #messages.msg('order.address.surname'),
+                                 'shippingDetails.companyName': #messages.msg('order.address.company'),
+                                 'shippingDetails.streetAndNumber': #messages.msg('order.address.street'),
+                                 'shippingDetails.postalCode': #messages.msg('order.address.postal'),
+                                 'shippingDetails.city': #messages.msg('order.address.city'),
+                                 'shippingDetails.email': #messages.msg('client.offer.data.email'),
+                                 'shippingDetails.phone': #messages.msg('client.offer.data.phone'),
+                                 'selectedPackageTemplateId': #messages.msg('client.return.form.package')} }">
+            <th:block th:if="${notice != null}">
+                <div th:replace="~{client-return/notice :: notice(${notice})}"></div>
+            </th:block>
+            <div th:replace="~{fragments/settings-form :: errorSummaryTitled('return-form-errors', ${errors}, ${labels}, 'client.return.form.errors.title')}"></div>
+
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{client.return.form.package}"></legend>
+                <!--/* One box needs no choice; up to five are compared side by side; more would push the address off the screen. */-->
+                <th:block th:if="${#lists.size(packageOptions) == 1}" th:with="option=${packageOptions[0]}">
+                    <input type="hidden" name="selectedPackageTemplateId" th:value="${option.id}">
+                    <p class="cl-note" id="selectedPackageTemplateId"><th:block th:text="#{client.return.form.package.one}"></th:block> <strong th:text="${option.title}"></strong><th:block
+                            th:if="${option.parcels != null}" th:text="' · ' + (${option.parcelCount > 1} ? #{client.return.form.package.parcels(${option.parcelCount}, ${option.parcels})} : ${option.parcels})"></th:block></p>
+                </th:block>
+                <fieldset th:if="${#lists.size(packageOptions) > 1 and #lists.size(packageOptions) <= 5}" class="cl-choice-cards"
+                          th:attr="aria-describedby=${packageError != null ? 'selectedPackageTemplateId-error' : null}">
+                    <legend th:text="#{client.return.form.package.legend}"></legend>
+                    <label class="cl-choice" th:each="option : ${packageOptions}" th:with="checked=${option.id == selectedPackage}">
+                        <input type="radio" name="selectedPackageTemplateId" th:value="${option.id}" th:id="${checked ? 'selectedPackageTemplateId' : null}" th:checked="${checked}">
+                        <span class="cl-choice-text">
+                            <span class="cl-choice-title" th:text="${option.title}"></span>
+                            <span class="cl-choice-description" th:if="${option.parcels != null}"
+                                  th:text="${option.parcelCount > 1} ? #{client.return.form.package.parcels(${option.parcelCount}, ${option.parcels})} : ${option.parcels}"></span>
+                        </span>
+                    </label>
+                </fieldset>
+                <p th:if="${packageError != null and #lists.size(packageOptions) <= 5}" class="cl-field-error" id="selectedPackageTemplateId-error">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="#{${packageError}}"></span>
+                </p>
+                <th:block th:if="${#lists.size(packageOptions) > 5}">
+                    <div th:replace="~{fragments/settings-form :: selectField('selectedPackageTemplateId', 'client.return.form.package.legend', ${selectedPackage},
+                        ${packageOptions.![{'value': id, 'label': title + (parcels == null ? '' : ' · ' + (parcelCount > 1
+                            ? #messages.msg('client.return.form.package.parcels', parcelCount, parcels) : parcels))}]},
+                        null, true, ${packageError}, null)}"></div>
+                </th:block>
+            </fieldset>
+
+            <fieldset class="cl-fieldset">
+                <legend class="cl-fieldset-title" th:text="#{client.return.form.address}"></legend>
+                <div class="cl-form-grid">
+                    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.name', 'order.address.name', ${details?.name}, 'text', 'section-return given-name', true, ${errors['shippingDetails.name']}, null, null, null, false, 100)}"></div>
+                    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.surname', 'order.address.surname', ${details?.surname}, 'text', 'section-return family-name', true, ${errors['shippingDetails.surname']}, null, null, null, false, 100)}"></div>
+                    <div th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.companyName', 'order.address.company', ${details?.companyName}, 'text', 'section-return organization', false, ${errors['shippingDetails.companyName']}, null, null, null, false, 100)}"></div>
+                    <div th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.streetAndNumber', 'order.address.street', ${details?.streetAndNumber}, 'text', 'section-return street-address', true, ${errors['shippingDetails.streetAndNumber']}, null, null, null, false, 100)}"></div>
+                    <div class="cl-span-2" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.postalCode', 'order.address.postal', ${details?.postalCode}, 'text', 'section-return postal-code', true, ${errors['shippingDetails.postalCode']}, null, null, null, false, 100)}"></div>
+                    <div class="cl-span-4" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.city', 'order.address.city', ${details?.city}, 'text', 'section-return address-level2', true, ${errors['shippingDetails.city']}, null, null, null, false, 100)}"></div>
+                    <!--/* Returns are picked up in Poland only: the server sets the country, whatever is posted. */-->
+                    <div class="cl-field">
+                        <span class="cl-label" th:text="#{order.address.country}"></span>
+                        <p class="cl-static-value" th:text="${T(pl.commercelink.web.dtos.CountryOptions).displayName('PL', #locale)}"></p>
+                    </div>
+                    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.email', 'client.offer.data.email', ${details?.email}, 'email', 'section-return email', true, ${errors['shippingDetails.email']}, null, null, null, false, 100)}"></div>
+                    <div class="cl-span-3" th:insert="~{fragments/settings-form :: textFieldLimited('shippingDetails.phone', 'client.offer.data.phone', ${details?.phone}, 'tel', 'section-return tel', true, ${errors['shippingDetails.phone']}, null, null, null, false, 100)}"></div>
+                </div>
+            </fieldset>
+        </div>
+        <div class="cl-card-footer">
+            <button class="cl-button is-primary" type="submit" th:text="#{client.return.form.submit}"></button>
+            <p class="cl-help" th:text="#{client.return.form.submit.help}"></p>
+        </div>
+    </form>
+</section>
+
+</body>
+</html>

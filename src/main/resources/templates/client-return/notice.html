@@ -1,0 +1,14 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The outcome of a submission (ClientReturnNotice), on top of its card; focusable, because the redirect anchors to the card. */-->
+<div th:fragment="notice(notice)" class="cl-alert" role="status" tabindex="-1"
+     th:classappend="${notice.tone() == 'ok'} ? 'is-ok' : (${notice.tone() == 'info'} ? 'is-info' : 'is-bad')">
+    <span class="cl-alert-icon" aria-hidden="true"><i th:class="${notice.tone() == 'ok'} ? 'fas fa-check-circle'
+            : (${notice.tone() == 'info'} ? 'fas fa-info-circle' : 'fas fa-exclamation-circle')"></i></span>
+    <div><p class="cl-alert-text" th:text="${notice.text()}"></p></div>
+</div>
+
+</body>
+</html>

@@ -238,13 +238,23 @@ public class Shipment {
      */
     @DynamoDBIgnore
     public boolean isCreating() {
-        return creation != null && creation.isInProgress(LocalDateTime.now());
+        return isCreating(LocalDateTime.now());
+    }
+
+    @DynamoDBIgnore
+    public boolean isCreating(LocalDateTime now) {
+        return creation != null && creation.isInProgress(now);
     }
 
     /** The creation failed, or was never confirmed (see isCreating). */
     @DynamoDBIgnore
     public boolean creationFailed() {
-        return creation != null && (creation.isFailed() || creation.isUnconfirmed(LocalDateTime.now()));
+        return creationFailed(LocalDateTime.now());
+    }
+
+    @DynamoDBIgnore
+    public boolean creationFailed(LocalDateTime now) {
+        return creation != null && (creation.isFailed() || creation.isUnconfirmed(now));
     }
 
     /**

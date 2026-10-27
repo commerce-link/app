@@ -149,4 +149,18 @@ class ShipmentTest {
         assertFalse(stuck.awaitsProviderAnswer(LocalDateTime.now()));
         assertTrue(stuck.isCreationPendingFor("cmd-1"));
     }
+
+    @Test
+    void creationStateIsReadAgainstTheGivenClock() {
+        // given
+        LocalDateTime requested = LocalDateTime.of(2026, 10, 23, 12, 0);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCreation(ShipmentCreationState.pending("cmd-1", requested));
+
+        // then
+        assertTrue(shipment.isCreating(requested.plusMinutes(9)));
+        assertFalse(shipment.creationFailed(requested.plusMinutes(9)));
+        assertFalse(shipment.isCreating(requested.plusMinutes(11)));
+        assertTrue(shipment.creationFailed(requested.plusMinutes(11)));
+    }
 }

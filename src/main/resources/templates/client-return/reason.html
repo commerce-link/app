@@ -1,0 +1,21 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The store's own words, quoted as text with their line breaks (white-space: pre-line); the RMA keeps no date for them. */-->
+<section th:fragment="reason" id="return-reason" class="cl-card" aria-labelledby="return-reason-title"
+         th:with="reason=${view.rejectionReason()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="return-reason-title" th:text="#{client.return.reason.title}"></h2>
+    </div>
+    <div class="cl-card-inset">
+        <th:block th:if="${reason != null}">
+            <blockquote class="cl-quote" th:text="${reason}"></blockquote>
+            <p class="cl-quote-source" th:text="#{client.return.reason.source}"></p>
+        </th:block>
+        <p th:if="${reason == null}" class="cl-note" th:text="#{client.return.reason.none}"></p>
+    </div>
+</section>
+
+</body>
+</html>
