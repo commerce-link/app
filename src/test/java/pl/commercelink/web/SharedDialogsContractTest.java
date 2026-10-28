@@ -107,7 +107,7 @@ class SharedDialogsContractTest {
                 .containsPattern("type=\"text\" readonly id=\"addPaymentExpected\"")
                 .doesNotContain("type=\"number\"").doesNotContain("step=")
                 .contains("data-help-order=\"Przychodząca = wpłata od klienta. Wychodząca = zwrot do klienta. Kwotę wpisz bez znaku.\"")
-                .contains("data-help-delivery=\"Przychodząca = wpłata od klienta / od dystrybutora.");
+                .contains("data-help-delivery=\"Przelew do dostawcy zapisz z kierunkiem „Wychodząca”. Zwrot od dostawcy wpisz z minusem, np. -50,00 — o zwrocie decyduje minus, nie kierunek.\"");
     }
 
     @Test
