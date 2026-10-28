@@ -9,6 +9,7 @@ import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketType;
 import pl.commercelink.baskets.ContactDetails;
+import pl.commercelink.baskets.EstimatedCost;
 import pl.commercelink.baskets.OfferItem;
 import pl.commercelink.baskets.OfferItemReloader;
 import pl.commercelink.baskets.OfferValidity;
@@ -24,8 +25,6 @@ import pl.commercelink.web.orders.ItemMargin;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderLabels;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -188,18 +187,9 @@ public class OfferDetailsPageFactory {
                 known ? offer.getLowestCostQty() : 0, known ? offer.getMedianCostQty() : 0);
     }
 
-    /**
-     * The cost the page assumes for an item without its own: halfway between the suppliers' lowest and median gross cost
-     * (client 2026-10-27: buying at the median is rare, at the lowest not always possible), rounded to grosze. 0 when
-     * either is unknown. Display only: "Przelicz z cennika" and items added from the inventory store their own cost as
-     * before (the median and the lowest price).
-     */
+    /** EstimatedCost from the suppliers' lowest and median gross cost; 0 when either is unknown. */
     static double estimatedCost(OfferItem offer) {
-        if (offer.getLowestCost() <= 0 || offer.getMedianCost() <= 0) {
-            return 0;
-        }
-        return BigDecimal.valueOf(offer.getLowestCost()).add(BigDecimal.valueOf(offer.getMedianCost()))
-                .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP).doubleValue();
+        return EstimatedCost.between(offer.getLowestCost(), offer.getMedianCost());
     }
 
     /**

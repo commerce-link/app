@@ -14,6 +14,8 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
@@ -26,6 +28,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -109,6 +114,24 @@ class OfferItemReloaderTest {
     }
 
     @Test
+    void recalculateNeverWritesACostWhenSuppliersOfferTheItem() {
+        // given
+        BasketItem noCost = basketItemWithMfn("MFN-A", 0.0);
+        BasketItem costed = basketItemWithMfn("MFN-B", 412.30);
+        MatchedInventory offered = offeredAt(100, 200, 2);
+        when(inventoryView.findByProductCode(any())).thenReturn(offered);
+        Basket basket = basketWith(noCost, costed);
+
+        // when
+        offerItemReloader.recalculate(basket);
+
+        // then — client 2026-10-27: a cost is what the operator entered; the offer page estimates the rest
+        assertThat(noCost.getUnitCost()).isZero();
+        assertThat(costed.getUnitCost()).isEqualTo(412.30);
+        assertThat(noCost.getEstimatedDeliveryDays()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("reload returns offer items sorted by position without mutating the basket")
     void reloadReturnsOfferItemsSortedByPositionWithoutMutatingTheBasket() {
         // given
@@ -168,6 +191,21 @@ class OfferItemReloaderTest {
             assertThat(basket.getBasketItems().get(offerItem.getSequenceNumber()))
                     .isSameAs(offerItem.getBasketItem());
         }
+    }
+
+    private static MatchedInventory offeredAt(double lowestNet, double medianNet, int deliveryDays) {
+        // deep stubs: building the OfferItem reads more of the matched inventory than this test is about
+        MatchedInventory matched = mock(MatchedInventory.class, RETURNS_DEEP_STUBS);
+        // the fulfilment candidates come from the supplier offers, so the reloader reaches the matched inventory
+        lenient().when(matched.getInventoryItems()).thenReturn(List.of(
+                new InventoryItem("5900000000014", "MFN-A", lowestNet, "PLN", 5, deliveryDays, "Acme", true, true, false)));
+        when(matched.hasAnyOffers()).thenReturn(true);
+        lenient().when(matched.getLowestPrice()).thenReturn(Price.fromNet(lowestNet));
+        lenient().when(matched.getMedianPrice()).thenReturn(Price.fromNet(medianNet));
+        when(matched.getEstimatedDeliveryDays()).thenReturn(deliveryDays);
+        lenient().when(matched.getSuppliers()).thenReturn(List.of("Acme"));
+        lenient().when(matched.getMedianPriceSuppliers()).thenReturn(List.of("Acme"));
+        return matched;
     }
 
     private Basket basketWith(BasketItem... items) {

@@ -41,7 +41,7 @@ public class OfferItemReloader {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
 
         updatePrices(basket);
-        updateCosts(enabledInventory, basket.getBasketItems());
+        updateDeliveryDays(enabledInventory, basket.getBasketItems());
 
         return convertBasketItemsIntoOffers(enabledInventory, basket.getBasketItems());
     }
@@ -98,7 +98,11 @@ public class OfferItemReloader {
                 });
     }
 
-    private void updateCosts(InventoryView inventory, List<BasketItem> basketItems) {
+    /**
+     * Refreshes the delivery days of the items without a cost, as before; the cost itself stays what it was, 0 included
+     * (client 2026-10-27: a cost is what the operator entered, and the offer page estimates the rest, EstimatedCost).
+     */
+    private void updateDeliveryDays(InventoryView inventory, List<BasketItem> basketItems) {
         basketItems.stream()
                 .filter(i -> isNotBlank(i.getMfn()))
                 .filter(i -> i.getUnitCost() == 0)
@@ -106,7 +110,6 @@ public class OfferItemReloader {
                     MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
                     if (matchedInventory.hasAnyOffers()) {
                         basketItem.setEstimatedDeliveryDays(matchedInventory.getEstimatedDeliveryDays());
-                        basketItem.setUnitCost(matchedInventory.getMedianPrice().grossValue());
                     }
                 });
     }
