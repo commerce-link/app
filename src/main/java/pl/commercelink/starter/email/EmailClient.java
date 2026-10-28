@@ -8,9 +8,12 @@ import pl.commercelink.templates.EmailTemplate;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.*;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,7 +30,16 @@ public class EmailClient {
     private final SesV2Client sesClient;
     private final NotificationConfigProvider configProvider;
     private final EmailTemplateProvider templateProvider;
-    private final MustacheFactory mustacheFactory = new DefaultMustacheFactory();
+    private final MustacheFactory mustacheFactory = new DefaultMustacheFactory() {
+        @Override
+        public void encode(String value, Writer writer) {
+            try {
+                writer.write(value);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    };
 
     @Value("${order.sender.mail:noreplay@commercelink.pl}")
     private String defaultSenderEmail;

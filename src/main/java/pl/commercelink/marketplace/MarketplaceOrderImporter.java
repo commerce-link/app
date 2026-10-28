@@ -128,9 +128,9 @@ public class MarketplaceOrderImporter {
             billing.setCompanyName(address.name());
             billing.setTaxId(customer.taxId());
         } else {
-            String[] parts = address.name() != null ? address.name().split(" ") : new String[] {""};
-            billing.setName(parts[0]);
-            billing.setSurname(parts.length > 1 ? parts[1] : "");
+            String fullName = StringUtils.defaultString(StringUtils.normalizeSpace(address.name()));
+            billing.setName(StringUtils.substringBeforeLast(fullName, " "));
+            billing.setSurname(StringUtils.substringAfterLast(fullName, " "));
         }
 
         billing.setEmail(customer.email());
@@ -147,9 +147,9 @@ public class MarketplaceOrderImporter {
         ShippingDetails shipping = new ShippingDetails();
         MarketplaceCustomer.Address address = customer.shippingAddress();
 
-        String[] parts = address.name() != null ? address.name().split(" ") : new String[] {""};
-        shipping.setName(parts[0]);
-        shipping.setSurname(parts.length > 1 ? parts[1] : "");
+        String fullName = StringUtils.defaultString(StringUtils.normalizeSpace(address.name()));
+        shipping.setName(StringUtils.substringBeforeLast(fullName, " "));
+        shipping.setSurname(StringUtils.substringAfterLast(fullName, " "));
         shipping.setCompanyName(customer.company());
         shipping.setEmail(customer.email());
         shipping.setPhone(address.phone());

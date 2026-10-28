@@ -131,6 +131,24 @@ class EmailClientTest {
     }
 
     @Test
+    void parameterValuesAreInsertedAsTheyAreBecauseTheEmailIsPlainText() {
+        // given
+        EmailTemplate withParameters = new EmailTemplate();
+        withParameters.setSubject("Dla {{recipientName}}");
+        withParameters.setTextBody("Dzień dobry {{recipientName}}");
+        when(templateProvider.getTemplate("store-1", "OrderShippingTemplate")).thenReturn(withParameters);
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", "kontakt@sklep-demo.pl"));
+        String name = "O'Brien & \"Syn\" <a=b>";
+
+        // when
+        emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", name));
+
+        // then
+        assertThat(sentRequest().content().simple().subject().data()).isEqualTo("Dla " + name);
+        assertThat(sentRequest().content().simple().body().text().data()).isEqualTo("Dzień dobry " + name);
+    }
+
+    @Test
     void aTemplateWithABlankSubjectIsNotSent() {
         // given
         EmailTemplate withoutSubject = new EmailTemplate();

@@ -6,7 +6,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
@@ -118,7 +117,7 @@ public class RestockSuggestionService {
         if (offer == null) {
             return null;
         }
-        return level.categorizeOfferPrice(Price.fromNet(offer.netPrice()).grossValue());
+        return level.categorizeOfferPrice(offer.netPrice());
     }
 
     private List<RestockSuggestion> withoutItemsInStock(String storeId, List<RestockSuggestion> suggestions) {

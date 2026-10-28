@@ -15,6 +15,7 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
@@ -247,6 +248,24 @@ class DeliveriesManagerTest {
         assertThat(existing.getEstimatedDeliveryAt()).isEqualTo(NEW_DELIVERY_DATE);
         verify(deliveriesRepository).save(existing);
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
+    void updateDeliveryRecomputesPaidFlagAfterVatChange() {
+        // given: 1000 net paid in full at 23% VAT
+        Delivery existing = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        existing.setTotalCost(1000.0);
+        existing.addPayment(Payment.outgoingBankTransfer("FV/1", null, 1230.0));
+        Delivery updated = deliveryWith(ORIGINAL_DELIVERY_DATE);
+        updated.setTax(1.08);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(existing);
+
+        // when
+        deliveriesManager.updateDelivery(updated);
+
+        // then: at 8% the delivery costs 1080 gross, so 1230 is an overpayment
+        assertThat(existing.getUnpaidAmount()).isEqualTo(-150.0);
+        assertThat(existing.isPaid()).isFalse();
     }
 
     @Test
