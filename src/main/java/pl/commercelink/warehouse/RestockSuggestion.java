@@ -59,18 +59,18 @@ public class RestockSuggestion {
         if (!hasOffer() || priceCategory == null) {
             return Double.MAX_VALUE;
         }
-        int aggregatePrice = level.restockPriceFor(priceCategory);
+        double aggregatePrice = level.restockPriceFor(priceCategory);
         if (aggregatePrice <= 0) {
             return Double.MAX_VALUE;
         }
-        return Price.fromNet(offer.netPrice()).grossValue() / aggregatePrice;
+        return offer.netPrice() / aggregatePrice;
     }
 
     public boolean isWithinBudget(RestockPriceCategory budget) {
-        return hasOffer() && level.isWithinBudget(Price.fromNet(offer.netPrice()).grossValue(), budget);
+        return hasOffer() && level.isWithinBudget(offer.netPrice(), budget);
     }
 
-    public int restockPriceFor(RestockPriceCategory budget) {
-        return level.restockPriceFor(budget);
+    public double restockPriceGrossFor(RestockPriceCategory budget) {
+        return Price.fromNet(level.restockPriceFor(budget)).grossValue();
     }
 }

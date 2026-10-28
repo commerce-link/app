@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pricelist.RollingPriceAggregate;
 import pl.commercelink.pricelist.RollingPriceAggregateRepository;
 import pl.commercelink.products.CategoryDefinition;
@@ -82,10 +81,10 @@ public class StockLevels {
                     continue;
                 }
 
-                int restockPriceLowest = getRestockPriceLowest(product, priceAggregates);
-                int restockPriceHotDeal = getRestockPriceHotDeal(product, priceAggregates);
-                int restockPricePromo = getRestockPricePromo(product, priceAggregates);
-                int restockPriceStandard = getRestockPriceStandard(product, priceAggregates);
+                double restockPriceLowest = getRestockPriceLowest(product, priceAggregates);
+                double restockPriceHotDeal = getRestockPriceHotDeal(product, priceAggregates);
+                double restockPricePromo = getRestockPricePromo(product, priceAggregates);
+                double restockPriceStandard = getRestockPriceStandard(product, priceAggregates);
 
                 Optional<StockProductLevel> optional = stockProductLevels.stream()
                         .filter(s -> s.hasManufacturerCode(product.getManufacturerCode())).findFirst();
@@ -147,7 +146,7 @@ public class StockLevels {
                 .collect(Collectors.toList());
     }
 
-    private int getRestockPricePromo(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
+    private double getRestockPricePromo(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
         if (product.getRestockPricePromo() > 0) {
             return product.getRestockPricePromo();
         }
@@ -155,37 +154,34 @@ public class StockLevels {
         if (product.getPimId() != null && !product.getPimId().isEmpty()) {
             RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
             if (aggregate != null) {
-                Price price = Price.fromNet(aggregate.getMedianLowestPrice30d());
-                return (int) Math.round(price.grossValue());
+                return aggregate.getMedianLowestPrice30d();
             }
         }
 
         return 0;
     }
 
-    private int getRestockPriceLowest(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
+    private double getRestockPriceLowest(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
         if (product.getPimId() != null && !product.getPimId().isEmpty()) {
             RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
             if (aggregate != null && aggregate.isAtLowestPrice()) {
-                Price price = Price.fromNet(aggregate.getCurrentLowestPrice());
-                return (int) Math.round(price.grossValue());
+                return aggregate.getCurrentLowestPrice();
             }
         }
         return 0;
     }
 
-    private int getRestockPriceHotDeal(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
+    private double getRestockPriceHotDeal(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
         if (product.getPimId() != null && !product.getPimId().isEmpty()) {
             RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
             if (aggregate != null && aggregate.isHotDeal()) {
-                Price price = Price.fromNet(aggregate.getCurrentLowestPrice());
-                return (int) Math.round(price.grossValue());
+                return aggregate.getCurrentLowestPrice();
             }
         }
         return 0;
     }
 
-    private int getRestockPriceStandard(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
+    private double getRestockPriceStandard(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
         if (product.getRestockPriceStandard() > 0) {
             return product.getRestockPriceStandard();
         }
@@ -193,8 +189,7 @@ public class StockLevels {
         if (product.getPimId() != null && !product.getPimId().isEmpty()) {
             RollingPriceAggregate aggregate = priceAggregates.get(product.getPimId());
             if (aggregate != null) {
-                Price price = Price.fromNet(aggregate.getMedianMedianPrice30d());
-                return (int) Math.round(price.grossValue());
+                return aggregate.getMedianMedianPrice30d();
             }
         }
 

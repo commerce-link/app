@@ -149,7 +149,7 @@ class RestockSuggestionServiceTest {
     void restockWithBudgetKeepsOnlyOffersWithinThreshold() {
         // given
         StockProductLevel affordable = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 200, 0, 3);
-        StockProductLevel tooExpensive = new StockProductLevel("CPU", "MFN-2", "Intel Core", 100, 0, 3);
+        StockProductLevel tooExpensive = new StockProductLevel("CPU", "MFN-2", "Intel Core", 99, 0, 3);
 
         InventoryItem offer = new InventoryItem("EAN", "MFN", 100.0, "PLN", 5, 1, "Action");
 
@@ -165,6 +165,26 @@ class RestockSuggestionServiceTest {
 
         // then
         assertThat(result).extracting(RestockSuggestion::getName).containsExactly("AMD Ryzen");
+    }
+
+    @Test
+    void restockComparesTheOfferNetPriceWithTheNetLimit() {
+        // given
+        StockProductLevel level = new StockProductLevel("CPU", "MFN-1", "AMD Ryzen", 100, 0, 3);
+        InventoryItem offer = new InventoryItem("EAN", "MFN", 90.0, "PLN", 5, 1, "Action");
+
+        when(inventory.withEnabledSuppliersOnly("store", SupplierScope.FULFILMENT)).thenReturn(enabledInventory);
+        when(stockLevels.calculate("store", "cat", null, RestockScope.WholeCatalog, false, false))
+                .thenReturn(List.of(level));
+        when(enabledInventory.findByProductCode(anyString())).thenReturn(matched);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryItems()).thenReturn(List.of(offer));
+
+        // when
+        List<RestockSuggestion> result = service.suggestForRestock("store", "cat", null, RestockScope.WholeCatalog, false, RestockPriceCategory.GoodDeal);
+
+        // then
+        assertThat(result).extracting(RestockSuggestion::getPriceCategory).containsExactly(RestockPriceCategory.GoodDeal);
     }
 
     @Test

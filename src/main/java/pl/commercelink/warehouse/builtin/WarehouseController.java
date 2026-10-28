@@ -360,11 +360,11 @@ class WarehouseController {
         return new RestockForm(catalogs, categoriesByCatalog, selectedCatalogId, error);
     }
 
-    private int getRestockPrice(RestockSuggestion suggestion, RestockPriceCategory budget) {
+    private double getRestockPrice(RestockSuggestion suggestion, RestockPriceCategory budget) {
         if (budget == null) {
             return 100000;
         }
-        return suggestion.restockPriceFor(budget);
+        return suggestion.restockPriceGrossFor(budget);
     }
 
     @PostMapping("/dashboard/warehouse/fulfilment/commit")

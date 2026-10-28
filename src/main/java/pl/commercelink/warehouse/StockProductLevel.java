@@ -9,10 +9,10 @@ public class StockProductLevel {
     private String category;
     private String manufacturerCode;
     private String name;
-    private int restockPriceLowest;
-    private int restockPriceHotDeal;
-    private int restockPricePromo;
-    private int restockPriceStandard;
+    private double restockPriceLowest;
+    private double restockPriceHotDeal;
+    private double restockPricePromo;
+    private double restockPriceStandard;
     private int expectedQuantity;
     private int currentQuantity;
     private int missingQuantity;
@@ -20,7 +20,7 @@ public class StockProductLevel {
     private int tolerance;
     private int diff;
 
-    public StockProductLevel(String category, String manufacturerCode, String name, int restockPricePromo, int restockPriceStandard, int expectedQuantity) {
+    public StockProductLevel(String category, String manufacturerCode, String name, double restockPricePromo, double restockPriceStandard, int expectedQuantity) {
         this.category = category;
         this.manufacturerCode = manufacturerCode;
         this.name = name;
@@ -47,25 +47,25 @@ public class StockProductLevel {
         return missingQuantity > 0;
     }
 
-    public RestockPriceCategory categorizeOfferPrice(double offerGross) {
-        if (isWithinBudget(offerGross, RestockPriceCategory.HotDeal)) {
+    public RestockPriceCategory categorizeOfferPrice(double offerNet) {
+        if (isWithinBudget(offerNet, RestockPriceCategory.HotDeal)) {
             return RestockPriceCategory.HotDeal;
         }
-        if (isWithinBudget(offerGross, RestockPriceCategory.LowestPrice)) {
+        if (isWithinBudget(offerNet, RestockPriceCategory.LowestPrice)) {
             return RestockPriceCategory.LowestPrice;
         }
-        if (isWithinBudget(offerGross, RestockPriceCategory.GoodDeal)) {
+        if (isWithinBudget(offerNet, RestockPriceCategory.GoodDeal)) {
             return RestockPriceCategory.GoodDeal;
         }
         return null;
     }
 
-    public boolean isWithinBudget(double offerGross, RestockPriceCategory budget) {
-        int threshold = restockPriceFor(budget);
-        return threshold > 0 && offerGross <= threshold;
+    public boolean isWithinBudget(double offerNet, RestockPriceCategory budget) {
+        double threshold = restockPriceFor(budget);
+        return threshold > 0 && offerNet <= threshold;
     }
 
-    public int restockPriceFor(RestockPriceCategory budget) {
+    public double restockPriceFor(RestockPriceCategory budget) {
         return switch (budget) {
             case HotDeal -> restockPriceHotDeal;
             case LowestPrice -> restockPriceLowest;
@@ -98,11 +98,11 @@ public class StockProductLevel {
         return missingQuantity;
     }
 
-    public int getRestockPricePromo() {
+    public double getRestockPricePromo() {
         return restockPricePromo;
     }
 
-    public int getRestockPriceStandard() {
+    public double getRestockPriceStandard() {
         return restockPriceStandard;
     }
 
@@ -110,11 +110,11 @@ public class StockProductLevel {
         return this.manufacturerCode.equalsIgnoreCase(other);
     }
 
-    public void setRestockPricePromo(int restockPricePromo) {
+    public void setRestockPricePromo(double restockPricePromo) {
         this.restockPricePromo = restockPricePromo;
     }
 
-    public void setRestockPriceStandard(int restockPriceStandard) {
+    public void setRestockPriceStandard(double restockPriceStandard) {
         this.restockPriceStandard = restockPriceStandard;
     }
 
@@ -142,19 +142,19 @@ public class StockProductLevel {
         return currentQuantity == 0 && expectedQuantity > 0;
     }
 
-    public int getRestockPriceLowest() {
+    public double getRestockPriceLowest() {
         return restockPriceLowest;
     }
 
-    public void setRestockPriceLowest(int restockPriceLowest) {
+    public void setRestockPriceLowest(double restockPriceLowest) {
         this.restockPriceLowest = restockPriceLowest;
     }
 
-    public int getRestockPriceHotDeal() {
+    public double getRestockPriceHotDeal() {
         return restockPriceHotDeal;
     }
 
-    public void setRestockPriceHotDeal(int restockPriceHotDeal) {
+    public void setRestockPriceHotDeal(double restockPriceHotDeal) {
         this.restockPriceHotDeal = restockPriceHotDeal;
     }
 
