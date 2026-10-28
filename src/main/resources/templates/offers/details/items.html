@@ -6,8 +6,7 @@
        (or its page without JavaScript). Rows bind as basketItems[i].* like the old form; offer-lines.js renumbers them
        before a submit. The column of the stored list position is data-index; Item.index is that position. */-->
 <section th:fragment="card(p)" class="cl-card" id="pozycje" aria-labelledby="items-title"
-         th:with="items=${p.lines().?[#this instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)]},
-                  unit=${#strings.trim(#messages.msg('general.currency.amount', ''))}">
+         th:with="items=${p.lines().?[#this instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)]}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{offers.details.items.title(${#lists.size(items)})}"></h2>
         <div class="cl-card-actions">
@@ -44,35 +43,54 @@
                         data-msg-line-qty=#{offers.details.line.qty},
                         data-msg-line-price=#{offers.details.line.price},
                         data-msg-line-menu=#{offers.details.line.menu},
-                        data-msg-line-cost=#{offers.details.line.cost},
-                        data-msg-line-no-cost=#{offers.details.line.noCost},
-                        data-msg-line-margin=#{offers.details.line.margin},
-                        data-msg-line-margin-unknown=#{offers.details.line.marginUnknown},
-                        data-msg-line-margin-low=#{offers.details.line.marginLow},
+                        data-msg-margin-estimated=#{offers.details.margin.estimated},
                         data-msg-margin-ok=#{offers.details.margin.ok},
                         data-msg-margin-loss=#{offers.details.margin.loss},
                         data-msg-margin-unknown=#{offers.details.margin.unknown},
                         data-msg-mfn-prefix=#{order.items.mfn.prefix},
+                        data-msg-copy-mfn=#{order.items.copy.mfn},
+                        data-msg-consolidate=#{offers.details.line.menu.consolidate},
+                        data-msg-deconsolidate=#{offers.details.line.menu.deconsolidate},
                         data-msg-last-item=#{offers.details.line.menu.remove.reason},
+                        data-msg-line-selected=#{offers.details.line.selected},
                         data-msg-line-moved=#{offers.details.line.moved},
                         data-msg-line-moved-group=#{offers.details.line.moved.inGroup},
-                        data-msg-group-moved=#{offers.details.group.moved}">
+                        data-msg-group-moved=#{offers.details.group.moved},
+                        data-msg-line-removed-draft=#{offers.details.line.removedDraft},
+                        data-msg-undo=#{offers.details.line.undo},
+                        data-msg-items-added-draft=#{offers.details.items.addedDraft},
+                        data-msg-items-title=#{offers.details.items.title('{n}')}">
             <caption class="cl-visually-hidden" th:text="${p.template()} ? #{offers.details.items.caption.template} : #{offers.details.items.caption.offer}"></caption>
-            <colgroup><col class="cl-col-drag"><col><col class="cl-col-qty-in"><col class="cl-col-money-in"><col class="cl-col-value"><col class="cl-col-menu"></colgroup>
+            <colgroup><col class="cl-col-drag"><col><col class="cl-col-qty-in"><col class="cl-col-money-in"><col class="cl-col-flag"><col class="cl-col-menu"></colgroup>
             <thead>
             <tr>
                 <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.details.items.column.order}"></span></th>
                 <th scope="col" th:text="#{offers.details.items.column.product}"></th>
                 <th scope="col" th:text="#{offers.details.items.column.qty}"></th>
                 <th scope="col" th:text="#{offers.details.items.column.price}"></th>
-                <th scope="col" class="is-numeric" th:text="#{offers.details.items.column.value(${unit})}"></th>
+                <th scope="col" class="cl-table-flag" th:text="#{offers.details.items.column.consolidated}"></th>
                 <th scope="col"><span class="cl-visually-hidden" th:text="#{offers.details.items.column.actions}"></span></th>
             </tr>
             </thead>
-            <tbody data-cl-lines>
-            <th:block th:each="line, stat : ${p.lines()}">
+            <!--/* Products, then services under their heading, as on the order page. Two sections so a row never leaves
+                   its own (offer-lines.js sorts each apart); the services one is there even when empty, so a draft that
+                   brings the first service has its place. The save posts them in this order (Basket bands the
+                   positions the same way). */-->
+            <tbody data-cl-lines data-cl-lines-section="products">
+            <th:block th:each="line, stat : ${p.productLines()}">
                 <th:block th:if="${!(line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item))}"><tr
                     th:replace="~{offers/details/items :: group(${line}, ${stat.index})}"></tr></th:block>
+                <th:block th:if="${line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)}"><tr
+                    th:replace="~{offers/details/items :: row(${p}, ${line}, ${#lists.size(items)})}"></tr></th:block>
+            </th:block>
+            </tbody>
+            <tbody data-cl-lines data-cl-lines-section="services" th:with="services=${p.serviceLines()}">
+            <tr th:if="${!services.isEmpty()}" class="cl-table-group" data-cl-section-head>
+                <th scope="rowgroup" colspan="6"><span class="cl-eyebrow" th:text="#{offers.details.items.section.services}"></span></th>
+            </tr>
+            <th:block th:each="line, stat : ${services}">
+                <th:block th:if="${!(line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item))}"><tr
+                    th:replace="~{offers/details/items :: group(${line}, |s${stat.index}|)}"></tr></th:block>
                 <th:block th:if="${line instanceof T(pl.commercelink.web.offers.OfferDetailsPage$Item)}"><tr
                     th:replace="~{offers/details/items :: row(${p}, ${line}, ${#lists.size(items)})}"></tr></th:block>
             </th:block>
@@ -135,6 +153,7 @@
              rt=${returnTo != null ? '?returnTo=' + #uris.escapeQueryParam(returnTo) : ''}"
     th:classappend="${grouped} ? (${it.variantSelected()} ? 'is-variant' : 'is-variant is-unpicked')"
     th:attr="data-index=${i}, data-price=${it.unitPrice()}, data-cost=${it.unitCost()}, data-qty=${it.qty()},
+             data-estimated-cost=${it.estimatedCost() > 0} ? ${it.estimatedCost()} : null,
              data-group=${it.variantGroupId() ?: ''}, data-selected=${it.variantSelected()}, data-service=${it.service()},
              data-market=${it.market() != null and !it.market().missing()} ? #{offers.details.margin.market(
                  #{general.currency.amount(${it.market().low()})}, #{general.currency.amount(${it.market().median()})})} : null,
@@ -159,18 +178,18 @@
            th:href="@{|/dashboard/offer/${p.offerId()}/items/${i}${rt}|}" data-cl-dialog-open="item-edit-dialog"
            th:attr="aria-label=#{offers.details.line.edit(${it.name()})}"><i class="fas fa-pencil-alt" aria-hidden="true"></i></a>
         <span class="cl-table-marks">
-            <span th:if="${it.service()}" class="cl-status is-neutral" th:text="#{offers.details.line.mark.service}"></span>
             <span class="cl-status is-info" data-cl-mark-selected th:hidden="${!(grouped and it.variantSelected())}"
                   th:text="#{offers.details.line.mark.selected}"></span>
-            <span class="cl-status is-neutral" data-cl-mark-consolidated th:hidden="${!it.consolidated()}"
-                  th:text="#{offers.details.line.mark.consolidated}"></span>
             <span th:if="${it.market() != null and it.market().missing()}" class="cl-status is-warn" th:text="#{offers.details.line.mark.missing}"></span>
         </span>
         <span class="cl-table-sub" data-cl-line-sub>
             <span th:if="${it.category() != null and !#strings.isEmpty(it.category())}" data-cl-line-category th:text="${it.category()}"></span>
             <th:block th:if="${it.mfn() != null and !#strings.isEmpty(it.mfn())}">
                 <span th:if="${it.category() != null and !#strings.isEmpty(it.category())}" class="cl-table-sep">·</span>
-                <span><span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<span class="cl-code-nowrap" data-cl-line-mfn th:text="${it.mfn()}"></span></span>
+                <span class="cl-line-code"><span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline"
+                      th:attr="data-cl-copy=${it.mfn()}, title=${it.mfn()}, aria-label=#{order.items.copy.mfn(${it.mfn()})}"><span
+                      class="cl-copy-code"><span class="cl-copy-text" data-cl-line-mfn th:text="${it.mfn()}"></span><span class="cl-copy-icon"
+                      aria-hidden="true"><i class="far fa-copy"></i></span></span></button></span>
             </th:block>
         </span>
     </th>
@@ -187,75 +206,68 @@
         <input class="cl-input is-money" type="number" min="0" step="0.01" inputmode="decimal" required
                th:name="|basketItems[${i}].unitPrice|" th:value="${it.unitPriceInput()}"
                th:attr="aria-label=#{offers.details.line.price(${it.name()})}">
-        <th:block th:unless="${it.service()}">
-            <span th:if="${it.unitCost() > 0}" class="cl-line-hint" data-cl-line-cost
-                  th:text="#{offers.details.line.cost(${money.format(it.unitCost())})}"></span>
-            <span th:unless="${it.unitCost() > 0}" class="cl-line-hint is-warn" data-cl-line-cost
-                  th:text="#{offers.details.line.noCost}"></span>
-        </th:block>
-    </td>
-    <td class="is-numeric cl-cell-value" th:attr="data-label=#{offers.details.items.column.value(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
-        <span class="cl-line-value">
-            <span class="cl-price-margin"><span class="cl-line-total" data-cl-line-total th:text="${money.format(it.qty() * it.unitPrice())}"></span><th:block
-                  th:if="${it.margin() != null}"><th:block th:replace="~{offers/details/items :: margin(${it})}"></th:block></th:block></span>
-            <span th:if="${it.service()}" class="cl-line-margin" th:text="#{offers.details.line.service}"></span>
-            <th:block th:unless="${it.service()}">
-                <span th:if="${it.margin().percent() == null}" class="cl-line-margin is-low" data-cl-line-margin
-                      th:text="#{offers.details.line.marginUnknown}"></span>
-                <!--/* a low margin says so in words, not only by its colour */-->
-                <span th:unless="${it.margin().percent() == null}" class="cl-line-margin" data-cl-line-margin
-                      th:with="low=${it.margin().tone().name() != 'LOSS' and (it.unitPrice() - it.unitCost()) * 10 < it.unitPrice()}"
-                      th:classappend="${it.margin().tone().name() == 'LOSS'} ? 'is-bad' : (${low} ? 'is-low')"
-                      th:text="${low} ? #{offers.details.line.marginLow(${it.margin().percent()})} : #{offers.details.line.margin(${it.margin().percent()})}"></span>
-            </th:block>
-            <span class="cl-line-margin cl-line-outside" th:text="#{offers.details.line.outside}"></span>
+        <!--/* the row's value with its margin mark (client 2026-10-27: the value column and the cost and margin lines went,
+               the numbers are in the mark's tooltip). A variant outside the total has its value muted and no mark. */-->
+        <span class="cl-line-amount">
+            <span class="cl-line-total-label"><span th:text="#{offers.details.line.value}"></span>&nbsp;<span class="cl-line-total"
+                  data-cl-line-total th:text="${money.format(it.qty() * it.unitPrice())}"></span></span><th:block
+                  th:if="${it.margin() != null}"><th:block th:replace="~{offers/details/items :: margin(${it})}"></th:block></th:block>
         </span>
     </td>
+    <!--/* display only, toggled by the row menu or "Edytuj pozycję", as on the order page; an empty cell is not shown as a card */-->
+    <td class="cl-table-flag" th:classappend="${it.consolidated()} ? '' : 'is-empty'" data-cl-line-consolidated-cell
+        th:attr="data-label=#{offers.details.items.column.consolidated}"><span data-cl-line-consolidated th:hidden="${!it.consolidated()}"><span
+        class="cl-table-flag-mark" aria-hidden="true">✓</span><span class="cl-visually-hidden" th:text="#{offers.details.line.consolidated.yes}"></span></span></td>
     <td class="cl-table-actions cl-cell-menu">
         <details class="cl-menu">
             <summary class="cl-button is-icon" th:attr="aria-label=#{offers.details.line.menu(${it.name()})}"><span class="cl-menu-glyph" aria-hidden="true">⋯</span></summary>
             <ul class="cl-menu-list">
                 <li><a class="cl-menu-item" th:href="@{|/dashboard/offer/${p.offerId()}/items/${i}${rt}|}" data-cl-dialog-open="item-edit-dialog"
                        th:text="#{offers.details.line.menu.edit}"></a></li>
+                <!--/* written into the hidden field like any edit of the table; without the script "Edytuj pozycję" has the box */-->
+                <li hidden data-cl-lines-reveal><button type="button" class="cl-menu-item" data-cl-line-consolidate
+                        th:text="${it.consolidated()} ? #{offers.details.line.menu.deconsolidate} : #{offers.details.line.menu.consolidate}"></button></li>
                 <li hidden data-cl-lines-reveal><button type="button" class="cl-menu-item" data-cl-line-move="up" th:text="#{offers.details.line.menu.up}"></button></li>
                 <li hidden data-cl-lines-reveal><button type="button" class="cl-menu-item" data-cl-line-move="down" th:text="#{offers.details.line.menu.down}"></button></li>
                 <!--/* shown by the page script while the row sits in a group */-->
                 <li hidden data-cl-line-ungroup-item><button type="button" class="cl-menu-item" data-cl-line-ungroup th:text="#{offers.details.line.menu.ungroup}"></button></li>
+                <li hidden data-cl-line-select-item><button type="button" class="cl-menu-item" data-cl-line-select th:text="#{offers.details.line.menu.select}"></button></li>
                 <li class="cl-menu-sep" aria-hidden="true"></li>
-                <!--/* with the page script it asks first; without it the post removes the item at once, as before */-->
-                <li th:if="${count > 1}"><button type="submit" class="cl-menu-item is-danger" form="offer-action-form"
-                        th:attr="formaction=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
-                                 data-action-url=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}${rt}|},
-                                 data-label=#{offers.details.line.menu.remove.then},
-                                 data-cl-confirm-title=#{offers.details.line.remove.confirm.title(${it.name()})},
-                                 data-cl-confirm-message=#{offers.details.line.remove.confirm.message},
-                                 data-cl-confirm-action=#{offers.details.line.menu.remove}"
-                        data-cl-offer-action data-action-method="post" th:text="#{offers.details.line.menu.remove}"></button></li>
-                <li th:unless="${count > 1}"><button type="button" class="cl-menu-item is-danger" aria-disabled="true"
-                        th:attr="aria-describedby=|offer-line-${i}-remove-reason|">
+                <!--/* With the page script the row leaves the table at once and comes back with "Cofnij" in the toast: the
+                       table is a draft until "Zapisz zmiany", and the script refuses the item that would leave no kept item.
+                       Without it the post removes the item at once, as before; itemId names the item: when the offer
+                       changed and another item sits at that position, nothing is removed. */-->
+                <li><button th:type="${count > 1} ? 'submit' : 'button'" class="cl-menu-item is-danger" data-cl-line-remove
+                        th:with="removeUrl=@{|/dashboard/offer/${p.offerId()}/remove-item/${i}?itemId=${#uris.escapeQueryParam(it.id() ?: '')}${returnTo != null ? '&returnTo=' + #uris.escapeQueryParam(returnTo) : ''}|},
+                                 reasonId=|offer-line-${i}-remove-reason|"
+                        th:attr="form=${count > 1} ? 'offer-action-form' : null, formaction=${count > 1} ? ${removeUrl} : null,
+                                 aria-disabled=${count > 1} ? null : 'true', aria-describedby=${count > 1} ? null : ${reasonId}">
                     <span th:text="#{offers.details.line.menu.remove}"></span>
-                    <span class="cl-menu-reason" th:id="|offer-line-${i}-remove-reason|" th:text="#{offers.details.line.menu.remove.reason}"></span>
+                    <span class="cl-menu-reason" th:id="${reasonId}" th:hidden="${count > 1}" th:text="#{offers.details.line.menu.remove.reason}"></span>
                 </button></li>
             </ul>
         </details>
     </td>
 </tr>
 
-<!--/* The order's margin mark (Ikona marży z dymkiem) with the offer's own lines: the item cost entered or taken from
-       the price list, then the market now — what the old table showed in three columns. */-->
+<!--/* The order's margin mark (Ikona marży z dymkiem) with the offer's own facts in three blocks, as the client drew them
+       (2026-10-27): the margin, cost and profit of one unit, the suppliers' lowest and median price with their stock, and
+       the suppliers (those of the median | the others). Red (is-loss) at a margin of 0 or less, grey otherwise: no other
+       threshold (client 2026-10-27). */-->
 <span th:fragment="margin(it)" class="cl-mark cl-margin cl-tooltip is-lines is-end" tabindex="0" role="img"
       th:with="m=${it.margin()}, mk=${it.market()}, nl=${#strings.unescapeJava('\n')},
                marginText=${m.tone().name() == 'UNKNOWN'} ? #{offers.details.margin.unknown}
-                   : #{${'offers.details.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
+                   : #{${it.costEstimated() ? 'offers.details.margin.estimated' : 'offers.details.margin.' + #strings.toLowerCase(m.tone().name())}(${m.percent() != null ? m.percent() : '—'},
                        ${#messages.msg('general.currency.amount', m.profit())},
                        ${#messages.msg('general.currency.amount', m.cost())},
                        ${#messages.msg('general.currency.amount', m.profitNet())})},
-               marketText=${mk == null or mk.missing()} ? #{offers.details.margin.noMarket}
-                   : ${#messages.msg('offers.details.margin.market', #messages.msg('general.currency.amount', mk.low()), #messages.msg('general.currency.amount', mk.median()))
-                       + nl + #messages.msg('offers.details.margin.stock', it.lowestQty(), it.medianQty(), mk.stock())
-                       + (#strings.isEmpty(it.medianProviders()) ? '' : nl + #messages.msg('offers.details.margin.medianProviders', it.medianProviders()))
-                       + (#strings.isEmpty(it.otherProviders()) ? '' : nl + #messages.msg('offers.details.margin.otherProviders', it.otherProviders()))},
-               text=${marginText + nl + marketText}"
+               providers=${#strings.isEmpty(it.medianProviders()) ? it.otherProviders()
+                   : (#strings.isEmpty(it.otherProviders()) ? it.medianProviders() : it.medianProviders() + ' | ' + it.otherProviders())},
+               availability=${mk == null or mk.missing()} ? #{offers.details.margin.availability.none}
+                   : #{offers.details.margin.availability(#{general.currency.amount(${mk.low()})}, ${it.lowestQty()},
+                       #{general.currency.amount(${mk.median()})}, ${it.medianQty()})},
+               marketText=${availability + (#strings.isEmpty(providers) ? '' : nl + nl + #messages.msg('offers.details.margin.distributors', providers))},
+               text=${marginText + nl + nl + marketText}"
       th:classappend="|is-${#strings.toLowerCase(m.tone().name())}|"
       th:attr="data-tooltip=${text}, aria-label=${text}, data-cl-market-text=${marketText}"><i aria-hidden="true" class="fas"
       th:classappend="${m.tone().name() == 'LOSS'} ? 'fa-exclamation-circle' : 'fa-info-circle'"></i></span>

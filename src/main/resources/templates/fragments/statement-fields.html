@@ -20,5 +20,75 @@
     </p>
 </div>
 
+<!--/* The fields of one payout row: what the format form posts. Without JavaScript they are the editable table; with it
+       static/js/payout-rows.js hides them and edits them through its dialog. index is the row's index, or '@INDEX@' in
+       the blank row the script copies (channel is then null). Uses errors, sourceOptions and methodOptions of the page. */-->
+<tr th:fragment="payoutRow(channel, index)" data-cl-payout-row
+    th:with="matchId=|channel-${index}-match|, sourceId=|channel-${index}-source|, methodId=|channel-${index}-method|,
+             netId=|channel-${index}-netOfFees|, feeRatesId=|channel-${index}-feeRates|, feeLimitId=|channel-${index}-maxFeePercent|">
+    <td>
+        <input class="cl-input" type="text" autocomplete="off" th:id="${matchId}"
+               th:name="|channels[${index}].match|" th:value="${channel?.match}"
+               th:classappend="${errors.get(matchId) != null} ? 'is-invalid'"
+               th:attr="aria-label=#{store.payments.statement.channels.match}, aria-invalid=${errors.get(matchId) != null ? 'true' : null}"/>
+        <p th:if="${errors.get(matchId) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(matchId)}}"></span>
+        </p>
+    </td>
+    <td>
+        <select class="cl-select" th:id="${sourceId}" th:name="|channels[${index}].source|"
+                th:classappend="${errors.get(sourceId) != null} ? 'is-invalid'"
+                th:attr="aria-label=#{store.payments.statement.channels.source}, aria-invalid=${errors.get(sourceId) != null ? 'true' : null}">
+            <option th:each="option : ${sourceOptions}" th:value="${option.value()}" th:text="${option.label()}"
+                    th:selected="${option.value() == (channel?.source == null ? '' : channel.source)}"></option>
+        </select>
+        <p th:if="${errors.get(sourceId) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(sourceId)}}"></span>
+        </p>
+    </td>
+    <td>
+        <select class="cl-select" th:id="${methodId}" th:name="|channels[${index}].method|"
+                th:classappend="${errors.get(methodId) != null} ? 'is-invalid'"
+                th:attr="aria-label=#{store.payments.statement.channels.method}, aria-invalid=${errors.get(methodId) != null ? 'true' : null}">
+            <option th:each="option : ${methodOptions}" th:value="${option.value()}" th:text="${option.label()}"
+                    th:selected="${option.value() == (channel?.method == null ? '' : channel.method)}"></option>
+        </select>
+        <p th:if="${errors.get(methodId) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(methodId)}}"></span>
+        </p>
+    </td>
+    <td>
+        <label class="cl-check">
+            <input type="checkbox" value="true" th:id="${netId}" th:name="|channels[${index}].netOfFees|"
+                   th:checked="${channel?.netOfFees}"/>
+            <span th:text="#{store.payments.statement.channels.net.short}"></span>
+        </label>
+    </td>
+    <td>
+        <input class="cl-input is-qty" type="text" autocomplete="off" th:id="${feeRatesId}"
+               th:name="|channels[${index}].feeRates|" th:value="${channel?.feeRates}"
+               th:placeholder="#{store.payments.statement.channels.feeRates.placeholder}"
+               th:classappend="${errors.get(feeRatesId) != null} ? 'is-invalid'"
+               th:attr="aria-label=#{store.payments.statement.channels.feeRates}, aria-invalid=${errors.get(feeRatesId) != null ? 'true' : null}"/>
+        <p th:if="${errors.get(feeRatesId) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(feeRatesId)}}"></span>
+        </p>
+    </td>
+    <td>
+        <input class="cl-input is-qty" type="text" inputmode="decimal" autocomplete="off" th:id="${feeLimitId}"
+               th:name="|channels[${index}].maxFeePercent|" th:value="${channel?.maxFeePercent}"
+               th:classappend="${errors.get(feeLimitId) != null} ? 'is-invalid'"
+               th:attr="aria-label=#{store.payments.statement.channels.feeLimit}, aria-invalid=${errors.get(feeLimitId) != null ? 'true' : null}"/>
+        <p th:if="${errors.get(feeLimitId) != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${errors.get(feeLimitId)}}"></span>
+        </p>
+    </td>
+</tr>
+
 </body>
 </html>

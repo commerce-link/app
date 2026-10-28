@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Where the courier collects the parcel, masked like the order page because the link gets forwarded; the name and
+       the place are put together by the view, so a missing part never shows as "null". */-->
+<section th:fragment="address" id="return-address" class="cl-card" aria-labelledby="return-address-title"
+         th:with="option=${view.packageOption()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="return-address-title" th:text="#{client.return.address.title}"></h2>
+    </div>
+    <div class="cl-card-inset">
+        <div class="cl-kv-grid">
+            <div>
+                <h3 th:text="#{client.return.address.address}"></h3>
+                <p th:if="${view.addressName() != null}"><span th:replace="~{fragments/masked-field :: masked(${view.addressName()})}"></span></p>
+                <p th:if="${view.addressStreet() != null}"><span th:replace="~{fragments/masked-field :: masked(${view.addressStreet()})}"></span></p>
+                <p th:if="${view.addressPlace() != null}" th:text="${view.addressPlace()}"></p>
+                <p th:if="${view.addressPhone() != null or view.addressEmail() != null}" class="cl-muted"><th:block th:if="${view.addressPhone() != null}"><span
+                        th:replace="~{fragments/masked-field :: masked(${view.addressPhone()})}"></span></th:block><th:block
+                        th:if="${view.addressPhone() != null and view.addressEmail() != null}"> · </th:block><th:block th:if="${view.addressEmail() != null}"><span
+                        th:replace="~{fragments/masked-field :: masked(${view.addressEmail()})}"></span></th:block></p>
+            </div>
+            <div th:if="${option != null}">
+                <h3 th:text="#{client.return.address.package}"></h3>
+                <p th:text="${option.title()}"></p>
+                <p th:if="${option.parcels() != null}" class="cl-muted"
+                   th:text="${option.parcelCount() > 1} ? #{client.return.form.package.parcels(${option.parcelCount()}, ${option.parcels()})} : ${option.parcels()}"></p>
+            </div>
+        </div>
+        <p th:if="${view.state().name() == 'STORE_BOOKS'}" class="cl-help" th:text="#{client.return.address.change}"></p>
+    </div>
+</section>
+
+</body>
+</html>

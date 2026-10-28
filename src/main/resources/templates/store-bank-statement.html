@@ -137,73 +137,63 @@
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{store.payments.statement.channels.section}"></legend>
                         <p class="cl-help" th:text="#{store.payments.statement.channels.help}"></p>
-                        <div class="cl-statement-scroll is-fields">
+                        <!--/* With JavaScript the rows are a list edited in #payout-row-dialog (payout-rows.js) and the
+                               fields below stay hidden as what the form posts; without it the fields are the editing. */-->
+                        <div data-cl-payout-rows
+                             th:attr="data-text-edit=#{store.payments.statement.channels.edit},
+                                      data-text-edit-for=#{store.payments.statement.channels.edit.for('{0}')},
+                                      data-text-removed=#{store.payments.statement.channels.removed('{0}')},
+                                      data-text-invalid=#{store.payments.statement.channels.invalid},
+                                      data-text-net=#{store.payments.statement.channels.fees.net},
+                                      data-text-gross=#{store.payments.statement.channels.fees.gross},
+                                      data-text-rates=#{store.payments.statement.channels.fees.rates('{0}')},
+                                      data-text-limit=#{store.payments.statement.channels.fees.limit('{0}')}">
+                        <div data-cl-payout-list hidden>
+                            <table class="cl-table is-compact">
+                                <thead>
+                                <tr>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.match}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.orders}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.net}"></th>
+                                    <th scope="col" class="cl-table-actions">
+                                        <span class="cl-visually-hidden" th:text="#{store.payments.statement.channels.actions}"></span>
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody data-cl-payout-list-rows></tbody>
+                            </table>
+                            <p class="cl-list-empty" data-cl-payout-empty hidden th:text="#{store.payments.statement.channels.empty}"></p>
+                            <p class="cl-visually-hidden" role="status" data-cl-payout-status></p>
+                            <div class="cl-repeat-add">
+                                <button type="button" class="cl-button" data-cl-dialog-open="payout-row-dialog">
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                    <span th:text="#{store.payments.statement.channels.add}"></span>
+                                </button>
+                                <p class="cl-help" data-cl-payout-unsaved hidden th:text="#{store.payments.statement.channels.unsaved}"></p>
+                            </div>
+                        </div>
+                        <div class="cl-statement-scroll is-fields" data-cl-payout-fields>
                             <table class="cl-table is-compact">
                                 <thead>
                                 <tr>
                                     <th scope="col" th:text="#{store.payments.statement.channels.match}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.source}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.method}"></th>
-                                    <th scope="col" th:text="#{store.payments.statement.channels.provider}"></th>
                                     <th scope="col" th:text="#{store.payments.statement.channels.net}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.feeRates}"></th>
+                                    <th scope="col" th:text="#{store.payments.statement.channels.feeLimit}"></th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                <tr th:each="channel, s : *{channels}"
-                                    th:with="matchId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'match')},
-                                             sourceId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'source')},
-                                             methodId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'method')},
-                                             providerId=${T(pl.commercelink.web.dtos.BankStatementFormatForm).channelField(s.index, 'provider')}">
-                                    <td>
-                                        <input class="cl-input" type="text" autocomplete="off" th:id="${matchId}"
-                                               th:name="|channels[${s.index}].match|" th:value="${channel.match}"
-                                               th:classappend="${errors[matchId] != null} ? 'is-invalid'"
-                                               th:attr="aria-label=#{store.payments.statement.channels.match}, aria-invalid=${errors[matchId] != null ? 'true' : null}"/>
-                                        <p th:if="${errors[matchId] != null}" class="cl-field-error">
-                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                            <span th:text="#{${errors[matchId]}}"></span>
-                                        </p>
-                                    </td>
-                                    <td>
-                                        <select class="cl-select" th:id="${sourceId}" th:name="|channels[${s.index}].source|"
-                                                th:classappend="${errors[sourceId] != null} ? 'is-invalid'"
-                                                th:attr="aria-label=#{store.payments.statement.channels.source}, aria-invalid=${errors[sourceId] != null ? 'true' : null}">
-                                            <option th:each="option : ${sourceOptions}" th:value="${option.value()}" th:text="${option.label()}"
-                                                    th:selected="${option.value() == (channel.source == null ? '' : channel.source)}"></option>
-                                        </select>
-                                        <p th:if="${errors[sourceId] != null}" class="cl-field-error">
-                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                            <span th:text="#{${errors[sourceId]}}"></span>
-                                        </p>
-                                    </td>
-                                    <td>
-                                        <select class="cl-select" th:id="${methodId}" th:name="|channels[${s.index}].method|"
-                                                th:classappend="${errors[methodId] != null} ? 'is-invalid'"
-                                                th:attr="aria-label=#{store.payments.statement.channels.method}, aria-invalid=${errors[methodId] != null ? 'true' : null}">
-                                            <option th:each="option : ${methodOptions}" th:value="${option.value()}" th:text="${option.label()}"
-                                                    th:selected="${option.value() == (channel.method == null ? '' : channel.method)}"></option>
-                                        </select>
-                                        <p th:if="${errors[methodId] != null}" class="cl-field-error">
-                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-                                            <span th:text="#{${errors[methodId]}}"></span>
-                                        </p>
-                                    </td>
-                                    <td>
-                                        <select class="cl-select" th:id="${providerId}" th:name="|channels[${s.index}].provider|"
-                                                th:attr="aria-label=#{store.payments.statement.channels.provider}">
-                                            <option th:each="option : ${providerOptions}" th:value="${option.value()}" th:text="${option.label()}"
-                                                    th:selected="${option.value() == (channel.provider == null ? '' : channel.provider)}"></option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <label class="cl-check">
-                                            <input type="checkbox" value="true" th:name="|channels[${s.index}].netOfFees|" th:checked="${channel.netOfFees}"/>
-                                            <span th:text="#{store.payments.statement.channels.net.short}"></span>
-                                        </label>
-                                    </td>
-                                </tr>
+                                <th:block th:each="channel, s : *{channels}">
+                                    <tr th:replace="~{fragments/statement-fields :: payoutRow(${channel}, ${s.index})}"></tr>
+                                </th:block>
                                 </tbody>
                             </table>
+                            <template data-cl-payout-template>
+                                <tr th:replace="~{fragments/statement-fields :: payoutRow(null, '@INDEX@')}"></tr>
+                            </template>
+                        </div>
                         </div>
                     </fieldset>
 
@@ -215,12 +205,104 @@
                     </div>
                 </div>
             </form>
+
+            <!--/* One payout row, added or edited; its fields have no names, payout-rows.js copies them into the row's
+                   fields of the format form, which keeps them until "Zapisz format". */-->
+            <dialog class="cl-dialog is-form" id="payout-row-dialog" aria-labelledby="payout-row-title"
+                    th:attr="data-title-add=#{store.payments.statement.channels.add},
+                             data-title-edit=#{store.payments.statement.channels.dialog.edit},
+                             data-submit-add=#{store.payments.statement.channels.dialog.submit.add},
+                             data-submit-edit=#{store.payments.statement.channels.dialog.submit.edit},
+                             data-error-match=#{store.payments.statement.error.channelMatch},
+                             data-error-orders=#{store.payments.statement.error.channelOrders},
+                             data-error-rates=#{store.payments.statement.error.channelFeeRates},
+                             data-error-limit=#{store.payments.statement.error.channelFeeLimit}">
+                <form data-cl-payout-form novalidate>
+                    <h2 class="cl-dialog-title" id="payout-row-title"></h2>
+                    <div class="cl-dialog-body">
+                        <div class="cl-form-grid">
+                            <div class="cl-field cl-span-6">
+                                <label class="cl-label" for="payout-dialog-match" th:text="#{store.payments.statement.channels.match}"></label>
+                                <input class="cl-input" type="text" id="payout-dialog-match" autocomplete="off" data-cl-payout-field="match"
+                                       aria-describedby="payout-dialog-match-help payout-dialog-match-error"/>
+                                <p class="cl-help" id="payout-dialog-match-help" th:text="#{store.payments.statement.channels.match.help}"></p>
+                                <p class="cl-field-error" id="payout-dialog-match-error" data-cl-payout-error="match" hidden>
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span></span>
+                                </p>
+                            </div>
+                            <div class="cl-field cl-span-3">
+                                <label class="cl-label" for="payout-dialog-source" th:text="#{store.payments.statement.channels.source}"></label>
+                                <select class="cl-select" id="payout-dialog-source" data-cl-payout-field="source"
+                                        aria-describedby="payout-dialog-source-error">
+                                    <option th:each="option : ${sourceOptions}" th:value="${option.value()}" th:text="${option.label()}"></option>
+                                </select>
+                                <p class="cl-field-error" id="payout-dialog-source-error" data-cl-payout-error="source" hidden>
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span></span>
+                                </p>
+                            </div>
+                            <div class="cl-field cl-span-3">
+                                <label class="cl-label" for="payout-dialog-method" th:text="#{store.payments.statement.channels.method}"></label>
+                                <select class="cl-select" id="payout-dialog-method" data-cl-payout-field="method"
+                                        aria-describedby="payout-dialog-method-error">
+                                    <option th:each="option : ${methodOptions}" th:value="${option.value()}" th:text="${option.label()}"></option>
+                                </select>
+                                <p class="cl-field-error" id="payout-dialog-method-error" data-cl-payout-error="method" hidden>
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span></span>
+                                </p>
+                            </div>
+                            <div class="cl-check-field cl-span-6">
+                                <label class="cl-check">
+                                    <input type="checkbox" id="payout-dialog-net" data-cl-payout-field="netOfFees"
+                                           aria-controls="payout-dialog-rates payout-dialog-limit" aria-describedby="payout-dialog-net-description"/>
+                                    <span th:text="#{store.payments.statement.channels.net.short}"></span>
+                                </label>
+                                <p class="cl-check-description" id="payout-dialog-net-description" th:text="#{store.payments.statement.channels.net.help}"></p>
+                            </div>
+                            <div class="cl-field cl-span-3" data-cl-payout-fees>
+                                <label class="cl-label" for="payout-dialog-rates">
+                                    <span th:text="#{store.payments.statement.channels.feeRates}"></span>
+                                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <input class="cl-input" type="text" id="payout-dialog-rates" autocomplete="off" data-cl-payout-field="feeRates"
+                                       th:placeholder="#{store.payments.statement.channels.feeRates.placeholder}"
+                                       aria-describedby="payout-dialog-rates-help payout-dialog-rates-error"/>
+                                <p class="cl-help" id="payout-dialog-rates-help" th:text="#{store.payments.statement.channels.feeRates.help}"></p>
+                                <p class="cl-field-error" id="payout-dialog-rates-error" data-cl-payout-error="feeRates" hidden>
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span></span>
+                                </p>
+                            </div>
+                            <div class="cl-field cl-span-3" data-cl-payout-fees>
+                                <label class="cl-label" for="payout-dialog-limit">
+                                    <span th:text="#{store.payments.statement.channels.feeLimit}"></span>
+                                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <input class="cl-input" type="text" inputmode="decimal" id="payout-dialog-limit" autocomplete="off"
+                                       data-cl-payout-field="maxFeePercent"
+                                       aria-describedby="payout-dialog-limit-help payout-dialog-limit-error"/>
+                                <p class="cl-help" id="payout-dialog-limit-help" th:text="#{store.payments.statement.channels.feeLimit.help}"></p>
+                                <p class="cl-field-error" id="payout-dialog-limit-error" data-cl-payout-error="maxFeePercent" hidden>
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i> <span></span>
+                                </p>
+                            </div>
+                        </div>
+                        <p class="cl-help" th:text="#{store.payments.statement.channels.unsaved}"></p>
+                    </div>
+                    <div class="cl-dialog-actions">
+                        <button type="submit" class="cl-button is-primary" data-cl-payout-apply></button>
+                        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                        <button type="button" class="cl-link-button is-danger cl-dialog-actions-end" data-cl-payout-remove hidden
+                                th:text="#{store.payments.statement.channels.remove}"></button>
+                    </div>
+                </form>
+            </dialog>
         </div>
     </section>
     <script th:if="${!errors.isEmpty()}">
         document.getElementById('statement-format-errors').focus();
     </script>
     <script th:src="@{/js/submit-on-change.js}" defer></script>
+    <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/payout-rows.js}" defer></script>
 </div>
 </body>
 </html>

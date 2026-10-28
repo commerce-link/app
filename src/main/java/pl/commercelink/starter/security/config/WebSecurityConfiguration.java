@@ -23,6 +23,7 @@ import pl.commercelink.starter.security.filter.CustomTokenRefreshFilter;
 import pl.commercelink.starter.security.handler.CustomAuthenticationSuccessHandler;
 import pl.commercelink.starter.security.handler.CustomLogoutSuccessHandler;
 import pl.commercelink.starter.security.service.CustomOAuth2UserService;
+import pl.commercelink.web.errorpage.CustomerPageErrors;
 
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -91,6 +92,10 @@ public class WebSecurityConfiguration {
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
                         .addHeaderWriter(frameOptions()))
                 .authorizeHttpRequests(auth -> {
+                    // Only the error of a customer page is open, so its customer sees the store's error page
+                    // (PublicErrorViewResolver) instead of the dashboard login. Any other error, including those of the
+                    // shop API and the webhooks, still sends an anonymous caller to the login, as it always has.
+                    auth.requestMatchers(CustomerPageErrors.DISPATCH).permitAll();
                     auth.requestMatchers(
                             "/",
                             "/env",
@@ -113,7 +118,7 @@ public class WebSecurityConfiguration {
                 })
                 .addFilterBefore(tokenRefreshFilter, OAuth2AuthorizationRequestRedirectFilter.class)
                 .oauth2Login(oauth2 -> oauth2
-                        .successHandler(successHandler)
+                        .successHandler(new ErrorPageSkippingSuccessHandler(successHandler))
                         .userInfoEndpoint(userInfo -> {
                             userInfo.userService(customOAuth2UserService);
                         })

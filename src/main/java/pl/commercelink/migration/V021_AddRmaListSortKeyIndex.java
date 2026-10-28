@@ -13,10 +13,8 @@ import pl.commercelink.orders.rma.RmaListSortKey;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.LongConsumer;
-import java.util.function.Predicate;
 
 /**
  * RMAs by store and list key (RMA list spec §5.2): the list reads the RMAs being handled and a window of the closed
@@ -43,21 +41,18 @@ public class V021_AddRmaListSortKeyIndex {
     static final String TABLE = "RMA";
     static final String ATTRIBUTE = "rmaListSortKey";
     static final Duration TIMEOUT = Duration.ofMinutes(10);
-    static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
 
     private final AmazonDynamoDB dynamoDB;
-    private final LongConsumer pause;
-    private final Duration timeout;
+    private final GlobalSecondaryIndexCreation indexCreation;
 
     @ChangeUnitConstructor
     public V021_AddRmaListSortKeyIndex(AmazonDynamoDB dynamoDB) {
-        this(dynamoDB, V021_AddRmaListSortKeyIndex::sleep, TIMEOUT);
+        this(dynamoDB, GlobalSecondaryIndexCreation::sleep, TIMEOUT);
     }
 
     V021_AddRmaListSortKeyIndex(AmazonDynamoDB dynamoDB, LongConsumer pause, Duration timeout) {
         this.dynamoDB = dynamoDB;
-        this.pause = pause;
-        this.timeout = timeout;
+        this.indexCreation = new GlobalSecondaryIndexCreation(dynamoDB, "V021", pause, timeout);
     }
 
     /**
@@ -80,31 +75,9 @@ public class V021_AddRmaListSortKeyIndex {
     }
 
     private void createIndexIfAbsent() {
-        if (hasIndex(describe())) {
-            return;
-        }
-        awaitUntil(table -> busyIndexes(table).isEmpty() && isActive(table.getTableStatus()),
-                "the index operations on RMA to finish");
-        TableDescription table = describe();
-        CreateGlobalSecondaryIndexAction create = new CreateGlobalSecondaryIndexAction()
-                .withIndexName(INDEX)
-                .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), new KeySchemaElement(ATTRIBUTE, KeyType.RANGE))
-                // the list shows the client, shipments and value of every row, so the index carries whole RMAs
-                .withProjection(new Projection().withProjectionType(ProjectionType.ALL));
-        // A provisioned table rejects an index without its own throughput (same as V018-V020).
-        boolean onDemand = table.getBillingModeSummary() != null
-                && BillingMode.PAY_PER_REQUEST.toString().equals(table.getBillingModeSummary().getBillingMode());
-        if (!onDemand) {
-            ProvisionedThroughputDescription capacity = table.getProvisionedThroughput();
-            create.withProvisionedThroughput(new ProvisionedThroughput(
-                    Math.max(1L, capacity.getReadCapacityUnits()), Math.max(1L, capacity.getWriteCapacityUnits())));
-        }
-        dynamoDB.updateTable(new UpdateTableRequest()
-                .withTableName(TABLE)
-                .withAttributeDefinitions(
-                        new AttributeDefinition("storeId", ScalarAttributeType.S),
-                        new AttributeDefinition(ATTRIBUTE, ScalarAttributeType.S))
-                .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate().withCreate(create)));
+        // the list shows the client, shipments and value of every row, so the index carries whole RMAs
+        indexCreation.createIfAbsent(TABLE, INDEX, "storeId", ATTRIBUTE,
+                new Projection().withProjectionType(ProjectionType.ALL));
     }
 
     /**
@@ -167,53 +140,6 @@ public class V021_AddRmaListSortKeyIndex {
     private static String idOf(Map<String, AttributeValue> item, String name) {
         AttributeValue value = item.get(name);
         return value == null ? null : value.getS();
-    }
-
-    private TableDescription describe() {
-        return dynamoDB.describeTable(TABLE).getTable();
-    }
-
-    private static boolean hasIndex(TableDescription table) {
-        return table.getGlobalSecondaryIndexes() != null
-                && table.getGlobalSecondaryIndexes().stream().anyMatch(index -> INDEX.equals(index.getIndexName()));
-    }
-
-    private static List<String> busyIndexes(TableDescription table) {
-        if (table.getGlobalSecondaryIndexes() == null) {
-            return List.of();
-        }
-        return table.getGlobalSecondaryIndexes().stream()
-                .filter(index -> !isActive(index.getIndexStatus()))
-                .map(index -> index.getIndexName() + " (" + index.getIndexStatus() + ")")
-                .toList();
-    }
-
-    // dynamodb-local reports no status at all for an index that is ready
-    private static boolean isActive(String status) {
-        return status == null || "ACTIVE".equals(status);
-    }
-
-    private void awaitUntil(Predicate<TableDescription> done, String what) {
-        long waitedMillis = 0;
-        while (!done.test(describe())) {
-            if (waitedMillis >= timeout.toMillis()) {
-                TableDescription table = describe();
-                throw new IllegalStateException("V021: timed out after " + timeout + " waiting for " + what
-                        + " on RMA; table status " + table.getTableStatus() + ", busy indexes " + busyIndexes(table)
-                        + ". Restart the application to resume V021.");
-            }
-            pause.accept(POLL_INTERVAL.toMillis());
-            waitedMillis += POLL_INTERVAL.toMillis();
-        }
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("V021 interrupted while waiting for the RMA table", e);
-        }
     }
 
     @RollbackExecution

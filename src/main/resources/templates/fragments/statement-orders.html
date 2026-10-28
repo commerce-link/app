@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The orders an operation of the statement is assigned to, in its row of the reconciliation (payments-statement.html).
+       Each links to the order in a new tab: the reconciliation lives only on this page, leaving it would lose it. A
+       payout of many orders shows the first ones and folds the rest (statement-reconciliation.js draws the same). */-->
+<th:block th:fragment="orders(refs)" th:with="folded=${refs.size() > 4}">
+    <th:block th:each="ref, it : ${refs}" th:if="${!folded or it.index < 3}">
+        <div th:replace="~{fragments/statement-orders :: order(${ref})}"></div>
+    </th:block>
+    <details th:if="${folded}" class="cl-row-disclosure">
+        <summary th:text="#{payments.statement.orders.more(${refs.size() - 3})}"></summary>
+        <th:block th:each="ref, it : ${refs}" th:if="${it.index >= 3}">
+            <div th:replace="~{fragments/statement-orders :: order(${ref})}"></div>
+        </th:block>
+    </details>
+</th:block>
+
+<div th:fragment="order(ref)" class="cl-statement-order">
+    <a class="cl-table-code" th:href="@{${ref.href()}}" target="_blank" rel="noopener"
+       th:title="#{payments.statement.orders.open(${ref.shortId()})}" th:text="${ref.shortId()}"></a>
+    <span th:if="${ref.client() != null}" th:text="${ref.client()}"></span>
+    <span th:if="${ref.detail() != null}" class="cl-table-sub" th:text="${ref.detail()}"></span>
+</div>
+
+</body>
+</html>

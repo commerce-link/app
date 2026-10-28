@@ -1,6 +1,7 @@
 package pl.commercelink.pricelist;
 
 import org.springframework.stereotype.Service;
+import pl.commercelink.products.information.StorePimAliases;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -11,8 +12,11 @@ public class SellingPriceHistoryService {
 
     private final SellingPriceHistoryRepository sellingPriceHistoryRepository;
 
-    public SellingPriceHistoryService(SellingPriceHistoryRepository sellingPriceHistoryRepository) {
+    private final StorePimAliases aliases;
+
+    public SellingPriceHistoryService(SellingPriceHistoryRepository sellingPriceHistoryRepository, StorePimAliases aliases) {
         this.sellingPriceHistoryRepository = sellingPriceHistoryRepository;
+        this.aliases = aliases;
     }
 
     public void update(String storeId, String catalogId, List<AvailabilityAndPrice> pricelist) {
@@ -25,6 +29,9 @@ public class SellingPriceHistoryService {
                 if (item.getPrice() <= 0) continue;
                 SellingPriceHistory history = histories.computeIfAbsent(item.getPimId(), SellingPriceHistory::new);
                 history.recordPrice(today, item.getPrice());
+                // A clone's days are also kept under its source, so they survive deleting the clone.
+                aliases.sourceOf(storeId, item.getPimId()).ifPresent(sourcePimId ->
+                        histories.computeIfAbsent(sourcePimId, SellingPriceHistory::new).recordPrice(today, item.getPrice()));
             }
 
             for (SellingPriceHistory history : histories.values()) {

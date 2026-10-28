@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LayoutFlashMessagesTemplateTest {
 
     private static final List<String> LAYOUT_PAGES = List.of("deliveries", "deliveries/details", "deliveries/create/items",
-            "deliveries/create/purchase", "deliveries/create/manual", "store-categories", "store-copy");
+            "deliveries/create/purchase", "deliveries/create/manual", "store-categories");
 
     private static String read(String template) throws Exception {
         return Files.readString(Path.of("src/main/resources/templates/" + template + ".html"), StandardCharsets.UTF_8);

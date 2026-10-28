@@ -34,4 +34,30 @@ class FinancesViewTest {
         assertThat(settled.overpaid()).isFalse();
         assertThat(settled.unpaid()).isEqualTo("0,00");
     }
+
+    @Test
+    void anOrderWithACodeShowsTheCodeAndTheDiscount() {
+        // given
+        Order order = order(350.73, 0);
+        order.setDiscountCode("LATO-10");
+        order.setDiscountAmount(38.97);
+
+        // when
+        FinancesView view = FinancesView.of(order, List.of());
+
+        // then
+        assertThat(view.hasDiscount()).isTrue();
+        assertThat(view.discountCode()).isEqualTo("LATO-10");
+        assertThat(view.discountAmount()).isEqualTo("38,97");
+    }
+
+    @Test
+    void anOrderWithoutACodeHasNoDiscount() {
+        // when
+        FinancesView view = FinancesView.of(order(199, 0), List.of());
+
+        // then
+        assertThat(view.hasDiscount()).isFalse();
+        assertThat(view.discountCode()).isNull();
+    }
 }

@@ -11,7 +11,8 @@ import java.util.Set;
  * candidates are the orders to choose from when the proposal is ambiguous, or the orders that already hold the
  * operation when it is {@link MatchKind#BOOKED}. payout holds the rows of the payer that sent a payout, empty for a
  * transfer from a customer. matchedTexts are the parts of the title that named the orders, to be
- * highlighted; difference is the amount behind {@link MatchWarning#UNDERPAID} or {@link MatchWarning#OVERPAID}.
+ * highlighted; difference is the amount behind {@link MatchWarning#UNDERPAID} or {@link MatchWarning#OVERPAID}, or the
+ * fee behind {@link MatchWarning#FEE_ABOVE_LIMIT}.
  */
 public record OperationMatch(BankOperation operation, MatchKind kind, MatchRule rule, List<Allocation> allocations,
                              List<String> candidates, List<PayoutChannel> payout, Set<MatchWarning> warnings,

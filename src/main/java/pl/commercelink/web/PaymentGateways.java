@@ -11,6 +11,7 @@ import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.provider.api.ProviderField.FieldType;
 import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.web.dtos.PaymentOptionView;
 import pl.commercelink.web.settings.PaymentGatewayView;
 
 import java.util.Comparator;
@@ -23,10 +24,11 @@ import java.util.stream.Collectors;
 /**
  * What the payments settings pages need to know about the store's payment gateways: the installed ones, the gateways
  * the store uses (several, one of them the default), their adapter settings and the webhook address each gateway's own
- * panel has to call when a customer pays. Without that address no order is created after a payment.
+ * panel has to call when a customer pays. Without that address no order is created after a payment. The client offer
+ * page lists the same gateways for the customer to choose from.
  */
 @Component
-class PaymentGateways {
+public class PaymentGateways {
 
     private final PaymentProviderFactory paymentProviderFactory;
     private final MessageSource messageSource;
@@ -66,6 +68,13 @@ class PaymentGateways {
     String displayName(String name) {
         PaymentProviderDescriptor descriptor = descriptor(name);
         return descriptor == null ? name : descriptor.displayName();
+    }
+
+    public List<PaymentOptionView> paymentOptions(Store store) {
+        return store.getPayments().stream()
+                .map(integration -> new PaymentOptionView(integration.getName(), displayName(integration.getName()),
+                        integration.is_default()))
+                .toList();
     }
 
     /** What disconnecting does to customers; the list's dialog and the confirmation page say the same. */

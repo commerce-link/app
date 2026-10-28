@@ -55,8 +55,8 @@ class BankStatementFormatFormTest {
         form.setSeparator("TAB");
         form.setTitleColumn2("#Tytuł");
         form.setChannels(new ArrayList<>(List.of(
-                row("ALLEGRO", "Allegro", "", "", true),
-                row("", "", "", "", false))));
+                row("ALLEGRO", "Allegro", "", true),
+                row("", "", "", false))));
 
         // when
         BankStatementFormat format = form.toFormat();
@@ -71,7 +71,6 @@ class BankStatementFormatFormTest {
             assertThat(channel.getMatch()).isEqualTo("ALLEGRO");
             assertThat(channel.getOrderSource()).isEqualTo("Allegro");
             assertThat(channel.getMethod()).isNull();
-            assertThat(channel.getProvider()).isNull();
             assertThat(channel.isNetOfFees()).isTrue();
         });
         assertThat(format.isComplete()).isTrue();
@@ -85,8 +84,8 @@ class BankStatementFormatFormTest {
         // given
         BankStatementFormatForm form = filled();
         form.setChannels(new ArrayList<>(List.of(
-                row("SANTANDER", "", "Installments", "", false),
-                row("SANTANDER", "SHOP", "OnlinePayment", "Santander eRaty", false))));
+                row("SANTANDER", "", "Installments", false),
+                row("SANTANDER", "SHOP", "OnlinePayment", false))));
 
         // when
         List<PayoutChannel> channels = form.toFormat().getPayoutChannels();
@@ -96,7 +95,6 @@ class BankStatementFormatFormTest {
         assertThat(channels).extracting(PayoutChannel::getMethod)
                 .containsExactly(PaymentSource.Installments, PaymentSource.OnlinePayment);
         assertThat(channels.get(1).getOrderSource()).isEqualTo(PayoutChannel.SHOP);
-        assertThat(channels.get(1).getProvider()).isEqualTo("Santander eRaty");
         assertThat(BankStatementFormatForm.from(form.toFormat()).getChannels().get(0).getMethod()).isEqualTo("Installments");
     }
 
@@ -104,18 +102,104 @@ class BankStatementFormatFormTest {
     void asksForTheMatchAndTheChannelOfAStartedRow() {
         // given
         BankStatementFormatForm form = filled();
-        form.setChannels(new ArrayList<>(List.of(row("", "", "", "Przelewy24", false), row("PAYPRO", "", "", "", true),
-                row("PAYPRO", "", "Barter", "", false))));
+        form.setChannels(new ArrayList<>(List.of(row("", "Allegro", "", false), row("PAYPRO", "", "", true),
+                row("PAYPRO", "", "Barter", false))));
 
         // when / then
         assertThat(form.validate()).containsOnlyKeys("channel-0-match", "channel-1-source", "channel-2-method");
     }
 
     @Test
+    void storesTheFeeLimitAndShowsItAsTyped() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow paynow = row("PAYNOW", "SHOP", "OnlinePayment", true);
+        paynow.setMaxFeePercent("1,5");
+        form.setChannels(new ArrayList<>(List.of(paynow)));
+
+        // when
+        BankStatementFormat format = form.toFormat();
+
+        // then
+        assertThat(form.validate()).isEmpty();
+        assertThat(format.getPayoutChannels().get(0).getMaxFeePercent()).isEqualTo(1.5);
+        assertThat(BankStatementFormatForm.from(format).getChannels().get(0).getMaxFeePercent()).isEqualTo("1,5");
+    }
+
+    @Test
+    void refusesAFeeLimitThatIsNoPercentage() {
+        // given
+        BankStatementFormatForm form = filled();
+        List<BankStatementFormatForm.ChannelRow> rows = new ArrayList<>();
+        for (String limit : List.of("dwa", "0", "100,5")) {
+            BankStatementFormatForm.ChannelRow row = row("PAYNOW", "SHOP", "", true);
+            row.setMaxFeePercent(limit);
+            rows.add(row);
+        }
+        form.setChannels(rows);
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("channel-0-maxFeePercent", "channel-1-maxFeePercent",
+                "channel-2-maxFeePercent");
+    }
+
+    @Test
+    void storesTheFeeRatesAndShowsThemAsTyped() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow bnp = row("BNP PARIBAS", "SHOP", "Installments", true);
+        bnp.setFeeRates(" 2;4,5 ");
+        form.setChannels(new ArrayList<>(List.of(bnp)));
+
+        // when
+        BankStatementFormat format = form.toFormat();
+
+        // then
+        assertThat(form.validate()).isEmpty();
+        assertThat(format.getPayoutChannels().get(0).getFeeRates()).containsExactly(2.0, 4.5);
+        assertThat(BankStatementFormatForm.from(format).getChannels().get(0).getFeeRates()).isEqualTo("2; 4,5");
+    }
+
+    @Test
+    void refusesFeeRatesThatAreNoPercentages() {
+        // given
+        BankStatementFormatForm form = filled();
+        List<BankStatementFormatForm.ChannelRow> rows = new ArrayList<>();
+        // "2 4" has no semicolon: a comma or a dot is the decimal mark, so only a semicolon separates the rates
+        for (String rates : List.of("2; dwa", "0", "2; 150", "1; 2; 3; 4; 5; 6", "2 4")) {
+            BankStatementFormatForm.ChannelRow row = row("BNP PARIBAS", "SHOP", "", true);
+            row.setFeeRates(rates);
+            rows.add(row);
+        }
+        form.setChannels(rows);
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("channel-0-feeRates", "channel-1-feeRates", "channel-2-feeRates",
+                "channel-3-feeRates", "channel-4-feeRates");
+    }
+
+    @Test
+    void feeRatesAndTheFeeLimitAskForATransferNetOfFees() {
+        // given
+        BankStatementFormatForm form = filled();
+        BankStatementFormatForm.ChannelRow rates = row("BNP PARIBAS", "SHOP", "", false);
+        rates.setFeeRates("2; 4");
+        BankStatementFormatForm.ChannelRow limit = row("PAYNOW", "SHOP", "", false);
+        limit.setMaxFeePercent("1");
+        form.setChannels(new ArrayList<>(List.of(rates, limit)));
+
+        // when / then
+        assertThat(form.validate())
+                .containsEntry("channel-0-feeRates", "store.payments.statement.error.channelNetOfFees")
+                .containsEntry("channel-1-maxFeePercent", "store.payments.statement.error.channelNetOfFees")
+                .hasSize(2);
+    }
+
+    @Test
     void aGuessKeepsTheChannelsAndTheSample() {
         // given
         BankStatementFormatForm form = BankStatementFormatForm.defaults();
-        form.setChannels(new ArrayList<>(List.of(row("ALLEGRO", "Allegro", "", "", true))));
+        form.setChannels(new ArrayList<>(List.of(row("ALLEGRO", "Allegro", "", true))));
         form.attachSample(new byte[]{1, 2, 3}, "wyciag.csv");
         BankStatementFormat guess = new BankStatementFormat();
         guess.setEncoding("UTF-8");
@@ -158,13 +242,11 @@ class BankStatementFormatFormTest {
         return form;
     }
 
-    private static BankStatementFormatForm.ChannelRow row(String match, String source, String method, String provider,
-                                                          boolean net) {
+    private static BankStatementFormatForm.ChannelRow row(String match, String source, String method, boolean net) {
         BankStatementFormatForm.ChannelRow row = new BankStatementFormatForm.ChannelRow();
         row.setMatch(match);
         row.setSource(source);
         row.setMethod(method);
-        row.setProvider(provider);
         row.setNetOfFees(net);
         return row;
     }

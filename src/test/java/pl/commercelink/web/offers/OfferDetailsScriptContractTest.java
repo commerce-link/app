@@ -182,6 +182,18 @@ class OfferDetailsScriptContractTest {
     }
 
     @Test
+    void selectVariantMarksOnlyTheRowAndRecounts() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then
+        assertThat(js).contains("data-cl-line-select").contains("selectVariant(");
+        String body = js.substring(js.indexOf("function selectVariant(row) {"));
+        body = body.substring(0, body.indexOf("\n    }\n"));
+        assertThat(body).contains("'variantSelected'").contains("recount()").contains("changed()");
+    }
+
+    @Test
     void clearedCostInTheItemDialogReadsZeroOnLeavingTheField() throws Exception {
         // when
         String js = read("static/js/offer-lines.js");
@@ -208,7 +220,7 @@ class OfferDetailsScriptContractTest {
 
         // then
         assertThat(js).contains("if (!confirmDialog.open) {\n                    window.location.reload();\n                    return;");
-        assertThat(js.indexOf("if (!confirmDialog.open) {")).isLessThan(js.indexOf("var savedUrl = actionUrl(element);"));
+        assertThat(js.indexOf("if (!confirmDialog.open) {")).isLessThan(js.indexOf("HTMLFormElement.prototype.submit.call(confirmForm);"));
     }
 
     @Test
@@ -236,5 +248,158 @@ class OfferDetailsScriptContractTest {
         assertThat(css).contains(".cl-page .cl-table.is-line-editor tr.sortable-ghost > * > * { visibility: hidden; }")
                 .contains(".cl-page .cl-table.is-line-editor tr.sortable-fallback { display: table; table-layout: fixed;")
                 .contains("html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }");
+    }
+
+    @Test
+    void theLiveRecountUsesTheEstimateWhenTheCostIsEmpty() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String recountRow = js.substring(js.indexOf("function recountRow("), js.indexOf("function recount()"));
+        String recount = js.substring(js.indexOf("function recount()"), js.indexOf("var totalTimer"));
+
+        // then
+        assertThat(js).contains("data-estimated-cost").doesNotContain("data-median-cost").contains("function costOf(")
+                .contains("'margin-estimated'").contains("data-cl-sum-estimated");
+        // client 2026-10-27: the cost and margin lines went, the tooltip carries them; red only at a margin of 0 or less
+        assertThat(js).doesNotContain("'line-cost").doesNotContain("'line-margin").doesNotContain("data-cl-line-cost")
+                .doesNotContain("is-low").contains("tone: profit <= 0 ? 'loss' : 'ok',");
+        assertThat(recountRow).contains("+ '\\n\\n' + (mark.getAttribute('data-cl-market-text') || '')");
+        assertThat(recountRow).contains("costOf(");
+        assertThat(recount).contains("costOf(");
+    }
+
+    @Test
+    void theRowMenuTogglesMergingOnTheInvoiceInTheDraft() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String toggle = js.substring(js.indexOf("function toggleConsolidated("), js.indexOf("// --- before a save"));
+
+        // then — written into the hidden field like any edit, so it waits for "Zapisz zmiany"
+        assertThat(js).contains("target.hasAttribute('data-cl-line-consolidate')").contains("toggleConsolidated(row);");
+        assertThat(toggle).contains("consolidated.value = consolidated.value === 'true' ? 'false' : 'true';")
+                .contains("showConsolidated(row);").contains("changed();");
+        assertThat(js).contains("message(on ? 'deconsolidate' : 'consolidate')")
+                .doesNotContain("data-cl-mark-consolidated");
+    }
+
+    @Test
+    void anEditedCodeIsRenderedAsTheCopyButtonTheServerDraws() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String renderSub = js.substring(js.indexOf("function renderSub("), js.indexOf("function showConsolidated("));
+
+        // then
+        assertThat(renderSub).contains("copy.className = 'cl-copy-inline';").contains("copy.setAttribute('data-cl-copy', mfn);")
+                .contains("code.className = 'cl-copy-text';").contains("wrap.className = 'cl-line-code';")
+                .contains("message('copy-mfn', [mfn])").doesNotContain("cl-code-nowrap");
+    }
+
+    @Test
+    void addingItemsPostsTheDraftAndSwapsTheTable() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String dialog = read("static/js/item-add-dialog.js");
+        String handler = js.substring(js.indexOf("addEventListener('cl:item-add-submit'"));
+        handler = handler.substring(0, handler.indexOf("\n    });\n"));
+
+        // then
+        assertThat(handler).contains("event.preventDefault();").contains("addToDraft(detail.params)")
+                .contains("detail.done()").contains("detail.abort()")
+                .doesNotContain("proceed(").doesNotContain("form.submit").doesNotContain("saveItems(");
+        assertThat(handler.indexOf("event.preventDefault();")).isLessThan(handler.indexOf("addToDraft("));
+        assertThat(js).contains("+ '/items/draft'").contains("querySelectorAll('tbody[data-cl-lines]')")
+                .contains("window.CL_offerLines.reinit(Array.prototype.map.call(fresh, function (section) {")
+                .contains("document.importNode(section, true)")
+                .contains("template[data-cl-draft-meta]").contains("'data-skipped'")
+                .doesNotContain("data-add-label").doesNotContain("data-add-count");
+        assertThat(dialog).contains("params: params").contains("done: () =>").contains("proceed: () => form.submit()");
+    }
+
+    @Test
+    void removingARowDoesNotPost() throws Exception {
+        // when
+        String details = read("static/js/offer-details.js");
+        String lines = read("static/js/offer-lines.js");
+        String items = read("templates/offers/details/items.html");
+
+        // then
+        assertThat(items).contains("data-cl-line-remove").doesNotContain("offers.details.line.remove.confirm")
+                .contains("data-msg-line-removed-draft=#{offers.details.line.removedDraft}")
+                .contains("data-msg-undo=#{offers.details.line.undo}");
+        assertThat(details).doesNotContain("remove-item").doesNotContain("savedIndex").doesNotContain("leavesNoItem");
+        assertThat(lines).contains("hasAttribute('data-cl-line-remove')").contains("function removeRow(")
+                .contains("keptWithout(row) === 0").contains("'line-removed-draft'").contains("'undo'")
+                .doesNotContain("savedIndex");
+        String removeRow = lines.substring(lines.indexOf("function removeRow("));
+        removeRow = removeRow.substring(0, removeRow.indexOf("\n    }\n"));
+        assertThat(removeRow).contains("row.remove()").contains("refresh(true)").contains("changed()")
+                .contains("next.before(row)").doesNotContain("fetch(").doesNotContain("submit");
+    }
+
+    @Test
+    void theTableCanBeSetUpAgainForAFreshBody() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+
+        // then
+        assertThat(js).contains("reinit: reinit").contains("function reinit(fresh)").contains("function setUp()")
+                .contains("sortable.destroy()").contains("table.addEventListener('click'")
+                .doesNotContain("body.addEventListener(");
+    }
+
+    @Test
+    void rowsMoveOnlyWithinTheirSection() throws Exception {
+        // when
+        String js = read("static/js/offer-lines.js");
+        String items = read("templates/offers/details/items.html");
+
+        // then
+        assertThat(items).contains("data-cl-lines data-cl-lines-section=\"products\"")
+                .contains("data-cl-lines data-cl-lines-section=\"services\"").contains("data-cl-section-head");
+        assertThat(js).contains("querySelectorAll('tbody[data-cl-lines]')").contains("'data-cl-lines-section'")
+                // one Sortable per section, each in a group of its own that neither gives nor takes rows
+                .contains("sortables = bodies.map(function (section)")
+                .contains("group: { name: 'offer-lines-' + section.getAttribute('data-cl-lines-section'), pull: false, put: false }")
+                .contains("draggable: 'tr:not([data-cl-section-head])'")
+                .doesNotContain("new Sortable(body,");
+        // the moves stop at the section's heading, a new group goes to the products and a removed row comes back home
+        assertThat(js).contains("function previousRow(row)").contains("productsBody().append(head, createFoot())")
+                .contains("parent.isConnected");
+    }
+
+    @Test
+    void aConflictFallsBackToAnOrdinarySubmit() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+        String guard = read("static/js/dirty-form.js");
+
+        // then
+        assertThat(js).contains("response.status === 409").contains("HTMLFormElement.prototype.submit.call(form)")
+                .contains("[data-cl-offer-conflict]").contains("window.CL_markDirty(form)")
+                .contains("alert.focus()").contains("alert.scrollIntoView");
+        assertThat(guard).contains("window.CL_markDirty = function (form)").contains("state.forced");
+    }
+
+    @Test
+    void aDialogSaveCarriesTheNewVersion() throws Exception {
+        // when
+        String js = read("static/js/offer-details.js");
+
+        // then
+        assertThat(js).contains("template.content.querySelector('[data-cl-offer-version]')")
+                .contains("form.querySelector('input[name=\"version\"]')");
+    }
+
+    @Test
+    void theToastCanCarryAnAction() throws Exception {
+        // when
+        String layout = read("templates/layout.html");
+        String css = read("static/css/commercelink.css");
+
+        // then
+        assertThat(layout).contains("function showToast(message, type, action)").contains("cl-toast-action")
+                .contains("action.run()").contains("const CL_TOAST_ACTION_MS = 5000;").doesNotContain("8000")
+                .contains("button.type = 'button'");
+        assertThat(css).contains(".cl-toast-action {").contains(".cl-toast-action:focus-visible");
     }
 }

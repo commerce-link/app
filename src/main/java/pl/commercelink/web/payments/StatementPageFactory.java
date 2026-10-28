@@ -149,15 +149,14 @@ public class StatementPageFactory {
         String note = null;
         if (booked) {
             match.candidates().forEach(id -> refs.add(orderRef(id, orders, bookedDetail(orders.get(id), operation, locale))));
-        } else if (payout && namedPayout(match)) {
-            allocations.forEach(allocation -> refs.add(orderRef(allocation.orderId(), orders,
-                    text(locale, "payments.statement.orders.payoutFee", money(locale, allocation.amount()),
-                            money(locale, allocation.fee())))));
+        } else if (payout && !allocations.isEmpty()) {
+            allocations.forEach(allocation -> refs.add(orderRef(allocation.orderId(), orders, payoutDetail(allocation, locale))));
+            if (allocations.size() > 1) {
+                note = text(locale, "payments.statement.orders.payout", allocations.size(),
+                        money(locale, allocations.stream().map(Allocation::amount).reduce(BigDecimal.ZERO, BigDecimal::add)));
+            }
         } else if (payout) {
-            note = allocations.isEmpty()
-                    ? text(locale, "payments.statement.orders.payout.none", match.candidates().size())
-                    : text(locale, "payments.statement.orders.payout", allocations.size(),
-                    money(locale, allocations.stream().map(Allocation::amount).reduce(BigDecimal.ZERO, BigDecimal::add)));
+            note = text(locale, "payments.statement.orders.payout.none", match.candidates().size());
         } else if (!allocations.isEmpty()) {
             allocations.forEach(allocation -> refs.add(orderRef(allocation.orderId(), orders,
                     debtDetail(orders.get(allocation.orderId()), allocation, locale))));
@@ -188,6 +187,13 @@ public class StatementPageFactory {
         String shortId = order == null ? StringUtils.left(orderId, 8) : order.getShortenedOrderId();
         String client = order == null ? null : OrderPageModelFactory.clientName(order);
         return new OrderRef(orderId, shortId, "/dashboard/orders/" + orderId, client, detail);
+    }
+
+    /** What a payout pays for one of its orders, with the fee the payer kept when it kept one. */
+    private String payoutDetail(Allocation allocation, Locale locale) {
+        return allocation.fee().signum() > 0
+                ? text(locale, "payments.statement.orders.payoutFee", money(locale, allocation.amount()), money(locale, allocation.fee()))
+                : text(locale, "payments.statement.orders.owed", money(locale, allocation.amount()));
     }
 
     private String debtDetail(Order order, Allocation allocation, Locale locale) {
@@ -299,7 +305,8 @@ public class StatementPageFactory {
         List<Pill> pills = new ArrayList<>();
         for (MatchWarning warning : match.warnings()) {
             String label = switch (warning) {
-                case UNDERPAID, OVERPAID -> text(locale, "payments.statement.warning." + warning.name(), money(locale, match.difference()));
+                case UNDERPAID, OVERPAID, FEE_ABOVE_LIMIT ->
+                        text(locale, "payments.statement.warning." + warning.name(), money(locale, match.difference()));
                 case AMBIGUOUS -> text(locale, "payments.statement.warning.AMBIGUOUS", match.candidates().size());
                 default -> text(locale, "payments.statement.warning." + warning.name());
             };

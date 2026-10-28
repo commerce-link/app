@@ -7,6 +7,7 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
@@ -31,16 +32,19 @@ public class PaymentWebhookRegistry {
     private final BasketsRepository basketsRepository;
     private final OrdersManager ordersManager;
     private final StoreActivity storeActivity;
+    private final DiscountService discountService;
     private final RouterFunction<ServerResponse> routes;
 
     PaymentWebhookRegistry(PaymentProviderFactory paymentProviderFactory,
                            StoresRepository storesRepository,
                            BasketsRepository basketsRepository,
                            OrdersManager ordersManager,
-                           StoreActivity storeActivity) {
+                           StoreActivity storeActivity,
+                           DiscountService discountService) {
         this.basketsRepository = basketsRepository;
         this.ordersManager = ordersManager;
         this.storeActivity = storeActivity;
+        this.discountService = discountService;
 
         this.routes = EventBindingRegistrar.forDescriptors(paymentProviderFactory.availableProviders())
                 .<PaymentWebhookResult>withWebhooks(
@@ -86,6 +90,10 @@ public class PaymentWebhookRegistry {
         });
 
         ordersManager.saveWithFulfilment(order, orderItems);
+
+        if (basket.hasDiscountCode()) {
+            discountService.redeem(store.getStoreId(), basket.getDiscountCode());
+        }
 
         basketsRepository.delete(basket);
 

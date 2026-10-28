@@ -260,4 +260,84 @@ class GroupInventorySourceTest {
         // then
         assertThat(result.getSuppliers()).containsExactly("AB Group");
     }
+
+    // a store entry "clone" cloned from the global entry "source"; other "-s-" ids are plain store entries
+    private static StoreEntryKeys cloneOf(String clone, String source) {
+        return new StoreEntryKeys() {
+            @Override
+            public boolean isStoreEntry(String pimId) {
+                return pimId.contains("-s-");
+            }
+
+            @Override
+            public String sourceOf(String pimId) {
+                return clone.equals(pimId) ? source : null;
+            }
+        };
+    }
+
+    @Test
+    void cloneKeyGetsTheGlobalGroupOfItsSource() {
+        // given
+        MatchedInventory sourceGroup = group(pimKey("g-1", "5900000000031", "SRC-1"), item("5900000000031", "SRC-1", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(sourceGroup)), supplier -> true,
+                cloneOf("st-s-c", "g-1"));
+        InventoryKey lookupKey = pimKey("st-s-c", "5900000000031", "SRC-1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.getSuppliers()).containsExactly("AB Group");
+        assertThat(result.getInventoryKey().getId()).isEqualTo("st-s-c");
+    }
+
+    @Test
+    void plainStoreEntryStillSkipsAnotherGlobalEntrysGroupWhenAnotherEntryIsCloned() {
+        // given
+        MatchedInventory otherEntry = group(pimKey("g-2", "5900000000031", "E-X"), item("5900000000031", "E-X", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(otherEntry)), supplier -> true,
+                cloneOf("st-s-c", "g-1"));
+        InventoryKey lookupKey = pimKey("st-s-plain", "5900000000032", "E-X");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.isEmpty()).isTrue();
+    }
+
+    @Test
+    void cloneWithoutSourceBehavesAsToday() {
+        // given
+        MatchedInventory otherEntry = group(pimKey("g-1", "5900000000031", "SRC-1"), item("5900000000031", "SRC-1", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(otherEntry)), supplier -> true,
+                cloneOf("st-s-c", null));
+        InventoryKey lookupKey = pimKey("st-s-c", "5900000000032", "SRC-1");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.isEmpty()).isTrue();
+    }
+
+    @Test
+    void cloneWithChangedCodesGetsNoSourceOffers() {
+        // given
+        MatchedInventory sourceGroup = group(pimKey("g-1", "5900000000031", "SRC-1"), item("5900000000031", "SRC-1", "AB Group", 100.0));
+        GroupInventorySource source = GroupInventorySource.global(InventoryIndex.of(List.of(sourceGroup)), supplier -> true,
+                cloneOf("st-s-c", "g-1"));
+        InventoryKey lookupKey = pimKey("st-s-c", "5900000000099", "CHANGED");
+        MatchedInventory result = accumulator(lookupKey);
+
+        // when
+        source.mergeInto(result, lookupKey);
+
+        // then
+        assertThat(result.isEmpty()).isTrue();
+    }
 }

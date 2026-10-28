@@ -140,6 +140,38 @@ class BasketViewPageFactoryTest {
     }
 
     @Test
+    void discountedBasketShowsItemsBeforeDiscountAndTheCode() {
+        // given
+        Basket basket = basket(item("Laptop", "L-1", 1, 900.00), item("Mysz", "M-1", 2, 50.00));
+        basket.setDiscountCode("LATO-10");
+        basket.setDiscountAmount(100.00);
+        basket.setDeliveryOptionId("inpost");
+
+        // when
+        BasketViewPage page = build(basket);
+
+        // then
+        assertThat(page.summary().items()).isEqualTo("1" + NBSP + "100,00");
+        assertThat(page.summary().discountCode()).isEqualTo("LATO-10");
+        assertThat(page.summary().discount()).isEqualTo("100,00");
+        assertThat(page.summary().total()).isEqualTo("1" + NBSP + "019,99");
+        assertThat(page.products()).extracting(BasketViewPage.Row::unitPrice).containsExactly("900,00", "50,00");
+    }
+
+    @Test
+    void basketWithoutCodeHasNoDiscount() {
+        // given
+        Basket basket = basket(item("Laptop", "L-1", 1, 900.00));
+
+        // when
+        BasketViewPage page = build(basket);
+
+        // then
+        assertThat(page.summary().discountCode()).isNull();
+        assertThat(page.summary().items()).isEqualTo("900,00");
+    }
+
+    @Test
     void unknownDeliveryOptionCountsAsZeroAndIsFlagged() {
         // given
         Basket basket = basket(item("Laptop", "L-1", 1, 6899.00));

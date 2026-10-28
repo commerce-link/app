@@ -11,6 +11,7 @@ import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.QueryPageResult;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
+import pl.commercelink.migration.V023_AddDiscountCodeIndex;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrdersRepository.class);
     static final String STORE_STATUS_INDEX = "StoreIdStatusIndex";
+    static final String DISCOUNT_CODE_INDEX = V023_AddDiscountCodeIndex.INDEX;
 
     public OrdersRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -108,7 +110,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 } while (startKey != null && !startKey.isEmpty());
             }
         } catch (AmazonDynamoDBException e) {
-            if (!indexUnavailable(e)) {
+            if (!indexUnavailable(e, STORE_STATUS_INDEX)) {
                 throw e;
             }
             log.warn("{} is not available yet ({}); reading the store's partition for the orders list", STORE_STATUS_INDEX, e.getErrorMessage());
@@ -148,11 +150,11 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
 
     /**
      * A missing index ("The table does not have the specified index: StoreIdStatusIndex") or one still being built after
-     * V018 ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error naming it;
-     * every other error is a real failure and is not hidden behind the fallback.
+     * its migration ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error
+     * naming it; every other error is a real failure and is not hidden behind the fallback.
      */
-    private static boolean indexUnavailable(AmazonDynamoDBException e) {
-        return e.getErrorMessage() != null && e.getErrorMessage().contains(STORE_STATUS_INDEX);
+    private static boolean indexUnavailable(AmazonDynamoDBException e, String index) {
+        return e.getErrorMessage() != null && e.getErrorMessage().contains(index);
     }
 
     private static Order orderKey(String storeId, String orderId) {
@@ -355,37 +357,12 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return total;
     }
 
-    /**
-     * The days are compared as text: "from" as the bare date sorts before every time of that day (and equals a legacy
-     * date-only value), "to" is exclusive on the next day, so the last fraction of a second of the "to" day is still in.
-     */
     private static QueryRequest archiveQuery(String storeId, Set<OrderStatus> statuses, LocalDate from, LocalDate to) {
         Map<String, AttributeValue> values = new HashMap<>();
         Map<String, String> names = new HashMap<>();
         values.put(":storeId", new AttributeValue().withS(storeId));
         names.put("#status", "status");
-        String key = "storeId = :storeId";
-        if (from != null || to != null) {
-            // DynamoDB rejects a name placeholder that no expression uses
-            names.put("#orderedAt", "orderedAt");
-        }
-        if (from != null && to != null) {
-            key += " AND #orderedAt BETWEEN :from AND :toEnd";
-        } else if (from != null) {
-            key += " AND #orderedAt >= :from";
-        } else if (to != null) {
-            key += " AND #orderedAt < :toNext";
-        }
-        if (from != null) {
-            values.put(":from", new AttributeValue().withS(from.toString()));
-        }
-        if (to != null && from != null) {
-            // a key condition takes one comparison of the range key, so with both days it is BETWEEN (inclusive): the
-            // upper bound is the highest text of the "to" day, above every "yyyy-MM-ddT…" of it and below the next day
-            values.put(":toEnd", new AttributeValue().withS(to + "T\uffff"));
-        } else if (to != null) {
-            values.put(":toNext", new AttributeValue().withS(to.plusDays(1).toString()));
-        }
+        String key = new OrderedAtDays(from, to).keyCondition("storeId = :storeId", values, names);
         List<String> statusPlaceholders = new ArrayList<>();
         int i = 0;
         for (OrderStatus status : statuses) {
@@ -448,6 +425,65 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         };
     }
 
+
+    /**
+     * The store's orders placed with this code, newest first, every page: the code's details page sums them all. The
+     * index is keyed by the code alone, so the store is a filter; the same code in another store only adds entries the
+     * filter drops. Empty while the index cannot be read yet (DynamoDB still backfills it after V023).
+     */
+    public Optional<List<DiscountedOrderEntry>> findAllByDiscountCode(String storeId, String code, LocalDate from, LocalDate to) {
+        return findAllByDiscountCode(storeId, code, from, to, null);
+    }
+
+    // pageLimit is null in production (DynamoDB's own 1 MB page); tests set it to force several pages on a small data set
+    Optional<List<DiscountedOrderEntry>> findAllByDiscountCode(String storeId, String code, LocalDate from, LocalDate to,
+                                                               Integer pageLimit) {
+        Map<String, AttributeValue> values = new HashMap<>();
+        Map<String, String> names = new HashMap<>();
+        values.put(":code", new AttributeValue().withS(code));
+        values.put(":storeId", new AttributeValue().withS(storeId));
+        String key = new OrderedAtDays(from, to).keyCondition("discountCode = :code", values, names);
+        List<DiscountedOrderEntry> entries = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        try {
+            do {
+                QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                        .withTableName("Orders")
+                        .withIndexName(DISCOUNT_CODE_INDEX)
+                        .withKeyConditionExpression(key)
+                        .withFilterExpression("storeId = :storeId")
+                        .withExpressionAttributeValues(values)
+                        .withExpressionAttributeNames(names.isEmpty() ? null : names)
+                        .withScanIndexForward(false)
+                        .withLimit(pageLimit)
+                        .withExclusiveStartKey(startKey));
+                page.getItems().forEach(item -> entries.add(toDiscountedOrderEntry(item)));
+                startKey = page.getLastEvaluatedKey();
+            } while (startKey != null && !startKey.isEmpty());
+        } catch (AmazonDynamoDBException e) {
+            if (!indexUnavailable(e, DISCOUNT_CODE_INDEX)) {
+                throw e;
+            }
+            log.warn("{} is not available yet ({}); the details of code {} show no orders", DISCOUNT_CODE_INDEX, e.getErrorMessage(), code);
+            return Optional.empty();
+        }
+        return Optional.of(entries);
+    }
+
+    private DiscountedOrderEntry toDiscountedOrderEntry(Map<String, AttributeValue> item) {
+        return new DiscountedOrderEntry(
+                item.get("orderId").getS(),
+                parseOrderedAt(item.get("orderedAt").getS()),
+                item.containsKey("email") ? item.get("email").getS() : null,
+                amount(item, "totalPrice"),
+                amount(item, "discountAmount"),
+                OrderStatus.valueOf(item.get("status").getS()));
+    }
+
+    private static double amount(Map<String, AttributeValue> item, String name) {
+        AttributeValue value = item.get(name);
+        return value == null ? 0 : Double.parseDouble(value.getN());
+    }
 
     public List<Order> findAllOrders(String storeId, LocalDate dateFrom, LocalDate dateTo) {
         Map<String, AttributeValue> eav = new HashMap<>();

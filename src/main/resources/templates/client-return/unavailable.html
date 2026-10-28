@@ -1,0 +1,14 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{public-layout}" th:with="publicWidth='is-narrow'">
+<head>
+    <title th:text="#{client.return.unavailable.pageTitle}">Zwrot niedostępny</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+    <section th:replace="~{fragments/public-message :: card(eyebrow=null,
+            title=#{client.return.unavailable.title}, lead=#{client.return.unavailable.lead},
+            contact=#{client.return.unavailable.contact}, fallback=null)}"></section>
+</th:block>
+</body>
+</html>

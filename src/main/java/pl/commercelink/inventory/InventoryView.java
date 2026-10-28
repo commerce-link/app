@@ -17,16 +17,16 @@ public class InventoryView {
 
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
-    private final Predicate<String> isStoreEntry;
+    private final StoreEntryKeys storeEntries;
     private final TaxonomyCache taxonomyCache;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
-    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex, Predicate<String> isStoreEntry,
+    InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex, StoreEntryKeys storeEntries,
                   TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
-        this.isStoreEntry = isStoreEntry;
+        this.storeEntries = storeEntries;
         this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
@@ -60,7 +60,7 @@ public class InventoryView {
     // (see InventoryIndex.covers)
     private boolean mayCarryPimId(InventoryKey key) {
         return key.getId() != null || ownIndex.findMatching(key).stream()
-                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own.getInventoryKey(), isStoreEntry));
+                .anyMatch(own -> InventoryIndex.isStoreEntryKey(own.getInventoryKey(), storeEntries));
     }
 
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
@@ -77,7 +77,7 @@ public class InventoryView {
     }
 
     private Stream<InventoryKey> listedKeys() {
-        return new ListingInventory(globalIndex, ownIndex, isStoreEntry).keys();
+        return new ListingInventory(globalIndex, ownIndex, storeEntries).keys();
     }
 
     private MatchedInventory assemble(InventoryKey lookupKey) {

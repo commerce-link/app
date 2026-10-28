@@ -20,7 +20,6 @@ import pl.commercelink.payments.statements.BankStatementSniffer;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.MarketplaceIntegration;
-import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.PayoutChannel;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -57,7 +56,6 @@ public class StoreBankStatementController {
     private static final long SAMPLE_LIMIT = 2 * 1024 * 1024;
 
     private final StoresRepository storesRepository;
-    private final PaymentGateways paymentGateways;
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard/store/payments/bank-accounts/{accountId}/statement")
@@ -161,7 +159,6 @@ public class StoreBankStatementController {
                 new PickerOption(BankStatementFormatForm.DOT, "1234.56")));
         model.addAttribute("sourceOptions", sourceOptions(store, form, locale));
         model.addAttribute("methodOptions", methodOptions(locale));
-        model.addAttribute("providerOptions", providerOptions(store, form, locale));
         model.addAttribute("formAction", SettingsPaths.store(storeId, "/payments/bank-accounts/" + account.getId() + "/statement"));
         model.addAttribute("pageTitle", messageSource.getMessage("store.payments.statement.title", new Object[]{accountTitle}, locale));
         model.addAttribute("paymentsHref", SettingsPaths.store(storeId, "/payments"));
@@ -187,24 +184,6 @@ public class StoreBankStatementController {
             options.add(new PickerOption(source.name(), text("PaymentSource." + source.name(), locale)));
         }
         return options;
-    }
-
-    /**
-     * Who the payment goes through: the store's payment gateways by the name their payments carry, and its shipping
-     * integrations, whose carriers hand over cash on delivery. A value of an integration since disconnected is kept, so
-     * a saved row is still shown as saved.
-     */
-    private List<PickerOption> providerOptions(Store store, BankStatementFormatForm form, Locale locale) {
-        Map<String, String> options = new LinkedHashMap<>();
-        options.put("", text("store.payments.statement.channels.any.provider", locale));
-        Objects.requireNonNullElse(store.getPayments(), List.<PaymentIntegration>of()).forEach(gateway -> {
-            String name = paymentGateways.displayName(gateway.getName());
-            options.put(name, messageSource.getMessage("store.payments.statement.channels.gateway", new Object[]{name}, locale));
-        });
-        store.shippingIntegrationNames().forEach(name -> options.putIfAbsent(name,
-                messageSource.getMessage("store.payments.statement.channels.carrier", new Object[]{name}, locale)));
-        keepSaved(options, form, BankStatementFormatForm.ChannelRow::getProvider);
-        return pickerOptions(options);
     }
 
     private static void keepSaved(Map<String, String> options, BankStatementFormatForm form,

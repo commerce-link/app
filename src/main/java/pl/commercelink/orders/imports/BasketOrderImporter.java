@@ -1,9 +1,10 @@
 package pl.commercelink.orders.imports;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketsRepository;
+import pl.commercelink.discounts.DiscountService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
@@ -17,16 +18,13 @@ import java.util.stream.Collectors;
 import static pl.commercelink.starter.security.CustomSecurityContext.getStoreId;
 
 @Component
+@RequiredArgsConstructor
 public class BasketOrderImporter {
 
-    @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
-    private BasketsRepository basketsRepository;
-
-    @Autowired
-    private OrdersManager ordersManager;
+    private final StoresRepository storesRepository;
+    private final BasketsRepository basketsRepository;
+    private final OrdersManager ordersManager;
+    private final DiscountService discountService;
 
     public Order _import(String storeId, ClientDataDto dto) {
         Store store = storesRepository.findById(storeId);
@@ -52,6 +50,10 @@ public class BasketOrderImporter {
         });
 
         ordersManager.saveWithFulfilment(order, orderItems);
+
+        if (basket.hasDiscountCode()) {
+            discountService.redeem(storeId, basket.getDiscountCode());
+        }
 
         cleanUp(getStoreId(), dto);
 

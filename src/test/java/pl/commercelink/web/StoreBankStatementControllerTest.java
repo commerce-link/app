@@ -38,7 +38,6 @@ class StoreBankStatementControllerTest {
     private static final String SAMPLE = "Bank;\n;\n#Data operacji;#Opis;#Kwota;\n2026-10-07;\"zakupy\";159,00;\n2026-10-08;\"oplata\";-9,00;\n";
 
     @Mock StoresRepository storesRepository;
-    @Mock PaymentGateways paymentGateways;
     @Spy ResourceBundleMessageSource messageSource = messages();
     @InjectMocks StoreBankStatementController controller;
 

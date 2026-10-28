@@ -560,7 +560,7 @@ class OrderDetailsTemplateTest {
 
         // then: 450 net + 23% = 553,50 gross against 500,00
         assertThat(html).contains("cl-mark cl-margin cl-tooltip is-lines is-end is-loss")
-                .contains("Sprzedaż poniżej kosztu: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
+                .contains("Sprzedaż bez zysku: marża −10,7%\nZysk: −43,50 PLN netto (−53,50 PLN brutto) / szt.")
                 .contains("class=\"fas fa-exclamation-circle\"");
     }
 
@@ -2470,6 +2470,32 @@ class OrderDetailsTemplateTest {
         assertThat(dialog(html, "payment-dialog-0")).contains("class=\"cl-alert is-warn\"")
                 .contains("Ten zwrot był zapisany bez minusa i liczył się jako wpłata. Po zapisaniu „Wpłacono” zmniejszy się o 80,00 PLN.");
         assertThat(dialog(html, "payment-dialog-1")).doesNotContain("bez minusa");
+    }
+
+    @Test
+    void theFinancesCardShowsTheDiscountCodeBelowTheTotal() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.setDiscountCode("LATO-10");
+        order.setDiscountAmount(38.97);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String totals = html.substring(html.indexOf("id=\"finances-title\""), html.indexOf("id=\"finances-costs\""));
+        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(totals).results().map(m -> m.group(1)).toList())
+                .containsExactly("Razem", "Kod rabatowy LATO-10", "Wpłacono", "Do zapłaty");
+        assertThat(totals).contains("−38,97 PLN");
+    }
+
+    @Test
+    void theFinancesCardHasNoDiscountRowWithoutACode() {
+        // when
+        String html = page(render(order(OrderStatus.Realization), ADMIN));
+
+        // then
+        assertThat(card(html, "finances-title")).doesNotContain("Kod rabatowy");
     }
 
     @Test

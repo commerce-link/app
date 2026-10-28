@@ -126,7 +126,8 @@
 <section th:fragment="summaryCard(s)" class="cl-card" aria-labelledby="summary-title">
     <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{offers.basket.summary.title}"></h2></div>
     <dl class="cl-kv is-column">
-        <div><dt th:text="#{offers.basket.summary.items}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.items()})}"></dd></div>
+        <div><dt th:text="${s.hasDiscount()} ? #{offers.basket.summary.items.beforeDiscount} : #{offers.basket.summary.items}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.items()})}"></dd></div>
+        <div th:if="${s.hasDiscount()}"><dt th:text="#{offers.basket.summary.discount(${s.discountCode()})}"></dt><dd class="is-numeric" th:text="'−' + #{general.currency.amount(${s.discount()})}"></dd></div>
         <div th:if="${s.deliveryState().name() == 'CHOSEN'}"><dt th:text="#{offers.basket.summary.delivery(${s.deliveryName()})}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${s.delivery()})}"></dd></div>
         <div th:if="${s.deliveryState().name() == 'NONE'}"><dt th:text="#{offers.basket.summary.delivery.plain}"></dt><dd th:text="#{offers.basket.summary.delivery.none}"></dd></div>
         <div th:if="${s.deliveryState().name() == 'UNKNOWN'}"><dt th:text="#{offers.basket.summary.delivery.plain}"></dt><dd th:text="#{offers.basket.summary.delivery.unknown}"></dd></div>

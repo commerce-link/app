@@ -11,6 +11,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentItem;
 import pl.commercelink.orders.fulfilment.FulfilmentGroupsGenerator;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.SupplierScope;
 
 import java.util.*;
@@ -23,10 +24,12 @@ public class OfferItemReloader {
 
     private final Inventory inventory;
     private final PricelistRepository pricelistRepository;
+    private final StorePimAliases aliases;
 
-    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository) {
+    OfferItemReloader(Inventory inventory, PricelistRepository pricelistRepository, StorePimAliases aliases) {
         this.inventory = inventory;
         this.pricelistRepository = pricelistRepository;
+        this.aliases = aliases;
     }
 
     public List<OfferItem> reload(Basket basket) {
@@ -38,7 +41,7 @@ public class OfferItemReloader {
         InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(basket.getStoreId(), SupplierScope.PRICING);
 
         updatePrices(basket);
-        updateCosts(enabledInventory, basket.getBasketItems());
+        updateDeliveryDays(enabledInventory, basket.getBasketItems());
 
         return convertBasketItemsIntoOffers(enabledInventory, basket.getBasketItems());
     }
@@ -85,7 +88,7 @@ public class OfferItemReloader {
                     Pricelist pricelist = pricelistRepository.find(storeId, i.getCatalogId(), newestPricelistId);
                     if (pricelist == null) return;
 
-                    Optional<AvailabilityAndPrice> op = pricelist.findByPimId(i.getId());
+                    Optional<AvailabilityAndPrice> op = aliases.find(storeId, pricelist, i.getId());
                     if (op.isPresent()) {
                         AvailabilityAndPrice availability = op.get();
 
@@ -95,7 +98,11 @@ public class OfferItemReloader {
                 });
     }
 
-    private void updateCosts(InventoryView inventory, List<BasketItem> basketItems) {
+    /**
+     * Refreshes the delivery days of the items without a cost, as before; the cost itself stays what it was, 0 included
+     * (client 2026-10-27: a cost is what the operator entered, and the offer page estimates the rest, EstimatedCost).
+     */
+    private void updateDeliveryDays(InventoryView inventory, List<BasketItem> basketItems) {
         basketItems.stream()
                 .filter(i -> isNotBlank(i.getMfn()))
                 .filter(i -> i.getUnitCost() == 0)
@@ -103,7 +110,6 @@ public class OfferItemReloader {
                     MatchedInventory matchedInventory = findMatchedInventoryLowestPricedSKU(inventory, basketItem);
                     if (matchedInventory.hasAnyOffers()) {
                         basketItem.setEstimatedDeliveryDays(matchedInventory.getEstimatedDeliveryDays());
-                        basketItem.setUnitCost(matchedInventory.getMedianPrice().grossValue());
                     }
                 });
     }

@@ -7,6 +7,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.baskets.Basket;
+import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.Order;
@@ -394,6 +395,42 @@ class StoreDeletionServiceTest {
         verify(wipeRepository).deleteAll(List.of(filters));
         verify(wipeRepository).deleteAll(List.of(tracking));
         verify(storeFilesWipe).deleteAllVersions("stores", STORE_ID + "/");
+    }
+
+    @Test
+    void deletesStoreDiscountCodesAlsoUsedOnes() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        DiscountCode unused = new DiscountCode();
+        DiscountCode used = new DiscountCode();
+        used.setUsedCount(3);
+        when(wipeRepository.findDiscountCodes(STORE_ID)).thenReturn(List.of(unused, used));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(wipeRepository).deleteAll(List.of(unused, used));
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void keepsStoreRecordWhenDiscountCodesCannotBeDeleted() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        when(wipeRepository.findDiscountCodes(STORE_ID)).thenThrow(new RuntimeException("throttled"));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertFalse(deleted);
+        verify(storesRepository, never()).delete(any(Store.class));
     }
 
     @Test

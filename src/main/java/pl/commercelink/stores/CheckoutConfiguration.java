@@ -100,9 +100,14 @@ public class CheckoutConfiguration {
     }
 
     public DeliveryOption findDeliveryOption(String deliveryOptionId) {
+        return findDeliveryOptionById(deliveryOptionId)
+                .orElseThrow(() -> new IllegalArgumentException("Delivery option not found: " + deliveryOptionId));
+    }
+
+    @DynamoDBIgnore
+    public Optional<DeliveryOption> findDeliveryOptionById(String deliveryOptionId) {
         return deliveryOptions.stream()
                 .filter(o -> o.getId().equals(deliveryOptionId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Delivery option not found: " + deliveryOptionId));
+                .findFirst();
     }
 }

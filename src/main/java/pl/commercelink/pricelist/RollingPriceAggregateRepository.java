@@ -5,6 +5,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.csv.CSVLoader;
 
@@ -18,6 +19,9 @@ public class RollingPriceAggregateRepository {
 
     @Autowired
     private FileStorage fileStorage;
+
+    @Autowired
+    private StorePimAliases aliases;
 
     @Value("${s3.bucket.datalake}")
     private String bucketName;
@@ -40,6 +44,13 @@ public class RollingPriceAggregateRepository {
         } catch (RuntimeException e) {
             log.error("Rolling price aggregate of store {} is unreadable, the global one is used", storeId, e);
         }
+        // Aggregates are keyed by the global entry; a clone without an aggregate of its own is priced as its source.
+        aliases.clonesWithSources(storeId).forEach((clonePimId, sourcePimId) -> {
+            RollingPriceAggregate ofSource = aggregates.get(sourcePimId);
+            if (ofSource != null) {
+                aggregates.putIfAbsent(clonePimId, ofSource);
+            }
+        });
         return aggregates;
     }
 

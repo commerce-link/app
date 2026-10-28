@@ -2,6 +2,8 @@ package pl.commercelink.products.information;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.pim.api.PIMEntryAddedEvent;
+import pl.commercelink.pim.api.PIMEntryDeletedEvent;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -9,21 +11,33 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCatalogDescriptor;
+import pl.commercelink.pim.api.PimEntry;
+import pl.commercelink.pim.api.PimIdentifier;
+import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.pim.api.PimView;
 import pl.commercelink.provider.api.ProviderField;
 
 import org.junit.jupiter.api.AfterEach;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.config.BeanExpressionContext;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -76,47 +90,11 @@ class PimCatalogRegistryTest {
         // when
         PimCatalogRegistry.attachEntryToProducts(
                 new PIMEntryAddedEvent("pim-1", List.of("e1"), List.of("m1"), null),
-                productRepository, productCatalogRepository);
+                productRepository);
 
         // then
         assertThat(product.getPimId()).isEqualTo("pim-1");
         verify(productRepository).save(product);
-        verify(productRepository, never()).findAllWithoutPimIdByEanOrMfnInCategories(any(), any(), any());
-    }
-
-    @Test
-    void storeEntryAttachesOnlyToProductsInTheOwnersCategories() {
-        // given
-        when(productCatalogRepository.findAll("s1")).thenReturn(List.of(
-                catalogWith("c1", "c2"), catalogWith("c2", "c3")));
-        Product product = new Product();
-        when(productRepository.findAllWithoutPimIdByEanOrMfnInCategories(
-                List.of("c1", "c2", "c3"), List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(
-                new PIMEntryAddedEvent("pim-1", List.of("e1"), List.of("m1"), "s1"),
-                productRepository, productCatalogRepository);
-
-        // then
-        assertThat(product.getPimId()).isEqualTo("pim-1");
-        verify(productRepository).save(product);
-        verify(productRepository, never()).findAllWithoutPimIdByEanOrMfn(any(), any());
-    }
-
-    @Test
-    void storeWithoutCatalogsAttachesNothing() {
-        // given
-        when(productCatalogRepository.findAll("s1")).thenReturn(List.of());
-
-        // when
-        PimCatalogRegistry.attachEntryToProducts(
-                new PIMEntryAddedEvent("pim-1", List.of("e1"), List.of("m1"), "s1"),
-                productRepository, productCatalogRepository);
-
-        // then
-        verify(productRepository, never()).save(any());
-        verify(productRepository, never()).findAllWithoutPimIdByEanOrMfn(any(), any());
     }
 
     private final PimCatalog catalogMock = mock(PimCatalog.class);
@@ -199,12 +177,100 @@ class PimCatalogRegistryTest {
     }
 
     @Test
-    void scheduledRefreshRunsEveryFiveMinutes() throws Exception {
+    void globalEntryEventBehavesAsBefore() {
+        // given
+        Product product = new Product();
+        when(productRepository.findAllWithoutPimIdByEanOrMfn(List.of("e1"), List.of("m1"))).thenReturn(List.of(product));
+
+        // when
+        entryAddedHandler().accept(event());
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("pim-1");
+        verify(productRepository, never()).findAllByPimId(any());
+        verify(productRepository, never()).detachPimFromProducts(any());
+        verify(productRepository, never()).findAllByEanOrMfnInCategories(any(), any(), any());
+        verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void deletedEventRefreshesTheIndex() {
+        // given
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryDeletedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(catalogMock).onEntryDeleted(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryDeletedEvent("pim-1"));
+
+        // then
+        var order = inOrder(productRepository, catalogMock);
+        order.verify(productRepository).detachPimFromProducts("pim-1");
+        order.verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    @Test
+    void scheduledRefreshUsesAFixedDelayWithARandomStart() throws Exception {
         // when
         Scheduled scheduled = PimCatalogRegistry.class.getDeclaredMethod("refresh").getAnnotation(Scheduled.class);
 
         // then
-        assertThat(scheduled.cron()).isEqualTo("0 */5 * * * ?");
+        assertThat(scheduled.cron()).isEmpty();
+        assertThat(scheduled.fixedDelay()).isEqualTo(300_000);
+        assertThat(scheduled.initialDelayString()).isNotBlank();
+        Object resolved = new StandardBeanExpressionResolver().evaluate(
+                scheduled.initialDelayString(), new BeanExpressionContext(new DefaultListableBeanFactory(), null));
+        assertThat(Long.parseLong(String.valueOf(resolved))).isBetween(60_000L, 299_999L);
+    }
+
+    @Test
+    void refreshInterruptedByShutdownIsNotAnError() throws Exception {
+        // given
+        CountDownLatch refreshStarted = new CountDownLatch(1);
+        CountDownLatch neverReleased = new CountDownLatch(1);
+        AtomicReference<Thread> worker = new AtomicReference<>();
+        doAnswer(invocation -> {
+            worker.set(Thread.currentThread());
+            refreshStarted.countDown();
+            try {
+                neverReleased.await();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException("interrupted", e);
+            }
+            return null;
+        }).when(catalogMock).refresh();
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+
+        try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
+            registry.requestRefresh();
+            assertThat(refreshStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            registry.stop();
+            worker.get().join(2000);
+            assertThat(worker.get().isAlive()).isFalse();
+
+            // then
+            assertThat(logs.errors()).isEmpty();
+        }
+    }
+
+    @Test
+    void genuineRefreshFailureIsStillLoggedAsOneError() throws Exception {
+        // given
+        doThrow(new IllegalStateException("index unreachable")).when(catalogMock).refresh();
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository);
+
+        try (CapturedLogs logs = CapturedLogs.of(PimCatalogRegistry.class)) {
+            // when
+            registry.requestRefresh();
+
+            // then: shutdown only after the error is observed, so the executor is still live when the worker logs
+            assertThat(logs.awaitErrors(1, Duration.ofSeconds(2))).containsExactly("PIM index refresh failed");
+        } finally {
+            registry.stop();
+        }
     }
 
     @Test
@@ -219,14 +285,95 @@ class PimCatalogRegistryTest {
         verify(catalogMock, timeout(2000)).refresh();
     }
 
-    private static ProductCatalog catalogWith(String... categoryIds) {
+    @Test
+    @SuppressWarnings("unchecked")
+    void cloneEventRefreshesBeforeMoving() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1", "S"));
+
+        // then
+        assertThat(product.getPimId()).isEqualTo("C");
+        var order = inOrder(copy, productRepository);
+        order.verify(copy).refresh();
+        order.verify(productRepository).save(product);
+        // the handler already refreshed synchronously: no background refresh follows
+        verify(copy, after(300).times(1)).refresh();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void blankSourceIsAPlainStoreEvent() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1", " "));
+
+        // then: the code matching of a plain store event, then its background refresh; no move from the source
+        verify(productRepository).findAllByEanOrMfnInCategories(List.of("c1"), List.of("5900000000011"), List.of());
+        verify(copy, timeout(2000)).refresh();
+        assertThat(product.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).findAllByPimId("S");
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void codeChangeEventOfACloneIsAPlainStoreEvent() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", "5900000000011", null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", "s1", "S", "5900000000011", null, "cat"));
+        Product product = storeProduct("S");
+        registry = new PimCatalogRegistry(copy, productRepository, productCatalogRepository);
+        ArgumentCaptor<Consumer<PIMEntryAddedEvent>> captor = ArgumentCaptor.forClass(Consumer.class);
+        verify(copy).onEntryAdded(captor.capture());
+
+        // when
+        captor.getValue().accept(new PIMEntryAddedEvent("C", List.of("5900000000011"), List.of(), "s1"));
+
+        // then
+        verify(copy, timeout(2000)).refresh();
+        assertThat(product.getPimId()).isEqualTo("S");
+        verify(productRepository, never()).findAllByPimId("S");
+        verify(productRepository, never()).save(any());
+    }
+
+    // a product of store s1 (category c1) pinned to pimId, by a sibling code no entry has
+    private Product storeProduct(String pimId) {
+        Product product = new Product();
+        product.setCategoryId("c1");
+        product.setProductId("p1");
+        product.setPimId(pimId);
+        product.setEan("5900000000099");
+        Product projection = new Product();
+        projection.setCategoryId("c1");
+        projection.setProductId("p1");
+        projection.setPimId(pimId);
+        when(productRepository.findAllByPimId(pimId)).thenReturn(List.of(projection));
+        when(productRepository.findByProductId("c1", "p1")).thenReturn(product);
         ProductCatalog catalog = new ProductCatalog();
-        for (String id : categoryIds) {
-            CategoryDefinition category = new CategoryDefinition();
-            category.setCategoryId(id);
-            catalog.getCategories().add(category);
-        }
-        return catalog;
+        catalog.setStoreId("s1");
+        CategoryDefinition category = new CategoryDefinition();
+        category.setCategoryId("c1");
+        catalog.getCategories().add(category);
+        when(productCatalogRepository.findAll("s1")).thenReturn(List.of(catalog));
+        return product;
     }
 
     private static PimCatalogDescriptor descriptor(String name) {
@@ -251,5 +398,46 @@ class PimCatalogRegistryTest {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    @Test
+    void refreshRecordsTheStoreEntryCodesBeforeTheCopyChanges() {
+        // given
+        StoreEntryCodeHistory history = new StoreEntryCodeHistory(Clock.systemUTC());
+        PimView storeView = mock(PimView.class);
+        when(storeView.findAll()).thenReturn(List.of(
+                pimEntry("X", "5900000000011", "s1"), pimEntry("G", "5900000000022", null)));
+        when(catalogMock.withStoreData("s1")).thenReturn(storeView);
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository,
+                () -> List.of("s1", " "), history);
+
+        // when
+        registry.requestRefresh();
+
+        // then
+        var order = inOrder(catalogMock);
+        order.verify(catalogMock, timeout(2000)).withStoreData("s1");
+        order.verify(catalogMock, timeout(2000)).refresh();
+        assertThat(history.eansOf("X")).containsExactly("5900000000011");
+        assertThat(history.eansOf("G")).isEmpty();
+    }
+
+    @Test
+    void refreshRunsWhenTheStoreEntryCodesCannotBeRecorded() {
+        // given
+        registry = new PimCatalogRegistry(catalogMock, productRepository, productCatalogRepository,
+                () -> { throw new IllegalStateException("DynamoDB down"); },
+                new StoreEntryCodeHistory(Clock.systemUTC()));
+
+        // when
+        registry.requestRefresh();
+
+        // then
+        verify(catalogMock, timeout(2000)).refresh();
+    }
+
+    private static PimEntry pimEntry(String pimId, String gtin, String ownerStoreId) {
+        return new PimEntry(pimId, List.of(new PimIdentifier(gtin, PimIdentifierType.GTIN)), "Brand", "Name",
+                null, null, true, null, null, null, ownerStoreId);
     }
 }

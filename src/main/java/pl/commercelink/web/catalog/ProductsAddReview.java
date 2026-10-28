@@ -23,6 +23,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.inventory.InventoryBrowseController;
 
@@ -55,6 +56,7 @@ public class ProductsAddReview {
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
     private final CatalogPlacement catalogPlacement;
+    private final StorePimAliases pimAliases;
 
     /**
      * @param resetRows rows whose label or pricing group, kept from the previous category, the new one does not offer and
@@ -175,7 +177,7 @@ public class ProductsAddReview {
                 continue;
             }
             Optional<PimEntry> entry = pimEntryOf(storeId, enabled, key, product);
-            if (entry.isPresent() && pimIdsInCategory.contains(entry.get().pimId())) {
+            if (entry.isPresent() && holdsAny(pimIdsInCategory, storeId, entry.get().pimId())) {
                 continue;
             }
             entry.ifPresent(found -> {
@@ -199,6 +201,18 @@ public class ProductsAddReview {
             catalogPlacement.evict(storeId);
         }
         return added;
+    }
+
+    /**
+     * The ids a product of the store is known by: its own, the global entry it was cloned from and the store's clone of
+     * it. A category holding the clone already holds the source, and the other way round.
+     */
+    public Set<String> aliasesOf(String storeId, String pimId) {
+        return pimAliases.aliasesOf(storeId, pimId);
+    }
+
+    private boolean holdsAny(Set<String> pimIds, String storeId, String pimId) {
+        return aliasesOf(storeId, pimId).stream().anyMatch(pimIds::contains);
     }
 
     /** The PIM entry of a product: by the inventory's own key when the inventory knows it, else by its identifiers. */

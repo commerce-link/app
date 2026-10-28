@@ -632,6 +632,30 @@ body.cl-drawer-open .cl-sidebar {
     --cl-toast-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3z'/%3E%3Cpath d='M12 10v4M12 17h.01'/%3E%3C/svg%3E");
 }
 
+/* The action of a toast (showToast's third argument, e.g. "Cofnij"): a text button in the toast's tone at its end. */
+.cl-toast-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+    min-height: 32px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--cl-toast-tone) 40%, transparent);
+    border-radius: var(--cl-radius);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--cl-toast-tone);
+    cursor: pointer;
+}
+
+.cl-toast-action:hover {
+    background: color-mix(in srgb, var(--cl-toast-tone) 10%, transparent);
+}
+
+.cl-toast-action:focus-visible {
+    outline: 2px solid var(--cl-toast-tone);
+    outline-offset: 2px;
+}
+
 @media screen and (max-width: 719px) {
     .cl-toast {
         top: calc(var(--cl-topbar-height) + 8px);
@@ -2173,6 +2197,14 @@ body.cl-drawer-open .cl-sidebar {
 .cl-page .cl-alert .cl-alert-text a {
     color: var(--cl-accent-ink);
     text-decoration: underline;
+}
+
+/* An alert that asks for a decision: its choices sit under the text, the primary one first. */
+.cl-page .cl-alert .cl-alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 0;
 }
 
 /* Destructive actions */
@@ -5242,6 +5274,11 @@ a.cl-link-button:hover {
     max-width: 760px;
 }
 
+/* The same for a page whose cards are the wide stack (1040 px), e.g. the details of a discount code. */
+.cl-page .cl-page-body:has(> .cl-stack.is-wide) > .cl-page-header {
+    max-width: 1040px;
+}
+
 /* --- Catalog: Warning help text (labels outside the list) --- */
 .cl-page .cl-help.is-warn,
 .cl-page .cl-list-desc .is-warn {
@@ -5258,21 +5295,9 @@ a.cl-link-button:hover {
     margin-top: 4px;
 }
 
-/* Scope of an operation: what it does and what it leaves out, two lists side by side (store copy, 2026-10-13). */
-.cl-page .cl-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
-.cl-page .cl-scope-title { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; color: var(--cl-ink); }
-.cl-page .cl-scope-list { margin: 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.4; color: var(--cl-ink-2); }
-.cl-page .cl-scope-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; margin: 0; }
-.cl-page .cl-scope-list li + li { margin-top: 4px; }
-.cl-page .cl-scope-list .icon { width: 16px; height: 1.4em; }
-.cl-page .cl-scope-list.is-yes .icon { color: var(--cl-ok); }
-.cl-page .cl-scope-list.is-no .icon { color: var(--cl-ink-3); }
-@media (max-width: 719px) {
-    .cl-page .cl-scope { grid-template-columns: minmax(0, 1fr); }
-}
 /* A short note under a page's form (a hint to another way of doing the same). */
 .cl-page .cl-form + .cl-help { margin-top: 12px; }
-/* A link in a sentence outside the lead (the hint under the store create form, the source store of a copy): a 44 px touch
+/* A link in a sentence outside the lead (the hint under the store create form): a 44 px touch
    target below 1024 px without moving the line, as .cl-lead-link does in a lead. */
 @media (max-width: 1023px) {
     .cl-page .cl-text-link { display: inline-block; padding-block: 13px; margin-block: -13px; }
@@ -10760,7 +10785,9 @@ a.cl-link-button:hover {
 /* the margin of an order item (ItemMargin tones); its tooltip is end-anchored (.is-end): the price column stands right
    of the middle and a centred box hid the state pill */
 .cl-page .cl-margin:hover { color: var(--cl-accent-ink); }
-.cl-page .cl-margin.is-unknown { opacity: .55; }
+/* only the icon is dimmed: the tooltip is drawn by the mark itself (::before/::after) and would inherit its opacity,
+   letting the rows below show through */
+.cl-page .cl-margin.is-unknown > * { opacity: .55; }
 .cl-page .cl-margin.is-loss { color: var(--cl-bad); }
 
 /* --- Subcategory list with counts: drill-down navigation above a table (inventory browse, 2026-10-06) --- */
@@ -13437,10 +13464,18 @@ a.cl-link-button:hover {
     padding: 16px 24px;
 }
 
-.cl-auth .cl-card-footer > .cl-button.is-primary {
+.cl-auth .cl-card-footer > .cl-button {
     flex: 1 1 100%;
     justify-content: center;
     height: 44px;
+}
+
+/* "Signed in as …" under the lead of the access-denied card; an e-mail address has no break opportunity */
+.cl-page .cl-auth-head .cl-auth-meta {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
 }
 
 @media screen and (max-width: 719px) {
@@ -13772,6 +13807,27 @@ a.cl-link-button:hover {
     overflow-wrap: anywhere;
 }
 
+.cl-page dl.cl-kv.is-rows {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 12px 32px;
+}
+.cl-page dl.cl-kv.is-rows > div {
+    display: contents;
+}
+.cl-page dl.cl-kv.is-rows .cl-meter {
+    max-width: 200px;
+    margin-top: 6px;
+}
+@media screen and (max-width: 719px) {
+    .cl-page dl.cl-kv.is-rows {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
+    .cl-page dl.cl-kv.is-rows dd {
+        margin-bottom: 10px;
+    }
+}
+
 /* Help text that quotes what was typed (an RMA item's serial numbers): a long value without spaces breaks anywhere
    instead of widening the field and scrolling the page sideways. */
 .cl-page .cl-help.is-break {
@@ -13972,10 +14028,17 @@ a.cl-link-button:hover {
     min-width: 0;
 }
 
-/* the payers' rows are edited in the table: its fields keep a readable width and the table scrolls instead */
+/* without JavaScript the payers' rows are edited in the table: its fields keep a readable width and the table scrolls */
 .cl-page .cl-statement-scroll.is-fields .cl-input,
 .cl-page .cl-statement-scroll.is-fields .cl-select {
     min-width: 180px;
+}
+
+/* payout-rows.js hides the row fields, the empty-list note, and the fee fields and the Remove button of its dialog;
+   .cl-field, the notes and .cl-link-button carry display rules of their own, which would win over the browser's [hidden] */
+.cl-page [data-cl-payout-rows] [hidden],
+.cl-page #payout-row-dialog [hidden] {
+    display: none;
 }
 
 .cl-page .cl-table.is-statement {
@@ -14012,21 +14075,35 @@ a.cl-link-button:hover {
 }
 
 /* --- Offer details (/dashboard/offer/{id}, spec docs/active/offer-details-redesign-v2, variant A4): the items table
-   edited in place (.is-line-editor: quantity and price in the row, the cost as a line under the price, the value with
-   its margin, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
+   edited in place (.is-line-editor: quantity and price in the row, the value with its margin mark under the price, the
+   "Połącz na FV" tick in its own column, a variant group as a head row), the unsaved state of the table and the peek with the save button. --- */
 .cl-page .cl-table.is-line-editor { table-layout: fixed; }
+/* The products and the services are two tbody sections (offers/details/items.html): the last product keeps its rule
+   above the services heading, as the rows of the order page's single tbody do. */
+.cl-page .cl-table.is-line-editor tbody:has(+ tbody > tr:not([hidden])) > tr:last-child > * { border-bottom: 1px solid var(--cl-line); }
 /* the 28 px handle, the cell's 2 × 10 px and its focus ring: narrower, it ran under the variant bar of the name */
 .cl-page .cl-table.is-line-editor col.cl-col-drag { width: 52px; }
 .cl-page .cl-table.is-line-editor col.cl-col-qty-in { width: 76px; }
-/* "99 999,99" whole inside the field, with the cell's and the field's insets */
-.cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 144px; }
-.cl-page .cl-table.is-line-editor col.cl-col-value { width: 124px; }
+/* "99 999,99" whole inside the field, and "wartość 99 999,99" with the margin mark on the line under it */
+.cl-page .cl-table.is-line-editor col.cl-col-money-in { width: 176px; }
 .cl-page .cl-table.is-line-editor col.cl-col-menu { width: 52px; }
 .cl-page .cl-table.is-line-editor :is(td, th) { vertical-align: top; }
-/* a name without spaces breaks inside the fixed column instead of running out of the page; a code longer than the whole
-   column is cut with an ellipsis (the dialog shows it in full), a shorter one still moves to the next line unbroken */
+/* a name without spaces breaks inside the fixed column instead of running out of the page. The category and the code
+   stay on one line (client 2026-10-27: a long MFN ran over two). The category gives way faster than the code (the code is
+   what gets copied) down to a few letters; the code is then cut with an ellipsis, its copy icon always shown after it; the
+   button copies it whole and its title shows it on hover. th.cl-table-key outweighs the card rule that makes it a block. */
 .cl-page .cl-table.is-line-editor th.cl-table-key { overflow-wrap: anywhere; }
-.cl-page .cl-table.is-line-editor .cl-code-nowrap { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+/* contain: the line takes the cell's width instead of giving the table a minimum as wide as the whole code (the phone
+   cards lay the table out with table-layout: auto, so an uncut 90-character code pushed the card past the screen) */
+.cl-page .cl-table.is-line-editor tbody th.cl-table-key .cl-table-sub { display: flex; align-items: baseline; gap: 0 4px; min-width: 0; white-space: nowrap; contain: inline-size; }
+.cl-page .cl-table.is-line-editor .cl-table-sub > [data-cl-line-category] { flex: 0 4 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; }
+.cl-page .cl-table.is-line-editor .cl-table-sub > .cl-table-sep { flex: none; }
+.cl-page .cl-table.is-line-editor .cl-line-code { display: flex; flex: 0 1 auto; align-items: baseline; min-width: 0; }
+.cl-page .cl-table.is-line-editor .cl-line-code > :not(.cl-copy-inline) { flex: none; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-inline { display: flex; min-width: 0; overflow-wrap: normal; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-code { display: flex; align-items: baseline; min-width: 0; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-page .cl-table.is-line-editor .cl-line-code .cl-copy-icon { flex: none; }
 .cl-page .cl-table.is-line-editor .cl-input.is-qty { width: 100%; text-align: right; }
 .cl-page .cl-table.is-line-editor .cl-input.is-money { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
 /* the number fields without the browser's spin buttons, which took the room of the digits (WebKit always, Chromium on
@@ -14037,15 +14114,10 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-line-editor .cl-line-warn { margin: var(--cl-gap-attached) 0 0; font-size: 12.5px; line-height: 1.3; }
 .cl-page .cl-line-hint { display: block; width: max-content; max-width: 100%; margin: var(--cl-gap-attached) 0 0 auto; font-size: 12.5px; color: var(--cl-ink-2); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cl-page .cl-line-hint.is-warn { color: var(--cl-warn); }
-.cl-page .cl-line-value { display: grid; justify-items: end; gap: 2px; padding-top: 7px; font-variant-numeric: tabular-nums; }
-.cl-page .cl-line-margin { font-size: 12.5px; color: var(--cl-ink-2); }
-.cl-page .cl-line-margin.is-low { color: var(--cl-warn); }
-.cl-page .cl-line-margin.is-bad { color: var(--cl-bad); }
-/* a variant outside the total: the amount muted with "poza sumą" instead of the margin (no strike-through) */
-.cl-page .cl-table.is-line-editor .cl-line-outside { display: none; }
-.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-outside { display: block; }
-.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-margin,
-.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-value .cl-line-margin:not(.cl-line-outside) { display: none; }
+.cl-page .cl-line-amount { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: var(--cl-gap-attached); font-size: 12.5px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-page .cl-line-amount .cl-line-total { color: var(--cl-ink); font-weight: 600; }
+/* a variant outside the total: the value muted, without the margin mark (no strike-through, no words: client 2026-10-27) */
+.cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-amount .cl-margin { display: none; }
 .cl-page .cl-table.is-line-editor tr.is-unpicked .cl-line-total { color: var(--cl-ink-3); }
 .cl-page .cl-table.is-line-editor .cl-drag { display: inline-grid; place-items: center; width: 28px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--cl-ink-3); cursor: grab; }
 .cl-page .cl-table.is-line-editor .cl-drag:hover { color: var(--cl-accent-ink); background: var(--cl-accent-soft); }
@@ -14085,6 +14157,8 @@ html.cl-dragging-rows, html.cl-dragging-rows * { cursor: grabbing; }
 .cl-page .cl-visibility { white-space: nowrap; }
 .cl-page.cl-offer-page :is(.cl-visibility, .cl-help) > :is(i, .svg-inline--fa) { margin-right: 2px; color: var(--cl-ink-3); }
 .cl-page .cl-kv-sub { display: block; font-size: 12.5px; font-weight: 400; color: var(--cl-ink-2); }
+/* display: block above would beat the hidden attribute of the estimated-cost note the script toggles */
+.cl-page .cl-kv-sub[hidden] { display: none; }
 .cl-page .cl-item-market { margin: 0; font-size: 14px; line-height: 1.4; font-variant-numeric: tabular-nums; }
 /* the internal note reads like the values of the cards above it */
 .cl-page.cl-offer-page .cl-card-inset > .cl-note-text { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
@@ -14135,13 +14209,13 @@ html:has(.cl-summary-peek.is-action[data-cl-peek-state="shown"]) { scroll-paddin
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-drag { display: none; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-qty { grid-column: 1; grid-row: 2; display: block; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-price { grid-column: 2; grid-row: 2; display: block; }
-    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-value { grid-column: 1 / -1; grid-row: 3; display: block; text-align: left; }
+    .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-table-flag:not(.is-empty) { grid-column: 1 / -1; grid-row: 3; display: block; padding: 0; }
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > td.cl-cell-menu { grid-column: 3; grid-row: 1; display: block; }
     /* one line each, so the two fields stay side by side at 320 px */
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(td.cl-cell-qty, td.cl-cell-price)::before { content: attr(data-label); display: block; margin-bottom: var(--cl-gap-attached); font-size: 12.5px; color: var(--cl-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* a grid cell grows to its content unless told otherwise: a long code is cut inside the card, as in the table */
     .cl-page .cl-table.is-wrap.is-line-editor tbody tr.cl-line:not(.cl-line-group):not(.cl-table-group) > :is(th, td) { min-width: 0; }
-    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-value { justify-items: start; padding-top: 0; }
+    .cl-page .cl-table.is-wrap.is-line-editor .cl-line-amount { justify-content: flex-start; }
     .cl-page .cl-table.is-wrap.is-line-editor .cl-line-hint { margin-left: 0; text-align: left; white-space: normal; }
     .cl-page.cl-offer-page .cl-visibility { white-space: normal; }
     /* two fields side by side on a 320 px screen: a narrower inset keeps "99 999,00" inside the field */
@@ -14199,7 +14273,7 @@ body.cl-public .cl-toast { top: 16px; }
 .cl-public-foot { border-top: 1px solid var(--cl-line); background: var(--cl-surface); }
 .cl-public-foot-inner { box-sizing: border-box; max-width: calc(var(--cl-public-width) + 32px); margin: 0 auto; padding: 16px 16px 20px;
   display: flex; flex-wrap: wrap; gap: 6px 24px; font-size: 13px; line-height: 1.5; color: var(--cl-ink-2); }
-.cl-public-foot-inner p { margin: 0; }
+.cl-public-foot-inner p { margin: 0; overflow-wrap: anywhere; }
 .cl-public-foot-inner .cl-public-foot-store { color: var(--cl-ink); font-weight: 600; }
 @media (max-width: 719px) {
   .cl-public-bar { min-height: 56px; padding: 6px 16px; gap: 8px; }
@@ -14211,7 +14285,30 @@ body.cl-public .cl-toast { top: 16px; }
   body.cl-public .cl-toast { top: 8px; }
 }
 
-/* ===== Public page components (offer, order) ===== */
+/* ===== Public page in two columns (offer, order): content on the left, payment and the seller card on the right ===== */
+body.cl-public.is-split, .cl-public-main.is-split { --cl-public-width: 1200px; }
+body.cl-public .cl-split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+body.cl-public .cl-split-main, body.cl-public .cl-split-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+body.cl-public .cl-seller-id { text-align: center; }
+body.cl-public .cl-seller-logo { display: block; margin: 0 auto 10px; max-width: 220px; max-height: 140px; width: auto; height: auto; }
+body.cl-public .cl-seller-name { margin: 0; font-size: 15px; font-weight: 650; color: var(--cl-ink); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-line { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); overflow-wrap: anywhere; }
+body.cl-public .cl-seller-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 12px 0 0;
+  padding-top: 12px; border-top: 1px solid var(--cl-line); font-size: 14px; }
+body.cl-public .cl-seller-contact a { display: inline-flex; gap: 8px; align-items: center; overflow-wrap: anywhere; }
+body.cl-public .cl-seller-help { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--cl-line); }
+body.cl-public .cl-seller-help .cl-card-title { margin: 0 0 4px; }
+/* below 1024 px the side column falls under the content: the logo moves up into a larger header instead */
+@media (max-width: 1023px) {
+  body.cl-public .cl-split { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  body.cl-public.is-split .cl-public-bar { min-height: 72px; }
+  body.cl-public.is-split .cl-public-logo { max-height: 52px; max-width: 220px; }
+  body.cl-public .cl-seller-logo { display: none; }
+  body.cl-public .cl-seller-id { text-align: left; }
+  body.cl-public .cl-seller-contact { align-items: flex-start; }
+}
+
+/* ===== Public page components (offer, order, return) ===== */
 body.cl-public .cl-stack { display: flex; flex-direction: column; gap: 16px; }
 body.cl-public .cl-card-head.has-step { justify-content: flex-start; gap: 10px; }
 body.cl-public .cl-card-head.has-step .cl-card-title { margin: 0; }
@@ -14259,6 +14356,30 @@ body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-in
   body.cl-public dl.cl-kv.is-bank dd { margin-bottom: 8px; }
 }
 
+/* one of a few options compared side by side, each a card with a title and a description (the box of a return):
+   fieldset.cl-choice-cards > legend + label.cl-choice > input[radio] + .cl-choice-text > .cl-choice-title + .cl-choice-description.
+   The radio stays visible; the card carries the checked state and the focus ring. */
+body.cl-public fieldset.cl-choice-cards { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+body.cl-public fieldset.cl-choice-cards > legend { margin: 0 0 6px; padding: 0; font-size: 13.5px; font-weight: 500;
+  color: var(--cl-ink-2); }
+body.cl-public fieldset.cl-choice-cards .cl-choice { align-items: flex-start; gap: 12px; margin: 0; padding: 12px 14px; min-height: 44px;
+  border: 1px solid var(--cl-line); border-radius: var(--cl-radius); background: var(--cl-surface); }
+@media (hover: hover) {
+  body.cl-public fieldset.cl-choice-cards .cl-choice:hover { border-color: var(--cl-ink-3); }
+}
+body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:checked) { border-color: var(--cl-accent); background: var(--cl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--cl-accent); }
+body.cl-public fieldset.cl-choice-cards .cl-choice:has(input:focus-visible) { outline: 2px solid var(--cl-accent); outline-offset: 2px; }
+body.cl-public fieldset.cl-choice-cards .cl-choice input { margin: 3px 0 0; }
+body.cl-public fieldset.cl-choice-cards .cl-choice input:focus-visible { outline: none; }
+body.cl-public fieldset.cl-choice-cards .cl-choice-title { font-size: 15px; }
+body.cl-public fieldset.cl-choice-cards .cl-choice-description { color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+/* a text written by the store and quoted to the customer (the reason for a rejection): keeps its line breaks */
+body.cl-public blockquote.cl-quote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--cl-line); border-radius: 0 6px 6px 0;
+  background: var(--cl-surface-2); font-size: 15px; line-height: 1.55; color: var(--cl-ink); white-space: pre-line; overflow-wrap: anywhere; }
+body.cl-public p.cl-quote-source { margin: 6px 0 0; font-size: 12.5px; color: var(--cl-ink-2); }
+
 /* ===== Client offer (clientOffer.html) ===== */
 /* variant choice */
 .cl-client-offer .cl-list .cl-list-item.is-group { grid-template-columns: minmax(0, 1fr); }
@@ -14289,10 +14410,10 @@ body.cl-public .cl-static-value { margin: 0; font-size: 15px; color: var(--cl-in
 .cl-client-offer .cl-offer-total-row dt { display: inline-flex; align-items: center; gap: 8px; }
 .cl-client-offer .cl-offer-updating { display: none; }
 .cl-client-offer #client-offer-items.is-slow .cl-offer-updating { display: inline-block; }
-.cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, dl.cl-kv.is-bank dd) {
+.cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, .cl-pay-total-value, .cl-pay-total-sub, dl.cl-kv.is-bank dd) {
   opacity: .45; transition: opacity .15s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, dl.cl-kv.is-bank dd) { transition: none; }
+  .cl-client-offer .is-updating :is(.cl-offer-total-row dd, .cl-offer-total-sub, .cl-list-amount, .cl-choice-aside, .cl-pay-amount strong, .cl-pay-total-value, .cl-pay-total-sub, dl.cl-kv.is-bank dd) { transition: none; }
 }
 .cl-client-offer .cl-offer-total-row dd { margin: 0; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--cl-ink); }
 .cl-client-offer .cl-offer-total-sub { margin: 2px 0 0; text-align: right; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
@@ -14440,6 +14561,40 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
   body.cl-public .cl-date-actions .cl-button { min-height: 44px; }
 }
 
+/* ===== Client return (client-return.html) ===== */
+/* side column (from 1024 px, 400 px wide): a shipment row puts its action under the text, the pickup card is one column */
+@media (min-width: 1024px) {
+  .cl-client-return .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .cl-client-return .cl-split-side .cl-list-actions { justify-content: stretch; }
+  .cl-client-return .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  .cl-client-return .cl-split-side .cl-kv-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.cl-client-return .cl-page-header { margin-bottom: 20px; }
+.cl-client-return .cl-page-title { margin: 2px 0 6px; }
+.cl-client-return .cl-card-head .cl-card-title { margin: 0; }
+.cl-client-return .cl-note { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: var(--cl-ink); }
+.cl-client-return :is(.cl-note, .cl-alert-text) a { overflow-wrap: anywhere; }
+.cl-client-return .cl-note a[href^="tel:"] { white-space: nowrap; }
+/* redirect targets after a notice keep a gap to the top edge */
+.cl-client-return :is(#return-form, #return-parcel) { scroll-margin-top: 16px; }
+.cl-client-return .cl-card-inset > .cl-alert + .cl-fieldset { margin-top: 16px; }
+.cl-client-return .cl-fieldset > :is(.cl-choice-cards, .cl-note) + .cl-field-error { margin-top: 6px; }
+.cl-client-return .cl-card-footer { align-items: center; column-gap: 12px; }
+.cl-client-return .cl-card-footer .cl-help { flex: 1 1 260px; margin: 0; }
+/* shipments, pickup and products */
+.cl-client-return .cl-list-actions .cl-button { white-space: nowrap; }
+.cl-client-return .cl-list-actions .cl-ext { font-size: 11px; margin-left: 6px; opacity: .8; }
+.cl-client-return .cl-list-desc .cl-sep { margin: 0 6px; color: var(--cl-ink-3); }
+.cl-client-return .cl-card-inset > .cl-kv-grid + .cl-help { margin-top: 12px; }
+@media (max-width: 719px) {
+  .cl-client-return .cl-list.is-items .cl-list-item { gap: 6px; }
+  .cl-client-return .cl-list.is-items .cl-status { justify-self: start; }
+  .cl-client-return .cl-list-actions .cl-button { width: 100%; justify-content: center; min-height: 44px; }
+}
+@media (max-width: 1023px) {
+  .cl-client-return #return-form :is(.cl-input, .cl-select, .cl-button) { min-height: 44px; }
+}
+
 /* ===== Public message page (client-offer/unavailable.html): one card with eyebrow, title and lead ===== */
 .cl-public-main .cl-card.cl-public-message { padding: 28px 24px; }
 .cl-public-message .cl-page-title { margin-top: 0; }
@@ -14454,3 +14609,61 @@ body.cl-public dl.cl-amounts > .is-sum { margin-top: 2px; padding-top: 8px; bord
 .cl-bridge .cl-page-title { margin-top: 0; }
 .cl-bridge .cl-page-lead { margin-bottom: 0; }
 .cl-bridge .cl-button.is-primary { width: 100%; min-height: 48px; justify-content: center; margin-top: 20px; }
+
+/* Offer in two columns: the total opens the payment card from 1024 px (the items card hides its own total row there), the
+   methods sit side by side and the transfer details are a compact list, so the seller card under the payment stays on
+   the first screen of a 1440 x 900 laptop. */
+.cl-client-offer .cl-pay-total { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--cl-line); }
+.cl-client-offer .cl-pay-total-label { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--cl-ink-2); }
+.cl-client-offer #client-offer-payment.is-slow .cl-offer-updating { display: inline-block; }
+.cl-client-offer .cl-pay-total-value { margin: 2px 0 0; font-size: 26px; font-weight: 650; line-height: 1.2; color: var(--cl-ink); font-variant-numeric: tabular-nums; }
+.cl-client-offer .cl-pay-total-sub { margin: 2px 0 0; font-size: 13px; color: var(--cl-ink-2); font-variant-numeric: tabular-nums; }
+.cl-client-offer .cl-pay-methods.is-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.cl-client-offer .cl-pay-methods.is-row legend { grid-column: 1 / -1; }
+.cl-client-offer .cl-pay-methods.is-row .cl-choice { padding: 10px 12px; min-height: 56px; }
+.cl-client-offer .cl-pay-methods.is-row .cl-choice-title { font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.cl-client-offer .cl-pay-methods .cl-choice-description { font-size: 12px; font-weight: 600; color: var(--cl-accent); }
+/* 13 px and a 10 px gap keep a grouped IBAN and its copy button (shown by copy-field.js) on one line in the 400 px column */
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact { grid-template-columns: max-content minmax(0, 1fr); gap: 4px 10px; margin: 0; padding: 0; font-size: 13px; }
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact :is(dt, dd) { font-size: 13px; }
+body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin: 0; line-height: 1.45; }
+.cl-client-offer .cl-pay-or { margin: 14px 0 8px; }
+.cl-client-offer .cl-link-button { display: inline-flex; align-items: baseline; gap: 6px; border: 0; background: none; padding: 0; font: inherit;
+  font-size: 13.5px; color: var(--cl-accent); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.cl-client-offer .cl-link-button:hover:not(:disabled) { text-decoration: underline; }
+.cl-client-offer .cl-link-button:disabled { color: var(--cl-ink-2); cursor: not-allowed; }
+.cl-client-offer .cl-link-button:focus-visible { outline: 2px solid var(--cl-accent); outline-offset: 2px; border-radius: 2px; }
+.cl-client-offer .cl-proforma .cl-help { margin-top: 2px; }
+.cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; justify-content: center; }
+@media (min-width: 1024px) {
+  /* a pointer is likely here: the link-like proforma button keeps a 28 px target (WCAG 2.5.8 asks for 24) */
+  .cl-client-offer .cl-link-button { min-height: 28px; align-items: center; }
+  .cl-client-offer .cl-items-total { display: none; }
+  .cl-client-offer .cl-split-side .cl-pay-row { display: block; }
+  .cl-client-offer .cl-split-side .cl-pay-amount { display: none; }
+}
+@media (max-width: 1023px) {
+  .cl-client-offer .cl-pay-total:not(.is-always) { display: none; }
+  .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: auto; }
+}
+@media (max-width: 719px) {
+  .cl-client-offer .cl-pay-methods.is-row { grid-template-columns: minmax(0, 1fr); }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-client-offer dl.cl-kv.is-bank.is-compact dd { margin-bottom: 8px; }
+  .cl-client-offer .cl-split-side .cl-pay-row .cl-button.is-primary { width: 100%; }
+}
+
+
+/* Order in two columns: the day tiles get four to a row in the 400 px side column (auto-fill at 92 px would leave three
+   and a ragged last row); "as soon as possible" spans the row. */
+@media (min-width: 1024px) {
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.cl-public .cl-order-page .cl-split-side .cl-date-grid .is-wide { grid-column: 1 / -1; }
+  /* 400 px is too narrow for a row beside its action or a label beside an IBAN: they stack as they do on a phone */
+  body.cl-public .cl-order-page .cl-split-side .cl-list .cl-list-item { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions { justify-content: stretch; }
+  body.cl-public .cl-order-page .cl-split-side .cl-list-actions .cl-button { width: 100%; justify-content: center; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dt { font-size: 12.5px; }
+  body.cl-public .cl-order-page .cl-split-side dl.cl-kv.is-bank dd { margin-bottom: 8px; }
+}

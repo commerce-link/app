@@ -30,8 +30,12 @@ public record BasketViewPage(String basketId, String shortId, String backHref, S
 
     public enum DeliveryState { CHOSEN, NONE, UNKNOWN }
 
-    public record Summary(String items, DeliveryState deliveryState, String deliveryName, String delivery, String total,
-                          String net, String vat) {
+    /** With a discount code items is the value before the discount, so the card adds up to the total. */
+    public record Summary(String items, String discountCode, String discount, DeliveryState deliveryState,
+                          String deliveryName, String delivery, String total, String net, String vat) {
+        public boolean hasDiscount() {
+            return discountCode != null;
+        }
     }
 
     public record Customer(AddressBlock billing, AddressBlock shipping, boolean sameAddress) {

@@ -8,25 +8,36 @@
 //   counting only the items the save keeps; the others are outside the total.
 // - Totals: each row and the summary are recounted as the fields change, with the server's formulas
 //   (OfferDetailsPageFactory.summary, ItemMargin): total = chosen items (qty × price) + delivery, cost = chosen items
-//   (qty × cost), gross profit = total − cost, net = gross / VAT rate; amounts rounded half up to grosze as Money.format.
+//   (qty × cost, the estimate for an item without one: costOf), gross profit = total − cost, net = gross / VAT rate;
+//   amounts rounded half up to grosze as Money.format.
 //   An item the save drops (incomplete) is left out, so the summary shows what the save will store.
 // - "Edytuj pozycję" fills its dialog from the row's hidden fields; "Zastosuj" writes them back and refreshes the row.
 // - Before the form is sent the rows are renumbered basketItems[0..n] in their order on screen, and an emptied
 //   quantity or price becomes 0, as it does when the field is left.
+// - Two sections, as on the order page: the products, then the services under their heading (tbody[data-cl-lines]
+//   each, data-cl-lines-section). A row never leaves its section: each is sorted apart, the moves stop at its edge and a
+//   new group goes to the products. A variant group sits in the section of its first item, even an old one mixing both.
+// - The table is a draft until it is saved: "Usuń" takes the row off the table at once, without asking, and the toast's
+//   "Cofnij" puts it back where it was. The item that would leave no item the save keeps cannot be removed; its menu
+//   says why, counted from the rows on screen.
 // window.CL_offerLines gives offer-details.js the same preparation for a save it sends itself, the recount after a
-// new delivery price and the position an item will have once the server has saved the table.
+// new delivery price and reinit(fresh): the rows of a draft the server built (items added) set up as on load.
 (function () {
     'use strict';
 
     var form = document.getElementById('offer-items');
-    var body = form && form.querySelector('tbody[data-cl-lines]');
-    if (!body) {
+    // the sections, replaced by reinit(fresh): every listener sits on the table, which stays
+    var bodies = form ? Array.prototype.slice.call(form.querySelectorAll('tbody[data-cl-lines]')) : [];
+    if (!bodies.length) {
         return;
     }
-    var table = body.closest('table');
+    var table = bodies[0].closest('table');
     var summary = document.getElementById('summary');
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     var addedGroups = 0;
+    var draftRows = 0;
+    var sortables = [];
+    var fallbackObservers = [];
 
     function fill(text, values) {
         return (text || '').replace(/\{(\w+)\}/g, function (whole, key) {
@@ -38,8 +49,43 @@
         return fill(table.getAttribute('data-msg-' + name), values);
     }
 
+    function isSectionHead(row) {
+        return row.hasAttribute('data-cl-section-head');
+    }
+
+    function sectionRows(section) {
+        return Array.prototype.slice.call(section.children).filter(function (row) {
+            return !isSectionHead(row);
+        });
+    }
+
+    // every row of both sections, in the order the save posts them
     function rows() {
-        return Array.prototype.slice.call(body.children);
+        return bodies.reduce(function (all, section) {
+            return all.concat(sectionRows(section));
+        }, []);
+    }
+
+    function productsBody() {
+        return bodies.filter(function (section) {
+            return section.getAttribute('data-cl-lines-section') === 'products';
+        })[0] || bodies[0];
+    }
+
+    // the row above in its own section: the services heading is the section's edge
+    function previousRow(row) {
+        var previous = row.previousElementSibling;
+        return previous && !isSectionHead(previous) ? previous : null;
+    }
+
+    // the services heading shows while the section has a row: a removed last service takes it away, "Cofnij" brings it back
+    function updateSectionHeads() {
+        bodies.forEach(function (section) {
+            var head = section.querySelector('[data-cl-section-head]');
+            if (head) {
+                head.hidden = !sectionRows(section).length;
+            }
+        });
     }
 
     function isItem(row) {
@@ -81,9 +127,9 @@
     }
 
     function headOf(foot) {
-        var row = foot.previousElementSibling;
+        var row = previousRow(foot);
         while (row && !isHead(row)) {
-            row = row.previousElementSibling;
+            row = previousRow(row);
         }
         return row;
     }
@@ -151,12 +197,28 @@
         var costCents = Math.round(roundHalfUp(cost) * 100);
         var profit = priceCents - costCents;
         return {
-            tone: profit < 0 ? 'loss' : 'ok',
+            tone: profit <= 0 ? 'loss' : 'ok',
             percent: priceCents > 0 ? percent(divideHalfUp(profit * 1000, priceCents)) : null,
             profit: profit / 100,
             net: divideHalfUp(profit * 100, Math.round(vatRate() * 100)) / 100,
             cost: costCents / 100
         };
+    }
+
+    // The cost a row counts (OfferDetailsPageFactory.item): its own when entered, else the estimate halfway between the
+    // suppliers' lowest and median gross cost (data-estimated-cost, also on rows with a cost) for an item that is not a
+    // service; estimated tells which one it is.
+    function costOf(row) {
+        var own = number(field(row, 'unitCost'));
+        if (own > 0) {
+            return { cost: own, estimated: false };
+        }
+        var estimate = parseFloat(row.getAttribute('data-estimated-cost'));
+        if (field(row, 'service').value !== 'true' && isFinite(estimate) && estimate > 0) {
+            return { cost: estimate, estimated: true };
+        }
+        // as OfferDetailsPageFactory.item: without an estimate the cost stays what is typed, a negative one included
+        return { cost: own, estimated: false };
     }
 
     // what the table save drops (OfferDetailsPageFactory.droppedOnSave)
@@ -168,7 +230,8 @@
     function recountRow(row) {
         var qty = qtyOf(row);
         var price = number(priceInput(row));
-        var cost = number(field(row, 'unitCost'));
+        var counted = costOf(row);
+        var cost = counted.cost;
         row.querySelector('[data-cl-line-total]').textContent = amount(qty * price);
         // a hidden element still counts in a description, so the field points at the warning only while it shows
         var warn = row.querySelector('[data-cl-line-warn]');
@@ -178,30 +241,18 @@
         } else {
             qtyInput(row).setAttribute('aria-describedby', warn.id);
         }
-        if (field(row, 'service').value === 'true') {
-            return;
-        }
-        var hint = row.querySelector('[data-cl-line-cost]');
-        hint.textContent = cost > 0 ? message('line-cost', [window.CL_formatAmount(roundHalfUp(cost))]) : message('line-no-cost');
-        hint.classList.toggle('is-warn', !(cost > 0));
-
-        var margin = marginOf(price, cost);
-        var label = row.querySelector('[data-cl-line-margin]');
-        // a low margin says so in words too: the tone alone is barely apart from the plain text
-        var low = margin.percent !== null && margin.tone !== 'loss' && (price - cost) * 10 < price;
-        label.textContent = margin.percent === null ? message('line-margin-unknown')
-            : message(low ? 'line-margin-low' : 'line-margin', [margin.percent]);
-        label.classList.toggle('is-bad', margin.percent !== null && margin.tone === 'loss');
-        label.classList.toggle('is-low', margin.percent === null || low);
-
+        // a service has no mark: its value is all the row shows
         var mark = row.querySelector('.cl-margin');
-        if (!mark) {
+        if (field(row, 'service').value === 'true' || !mark) {
             return;
         }
+        var margin = marginOf(price, cost);
+        // the margin block, an empty line, the suppliers' blocks the server wrote (items.html margin fragment)
         var text = (margin.tone === 'unknown' ? message('margin-unknown')
-            : message('margin-' + margin.tone, [margin.percent === null ? '—' : margin.percent,
-                window.CL_formatMoney(margin.profit), window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
-            + '\n' + (mark.getAttribute('data-cl-market-text') || '');
+            : message(counted.estimated ? 'margin-estimated' : 'margin-' + margin.tone,
+                [margin.percent === null ? '—' : margin.percent, window.CL_formatMoney(margin.profit),
+                    window.CL_formatMoney(margin.cost), window.CL_formatMoney(margin.net)]))
+            + '\n\n' + (mark.getAttribute('data-cl-market-text') || '');
         mark.setAttribute('data-tooltip', text);
         mark.setAttribute('aria-label', text);
         var loss = margin.tone === 'loss';
@@ -218,6 +269,7 @@
     }
 
     function recount() {
+        updateRemoves();
         if (!summary) {
             return;
         }
@@ -228,6 +280,7 @@
         }
         var items = 0;
         var cost = 0;
+        var estimated = false;
         rows().filter(isItem).forEach(function (row) {
             // the total the save will leave: no variant outside it, no item the save drops
             if (row.classList.contains('is-unpicked') || dropped(row)) {
@@ -235,7 +288,9 @@
             }
             var qty = qtyOf(row);
             items += qty * number(priceInput(row));
-            cost += qty * number(field(row, 'unitCost'));
+            var counted = costOf(row);
+            cost += qty * counted.cost;
+            estimated = estimated || counted.estimated;
         });
         var deliveryHolder = document.querySelector('[data-cl-delivery-price]');
         var delivery = deliveryHolder ? parseFloat(deliveryHolder.getAttribute('data-cl-delivery-price')) || 0 : 0;
@@ -250,6 +305,9 @@
             profitGross: window.CL_formatMoney(Math.round(profitGross * 100) / 100),
             profitNet: window.CL_formatMoney(Math.round(profitGross / vatRate() * 100) / 100)
         };
+        document.querySelectorAll('[data-cl-sum-estimated]').forEach(function (note) {
+            note.hidden = !estimated;
+        });
         var shown = summary.querySelector('output[data-cl-sum="total"]');
         // a move or a dialog saved recounts too: only a total that changed is worth hearing
         var changedTotal = !shown || shown.textContent !== values.total;
@@ -291,10 +349,10 @@
     function updateMoves() {
         rows().forEach(function (row) {
             if (isItem(row)) {
-                setDisabled(row.querySelector('[data-cl-line-move="up"]'), !row.previousElementSibling);
+                setDisabled(row.querySelector('[data-cl-line-move="up"]'), !previousRow(row));
                 setDisabled(row.querySelector('[data-cl-line-move="down"]'), !row.nextElementSibling);
             } else if (isHead(row)) {
-                setDisabled(row.querySelector('[data-cl-group-move="up"]'), !row.previousElementSibling);
+                setDisabled(row.querySelector('[data-cl-group-move="up"]'), !previousRow(row));
                 setDisabled(row.querySelector('[data-cl-group-move="down"]'), !groupOf(row).foot.nextElementSibling);
             }
         });
@@ -364,7 +422,13 @@
     function refresh(withTotals) {
         var group = null;
         var groups = [];
+        var section = null;
         rows().forEach(function (row) {
+            // a group ends with its section, whatever the rows say
+            if (row.parentNode !== section) {
+                section = row.parentNode;
+                group = null;
+            }
             if (isHead(row)) {
                 group = { head: row, name: nameInput(row).value.trim(), items: [] };
                 row.setAttribute('data-group', group.name);
@@ -387,6 +451,7 @@
             }
             row.classList.toggle('is-variant', !!group);
             row.querySelector('[data-cl-line-ungroup-item]').hidden = !group;
+            row.querySelector('[data-cl-line-select-item]').hidden = true;
         });
         groups.forEach(function (each) {
             // As the save leaves it: the incomplete items go first, then a group without its marked item takes its first
@@ -401,11 +466,18 @@
             each.items.forEach(function (row) {
                 row.classList.toggle('is-unpicked', row !== chosen);
                 row.querySelector('[data-cl-mark-selected]').hidden = row !== chosen;
+                row.querySelector('[data-cl-line-select-item]').hidden = row === chosen;
             });
             each.head.querySelector('[data-cl-group-count]').textContent = message('group-picks', { n: each.items.length });
         });
         validateGroups();
         updateMoves();
+        updateRemoves();
+        updateSectionHeads();
+        var title = form.querySelector('#items-title');
+        if (title) {
+            title.textContent = message('items-title', { n: rows().filter(isItem).length });
+        }
         if (withTotals) {
             recount();
         }
@@ -444,8 +516,8 @@
 
     function moveItem(row, direction) {
         // one step over whatever is next: an item swaps, a group's head or end lets the item out of or into the group
-        if (direction === 'up' && row.previousElementSibling) {
-            row.previousElementSibling.before(row);
+        if (direction === 'up' && previousRow(row)) {
+            previousRow(row).before(row);
             return true;
         }
         if (direction === 'down' && row.nextElementSibling) {
@@ -459,7 +531,7 @@
         var group = groupOf(head);
         var block = [head].concat(group.items, [group.foot]);
         if (direction === 'up') {
-            var before = head.previousElementSibling;
+            var before = previousRow(head);
             if (!before) {
                 return false;
             }
@@ -514,7 +586,8 @@
         });
         var input = nameInput(head);
         input.value = uniqueGroupName(message('group-new'));
-        body.append(head, createFoot());
+        // a new group starts among the products: a service joins a group only in its own section
+        productsBody().append(head, createFoot());
         labelGroup(head);
         refresh(false);
         head.scrollIntoView({ block: 'nearest' });
@@ -530,6 +603,24 @@
         afterMove(focus);
     }
 
+    // Marks the row as the variant the save counts and the others of its group as not; the menus and totals follow.
+    function selectVariant(row) {
+        var group = row.getAttribute('data-group');
+        rows().filter(function (each) {
+            return isItem(each) && each.getAttribute('data-group') === group;
+        }).forEach(function (each) {
+            field(each, 'variantSelected').value = each === row ? 'true' : 'false';
+        });
+        refresh(false);
+        recount();
+        changed();
+        var status = form.querySelector('[data-cl-lines-status]');
+        if (status) {
+            status.textContent = message('line-selected', [field(row, 'name').value, group]);
+        }
+        menuSummary(row).focus();
+    }
+
     function takeOutOfGroup(row) {
         var foot = row.nextElementSibling;
         while (foot && !isFoot(foot)) {
@@ -541,10 +632,86 @@
         }
     }
 
+    // --- removing a row (a draft change, undone from the toast)
+
+    // the items a save keeps besides this row
+    function keptWithout(row) {
+        return rows().filter(function (each) {
+            return isItem(each) && each !== row && !dropped(each);
+        }).length;
+    }
+
+    // the item that would leave the offer without an item the save keeps cannot be removed: its menu says why
+    function updateRemoves() {
+        rows().filter(isItem).forEach(function (row) {
+            var button = row.querySelector('[data-cl-line-remove]');
+            var reason = button && button.querySelector('.cl-menu-reason');
+            if (!reason) {
+                return;
+            }
+            var refused = keptWithout(row) === 0;
+            setDisabled(button, refused);
+            reason.hidden = !refused;
+            if (refused) {
+                button.setAttribute('aria-describedby', reason.id);
+            } else {
+                button.removeAttribute('aria-describedby');
+            }
+        });
+    }
+
+    // the next item of the table, across the sections, else the one before
+    function nearestItem(row) {
+        var all = rows();
+        var at = all.indexOf(row);
+        var after = all.slice(at + 1).filter(isItem)[0];
+        return after || all.slice(0, at).filter(isItem).pop() || null;
+    }
+
+    // The row is kept with its neighbours and its section, so "Cofnij" puts it back where it was; after the table was
+    // rebuilt from a draft (reinit) there is nothing to put it back into, and the toast with the button is gone by then.
+    function removeRow(row) {
+        var name = field(row, 'name').value;
+        var next = row.nextElementSibling;
+        var previous = row.previousElementSibling;
+        var parent = row.parentNode;
+        var focus = nearestItem(row);
+        row.querySelector('details.cl-menu').open = false;
+        row.remove();
+        refresh(true);
+        changed();
+        (focus ? menuSummary(focus) : form.querySelector('[data-cl-dialog-open="item-add-dialog"]') || table).focus();
+        showToast(message('line-removed-draft', [name]), 'info', {
+            label: message('undo'),
+            run: function () {
+                // back into its own section, unless a draft has replaced the sections since
+                if (!parent.isConnected || row.isConnected) {
+                    return;
+                }
+                if (next && next.parentNode === parent) {
+                    next.before(row);
+                } else if (previous && previous.parentNode === parent) {
+                    previous.after(row);
+                } else {
+                    parent.append(row);
+                }
+                refresh(true);
+                changed();
+                menuSummary(row).focus();
+            }
+        });
+    }
+
     function initSortable() {
         if (typeof window.Sortable !== 'function') {
             return;
         }
+        sortables.forEach(function (sortable) {
+            sortable.destroy();
+        });
+        fallbackObservers.forEach(function (observer) {
+            observer.disconnect();
+        });
         // an item dropped next to a group's rows lands in the group: only an item may, a group never goes into another
         function insideGroup(related, willInsertAfter) {
             if (isItem(related)) {
@@ -567,58 +734,70 @@
                 cell.style.width = hold ? cell.getBoundingClientRect().width + 'px' : '';
             });
         }
-        new MutationObserver(function (records) {
-            records.forEach(function (record) {
-                Array.prototype.forEach.call(record.addedNodes, function (node) {
-                    if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
-                        node.style.opacity = '1';
-                    }
+        fallbackObservers = bodies.map(function (section) {
+            var observer = new MutationObserver(function (records) {
+                records.forEach(function (record) {
+                    Array.prototype.forEach.call(record.addedNodes, function (node) {
+                        if (node.nodeType === 1 && node.classList.contains('sortable-fallback')) {
+                            node.style.opacity = '1';
+                        }
+                    });
                 });
             });
-        }).observe(body, { childList: true });
-        new Sortable(body, {
-            handle: '[data-cl-drag]',
-            draggable: 'tr',
-            filter: '[data-cl-group-foot]',
-            animation: reducedMotion.matches ? 0 : 150,
-            forceFallback: true,
-            // a click on the handle is not a drag
-            fallbackTolerance: 4,
-            onChoose: function (event) {
-                holdWidths(event.item, true);
-            },
-            onUnchoose: function (event) {
-                holdWidths(event.item, false);
-            },
-            onStart: function (event) {
-                table.classList.add('is-dragging');
-                document.documentElement.classList.add('cl-dragging-rows');
-                if (!isHead(event.item)) {
-                    return;
-                }
-                var group = groupOf(event.item);
-                group.items.concat([group.foot]).forEach(function (row) {
-                    row.hidden = true;
-                    row.setAttribute('data-cl-drag-hidden', '');
-                });
-            },
-            onMove: function (event) {
-                return isHead(event.dragged) ? !insideGroup(event.related, event.willInsertAfter) : true;
-            },
-            onEnd: function (event) {
-                table.classList.remove('is-dragging');
-                document.documentElement.classList.remove('cl-dragging-rows');
-                if (isHead(event.item)) {
-                    var anchor = event.item;
-                    body.querySelectorAll('[data-cl-drag-hidden]').forEach(function (row) {
-                        row.hidden = false;
-                        row.removeAttribute('data-cl-drag-hidden');
-                        anchor.after(row);
-                        anchor = row;
+            observer.observe(section, { childList: true });
+            return observer;
+        });
+        // one per section, in a group of its own that neither gives rows to the other section nor takes them from it;
+        // the services heading is not a row to drag nor a place to drop above
+        sortables = bodies.map(function (section) {
+            return new Sortable(section, {
+                group: { name: 'offer-lines-' + section.getAttribute('data-cl-lines-section'), pull: false, put: false },
+                handle: '[data-cl-drag]',
+                draggable: 'tr:not([data-cl-section-head])',
+                filter: '[data-cl-group-foot]',
+                animation: reducedMotion.matches ? 0 : 150,
+                forceFallback: true,
+                // a click on the handle is not a drag
+                fallbackTolerance: 4,
+                onChoose: function (event) {
+                    holdWidths(event.item, true);
+                },
+                onUnchoose: function (event) {
+                    holdWidths(event.item, false);
+                },
+                onStart: function (event) {
+                    table.classList.add('is-dragging');
+                    document.documentElement.classList.add('cl-dragging-rows');
+                    if (!isHead(event.item)) {
+                        return;
+                    }
+                    var group = groupOf(event.item);
+                    group.items.concat([group.foot]).forEach(function (row) {
+                        row.hidden = true;
+                        row.setAttribute('data-cl-drag-hidden', '');
                     });
+                },
+                onMove: function (event) {
+                    if (isSectionHead(event.related)) {
+                        return false;
+                    }
+                    return isHead(event.dragged) ? !insideGroup(event.related, event.willInsertAfter) : true;
+                },
+                onEnd: function (event) {
+                    table.classList.remove('is-dragging');
+                    document.documentElement.classList.remove('cl-dragging-rows');
+                    if (isHead(event.item)) {
+                        var anchor = event.item;
+                        table.querySelectorAll('[data-cl-drag-hidden]').forEach(function (row) {
+                            row.hidden = false;
+                            row.removeAttribute('data-cl-drag-hidden');
+                            anchor.after(row);
+                            anchor = row;
+                        });
+                    }
+                    afterMove(null);
                 }
-                afterMove(null);
-            }
+            });
         });
     }
 
@@ -725,7 +904,7 @@
             field(row, 'unitCost').value = input('unitCost').value === '' ? '0' : input('unitCost').value;
             field(row, 'consolidated').value = input('consolidated').checked ? 'true' : 'false';
             renderSub(row);
-            row.querySelector('[data-cl-mark-consolidated]').hidden = !input('consolidated').checked;
+            showConsolidated(row);
             labelRow(row);
             recountRow(row);
             recount();
@@ -752,14 +931,47 @@
                 separator.textContent = '·';
                 sub.append(' ', separator, ' ');
             }
+            // the items.html row: the code cut to one line, its copy icon always after it
             var code = document.createElement('span');
-            code.className = 'cl-code-nowrap';
+            code.className = 'cl-copy-text';
             code.setAttribute('data-cl-line-mfn', '');
             code.textContent = mfn;
+            var icon = document.createElement('span');
+            icon.className = 'cl-copy-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.innerHTML = '<i class="far fa-copy"></i>';
+            var shown = document.createElement('span');
+            shown.className = 'cl-copy-code';
+            shown.append(code, icon);
+            var copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'cl-copy-inline';
+            copy.setAttribute('data-cl-copy', mfn);
+            copy.title = mfn;
+            copy.setAttribute('aria-label', message('copy-mfn', [mfn]));
+            copy.append(shown);
             var wrap = document.createElement('span');
-            wrap.append(message('mfn-prefix') + ' ', code);
+            wrap.className = 'cl-line-code';
+            wrap.append(message('mfn-prefix') + '\u00a0', copy);
             sub.append(wrap);
         }
+    }
+
+    // "Połącz na FV": the column's tick and the menu entry follow the hidden field
+    function showConsolidated(row) {
+        var on = field(row, 'consolidated').value === 'true';
+        row.querySelector('[data-cl-line-consolidated]').hidden = !on;
+        row.querySelector('[data-cl-line-consolidated-cell]').classList.toggle('is-empty', !on);
+        row.querySelector('[data-cl-line-consolidate]').textContent = message(on ? 'deconsolidate' : 'consolidate');
+    }
+
+    function toggleConsolidated(row) {
+        var consolidated = field(row, 'consolidated');
+        consolidated.value = consolidated.value === 'true' ? 'false' : 'true';
+        showConsolidated(row);
+        row.querySelector('details.cl-menu').open = false;
+        changed();
+        menuSummary(row).focus();
     }
 
     // --- before a save
@@ -795,7 +1007,7 @@
 
     // --- wiring
 
-    body.addEventListener('input', function (event) {
+    table.addEventListener('input', function (event) {
         var row = event.target.closest('tr[data-cl-line]');
         if (row && (event.target === qtyInput(row) || event.target === priceInput(row))) {
             recountRow(row);
@@ -813,7 +1025,7 @@
     });
 
     // an emptied quantity or price is 0, as before
-    body.addEventListener('focusout', function (event) {
+    table.addEventListener('focusout', function (event) {
         var row = event.target.closest('tr[data-cl-line]');
         if (row && (event.target === qtyInput(row) || event.target === priceInput(row)) && event.target.value === '') {
             event.target.value = '0';
@@ -821,19 +1033,26 @@
         }
     });
 
-    body.addEventListener('click', function (event) {
+    table.addEventListener('click', function (event) {
         var target = event.target.closest && event.target.closest('button');
         if (!target || target.getAttribute('aria-disabled') === 'true') {
             return;
         }
         var row = target.closest('tr[data-cl-line]');
         var head = target.closest('tr[data-cl-line-group]');
-        if (row && target.hasAttribute('data-cl-line-move')) {
+        if (row && target.hasAttribute('data-cl-line-remove')) {
+            event.preventDefault();
+            removeRow(row);
+        } else if (row && target.hasAttribute('data-cl-line-move')) {
             if (moveItem(row, target.getAttribute('data-cl-line-move'))) {
                 afterMove(menuSummary(row), row);
             }
         } else if (row && target.hasAttribute('data-cl-line-ungroup')) {
             takeOutOfGroup(row);
+        } else if (row && target.hasAttribute('data-cl-line-select')) {
+            selectVariant(row);
+        } else if (row && target.hasAttribute('data-cl-line-consolidate')) {
+            toggleConsolidated(row);
         } else if (head && target.hasAttribute('data-cl-group-move')) {
             if (moveGroup(head, target.getAttribute('data-cl-group-move'))) {
                 afterMove(menuSummary(head), head);
@@ -844,7 +1063,7 @@
     });
 
     // the handle moves its row (or group) with the arrow keys too, and keeps the focus
-    body.addEventListener('keydown', function (event) {
+    table.addEventListener('keydown', function (event) {
         var handle = event.target.closest && event.target.closest('[data-cl-drag]');
         if (!handle || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) {
             return;
@@ -869,19 +1088,92 @@
         }
     });
 
-    form.querySelectorAll('[data-cl-lines-reveal][hidden]').forEach(function (control) {
-        control.hidden = false;
-    });
-    rows().filter(isHead).forEach(function (head) {
-        var name = head.getAttribute('data-group');
-        var last = head;
-        while (last.nextElementSibling && isItem(last.nextElementSibling)
-            && last.nextElementSibling.getAttribute('data-group') === name) {
-            last = last.nextElementSibling;
+    // what the server's rows need from the script, on load and for the rows of a draft: the controls that wait for it,
+    // the removal kept on the page and the ends of the groups
+    function setUp() {
+        form.querySelectorAll('[data-cl-lines-reveal][hidden]').forEach(function (control) {
+            control.hidden = false;
+        });
+        table.querySelectorAll('[data-cl-line-remove]').forEach(function (button) {
+            button.type = 'button';
+            button.removeAttribute('form');
+            button.removeAttribute('formaction');
+        });
+        rows().filter(isHead).forEach(function (head) {
+            var name = head.getAttribute('data-group');
+            var last = head;
+            while (last.nextElementSibling && isItem(last.nextElementSibling)
+                && last.nextElementSibling.getAttribute('data-group') === name) {
+                last = last.nextElementSibling;
+            }
+            last.after(createFoot());
+        });
+        rows().filter(isHead).forEach(labelGroup);
+    }
+
+    // values only, as dirty-form compares them, with numbers read as numbers: the server writes "6899.00" back for "6899"
+    function rowKey(row) {
+        return Array.prototype.map.call(row.querySelectorAll('input[name]'), function (input) {
+            var value = input.value.trim();
+            return value !== '' && isFinite(Number(value)) ? String(Number(value)) : value;
+        }).join('\u0001');
+    }
+
+    // The draft's rows are the posted ones, in their order, with the added items among them (the save drops the
+    // incomplete ones). A posted row stays the row on screen, so the unsaved-changes count and the focus see only what
+    // changed; the new rows get ids of their own, as their positions may repeat those of the rows kept.
+    function adopt(fresh) {
+        var posted = rows().filter(function (row) {
+            return isItem(row) && !dropped(row);
+        });
+        var next = 0;
+        fresh.reduce(function (all, section) {
+            return all.concat(Array.prototype.slice.call(section.children));
+        }, []).filter(isItem).forEach(function (row) {
+            var key = rowKey(row);
+            for (var k = next; k < posted.length; k++) {
+                if (rowKey(posted[k]) === key) {
+                    row.replaceWith(posted[k]);
+                    next = k + 1;
+                    return;
+                }
+            }
+            var prefix = 'offer-line-draft' + (++draftRows) + '-';
+            [row].concat(Array.prototype.slice.call(row.querySelectorAll('[id], [for], [aria-describedby]')))
+                .forEach(function (element) {
+                    ['id', 'for', 'aria-describedby'].forEach(function (attribute) {
+                        if (element.hasAttribute(attribute)) {
+                            element.setAttribute(attribute, element.getAttribute(attribute).replace(/offer-line-\d+-/g, prefix));
+                        }
+                    });
+                });
+        });
+        bodies.forEach(function (section, index) {
+            if (index === 0) {
+                section.before.apply(section, fresh);
+            }
+            section.remove();
+        });
+        bodies = fresh;
+    }
+
+    // fresh: the sections (tbody[data-cl-lines], products then services) the server built for a draft, put in place of
+    // the table's; the form stays dirty
+    function reinit(fresh) {
+        if (fresh && fresh.length) {
+            adopt(fresh);
         }
-        last.after(createFoot());
-    });
-    rows().filter(isHead).forEach(labelGroup);
+        table.querySelectorAll('[data-cl-group-foot]').forEach(function (foot) {
+            foot.remove();
+        });
+        setUp();
+        refresh(false);
+        recount();
+        initSortable();
+        changed();
+    }
+
+    setUp();
     // the server rendered the totals from the stored amounts: they are recounted once something changes
     var shownAsStored = true;
     refresh(false);
@@ -891,27 +1183,7 @@
     window.CL_offerLines = {
         prepare: prepare,
         recount: recount,
-        // the items a save keeps besides this row
-        keptWithout: function (row) {
-            return rows().filter(function (each) {
-                return isItem(each) && each !== row && !dropped(each);
-            }).length;
-        },
-        lastItemMessage: function () {
-            return message('last-item');
-        },
-        // the index the item will have in the saved offer (the save drops incomplete items), or -1 when it is dropped
-        savedIndex: function (row) {
-            if (dropped(row)) {
-                return -1;
-            }
-            var index = 0;
-            for (var before = body.firstElementChild; before && before !== row; before = before.nextElementSibling) {
-                if (isItem(before) && !dropped(before)) {
-                    index++;
-                }
-            }
-            return index;
-        }
+        reinit: reinit,
+        message: message
     };
 })();

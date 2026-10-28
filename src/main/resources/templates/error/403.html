@@ -1,8 +1,24 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head><title>Access Denied</title></head>
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{auth-layout}">
+<head>
+    <title th:text="#{error.page.accessDenied.pageTitle}">Brak dostępu</title>
+</head>
 <body>
-<h1>403 - Access Denied</h1>
-<p>You do not have permission to view this page.</p>
+
+<section class="cl-card" layout:fragment="content">
+    <div class="cl-auth-body">
+        <header class="cl-auth-head">
+            <h1 class="cl-page-title" th:text="#{error.page.accessDenied.title}"></h1>
+            <p class="cl-page-lead" th:text="#{error.page.accessDenied.lead}"></p>
+            <p class="cl-auth-meta" th:if="${userEmail != null}" th:text="#{error.page.accessDenied.signedInAs(${userEmail})}"></p>
+        </header>
+    </div>
+    <div class="cl-card-footer is-stacked">
+        <a class="cl-button is-primary" href="/dashboard" th:text="#{error.page.goToDashboard}"></a>
+        <a class="cl-button" href="/logout" th:text="#{error.page.logout}"></a>
+    </div>
+</section>
+
 </body>
 </html>

@@ -11,6 +11,7 @@ import java.io.StringWriter;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ public class OrdersExport {
                 .collect(Collectors.toList());
 
         StringWriter csvWriter = new StringWriter();
-        csvWriter.append("Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Invoiced At\n");
+        csvWriter.append("Order ID,Affiliate ID,Discount Code,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Discount Amount,Invoiced At\n");
 
         for (Order order : orders) {
             // An order can legitimately have no payment recorded (imported, POS, cash on delivery),
@@ -42,7 +43,8 @@ public class OrdersExport {
                     : order.getPayments().get(0).getSource();
 
             csvWriter.append(order.getOrderId()).append(",")
-                    .append(order.getAffiliateId()).append(",")
+                    .append(Objects.toString(order.getAffiliateId(), "")).append(",")
+                    .append(Objects.toString(order.getDiscountCode(), "")).append(",")
                     .append(order.getOrderedAt().toString()).append(",")
                     .append(order.getSource().getName()).append(",")
                     .append(order.getSource().getType().name()).append(",")
@@ -50,7 +52,8 @@ public class OrdersExport {
                     .append(order.getBillingDetails().getCity()).append(",")
                     .append(order.getShippingDetails().getCity()).append(",")
                     .append(paymentSource != null ? paymentSource.name() : "").append(",")
-                    .append(String.valueOf(order.getTotalPrice()).replace('.', ',')).append(",")
+                    .append(String.format(Locale.ROOT, "%.2f", order.getTotalPrice())).append(",")
+                    .append(String.format(Locale.ROOT, "%.2f", order.getDiscountAmount())).append(",")
                     .append(invoicedAt(order))
                     .append("\n");
         }

@@ -9,7 +9,7 @@ public final class StorePath {
     private static final Pattern STORE_PATH = Pattern.compile("/dashboard/store/([^/]+)(/.*)?");
 
     private static final Set<String> RESERVED_SEGMENTS = Set.of(
-            "branding", "categories", "company-details", "create", "email-templates", "fulfilment",
+            "branding", "categories", "company-details", "create", "discounts", "email-templates", "fulfilment",
             "invoicing", "marketplaces", "notification", "payments", "receipts",
             "report", "rma", "rma-centers", "shipping", "suppliers", "warehouse");
 

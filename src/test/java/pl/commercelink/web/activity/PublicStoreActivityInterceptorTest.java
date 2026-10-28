@@ -15,9 +15,12 @@ import pl.commercelink.starter.security.tenant.PathTenantResolver;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.publicpage.PublicPage;
 
 import java.net.URI;
+import java.util.Locale;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -155,5 +158,24 @@ class PublicStoreActivityInterceptorTest {
         mvc.perform(get("/store/" + STORE_ID + "/client/order/order-1"))
                 .andExpect(status().isForbidden())
                 .andExpect(view().name("store-inactive"));
+    }
+
+    @Test
+    void inactiveStorePageIsFramedByTheStoreItselfInTheRequestedLanguage() throws Exception {
+        // given
+        store.setName("Nova Tech");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when
+        PublicPage page = (PublicPage) mvc.perform(get("/store/" + STORE_ID + "/client/order/order-1").locale(Locale.ENGLISH))
+                .andExpect(status().isForbidden())
+                .andReturn().getModelAndView().getModel().get("publicPage");
+
+        // then
+        assertThat(page.storeId()).isEqualTo(STORE_ID);
+        assertThat(page.storeName()).isEqualTo("Nova Tech");
+        assertThat(page.language()).isEqualTo("en");
+        assertThat(page.otherLanguageHref()).isEqualTo("/store/" + STORE_ID + "/client/order/order-1?lang=pl");
     }
 }
