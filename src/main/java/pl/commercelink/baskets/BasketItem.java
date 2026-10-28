@@ -260,7 +260,9 @@ public class BasketItem {
                     taxonomy.mfn(),
                     taxonomy.category(),
                     matchedInventory.getMedianPrice().grossValue(),
-                    matchedInventory.getLowestPrice().grossValue(),
+                    // client 2026-10-27: an item outside the price list costs the estimate, not the lowest price
+                    EstimatedCost.between(matchedInventory.getLowestPrice().grossValue(),
+                            matchedInventory.getMedianPrice().grossValue()),
                     qty,
                     null,
                     matchedInventory.getEstimatedDeliveryDays(),
