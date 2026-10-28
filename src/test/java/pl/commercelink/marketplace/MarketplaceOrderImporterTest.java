@@ -127,6 +127,23 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
+    void takesTheLastWordOfTheShippingNameAsTheSurname() {
+        // given
+        MarketplaceCustomer.Address shippingAddress = new MarketplaceCustomer.Address(
+                "Anna Maria Kowalska", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Anna Maria Kowalska", null, "anna@example.com",
+                "500600700", null, shippingAddress, shippingAddress);
+
+        // when
+        ShippingDetails shipping = importer.toShippingDetails(customer);
+
+        // then
+        assertEquals("Anna Maria", shipping.getName());
+        assertEquals("Kowalska", shipping.getSurname());
+    }
+
+    @Test
     void storesTheShippingProviderCarrierNameInsteadOfTheMarketplaceCode() {
         // when / then
         assertEquals("InPost", importer.toCarrierName(storeShippingWith("furgonetka"), "Morele", "2"));
@@ -161,6 +178,57 @@ class MarketplaceOrderImporterTest {
 
         // then
         assertEquals("", billing.getName());
+        assertEquals("", billing.getSurname());
+    }
+
+    @Test
+    void splitsAFirstNameAndSurname() {
+        // given
+        MarketplaceCustomer.Address billingAddress = new MarketplaceCustomer.Address(
+                "Jan Kowalski", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Jan Kowalski", null, "jan@example.com",
+                "500600700", null, billingAddress, billingAddress);
+
+        // when
+        BillingDetails billing = importer.toBillingDetails(customer);
+
+        // then
+        assertEquals("Jan", billing.getName());
+        assertEquals("Kowalski", billing.getSurname());
+    }
+
+    @Test
+    void takesTheLastWordOfTheBillingNameAsTheSurname() {
+        // given
+        MarketplaceCustomer.Address billingAddress = new MarketplaceCustomer.Address(
+                "Anna Maria Kowalska", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Anna Maria Kowalska", null, "anna@example.com",
+                "500600700", null, billingAddress, billingAddress);
+
+        // when
+        BillingDetails billing = importer.toBillingDetails(customer);
+
+        // then
+        assertEquals("Anna Maria", billing.getName());
+        assertEquals("Kowalska", billing.getSurname());
+    }
+
+    @Test
+    void keepsASingleWordNameAsTheFirstNameWithoutASurname() {
+        // given
+        MarketplaceCustomer.Address billingAddress = new MarketplaceCustomer.Address(
+                "Kowalska", "500600700", "Prosta 1", "00-001", "Warszawa", "Polska");
+        MarketplaceCustomer customer = new MarketplaceCustomer(
+                MarketplaceCustomer.CustomerType.INDIVIDUAL, "Kowalska", null, "anna@example.com",
+                "500600700", null, billingAddress, billingAddress);
+
+        // when
+        BillingDetails billing = importer.toBillingDetails(customer);
+
+        // then
+        assertEquals("Kowalska", billing.getName());
         assertEquals("", billing.getSurname());
     }
 
