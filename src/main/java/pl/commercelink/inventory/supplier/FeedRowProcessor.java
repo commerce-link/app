@@ -35,7 +35,7 @@ class FeedRowProcessor {
             if (!TaxonomyCache.hasCategory(corrected)) {
                 stats.markImportedCategorized();
             }
-            return Optional.of(item);
+            return Optional.of(item.withBrand(taxonomy.brand()));
         }
 
         if (enrichment.isPendingEligible(taxonomy)) {

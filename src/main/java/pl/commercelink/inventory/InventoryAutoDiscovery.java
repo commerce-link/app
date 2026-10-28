@@ -99,8 +99,8 @@ class InventoryAutoDiscovery {
     }
 
     // The same code under different brands is a different product; the brand stays out of the group's key.
-    private String mfnKey(InventoryItem item) {
-        return mfnKey(taxonomyCache.brandOf(item.ean()), item.mfn());
+    private static String mfnKey(InventoryItem item) {
+        return mfnKey(item.brand(), item.mfn());
     }
 
     // A PIM entry without a brand cannot tell brands apart, so its codes match under any brand, as before the brand was part of the key.

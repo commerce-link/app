@@ -51,10 +51,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void separatesDifferentProductsSharingAShortMfnWhenBrandsDiffer() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(LAPTOP_EAN, "Dell");
-        InventoryItem cheapMouse = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem expensiveLaptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "B");
+        InventoryItem cheapMouse = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem expensiveLaptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "B", "Dell");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(cheapMouse, expensiveLaptop));
@@ -66,12 +64,10 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void separatesSeveralOffersOfEachProductSharingAShortMfn() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(LAPTOP_EAN, "Dell");
-        InventoryItem mouseA = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem mouseB = item(MOUSE_EAN, SHORT_MFN, 85, "B");
-        InventoryItem laptopA = item(LAPTOP_EAN, SHORT_MFN, 3000, "A");
-        InventoryItem laptopB = item(LAPTOP_EAN, SHORT_MFN, 3100, "B");
+        InventoryItem mouseA = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem mouseB = item(MOUSE_EAN, SHORT_MFN, 85, "B", "Logitech");
+        InventoryItem laptopA = item(LAPTOP_EAN, SHORT_MFN, 3000, "A", "Dell");
+        InventoryItem laptopB = item(LAPTOP_EAN, SHORT_MFN, 3100, "B", "Dell");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(mouseA, mouseB, laptopA, laptopB));
@@ -84,10 +80,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void separatesProductsOfOneSupplierSharingAShortMfnWhenBrandsDiffer() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(LAPTOP_EAN, "Dell");
-        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem laptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "A");
+        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem laptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "A", "Dell");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(mouse, laptop));
@@ -99,10 +93,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void joinsOffersWithDifferentEansWhenMfnAndBrandAreTheSame() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(OTHER_MOUSE_EAN, "Logitech");
-        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B");
+        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B", "Logitech");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(fromA, fromB));
@@ -115,10 +107,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void comparesBrandsIgnoringCaseAndSurroundingSpaces() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(OTHER_MOUSE_EAN, " LOGITECH ");
-        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B");
+        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B", " LOGITECH ");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(fromA, fromB));
@@ -130,10 +120,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void separatesProductsSharingALongMfnWhenBrandsDiffer() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(LAPTOP_EAN, "Dell");
-        InventoryItem fromA = item(MOUSE_EAN, LONG_MFN, 80, "A");
-        InventoryItem fromB = item(LAPTOP_EAN, LONG_MFN, 85, "B");
+        InventoryItem fromA = item(MOUSE_EAN, LONG_MFN, 80, "A", "Logitech");
+        InventoryItem fromB = item(LAPTOP_EAN, LONG_MFN, 85, "B", "Dell");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(fromA, fromB));
@@ -145,9 +133,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void joinsOffersWithTheSameEanEvenWhenBrandsDiffer() {
         // given
-        when(taxonomyCache.brandOf(MOUSE_EAN)).thenReturn("Logitech");
-        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem fromB = item(MOUSE_EAN, "OTHER-9999", 85, "B");
+        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem fromB = item(MOUSE_EAN, "OTHER-9999", 85, "B", "Logi");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(fromA, fromB));
@@ -160,8 +147,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void joinsOffersWithTheSameMfnWhenNoBrandIsKnown() {
         // given
-        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B");
+        InventoryItem fromA = item(MOUSE_EAN, SHORT_MFN, 80, "A", null);
+        InventoryItem fromB = item(OTHER_MOUSE_EAN, SHORT_MFN, 82, "B", null);
 
         // when
         Collection<MatchedInventory> result = autoDiscovery().run(List.of(fromA, fromB));
@@ -173,11 +160,9 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void takesOffersOfThePimEntryBrandThroughItsShortMpn() {
         // given
-        brand(MOUSE_EAN, "Logitech");
-        brand(LAPTOP_EAN, "Dell");
         PimEntry mousePim = pimEntry("PIM1", "Logitech", gtin("5900000000099"), mpn(SHORT_MFN));
-        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A");
-        InventoryItem laptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "B");
+        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
+        InventoryItem laptop = item(LAPTOP_EAN, SHORT_MFN, 3000, "B", "Dell");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery(mousePim).run(List.of(mouse, laptop));
@@ -193,9 +178,8 @@ class InventoryAutoDiscoveryBrandTest {
     @Test
     void takesOffersByMpnRegardlessOfBrandWhenPimEntryHasNone() {
         // given
-        brand(MOUSE_EAN, "Logitech");
         PimEntry pimWithoutBrand = pimEntry("PIM1", null, gtin("5900000000099"), mpn(SHORT_MFN));
-        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A");
+        InventoryItem mouse = item(MOUSE_EAN, SHORT_MFN, 80, "A", "Logitech");
 
         // when
         Collection<MatchedInventory> result = autoDiscovery(pimWithoutBrand).run(List.of(mouse));
@@ -207,12 +191,8 @@ class InventoryAutoDiscoveryBrandTest {
         assertThat(matched.getInventoryItems()).containsExactly(mouse);
     }
 
-    private void brand(String ean, String brand) {
-        when(taxonomyCache.brandOf(ean)).thenReturn(brand);
-    }
-
-    private InventoryItem item(String ean, String mfn, double netPrice, String supplier) {
-        return new InventoryItem(ean, mfn, netPrice, "PLN", 5, 1, supplier, true);
+    private InventoryItem item(String ean, String mfn, double netPrice, String supplier, String brand) {
+        return new InventoryItem(ean, mfn, netPrice, "PLN", 5, 1, supplier, true).withBrand(brand);
     }
 
     private PimEntry pimEntry(String pimId, String brand, PimIdentifier... identifiers) {

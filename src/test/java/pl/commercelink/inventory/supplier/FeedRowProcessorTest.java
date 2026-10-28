@@ -57,7 +57,7 @@ class FeedRowProcessorTest {
         Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
-        assertEquals(Optional.of(sellableItem), result);
+        assertEquals(Optional.of(sellableItem.withBrand("Brand")), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
         verify(stats).markImported();
         verify(stats, never()).markImportedCategorized();
@@ -183,7 +183,7 @@ class FeedRowProcessorTest {
         Optional<InventoryItem> result = processor.process(parsed, 0, stats);
 
         // then
-        assertEquals(Optional.of(sellableItem), result);
+        assertEquals(Optional.of(sellableItem.withBrand("Brand")), result);
         verify(taxonomyCache).add(categorizedTaxonomy);
         verify(stats).markImportedCategorized();
         verify(stats).markImported();

@@ -24,10 +24,6 @@ public class TaxonomyCache {
     private ConcurrentHashMap<String, Taxonomy> taxonomyByMfn = new ConcurrentHashMap<>();
     private final AtomicInteger pendingCount = new AtomicInteger();
     private final ConcurrentHashMap<String, String> stringPool = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, BrandSource> brandByEan = new ConcurrentHashMap<>();
-
-    private record BrandSource(String brand, int score) {
-    }
 
     public TaxonomyCache(TaxonomyRepository taxonomyRepository) {
         this.taxonomyRepository = taxonomyRepository;
@@ -41,7 +37,6 @@ public class TaxonomyCache {
         result.getRight().forEach(cachedTaxonomy -> {
             Taxonomy interned = internLowCardinalityFields(cachedTaxonomy);
             taxonomyByMfn.put(interned.mfn(), interned);
-            indexBrand(interned);
         });
         pendingCount.set((int) taxonomyByMfn.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
 
@@ -56,21 +51,6 @@ public class TaxonomyCache {
             pendingCount.addAndGet(pendingDelta(current, merged));
             return merged;
         });
-        indexBrand(candidate);
-    }
-
-    // Keyed by EAN because the cache by mfn keeps one entry per code, so products sharing a code would share a brand.
-    private void indexBrand(Taxonomy taxonomy) {
-        if (StringUtils.isBlank(taxonomy.ean()) || StringUtils.isBlank(taxonomy.brand())) return;
-        BrandSource candidate = new BrandSource(taxonomy.brand(), taxonomy.dataAccuracyScore());
-        brandByEan.merge(UnifiedProductIdentifiers.unifyEan(taxonomy.ean()), candidate,
-                (current, incoming) -> incoming.score() <= current.score() ? incoming : current);
-    }
-
-    public String brandOf(String ean) {
-        if (StringUtils.isBlank(ean)) return null;
-        BrandSource source = brandByEan.get(UnifiedProductIdentifiers.unifyEan(ean));
-        return source != null ? source.brand() : null;
     }
 
     private static int pendingDelta(Taxonomy current, Taxonomy merged) {
