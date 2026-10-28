@@ -30,6 +30,6 @@ public abstract class MetadataBasedObject<T> {
     }
 
     protected Metadata getMetadataByKey(List<Metadata> metadata, String key) {
-        return metadata.stream().filter(m -> m.getKey().equals(key)).findFirst().get();
+        return metadata.stream().filter(m -> m.hasKey(key)).findFirst().get();
     }
 }
