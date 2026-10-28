@@ -22,7 +22,9 @@ class CsrfTokenInFormsTest {
     private static final Path TEMPLATES = Path.of("src/main/resources/templates");
     private static final Path SCRIPTS = Path.of("src/main/resources/static/js");
     private static final Pattern FORM_TAG = Pattern.compile("<form\\b([^>]*)>", Pattern.DOTALL);
-    private static final Pattern POST_METHOD = Pattern.compile("method\\s*=\\s*\"post\"", Pattern.CASE_INSENSITIVE);
+    // a method set through th:attr is a POST form as well: Thymeleaf only adds the token for th:action
+    private static final Pattern POST_METHOD = Pattern.compile(
+            "method\\s*=\\s*\"post\"|th:attr\\s*=\\s*\"[^\"]*\\bmethod\\s*=[^\"]*'post'", Pattern.CASE_INSENSITIVE);
 
     @Test
     void everyPostFormWithoutThActionCarriesTheTokenField() throws IOException {
