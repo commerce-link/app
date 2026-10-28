@@ -309,6 +309,22 @@ class DashboardCsrfServerTest {
     }
 
     @Test
+    void longCustomerPageWithAFormRendersInFullAndStartsNoSession() throws Exception {
+        // given a customer without a session
+        Browser customer = new Browser();
+
+        // when
+        HttpResponse<String> page = customer.get("/store/probe/client/offer/long");
+
+        // then
+        assertThat(page.body().length()).isGreaterThan(16 * 1024);
+        assertThat(page.statusCode()).isEqualTo(200);
+        assertThat(page.body()).contains("end of page");
+        assertThat(page.body()).doesNotContain("name=\"_csrf\"");
+        assertThat(customer.cookies).doesNotContainKey("JSESSIONID");
+    }
+
+    @Test
     void shopApiTakesPostsWithoutAToken() throws Exception {
         // when
         HttpResponse<String> response = new Browser().postForm("/Store/probe", "basket=1");
@@ -373,6 +389,11 @@ class DashboardCsrfServerTest {
         @GetMapping("/dashboard/late")
         String latePage() {
             return "csrf-probe-late";
+        }
+
+        @GetMapping("/store/{storeId}/client/offer/long")
+        String customerPage() {
+            return "csrf-probe-client";
         }
 
         @PostMapping("/dashboard/probe")
