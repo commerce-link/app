@@ -273,6 +273,22 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aPersonalCollectionOrderDoesNotOfferTheCourierAsItsPrimaryAction() {
+        // given: booking a courier would replace the customer's own pickup with a paid parcel (OrderShipmentOwner)
+        Order personalCollection = order(OrderStatus.Realization);
+        personalCollection.getShipments().get(0).setType(ShipmentType.PersonalCollection);
+        Order courier = order(OrderStatus.Realization);
+
+        // when
+        OrderPageModel pickup = factory.build(personalCollection, List.of(), ADMIN, PL);
+        OrderPageModel parcel = factory.build(courier, List.of(), ADMIN, PL);
+
+        // then
+        assertThat(pickup.header().primaryAction()).isNull();
+        assertThat(parcel.header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
+    }
+
+    @Test
     void aRealizationOrderWithEveryShipmentAlreadyHandedToACourierHasNoPrimaryAction() {
         // given: the courier button only books a shipment that is not sent yet; nothing is left to book
         // once every shipment already carries a carrier, a tracking number and a ship date
