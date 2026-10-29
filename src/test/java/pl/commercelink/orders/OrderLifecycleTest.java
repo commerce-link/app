@@ -384,6 +384,38 @@ class OrderLifecycleTest {
     }
 
     @Test
+    void aDeliveredOrderWithNotificationsOffCompletesWithoutAskingForAReview() {
+        // given
+        Order order = settledDeliveredOrderAwaitingReview();
+        order.setEmailNotificationsEnabled(false);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Completed, order.getStatus());
+        assertEquals(OrderReviewStatus.NotApplicable, order.getReview().getStatus());
+    }
+
+    @Test
+    void aDeliveredOrderWithNotificationsOnStillWaitsForTheReview() {
+        // given
+        Order order = settledDeliveredOrderAwaitingReview();
+        order.setEmailNotificationsEnabled(true);
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Delivered, order.getStatus());
+        assertEquals(OrderReviewStatus.ToBeCollected, order.getReview().getStatus());
+    }
+
+    @Test
     void aDropshipOnlyOrderDoesNotWaitForAWarehouseDocument() {
         // given
         Order order = spy(new Order("store-1"));
@@ -721,6 +753,15 @@ class OrderLifecycleTest {
         // then
         assertEquals(OrderStatus.Realization, order.getStatus());
         verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCompleted);
+    }
+
+    private static Order settledDeliveredOrderAwaitingReview() {
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Delivered);
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.addShipment(deliveredShipment());
+        order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
+        return order;
     }
 
     /** Shipped and delivered: without shipments an order waits before Delivered instead of settling. */
