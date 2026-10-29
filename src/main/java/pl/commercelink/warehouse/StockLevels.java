@@ -91,10 +91,10 @@ public class StockLevels {
 
                 if (optional.isPresent()) {
                     StockProductLevel spl = optional.get();
-                    spl.setRestockPricePromo(Math.min(spl.getRestockPricePromo(), restockPricePromo));
-                    spl.setRestockPriceStandard(Math.min(spl.getRestockPriceStandard(), restockPriceStandard));
-                    spl.setRestockPriceLowest(Math.min(spl.getRestockPriceLowest(), restockPriceLowest));
-                    spl.setRestockPriceHotDeal(Math.min(spl.getRestockPriceHotDeal(), restockPriceHotDeal));
+                    spl.setRestockPricePromo(lowestSetPrice(spl.getRestockPricePromo(), restockPricePromo));
+                    spl.setRestockPriceStandard(lowestSetPrice(spl.getRestockPriceStandard(), restockPriceStandard));
+                    spl.setRestockPriceLowest(lowestSetPrice(spl.getRestockPriceLowest(), restockPriceLowest));
+                    spl.setRestockPriceHotDeal(lowestSetPrice(spl.getRestockPriceHotDeal(), restockPriceHotDeal));
                     spl.setExpectedQuantity(Math.max(spl.getExpectedQuantity(), expectedQty));
                 } else {
                     StockProductLevel spl = new StockProductLevel(
@@ -144,6 +144,16 @@ public class StockLevels {
                 .filter(p -> !p.isService())
                 .filter(p -> scope == RestockScope.WholeCatalog || p.getStockExpectedQty() > 0)
                 .collect(Collectors.toList());
+    }
+
+    private static double lowestSetPrice(double current, double candidate) {
+        if (current <= 0) {
+            return candidate;
+        }
+        if (candidate <= 0) {
+            return current;
+        }
+        return Math.min(current, candidate);
     }
 
     private double getRestockPricePromo(Product product, Map<String, RollingPriceAggregate> priceAggregates) {
