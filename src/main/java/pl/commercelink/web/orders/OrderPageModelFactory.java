@@ -164,8 +164,8 @@ public class OrderPageModelFactory {
         String sourceTypeKey = order.getSource() == null || sourceName != null ? null
                 : OrderLabels.sourceType(order.getSource().getType());
         // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
-        boolean canDelete = !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty()
-                && !order.isInvoiced() && !receiptLocked;
+        boolean canDelete = !viewer.superAdmin() && items.isEmpty() && !order.isInvoiced()
+                && !order.hasRecordedPayments() && !receiptLocked;
         // not tied to readOnly: a completed order is closed, yet a return is exactly when an RMA is reported
         String rmaHref = !viewer.superAdmin() && order.isEligibleForRMACreation()
                 ? "/dashboard/rma/new?q=" + order.getOrderId() + "&from=order" : null;

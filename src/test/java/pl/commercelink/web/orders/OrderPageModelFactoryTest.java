@@ -1800,6 +1800,38 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void anEmptyAssembledOrderCanBeDeleted() {
+        // when
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Assembled), List.of(), ADMIN, PL).header();
+
+        // then
+        assertThat(header.canDelete()).isTrue();
+    }
+
+    @Test
+    void anEmptyOrderWithARecordedPaymentCannotBeDeleted() {
+        // given
+        Order paid = order(OrderStatus.Assembled);
+        paid.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
+
+        // when
+        OrderPageModel.Header header = factory.build(paid, List.of(), ADMIN, PL).header();
+
+        // then
+        assertThat(header.canDelete()).isFalse();
+    }
+
+    @Test
+    void anAssembledOrderWithAnItemCannotBeDeleted() {
+        // when
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Assembled), List.of(item(FulfilmentStatus.Delivered)),
+                ADMIN, PL).header();
+
+        // then
+        assertThat(header.canDelete()).isFalse();
+    }
+
+    @Test
     void cancelReasonOfAnOpenOrderThatCannotBeDeletedStaysNeutral() {
         // when: an order in assembly has items, so "Usuń zamówienie" is greyed too
         OrderPageModel.Header header = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.New)),

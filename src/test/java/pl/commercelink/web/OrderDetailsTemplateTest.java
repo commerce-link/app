@@ -1471,8 +1471,8 @@ class OrderDetailsTemplateTest {
         String open = page(render(order(OrderStatus.Assembly), ADMIN));
 
         // then
-        assertThat(completed).doesNotContain("Usuniesz tylko nowe zamówienie");
-        assertThat(open).contains("Usuniesz tylko nowe zamówienie");
+        assertThat(completed).doesNotContain("Usuniesz tylko zamówienie");
+        assertThat(open).contains("Usuniesz tylko zamówienie");
     }
 
     @Test

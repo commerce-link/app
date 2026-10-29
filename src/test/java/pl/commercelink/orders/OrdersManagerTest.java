@@ -428,6 +428,71 @@ class OrdersManagerTest {
     }
 
     @Test
+    void anEmptyAssembledOrderIsDeleted() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Assembled);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+
+        // then
+        verify(ordersRepository).delete(order);
+    }
+
+    @Test
+    void anEmptyOrderWithARecordedPaymentIsNotDeleted() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Assembled);
+        Payment payment = new Payment(PaymentSource.BankTransfer);
+        payment.setAmount(100.0);
+        order.addPayment(payment);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+        verify(ordersRepository, never()).delete(order);
+    }
+
+    @Test
+    void anEmptyOrderStillWaitingForItsPaymentIsDeleted() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.addPayment(new Payment(PaymentSource.BankTransfer));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+
+        // when
+        ordersManager.deleteOrder(STORE_ID, ORDER_ID);
+
+        // then
+        verify(ordersRepository).delete(order);
+    }
+
+    @Test
+    void anAssembledOrderWithAnItemIsNotDeleted() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setStatus(OrderStatus.Assembled);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(new OrderItem()));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.deleteOrder(STORE_ID, ORDER_ID))
+                .isInstanceOf(IllegalStateException.class);
+        verify(ordersRepository, never()).delete(order);
+    }
+
+    @Test
     @DisplayName("a Delivered service item can be removed from the order")
     void serviceItemCanBeRemovedEvenWhenDelivered() {
         // given

@@ -378,6 +378,11 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean hasRecordedPayments() {
+        return payments.stream().anyMatch(payment -> !payment.isUnsettled());
+    }
+
+    @DynamoDBIgnore
     public double getUnpaidAmount() {
         return totalPrice - getPaidAmount();
     }

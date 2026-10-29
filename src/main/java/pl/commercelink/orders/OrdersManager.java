@@ -434,14 +434,14 @@ public class OrdersManager {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
 
-        if (!order.hasStatus(OrderStatus.New)) {
-            throw new IllegalStateException("Order must be in New status to be deleted");
-        }
         if (!orderItems.isEmpty()) {
             throw new IllegalStateException("Order must have no items to be deleted");
         }
         if (order.isInvoiced()) {
             throw new IllegalStateException("Order must not have an invoice to be deleted");
+        }
+        if (order.hasRecordedPayments()) {
+            throw new IllegalStateException("Order must not have payments to be deleted");
         }
 
         // Deleting a marketplace order is the operator's cancellation for an order not yet
