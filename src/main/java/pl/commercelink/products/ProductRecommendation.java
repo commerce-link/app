@@ -42,19 +42,19 @@ public class ProductRecommendation {
             this.brand = entry.brand();
             this.name = entry.name();
             this.label = StringUtils.isNotBlank(entry.subcategory()) ? entry.subcategory() : entry.name();
+            this.ean = entry.primaryGtin().orElse(taxonomy.ean());
+            this.manufacturerCode = entry.primaryMpn().orElse(taxonomy.mfn());
         } else {
             this.pimId = null;
             this.brand = taxonomy.brand();
             this.name = taxonomy.name();
             this.label = taxonomy.name();
+            this.ean = taxonomy.ean();
+            this.manufacturerCode = taxonomy.mfn();
         }
 
         this.lowestGrossPrice = matchedInventory.getLowestPrice().grossValue();
         this.pricingGroup = assignPricingGroup(categoryDefinition.getPriceDefinitions(), label, lowestGrossPrice);
-
-        this.ean = taxonomy.ean();
-        this.manufacturerCode = taxonomy.mfn();
-
 
         this.inventoryKey = matchedInventory.getInventoryKey();
         this.matchedInventory = matchedInventory;
