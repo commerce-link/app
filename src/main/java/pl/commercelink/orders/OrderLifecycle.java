@@ -131,6 +131,8 @@ public class OrderLifecycle {
                         }
                     });
 
+            order.waiveReviewWhenNotificationsAreOff();
+
             if (order.isAwaitingInvoiceGeneration() || order.isAwaitingDocumentsGeneration(warehouseDocumentsRequired)) {
                 String createdBy = CustomSecurityContext.getLoggedInUser()
                         .map(CustomUser::getName)

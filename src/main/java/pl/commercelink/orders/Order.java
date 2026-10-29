@@ -210,6 +210,13 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public void waiveReviewWhenNotificationsAreOff() {
+        if (!emailNotificationsEnabled && isAwaitingReview()) {
+            review.setStatus(OrderReviewStatus.NotApplicable);
+        }
+    }
+
+    @DynamoDBIgnore
     public boolean isAwaitingDocumentsGeneration(boolean warehouseDocumentsRequired) {
         return warehouseDocumentsRequired && !getDocumentByType(DocumentType.GoodsIssue).isPresent();
     }
