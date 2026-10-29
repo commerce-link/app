@@ -1,22 +1,31 @@
 package pl.commercelink.starter.security.config;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.HeaderWriter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import pl.commercelink.starter.security.filter.CustomTokenRefreshFilter;
 import pl.commercelink.starter.security.handler.CustomAuthenticationSuccessHandler;
 import pl.commercelink.starter.security.handler.CustomLogoutSuccessHandler;
 import pl.commercelink.starter.security.service.CustomOAuth2UserService;
 import pl.commercelink.web.errorpage.CustomerPageErrors;
 
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 @Configuration
@@ -41,10 +50,44 @@ public class WebSecurityConfiguration {
         };
     }
 
+    private static RequestMatcher dashboard() {
+        return PathPatternRequestMatcher.withDefaults().matcher("/dashboard/**");
+    }
+
+    private static final class DashboardCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
+
+        private final CsrfTokenRequestHandler delegate = new XorCsrfTokenRequestAttributeHandler();
+        private final RequestMatcher dashboard;
+
+        private DashboardCsrfTokenRequestHandler(RequestMatcher dashboard) {
+            this.dashboard = dashboard;
+        }
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response, Supplier<CsrfToken> csrfToken) {
+            if (dashboard.matches(request)) {
+                delegate.handle(request, response, csrfToken);
+            }
+        }
+
+        @Override
+        public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+            return delegate.resolveCsrfTokenValue(request, csrfToken);
+        }
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, CustomOAuth2UserService customOAuth2UserService, CustomAuthenticationSuccessHandler successHandler, CustomLogoutSuccessHandler logoutSuccessHandler, CustomTokenRefreshFilter tokenRefreshFilter) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                // CSRF protection only for unsafe methods on the session-based admin panel; the /Store,
+                // /Global and customer API paths are token/gateway-authenticated and stay exempt. The
+                // AndRequestMatcher keeps DEFAULT_CSRF_MATCHER's safe-method exclusion (GET/HEAD/OPTIONS/
+                // TRACE), so dashboard reads are never CSRF-gated — only state-changing requests are.
+                // The token is exposed to templates on the dashboard only: storing it creates a session, which a
+                // customer page cannot do once its response is partly sent (a long offer is cut off at the form).
+                .csrf(csrf -> csrf
+                        .requireCsrfProtectionMatcher(new AndRequestMatcher(CsrfFilter.DEFAULT_CSRF_MATCHER, dashboard()))
+                        .csrfTokenRequestHandler(new DashboardCsrfTokenRequestHandler(dashboard())))
                 .headers(headers -> headers
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)
                         .addHeaderWriter(frameOptions()))

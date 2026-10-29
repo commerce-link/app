@@ -251,6 +251,7 @@ Each execution is one atomic `UpdateItem` in `DailyScheduleExecutionCountReposit
 - Roles (`UserRole`): `USER`, `ADMIN`, `SUPER_ADMIN`
 - `@PreAuthorize` on controller methods
 - `StoreAccessInterceptor` enforces tenant isolation
+- CSRF is enforced only for unsafe methods under `/dashboard/**` (`WebSecurityConfiguration`); `/Store`, `/Global` and the client pages stay exempt (token- or gateway-authenticated). The token lives in the HTTP session (in memory, so a lost session means a redirect to login). The token is exposed to templates (`_csrf`) on `/dashboard/**` only (`DashboardCsrfTokenRequestHandler`): storing it creates a session, which a customer page cannot do once its response is partly sent, so a long customer offer would be cut off at its form; customer pages must never need a token or a session. Thymeleaf adds the `_csrf` field to every `th:action` form, so use `th:action` for POST forms; a POST form without it needs `<input type="hidden" name="_csrf" th:value="${_csrf.token}"/>`, a script that builds a form calls `window.clCsrf.appendTo(form)` (`layout.html`), and a `fetch` without a form body sends `X-CSRF-TOKEN`. `CsrfTokenInFormsTest` fails on a template or script that forgets it. Logout is a POST to `/logout`.
 - `StoreApiKeyAuthorizationInterceptor` for API key auth
 
 ### AWS Services

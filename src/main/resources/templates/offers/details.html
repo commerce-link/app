@@ -70,7 +70,7 @@
 
     <!--/* copy, proforma and removing an item post nothing of their own: the old page posted its whole form, which those
            endpoints never read */-->
-    <form id="offer-action-form" method="post" hidden></form>
+    <form id="offer-action-form" method="post" hidden><input type="hidden" name="_csrf" th:value="${_csrf.token}"/></form>
 
     <dialog class="cl-dialog is-form" id="offer-terms-dialog" aria-labelledby="offer-terms-dialog-title"
             th:attr="open=${open == 'terms'} ? 'open' : null">

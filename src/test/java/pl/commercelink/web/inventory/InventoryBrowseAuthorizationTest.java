@@ -51,6 +51,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
@@ -147,10 +148,10 @@ class InventoryBrowseAuthorizationTest {
                     .andExpect(status().isForbidden())
                     .andExpect(forwardedUrl("/access-denied"));
             mvc.perform(post("/dashboard/inventory/add").param("ean", "5901000000001").param("target", "c-1/cat-gpu")
-                            .with(signedInAs(role)))
+                            .with(csrf()).with(signedInAs(role)))
                     .andExpect(status().isForbidden());
             mvc.perform(post("/dashboard/inventory/add/save").param("ean", "5901000000001").param("target", "c-1/cat-gpu")
-                            .param("reviewedTarget", "c-1/cat-gpu").with(signedInAs(role)))
+                            .param("reviewedTarget", "c-1/cat-gpu").with(csrf()).with(signedInAs(role)))
                     .andExpect(status().isForbidden());
             mvc.perform(get("/dashboard/inventory/add/save").with(signedInAs(role)))
                     .andExpect(status().isForbidden());
@@ -166,7 +167,7 @@ class InventoryBrowseAuthorizationTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name(ProductsAddReview.VIEW));
         mvc.perform(post("/dashboard/inventory/add").param("ean", "5901000000001")
-                        .param("returnTo", "/dashboard/inventory?cat=11").with(signedInAs("ADMIN")))
+                        .param("returnTo", "/dashboard/inventory?cat=11").with(csrf()).with(signedInAs("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(view().name(ProductsAddReview.VIEW));
         mvc.perform(get("/dashboard/inventory/add/save").param("returnTo", "/dashboard/inventory?cat=11")
