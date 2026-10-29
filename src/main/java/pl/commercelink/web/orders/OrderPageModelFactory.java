@@ -151,8 +151,8 @@ public class OrderPageModelFactory {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
                     links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
                     "fa-truck");
-        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook() && !order.hasShipmentBeingCreated()
-                && shippingService.isAvailableFor(store, order)) {
+        } else if (!readOnly && canOrderShipment && !order.isPersonalCollection() && order.hasShipmentToBook()
+                && !order.hasShipmentBeingCreated() && shippingService.isAvailableFor(store, order)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
             // the shipping data into the shipment, so the page would only end on its refusal
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
