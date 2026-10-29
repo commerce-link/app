@@ -75,6 +75,7 @@ import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.ClientOrderView;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.PickerOption;
@@ -126,6 +127,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
@@ -872,10 +874,17 @@ public class OrdersController extends BaseController {
         Store store = storesRepository.findById(order.getStoreId());
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
 
-        // the place is fixed text since the page was introduced; the store address is not used for it
-        model.addAttribute("print", OrderPrintView.collection(order, orderItems, store, LocalDate.now(), "Kraków, PL",
+        model.addAttribute("print", OrderPrintView.collection(order, orderItems, store, LocalDate.now(), collectionPlace(store),
                 OrderLinks.of(order, superAdmin), supplierLabels.forStore(store).withWarehouse(warehouseLabel())));
         return "orders/collection";
+    }
+
+    private static String collectionPlace(Store store) {
+        ClientOrderView.PickupAddress address = ClientOrderView.resolvePickupAddress(store);
+        if (address == null) {
+            return "";
+        }
+        return String.join(", ", Stream.of(address.city(), address.country()).filter(StringUtils::isNotBlank).toList());
     }
 
     @GetMapping("/dashboard/orders/{orderId}/card")

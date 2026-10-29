@@ -16,16 +16,20 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderPrintView;
 import pl.commercelink.web.orders.QrCodeSvg;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -183,8 +187,74 @@ class OrdersControllerPrintTest {
         OrderPrintView.Collection collection = (OrderPrintView.Collection) model.get("print");
         assertThat(collection.detailsHref()).isEqualTo("/dashboard/store/" + STORE_ID + "/orders/" + ORDER_ID);
         assertThat(collection.store()).isEqualTo("Demo");
-        assertThat(collection.location()).isEqualTo("Kraków, PL");
         assertThat(collection.items()).extracting(OrderPrintView.ItemRow::name).containsExactly("Ryzen");
+    }
+
+    @Test
+    void theProtocolIsSignedInThePlaceOfThePickupAddressTheCustomerIsGiven() {
+        // given
+        order();
+        Store store = store();
+        store.setBillingDetails(companyIn("Kraków", "PL"));
+        store.setShippingConfiguration(pickupIn("Wieliczka", "PL"));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(supplierLabels.forStore(store)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(store));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCollectionProtocol(ORDER_ID, model);
+
+        // then
+        assertThat(((OrderPrintView.Collection) model.get("print")).location()).isEqualTo("Wieliczka, PL");
+    }
+
+    @Test
+    void withoutAPickupAddressTheProtocolIsSignedInThePlaceOfTheCompany() {
+        // given
+        order();
+        Store store = store();
+        store.setBillingDetails(companyIn("Kraków", "PL"));
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(supplierLabels.forStore(store)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(store));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCollectionProtocol(ORDER_ID, model);
+
+        // then
+        assertThat(((OrderPrintView.Collection) model.get("print")).location()).isEqualTo("Kraków, PL");
+    }
+
+    @Test
+    void withoutAnAddressThePlaceOfTheProtocolIsLeftEmpty() {
+        // given
+        order();
+        Store store = store();
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(supplierLabels.forStore(store)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(store));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCollectionProtocol(ORDER_ID, model);
+
+        // then
+        assertThat(((OrderPrintView.Collection) model.get("print")).location()).isEmpty();
+    }
+
+    private static BillingDetails companyIn(String city, String country) {
+        BillingDetails company = new BillingDetails();
+        company.setCity(city);
+        company.setCountry(country);
+        return company;
+    }
+
+    private static ShippingConfiguration pickupIn(String city, String country) {
+        ShippingDetails pickup = ShippingDetails._default();
+        pickup.setCity(city);
+        pickup.setCountry(country);
+        ShippingConfiguration shippingConfiguration = new ShippingConfiguration();
+        shippingConfiguration.setPickUpAddresses(new LinkedList<>(List.of(pickup)));
+        return shippingConfiguration;
     }
 
     @Test

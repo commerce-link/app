@@ -318,15 +318,18 @@ public class ClientOrderView {
     }
 
     // The pickup address is not stored on the order; the store's default pickup address (the same one POS
-    // orders use) is the answer, with the registered company address as fallback.
-    private static PickupAddress resolvePickupAddress(Store store) {
+    // orders use) is the answer, with the registered company address as fallback. The collection protocol
+    // takes its place from here too, so the customer signs for the address they were sent to.
+    public static PickupAddress resolvePickupAddress(Store store) {
         ShippingDetails pickup = store.getDefaultPickupAddress().orElse(null);
         if (pickup != null) {
-            return new PickupAddress(pickup.getCompanyName(), pickup.getStreetAndNumber(), pickup.getPostalCode(), pickup.getCity());
+            return new PickupAddress(pickup.getCompanyName(), pickup.getStreetAndNumber(), pickup.getPostalCode(),
+                    pickup.getCity(), pickup.getCountry());
         }
         BillingDetails company = store.getBillingDetails();
         if (company != null) {
-            return new PickupAddress(company.getCompanyName(), company.getStreetAndNumber(), company.getPostalCode(), company.getCity());
+            return new PickupAddress(company.getCompanyName(), company.getStreetAndNumber(), company.getPostalCode(),
+                    company.getCity(), company.getCountry());
         }
         return null;
     }
@@ -342,7 +345,8 @@ public class ClientOrderView {
                               LocalDateTime deliveredAt) {
     }
 
-    public record PickupAddress(String companyName, String streetAndNumber, String postalCode, String city) {
+    public record PickupAddress(String companyName, String streetAndNumber, String postalCode, String city,
+                                String country) {
     }
 
     public record ClientOrderItemView(String name, String category, int qty, ClientOrderItemStatus status) {
