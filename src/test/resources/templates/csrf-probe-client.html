@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>CSRF probe, customer page</title></head>
+<body>
+<p th:each="i : ${#numbers.sequence(1, 600)}">Filler text long enough to fill the response buffer before the form.</p>
+<form id="client" th:action="@{/store/probe/client/offer/o1/submit}" method="post"></form>
+<p id="end">end of page</p>
+</body>
+</html>

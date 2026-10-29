@@ -29,6 +29,8 @@
     <form id="order-items-form" class="cl-card-section"
           th:attr="method=${page.readOnly()} ? null : 'post',
                    action=${page.readOnly()} ? null : @{/dashboard/orders/{id}/moveSelectedItemsToAllocation(id=${page.orderId()})}">
+        <!--/* th:attr sets the action, so Thymeleaf does not add the CSRF field itself */-->
+        <input th:unless="${page.readOnly()}" type="hidden" name="_csrf" th:value="${_csrf.token}"/>
         <th:block th:if="${items.selectable()}">
             <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
             <!--/* The selection row covers the table header while items are checked (table-select.js): its own

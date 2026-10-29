@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>CSRF probe, token late in the page</title></head>
+<body>
+<p th:each="i : ${#numbers.sequence(1, 600)}">Filler text long enough to fill the response buffer before the form.</p>
+<form id="plain" th:action="@{/dashboard/probe}" method="post"></form>
+</body>
+</html>
