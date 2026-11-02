@@ -1,5 +1,9 @@
 package pl.commercelink.marketplace.links;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -8,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
@@ -20,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -150,5 +156,25 @@ class MarketplaceOfferMatchListenerTest {
         // when / then
         assertThatThrownBy(() -> listener.handleMessage(message())).isInstanceOf(IllegalStateException.class);
         verify(resultStore, never()).save(any(), any(), any());
+    }
+
+    @Test
+    void rethrowsWhenTheProviderCannotBeBuilt() {
+        // given
+        when(providerFactory.get(store, EMPIK)).thenThrow(new IllegalStateException("credentials unreadable"));
+
+        Logger logger = (Logger) LoggerFactory.getLogger(MarketplaceOfferMatchListener.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+
+        try {
+            // when / then
+            assertThatThrownBy(() -> listener.handleMessage(message())).isInstanceOf(IllegalStateException.class);
+            verifyNoInteractions(matching, resultStore);
+            assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.ERROR);
+        } finally {
+            logger.detachAppender(logs);
+        }
     }
 }

@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,6 +144,93 @@ class MarketplaceOfferMatchingTest {
         verify(links, never()).saveIfAbsent(any());
         verify(links, never()).save(any());
         assertThat(result.alreadyLinked()).isEqualTo(1);
+    }
+
+    @Test
+    void reportsExistingLinkStillMissingFromCatalog() {
+        // given an earlier run linked the offer, and the product is still not in the store's catalog
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", "pim-1", MarketplaceOfferLinkSource.EAN)));
+        when(storeOffers.isInStoreCatalog("pim-1")).thenReturn(false);
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then
+        verify(links, never()).saveIfAbsent(any());
+        assertThat(result.alreadyLinked()).isEqualTo(1);
+        assertThat(result.notInCatalog()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
+                List.of("5903771700818"), "pim-1", "already-linked"));
+    }
+
+    @Test
+    void doesNotReportExistingLinkInCatalog() {
+        // given
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", "pim-1", MarketplaceOfferLinkSource.EAN)));
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then
+        assertThat(result.alreadyLinked()).isEqualTo(1);
+        assertThat(result.linked()).isEmpty();
+        assertThat(result.notInCatalog()).isEmpty();
+        assertThat(result.toReview()).isEmpty();
+    }
+
+    @Test
+    void reportsStaleLinkForReview() {
+        // given the link points at an entry the PIM no longer knows
+        when(links.findAll(STORE, EMPIK)).thenReturn(List.of(existing("SILLO-1", "pim-gone", MarketplaceOfferLinkSource.MANUAL)));
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then nothing is written: the operator decides
+        verify(links, never()).saveIfAbsent(any());
+        verify(links, never()).save(any());
+        assertThat(result.alreadyLinked()).isEqualTo(1);
+        assertThat(result.toReview()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
+                List.of("5903771700818"), "pim-gone", "stale-link"));
+        assertThat(result.notInCatalog()).isEmpty();
+    }
+
+    @Test
+    void reportsLinkSavedMeanwhileStillMissingFromCatalog() {
+        // given
+        when(links.saveIfAbsent(any())).thenReturn(false);
+        when(links.find(STORE, EMPIK, "SILLO-1")).thenReturn(Optional.of(
+                existing("SILLO-1", "pim-1", MarketplaceOfferLinkSource.MANUAL)));
+        when(storeOffers.isInStoreCatalog("pim-1")).thenReturn(false);
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then
+        assertThat(result.alreadyLinked()).isEqualTo(1);
+        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::pimId, OfferMatchResult.Row::reason)
+                .containsExactly(tuple("pim-1", "already-linked"));
+    }
+
+    @Test
+    void countsAnOfferRepeatedAcrossPagesOnce() {
+        // given the listing shifted between pages and returned the same offer twice
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(
+                List.of(offer("SILLO-1", "5903771700818")),
+                List.of(offer("SILLO-1", "5903771700818"), offer("SILLO-2", "5900000000000"))));
+
+        // then
+        verify(links, times(1)).saveIfAbsent(any());
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.linked()).hasSize(1);
+        assertThat(result.alreadyLinked()).isZero();
+        assertThat(result.noPimEntry()).hasSize(1);
     }
 
     @Test

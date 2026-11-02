@@ -52,15 +52,14 @@ class MarketplaceOfferMatchListener {
             log.warn("Marketplace {} offer matching skipped store {}: the store is inactive", marketplace, storeId);
             return;
         }
-        MarketplaceProvider provider = providerFactory.get(store, marketplace);
-        Optional<MarketplaceOffers> offers = provider == null ? Optional.empty() : provider.offers();
-        if (offers.isEmpty()) {
-            log.warn("Marketplace {} offer matching skipped store {}: the marketplace does not list offers",
-                    marketplace, storeId);
-            return;
-        }
-
         try {
+            MarketplaceProvider provider = providerFactory.get(store, marketplace);
+            Optional<MarketplaceOffers> offers = provider == null ? Optional.empty() : provider.offers();
+            if (offers.isEmpty()) {
+                log.warn("Marketplace {} offer matching skipped store {}: the marketplace does not list offers",
+                        marketplace, storeId);
+                return;
+            }
             resultStore.save(storeId, marketplace, matching.match(store, marketplace, offers.get()));
         } catch (RuntimeException e) {
             log.error("Marketplace {} offer matching of store {} failed", marketplace, storeId, e);

@@ -14,9 +14,11 @@ import pl.commercelink.stores.Store;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -63,7 +65,8 @@ public class MarketplaceOfferMatching {
         private final String marketplace;
         private final PimView pim;
         private final MarketplaceOfferResolver.StoreOffers storeOffers;
-        private final Set<String> linkedKeys = new HashSet<>();
+        private final Map<String, String> linkedPimIds = new HashMap<>();
+        private final Set<String> seenKeys = new HashSet<>();
 
         private int total;
         private int ownOffers;
@@ -80,19 +83,23 @@ public class MarketplaceOfferMatching {
             // one scope for the whole run: the store's catalogs are read once, not once per offer
             this.storeOffers = resolver.forStore(storeId);
             linkRepository.findAll(storeId, marketplace)
-                    .forEach(link -> linkedKeys.add(link.getSellerOfferKey()));
+                    .forEach(link -> linkedPimIds.put(link.getSellerOfferKey(), link.getPimId()));
         }
 
         void match(MarketplaceListedOffer offer) {
-            total++;
             String key = offer.sellerOfferKey();
+            // the listing can shift between pages while it is read; the offer's first appearance counts
+            if (StringUtils.isNotBlank(key) && !seenKeys.add(key)) {
+                return;
+            }
+            total++;
             List<String> eans = eansOf(offer);
             if (StringUtils.isBlank(key)) {
                 toReview.add(row(offer, eans, null, OfferMatchResult.NO_KEY));
                 return;
             }
-            if (linkedKeys.contains(key)) {
-                alreadyLinked++;
+            if (linkedPimIds.containsKey(key)) {
+                alreadyLinked(offer, eans, linkedPimIds.get(key));
                 return;
             }
             // the export publishes our offers under the pimId, and a product on a clone under its source's id
@@ -118,10 +125,11 @@ public class MarketplaceOfferMatching {
         private void link(MarketplaceListedOffer offer, String key, List<String> eans, String pimId) {
             boolean saved = linkRepository.saveIfAbsent(MarketplaceOfferLink.of(storeId, marketplace, key, pimId,
                     MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant()));
-            linkedKeys.add(key);
             if (!saved) {
                 // linked by an operator after this run read the store's links
-                alreadyLinked++;
+                linkRepository.find(storeId, marketplace, key).ifPresentOrElse(
+                        existing -> alreadyLinked(offer, eans, existing.getPimId()),
+                        () -> alreadyLinked++);
                 return;
             }
             // linked either way: a product missing from the catalog has no price yet, but the link waits for it
@@ -130,6 +138,19 @@ public class MarketplaceOfferMatching {
                 linked.add(row);
             } else {
                 notInCatalog.add(row);
+            }
+        }
+
+        /**
+         * Counted, and listed while the link cannot work yet, so a rerun keeps the shop's "add to catalog" list. Nothing
+         * is written: an existing link, even a stale one, is the operator's to change.
+         */
+        private void alreadyLinked(MarketplaceListedOffer offer, List<String> eans, String pimId) {
+            alreadyLinked++;
+            if (pimAliases.effectiveEntry(storeId, pimId).isEmpty()) {
+                toReview.add(row(offer, eans, pimId, OfferMatchResult.STALE_LINK));
+            } else if (!storeOffers.isInStoreCatalog(pimId)) {
+                notInCatalog.add(row(offer, eans, pimId, OfferMatchResult.ALREADY_LINKED));
             }
         }
 
