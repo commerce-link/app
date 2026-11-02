@@ -21,7 +21,16 @@
                     <p th:if="${matching != null}" class="cl-card-body"
                        th:text="#{store.marketplaces.offer.matching.last(${matching.finishedAt()}, ${displayName}, ${matching.total()}, ${matching.ownOffers()}, ${matching.alreadyLinked()})}"></p>
                     <!--/* Ordered, not run here: the worker saves the result and a refresh shows it (no run state is stored). */-->
-                    <form method="post" th:action="@{${formAction}}" data-cl-submit-once>
+                    <!--/* A run the worker would skip is not offered: the reason and where to fix it instead of the button. */-->
+                    <div th:if="${runBlockedMessage != null}" class="cl-alert is-warn" role="status">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text">
+                            <span th:text="${runBlockedMessage}"></span>
+                            <a th:if="${runBlockedHref != null}" th:href="@{${runBlockedHref}}"
+                               th:text="#{store.marketplaces.offer.matching.blocked.integration.link}"></a>
+                        </p>
+                    </div>
+                    <form th:if="${runBlockedMessage == null}" method="post" th:action="@{${formAction}}" data-cl-submit-once>
                         <div class="cl-card-footer">
                             <button type="submit" class="cl-button is-primary" th:text="#{store.marketplaces.offer.matching.run.button}"
                                     th:attr="data-cl-busy-label=#{store.marketplaces.offer.matching.run.busy}"></button>

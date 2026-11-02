@@ -23,6 +23,7 @@ import pl.commercelink.marketplace.links.OfferMatchResult.Row;
 import pl.commercelink.marketplace.links.OfferMatchResultStore;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.settings.OfferMatchingView;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -56,13 +57,16 @@ class MarketplaceOfferMatchControllerTest {
     private MarketplaceOfferMatchPublisher publisher;
     @Mock
     private OfferMatchResultStore resultStore;
+    @Mock
+    private StoreActivity storeActivity;
 
     private MarketplaceOfferMatchController controller;
 
     @BeforeEach
     void setUp() {
         controller = new MarketplaceOfferMatchController(storesRepository, marketplaces, publisher, resultStore,
-                MarketplacesFixture.polishMessages());
+                storeActivity, MarketplacesFixture.polishMessages());
+        when(storeActivity.isActive(org.mockito.ArgumentMatchers.any(Store.class))).thenReturn(true);
         givenStoreConnectedTo(STORE_ID, EMPIK);
         givenStoreConnectedTo("store-2", EMPIK);
         MarketplaceProviderDescriptor empik = mock(MarketplaceProviderDescriptor.class);
@@ -185,23 +189,7 @@ class MarketplaceOfferMatchControllerTest {
     }
 
     @Test
-    void unknownMarketplaceIsNotFound() {
-        // given
-        MarketplaceProviderDescriptor allegro = mock(MarketplaceProviderDescriptor.class);
-        when(allegro.supportsOfferListing()).thenReturn(false);
-        when(marketplaces.descriptor("Allegro")).thenReturn(allegro);
-        storesRepository.findById(STORE_ID).connectMarketplace("Allegro", false);
-
-        // when / then
-        assertNotFound(() -> controller.offerMatching("Ceneo", new ExtendedModelMap(), PL));
-        assertNotFound(() -> controller.orderOfferMatching("Ceneo", PL, new RedirectAttributesModelMap()));
-        assertNotFound(() -> controller.orderOfferMatching("Allegro", PL, new RedirectAttributesModelMap()));
-        assertNotFound(() -> controller.offerMatching("Allegro", new ExtendedModelMap(), PL));
-        verify(publisher, never()).order(anyString(), anyString());
-    }
-
-    @Test
-    void marketplaceTheStoreIsNotConnectedToIsNotFound() {
+    void unknownStoreIsNotFound() {
         // given
         authenticateAs(STORE_ID, "SUPER_ADMIN");
 
@@ -209,6 +197,108 @@ class MarketplaceOfferMatchControllerTest {
         assertNotFound(() -> controller.superAdminOfferMatching("store-3", EMPIK, new ExtendedModelMap(), PL));
         assertNotFound(() -> controller.superAdminOrderOfferMatching("store-3", EMPIK, PL, new RedirectAttributesModelMap()));
         verify(publisher, never()).order(anyString(), anyString());
+    }
+
+    @Test
+    void marketplaceNotConnectedIsNotFound() {
+        // given
+        MarketplaceProviderDescriptor ceneo = mock(MarketplaceProviderDescriptor.class);
+        when(ceneo.supportsOfferListing()).thenReturn(true);
+        when(marketplaces.descriptor("Ceneo")).thenReturn(ceneo);
+
+        // when / then
+        assertNotFound(() -> controller.offerMatching("Ceneo", new ExtendedModelMap(), PL));
+        assertNotFound(() -> controller.orderOfferMatching("Ceneo", PL, new RedirectAttributesModelMap()));
+        verify(publisher, never()).order(anyString(), anyString());
+    }
+
+    @Test
+    void marketplaceWithoutInstalledAdapterIsNotFound() {
+        // given
+        storesRepository.findById(STORE_ID).connectMarketplace("Ceneo", false);
+
+        // when / then
+        assertNotFound(() -> controller.offerMatching("Ceneo", new ExtendedModelMap(), PL));
+        assertNotFound(() -> controller.orderOfferMatching("Ceneo", PL, new RedirectAttributesModelMap()));
+        verify(publisher, never()).order(anyString(), anyString());
+    }
+
+    @Test
+    void marketplaceWithoutOfferListingIsNotFound() {
+        // given
+        MarketplaceProviderDescriptor allegro = mock(MarketplaceProviderDescriptor.class);
+        when(allegro.supportsOfferListing()).thenReturn(false);
+        when(marketplaces.descriptor("Allegro")).thenReturn(allegro);
+        storesRepository.findById(STORE_ID).connectMarketplace("Allegro", false);
+
+        // when / then
+        assertNotFound(() -> controller.offerMatching("Allegro", new ExtendedModelMap(), PL));
+        assertNotFound(() -> controller.orderOfferMatching("Allegro", PL, new RedirectAttributesModelMap()));
+        verify(publisher, never()).order(anyString(), anyString());
+    }
+
+    @Test
+    void refusesRunForInactiveIntegration() {
+        // given
+        storesRepository.findById(STORE_ID).getMarketplaceIntegration(EMPIK).setLoggedIn(false);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.orderOfferMatching(EMPIK, PL, redirectAttributes);
+
+        // then
+        verify(publisher, never()).order(anyString(), anyString());
+        assertThat(view).isEqualTo("redirect:/dashboard/store/marketplaces/Empik/offer-matching");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(SettingsFlash.SAVED_MESSAGE);
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.ERROR_MESSAGE))
+                .startsWith("Połączenie z Empik nie działa");
+    }
+
+    @Test
+    void refusesRunForInactiveStore() {
+        // given
+        authenticateAs(STORE_ID, "SUPER_ADMIN");
+        when(storeActivity.isActive(storesRepository.findById("store-2"))).thenReturn(false);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.superAdminOrderOfferMatching("store-2", EMPIK, PL, redirectAttributes);
+
+        // then
+        verify(publisher, never()).order(anyString(), anyString());
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-2/marketplaces/Empik/offer-matching");
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.ERROR_MESSAGE))
+                .startsWith("Sklep jest nieaktywny");
+    }
+
+    @Test
+    void pageExplainsWhyARunCannotBeOrderedAndKeepsTheLatestResult() {
+        // given
+        storesRepository.findById(STORE_ID).getMarketplaceIntegration(EMPIK).setLoggedIn(false);
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(Instant.now(), 0,
+                List.of(), List.of(), List.of(), List.of(), 0, 0)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("runBlockedMessage")).asString().startsWith("Połączenie z Empik nie działa");
+        assertThat(model.getAttribute("runBlockedHref")).isEqualTo("/dashboard/store/marketplaces/Empik");
+        assertThat(model.getAttribute("matching")).isNotNull();
+    }
+
+    @Test
+    void activeStoreAndConnectionCanOrderARun() {
+        // given
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.empty());
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("runBlockedMessage")).isNull();
     }
 
     private static void assertNotFound(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

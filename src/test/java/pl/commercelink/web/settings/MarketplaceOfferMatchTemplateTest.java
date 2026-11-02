@@ -76,6 +76,30 @@ class MarketplaceOfferMatchTemplateTest {
     }
 
     @Test
+    void aRunThatCannotBeOrderedIsExplainedInsteadOfTheButton() {
+        // given
+        Map<String, Object> extra = Map.of("runBlockedMessage", "Połączenie z Empik nie działa.",
+                "runBlockedHref", "/dashboard/store/marketplaces/Empik");
+
+        // when
+        String html = render(null, null, extra);
+
+        // then
+        assertThat(html).contains("cl-alert is-warn").contains("Połączenie z Empik nie działa.")
+                .contains("href=\"/dashboard/store/marketplaces/Empik\"");
+        assertThat(html).doesNotContain("method=\"post\"").doesNotContain("??");
+    }
+
+    @Test
+    void aRefusedRunIsReportedOnThePage() {
+        // when
+        String html = render(null, null, Map.of("settingsErrorMessage", "Sklep jest nieaktywny."));
+
+        // then
+        assertThat(html).contains("cl-alert is-bad").contains("Sklep jest nieaktywny.");
+    }
+
+    @Test
     void anOrderedRunIsConfirmedOnThePage() {
         // when
         String html = render(null, "Dopasowanie ofert z Empik zlecone.");
@@ -85,7 +109,11 @@ class MarketplaceOfferMatchTemplateTest {
     }
 
     private static String render(OfferMatchingView matching, String savedMessage) {
-        Map<String, Object> variables = new HashMap<>();
+        return render(matching, savedMessage, Map.of());
+    }
+
+    private static String render(OfferMatchingView matching, String savedMessage, Map<String, Object> extra) {
+        Map<String, Object> variables = new HashMap<>(extra);
         variables.put("matching", matching);
         variables.put("settingsSavedMessage", savedMessage);
         variables.put("displayName", "Empik");

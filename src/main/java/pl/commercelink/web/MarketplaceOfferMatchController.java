@@ -16,6 +16,7 @@ import pl.commercelink.marketplace.links.MarketplaceOfferMatchPublisher;
 import pl.commercelink.marketplace.links.OfferMatchResultStore;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.settings.OfferMatchingView;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -27,19 +28,23 @@ import java.util.Locale;
  * Settings › Marketplaces › "Dopasuj oferty": links the offers another system published on the marketplace to the
  * store's products by EAN. The run is ordered, not done in the request (thousands of offers over many API pages), and
  * nothing tracks it: the page shows the latest saved result, which a refresh picks up once the worker is done. Only for a
- * connected marketplace whose adapter can list the store's offers.
+ * connected marketplace whose adapter can list the store's offers. A run the worker would skip (expired connection,
+ * inactive store) is not ordered at all, so the page never promises a result that cannot come.
  */
 @Controller
 @RequiredArgsConstructor
 public class MarketplaceOfferMatchController {
 
     private static final String VIEW = "store-marketplace-offer-matching";
+    private static final String BLOCKED_STORE = "store.marketplaces.offer.matching.blocked.store";
+    private static final String BLOCKED_INTEGRATION = "store.marketplaces.offer.matching.blocked.integration";
     private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}/offer-matching";
 
     private final StoresRepository storesRepository;
     private final MarketplaceConnections marketplaces;
     private final MarketplaceOfferMatchPublisher publisher;
     private final OfferMatchResultStore resultStore;
+    private final StoreActivity storeActivity;
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard/store/marketplaces" + MARKETPLACE_PATH)
@@ -70,8 +75,14 @@ public class MarketplaceOfferMatchController {
     }
 
     private String render(String storeId, String marketplace, Model model, Locale locale) {
-        requireOfferListing(storeId, marketplace);
+        Store store = requireOfferListing(storeId, marketplace);
         String displayName = marketplaces.displayName(marketplace);
+        String blockedKey = runBlockedKey(store, marketplace);
+        if (blockedKey != null) {
+            model.addAttribute("runBlockedMessage", messageSource.getMessage(blockedKey, new Object[]{displayName}, locale));
+            model.addAttribute("runBlockedHref", BLOCKED_INTEGRATION.equals(blockedKey)
+                    ? SettingsPaths.store(storeId, "/marketplaces/" + marketplace) : null);
+        }
         model.addAttribute("matching", resultStore.latest(storeId, marketplace).map(OfferMatchingView::of).orElse(null));
         model.addAttribute("displayName", displayName);
         model.addAttribute("formAction", pagePath(storeId, marketplace));
@@ -84,20 +95,35 @@ public class MarketplaceOfferMatchController {
     }
 
     private String order(String storeId, String marketplace, Locale locale, RedirectAttributes redirectAttributes) {
-        requireOfferListing(storeId, marketplace);
+        Store store = requireOfferListing(storeId, marketplace);
+        String blockedKey = runBlockedKey(store, marketplace);
+        if (blockedKey != null) {
+            SettingsFlash.errorOnRedirect(redirectAttributes, messageSource.getMessage(blockedKey,
+                    new Object[]{marketplaces.displayName(marketplace)}, locale));
+            return "redirect:" + pagePath(storeId, marketplace);
+        }
         publisher.order(storeId, marketplace);
         SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("store.marketplaces.offer.matching.ordered",
                 new Object[]{marketplaces.displayName(marketplace)}, locale));
         return "redirect:" + pagePath(storeId, marketplace);
     }
 
-    private void requireOfferListing(String storeId, String marketplace) {
+    /** The same checks as MarketplaceOfferMatchListener, which skips such a run without a trace. */
+    private String runBlockedKey(Store store, String marketplace) {
+        if (!storeActivity.isActive(store)) {
+            return BLOCKED_STORE;
+        }
+        return store.hasActiveMarketplaceIntegration(marketplace) ? null : BLOCKED_INTEGRATION;
+    }
+
+    private Store requireOfferListing(String storeId, String marketplace) {
         Store store = storesRepository.findById(storeId);
         MarketplaceProviderDescriptor descriptor = marketplaces.descriptor(marketplace);
         if (store == null || store.getMarketplaceIntegration(marketplace) == null
                 || descriptor == null || !descriptor.supportsOfferListing()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        return store;
     }
 
     private static String pagePath(String storeId, String marketplace) {
