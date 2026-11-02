@@ -269,6 +269,46 @@ class OrderItemTest {
                 "Laptops", 100.0, 0, 1, null, 3, false);
     }
 
+    @Test
+    void splitCopyKeepsTheMarketplaceOfferKey() {
+        // given
+        OrderItem source = orderItem("MFN-1");
+        source.setMarketplaceOfferKey("SILLO-84980");
+
+        // when
+        OrderItem split = new OrderItem(ORDER_ID, source, 1);
+
+        // then
+        assertThat(split.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
+    }
+
+    @Test
+    void updateAllFieldsCopiesTheMarketplaceOfferKey() {
+        // given
+        OrderItem target = orderItem("MFN-1");
+        OrderItem other = orderItem("MFN-1");
+        other.setMarketplaceOfferKey("SILLO-84980");
+
+        // when
+        target.updateAllFields(other);
+
+        // then
+        assertThat(target.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
+    }
+
+    @Test
+    void onlyANonServiceUncategorizedLineWithAnOfferKeyIsUnlinked() {
+        // given
+        OrderItem item = new OrderItem(ORDER_ID, "Uncategorized", "Product", 1, 100.0, "MFN-1", false);
+
+        // when / then
+        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+        item.setMarketplaceOfferKey("SILLO-84980");
+        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+        item.setService(true);
+        assertThat(item.isUnlinkedMarketplaceItem()).isFalse();
+    }
+
     private OrderItem orderItem(String mfn) {
         return new OrderItem(ORDER_ID, "Laptops", "Product", 1, 100.0, mfn, false);
     }

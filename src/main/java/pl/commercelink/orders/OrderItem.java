@@ -3,6 +3,7 @@ package pl.commercelink.orders;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.starter.util.ConversionUtil;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.warehouse.api.ReservationConfirmation;
 
@@ -27,6 +28,8 @@ public class OrderItem extends Item {
     private boolean consolidated;
     @DynamoDBAttribute(attributeName = "externalItemId")
     private String externalItemId;
+    @DynamoDBAttribute(attributeName = "marketplaceOfferKey")
+    private String marketplaceOfferKey;
     @DynamoDBAttribute(attributeName = "position")
     private int position;
     @DynamoDBVersionAttribute
@@ -64,6 +67,7 @@ public class OrderItem extends Item {
         this.price = source.getPrice();
         this.consolidated = source.isConsolidated();
         this.externalItemId = source.getExternalItemId();
+        this.marketplaceOfferKey = source.getMarketplaceOfferKey();
         this.position = source.getPosition();
         this.setCondition(source.getCondition());
 
@@ -132,6 +136,7 @@ public class OrderItem extends Item {
 
         this.setConsolidated(other.isConsolidated());
         this.setComment(other.getComment());
+        this.setMarketplaceOfferKey(other.getMarketplaceOfferKey());
     }
 
     public void updateLimitedFields(OrderItem other) {
@@ -219,6 +224,20 @@ public class OrderItem extends Item {
 
     public void setExternalItemId(String externalItemId) {
         this.externalItemId = externalItemId;
+    }
+
+    public String getMarketplaceOfferKey() {
+        return marketplaceOfferKey;
+    }
+
+    public void setMarketplaceOfferKey(String marketplaceOfferKey) {
+        this.marketplaceOfferKey = marketplaceOfferKey;
+    }
+
+    /** An imported marketplace line whose seller offer could not be tied to a product yet. */
+    @DynamoDBIgnore
+    public boolean isUnlinkedMarketplaceItem() {
+        return marketplaceOfferKey != null && Categories.UNCATEGORIZED.equals(getCategory()) && !isService();
     }
 
     public int getPosition() {

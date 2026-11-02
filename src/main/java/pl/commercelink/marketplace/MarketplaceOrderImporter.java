@@ -9,10 +9,10 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.marketplace.api.PickupPoint;
+import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
+import pl.commercelink.marketplace.links.ResolvedOffer;
 import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.starter.util.CountryCodeConverter;
 import pl.commercelink.stores.IntegrationType;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class MarketplaceOrderImporter {
 
     @Autowired
-    private PimCatalog pimCatalog;
+    private MarketplaceOfferResolver offerResolver;
 
     @Autowired
     private OrdersManager ordersManager;
@@ -45,6 +45,7 @@ public class MarketplaceOrderImporter {
         // Basket.setBasketItems normalises mfn (uppercase, spaces stripped); the marketplace key must stay raw,
         // so it is captured here, before the basket is built, and keyed by the basket item id.
         Map<String, String> rawKeysByBasketItemId = new HashMap<>();
+        Map<String, ResolvedLine> resolvedByBasketItemId = new HashMap<>();
 
         for (MarketplaceProduct product : marketplaceOrder.products()) {
             commission = commission.add(product.commission());
@@ -52,11 +53,15 @@ public class MarketplaceOrderImporter {
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
 
+            Optional<ResolvedOffer> resolved = offerResolver.resolve(
+                    store.getStoreId(), marketplaceName, product.sellerOfferKey(), product.manufacturerCode());
+            resolvedByBasketItemId.put(basketItemId, new ResolvedLine(product.sellerOfferKey(), resolved.orElse(null)));
+
             basketItems.add(new BasketItem(
                     basketItemId,
                     product.name(),
-                    product.manufacturerCode(),
-                    resolveProductCategory(store.getStoreId(), product.manufacturerCode()),
+                    resolved.map(ResolvedOffer::mfn).filter(StringUtils::isNotBlank).orElse(product.manufacturerCode()),
+                    resolved.map(ResolvedOffer::category).orElse(Categories.UNCATEGORIZED),
                     product.priceGross().doubleValue(),
                     0,
                     product.quantity(),
@@ -102,6 +107,11 @@ public class MarketplaceOrderImporter {
                     OrderItem orderItem = OrderItem.fromBasketItem(order.getOrderId(), i);
                     if (!i.isService()) {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
+                        ResolvedLine line = resolvedByBasketItemId.get(i.getId());
+                        orderItem.setMarketplaceOfferKey(line.sellerOfferKey());
+                        if (line.offer() != null) {
+                            orderItem.setEan(line.offer().ean());
+                        }
                     }
                     return orderItem;
                 })
@@ -161,10 +171,7 @@ public class MarketplaceOrderImporter {
         return shipping;
     }
 
-    private String resolveProductCategory(String storeId, String mfn) {
-        return pimCatalog.withStoreData(storeId).findByMpn(mfn)
-                .map(PimEntry::category)
-                .orElse(Categories.UNCATEGORIZED);
+    private record ResolvedLine(String sellerOfferKey, ResolvedOffer offer) {
     }
 
     private PaymentSource resolvePaymentSource(String paymentType) {

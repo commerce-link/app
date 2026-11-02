@@ -13,6 +13,9 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
+import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
+import pl.commercelink.marketplace.links.ResolvedOffer;
+import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -54,6 +57,9 @@ class MarketplaceOrderImporterTest {
 
     @Mock
     private OrdersManager ordersManager;
+
+    @Mock
+    private MarketplaceOfferResolver offerResolver;
 
     @InjectMocks
     private MarketplaceOrderImporter importer;
@@ -283,6 +289,97 @@ class MarketplaceOrderImporterTest {
         verify(ordersManager).saveWithFulfilment(orderCaptor.capture(), any());
         assertEquals(LocalDate.of(2026, 9, 10), orderCaptor.getValue().getPreferredShippingAt());
         assertNull(orderCaptor.getValue().getEstimatedShippingAt());
+    }
+
+    @Test
+    void usesResolvedProductCodesAndCategory() {
+        // given
+        when(offerResolver.resolve("store-1", "Empik", "SILLO-84980", "4M-7041"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.LINK)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "SILLO-84980"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals("7041", item.getSku());
+        assertEquals("5903771700818", item.getEan());
+        assertEquals("Zabawki", item.getCategory());
+        assertEquals("4M-7041", item.getExternalItemId());
+        assertEquals("SILLO-84980", item.getMarketplaceOfferKey());
+    }
+
+    @Test
+    void keepsTodaysBehaviourWithoutSellerOfferKey() {
+        // given
+        when(offerResolver.resolve("store-1", "Allegro", null, "ab 12"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals("AB12", item.getSku());
+        assertEquals("Monitors", item.getCategory());
+        assertEquals("ab 12", item.getExternalItemId());
+        assertNull(item.getMarketplaceOfferKey());
+        assertFalse(item.isUnlinkedMarketplaceItem());
+    }
+
+    @Test
+    void leavesItemUncategorizedAndRemembersOfferKeyWhenUnresolved() {
+        // given
+        when(offerResolver.resolve(anyString(), anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "SILLO-84980"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals(Categories.UNCATEGORIZED, item.getCategory());
+        assertEquals("4M-7041", item.getSku());
+        assertEquals("SILLO-84980", item.getMarketplaceOfferKey());
+        assertTrue(item.isUnlinkedMarketplaceItem());
+    }
+
+    @Test
+    void resolvesTwoLinesWithTheSameOfferKey() {
+        // given
+        when(offerResolver.resolve(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.LINK)));
+        MarketplaceOrder base = orderWithProduct("4M-7041", "SILLO-84980");
+        MarketplaceProduct first = base.products().get(0);
+        MarketplaceOrder order = new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(first, first),
+                base.shipping(), base.paymentType(), base.paymentTransactionId());
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", order);
+
+        // then
+        List<OrderItem> products = capturedOrderItems().stream().filter(i -> !i.isService()).toList();
+        assertEquals(2, products.size());
+        assertEquals("7041", products.get(0).getSku());
+        assertEquals("7041", products.get(1).getSku());
+    }
+
+    private OrderItem productItem() {
+        return capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
+    }
+
+    private static Store storeWithId(String storeId) {
+        Store store = new Store();
+        store.setStoreId(storeId);
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        return store;
+    }
+
+    private static MarketplaceOrder orderWithProduct(String manufacturerCode, String sellerOfferKey) {
+        MarketplaceOrder base = orderWithProduct(manufacturerCode);
+        MarketplaceProduct product = new MarketplaceProduct("Widget", manufacturerCode, new BigDecimal("100.00"), 2,
+                BigDecimal.ZERO, sellerOfferKey);
+        return new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(product), base.shipping(),
+                base.paymentType(), base.paymentTransactionId());
     }
 
     private static MarketplaceOrder orderWithProduct(String manufacturerCode) {
