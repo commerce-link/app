@@ -101,6 +101,29 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     }
 
     @Test
+    void saveIfAbsentWritesANewLink() {
+        // when
+        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "pim-1"));
+
+        // then
+        assertThat(saved).isTrue();
+        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getPimId).contains("pim-1");
+    }
+
+    @Test
+    void saveIfAbsentLeavesAnExistingLinkAlone() {
+        // given
+        repository.save(link("s1", "Empik", "SILLO-84980", "pim-manual"));
+
+        // when
+        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "pim-ean"));
+
+        // then
+        assertThat(saved).isFalse();
+        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getPimId).contains("pim-manual");
+    }
+
+    @Test
     void findByPimIdReadsTheStoresLinksThroughTheIndex() {
         // given
         repository.save(link("s1", "Empik", "A-1", "pim-1"));
