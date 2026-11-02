@@ -283,17 +283,18 @@ class OrderItemTest {
     }
 
     @Test
-    void updateAllFieldsCopiesTheMarketplaceOfferKey() {
+    void updatingANewItemFromAFormWithoutTheOfferKeyKeepsTheStoredKey() {
         // given
-        OrderItem target = orderItem("MFN-1");
-        OrderItem other = orderItem("MFN-1");
-        other.setMarketplaceOfferKey("SILLO-84980");
+        OrderItem stored = orderItem("MFN-1");
+        stored.setMarketplaceOfferKey("SILLO-84980");
+        OrderItem fromForm = orderItem("MFN-2");
 
         // when
-        target.updateAllFields(other);
+        stored.updateAllFields(fromForm);
+        stored.update(fromForm);
 
         // then
-        assertThat(target.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
+        assertThat(stored.getMarketplaceOfferKey()).isEqualTo("SILLO-84980");
     }
 
     @Test

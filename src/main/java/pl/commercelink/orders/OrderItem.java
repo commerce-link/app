@@ -136,7 +136,6 @@ public class OrderItem extends Item {
 
         this.setConsolidated(other.isConsolidated());
         this.setComment(other.getComment());
-        this.setMarketplaceOfferKey(other.getMarketplaceOfferKey());
     }
 
     public void updateLimitedFields(OrderItem other) {

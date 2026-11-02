@@ -313,7 +313,7 @@ class MarketplaceOrderImporterTest {
     void keepsTodaysBehaviourWithoutSellerOfferKey() {
         // given
         when(offerResolver.resolve("store-1", "Allegro", null, "ab 12"))
-                .thenReturn(Optional.of(new ResolvedOffer("pim-1", null, "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
 
         // when
         importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
@@ -321,6 +321,7 @@ class MarketplaceOrderImporterTest {
         // then
         OrderItem item = productItem();
         assertEquals("AB12", item.getSku());
+        assertNull(item.getEan());
         assertEquals("Monitors", item.getCategory());
         assertEquals("ab 12", item.getExternalItemId());
         assertNull(item.getMarketplaceOfferKey());

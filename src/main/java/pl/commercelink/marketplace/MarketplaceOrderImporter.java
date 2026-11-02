@@ -109,7 +109,8 @@ public class MarketplaceOrderImporter {
                         orderItem.setExternalItemId(rawKeysByBasketItemId.get(i.getId()));
                         ResolvedLine line = resolvedByBasketItemId.get(i.getId());
                         orderItem.setMarketplaceOfferKey(line.sellerOfferKey());
-                        if (line.offer() != null) {
+                        // the MFN step reproduces the pre-link behaviour, which never filled the ean
+                        if (line.offer() != null && line.offer().source() != ResolvedOffer.Source.MFN) {
                             orderItem.setEan(line.offer().ean());
                         }
                     }
