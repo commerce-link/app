@@ -1,6 +1,6 @@
 package pl.commercelink.web;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,26 +18,29 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.settings.OfferMatchingRunView;
 import pl.commercelink.web.settings.OfferMatchingView;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
+import java.time.Clock;
 import java.util.Locale;
 
 /**
  * Settings › Marketplaces › "Dopasuj oferty": links the offers another system published on the marketplace to the
- * store's products by EAN. The run is ordered, not done in the request (thousands of offers over many API pages), and
- * nothing tracks it: the page shows the latest saved result, which a refresh picks up once the worker is done. Only for a
- * connected marketplace whose adapter can list the store's offers. A run the worker would skip (expired connection,
- * inactive store) is not ordered at all, so the page never promises a result that cannot come.
+ * store's products by EAN. The run is ordered, not done in the request (thousands of offers over many API pages, which a
+ * marketplace may hand out only a few a minute): the page shows the latest saved result and, while a run goes on, how far
+ * it got, or why the last one failed; a refresh picks up the new state. A second run is refused while one is going on.
+ * Only for a connected marketplace whose adapter can list the store's offers. A run the worker would skip (expired
+ * connection, inactive store) is not ordered at all, so the page never promises a result that cannot come.
  */
 @Controller
-@RequiredArgsConstructor
 public class MarketplaceOfferMatchController {
 
     private static final String VIEW = "store-marketplace-offer-matching";
     private static final String BLOCKED_STORE = "store.marketplaces.offer.matching.blocked.store";
     private static final String BLOCKED_INTEGRATION = "store.marketplaces.offer.matching.blocked.integration";
+    private static final String RUNNING = "store.marketplaces.offer.matching.running.refused";
     private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}/offer-matching";
 
     private final StoresRepository storesRepository;
@@ -46,6 +49,26 @@ public class MarketplaceOfferMatchController {
     private final OfferMatchResultStore resultStore;
     private final StoreActivity storeActivity;
     private final MessageSource messageSource;
+    private final Clock clock;
+
+    @Autowired
+    public MarketplaceOfferMatchController(StoresRepository storesRepository, MarketplaceConnections marketplaces,
+                                           MarketplaceOfferMatchPublisher publisher, OfferMatchResultStore resultStore,
+                                           StoreActivity storeActivity, MessageSource messageSource) {
+        this(storesRepository, marketplaces, publisher, resultStore, storeActivity, messageSource, Clock.systemUTC());
+    }
+
+    MarketplaceOfferMatchController(StoresRepository storesRepository, MarketplaceConnections marketplaces,
+                                    MarketplaceOfferMatchPublisher publisher, OfferMatchResultStore resultStore,
+                                    StoreActivity storeActivity, MessageSource messageSource, Clock clock) {
+        this.storesRepository = storesRepository;
+        this.marketplaces = marketplaces;
+        this.publisher = publisher;
+        this.resultStore = resultStore;
+        this.storeActivity = storeActivity;
+        this.messageSource = messageSource;
+        this.clock = clock;
+    }
 
     @GetMapping("/dashboard/store/marketplaces" + MARKETPLACE_PATH)
     @PreAuthorize("hasRole('ADMIN')")
@@ -84,6 +107,8 @@ public class MarketplaceOfferMatchController {
                     ? SettingsPaths.store(storeId, "/marketplaces/" + marketplace) : null);
         }
         model.addAttribute("matching", resultStore.latest(storeId, marketplace).map(OfferMatchingView::of).orElse(null));
+        model.addAttribute("run", resultStore.progress(storeId, marketplace)
+                .map(progress -> OfferMatchingRunView.of(progress, clock.instant())).orElse(null));
         model.addAttribute("displayName", displayName);
         model.addAttribute("formAction", pagePath(storeId, marketplace));
         model.addAttribute("marketplacesHref", SettingsPaths.store(storeId, "/marketplaces"));
@@ -99,6 +124,11 @@ public class MarketplaceOfferMatchController {
         String blockedKey = runBlockedKey(store, marketplace);
         if (blockedKey != null) {
             SettingsFlash.errorOnRedirect(redirectAttributes, messageSource.getMessage(blockedKey,
+                    new Object[]{marketplaces.displayName(marketplace)}, locale));
+            return "redirect:" + pagePath(storeId, marketplace);
+        }
+        if (resultStore.progress(storeId, marketplace).filter(progress -> progress.isRunning(clock.instant())).isPresent()) {
+            SettingsFlash.errorOnRedirect(redirectAttributes, messageSource.getMessage(RUNNING,
                     new Object[]{marketplaces.displayName(marketplace)}, locale));
             return "redirect:" + pagePath(storeId, marketplace);
         }

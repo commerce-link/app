@@ -166,6 +166,54 @@ class MarketplaceOfferMatchTemplateTest {
         assertThat(html).contains("cl-alert is-ok").contains("Dopasowanie ofert z Empik zlecone.");
     }
 
+    private static OfferMatchingRunView run(boolean running, Integer total, String error) {
+        return new OfferMatchingRunView(running, !running, 400, total, "02.11.2026 10:59", "02.11.2026 10:50", error);
+    }
+
+    @Test
+    void aRunningRunShowsItsProgressInsteadOfTheButton() {
+        // when
+        String html = render(null, null, Map.of("run", run(true, 6150, null)));
+
+        // then
+        assertThat(html).contains("cl-spinner").contains("Dopasowanie trwa").containsPattern("400 z 6.150 ofert")
+                .contains("10:59").contains("aria-live=\"polite\"");
+        assertThat(html).doesNotContain("method=\"post\"").doesNotContain("??");
+    }
+
+    @Test
+    void aRunningRunWithoutKnownTotalCountsWhatItChecked() {
+        // when
+        String html = render(null, null, Map.of("run", run(true, null, null)));
+
+        // then
+        assertThat(html).contains("Dopasowanie trwa").contains("400 ofert").doesNotContain(" z null").doesNotContain("??");
+    }
+
+    @Test
+    void theLatestResultStaysVisibleDuringARun() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-01T09:15:00Z"), 1, List.of(), List.of(),
+                List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)), List.of(), 0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null, Map.of("run", run(true, 6150, null)));
+
+        // then
+        assertThat(html).contains("Ostatni przebieg: 01.11.2026 10:15").contains("Dopasowanie trwa").contains("cl-stat-grid");
+    }
+
+    @Test
+    void aFailedRunShowsTheErrorAndOffersANewOne() {
+        // when
+        String html = render(null, null, Map.of("run", run(false, 6150, "OF21 answered 500")));
+
+        // then
+        assertThat(html).contains("cl-alert is-bad").contains("OF21 answered 500").contains("02.11.2026 10:50")
+                .contains("method=\"post\"");
+        assertThat(html).doesNotContain("Dopasowanie trwa").doesNotContain("??");
+    }
+
     private static String render(OfferMatchingView matching, String savedMessage) {
         return render(matching, savedMessage, Map.of());
     }

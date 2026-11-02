@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.marketplace.links.MarketplaceOfferMatchPublisher;
+import pl.commercelink.marketplace.links.OfferMatchProgress;
 import pl.commercelink.marketplace.links.OfferMatchResult;
 import pl.commercelink.marketplace.links.OfferMatchResult.Row;
 import pl.commercelink.marketplace.links.OfferMatchResultStore;
@@ -25,10 +26,14 @@ import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.settings.OfferMatchingRunView;
 import pl.commercelink.web.settings.OfferMatchingView;
 import pl.commercelink.web.settings.SettingsFlash;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,6 +53,7 @@ class MarketplaceOfferMatchControllerTest {
 
     private static final String STORE_ID = "store-1";
     private static final String EMPIK = "Empik";
+    private static final Instant NOW = Instant.parse("2026-11-02T10:00:00Z");
 
     @Mock
     private StoresRepository storesRepository;
@@ -65,7 +71,7 @@ class MarketplaceOfferMatchControllerTest {
     @BeforeEach
     void setUp() {
         controller = new MarketplaceOfferMatchController(storesRepository, marketplaces, publisher, resultStore,
-                storeActivity, MarketplacesFixture.polishMessages());
+                storeActivity, MarketplacesFixture.polishMessages(), Clock.fixed(NOW, ZoneOffset.UTC));
         when(storeActivity.isActive(org.mockito.ArgumentMatchers.any(Store.class))).thenReturn(true);
         givenStoreConnectedTo(STORE_ID, EMPIK);
         givenStoreConnectedTo("store-2", EMPIK);
@@ -299,6 +305,116 @@ class MarketplaceOfferMatchControllerTest {
 
         // then
         assertThat(model.getAttribute("runBlockedMessage")).isNull();
+    }
+
+    private static OfferMatchProgress running(Instant updatedAt, Integer total) {
+        return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T09:50:00Z"), updatedAt,
+                OfferMatchProgress.Status.RUNNING, "400", 400, total, 0, 0, null, null, null, null, null, null);
+    }
+
+    @Test
+    void pageShowsProgressOfRunningRun() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW.minusSeconds(60), 6150)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        OfferMatchingRunView run = (OfferMatchingRunView) model.getAttribute("run");
+        assertThat(run.running()).isTrue();
+        assertThat(run.failed()).isFalse();
+        assertThat(run.processed()).isEqualTo(400);
+        assertThat(run.total()).isEqualTo(6150);
+        assertThat(run.updatedAt()).isEqualTo("02.11.2026 10:59");
+    }
+
+    @Test
+    void pageKeepsTheLatestResultDuringARun() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150)));
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW.minus(Duration.ofDays(1)),
+                0, List.of(), List.of(), List.of(), List.of(), 0, 0)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("matching")).isNotNull();
+        assertThat(model.getAttribute("run")).isNotNull();
+    }
+
+    @Test
+    void pageShowsFailure() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, "OF21 answered 500")));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        OfferMatchingRunView run = (OfferMatchingRunView) model.getAttribute("run");
+        assertThat(run.failed()).isTrue();
+        assertThat(run.running()).isFalse();
+        assertThat(run.error()).isEqualTo("OF21 answered 500");
+        assertThat(run.startedAt()).isEqualTo("02.11.2026 10:50");
+    }
+
+    @Test
+    void pageTreatsAStaleRunAsAbandoned() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW.minus(Duration.ofMinutes(31)), 6150)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.offerMatching(EMPIK, model, PL);
+
+        // then
+        assertThat(model.getAttribute("run")).isNull();
+    }
+
+    @Test
+    void refusesNewRunWhileOneIsRunning() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW.minus(Duration.ofMinutes(29)), 6150)));
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.orderOfferMatching(EMPIK, PL, redirectAttributes);
+
+        // then
+        verify(publisher, never()).order(anyString(), anyString());
+        assertThat(view).isEqualTo("redirect:/dashboard/store/marketplaces/Empik/offer-matching");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(SettingsFlash.SAVED_MESSAGE);
+        assertThat((String) redirectAttributes.getFlashAttributes().get(SettingsFlash.ERROR_MESSAGE))
+                .startsWith("Dopasowanie ofert z Empik już trwa");
+    }
+
+    @Test
+    void allowsNewRunAfterStaleProgress() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW.minus(Duration.ofMinutes(31)), 6150)));
+
+        // when
+        controller.orderOfferMatching(EMPIK, PL, new RedirectAttributesModelMap());
+
+        // then
+        verify(publisher).order(STORE_ID, EMPIK);
+    }
+
+    @Test
+    void allowsNewRunAfterFailure() {
+        // given
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, "boom")));
+
+        // when
+        controller.orderOfferMatching(EMPIK, PL, new RedirectAttributesModelMap());
+
+        // then
+        verify(publisher).order(STORE_ID, EMPIK);
     }
 
     private static void assertNotFound(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
