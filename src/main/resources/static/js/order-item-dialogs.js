@@ -1,7 +1,7 @@
 // Dialogs of the order's items (orders details), opened by dialog.js from the row menu: the menu entry's data
 // attributes (item id, name, sku, category, qty, price, tax) fill the dialog on cl:dialog-open. Assign SKU picks codes
 // from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Link to product picks
-// one product of that pricelist and posts its pimId; Assign supplier offers
+// one product of the catalog (every product with a pimId, the price where the pricelist has one) and posts its pimId; Assign supplier offers
 // the item's own codes and turns a gross price net with the item's VAT for the hint (the server converts it); Assign
 // from warehouse lists the stock of the item's category; Split bundle keeps the rows numbered rows[0..n] and the total
 // balanced; Serial numbers never submit on Enter; Move previews the target order.
@@ -273,7 +273,7 @@
     })();
 
     // --- Link offer to product ------------------------------------------------------------------------------------
-    // One product from the same pricelist Assign SKU reads; its pimId is posted, the server fills the codes.
+    // One product of the catalog (not only the pricelist's available ones); its pimId is posted, the server fills the codes.
     (function () {
         var dialog = document.getElementById('link-offer-dialog');
         if (!dialog) {
@@ -357,7 +357,8 @@
                 cell(row, p.name);
                 cell(row, p.label);
                 cell(row, p.mfn, 'cl-table-code');
-                cell(row, format(p.price), 'is-numeric');
+                // a product the newest pricelist does not carry has no price, not a price of zero
+                cell(row, p.price == null ? '—' : format(p.price), 'is-numeric');
                 row.addEventListener('click', function () {
                     choose(p.pimId);
                     renderTable();

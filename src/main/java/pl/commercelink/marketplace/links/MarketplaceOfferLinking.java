@@ -86,7 +86,7 @@ public class MarketplaceOfferLinking {
         if (offer == null) {
             log.warn("Offer {} of store {} linked to {}, but the product is not in the PIM view or has no manufacturer"
                     + " code; no item filled", offerKey, storeId, pimId);
-            return new LinkResult(0);
+            return LinkResult.productNotRecognised();
         }
         if (StringUtils.isBlank(offer.category())) {
             log.warn("Offer {} of store {} linked to {}, which has no category in the PIM nor in the store catalog;"
@@ -106,7 +106,7 @@ public class MarketplaceOfferLinking {
                 updated++;
             }
         }
-        return new LinkResult(updated);
+        return new LinkResult(updated, true);
     }
 
     private static String marketplaceOf(Order order) {
@@ -164,6 +164,15 @@ public class MarketplaceOfferLinking {
         }
     }
 
-    public record LinkResult(int updatedItems) {
+    /**
+     * @param productRecognised false when the link is saved but the product cannot fill the items yet (its PIM card is
+     *                          unknown to this instance, e.g. created by hand and not refreshed, or it has no
+     *                          manufacturer code): the operator is told so instead of seeing a success with 0 items
+     */
+    public record LinkResult(int updatedItems, boolean productRecognised) {
+
+        static LinkResult productNotRecognised() {
+            return new LinkResult(0, false);
+        }
     }
 }

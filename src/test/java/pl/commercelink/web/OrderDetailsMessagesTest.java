@@ -72,7 +72,8 @@ class OrderDetailsMessagesTest {
                 MarketplaceOfferLinking.NO_OFFER_KEY,
                 MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
                 MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
-                "order.item.link.offer.done");
+                "order.item.link.offer.done",
+                "order.item.link.offer.unrecognised");
 
         // then
         for (Properties bundle : List.of(pl, en)) {

@@ -68,8 +68,8 @@
         </form>
     </dialog>
 
-    <!--/* One product from a catalog's pricelist (the source of Assign SKU); the post saves the offer link and fills the
-           item and the store's other New items with the same offer. */-->
+    <!--/* One product of a catalog (every product with a pimId, not only the pricelist's available ones); the post saves
+           the offer link and fills the item and the store's other New items with the same offer. */-->
     <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
         <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
             <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"></h2>
@@ -83,7 +83,7 @@
                 <div class="cl-form-grid">
                     <div class="cl-span-2 cl-field">
                         <label class="cl-label" for="link-offer-catalog" th:text="#{order.item.assign.sku.catalog}"></label>
-                        <select class="cl-select" id="link-offer-catalog" data-cl-link-catalog th:attr="data-url=@{/dashboard/pricelist}">
+                        <select class="cl-select" id="link-offer-catalog" data-cl-link-catalog th:attr="data-url=@{/dashboard/orders/link-offer/products}">
                             <option value="" th:text="#{orders.select.catalog}"></option>
                             <option th:each="catalog : ${items.catalogs()}" th:value="${catalog.catalogId}" th:text="${catalog.name}"></option>
                         </select>

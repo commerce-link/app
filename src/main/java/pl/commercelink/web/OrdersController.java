@@ -1313,6 +1313,11 @@ public class OrdersController extends BaseController {
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
         }
+        if (!result.productRecognised()) {
+            OrderFlash.warning(redirectAttributes,
+                    messageSource.getMessage("order.item.link.offer.unrecognised", null, locale));
+            return details(orderId);
+        }
         OrderFlash.saved(redirectAttributes,
                 messageSource.getMessage("order.item.link.offer.done", new Object[]{result.updatedItems()}, locale));
         return details(orderId);

@@ -106,6 +106,39 @@ class MarketplaceOfferLinkingTest {
     }
 
     @Test
+    void linkSavesTheLinkButReportsAProductItCannotRecogniseYet() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+        when(resolver.resolve(STORE, EMPIK, KEY, null)).thenReturn(Optional.empty());
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+
+        // then
+        verify(linkRepository).save(any(MarketplaceOfferLink.class));
+        verify(orderItemsRepository, never()).save(any());
+        assertThat(result.productRecognised()).isFalse();
+        assertThat(result.updatedItems()).isZero();
+        assertThat(item.isUnlinkedMarketplaceItem()).isTrue();
+    }
+
+    @Test
+    void aRecognisedProductIsReportedAsSuch() {
+        // given
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        openOrders(order);
+
+        // when
+        MarketplaceOfferLinking.LinkResult result = linking.link(STORE, order, "i1", "pim-1", "user-1");
+
+        // then
+        assertThat(result.productRecognised()).isTrue();
+    }
+
+    @Test
     void linkAlsoUpdatesOtherNewItemsWithTheSameOfferKey() {
         // given
         Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);

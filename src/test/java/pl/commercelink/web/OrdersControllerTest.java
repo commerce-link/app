@@ -101,6 +101,7 @@ import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
@@ -3966,7 +3967,7 @@ class OrdersControllerTest {
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-1", null))
-                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3));
+                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3, true));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -3975,6 +3976,27 @@ class OrdersControllerTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [3]");
+        }
+
+        @Test
+        void linkOfferWarnsWhenTheLinkIsSavedButTheProductCannotFillTheItem() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-1", null))
+                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(0, false));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.unrecognised");
+            assertThat(notice(redirect).tone()).isEqualTo(OrderLabels.WARN);
         }
 
         @Test
