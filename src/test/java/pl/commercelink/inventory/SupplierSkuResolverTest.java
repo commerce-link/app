@@ -5,7 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.stores.SupplierScope;
 
 import java.util.List;
@@ -73,6 +73,6 @@ class SupplierSkuResolverTest {
     }
 
     private static InventoryItem item(String ean, String mfn, String sku) {
-        return new InventoryItem(ean, mfn, 10.0, "PLN", 5, 1, "Elko").withSku(sku);
+        return new InventoryItem(ean, mfn, 10.0, "PLN", 5, 1, "Elko", true, false, false, sku);
     }
 }

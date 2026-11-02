@@ -1,7 +1,7 @@
 package pl.commercelink.warehouse;
 
 import lombok.RequiredArgsConstructor;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 
 @RequiredArgsConstructor

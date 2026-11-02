@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
@@ -21,8 +21,8 @@ class StoreInventorySnapshotTest {
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private static final InventoryItem ITEM =
-            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true)
-                    .withSku("ACME-5900000000002");
+            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true,
+                    "ACME-5900000000002");
     private static final Set<String> KEY_EANS = Set.of("5900000000002", "4011200296908");
     private static final Set<String> KEY_CODES = Set.of("MFN-1");
 

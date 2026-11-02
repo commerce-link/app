@@ -2,7 +2,7 @@ package pl.commercelink.inventory.search;
 
 import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 

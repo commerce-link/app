@@ -1,7 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 
 import java.util.Collection;
 import java.util.LinkedList;

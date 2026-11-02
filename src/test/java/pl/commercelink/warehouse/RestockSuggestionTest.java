@@ -1,7 +1,7 @@
 package pl.commercelink.warehouse;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

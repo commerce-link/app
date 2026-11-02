@@ -2,7 +2,7 @@ package pl.commercelink.inventory;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 
 import java.util.List;
 import java.util.function.Predicate;

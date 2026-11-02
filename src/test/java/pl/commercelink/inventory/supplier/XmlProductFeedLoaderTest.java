@@ -9,8 +9,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.XmlItem;
@@ -144,11 +142,6 @@ class XmlProductFeedLoaderTest {
         @Override
         public String getCurrency() {
             return null;
-        }
-
-        @Override
-        public ParsedRow toParsedRow(SupplierInfo supplierInfo) {
-            return new ParsedRow(null, null);
         }
     }
 }

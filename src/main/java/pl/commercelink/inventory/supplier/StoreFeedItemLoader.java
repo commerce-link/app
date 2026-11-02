@@ -4,7 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 
 import java.util.List;
@@ -29,18 +29,15 @@ public class StoreFeedItemLoader {
     // adapter type's own and keeps reporting the type name, which never reaches the loaded items.
     public List<InventoryItem> load(String storeId, String identity, SupplierProviderDescriptor descriptor,
                                     Map<String, Double> sellRates) {
+        SupplierInfo supplierInfo = descriptor.supplierInfo().withName(identity);
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
-                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, identity, taxonomyPenalty);
+                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, supplierInfo, taxonomyPenalty);
             case FeedFormat.Xml xml ->
-                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(),
-                            descriptor.supplierInfo().withName(identity), storeId, taxonomyPenalty);
+                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierInfo, storeId, taxonomyPenalty);
         };
 
-        // Adapter CSV parsers stamp rows with the type name they were compiled with; a connection
-        // may be one of several instances of that type, so the connection identity must replace it.
         return items.stream()
-                .map(item -> item.withSupplier(identity))
                 .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                 .collect(Collectors.toList());
     }
