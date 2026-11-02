@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.orders.Order;
@@ -424,6 +425,40 @@ class StoreDeletionServiceTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         stubEmptyCascade();
         when(wipeRepository.findDiscountCodes(STORE_ID)).thenThrow(new RuntimeException("throttled"));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertFalse(deleted);
+        verify(storesRepository, never()).delete(any(Store.class));
+    }
+
+    @Test
+    void deletesStoreMarketplaceOfferLinks() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        MarketplaceOfferLink link = new MarketplaceOfferLink();
+        when(wipeRepository.findMarketplaceOfferLinks(STORE_ID)).thenReturn(List.of(link));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(wipeRepository).deleteAll(List.of(link));
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void keepsStoreRecordWhenMarketplaceOfferLinksCannotBeDeleted() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        when(wipeRepository.findMarketplaceOfferLinks(STORE_ID)).thenThrow(new RuntimeException("throttled"));
 
         // when
         boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);

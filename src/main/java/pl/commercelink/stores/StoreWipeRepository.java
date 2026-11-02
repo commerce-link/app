@@ -6,6 +6,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.discounts.DiscountCode;
+import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.orders.filters.model.OwnedOrderFilters;
@@ -113,6 +114,12 @@ public class StoreWipeRepository {
         DiscountCode key = new DiscountCode();
         key.setStoreId(storeId);
         return query(DiscountCode.class, key);
+    }
+
+    public List<MarketplaceOfferLink> findMarketplaceOfferLinks(String storeId) {
+        MarketplaceOfferLink key = new MarketplaceOfferLink();
+        key.setStoreId(storeId);
+        return query(MarketplaceOfferLink.class, key);
     }
 
     public void deleteAll(List<?> entities) {
