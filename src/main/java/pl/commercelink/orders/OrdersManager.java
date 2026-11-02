@@ -471,13 +471,13 @@ public class OrdersManager {
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
-    /** @return false when an order with the same externalOrderId already exists and nothing was saved. */
     /** Whether the store already has an order with this external (marketplace) id. */
     public boolean isAlreadyImported(String storeId, String externalOrderId) {
         return StringUtils.isNotBlank(externalOrderId)
                 && ordersRepository.findByStoreIdAndExternalOrderId(storeId, externalOrderId) != null;
     }
 
+    /** @return false when an order with the same externalOrderId already exists and nothing was saved. */
     public boolean saveWithFulfilment(Order order, List<OrderItem> orderItems) {
         // prevent duplicate orders based on externalOrderId
         if (isAlreadyImported(order.getStoreId(), order.getExternalOrderId())) {
