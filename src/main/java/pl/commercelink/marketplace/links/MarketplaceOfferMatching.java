@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
+import pl.commercelink.marketplace.api.MarketplaceOffersPage;
+import pl.commercelink.marketplace.api.MarketplaceRateLimitedException;
 import pl.commercelink.marketplace.links.OfferMatchResult.Row;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -14,6 +16,8 @@ import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,11 +33,17 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
  * Links a store's offers on a marketplace, published there by another system, to PIM entries by EAN. Each link is
  * saved as soon as its offer is matched, so a run cut short keeps what it linked and the next run skips those offers.
  * Existing links (manual or from an earlier run) are never replaced.
+ * <p>
+ * A run goes page by page from where its {@link OfferMatchProgress} stopped, and pauses when the marketplace limits
+ * requests (Empik answers about ten pages a minute) or the message's time budget is used, so the caller can carry on in
+ * another queue message instead of waiting in this one.
  */
 @Component
 public class MarketplaceOfferMatching {
 
     static final String CREATED_BY = "offer-matching";
+    /** Well under the queue's 900 s visibility timeout, so a message is done before SQS hands it out again. */
+    static final Duration TIME_BUDGET = Duration.ofMinutes(10);
 
     private final MarketplaceOfferLinkRepository linkRepository;
     private final MarketplaceOfferResolver resolver;
@@ -56,37 +66,87 @@ public class MarketplaceOfferMatching {
         this.clock = clock;
     }
 
-    public OfferMatchResult match(Store store, String marketplace, MarketplaceOffers offers) {
-        Run run = new Run(store.getStoreId(), marketplace);
-        offers.forEachPage(page -> page.forEach(run::match));
-        return run.result();
+    /**
+     * Reads pages from the progress's cursor until the listing ends, the marketplace asks to wait, or the time budget is
+     * used. Any other failure propagates; the links saved before it stay.
+     */
+    public Step resume(Store store, String marketplace, MarketplaceOffers offers, OfferMatchProgress progress) {
+        Instant deadline = clock.instant().plus(TIME_BUDGET);
+        Run run = new Run(store.getStoreId(), marketplace, progress);
+        String cursor = progress.nextCursor();
+        while (true) {
+            MarketplaceOffersPage page;
+            try {
+                page = offers.page(cursor);
+            } catch (MarketplaceRateLimitedException e) {
+                return new Paused(run.progress(cursor), e.retryAfter() == null ? Duration.ZERO : e.retryAfter());
+            }
+            if (page.offers() != null) {
+                page.offers().forEach(run::match);
+            }
+            run.total(page.total());
+            if (page.nextCursor() == null) {
+                return new Finished(run.result());
+            }
+            if (page.nextCursor().equals(cursor)) {
+                // a cursor that does not move would page forever, message after message
+                throw new IllegalStateException("The marketplace listing returned the same cursor again: " + cursor);
+            }
+            cursor = page.nextCursor();
+            if (!clock.instant().isBefore(deadline)) {
+                return new Paused(run.progress(cursor), Duration.ZERO);
+            }
+        }
+    }
+
+    /** What one queue message got done: the whole run, or a part of it with the rest to come in another message. */
+    public sealed interface Step permits Finished, Paused {
+    }
+
+    public record Finished(OfferMatchResult result) implements Step {
+    }
+
+    /** @param delay how long the marketplace wants the next page to wait (zero: the message used its time budget) */
+    public record Paused(OfferMatchProgress progress, Duration delay) implements Step {
     }
 
     private class Run {
 
         private final String storeId;
         private final String marketplace;
+        private final OfferMatchProgress started;
         private final PimView pim;
         private final PimView globalPim;
         private final MarketplaceOfferResolver.StoreOffers storeOffers;
         private final Map<String, String> linkedPimIds = new HashMap<>();
-        private final Set<String> seenKeys = new HashSet<>();
+        private final Set<String> seenKeys;
         private Map<String, Set<String>> catalogEntriesByEan;
 
         private int total;
+        private Integer listed;
         private int ownOffers;
         private int alreadyLinked;
-        private final List<Row> linked = new ArrayList<>();
-        private final List<Row> notInCatalog = new ArrayList<>();
-        private final List<Row> noPimEntry = new ArrayList<>();
-        private final List<Row> toReview = new ArrayList<>();
+        private final List<Row> linked;
+        private final List<Row> notInCatalog;
+        private final List<Row> noPimEntry;
+        private final List<Row> toReview;
 
-        Run(String storeId, String marketplace) {
+        Run(String storeId, String marketplace, OfferMatchProgress progress) {
             this.storeId = storeId;
             this.marketplace = marketplace;
+            this.started = progress;
+            this.seenKeys = new LinkedHashSet<>(progress.seenKeys());
+            this.total = progress.processed();
+            this.listed = progress.total();
+            this.ownOffers = progress.ownOffers();
+            this.alreadyLinked = progress.alreadyLinked();
+            this.linked = new ArrayList<>(progress.linked());
+            this.notInCatalog = new ArrayList<>(progress.notInCatalog());
+            this.noPimEntry = new ArrayList<>(progress.noPimEntry());
+            this.toReview = new ArrayList<>(progress.toReview());
             this.pim = pimCatalog.withStoreData(storeId);
             this.globalPim = pimCatalog.withGlobalData();
-            // one scope for the whole run: the store's catalogs are read once, not once per offer
+            // one scope per message: the store's catalogs are read once, not once per offer or page
             this.storeOffers = resolver.forStore(storeId);
             linkRepository.findAll(storeId, marketplace)
                     .forEach(link -> linkedPimIds.put(link.getSellerOfferKey(), link.getPimId()));
@@ -216,6 +276,18 @@ public class MarketplaceOfferMatching {
                 return entry.clonedFromPimId();
             }
             return entry.pimId();
+        }
+
+        void total(Integer total) {
+            if (total != null) {
+                listed = total;
+            }
+        }
+
+        OfferMatchProgress progress(String nextCursor) {
+            return new OfferMatchProgress(started.runId(), started.startedAt(), clock.instant(),
+                    OfferMatchProgress.Status.RUNNING, nextCursor, total, listed, ownOffers, alreadyLinked, linked,
+                    notInCatalog, noPimEntry, toReview, seenKeys, null);
         }
 
         OfferMatchResult result() {

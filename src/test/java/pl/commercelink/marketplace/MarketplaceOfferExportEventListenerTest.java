@@ -26,7 +26,9 @@ import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkSource;
+import pl.commercelink.marketplace.api.MarketplaceOffersPage;
 import pl.commercelink.marketplace.links.MarketplaceOfferMatching;
+import pl.commercelink.marketplace.links.OfferMatchProgress;
 import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
 import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
@@ -1062,7 +1064,8 @@ class MarketplaceOfferExportEventListenerTest {
         matchingStore.setStoreId(STORE_ID);
 
         new MarketplaceOfferMatching(matchingLinks, resolver, pim, new StorePimAliases(pim))
-                .match(matchingStore, MARKETPLACE, consumer -> consumer.accept(List.of(offer)));
+                .resume(matchingStore, MARKETPLACE, cursor -> new MarketplaceOffersPage(List.of(offer), null, 1),
+                        OfferMatchProgress.start("run-1", Instant.now()));
 
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
         verify(matchingLinks).saveIfAbsent(saved.capture());

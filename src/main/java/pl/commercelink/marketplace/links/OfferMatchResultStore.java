@@ -16,6 +16,7 @@ import java.util.Optional;
 /**
  * The latest offer matching result of a store's marketplace, in the {@code stores} bucket next to the store's other
  * files (so a store's deletion takes it along). Only the latest run is kept: the links themselves are the lasting result.
+ * A run still going on, or one that failed, is a second file next to it, removed when the run finishes.
  */
 @Slf4j
 @Component
@@ -44,20 +45,44 @@ public class OfferMatchResultStore {
     }
 
     public Optional<OfferMatchResult> latest(String storeId, String marketplace) {
-        String key = key(storeId, marketplace);
+        return read(key(storeId, marketplace), OfferMatchResult.class);
+    }
+
+    /** The run going on (or the one that failed), kept apart so the latest result stays on the page meanwhile. */
+    public void saveProgress(String storeId, String marketplace, OfferMatchProgress progress) {
+        try {
+            fileStorage.put(bucketName, progressKey(storeId, marketplace), MAPPER.writeValueAsBytes(progress));
+        } catch (IOException e) {
+            throw new IllegalStateException("Offer match progress of store " + storeId + " cannot be written", e);
+        }
+    }
+
+    public Optional<OfferMatchProgress> progress(String storeId, String marketplace) {
+        return read(progressKey(storeId, marketplace), OfferMatchProgress.class);
+    }
+
+    public void deleteProgress(String storeId, String marketplace) {
+        fileStorage.delete(bucketName, progressKey(storeId, marketplace));
+    }
+
+    private <T> Optional<T> read(String key, Class<T> type) {
         try {
             if (!fileStorage.canRead(bucketName, key)) {
                 return Optional.empty();
             }
-            return Optional.of(MAPPER.readValue(fileStorage.getBytes(bucketName, key), OfferMatchResult.class));
+            return Optional.of(MAPPER.readValue(fileStorage.getBytes(bucketName, key), type));
         } catch (Exception e) {
             // the page then offers a new run, which overwrites the file
-            log.warn("Skipping unreadable offer match result {}: {}", key, e.getMessage());
+            log.warn("Skipping unreadable offer match file {}: {}", key, e.getMessage());
             return Optional.empty();
         }
     }
 
     private static String key(String storeId, String marketplace) {
         return String.format("%s/marketplace-offer-matches/%s/latest.json", storeId, marketplace);
+    }
+
+    private static String progressKey(String storeId, String marketplace) {
+        return String.format("%s/marketplace-offer-matches/%s/in-progress.json", storeId, marketplace);
     }
 }

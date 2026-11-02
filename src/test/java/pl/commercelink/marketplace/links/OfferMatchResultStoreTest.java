@@ -110,4 +110,78 @@ class OfferMatchResultStoreTest {
         // then
         assertThat(latest).isEmpty();
     }
+
+    private static final String PROGRESS_KEY = "s1/marketplace-offer-matches/Empik/in-progress.json";
+
+    private static OfferMatchProgress progress() {
+        return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T10:00:00Z"),
+                Instant.parse("2026-11-02T10:01:00Z"), OfferMatchProgress.Status.RUNNING, "200", 2, 6150, 1, 0,
+                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "pim-1", null)),
+                List.of(), List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null,
+                        false, null)), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), null);
+    }
+
+    @Test
+    void savesProgressNextToTheLatestResult() {
+        // given
+        ArgumentCaptor<byte[]> bytes = ArgumentCaptor.forClass(byte[].class);
+
+        // when
+        store().saveProgress("s1", "Empik", progress());
+
+        // then
+        verify(fileStorage).put(eq(BUCKET), eq(PROGRESS_KEY), bytes.capture());
+        assertThat(new String(bytes.getValue(), StandardCharsets.UTF_8))
+                .contains("\"runId\":\"run-1\"").contains("\"nextCursor\":\"200\"").contains("\"status\":\"RUNNING\"");
+    }
+
+    @Test
+    void readsBackSavedProgress() {
+        // given
+        ArgumentCaptor<byte[]> bytes = ArgumentCaptor.forClass(byte[].class);
+        store().saveProgress("s1", "Empik", progress());
+        verify(fileStorage).put(eq(BUCKET), eq(PROGRESS_KEY), bytes.capture());
+        when(fileStorage.canRead(BUCKET, PROGRESS_KEY)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, PROGRESS_KEY)).thenReturn(bytes.getValue());
+
+        // when
+        Optional<OfferMatchProgress> read = store().progress("s1", "Empik");
+
+        // then
+        assertThat(read).contains(progress());
+    }
+
+    @Test
+    void hasNoProgressWithoutARun() {
+        // given
+        when(fileStorage.canRead(BUCKET, PROGRESS_KEY)).thenReturn(false);
+
+        // when
+        Optional<OfferMatchProgress> read = store().progress("s1", "Empik");
+
+        // then
+        assertThat(read).isEmpty();
+    }
+
+    @Test
+    void treatsUnreadableProgressAsMissing() {
+        // given
+        when(fileStorage.canRead(BUCKET, PROGRESS_KEY)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, PROGRESS_KEY)).thenReturn("{broken".getBytes(StandardCharsets.UTF_8));
+
+        // when
+        Optional<OfferMatchProgress> read = store().progress("s1", "Empik");
+
+        // then
+        assertThat(read).isEmpty();
+    }
+
+    @Test
+    void deletesProgressOfAFinishedRun() {
+        // when
+        store().deleteProgress("s1", "Empik");
+
+        // then
+        verify(fileStorage).delete(BUCKET, PROGRESS_KEY);
+    }
 }
