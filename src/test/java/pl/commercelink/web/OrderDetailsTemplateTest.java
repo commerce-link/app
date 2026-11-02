@@ -2719,10 +2719,26 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
 
-        // then
-        assertThat(html).contains("Niepołączona oferta")
+        // then: the badge goes once the item is in fulfilment; the greyed entry says why it can no longer be linked
+        assertThat(html).doesNotContain("Niepołączona oferta")
                 .containsPattern("<span>Połącz z produktem</span>\\s*<span class=\"cl-menu-reason\">Tylko dla pozycji w stanie Nowy</span>")
                 .doesNotContain("data-cl-dialog-open=\"link-offer-dialog\"");
+    }
+
+    @Test
+    void anUnlinkedItemOfAClosedOrderHasNoBadge() {
+        // given
+        Order order = order(OrderStatus.Cancelled);
+        OrderItem unlinked = new OrderItem(order.getOrderId(), pl.commercelink.taxonomy.Categories.UNCATEGORIZED,
+                "Krzesło biurowe Sillo", 1, 499, "1696938202", false, 0);
+        unlinked.setStatus(FulfilmentStatus.New);
+        unlinked.setMarketplaceOfferKey("SILLO-84980");
+
+        // when
+        String html = page(render(order, List.of(unlinked), ADMIN, Set.of()));
+
+        // then
+        assertThat(html).doesNotContain("Niepołączona oferta");
     }
 
     @Test

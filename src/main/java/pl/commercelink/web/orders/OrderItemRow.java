@@ -72,7 +72,9 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null,
-                item.isUnlinkedMarketplaceItem(), item.getMarketplaceOfferKey());
+                // the badge asks for a link, which only a New item of an open order can still take
+                item.isUnlinkedMarketplaceItem() && item.isNew() && !context.order().isClosed(),
+                item.getMarketplaceOfferKey());
     }
 
     /**
