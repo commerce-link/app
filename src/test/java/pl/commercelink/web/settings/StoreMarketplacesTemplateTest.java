@@ -27,7 +27,7 @@ class StoreMarketplacesTemplateTest {
         String base = PATH + "/" + name;
         return new MarketplaceView(name, displayName, state, "Zamówienia: Co 30 min · ostatnio pobrane 18.09.2026 14:05",
                 returns, catalogs, base, accountPage ? base + "/authorize" : null, base + "/disconnect",
-                PATH + "/exports/" + name);
+                PATH + "/exports/" + name, "Allegro".equals(name) ? base + "/offer-matching" : null);
     }
 
     private static String list(List<MarketplaceView> marketplaces, boolean canAdd) {
@@ -82,6 +82,17 @@ class StoreMarketplacesTemplateTest {
         // then
         assertThat(html).contains(">Połączenie wygasło<").contains("Sprawdź je i zapisz ponownie.").contains(">Uzupełnij<");
         assertThat(html).doesNotContain("/authorize").doesNotContain(">Dodaj marketplace<");
+        assertThat(html).doesNotContain("offer-matching").doesNotContain("Dopasuj oferty");
+    }
+
+    @Test
+    void aMarketplaceListingItsOffersLinksToOfferMatchingNextToTheHistory() {
+        // when
+        String html = list(List.of(view("Allegro", "Allegro", State.ACTIVE, null, List.of("Główny"), true)), true);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces/Allegro/offer-matching\"")
+                .contains(">Dopasuj oferty<").contains("aria-label=\"Dopasuj oferty: Allegro\"");
     }
 
     /** Without a catalog sending offers the row says nothing about catalogs (decision 2026-09-18: no warning). */
