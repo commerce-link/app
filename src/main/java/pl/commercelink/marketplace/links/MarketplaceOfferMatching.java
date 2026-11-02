@@ -9,6 +9,7 @@ import pl.commercelink.marketplace.links.OfferMatchResult.Row;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimView;
+import pl.commercelink.products.Product;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
 /**
  * Links a store's offers on a marketplace, published there by another system, to PIM entries by EAN. Each link is
@@ -64,9 +67,11 @@ public class MarketplaceOfferMatching {
         private final String storeId;
         private final String marketplace;
         private final PimView pim;
+        private final PimView globalPim;
         private final MarketplaceOfferResolver.StoreOffers storeOffers;
         private final Map<String, String> linkedPimIds = new HashMap<>();
         private final Set<String> seenKeys = new HashSet<>();
+        private Map<String, Set<String>> catalogEntriesByEan;
 
         private int total;
         private int ownOffers;
@@ -80,6 +85,7 @@ public class MarketplaceOfferMatching {
             this.storeId = storeId;
             this.marketplace = marketplace;
             this.pim = pimCatalog.withStoreData(storeId);
+            this.globalPim = pimCatalog.withGlobalData();
             // one scope for the whole run: the store's catalogs are read once, not once per offer
             this.storeOffers = resolver.forStore(storeId);
             linkRepository.findAll(storeId, marketplace)
@@ -157,9 +163,47 @@ public class MarketplaceOfferMatching {
         private Set<String> matchedEntries(List<String> eans) {
             Set<String> pimIds = new LinkedHashSet<>();
             for (String ean : eans) {
-                pim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
+                pimIds.addAll(entriesOf(ean));
             }
             return pimIds;
+        }
+
+        /**
+         * A product of the store's catalogs decides what its EAN means: the store view's lookup prefers the store's own
+         * card, which may share the EAN with the entry the catalog uses, and a link to that card would leave the product
+         * exported next to the foreign offer. Outside the catalog both views are asked, so a store card and a global card
+         * with one EAN make the offer ambiguous rather than picking one of them.
+         */
+        private Set<String> entriesOf(String ean) {
+            Set<String> inCatalog = catalogEntriesByEan().getOrDefault(unifyEan(ean), Set.of());
+            if (!inCatalog.isEmpty()) {
+                return inCatalog;
+            }
+            Set<String> pimIds = new LinkedHashSet<>();
+            pim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
+            globalPim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
+            return pimIds;
+        }
+
+        // built on the first EAN lookup from the scope's single catalog read; keyed by the product's EAN and its entry's
+        private Map<String, Set<String>> catalogEntriesByEan() {
+            if (catalogEntriesByEan == null) {
+                Map<String, Set<String>> index = new HashMap<>();
+                for (Product product : storeOffers.catalogProducts()) {
+                    String pimId = pimAliases.offerIdOf(storeId, product.getPimId());
+                    Set<String> gtins = new HashSet<>();
+                    if (StringUtils.isNotBlank(product.getEan())) {
+                        gtins.add(product.getEan());
+                    }
+                    pimAliases.effectiveEntry(storeId, product.getPimId()).map(PimEntry::gtins).orElse(List.of()).stream()
+                            .filter(StringUtils::isNotBlank)
+                            .map(gtin -> unifyEan(gtin))
+                            .forEach(gtins::add);
+                    gtins.forEach(gtin -> index.computeIfAbsent(gtin, key -> new LinkedHashSet<>()).add(pimId));
+                }
+                catalogEntriesByEan = index;
+            }
+            return catalogEntriesByEan;
         }
 
         private String primaryGtin(String pimId) {

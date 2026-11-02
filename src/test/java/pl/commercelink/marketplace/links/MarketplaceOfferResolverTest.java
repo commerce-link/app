@@ -317,4 +317,24 @@ class MarketplaceOfferResolverTest {
         // when / then
         assertThat(resolver.isInStoreCatalog(STORE, "clone")).isTrue();
     }
+
+    @Test
+    void listsTheCatalogProductsWithAPimEntryReadingTheCatalogsOnce() {
+        // given
+        catalogCategory("c1", "Krzesła");
+        Product pinned = new Product("c1", "pim-1", "5900000000011", "M1", "Brand", "Label", "Pinned", "default");
+        Product unpinned = new Product("c1", null, "5900000000022", "M2", "Brand", "Label", "Unpinned", "default");
+        when(products.findAll("c1")).thenReturn(List.of(pinned, unpinned));
+        MarketplaceOfferResolver.StoreOffers offers = resolver.forStore(STORE);
+
+        // when
+        List<Product> first = offers.catalogProducts();
+        List<Product> second = offers.catalogProducts();
+
+        // then
+        assertThat(first).containsExactly(pinned);
+        assertThat(second).containsExactly(pinned);
+        verify(catalogs, times(1)).findAll(STORE);
+        verify(products, times(1)).findAll("c1");
+    }
 }

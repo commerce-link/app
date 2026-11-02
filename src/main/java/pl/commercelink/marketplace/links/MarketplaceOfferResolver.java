@@ -13,6 +13,7 @@ import pl.commercelink.products.information.StorePimAliases;
 
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -63,6 +64,7 @@ public class MarketplaceOfferResolver {
 
         private final String storeId;
         private Map<String, String> categoryNamesById;
+        private List<Product> catalogProducts;
 
         private StoreOffers(String storeId) {
             this.storeId = storeId;
@@ -91,6 +93,17 @@ public class MarketplaceOfferResolver {
                                 entry.category(), Source.MFN));
             }
             return Optional.empty();
+        }
+
+        /** The products of the store's catalogs that carry a pimId, read once per scope. */
+        public List<Product> catalogProducts() {
+            if (catalogProducts == null) {
+                catalogProducts = categoryNamesById().keySet().stream()
+                        .flatMap(categoryId -> productRepository.findAll(categoryId).stream())
+                        .filter(product -> StringUtils.isNotBlank(product.getPimId()))
+                        .toList();
+            }
+            return catalogProducts;
         }
 
         public boolean isInStoreCatalog(String pimId) {

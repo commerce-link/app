@@ -20,11 +20,16 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.marketplace.api.MarketplaceExportReport;
+import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkSource;
+import pl.commercelink.marketplace.links.MarketplaceOfferMatching;
+import pl.commercelink.marketplace.links.MarketplaceOfferResolver;
+import pl.commercelink.pim.ScopedPimCatalog;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -39,6 +44,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -1019,6 +1025,48 @@ class MarketplaceOfferExportEventListenerTest {
             });
             assertThat(logs.warnings()).isEmpty();
         }
+    }
+
+    @Test
+    void skipsACatalogProductMatchedThroughAnEanItSharesWithTheStoresOwnCard() {
+        // given the catalog product sits on the global entry, and the store's own card carries the same EAN
+        Product product = product("local-seed-0101", "730143315289");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        PimCatalog pim = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("local-seed-0101", "730143315289", "100-100001084WOF", "CPU"),
+                ScopedPimCatalog.storeEntry("local-store-0001", STORE_ID, "730143315289", "STORE-OWN-01", "CPU"));
+        MarketplaceOfferLink matched = matchedLink(pim, product,
+                new MarketplaceListedOffer("SILLO-84980", List.of("730143315289"), "Sillo", 3, new BigDecimal("19.99"), true));
+        linksOnTheMarketplace(matched);
+
+        // when
+        listener.handleMessage(request());
+
+        // then the link offer matching saved points at the catalog product, so no duplicate offer is published
+        assertThat(matched.getPimId()).isEqualTo("local-seed-0101");
+        verify(provider, never()).exportOffers(any(), any(), any());
+        assertThat(captureSavedRows()).isEmpty();
+    }
+
+    // the link a real matching run saves for the offer, with the given product as the store's catalog
+    private MarketplaceOfferLink matchedLink(PimCatalog pim, Product catalogProduct, MarketplaceListedOffer offer) {
+        MarketplaceOfferResolver resolver = mock(MarketplaceOfferResolver.class);
+        MarketplaceOfferResolver.StoreOffers storeOffers = mock(MarketplaceOfferResolver.StoreOffers.class);
+        MarketplaceOfferLinkRepository matchingLinks = mock(MarketplaceOfferLinkRepository.class);
+        when(resolver.forStore(STORE_ID)).thenReturn(storeOffers);
+        when(storeOffers.catalogProducts()).thenReturn(List.of(catalogProduct));
+        when(storeOffers.isInStoreCatalog(catalogProduct.getPimId())).thenReturn(true);
+        when(matchingLinks.saveIfAbsent(any())).thenReturn(true);
+        Store matchingStore = new Store();
+        matchingStore.setStoreId(STORE_ID);
+
+        new MarketplaceOfferMatching(matchingLinks, resolver, pim, new StorePimAliases(pim))
+                .match(matchingStore, MARKETPLACE, consumer -> consumer.accept(List.of(offer)));
+
+        ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
+        verify(matchingLinks).saveIfAbsent(saved.capture());
+        return saved.getValue();
     }
 
     @Test

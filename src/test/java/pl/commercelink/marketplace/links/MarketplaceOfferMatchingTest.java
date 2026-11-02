@@ -15,6 +15,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.pim.api.PimIdentifier;
 import pl.commercelink.pim.api.PimIdentifierType;
+import pl.commercelink.products.Product;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static pl.commercelink.pim.ScopedPimCatalog.cloneEntry;
 import static pl.commercelink.pim.ScopedPimCatalog.globalEntry;
+import static pl.commercelink.pim.ScopedPimCatalog.storeEntry;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -60,6 +62,7 @@ class MarketplaceOfferMatchingTest {
         store.setStoreId(STORE);
         when(resolver.forStore(STORE)).thenReturn(storeOffers);
         when(storeOffers.isInStoreCatalog(any())).thenReturn(true);
+        when(storeOffers.catalogProducts()).thenReturn(List.of());
         when(links.findAll(STORE, EMPIK)).thenReturn(List.of());
         when(links.saveIfAbsent(any())).thenReturn(true);
     }
@@ -68,6 +71,10 @@ class MarketplaceOfferMatchingTest {
         PimCatalog pim = ScopedPimCatalog.of(entries);
         return new MarketplaceOfferMatching(links, resolver, pim, new StorePimAliases(pim),
                 Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static Product catalogProduct(String pimId, String ean) {
+        return new Product("cat-1", pimId, ean, "MFN-" + pimId, "Brand", "Label", "Name " + pimId, "default");
     }
 
     private static MarketplaceListedOffer offer(String key, String... eans) {
@@ -410,6 +417,108 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
+    void prefersTheCatalogProductsEntryOverTheStoresOwnCardWithTheSameEan() {
+        // given the store's own card shares the EAN of the global entry its catalog product uses
+        when(storeOffers.catalogProducts()).thenReturn(List.of(catalogProduct("pim-g", "730143315289")));
+        when(storeOffers.isInStoreCatalog("store-card")).thenReturn(false);
+        MarketplaceOfferMatching matching = matching(
+                globalEntry("pim-g", "730143315289", "100-100001084WOF", "CPU"),
+                storeEntry("store-card", STORE, "730143315289", "STORE-OWN-01", "CPU"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-84980", "730143315289"))));
+
+        // then the link points at the catalog product's entry, so imports and the export use it
+        assertThat(savedLink().getPimId()).isEqualTo("pim-g");
+        assertThat(result.linked()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-g");
+        assertThat(result.notInCatalog()).isEmpty();
+        assertThat(result.toReview()).isEmpty();
+    }
+
+    @Test
+    void findsTheCatalogProductByTheGtinOfItsEntryWhenTheProductHasNoEan() {
+        // given
+        when(storeOffers.catalogProducts()).thenReturn(List.of(catalogProduct("pim-g", null)));
+        MarketplaceOfferMatching matching = matching(
+                globalEntry("pim-g", "730143315289", "M1", "CPU"),
+                storeEntry("store-card", STORE, "730143315289", "STORE-OWN-01", "CPU"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-84980", "730143315289"))));
+
+        // then
+        assertThat(savedLink().getPimId()).isEqualTo("pim-g");
+        assertThat(result.linked()).hasSize(1);
+    }
+
+    @Test
+    void sendsAnEanOnBothAStoreCardAndAGlobalCardOutsideTheCatalogToReview() {
+        // given neither card is used by a catalog product
+        MarketplaceOfferMatching matching = matching(
+                globalEntry("pim-g", "730143315289", "M1", "CPU"),
+                storeEntry("store-card", STORE, "730143315289", "STORE-OWN-01", "CPU"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-84980", "730143315289"))));
+
+        // then
+        verify(links, never()).saveIfAbsent(any());
+        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
+                .containsExactly(tuple("SILLO-84980", "ambiguous"));
+        assertThat(result.linked()).isEmpty();
+        assertThat(result.notInCatalog()).isEmpty();
+    }
+
+    @Test
+    void sendsAnEanOfTwoCatalogProductsWithDifferentEntriesToReview() {
+        // given
+        when(storeOffers.catalogProducts()).thenReturn(List.of(
+                catalogProduct("pim-1", "5903771700818"), catalogProduct("pim-2", "5903771700818")));
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "M1", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then
+        verify(links, never()).saveIfAbsent(any());
+        assertThat(result.toReview()).extracting(OfferMatchResult.Row::reason).containsExactly("ambiguous");
+    }
+
+    @Test
+    void countsCatalogProductsOnTheCloneAndOnItsSourceAsOneEntry() {
+        // given one product still pinned to the source, another moved onto the store's clone
+        when(storeOffers.catalogProducts()).thenReturn(List.of(
+                catalogProduct("src", "5903771700818"), catalogProduct("clone", "5903771700818")));
+        MarketplaceOfferMatching matching = matching(
+                globalEntry("src", "5903771700818", "7041", "Zabawki"),
+                cloneEntry("clone", STORE, "src", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
+
+        // then
+        assertThat(savedLink().getPimId()).isEqualTo("src");
+        assertThat(result.toReview()).isEmpty();
+    }
+
+    @Test
+    void sendsAnOfferWhoseEansHitACatalogProductAndAnotherEntryToReview() {
+        // given
+        when(storeOffers.catalogProducts()).thenReturn(List.of(catalogProduct("pim-1", "5903771700818")));
+        MarketplaceOfferMatching matching = matching(
+                globalEntry("pim-1", "5903771700818", "M1", "Zabawki"),
+                globalEntry("pim-2", "5903771700825", "M2", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK,
+                pages(List.of(offer("SILLO-1", "5903771700818", "5903771700825"))));
+
+        // then
+        verify(links, never()).saveIfAbsent(any());
+        assertThat(result.toReview()).extracting(OfferMatchResult.Row::reason).containsExactly("ambiguous");
+    }
+
+    @Test
     void readsTheStoresLinksAndCatalogsOncePerRun() {
         // given
         MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"),
@@ -422,6 +531,7 @@ class MarketplaceOfferMatchingTest {
 
         // then
         verify(resolver, times(1)).forStore(STORE);
+        verify(storeOffers, times(1)).catalogProducts();
         verify(links, times(1)).findAll(STORE, EMPIK);
         assertThat(result.total()).isEqualTo(3);
         assertThat(result.linked()).hasSize(2);
