@@ -6,7 +6,7 @@ import pl.commercelink.stores.ConnectionMode;
  * One supplier's offer for the searched product. Price alone does not decide where to buy, so the row
  * also carries what the supplier charges to ship one unit and how long the whole thing takes.
  */
-public record OfferRow(String supplier, String supplierLabel, ConnectionMode mode, String productEan, String productCode,
+public record OfferRow(String supplier, String supplierLabel, ConnectionMode mode, String brand, String productEan, String productCode,
                        double netPrice, double grossPrice, double deliveryNet, double freeDeliveryFrom,
                        boolean deliveryKnown, int leadTimeDays, int qty, boolean cheapest, boolean sharesLabel,
                        CodeMatch codeMatch) {

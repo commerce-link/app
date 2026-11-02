@@ -185,6 +185,8 @@
                             <span th:if="${offer.mode() != null}" class="cl-inv-mode"
                                   th:text="#{${'inventory.mode.' + offer.mode().name()}}"></span>
                         </span>
+                        <span th:if="${offer.brand() != null}" class="cl-inv-code-info"
+                              th:text="#{inventory.table.brand(${offer.brand()})}"></span>
                         <span th:replace="~{fragments/inventory-results :: codeMatch(${offer.codeMatch()}, ${offer.productEan()}, ${offer.productCode()})}"></span>
                         <!-- same name twice in one result: the codes are the only thing telling the rows apart -->
                         <span th:if="${offer.needsOwnCodes()}" class="cl-inv-code-info">

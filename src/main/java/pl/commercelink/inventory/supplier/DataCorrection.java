@@ -20,16 +20,14 @@ class DataCorrection {
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
 
-    InventoryItem run(InventoryItem inventoryItem) {
-        return resolveCorrectEanForMfn(inventoryItem.ean(), inventoryItem.mfn())
-                .map(inventoryItem::withEan)
-                .orElse(inventoryItem);
+    InventoryItem run(InventoryItem item) {
+        String ean = item.requiresEanCorrection() ? correctEan(item) : item.ean();
+        String brand = item.requiresBrandCorrection() ? correctBrand(item) : item.brand();
+        return item.withBrandAndEan(brand, ean);
     }
 
-    Taxonomy run(SupplierProduct product) {
-        Optional<String> correctedEan = resolveCorrectEanForMfn(product.ean(), product.mfn());
-        String ean = correctedEan.orElse(product.ean());
-        String brand = brandMapper.unifyBrand(product.brand());
+    Taxonomy run(SupplierProduct product, InventoryItem offer) {
+        String brand = offer.brand();
         String name = product.name();
         String category = null;
         int score = product.dataAccuracyScore();
@@ -37,10 +35,10 @@ class DataCorrection {
         Integer grossWeight = product.grossWeightInGrams();
         String categoryId = null;
 
-        Optional<PimEntry> pim = resolveFromPim(ean, product.mfn());
+        Optional<PimEntry> pim = resolveFromPim(offer.ean(), offer.mfn());
         if (pim.isPresent()) {
             PimEntry entry = pim.get();
-            if (isNotBlank(entry.brand())) brand = brandMapper.unifyBrand(entry.brand());
+            if (isNotBlank(entry.brand())) brand = entry.brand();
             if (isNotBlank(entry.name())) name = entry.name();
             if (isNotBlank(entry.category())) category = entry.category();
             if (isNotBlank(entry.categoryId())) categoryId = entry.categoryId();
@@ -53,26 +51,37 @@ class DataCorrection {
             category = Taxonomy.SERVICES;
         }
 
-        String normalizedEan = correctedEan.map(UnifiedProductIdentifiers::unifyEan).orElse(product.ean());
-        return new Taxonomy(normalizedEan, product.mfn(),
+        return new Taxonomy(offer.ean(), offer.mfn(),
                 brand, name, category, score, netWeight, grossWeight,
                 product.rawCategory(), categoryId);
     }
 
-    Optional<String> resolveCorrectEanForMfn(String ean, String mfn) {
-        if (!requiresEanCorrection(ean)) {
-            return Optional.empty();
-        }
+    private String correctEan(InventoryItem item) {
+        return resolveCorrectEanForMfn(item.mfn())
+                .map(UnifiedProductIdentifiers::unifyEan)
+                .orElse(item.ean());
+    }
 
+    private String correctBrand(InventoryItem item) {
+        if (isNotBlank(item.brand())) {
+            return brandMapper.unifyBrand(item.brand());
+        }
+        if (item.requiresEanCorrection()) {
+            return null;
+        }
+        return pimCatalog.withGlobalData().findByGtin(item.ean())
+                .filter(PimEntry::approved)
+                .map(PimEntry::brand)
+                .filter(StringUtils::isNotBlank)
+                .orElse(null);
+    }
+
+    Optional<String> resolveCorrectEanForMfn(String mfn) {
         return pimCatalog.withGlobalData().findByMpn(mfn)
                 .flatMap(PimEntry::primaryGtin);
     }
 
     Optional<PimEntry> resolveFromPim(String ean, String mfn) {
         return pimCatalog.withGlobalData().findByGtinOrMpn(ean, mfn).filter(PimEntry::approved);
-    }
-
-    private boolean requiresEanCorrection(String ean) {
-        return StringUtils.isBlank(ean) || "1111111111111".equalsIgnoreCase(ean);
     }
 }

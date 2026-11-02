@@ -144,6 +144,7 @@ public class InventorySearch {
                         row.item().supplier(),
                         labels.of(row.item().supplier()),
                         modeOf.apply(row.item().supplier()),
+                        row.item().brand(),
                         row.item().ean(),
                         row.item().mfn(),
                         Price.fromNet(row.item().netPrice()).netValue(),

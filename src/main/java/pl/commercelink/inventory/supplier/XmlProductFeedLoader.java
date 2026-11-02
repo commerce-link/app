@@ -83,10 +83,12 @@ public class XmlProductFeedLoader {
             while (xsr.hasNext()) {
                 if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
-
-                    ParsedRow parsed = ParsedRow.of(xmlItem, supplierInfo);
-                    feedRowProcessor.process(parsed, taxonomyPenalty, stats)
-                            .ifPresent(res::add);
+                    if (ParsedRow.hasQty(xmlItem)) {
+                        feedRowProcessor.process(ParsedRow.of(xmlItem, supplierInfo), taxonomyPenalty, stats)
+                                .ifPresent(res::add);
+                    } else {
+                        stats.markInvalid();
+                    }
                 } else {
                     xsr.next();
                 }

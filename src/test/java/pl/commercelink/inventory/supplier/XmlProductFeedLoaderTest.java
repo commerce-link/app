@@ -21,6 +21,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,7 +48,7 @@ class XmlProductFeedLoaderTest {
     void parsesWellFormedFeedWithoutADtd() throws Exception {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
-                "<products><product><ean>111</ean></product><product><ean>222</ean></product></products>"));
+                "<products><product><ean>111</ean><qty>1</qty></product><product><ean>222</ean><qty>1</qty></product></products>"));
         when(feedRowProcessor.process(any(), anyInt(), any())).thenReturn(Optional.empty());
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -57,6 +58,22 @@ class XmlProductFeedLoaderTest {
         // then
         assertThat(result).isEmpty();
         verify(feedRowProcessor, times(2)).process(any(), anyInt(), any());
+    }
+
+    @Test
+    void productOutOfStockIsNotPassedOn() throws Exception {
+        // given
+        when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
+                "<products><product><ean>111</ean><qty>0</qty></product><product><ean>222</ean><qty>4</qty></product></products>"));
+        when(feedRowProcessor.process(any(), anyInt(), any())).thenReturn(Optional.empty());
+        when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.load(TestProduct.class, "product", SUPPLIER);
+
+        // then
+        verify(feedRowProcessor, times(1)).process(argThat(parsed -> parsed.item().ean().equals("222")), anyInt(), any());
+        verify(feedRowProcessor, times(1)).process(any(), anyInt(), any());
     }
 
     @Test
@@ -103,6 +120,7 @@ class XmlProductFeedLoaderTest {
     static class TestProduct implements XmlItem {
 
         private String ean;
+        private int qty;
 
         @Override
         public String getEan() {
@@ -136,7 +154,7 @@ class XmlProductFeedLoaderTest {
 
         @Override
         public int getQty() {
-            return 0;
+            return qty;
         }
 
         @Override

@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,7 +77,7 @@ class InventoryItemTest {
         InventoryItem item = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Elko",
                 true, false, false, "101");
         assertEquals("101", item.toLocalCurrency("EUR", 4.0).orElseThrow().sku());
-        assertEquals("101", item.withEan("4006381333931").sku());
+        assertEquals("101", item.withBrandAndEan(null, "4006381333931").sku());
     }
 
     @Test
@@ -87,12 +88,10 @@ class InventoryItemTest {
 
         // when
         InventoryItem otherSupplier = item.withSupplier("Elko-k7f3a9c2");
-        InventoryItem otherEan = item.withEan("4006381333931");
         InventoryItem otherCurrency = item.toLocalCurrency("EUR", 4.0).orElseThrow();
 
         // then
         assertEquals("ASUS", otherSupplier.brand());
-        assertEquals("ASUS", otherEan.brand());
         assertEquals("ASUS", otherCurrency.brand());
     }
 
@@ -105,10 +104,37 @@ class InventoryItemTest {
         // when / then
         assertEquals(new InventoryItem("ASUS", "101", "1234567890123", "MFN-1", "Elko-k7f3a9c2",
                 10.0, "PLN", 5, 1, true, false, true), item.withSupplier("Elko-k7f3a9c2"));
-        assertEquals(new InventoryItem("ASUS", "101", "4006381333931", "MFN-1", "Elko",
-                10.0, "PLN", 5, 1, true, false, true), item.withEan("4006381333931"));
         assertEquals(new InventoryItem("ASUS", "101", "1234567890123", "MFN-1", "Elko",
                 40.0, "EUR", 5, 1, true, false, true), item.toLocalCurrency("EUR", 4.0).orElseThrow());
+        assertEquals(new InventoryItem("Asustek", "101", "4006381333931", "MFN-1", "Elko",
+                10.0, "PLN", 5, 1, true, false, true), item.withBrandAndEan("Asustek", "4006381333931"));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "1111111111111"})
+    void itemWithoutARealEanRequiresEanCorrection(String ean) {
+        // when / then
+        assertTrue(new InventoryItem(ean, "MFN-1", 10.0, "PLN", 5, 1, "Elko").requiresEanCorrection());
+    }
+
+    @Test
+    void itemWithAnEanRequiresNoEanCorrection() {
+        // when / then
+        assertFalse(new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 5, 1, "Elko").requiresEanCorrection());
+    }
+
+    @Test
+    void copyWithTheSameBrandAndEanIsTheSameRecord() {
+        // given
+        InventoryItem item = new InventoryItem("ASUS", "101", "1234567890123", "MFN-1", "Elko",
+                10.0, "PLN", 5, 1, true, false, true);
+
+        // when
+        InventoryItem copy = item.withBrandAndEan(new String("ASUS"), "1234567890123");
+
+        // then
+        assertSame(item, copy);
     }
 
     @Test

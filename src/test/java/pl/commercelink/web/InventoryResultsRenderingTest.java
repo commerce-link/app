@@ -57,8 +57,26 @@ class InventoryResultsRenderingTest {
     private static OfferRow offer(String supplier, String label, ConnectionMode mode, String ean, String code,
                                   double net, double gross, double delivery, double freeFrom, boolean deliveryKnown,
                                   int leadDays, int qty, boolean cheapest, boolean sharesLabel, CodeMatch match) {
-        return new OfferRow(supplier, label, mode, ean, code, net, gross, delivery, freeFrom, deliveryKnown,
+        return new OfferRow(supplier, label, mode, null, ean, code, net, gross, delivery, freeFrom, deliveryKnown,
                 leadDays, qty, cheapest, sharesLabel, match);
+    }
+
+    @Test
+    void offerShowsTheBrandItCameWith() {
+        // given
+        InventorySearchResult.Found found = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
+                List.of(new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "Logitech", "5901234123457", "910-006559",
+                                405.0, 498.15, 0, 0, true, 2, 80, true, false, CodeMatch.SAME),
+                        offer("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559",
+                                410.0, 504.30, 0, 0, true, 2, 10, false, false, CodeMatch.SAME)),
+                List.of(), new PriceSummary(405.0, 405.0, 0, 2, 90, 0, 0, false), true);
+
+        // when
+        String html = engine.process(RESULTS, context(found, true));
+
+        // then
+        assertThat(html.split("Brand: Logitech", -1)).hasSize(2);
+        assertThat(html.substring(html.indexOf("Elko"))).doesNotContain("Brand:");
     }
 
     @Test

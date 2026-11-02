@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -66,6 +67,14 @@ public record InventoryItem(
         return ean != null && !ean.isBlank() && !MISSING_EAN_PLACEHOLDER.equalsIgnoreCase(ean);
     }
 
+    public boolean requiresEanCorrection() {
+        return !hasEan();
+    }
+
+    public boolean requiresBrandCorrection() {
+        return true;
+    }
+
     public boolean hasMfn() {
         return mfn != null && !mfn.isBlank() && !MISSING_MFN_PLACEHOLDERS.contains(mfn);
     }
@@ -85,8 +94,11 @@ public record InventoryItem(
                 qty, leadTimeDays, sellable, inStock, inDelivery));
     }
 
-    public InventoryItem withEan(String newEan) {
-        return new InventoryItem(brand, sku, newEan, mfn, supplier, netPrice, currency, qty, leadTimeDays,
+    InventoryItem withBrandAndEan(String newBrand, String newEan) {
+        if (Objects.equals(brand, newBrand) && Objects.equals(ean, newEan)) {
+            return this;
+        }
+        return new InventoryItem(newBrand, sku, newEan, mfn, supplier, netPrice, currency, qty, leadTimeDays,
                 sellable, inStock, inDelivery);
     }
 

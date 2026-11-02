@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -155,6 +156,21 @@ class InventorySearchTest {
         assertThat(found.matchedBy()).isEqualTo(MatchedBy.EAN);
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko");
         assertThat(found.supplierOffers().get(0).mode()).isEqualTo(ConnectionMode.GLOBAL);
+    }
+
+    @Test
+    void offerRowCarriesTheOfferBrand() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                new InventoryItem("Logitech", null, EAN, MFN, "Elko", 100.0, "PLN", 5, 1, true, false, false),
+                offer("AB", 110.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplier, OfferRow::brand)
+                .containsExactly(tuple("Elko", "Logitech"), tuple("AB", null));
     }
 
     @Test

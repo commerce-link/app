@@ -12,6 +12,7 @@ import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -189,6 +190,54 @@ class ParsedRowTest {
         assertTrue(parsed.isPresent());
         assertEquals("5901234123457", parsed.get().item().ean());
         assertEquals("SupplierX", parsed.get().item().supplier());
+    }
+
+    @Test
+    void csvRowOutOfStockIsRejectedBeforeItsValuesAreRead() {
+        // given
+        AtomicInteger reads = new AtomicInteger();
+        CsvRowParser parser = row -> countingReads(reads, 0, true);
+
+        // when
+        Optional<ParsedRow> parsed = ParsedRow.tryParse(parser, new String[]{"x"}, SUPPLIER);
+
+        // then
+        assertTrue(parsed.isEmpty());
+        assertEquals(0, reads.get());
+    }
+
+    @Test
+    void csvRowInStockIsAssembledEvenWhenTheAdapterCannotSellIt() {
+        // given
+        CsvRowParser parser = row -> countingReads(new AtomicInteger(), 5, false);
+
+        // when
+        Optional<ParsedRow> parsed = ParsedRow.tryParse(parser, new String[]{"x"}, SUPPLIER);
+
+        // then
+        assertTrue(parsed.isPresent());
+        assertFalse(parsed.get().item().sellable());
+    }
+
+    @Test
+    void negativeStockCountsAsNoStock() {
+        // when / then
+        assertTrue(ParsedRow.hasQty(countingReads(new AtomicInteger(), 1, true)));
+        assertFalse(ParsedRow.hasQty(countingReads(new AtomicInteger(), -1, true)));
+    }
+
+    private static FeedItem countingReads(AtomicInteger reads, int qty, boolean sellable) {
+        return new FeedItem() {
+            public String getEan() { reads.incrementAndGet(); return "5901234123457"; }
+            public String getMfn() { reads.incrementAndGet(); return "MFN-1"; }
+            public String getBrand() { reads.incrementAndGet(); return "ASUS"; }
+            public String getName() { reads.incrementAndGet(); return "GeForce RTX"; }
+            public String getCategory() { reads.incrementAndGet(); return null; }
+            public double getNetPrice() { reads.incrementAndGet(); return 99.99; }
+            public String getCurrency() { reads.incrementAndGet(); return "PLN"; }
+            public int getQty() { return qty; }
+            public boolean isSellable() { return sellable; }
+        };
     }
 
     @Test

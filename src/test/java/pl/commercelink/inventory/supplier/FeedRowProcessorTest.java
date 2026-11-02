@@ -46,7 +46,7 @@ class FeedRowProcessorTest {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedParseStats stats = mock(FeedParseStats.class);
 
@@ -62,11 +62,29 @@ class FeedRowProcessorTest {
     }
 
     @Test
+    void returnedOfferCarriesTheOfferBrand() {
+        // given
+        InventoryItem branded = new InventoryItem("Logitech", null, "1234567890123", "MFN-1", "Acme",
+                10.0, "PLN", 5, 1, true, false, false);
+        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        when(dataCorrection.run(sellableItem)).thenReturn(branded);
+        when(dataCorrection.run(feedProduct, branded)).thenReturn(categorizedTaxonomy);
+        when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
+        FeedParseStats stats = mock(FeedParseStats.class);
+
+        // when
+        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+
+        // then
+        assertEquals("Logitech", result.orElseThrow().brand());
+    }
+
+    @Test
     void pendingEligibleRowGoesOnlyToPendingNotToInventory() {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
@@ -90,7 +108,7 @@ class FeedRowProcessorTest {
         // given -- category mappings are learned per adapter type, not per connection instance
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
@@ -108,7 +126,7 @@ class FeedRowProcessorTest {
         // given -- manual feeds are distinct per connection, so each keeps its own mappings
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
         FeedParseStats stats = mock(FeedParseStats.class);
@@ -126,7 +144,7 @@ class FeedRowProcessorTest {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
         when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(true);
@@ -149,7 +167,7 @@ class FeedRowProcessorTest {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
         when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(false);
@@ -172,7 +190,7 @@ class FeedRowProcessorTest {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedParseStats stats = mock(FeedParseStats.class);
 
@@ -193,7 +211,7 @@ class FeedRowProcessorTest {
         Taxonomy enrichedNoBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", "CPU", 5, null, null);
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(noBrand);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(noBrand);
         when(enrichment.enrich(noBrand)).thenReturn(enrichedNoBrand);
         when(enrichment.isPendingEligible(enrichedNoBrand)).thenReturn(false);
         when(enrichment.hasIdentificationData(enrichedNoBrand)).thenReturn(false);
@@ -215,7 +233,6 @@ class FeedRowProcessorTest {
         InventoryItem noQty = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 0, 1, "Acme", true);
         ParsedRow parsed = new ParsedRow(noQty, feedProduct);
         when(dataCorrection.run(noQty)).thenReturn(noQty);
-        when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
         FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
@@ -230,11 +247,25 @@ class FeedRowProcessorTest {
     }
 
     @Test
+    void taxonomyIsNotCorrectedForAnOfferThatCannotBeSold() {
+        // given
+        InventoryItem noQty = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 0, 1, "Acme", true);
+        when(dataCorrection.run(noQty)).thenReturn(noQty);
+
+        // when
+        processor.process(new ParsedRow(noQty, feedProduct), 0, mock(FeedParseStats.class));
+
+        // then
+        verify(dataCorrection, never()).run(any(SupplierProduct.class), any(InventoryItem.class));
+        verify(enrichment, never()).enrich(any());
+    }
+
+    @Test
     void taxonomyPenaltyIsAppliedBeforeCacheAdd() {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
+        when(dataCorrection.run(feedProduct, sellableItem)).thenReturn(categorizedTaxonomy);
         when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
         FeedParseStats stats = mock(FeedParseStats.class);
 

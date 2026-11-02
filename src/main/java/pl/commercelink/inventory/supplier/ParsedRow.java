@@ -26,11 +26,15 @@ public record ParsedRow(InventoryItem item, SupplierProduct product) {
         return new ParsedRow(item, product);
     }
 
+    public static boolean hasQty(FeedItem feedItem) {
+        return feedItem.getQty() > 0;
+    }
+
     // A value may fail in the adapter's parse or only in a getter, so both are guarded together.
     public static Optional<ParsedRow> tryParse(CsvRowParser parser, String[] row, SupplierInfo supplierInfo) {
         try {
             FeedItem feedItem = parser.parse(row);
-            return feedItem == null ? Optional.empty() : Optional.of(of(feedItem, supplierInfo));
+            return feedItem == null || !hasQty(feedItem) ? Optional.empty() : Optional.of(of(feedItem, supplierInfo));
         } catch (Exception e) {
             return Optional.empty();
         }
