@@ -9,7 +9,7 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
@@ -144,6 +144,7 @@ public class InventorySearch {
                         row.item().supplier(),
                         labels.of(row.item().supplier()),
                         modeOf.apply(row.item().supplier()),
+                        row.item().brand(),
                         row.item().ean(),
                         row.item().mfn(),
                         Price.fromNet(row.item().netPrice()).netValue(),

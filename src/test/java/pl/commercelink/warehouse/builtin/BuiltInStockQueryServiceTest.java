@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;

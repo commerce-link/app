@@ -455,4 +455,15 @@ class ManualSupplierServiceTest {
         assertFalse(service.isLoadable(headerOnly));
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
     }
+
+    @Test
+    void manualFileWithOneFailingRowIsStillAccepted() {
+        // given
+        byte[] csv = ("ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;K-1;Kowal;Kabel HDMI;Kable;abc;PLN;5;2\n"
+                + "5901234123464;K-2;Kowal;Kabel USB;Kable;10,50;PLN;5;2\n").getBytes(StandardCharsets.UTF_8);
+
+        // when / then
+        assertTrue(service.isLoadable(csv));
+    }
 }

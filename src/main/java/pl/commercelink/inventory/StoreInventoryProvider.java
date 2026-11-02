@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
 import pl.commercelink.pim.api.PimCatalog;

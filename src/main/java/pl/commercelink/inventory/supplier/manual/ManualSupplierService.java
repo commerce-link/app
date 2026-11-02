@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
+import pl.commercelink.inventory.supplier.ParsedRow;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
 import pl.commercelink.inventory.supplier.SupplierConnectionValidator;
 import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -228,10 +230,11 @@ public class ManualSupplierService {
     }
 
     private boolean hasAtLeastOneLoadableRow(String identity, byte[] csvBytes) {
-        CsvRowParser parser = new ManualCsvRowParser(identity);
+        CsvRowParser parser = new ManualCsvRowParser();
+        SupplierInfo supplierInfo = ManualSupplierInfos.forIdentity(identity);
         AtomicInteger loadable = new AtomicInteger();
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(csvBytes), StandardCharsets.UTF_8)) {
-            new CSVLoader(reader).readRows(';', row -> parser.tryParse(row).ifPresent(parsed -> {
+            new CSVLoader(reader).readRows(';', row -> ParsedRow.tryParse(parser, row, supplierInfo).ifPresent(parsed -> {
                 if (parsed.item().isSellable()) {
                     loadable.incrementAndGet();
                 }

@@ -1,6 +1,6 @@
 package pl.commercelink.warehouse.api;
 
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.invoicing.api.Price;

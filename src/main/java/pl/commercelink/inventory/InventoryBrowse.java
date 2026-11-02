@@ -6,7 +6,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.search.OfferShipping;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 

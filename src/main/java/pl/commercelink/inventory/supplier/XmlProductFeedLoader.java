@@ -4,9 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
@@ -85,10 +83,12 @@ public class XmlProductFeedLoader {
             while (xsr.hasNext()) {
                 if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
-
-                    ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                    feedRowProcessor.process(parsed, taxonomyPenalty, stats)
-                            .ifPresent(res::add);
+                    if (ParsedRow.hasQty(xmlItem)) {
+                        feedRowProcessor.process(ParsedRow.of(xmlItem, supplierInfo), taxonomyPenalty, stats)
+                                .ifPresent(res::add);
+                    } else {
+                        stats.markInvalid();
+                    }
                 } else {
                     xsr.next();
                 }

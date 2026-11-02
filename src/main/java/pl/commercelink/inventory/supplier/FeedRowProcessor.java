@@ -3,8 +3,6 @@ package pl.commercelink.inventory.supplier;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
@@ -21,12 +19,11 @@ class FeedRowProcessor {
 
     Optional<InventoryItem> process(ParsedRow parsed, int taxonomyPenalty, FeedParseStats stats) {
         InventoryItem item = dataCorrection.run(parsed.item());
-        Taxonomy corrected = dataCorrection.run(parsed.product());
-        if (item == null || corrected == null || !item.isSellable()) {
+        if (!item.isSellable()) {
             stats.markInvalid();
             return Optional.empty();
         }
-
+        Taxonomy corrected = dataCorrection.run(parsed.product(), item);
         Taxonomy taxonomy = enrichment.enrich(corrected);
         Taxonomy deprioritized = StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty);
         if (taxonomy.isProcessable()) {

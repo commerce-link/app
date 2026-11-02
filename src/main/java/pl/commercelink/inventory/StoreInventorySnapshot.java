@@ -1,7 +1,7 @@
 package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
@@ -22,16 +22,18 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             boolean sellable,
             boolean inStock,
             boolean inDelivery,
-            String sku
+            String sku,
+            String brand
     ) {
         static ItemData from(InventoryItem item) {
             return new ItemData(item.ean(), item.mfn(), item.netPrice(), item.currency(),
                     item.qty(), item.leadTimeDays(), item.supplier(),
-                    item.sellable(), item.inStock(), item.inDelivery(), item.sku());
+                    item.sellable(), item.inStock(), item.inDelivery(), item.sku(), item.brand());
         }
 
         InventoryItem toInventoryItem() {
-            return new InventoryItem(ean, mfn, netPrice, currency, qty, leadTimeDays, supplier, sellable, inStock, inDelivery, sku);
+            return new InventoryItem(brand, sku, ean, mfn, supplier, netPrice, currency, qty, leadTimeDays,
+                    sellable, inStock, inDelivery);
         }
     }
 

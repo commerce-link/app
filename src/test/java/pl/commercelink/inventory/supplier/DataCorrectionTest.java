@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import pl.commercelink.inventory.supplier.api.SupplierProduct;
+import pl.commercelink.pim.ScopedPimCatalog;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
@@ -20,8 +20,11 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DataCorrectionTest {
@@ -47,7 +50,7 @@ class DataCorrectionTest {
         PimEntry pim = pimEntry(true, 7000, 9000);
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         assertThat(result.netWeightInGrams()).isEqualTo(7000);
         assertThat(result.grossWeightInGrams()).isEqualTo(9000);
@@ -59,7 +62,7 @@ class DataCorrectionTest {
         PimEntry pim = pimEntry(true, 7000, null);
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         assertThat(result.netWeightInGrams()).isEqualTo(7000);
         assertThat(result.grossWeightInGrams()).isEqualTo(1999);
@@ -78,7 +81,7 @@ class DataCorrectionTest {
         SupplierProduct fromFeed = feed(100, 200);
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(pimEntry);
 
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         assertThat(result.netWeightInGrams()).isEqualTo(100);
         assertThat(result.grossWeightInGrams()).isEqualTo(200);
@@ -90,7 +93,7 @@ class DataCorrectionTest {
         PimEntry pim = pimEntry(true, 7000, 9000);
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         assertThat(result.dataAccuracyScore()).isZero();
     }
@@ -103,7 +106,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.category()).isNull();
@@ -118,7 +121,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.category()).isEqualTo("Karty graficzne");
@@ -134,7 +137,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.categoryId()).isNull();
@@ -147,7 +150,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.empty());
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.category()).isEqualTo("Services");
@@ -161,7 +164,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.ean()).isEqualTo("012345678905");
@@ -175,7 +178,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.ean()).isEqualTo("012345678901");
@@ -192,7 +195,7 @@ class DataCorrectionTest {
         when(pimView.findByGtinOrMpn(anyString(), anyString())).thenReturn(Optional.empty());
 
         // when
-        Taxonomy result = dataCorrection.run(fromFeed);
+        Taxonomy result = taxonomyOf(fromFeed);
 
         // then
         assertThat(result.ean()).isEqualTo("012345678905");
@@ -209,7 +212,7 @@ class DataCorrectionTest {
         when(pimView.findByMpn("MFN")).thenReturn(Optional.of(pim));
 
         // when
-        Optional<String> replacement = dataCorrection.resolveCorrectEanForMfn("", "MFN");
+        Optional<String> replacement = dataCorrection.resolveCorrectEanForMfn("MFN");
 
         // then
         assertThat(replacement).contains("5900000000002");
@@ -222,17 +225,171 @@ class DataCorrectionTest {
                 new PimIdentifier("5900000000002", PimIdentifierType.GTIN),
                 new PimIdentifier("MFN", PimIdentifierType.MPN)),
                 "StoreBrand", "StoreName", "Monitors", null, true, 4000, 5000, null, "s1");
-        DataCorrection correction = new DataCorrection(pl.commercelink.pim.ScopedPimCatalog.of(storeEntry), brandMapper);
+        DataCorrection correction = new DataCorrection(ScopedPimCatalog.of(storeEntry), brandMapper);
         SupplierProduct fromFeed = new SupplierProduct("", "MFN", "FeedBrand", "FeedName", 5, 100, 200);
 
         // when
-        Taxonomy result = correction.run(fromFeed);
+        InventoryItem offer = correction.run(offerOf(fromFeed));
+        Taxonomy result = correction.run(fromFeed, offer);
 
         // then
+        assertThat(offer.ean()).isEmpty();
         assertThat(result.ean()).isEmpty();
         assertThat(result.name()).isEqualTo("FeedName");
         assertThat(result.category()).isNull();
         assertThat(result.netWeightInGrams()).isEqualTo(100);
+    }
+
+    @Test
+    void offerBrandIsTheUnifiedSupplierBrand() {
+        // given
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("PimBrand", true, "5900000000002", "SDSSDA-1T00")), brandMapper);
+        when(brandMapper.unifyBrand("Sandisk")).thenReturn("SanDisk");
+
+        // when
+        InventoryItem result = correction.run(offer("Sandisk", "5900000000002", "SDSSDA-1T00"));
+
+        // then
+        assertThat(result.brand()).isEqualTo("SanDisk");
+    }
+
+    @Test
+    void brandIsUnifiedOncePerRow() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("1234567890123", "MFN", "Sandisk", "FeedName", 5, null, null);
+        when(pimView.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pimEntry(true, null, null)));
+
+        // when
+        taxonomyOf(fromFeed);
+
+        // then
+        verify(brandMapper, times(1)).unifyBrand(any());
+    }
+
+    @Test
+    void offerThatNeedsNoCorrectionIsNotCopied() {
+        // given
+        InventoryItem fromFeed = offer("Logitech", "5900000000002", "910-006559");
+
+        // when
+        InventoryItem result = dataCorrection.run(fromFeed);
+
+        // then
+        assertThat(result).isSameAs(fromFeed);
+    }
+
+    @Test
+    void offerWithoutEanUnknownToPimStaysUnsellable() {
+        // given
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("Trust", true, "5900000000002", "23647")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer("Trust", "", "OTHER-CODE"));
+
+        // then
+        assertThat(result.isSellable()).isFalse();
+    }
+
+    @Test
+    void taxonomyTakesTheEanAndBrandSettledOnTheOffer() {
+        // given
+        SupplierProduct fromFeed = new SupplierProduct("", "23647", null, "FeedName", 5, null, null);
+        InventoryItem corrected = offer("Trust", "5900000000002", "23647");
+
+        // when
+        Taxonomy result = dataCorrection.run(fromFeed, corrected);
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000002");
+        assertThat(result.brand()).isEqualTo("Trust");
+    }
+
+    @Test
+    void offerWithoutBrandTakesTheBrandOfThePimEntryFoundByGtin() {
+        // given
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("Logitech", true, "5900000000002", "910-006559")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer(null, "5900000000002", "MX-MASTER-3S"));
+
+        // then
+        assertThat(result.brand()).isEqualTo("Logitech");
+    }
+
+    @Test
+    void offerWithoutBrandIgnoresAnUnapprovedPimEntry() {
+        // given
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("Logitech", false, "5900000000002", "910-006559")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer(null, "5900000000002", "910-006559"));
+
+        // then
+        assertThat(result.brand()).isNull();
+    }
+
+    @Test
+    void offerWithoutBrandNeverTakesTheBrandOfAnEntryFoundOnlyByMpn() {
+        // given -- a short code can belong to products of two brands
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("Trust", true, "5900000000002", "23647")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer(null, "5900000000009", "23647"));
+
+        // then
+        assertThat(result.brand()).isNull();
+    }
+
+    @Test
+    void offerWithoutBrandAndEanHasNoBrand() {
+        // given -- the EAN filled in from the entry under the code is no proof the entry is this product
+        DataCorrection correction = new DataCorrection(
+                ScopedPimCatalog.of(entryWithBrand("Trust", true, "5900000000002", "23647")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer(null, "", "23647"));
+
+        // then
+        assertThat(result.ean()).isEqualTo("5900000000002");
+        assertThat(result.brand()).isNull();
+    }
+
+    @Test
+    void offerWithThePlaceholderEanTakesNoBrandFromPim() {
+        // given -- the EAN comes from the entry under the code; another entry carries the placeholder as its GTIN
+        DataCorrection correction = new DataCorrection(ScopedPimCatalog.of(
+                entryWithBrand("Trust", true, "5900000000002", "23647"),
+                entryWithBrand("Logitech", true, "1111111111111", "910-006559")), brandMapper);
+
+        // when
+        InventoryItem result = correction.run(offer(null, "1111111111111", "23647"));
+
+        // then
+        assertThat(result.brand()).isNull();
+    }
+
+    private Taxonomy taxonomyOf(SupplierProduct product) {
+        return dataCorrection.run(product, dataCorrection.run(offerOf(product)));
+    }
+
+    private static InventoryItem offerOf(SupplierProduct product) {
+        return offer(product.brand(), product.ean(), product.mfn());
+    }
+
+    private static InventoryItem offer(String brand, String ean, String mfn) {
+        return new InventoryItem(brand, null, ean, mfn, "Acme", 10.0, "PLN", 5, 1, true, false, false);
+    }
+
+    private static PimEntry entryWithBrand(String brand, boolean approved, String gtin, String mpn) {
+        return new PimEntry("pim-" + gtin, List.of(
+                new PimIdentifier(gtin, PimIdentifierType.GTIN),
+                new PimIdentifier(mpn, PimIdentifierType.MPN)),
+                brand, "PimName", null, null, approved, null, null);
     }
 
     private SupplierProduct feed(Integer net, Integer gross) {

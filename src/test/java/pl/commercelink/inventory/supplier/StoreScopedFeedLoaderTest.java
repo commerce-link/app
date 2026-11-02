@@ -10,14 +10,12 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryRepository;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
+import pl.commercelink.inventory.supplier.api.FeedItem;
 import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierType;
-import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
@@ -26,13 +24,14 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import java.io.FileNotFoundException;
 import java.io.StringReader;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,13 +85,26 @@ class StoreScopedFeedLoaderTest {
                 new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())));
     }
 
+    private static FeedItem feedItem(String netPrice) {
+        return new FeedItem() {
+            public String getEan() { return "5900000000001"; }
+            public String getMfn() { return "MFN1"; }
+            public String getBrand() { return "Brand"; }
+            public String getName() { return "Name"; }
+            public String getCategory() { return "CPU"; }
+            public double getNetPrice() { return Double.parseDouble(netPrice); }
+            public String getCurrency() { return "PLN"; }
+            public int getQty() { return 1; }
+        };
+    }
+
     @Test
     void csvStoreOverloadReturnsEmptyWhenStoreFeedNotReadable() {
         // given
         when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(false);
 
         // when
-        List<?> result = loader.fetch(mock(CsvRowParser.class), ';', "store-1", "Action", 0);
+        List<?> result = loader.fetch(mock(CsvRowParser.class), ';', "store-1", supplierInfo("Action"), 0);
 
         // then
         assertTrue(result.isEmpty());
@@ -106,18 +118,53 @@ class StoreScopedFeedLoaderTest {
         when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
 
         CsvRowParser parser = mock(CsvRowParser.class);
-        InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
+        when(parser.parse(any())).thenReturn(feedItem("10.0"));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        loader.fetch(parser, ';', "store-1", "Action", 1000);
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 1000);
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
         verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
         assertEquals(1000, captor.getValue());
+    }
+
+    @Test
+    void csvRowIsAssembledWithTheSupplierInfoOfTheFeed() throws Exception {
+        // given
+        when(storeFeedRepository.canRead("store-1", "Action-k7f3a9c2", "csv")).thenReturn(true);
+        when(storeFeedRepository.read("store-1", "Action-k7f3a9c2", "csv")).thenReturn(new StringReader("header\nrow"));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        when(parser.parse(any())).thenReturn(feedItem("10.0"));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        loader.fetch(parser, ';', "store-1", supplierInfo("Action-k7f3a9c2"), 0);
+
+        // then
+        ArgumentCaptor<ParsedRow> captor = ArgumentCaptor.forClass(ParsedRow.class);
+        verify(feedRowProcessor).process(captor.capture(), anyInt(), any(FeedParseStats.class));
+        assertEquals("Action-k7f3a9c2", captor.getValue().item().supplier());
+        assertEquals(5, captor.getValue().product().dataAccuracyScore());
+        assertEquals("CPU", captor.getValue().product().rawCategory());
+    }
+
+    @Test
+    void csvRowWithAFailingValueIsInvalid() throws Exception {
+        // given
+        when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
+        when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(new StringReader("header\nrow"));
+        CsvRowParser parser = mock(CsvRowParser.class);
+        when(parser.parse(any())).thenReturn(feedItem("abc"));
+        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        List<?> result = loader.fetch(parser, ';', "store-1", supplierInfo("Action"), 0);
+
+        // then
+        assertTrue(result.isEmpty());
+        verify(feedRowProcessor, never()).process(any(), anyInt(), any());
     }
 
     @Test
@@ -155,13 +202,11 @@ class StoreScopedFeedLoaderTest {
         when(inventoryRepository.read("Action")).thenReturn(new StringReader("header\nrow"));
 
         CsvRowParser parser = mock(CsvRowParser.class);
-        InventoryItem item = new InventoryItem("5900000000001", "MFN1", 10.0, "PLN", 1, 1, "Action", true, true, false);
-        SupplierProduct product = new SupplierProduct("5900000000001", "MFN1", "Brand", "Name", 5, null, null);
-        when(parser.tryParse(any())).thenReturn(Optional.of(new ParsedRow(item, product)));
+        when(parser.parse(any())).thenReturn(feedItem("10.0"));
         when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        loader.fetch(parser, ';', "Action");
+        loader.fetch(parser, ';', supplierInfo("Action"));
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);

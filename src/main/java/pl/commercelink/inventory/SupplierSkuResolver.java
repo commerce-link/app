@@ -2,7 +2,7 @@ package pl.commercelink.inventory;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.stores.SupplierScope;
 
 import java.util.List;

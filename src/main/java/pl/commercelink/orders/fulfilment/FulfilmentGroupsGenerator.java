@@ -1,6 +1,6 @@
 package pl.commercelink.orders.fulfilment;
 
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.orders.OrderItem;
 import java.util.*;

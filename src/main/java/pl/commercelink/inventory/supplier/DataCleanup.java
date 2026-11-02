@@ -1,7 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
 
 import java.util.ArrayList;
 import java.util.HashMap;

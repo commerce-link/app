@@ -1,10 +1,11 @@
 package pl.commercelink.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
 class StoreInventorySnapshotTest {
@@ -21,8 +23,11 @@ class StoreInventorySnapshotTest {
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 
     private static final InventoryItem ITEM =
-            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true)
-                    .withSku("ACME-5900000000002");
+            new InventoryItem("5900000000002", "MFN-1", 19.99, "EUR", 7, 3, "Acme", true, false, true,
+                    "ACME-5900000000002");
+    private static final InventoryItem BRANDED_ITEM =
+            new InventoryItem("Logitech", "ACME-5900000000002", "5900000000002", "MFN-1", "Acme",
+                    19.99, "EUR", 7, 3, true, false, true);
     private static final Set<String> KEY_EANS = Set.of("5900000000002", "4011200296908");
     private static final Set<String> KEY_CODES = Set.of("MFN-1");
 
@@ -82,6 +87,42 @@ class StoreInventorySnapshotTest {
         assertEquals(List.of("MFN-1"), List.copyOf(m.getInventoryKey().getProductCodes()));
         assertEquals(KEY_EANS, Set.copyOf(m.getInventoryKey().getProductEans()));
         assertEquals(LocalDateTime.of(2026, 6, 17, 10, 0), restored.builtAt());
+    }
+
+    @Test
+    void brandSurvivesTheRoundTrip() throws Exception {
+        // given
+        StoreInventorySnapshot snapshot = StoreInventorySnapshot.from(inventoryOf(BRANDED_ITEM));
+
+        // when
+        StoreInventorySnapshot back = objectMapper.readValue(objectMapper.writeValueAsString(snapshot), StoreInventorySnapshot.class);
+
+        // then
+        InventoryItem restored = back.toStoreInventory(taxonomyCache, supplierRegistry).items().iterator().next()
+                .getInventoryItems().get(0);
+        assertEquals(BRANDED_ITEM, restored);
+    }
+
+    @Test
+    void snapshotWrittenBeforeBrandsReadsWithoutBrand() throws Exception {
+        // given
+        ObjectNode json = objectMapper.valueToTree(StoreInventorySnapshot.from(inventoryOf(BRANDED_ITEM)));
+        ((ObjectNode) json.at("/entries/0/items/0")).remove("brand");
+
+        // when
+        StoreInventorySnapshot back = objectMapper.treeToValue(json, StoreInventorySnapshot.class);
+
+        // then
+        InventoryItem restored = back.toStoreInventory(taxonomyCache, supplierRegistry).items().iterator().next()
+                .getInventoryItems().get(0);
+        assertNull(restored.brand());
+        assertEquals("5900000000002", restored.ean());
+    }
+
+    private StoreInventory inventoryOf(InventoryItem item) {
+        MatchedInventory matched = new MatchedInventory(new InventoryKey(KEY_EANS, KEY_CODES),
+                List.of(item), taxonomyCache, supplierRegistry);
+        return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
     @Test

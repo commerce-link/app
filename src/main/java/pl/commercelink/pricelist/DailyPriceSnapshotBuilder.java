@@ -2,7 +2,7 @@ package pl.commercelink.pricelist;
 
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 
 import java.time.LocalDate;

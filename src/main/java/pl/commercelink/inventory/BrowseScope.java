@@ -1,6 +1,6 @@
 package pl.commercelink.inventory;
 
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -9,7 +9,7 @@ import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
 
 import java.util.List;
@@ -40,7 +40,7 @@ class InventoryLoad {
 
     private List<InventoryItem> fetchItems(SupplierProviderDescriptor supplierDescriptor) {
         return switch (supplierDescriptor.feedFormat()) {
-            case FeedFormat.Csv csv -> csvProductFeedLoader.fetch(csv.parser(), csv.separator(), supplierDescriptor.supplierInfo().name());
+            case FeedFormat.Csv csv -> csvProductFeedLoader.fetch(csv.parser(), csv.separator(), supplierDescriptor.supplierInfo());
             case FeedFormat.Xml xml -> xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), supplierDescriptor.supplierInfo());
         };
     }

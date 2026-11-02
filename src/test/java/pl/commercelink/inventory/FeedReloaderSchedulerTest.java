@@ -10,8 +10,7 @@ import pl.commercelink.inventory.supplier.CsvProductFeedLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.XmlProductFeedLoader;
 import pl.commercelink.inventory.supplier.api.FeedFormat;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
+import pl.commercelink.inventory.supplier.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.api.SupplierType;
@@ -130,11 +129,6 @@ class FeedReloaderSchedulerTest {
         @Override
         public String getCurrency() {
             return null;
-        }
-
-        @Override
-        public ParsedRow toParsedRow(SupplierInfo supplierInfo) {
-            return new ParsedRow(null, null);
         }
     }
 }
