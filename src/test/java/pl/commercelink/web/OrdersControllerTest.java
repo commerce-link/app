@@ -3938,6 +3938,26 @@ class OrdersControllerTest {
         }
 
         @Test
+        void linkOfferRefusesClosedOrder() {
+            // given
+            Order order = order(OrderStatus.Cancelled);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.error.closed");
+            verifyNoInteractions(marketplaceOfferLinking);
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
         void linkOfferRedirectsToDetails() {
             // given
             Order order = order(OrderStatus.New);

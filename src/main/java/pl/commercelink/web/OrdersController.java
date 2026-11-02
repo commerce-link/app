@@ -1298,6 +1298,10 @@ public class OrdersController extends BaseController {
     public String linkOffer(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String pimId,
                             RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the page of a closed order has no item menu; a stale page must not save a link or fill its items either
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         OrderItem orderItem = requireItem(orderId, itemId);
         // the rule of "Assign SKU": the codes are filled before fulfilment only
         if (!orderItem.isNew() || orderItem.isGroup()) {
