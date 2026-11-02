@@ -28,6 +28,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
+import pl.commercelink.marketplace.links.MarketplaceOfferLinking;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
@@ -230,6 +231,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ReceiptAttemptService receiptAttemptService;
+
+    @Autowired
+    private MarketplaceOfferLinking marketplaceOfferLinking;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1286,6 +1290,27 @@ public class OrdersController extends BaseController {
         }
         orderItem.setSku(sku);
         orderItemsRepository.save(orderItem);
+        return details(orderId);
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/link-offer")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String linkOffer(@PathVariable String orderId, @RequestParam String itemId, @RequestParam String pimId,
+                            RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        OrderItem orderItem = requireItem(orderId, itemId);
+        // the rule of "Assign SKU": the codes are filled before fulfilment only
+        if (!orderItem.isNew() || orderItem.isGroup()) {
+            return refuse(redirectAttributes, orderId, "order.item.link.offer.locked", locale);
+        }
+        MarketplaceOfferLinking.LinkResult result;
+        try {
+            result = marketplaceOfferLinking.link(getStoreId(), order, itemId, pimId, getUserId());
+        } catch (IllegalArgumentException e) {
+            return refuse(redirectAttributes, orderId, e.getMessage(), locale);
+        }
+        OrderFlash.saved(redirectAttributes,
+                messageSource.getMessage("order.item.link.offer.done", new Object[]{result.updatedItems()}, locale));
         return details(orderId);
     }
 

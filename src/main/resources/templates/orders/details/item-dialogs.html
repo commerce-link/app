@@ -68,6 +68,58 @@
         </form>
     </dialog>
 
+    <!--/* One product from a catalog's pricelist (the source of Assign SKU); the post saves the offer link and fills the
+           item and the store's other New items with the same offer. */-->
+    <dialog class="cl-dialog is-form is-wide" id="link-offer-dialog" aria-labelledby="link-offer-title">
+        <form method="post" th:action="@{/dashboard/orders/{o}/link-offer(o=${page.orderId()})}" data-cl-link-offer>
+            <h2 class="cl-dialog-title" id="link-offer-title" th:text="#{order.item.menu.link.offer}"></h2>
+            <div class="cl-dialog-body">
+                <input type="hidden" name="itemId" data-cl-item-id>
+                <input type="hidden" name="pimId" data-cl-link-pim>
+                <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
+                <dl class="cl-kv">
+                    <div><dt th:text="#{order.item.link.offer.key}"></dt><dd><code class="cl-code" data-cl-link-key></code></dd></div>
+                </dl>
+                <div class="cl-form-grid">
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="link-offer-catalog" th:text="#{order.item.assign.sku.catalog}"></label>
+                        <select class="cl-select" id="link-offer-catalog" data-cl-link-catalog th:attr="data-url=@{/dashboard/pricelist}">
+                            <option value="" th:text="#{orders.select.catalog}"></option>
+                            <option th:each="catalog : ${items.catalogs()}" th:value="${catalog.catalogId}" th:text="${catalog.name}"></option>
+                        </select>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="link-offer-category" th:text="#{order.item.category}"></label>
+                        <select class="cl-select" id="link-offer-category" data-cl-link-category th:attr="data-placeholder=#{offers.select.category}"></select>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="link-offer-search" th:text="#{general.search}"></label>
+                        <input class="cl-input" id="link-offer-search" type="search" data-cl-link-search
+                               th:placeholder="#{order.item.assign.sku.search.placeholder}">
+                    </div>
+                </div>
+                <table class="cl-table is-compact">
+                    <caption class="cl-visually-hidden" th:text="#{order.item.assign.sku.table}"></caption>
+                    <thead><tr>
+                        <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{order.item.assign.sku.pick}"></span></th>
+                        <th scope="col" th:text="#{order.item.name}"></th>
+                        <th scope="col" th:text="#{order.item.assign.sku.label}"></th>
+                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{order.item.price}"></th>
+                    </tr></thead>
+                    <tbody data-cl-link-rows></tbody>
+                </table>
+                <p class="cl-list-empty" data-cl-link-none hidden th:text="#{order.item.assign.sku.no.results}"></p>
+                <p class="cl-dialog-effect" th:text="#{order.item.link.offer.effect}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-link-submit disabled th:text="#{order.item.link.offer.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                <span class="cl-help" data-cl-link-hint th:text="#{order.item.link.offer.empty.hint}"></span>
+            </div>
+        </form>
+    </dialog>
+
     <dialog class="cl-dialog is-form" id="assign-supplier-dialog" aria-labelledby="assign-supplier-title">
         <form th:replace="~{orders/details/item-dialogs :: supplierForm}"></form>
     </dialog>

@@ -23,7 +23,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                            ItemMargin margin, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
                            boolean deliveryToCreate, boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
                            boolean removable, List<ItemAction.State> actions, String editHref, double price, double tax,
-                           boolean group, String viewHref) {
+                           boolean group, String viewHref, boolean unlinkedOffer, String marketplaceOfferKey) {
 
     /**
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
@@ -71,7 +71,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
-                context.readOnly() && !context.superAdmin() ? itemHref : null);
+                context.readOnly() && !context.superAdmin() ? itemHref : null,
+                item.isUnlinkedMarketplaceItem(), item.getMarketplaceOfferKey());
     }
 
     /**
@@ -95,9 +96,9 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         return sku != null && !sku.equals(mfn);
     }
 
-    /** The markers after the name: condition and service pills and the comment toggle. */
+    /** The markers after the name: condition, service and unlinked-offer pills and the comment toggle. */
     public boolean hasMarkers() {
-        return conditionKey != null || service || comment != null;
+        return conditionKey != null || service || unlinkedOffer || comment != null;
     }
 
     /** Any part of the codes line under the name: category, MFN, SKU, SN. */
@@ -140,6 +141,10 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 : item.isNew() ? null
                 : "order.item.unavailable.not.new";
         if (!releaseFirst) {
+            // only an imported line that carries the seller's offer key can be linked; older lines keep "Assign SKU"
+            if (item.isUnlinkedMarketplaceItem()) {
+                states.add(ItemAction.State.of(ItemAction.LINK_OFFER, assignReason, null));
+            }
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
             states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));
             // a marketplace-routed order keeps the supplier the marketplace chose; the server refuses the warehouse too

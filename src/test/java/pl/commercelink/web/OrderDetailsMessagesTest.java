@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.marketplace.links.MarketplaceOfferLinking;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -61,6 +62,23 @@ class OrderDetailsMessagesTest {
 
         // then
         assertThat(missing).isEmpty();
+    }
+
+    @Test
+    void theOfferLinkRefusalsAndOutcomeExistInBothBundles() throws IOException {
+        // given
+        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
+        List<String> keys = List.of(
+                MarketplaceOfferLinking.NO_OFFER_KEY,
+                MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
+                MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
+                "order.item.link.offer.done");
+
+        // then
+        for (Properties bundle : List.of(pl, en)) {
+            assertThat(keys).allSatisfy(key -> assertThat(bundle.getProperty(key)).as(key).isNotBlank());
+            assertThat(bundle.getProperty("order.item.link.offer.done")).contains("{0}");
+        }
     }
 
     @Test

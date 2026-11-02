@@ -209,6 +209,8 @@ class OrdersControllerTest {
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock
     private ReceiptAttemptService receiptAttemptService;
+    @Mock
+    private pl.commercelink.marketplace.links.MarketplaceOfferLinking marketplaceOfferLinking;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -3914,6 +3916,65 @@ class OrdersControllerTest {
             // then
             assertThat(fresh.getSku()).isEqualTo("X:Y");
             verify(orderItemsRepository).save(fresh);
+        }
+
+        @Test
+        void linkOfferRefusesItemThatIsNotNew() {
+            // given
+            Order order = order(OrderStatus.Assembly);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem ordered = item("i1", FulfilmentStatus.Ordered, "RAW-1");
+            ordered.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(ordered);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.locked");
+            verifyNoInteractions(marketplaceOfferLinking);
+        }
+
+        @Test
+        void linkOfferRedirectsToDetails() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-1", null))
+                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.linkOffer(ORDER_ID, "i1", "pim-1", redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.done [3]");
+        }
+
+        @Test
+        void linkOfferShowsWhyTheProductCannotBeLinked() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "pim-x", null)).thenThrow(
+                    new IllegalArgumentException(pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "pim-x", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage",
+                    pl.commercelink.marketplace.links.MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG);
         }
 
         @Test

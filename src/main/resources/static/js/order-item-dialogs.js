@@ -1,6 +1,7 @@
 // Dialogs of the order's items (orders details), opened by dialog.js from the row menu: the menu entry's data
 // attributes (item id, name, sku, category, qty, price, tax) fill the dialog on cl:dialog-open. Assign SKU picks codes
-// from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Assign supplier offers
+// from a catalog's pricelist (fetched once per catalog) or typed by hand and joins them with ":"; Link to product picks
+// one product of that pricelist and posts its pimId; Assign supplier offers
 // the item's own codes and turns a gross price net with the item's VAT for the hint (the server converts it); Assign
 // from warehouse lists the stock of the item's category; Split bundle keeps the rows numbered rows[0..n] and the total
 // balanced; Serial numbers never submit on Enter; Move previews the target order.
@@ -266,6 +267,130 @@
         });
         form.addEventListener('submit', function (event) {
             if (selected.length === 0) {
+                event.preventDefault();
+            }
+        });
+    })();
+
+    // --- Link offer to product ------------------------------------------------------------------------------------
+    // One product from the same pricelist Assign SKU reads; its pimId is posted, the server fills the codes.
+    (function () {
+        var dialog = document.getElementById('link-offer-dialog');
+        if (!dialog) {
+            return;
+        }
+        var form = dialog.querySelector('form');
+        var catalog = dialog.querySelector('[data-cl-link-catalog]');
+        var category = dialog.querySelector('[data-cl-link-category]');
+        var search = dialog.querySelector('[data-cl-link-search]');
+        var rows = dialog.querySelector('[data-cl-link-rows]');
+        var pimId = dialog.querySelector('[data-cl-link-pim]');
+        var cache = {};
+        var data = [];
+
+        function load(catalogId, done) {
+            if (!catalogId) {
+                data = [];
+                done();
+                return;
+            }
+            if (cache[catalogId]) {
+                data = cache[catalogId];
+                done();
+                return;
+            }
+            fetch(catalog.getAttribute('data-url') + '?catalogId=' + encodeURIComponent(catalogId))
+                .then(function (response) {
+                    return response.ok ? response.json() : [];
+                })
+                .catch(function () {
+                    return [];
+                })
+                .then(function (loaded) {
+                    cache[catalogId] = loaded.filter(function (p) {
+                        return p.pimId;
+                    });
+                    data = cache[catalogId];
+                    done();
+                });
+        }
+
+        function refreshCategories() {
+            var values = data.map(function (p) {
+                return p.category;
+            }).filter(function (value, index, all) {
+                return value && all.indexOf(value) === index;
+            });
+            category.replaceChildren(new Option(category.getAttribute('data-placeholder'), ''));
+            values.forEach(function (value) {
+                category.appendChild(new Option(value, value));
+            });
+            renderTable();
+        }
+
+        function choose(id) {
+            pimId.value = id;
+            dialog.querySelector('[data-cl-link-submit]').disabled = !id;
+            dialog.querySelector('[data-cl-link-hint]').hidden = !!id;
+        }
+
+        function renderTable() {
+            var term = search.value.trim().toLowerCase();
+            var shown = data.filter(function (p) {
+                return (!category.value || p.category === category.value)
+                    && (!term || (p.name || '').toLowerCase().indexOf(term) >= 0 || (p.mfn || '').toLowerCase().indexOf(term) >= 0);
+            });
+            rows.replaceChildren();
+            shown.forEach(function (p) {
+                var row = document.createElement('tr');
+                row.classList.toggle('is-selected', p.pimId === pimId.value);
+                var check = document.createElement('td');
+                check.className = 'cl-table-check';
+                var radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'link-offer-product';
+                radio.className = 'cl-check-input';
+                radio.checked = p.pimId === pimId.value;
+                radio.setAttribute('aria-label', p.name || p.mfn || p.pimId);
+                check.appendChild(radio);
+                row.appendChild(check);
+                cell(row, p.name);
+                cell(row, p.label);
+                cell(row, p.mfn, 'cl-table-code');
+                cell(row, format(p.price), 'is-numeric');
+                row.addEventListener('click', function () {
+                    choose(p.pimId);
+                    renderTable();
+                });
+                rows.appendChild(row);
+            });
+            dialog.querySelector('[data-cl-link-none]').hidden = shown.length > 0;
+        }
+
+        dialog.addEventListener('cl:dialog-open', function (event) {
+            var trigger = event.detail.trigger;
+            fillContext(dialog, trigger);
+            dialog.querySelector('[data-cl-link-key]').textContent = trigger.getAttribute('data-offer-key') || '';
+            search.value = '';
+            choose('');
+            if (!catalog.value && catalog.options.length === 2) {
+                catalog.selectedIndex = 1;
+            }
+            load(catalog.value, refreshCategories);
+        });
+        catalog.addEventListener('change', function () {
+            choose('');
+            load(catalog.value, refreshCategories);
+        });
+        category.addEventListener('change', renderTable);
+        search.addEventListener('input', renderTable);
+        search.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+            }
+        });
+        form.addEventListener('submit', function (event) {
+            if (!pimId.value) {
                 event.preventDefault();
             }
         });

@@ -64,6 +64,11 @@ public class MarketplaceOfferResolver {
         return Optional.empty();
     }
 
+    /** Whether a product of the store's catalogs carries this pimId (what an operator may link an offer to). */
+    public boolean isInStoreCatalog(String storeId, String pimId) {
+        return catalogProduct(storeId, pimId).isPresent();
+    }
+
     // a store's clone replaces its source for that store, so it wins over the source entry
     private Optional<PimEntry> entryOf(PimView view, String storeId, String pimId) {
         if (StringUtils.isBlank(pimId)) {

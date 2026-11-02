@@ -173,4 +173,28 @@ class MarketplaceOfferResolverTest {
         // then
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void aProductCountsAsInTheStoreCatalogOnlyInTheStoresOwnCategories() {
+        // given
+        MarketplaceOfferResolver resolver = resolverOver(ScopedPimCatalog.of(
+                globalEntry("pim-1", "5900000000011", "M1", "cat-a")));
+        CategoryDefinition category = new CategoryDefinition();
+        category.setCategoryId("c1");
+        ProductCatalog catalog = new ProductCatalog(STORE, "main");
+        catalog.setCategories(List.of(category));
+        when(catalogs.findAll(STORE)).thenReturn(List.of(catalog));
+        Product own = new Product("c1");
+        own.setProductId("p1");
+        Product foreign = new Product("other-store-category");
+        foreign.setProductId("p2");
+        when(products.findAllByPimId("pim-1")).thenReturn(List.of(own));
+        when(products.findAllByPimId("pim-2")).thenReturn(List.of(foreign));
+        when(products.findByProductId("c1", "p1")).thenReturn(own);
+
+        // when / then
+        assertThat(resolver.isInStoreCatalog(STORE, "pim-1")).isTrue();
+        assertThat(resolver.isInStoreCatalog(STORE, "pim-2")).isFalse();
+        assertThat(resolver.isInStoreCatalog(STORE, "pim-unknown")).isFalse();
+    }
 }
