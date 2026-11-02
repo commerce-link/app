@@ -367,7 +367,7 @@ class MarketplaceOfferMatchingTest {
         // when
         OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(offer("SILLO-1", "5903771700818"))));
 
-        // then the link is saved anyway: it starts working once the product is added to the catalog
+        // then the link is saved anyway: imports use it now, price and export once the product is in the catalog
         assertThat(savedLink().getPimId()).isEqualTo("pim-1");
         assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-1");
         assertThat(result.linked()).isEmpty();
