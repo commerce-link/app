@@ -2,8 +2,11 @@ package pl.commercelink.web.settings;
 
 import pl.commercelink.marketplace.links.OfferMatchResult;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -11,7 +14,7 @@ import java.util.Set;
 /**
  * The latest offer matching run as the "Dopasuj oferty" page shows it: one group per outcome, each with its full count
  * but at most {@link #ROW_LIMIT} rows, since a store can have thousands of offers in one group. The EANs of the groups
- * whose products have to be added to a catalog are given in full, one per line, to paste into the catalog screens.
+ * whose products have to be added to a catalog are given in full (one per active offer), one per line, to paste into the catalog screens.
  */
 public record OfferMatchingView(String finishedAt, int total, int ownOffers, int alreadyLinked, List<Group> groups) {
 
@@ -38,16 +41,29 @@ public record OfferMatchingView(String finishedAt, int total, int ownOffers, int
 
     private static Group group(String name, List<OfferMatchResult.Row> rows, boolean eansToCopy) {
         List<OfferMatchResult.Row> all = rows == null ? List.of() : rows;
+        // active offers first (stable), so the capped rows show the ones that matter
+        List<OfferMatchResult.Row> ordered = all.stream()
+                .sorted(Comparator.comparing((OfferMatchResult.Row row) -> !isActive(row))).toList();
         return new Group(name, all.size(),
-                all.stream().limit(ROW_LIMIT).map(OfferMatchingView::row).toList(),
-                eansToCopy && !all.isEmpty() ? eans(all) : null);
+                ordered.stream().limit(ROW_LIMIT).map(OfferMatchingView::row).toList(),
+                eansToCopy && !all.isEmpty() ? eans(ordered) : null);
     }
 
+    private static boolean isActive(OfferMatchResult.Row row) {
+        return !Boolean.FALSE.equals(row.active());
+    }
+
+    /**
+     * One EAN per active offer: the linked entry's primary GTIN when known, else the offer's first EAN. Every EAN of an
+     * offer would add the same product to the catalog several times, and an inactive offer is not worth a catalog slot.
+     */
     private static String eans(List<OfferMatchResult.Row> rows) {
         Set<String> eans = new LinkedHashSet<>();
-        rows.forEach(row -> {
-            if (row.eans() != null) {
-                eans.addAll(row.eans());
+        rows.stream().filter(OfferMatchingView::isActive).forEach(row -> {
+            if (StringUtils.isNotBlank(row.catalogEan())) {
+                eans.add(row.catalogEan());
+            } else if (row.eans() != null && !row.eans().isEmpty()) {
+                eans.add(row.eans().get(0));
             }
         });
         return String.join("\n", eans);
@@ -57,12 +73,12 @@ public record OfferMatchingView(String finishedAt, int total, int ownOffers, int
         String reason = row.reason();
         return new Row(row.sellerOfferKey(), row.title(), row.eans() == null ? List.of() : row.eans(), row.pimId(),
                 reason != null && KNOWN_REASONS.contains(reason) ? REASON_KEY + reason : null,
-                OfferMatchResult.ALREADY_LINKED.equals(reason));
+                OfferMatchResult.ALREADY_LINKED.equals(reason), isActive(row));
     }
 
     /**
-     * @param eans the distinct EANs of every offer in the group, one per line, or null when the group has nothing to
-     *             add to a catalog
+     * @param eans one EAN per active offer in the group, one per line, or null when the group has nothing to add to a
+     *             catalog
      */
     public record Group(String name, int count, List<Row> rows, String eans) {
 
@@ -74,8 +90,9 @@ public record OfferMatchingView(String finishedAt, int total, int ownOffers, int
     /**
      * @param reasonKey    message key of the reason an offer was left to review, or null
      * @param linkedBefore the offer was linked by an earlier run; its product is still missing from the catalog
+     * @param active       the offer is on sale on the marketplace
      */
     public record Row(String sellerOfferKey, String title, List<String> eans, String pimId, String reasonKey,
-                      boolean linkedBefore) {
+                      boolean linkedBefore, boolean active) {
     }
 }

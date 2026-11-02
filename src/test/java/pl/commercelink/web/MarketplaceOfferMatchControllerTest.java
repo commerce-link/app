@@ -124,7 +124,7 @@ class MarketplaceOfferMatchControllerTest {
         assertThat(matching.groups()).extracting(OfferMatchingView.Group::name)
                 .containsExactly("linked", "notInCatalog", "noPimEntry", "toReview");
         assertThat(matching.groups()).extracting(OfferMatchingView.Group::count).containsExactly(1, 1, 2, 1);
-        assertThat(matching.group("noPimEntry").eans()).isEqualTo("5901234123459\n5901234123460");
+        assertThat(matching.group("noPimEntry").eans()).isEqualTo("5901234123459");
         assertThat(matching.group("notInCatalog").eans()).isEqualTo("5901234123458");
         assertThat(matching.group("linked").eans()).isNull();
         assertThat(matching.group("toReview").eans()).isNull();

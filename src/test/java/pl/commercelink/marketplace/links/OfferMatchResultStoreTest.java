@@ -30,6 +30,24 @@ class OfferMatchResultStoreTest {
         return new OfferMatchResultStore(fileStorage, BUCKET);
     }
 
+    @Test
+    void readsAFileSavedBeforeRowsCarriedTheActiveFlagAsActive() {
+        // given
+        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":1,\"linked\":[],\"notInCatalog\":[],"
+                + "\"noPimEntry\":[{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
+                + "\"pimId\":null,\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
+        when(fileStorage.canRead(BUCKET, KEY)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, KEY)).thenReturn(old.getBytes(StandardCharsets.UTF_8));
+
+        // when
+        Optional<OfferMatchResult> latest = store().latest("s1", "Empik");
+
+        // then
+        assertThat(latest).isPresent();
+        assertThat(latest.get().noPimEntry()).extracting(OfferMatchResult.Row::active, OfferMatchResult.Row::catalogEan)
+                .containsExactly(org.assertj.core.api.Assertions.tuple(true, null));
+    }
+
     private static OfferMatchResult result() {
         return new OfferMatchResult(Instant.parse("2026-11-02T10:00:00Z"), 6,
                 List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "pim-1", null)),

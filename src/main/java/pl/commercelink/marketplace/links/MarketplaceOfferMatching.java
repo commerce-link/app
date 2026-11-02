@@ -133,11 +133,10 @@ public class MarketplaceOfferMatching {
                 return;
             }
             // linked either way: a product missing from the catalog has no price yet, but the link waits for it
-            Row row = row(offer, eans, pimId, null);
             if (storeOffers.isInStoreCatalog(pimId)) {
-                linked.add(row);
+                linked.add(row(offer, eans, pimId, null));
             } else {
-                notInCatalog.add(row);
+                notInCatalog.add(row(offer, eans, pimId, null, primaryGtin(pimId)));
             }
         }
 
@@ -150,7 +149,7 @@ public class MarketplaceOfferMatching {
             if (pimAliases.effectiveEntry(storeId, pimId).isEmpty()) {
                 toReview.add(row(offer, eans, pimId, OfferMatchResult.STALE_LINK));
             } else if (!storeOffers.isInStoreCatalog(pimId)) {
-                notInCatalog.add(row(offer, eans, pimId, OfferMatchResult.ALREADY_LINKED));
+                notInCatalog.add(row(offer, eans, pimId, OfferMatchResult.ALREADY_LINKED, primaryGtin(pimId)));
             }
         }
 
@@ -161,6 +160,11 @@ public class MarketplaceOfferMatching {
                 pim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
             }
             return pimIds;
+        }
+
+        private String primaryGtin(String pimId) {
+            return pimAliases.effectiveEntry(storeId, pimId).map(PimEntry::gtins)
+                    .flatMap(gtins -> gtins.stream().filter(StringUtils::isNotBlank).findFirst()).orElse(null);
         }
 
         private String canonicalId(PimEntry entry) {
@@ -189,6 +193,11 @@ public class MarketplaceOfferMatching {
     }
 
     private static Row row(MarketplaceListedOffer offer, List<String> eans, String pimId, String reason) {
-        return new Row(offer.sellerOfferKey(), offer.title(), eans, pimId, reason);
+        return row(offer, eans, pimId, reason, null);
+    }
+
+    private static Row row(MarketplaceListedOffer offer, List<String> eans, String pimId, String reason,
+                           String catalogEan) {
+        return new Row(offer.sellerOfferKey(), offer.title(), eans, pimId, reason, offer.active(), catalogEan);
     }
 }

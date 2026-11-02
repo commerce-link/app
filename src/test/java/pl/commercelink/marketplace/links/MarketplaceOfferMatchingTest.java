@@ -160,7 +160,7 @@ class MarketplaceOfferMatchingTest {
         verify(links, never()).saveIfAbsent(any());
         assertThat(result.alreadyLinked()).isEqualTo(1);
         assertThat(result.notInCatalog()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Title SILLO-1",
-                List.of("5903771700818"), "pim-1", "already-linked"));
+                List.of("5903771700818"), "pim-1", "already-linked", true, "5903771700818"));
     }
 
     @Test
@@ -364,6 +364,35 @@ class MarketplaceOfferMatchingTest {
         assertThat(savedLink().getPimId()).isEqualTo("pim-1");
         assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::pimId).containsExactly("pim-1");
         assertThat(result.linked()).isEmpty();
+    }
+
+    @Test
+    void carriesTheOffersActiveFlagIntoItsRow() {
+        // given
+        MarketplaceOfferMatching matching = matching();
+        MarketplaceListedOffer inactive = new MarketplaceListedOffer("OLD-1", List.of("5900000000000"), "Stara", 0,
+                new BigDecimal("1.00"), false);
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK, pages(List.of(inactive, offer("NEW-1", "5900000000001"))));
+
+        // then
+        assertThat(result.noPimEntry()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::active)
+                .containsExactly(tuple("OLD-1", false), tuple("NEW-1", true));
+    }
+
+    @Test
+    void givesALinkedRowMissingFromTheCatalogThePimEntrysPrimaryGtin() {
+        // given the offer carries two EANs, the entry's primary GTIN is the first of its own
+        when(storeOffers.isInStoreCatalog("pim-1")).thenReturn(false);
+        MarketplaceOfferMatching matching = matching(globalEntry("pim-1", "5903771700818", "7041", "Zabawki"));
+
+        // when
+        OfferMatchResult result = matching.match(store, EMPIK,
+                pages(List.of(offer("SILLO-1", "5900000000000", "5903771700818"))));
+
+        // then
+        assertThat(result.notInCatalog()).extracting(OfferMatchResult.Row::catalogEan).containsExactly("5903771700818");
     }
 
     @Test

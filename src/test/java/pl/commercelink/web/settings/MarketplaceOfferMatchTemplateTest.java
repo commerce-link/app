@@ -50,10 +50,68 @@ class MarketplaceOfferMatchTemplateTest {
                 .contains("Połączone, produktu brak w katalogu")
                 .contains("Brak karty w PIM")
                 .contains("Do przejrzenia");
-        assertThat(html).contains(">5901234123459\n5901234123460</textarea>").contains(">5901234123458</textarea>");
+        assertThat(html).contains(">5901234123459</textarea>").contains(">5901234123458</textarea>");
         assertThat(html).contains("Oferta nie ma EAN").contains("różne karty PIM").contains("PIM już nie zna");
         assertThat(html).contains("Połączona wcześniej").contains("pim-1").contains("sku-5");
         assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void inactiveOffersGetAPillAndAreNotOfferedForCopying() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2, List.of(), List.of(),
+                List.of(new Row("old-1", "Stara", List.of("5901234123457"), null, null, false, null),
+                        new Row("new-1", "Nowa", List.of("5901234123458"), null, null, true, null)),
+                List.of(), 0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html).contains("nieaktywna").contains(">5901234123458</textarea>")
+                .contains("Nieaktywnych ofert nie ma na liście do skopiowania");
+        assertThat(html).doesNotContain(">5901234123457</textarea>").doesNotContain("??");
+    }
+
+    @Test
+    void aRowWithoutKeyAndTitleGetsAPlaceholderAndNoEmptySkuLine() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
+                List.of(), List.of(new Row(null, null, List.of("5901234123457"), null, OfferMatchResult.NO_KEY)), 0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html).contains("bez nazwy").doesNotContain("SKU <span").doesNotContain("??");
+    }
+
+    @Test
+    void aRowWithoutTitleShowsItsSkuOnce() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
+                List.of(), List.of(new Row("sku-unique", null, List.of(), null, OfferMatchResult.NO_EAN)), 0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html.split("sku-unique", -1)).hasSize(2);
+    }
+
+    @Test
+    void statTilesGroupThousandsLikeTheTexts() {
+        // given
+        List<Row> many = IntStream.range(0, 12345)
+                .mapToObj(index -> new Row("sku-" + index, "P", List.of("59" + index), null, null)).toList();
+        OfferMatchResult result = new OfferMatchResult(Instant.now(), many.size(), List.of(), List.of(), many,
+                List.of(), 0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html).containsPattern("cl-stat-value\">12\u00a0345<");
     }
 
     @Test

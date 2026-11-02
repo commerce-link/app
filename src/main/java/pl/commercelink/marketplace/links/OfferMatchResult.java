@@ -20,7 +20,20 @@ public record OfferMatchResult(Instant finishedAt, int total, List<Row> linked, 
     /** In {@code toReview}: the existing link points at an entry the PIM no longer knows. */
     public static final String STALE_LINK = "stale-link";
 
-    /** {@code pimId} is set for a saved link; {@code reason} only for an offer left to review. */
-    public record Row(String sellerOfferKey, String title, List<String> eans, String pimId, String reason) {
+    /**
+     * {@code pimId} is set for a saved link; {@code reason} only for an offer left to review. {@code active} is whether
+     * the offer is on sale on the marketplace (null in files saved before it was kept: such an offer counts as active).
+     * {@code catalogEan} is the linked PIM entry's primary GTIN, the one to add to a catalog (null when unknown).
+     */
+    public record Row(String sellerOfferKey, String title, List<String> eans, String pimId, String reason,
+                      Boolean active, String catalogEan) {
+
+        public Row {
+            active = active == null ? Boolean.TRUE : active;
+        }
+
+        public Row(String sellerOfferKey, String title, List<String> eans, String pimId, String reason) {
+            this(sellerOfferKey, title, eans, pimId, reason, true, null);
+        }
     }
 }

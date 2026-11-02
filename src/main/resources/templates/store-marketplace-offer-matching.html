@@ -44,7 +44,7 @@
                         <li th:each="group : ${matching.groups()}">
                             <div class="cl-stat">
                                 <span class="cl-eyebrow" th:text="#{'store.marketplaces.offer.matching.stat.' + ${group.name()}}"></span>
-                                <span class="cl-stat-value" th:text="${group.count()}"></span>
+                                <span class="cl-stat-value" th:text="${#numbers.formatInteger(group.count(), 1, 'DEFAULT')}"></span>
                             </div>
                         </li>
                     </ul>
@@ -72,6 +72,7 @@
                                       th:text="${group.eans()}"></textarea>
                             <p class="cl-help" th:id="${'offer-matching-' + group.name() + '-eans-help'}"
                                th:text="#{store.marketplaces.offer.matching.eans.help}"></p>
+                            <p class="cl-help" th:text="#{store.marketplaces.offer.matching.eans.inactive}"></p>
                         </div>
 
                         <details th:if="${group.count() > 0}" class="cl-disclosure" th:id="${'offer-matching-' + group.name() + '-rows'}">
@@ -91,9 +92,14 @@
                                     <tbody>
                                     <tr th:each="row : ${group.rows()}">
                                         <th scope="row" class="cl-table-key" th:attr="data-label=#{store.marketplaces.offer.matching.column.offer}">
-                                            <div>
-                                                <span th:text="${row.title() != null ? row.title() : row.sellerOfferKey()}"></span>
-                                                <span class="cl-table-sub">SKU <span class="cl-table-code" th:text="${row.sellerOfferKey()}"></span></span>
+                                            <div th:with="hasTitle=${row.title() != null and !#strings.isEmpty(#strings.trim(row.title()))}, hasKey=${row.sellerOfferKey() != null and !#strings.isEmpty(#strings.trim(row.sellerOfferKey()))}">
+                                                <!--/* name falls back to the SKU, then to a placeholder; the SKU line only when it adds something */-->
+                                                <span th:if="${hasTitle}" th:text="${row.title()}"></span>
+                                                <span th:if="${!hasTitle and hasKey}" th:text="${row.sellerOfferKey()}"></span>
+                                                <span th:if="${!hasTitle and !hasKey}" th:text="#{store.marketplaces.offer.matching.row.untitled}"></span>
+                                                <span th:if="${!row.active()}" class="cl-status is-neutral"
+                                                      th:text="#{store.marketplaces.offer.matching.inactive}"></span>
+                                                <span th:if="${hasTitle and hasKey}" class="cl-table-sub">SKU <span class="cl-table-code" th:text="${row.sellerOfferKey()}"></span></span>
                                             </div>
                                         </th>
                                         <td th:attr="data-label=#{store.marketplaces.offer.matching.column.eans}"
