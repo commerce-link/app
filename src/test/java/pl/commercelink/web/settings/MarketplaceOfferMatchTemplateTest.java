@@ -1,6 +1,7 @@
 package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.marketplace.links.OfferMatchError;
 import pl.commercelink.marketplace.links.OfferMatchResult;
 import pl.commercelink.marketplace.links.OfferMatchResult.Row;
 
@@ -166,8 +167,10 @@ class MarketplaceOfferMatchTemplateTest {
         assertThat(html).contains("cl-alert is-ok").contains("Dopasowanie ofert z Empik zlecone.");
     }
 
-    private static OfferMatchingRunView run(boolean running, Integer total, String error) {
-        return new OfferMatchingRunView(running, !running, 400, total, "02.11.2026 10:59", "02.11.2026 10:50", error);
+    private static OfferMatchingRunView run(boolean running, Integer total, OfferMatchError error) {
+        return new OfferMatchingRunView(running, !running, 400, total, "02.11.2026 10:59", "02.11.2026 10:50",
+                error == null ? null : "store.marketplaces.offer.matching.error." + error.name(),
+                error == OfferMatchError.MARKETPLACE_ERROR ? 503 : null);
     }
 
     @Test
@@ -204,14 +207,26 @@ class MarketplaceOfferMatchTemplateTest {
     }
 
     @Test
-    void aFailedRunShowsTheErrorAndOffersANewOne() {
+    void aFailedRunExplainsWhyAndOffersANewOne() {
         // when
-        String html = render(null, null, Map.of("run", run(false, 6150, "OF21 answered 500")));
+        String html = render(null, null, Map.of("run", run(false, 6150, OfferMatchError.MARKETPLACE_ERROR)));
 
         // then
-        assertThat(html).contains("cl-alert is-bad").contains("OF21 answered 500").contains("02.11.2026 10:50")
-                .contains("method=\"post\"");
+        assertThat(html).contains("cl-alert is-bad").contains("02.11.2026 10:50").contains("HTTP 503")
+                .contains("Empik").contains("method=\"post\"");
         assertThat(html).doesNotContain("Dopasowanie trwa").doesNotContain("??");
+    }
+
+    @Test
+    void everyFailureHasASentenceOnThePage() {
+        for (OfferMatchError error : OfferMatchError.values()) {
+            // when
+            String html = render(null, null, Map.of("run", run(false, 6150, error)));
+
+            // then
+            assertThat(html).as(error.name()).contains("cl-alert is-bad").doesNotContain("??")
+                    .doesNotContain("store.marketplaces.offer.matching.error");
+        }
     }
 
     private static String render(OfferMatchingView matching, String savedMessage) {

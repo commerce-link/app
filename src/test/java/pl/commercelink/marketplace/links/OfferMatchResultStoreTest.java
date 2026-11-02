@@ -118,7 +118,8 @@ class OfferMatchResultStoreTest {
                 Instant.parse("2026-11-02T10:01:00Z"), OfferMatchProgress.Status.RUNNING, "200", 2, 6150, 1, 0,
                 List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "pim-1", null)),
                 List.of(), List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null,
-                        false, null)), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), null);
+                        false, null)), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), 2,
+                null, null);
     }
 
     @Test
@@ -174,6 +175,25 @@ class OfferMatchResultStoreTest {
 
         // then
         assertThat(read).isEmpty();
+    }
+
+    @Test
+    void readsBackTheCodeOfAFailedRun() {
+        // given
+        ArgumentCaptor<byte[]> bytes = ArgumentCaptor.forClass(byte[].class);
+        OfferMatchProgress failed = progress().failed(Instant.parse("2026-11-02T10:02:00Z"),
+                OfferMatchError.MARKETPLACE_ERROR, 503);
+        store().saveProgress("s1", "Empik", failed);
+        verify(fileStorage).put(eq(BUCKET), eq(PROGRESS_KEY), bytes.capture());
+        when(fileStorage.canRead(BUCKET, PROGRESS_KEY)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, PROGRESS_KEY)).thenReturn(bytes.getValue());
+
+        // when
+        Optional<OfferMatchProgress> read = store().progress("s1", "Empik");
+
+        // then
+        assertThat(new String(bytes.getValue(), StandardCharsets.UTF_8)).contains("\"error\":\"MARKETPLACE_ERROR\"");
+        assertThat(read).contains(failed);
     }
 
     @Test

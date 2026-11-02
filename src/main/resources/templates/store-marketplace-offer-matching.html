@@ -31,7 +31,11 @@
                     </div>
                     <div th:if="${run != null and run.failed()}" class="cl-alert is-bad" role="status">
                         <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                        <p class="cl-alert-text" th:text="#{store.marketplaces.offer.matching.failed(${run.startedAt()}, ${run.error()})}"></p>
+                        <!--/* A reason code in a sentence, never the exception's text (the log has that). */-->
+                        <p class="cl-alert-text">
+                            <span th:text="#{store.marketplaces.offer.matching.failed(${run.startedAt()})}"></span>
+                            <span th:text="#{${run.errorKey()}(${run.errorStatus()}, ${displayName})}"></span>
+                        </p>
                     </div>
                     <!--/* A run the worker would skip is not offered: the reason and where to fix it instead of the button. */-->
                     <div th:if="${runBlockedMessage != null}" class="cl-alert is-warn" role="status">

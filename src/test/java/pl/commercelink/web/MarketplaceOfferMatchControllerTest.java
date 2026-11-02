@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.marketplace.links.MarketplaceOfferMatchPublisher;
+import pl.commercelink.marketplace.links.OfferMatchError;
 import pl.commercelink.marketplace.links.OfferMatchProgress;
 import pl.commercelink.marketplace.links.OfferMatchResult;
 import pl.commercelink.marketplace.links.OfferMatchResult.Row;
@@ -309,7 +310,7 @@ class MarketplaceOfferMatchControllerTest {
 
     private static OfferMatchProgress running(Instant updatedAt, Integer total) {
         return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T09:50:00Z"), updatedAt,
-                OfferMatchProgress.Status.RUNNING, "400", 400, total, 0, 0, null, null, null, null, null, null);
+                OfferMatchProgress.Status.RUNNING, "400", 400, total, 0, 0, null, null, null, null, null, 0, null, null);
     }
 
     @Test
@@ -349,7 +350,7 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void pageShowsFailure() {
         // given
-        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, "OF21 answered 500")));
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, OfferMatchError.MARKETPLACE_ERROR, 500)));
         Model model = new ExtendedModelMap();
 
         // when
@@ -359,7 +360,8 @@ class MarketplaceOfferMatchControllerTest {
         OfferMatchingRunView run = (OfferMatchingRunView) model.getAttribute("run");
         assertThat(run.failed()).isTrue();
         assertThat(run.running()).isFalse();
-        assertThat(run.error()).isEqualTo("OF21 answered 500");
+        assertThat(run.errorKey()).isEqualTo("store.marketplaces.offer.matching.error.MARKETPLACE_ERROR");
+        assertThat(run.errorStatus()).isEqualTo(500);
         assertThat(run.startedAt()).isEqualTo("02.11.2026 10:50");
     }
 
@@ -408,7 +410,7 @@ class MarketplaceOfferMatchControllerTest {
     @Test
     void allowsNewRunAfterFailure() {
         // given
-        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, "boom")));
+        when(resultStore.progress(STORE_ID, EMPIK)).thenReturn(Optional.of(running(NOW, 6150).failed(NOW, OfferMatchError.INTERNAL)));
 
         // when
         controller.orderOfferMatching(EMPIK, PL, new RedirectAttributesModelMap());

@@ -79,8 +79,9 @@ public class MarketplaceOfferMatching {
             try {
                 page = offers.page(cursor);
             } catch (MarketplaceRateLimitedException e) {
-                return new Paused(run.progress(cursor), e.retryAfter() == null ? Duration.ZERO : e.retryAfter());
+                return new Paused(run.rateLimited(cursor), e.retryAfter() == null ? Duration.ZERO : e.retryAfter());
             }
+            run.pageRead();
             if (page.offers() != null) {
                 page.offers().forEach(run::match);
             }
@@ -124,6 +125,7 @@ public class MarketplaceOfferMatching {
 
         private int total;
         private Integer listed;
+        private int idleRateLimitPauses;
         private int ownOffers;
         private int alreadyLinked;
         private final List<Row> linked;
@@ -138,6 +140,7 @@ public class MarketplaceOfferMatching {
             this.seenKeys = new LinkedHashSet<>(progress.seenKeys());
             this.total = progress.processed();
             this.listed = progress.total();
+            this.idleRateLimitPauses = progress.idleRateLimitPauses();
             this.ownOffers = progress.ownOffers();
             this.alreadyLinked = progress.alreadyLinked();
             this.linked = new ArrayList<>(progress.linked());
@@ -284,10 +287,22 @@ public class MarketplaceOfferMatching {
             }
         }
 
+        void pageRead() {
+            idleRateLimitPauses = 0;
+        }
+
+        /** A pause on the request limit; one before any page of this message read counts as a pause without progress. */
+        OfferMatchProgress rateLimited(String nextCursor) {
+            if (Objects.equals(nextCursor, started.nextCursor())) {
+                idleRateLimitPauses++;
+            }
+            return progress(nextCursor);
+        }
+
         OfferMatchProgress progress(String nextCursor) {
             return new OfferMatchProgress(started.runId(), started.startedAt(), clock.instant(),
                     OfferMatchProgress.Status.RUNNING, nextCursor, total, listed, ownOffers, alreadyLinked, linked,
-                    notInCatalog, noPimEntry, toReview, seenKeys, null);
+                    notInCatalog, noPimEntry, toReview, seenKeys, idleRateLimitPauses, null, null);
         }
 
         OfferMatchResult result() {

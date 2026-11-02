@@ -15,13 +15,16 @@ import java.util.Set;
  *
  * @param processed offers counted so far (each seller offer key once)
  * @param total     how many offers the marketplace says it lists, or null while unknown
- * @param seenKeys  seller offer keys already counted, so an offer the listing repeats on a later page counts once
- * @param error     what stopped a {@code FAILED} run, short and fit for the operator
+ * @param seenKeys            seller offer keys already counted, so an offer the listing repeats on a later page counts once
+ * @param idleRateLimitPauses pauses in a row on the marketplace's request limit without a page read in between
+ * @param error               why a {@code FAILED} run stopped (a code the page turns into a sentence), else null
+ * @param errorStatus         the marketplace's HTTP status for {@link OfferMatchError#MARKETPLACE_ERROR}, else null
  */
 public record OfferMatchProgress(String runId, Instant startedAt, Instant updatedAt, Status status, String nextCursor,
                                  int processed, Integer total, int ownOffers, int alreadyLinked, List<Row> linked,
                                  List<Row> notInCatalog, List<Row> noPimEntry, List<Row> toReview,
-                                 Set<String> seenKeys, String error) {
+                                 Set<String> seenKeys, int idleRateLimitPauses, OfferMatchError error,
+                                 Integer errorStatus) {
 
     /**
      * A {@code RUNNING} run not saved for this long is taken as abandoned (a lost continuation, a crashed worker), so a
@@ -42,7 +45,7 @@ public record OfferMatchProgress(String runId, Instant startedAt, Instant update
 
     public static OfferMatchProgress start(String runId, Instant now) {
         return new OfferMatchProgress(runId, now, now, Status.RUNNING, null, 0, null, 0, 0, List.of(), List.of(),
-                List.of(), List.of(), Set.of(), null);
+                List.of(), List.of(), Set.of(), 0, null, null);
     }
 
     /** Running and saved recently enough that it is still going on: a second run must wait. */
@@ -54,9 +57,14 @@ public record OfferMatchProgress(String runId, Instant startedAt, Instant update
         return status == Status.FAILED;
     }
 
-    public OfferMatchProgress failed(Instant now, String reason) {
+    public OfferMatchProgress failed(Instant now, OfferMatchError reason) {
+        return failed(now, reason, null);
+    }
+
+    public OfferMatchProgress failed(Instant now, OfferMatchError reason, Integer httpStatus) {
         return new OfferMatchProgress(runId, startedAt, now, Status.FAILED, nextCursor, processed, total, ownOffers,
-                alreadyLinked, linked, notInCatalog, noPimEntry, toReview, seenKeys, reason);
+                alreadyLinked, linked, notInCatalog, noPimEntry, toReview, seenKeys, idleRateLimitPauses, reason,
+                httpStatus);
     }
 
     OfferMatchResult result(Instant finishedAt) {

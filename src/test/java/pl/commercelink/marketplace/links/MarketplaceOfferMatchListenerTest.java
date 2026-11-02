@@ -19,6 +19,7 @@ import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.links.OfferMatchProgress.Status;
+import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
@@ -30,11 +31,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,6 +72,7 @@ class MarketplaceOfferMatchListenerTest {
     private MarketplaceOfferMatchListener listener;
     private Store store;
     private ListAppender<ILoggingEvent> logs;
+    private final AtomicReference<OfferMatchProgress> file = new AtomicReference<>();
 
     @BeforeEach
     void setUp() {
@@ -83,7 +87,16 @@ class MarketplaceOfferMatchListenerTest {
         when(storeActivity.isActive(store)).thenReturn(true);
         when(providerFactory.get(store, EMPIK)).thenReturn(provider);
         when(provider.offers()).thenReturn(Optional.of(offers));
-        when(resultStore.progress(STORE, EMPIK)).thenReturn(Optional.empty());
+        // the progress file as S3 keeps it: what was saved last, gone once deleted
+        when(resultStore.progress(STORE, EMPIK)).thenAnswer(call -> Optional.ofNullable(file.get()));
+        doAnswer(call -> {
+            file.set(call.getArgument(2));
+            return null;
+        }).when(resultStore).saveProgress(eq(STORE), eq(EMPIK), any());
+        doAnswer(call -> {
+            file.set(null);
+            return null;
+        }).when(resultStore).deleteProgress(STORE, EMPIK);
         logs = new ListAppender<>();
         logs.start();
         ((Logger) LoggerFactory.getLogger(MarketplaceOfferMatchListener.class)).addAppender(logs);
@@ -104,7 +117,7 @@ class MarketplaceOfferMatchListenerTest {
 
     private static OfferMatchProgress running(String runId, String nextCursor, Instant updatedAt) {
         return new OfferMatchProgress(runId, NOW.minus(Duration.ofHours(1)), updatedAt, Status.RUNNING, nextCursor, 100,
-                6150, 0, 0, null, null, null, null, null, null);
+                6150, 0, 0, null, null, null, null, null, 0, null, null);
     }
 
     private static OfferMatchResult result() {
@@ -112,7 +125,12 @@ class MarketplaceOfferMatchListenerTest {
     }
 
     private void givenProgress(OfferMatchProgress progress) {
-        when(resultStore.progress(STORE, EMPIK)).thenReturn(Optional.of(progress));
+        file.set(progress);
+    }
+
+    private static OfferMatchProgress pausedAt(String runId, String cursor, int idleRateLimitPauses) {
+        return new OfferMatchProgress(runId, NOW.minus(Duration.ofHours(1)), NOW, Status.RUNNING, cursor, 200, 6150, 0, 0,
+                null, null, null, null, null, idleRateLimitPauses, null, null);
     }
 
     private OfferMatchProgress lastSavedProgress() {
@@ -165,12 +183,13 @@ class MarketplaceOfferMatchListenerTest {
     @Test
     void publishesContinuationDelayedByRetryAfter() {
         // given
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
         OfferMatchProgress paused = running("run-1", "200", NOW);
         when(matching.resume(eq(store), eq(EMPIK), eq(offers), any()))
                 .thenReturn(new MarketplaceOfferMatching.Paused(paused, Duration.ofSeconds(60)));
 
         // when
-        listener.handleMessage(start());
+        listener.handleMessage(continuation("run-1", "100"));
 
         // then the progress is saved before the continuation can arrive
         InOrder order = inOrder(resultStore, publisher);
@@ -253,7 +272,7 @@ class MarketplaceOfferMatchListenerTest {
     @Test
     void ignoresAContinuationOfAFailedRun() {
         // given
-        givenProgress(running("run-1", "100", NOW).failed(NOW, "boom"));
+        givenProgress(running("run-1", "100", NOW).failed(NOW, OfferMatchError.INTERNAL));
 
         // when
         listener.handleMessage(continuation("run-1", "100"));
@@ -294,7 +313,7 @@ class MarketplaceOfferMatchListenerTest {
     @Test
     void startsOverAFailedRun() {
         // given
-        givenProgress(running("run-old", "100", NOW).failed(NOW, "boom"));
+        givenProgress(running("run-old", "100", NOW).failed(NOW, OfferMatchError.INTERNAL));
         when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenReturn(new MarketplaceOfferMatching.Finished(result()));
 
         // when
@@ -319,7 +338,8 @@ class MarketplaceOfferMatchListenerTest {
         OfferMatchProgress failed = lastSavedProgress();
         assertThat(failed.status()).isEqualTo(Status.FAILED);
         assertThat(failed.runId()).isEqualTo("run-1");
-        assertThat(failed.error()).isEqualTo("OF21 answered 500");
+        assertThat(failed.error()).isEqualTo(OfferMatchError.INTERNAL);
+        assertThat(failed.errorStatus()).isNull();
         assertThat(failed.updatedAt()).isEqualTo(NOW);
         verifyNoInteractions(publisher);
         assertThat(levels()).containsExactly(Level.ERROR);
@@ -336,23 +356,109 @@ class MarketplaceOfferMatchListenerTest {
         // then
         verifyNoInteractions(matching, publisher);
         assertThat(lastSavedProgress().status()).isEqualTo(Status.FAILED);
-        assertThat(lastSavedProgress().error()).isEqualTo("credentials unreadable");
+        assertThat(lastSavedProgress().error()).isEqualTo(OfferMatchError.INTERNAL);
         assertThat(levels()).containsExactly(Level.ERROR);
     }
 
     @Test
-    void keepsTheFailureShortAndOnOneLine() {
-        // given
-        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any()))
-                .thenThrow(new IllegalStateException("first line\nsecond " + "x".repeat(500)));
+    void recordsTheMarketplacesHttpStatusButNotItsAnswer() {
+        // given the adapter wraps the HTTP error
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenThrow(new IllegalStateException(
+                "OF21 failed", new HttpClientException(503, "{\"token\":\"secret\"}")));
 
         // when
         listener.handleMessage(start());
 
         // then
-        String error = lastSavedProgress().error();
-        assertThat(error).startsWith("first line second").doesNotContain("\n");
-        assertThat(error.length()).isLessThanOrEqualTo(300);
+        OfferMatchProgress failed = lastSavedProgress();
+        assertThat(failed.error()).isEqualTo(OfferMatchError.MARKETPLACE_ERROR);
+        assertThat(failed.errorStatus()).isEqualTo(503);
+        assertThat(levels()).containsExactly(Level.ERROR);
+    }
+
+    @Test
+    void doesNotFinishARunAnotherRunReplaced() {
+        // given a second run took the file over while this one read its pages
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenAnswer(call -> {
+            file.set(running("run-2", null, NOW));
+            return new MarketplaceOfferMatching.Finished(result());
+        });
+
+        // when
+        listener.handleMessage(continuation("run-1", "100"));
+
+        // then
+        verify(resultStore, never()).save(any(), any(), any());
+        verify(resultStore, never()).deleteProgress(any(), any());
+        assertThat(file.get().runId()).isEqualTo("run-2");
+        assertThat(levels()).doesNotContain(Level.ERROR);
+    }
+
+    @Test
+    void doesNotSaveAPauseOfARunAnotherRunReplaced() {
+        // given
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenAnswer(call -> {
+            file.set(running("run-2", null, NOW));
+            return new MarketplaceOfferMatching.Paused(running("run-1", "200", NOW), Duration.ofSeconds(60));
+        });
+
+        // when
+        listener.handleMessage(continuation("run-1", "100"));
+
+        // then
+        verify(resultStore, never()).saveProgress(any(), any(), any());
+        verifyNoInteractions(publisher);
+        assertThat(file.get().runId()).isEqualTo("run-2");
+    }
+
+    @Test
+    void doesNotMarkARunAnotherRunReplacedAsFailed() {
+        // given
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenAnswer(call -> {
+            file.set(running("run-2", null, NOW));
+            throw new IllegalStateException("OF21 failed");
+        });
+
+        // when
+        listener.handleMessage(continuation("run-1", "100"));
+
+        // then
+        assertThat(file.get().runId()).isEqualTo("run-2");
+        assertThat(file.get().status()).isEqualTo(Status.RUNNING);
+    }
+
+    @Test
+    void failsTheRunWhenTheMarketplaceKeepsRefusingPages() {
+        // given the fifteenth pause in a row without a page read
+        givenProgress(pausedAt("run-1", "200", 14));
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenReturn(
+                new MarketplaceOfferMatching.Paused(pausedAt("run-1", "200", 15), Duration.ofSeconds(60)));
+
+        // when
+        listener.handleMessage(continuation("run-1", "200"));
+
+        // then
+        verifyNoInteractions(publisher);
+        assertThat(file.get().status()).isEqualTo(Status.FAILED);
+        assertThat(file.get().error()).isEqualTo(OfferMatchError.RATE_LIMIT_EXHAUSTED);
+    }
+
+    @Test
+    void keepsWaitingOnTheRateLimitBelowTheLimitOfPauses() {
+        // given
+        givenProgress(pausedAt("run-1", "200", 13));
+        when(matching.resume(eq(store), eq(EMPIK), eq(offers), any())).thenReturn(
+                new MarketplaceOfferMatching.Paused(pausedAt("run-1", "200", 14), Duration.ofSeconds(60)));
+
+        // when
+        listener.handleMessage(continuation("run-1", "200"));
+
+        // then
+        verify(publisher).continueRun(STORE, EMPIK, "run-1", "200", Duration.ofSeconds(60));
+        assertThat(file.get().status()).isEqualTo(Status.RUNNING);
     }
 
     @Test
@@ -366,6 +472,21 @@ class MarketplaceOfferMatchListenerTest {
         // then
         verifyNoInteractions(matching, publisher);
         assertThat(lastSavedProgress().status()).isEqualTo(Status.FAILED);
+        assertThat(lastSavedProgress().error()).isEqualTo(OfferMatchError.NO_LISTING);
+    }
+
+    @Test
+    void failsAContinuedRunOfAStoreDeactivatedMeanwhile() {
+        // given
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when
+        listener.handleMessage(continuation("run-1", "100"));
+
+        // then
+        verifyNoInteractions(matching, providerFactory, publisher);
+        assertThat(lastSavedProgress().error()).isEqualTo(OfferMatchError.STORE_INACTIVE);
     }
 
     @Test
@@ -407,11 +528,13 @@ class MarketplaceOfferMatchListenerTest {
         verifyNoInteractions(matching, providerFactory, publisher);
         assertThat(lastSavedProgress().status()).isEqualTo(Status.FAILED);
         assertThat(lastSavedProgress().runId()).isEqualTo("run-1");
+        assertThat(lastSavedProgress().error()).isEqualTo(OfferMatchError.INTEGRATION_INACTIVE);
     }
 
     @Test
     void failsTheRunWhenTheContinuationCannotBeSent() {
         // given
+        givenProgress(running("run-1", "100", NOW.minusSeconds(60)));
         OfferMatchProgress paused = running("run-1", "200", NOW);
         when(matching.resume(eq(store), eq(EMPIK), eq(offers), any()))
                 .thenReturn(new MarketplaceOfferMatching.Paused(paused, Duration.ofSeconds(60)));
@@ -419,11 +542,11 @@ class MarketplaceOfferMatchListenerTest {
                 .when(publisher).continueRun(anyString(), anyString(), anyString(), anyString(), any());
 
         // when
-        listener.handleMessage(start());
+        listener.handleMessage(continuation("run-1", "100"));
 
         // then
         assertThat(lastSavedProgress().status()).isEqualTo(Status.FAILED);
-        assertThat(lastSavedProgress().error()).isEqualTo("SQS down");
+        assertThat(lastSavedProgress().error()).isEqualTo(OfferMatchError.INTERNAL);
     }
 
     @Test

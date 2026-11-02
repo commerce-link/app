@@ -2,12 +2,12 @@ package pl.commercelink.marketplace.links;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -27,7 +27,11 @@ import java.util.UUID;
 // instance, so it runs in every environment, as ReportGenerationListener does.
 class MarketplaceOfferMatchListener {
 
-    private static final int MAX_ERROR_LENGTH = 300;
+    /**
+     * Pauses in a row on the request limit without a page read before the run gives up: at Empik's 60 s that is a quarter
+     * of an hour in which the marketplace answered nothing but 429.
+     */
+    static final int MAX_IDLE_RATE_LIMIT_PAUSES = 15;
 
     private final StoresRepository storesRepository;
     private final StoreActivity storeActivity;
@@ -87,7 +91,7 @@ class MarketplaceOfferMatchListener {
         }
 
         Store store = storesRepository.findById(storeId);
-        String skipped = skipReason(store, marketplace);
+        OfferMatchError skipped = skipReason(store, marketplace);
         if (skipped != null) {
             log.warn("Marketplace {} offer matching skipped store {}: {}", marketplace, storeId, skipped);
             // a run already going on is closed, so the page does not show it running until it goes stale
@@ -109,7 +113,11 @@ class MarketplaceOfferMatchListener {
             // not rethrown: a retry would read the same pages again; the page shows the failure and the operator re-orders
             log.error("Marketplace {} offer matching of store {} failed (run {})", marketplace, storeId,
                     progress.runId(), e);
-            resultStore.saveProgress(storeId, marketplace, progress.failed(clock.instant(), describe(e)));
+            if (ownsProgressFile(storeId, marketplace, progress.runId())) {
+                Integer status = httpStatusOf(e);
+                resultStore.saveProgress(storeId, marketplace, progress.failed(clock.instant(),
+                        status == null ? OfferMatchError.INTERNAL : OfferMatchError.MARKETPLACE_ERROR, status));
+            }
         }
     }
 
@@ -120,15 +128,27 @@ class MarketplaceOfferMatchListener {
         if (offers.isEmpty()) {
             log.warn("Marketplace {} offer matching skipped store {}: the marketplace does not list offers",
                     marketplace, storeId);
-            resultStore.saveProgress(storeId, marketplace,
-                    progress.failed(clock.instant(), "the marketplace does not list offers"));
+            resultStore.saveProgress(storeId, marketplace, progress.failed(clock.instant(), OfferMatchError.NO_LISTING));
             return;
         }
         MarketplaceOfferMatching.Step step = matching.resume(store, marketplace, offers.get(), progress);
+        // a run that went stale while this message worked may have been replaced; the newer run owns the files now
+        if (!ownsProgressFile(storeId, marketplace, progress.runId())) {
+            log.info("Marketplace {} offer matching of store {} stopped run {}: a newer run replaced it", marketplace,
+                    storeId, progress.runId());
+            return;
+        }
         if (step instanceof MarketplaceOfferMatching.Finished finished) {
             resultStore.save(storeId, marketplace, finished.result());
             resultStore.deleteProgress(storeId, marketplace);
         } else if (step instanceof MarketplaceOfferMatching.Paused paused) {
+            if (paused.progress().idleRateLimitPauses() >= MAX_IDLE_RATE_LIMIT_PAUSES) {
+                log.warn("Marketplace {} offer matching of store {} gave up run {}: {} pauses on the request limit "
+                        + "without a page", marketplace, storeId, progress.runId(), MAX_IDLE_RATE_LIMIT_PAUSES);
+                resultStore.saveProgress(storeId, marketplace,
+                        paused.progress().failed(clock.instant(), OfferMatchError.RATE_LIMIT_EXHAUSTED));
+                return;
+            }
             // saved before it is sent: a continuation arriving first would not match the file and be dropped
             resultStore.saveProgress(storeId, marketplace, paused.progress());
             publisher.continueRun(storeId, marketplace, paused.progress().runId(), paused.progress().nextCursor(),
@@ -136,18 +156,28 @@ class MarketplaceOfferMatchListener {
         }
     }
 
-    private String skipReason(Store store, String marketplace) {
+    private boolean ownsProgressFile(String storeId, String marketplace, String runId) {
+        return resultStore.progress(storeId, marketplace).map(OfferMatchProgress::runId).filter(runId::equals)
+                .isPresent();
+    }
+
+    private OfferMatchError skipReason(Store store, String marketplace) {
         if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
-            return "no active integration";
+            return OfferMatchError.INTEGRATION_INACTIVE;
         }
         if (!storeActivity.isActive(store)) {
-            return "the store is inactive";
+            return OfferMatchError.STORE_INACTIVE;
         }
         return null;
     }
 
-    private static String describe(RuntimeException e) {
-        String text = StringUtils.normalizeSpace(StringUtils.defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()));
-        return StringUtils.abbreviate(text, MAX_ERROR_LENGTH);
+    /** The marketplace's HTTP status when the failure is (or wraps) its HTTP error; its answer stays in the log only. */
+    private static Integer httpStatusOf(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HttpClientException http) {
+                return http.getStatusCode();
+            }
+        }
+        return null;
     }
 }

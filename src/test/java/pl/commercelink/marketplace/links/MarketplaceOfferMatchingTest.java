@@ -724,6 +724,40 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
+    void countsPausesOnTheRateLimitWithoutAPageRead() {
+        // given a run that already paused twice at page 1 without reading it
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("A", "5900000000001")), List.of(offer("B", "5900000000002")))
+                .rateLimitedOnceAt(1);
+        OfferMatchProgress pausedTwice = new OfferMatchProgress("run-1", NOW, NOW, OfferMatchProgress.Status.RUNNING, "1",
+                1, 2, 0, 0, null, null, null, null, Set.of("A"), 2, null, null);
+
+        // when
+        MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, pausedTwice);
+
+        // then
+        assertThat(((MarketplaceOfferMatching.Paused) step).progress().idleRateLimitPauses()).isEqualTo(3);
+    }
+
+    @Test
+    void resetsThePauseCountOnceAPageIsRead() {
+        // given page 1 is read, page 2 answers 429
+        MarketplaceOfferMatching matching = matching();
+        ListedPages offers = pages(List.of(offer("A", "5900000000001")), List.of(offer("B", "5900000000002")),
+                List.of(offer("C", "5900000000003"))).rateLimitedOnceAt(2);
+        OfferMatchProgress pausedOften = new OfferMatchProgress("run-1", NOW, NOW, OfferMatchProgress.Status.RUNNING, "1",
+                1, 3, 0, 0, null, null, null, null, Set.of("A"), 9, null, null);
+
+        // when
+        MarketplaceOfferMatching.Step step = matching.resume(store, EMPIK, offers, pausedOften);
+
+        // then
+        OfferMatchProgress progress = ((MarketplaceOfferMatching.Paused) step).progress();
+        assertThat(progress.nextCursor()).isEqualTo("2");
+        assertThat(progress.idleRateLimitPauses()).isZero();
+    }
+
+    @Test
     void failsWhenTheMarketplaceGivesBackTheSameCursor() {
         // given a listing that never moves on
         MarketplaceOfferMatching matching = matching();

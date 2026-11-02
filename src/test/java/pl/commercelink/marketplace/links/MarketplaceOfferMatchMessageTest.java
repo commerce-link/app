@@ -13,7 +13,7 @@ class MarketplaceOfferMatchMessageTest {
 
     private static OfferMatchProgress progressAt(String runId, String nextCursor) {
         return new OfferMatchProgress(runId, NOW, NOW, OfferMatchProgress.Status.RUNNING, nextCursor, 0, null, 0, 0,
-                null, null, null, null, null, null);
+                null, null, null, null, null, 0, null, null);
     }
 
     @Test
@@ -57,7 +57,7 @@ class MarketplaceOfferMatchMessageTest {
         assertThat(message.continues(progressAt("run-1", "200"))).isTrue();
         assertThat(message.continues(progressAt("run-1", "300"))).isFalse();
         assertThat(message.continues(progressAt("run-2", "200"))).isFalse();
-        assertThat(message.continues(progressAt("run-1", "200").failed(NOW, "boom"))).isFalse();
+        assertThat(message.continues(progressAt("run-1", "200").failed(NOW, OfferMatchError.INTERNAL))).isFalse();
     }
 
     @Test
