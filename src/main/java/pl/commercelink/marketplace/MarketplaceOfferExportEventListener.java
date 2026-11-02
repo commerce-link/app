@@ -11,6 +11,8 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.marketplace.links.MarketplaceOfferLink;
+import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -49,6 +51,7 @@ public class MarketplaceOfferExportEventListener {
     private final MarketplaceExportRunService marketplaceExportRunService;
     private final StoreActivity storeActivity;
     private final StorePimAliases aliases;
+    private final MarketplaceOfferLinkRepository offerLinks;
 
     @Value("${marketplace.export.removalAttempts:3}")
     private int removalRetryCount;
@@ -92,8 +95,12 @@ public class MarketplaceOfferExportEventListener {
 
         List<MarketplaceOfferSnapshot> previousExport = loadPreviousSnapshot(store, catalog, payload.getMarketplace());
 
-        ExportCandidates candidates = collectOffersFromCatalog(
-                store.getStoreId(), catalog, payload.getMarketplace(), enrichedInventory, pricelist, previousExport);
+        // a failed read fails the run: exporting without the links would publish duplicates of the foreign offers
+        ForeignOffers foreignOffers = new ForeignOffers(
+                offerLinks.findAll(store.getStoreId(), payload.getMarketplace()));
+
+        ExportCandidates candidates = collectOffersFromCatalog(store.getStoreId(), catalog, payload.getMarketplace(),
+                enrichedInventory, pricelist, previousExport, foreignOffers);
 
         handleMarketplaceExport(store, payload.getMarketplace(), candidates, previousExport, run);
     }
@@ -109,7 +116,8 @@ public class MarketplaceOfferExportEventListener {
                                                       String marketplace,
                                                       InventoryView inventory,
                                                       Pricelist pricelist,
-                                                      List<MarketplaceOfferSnapshot> previousExport) {
+                                                      List<MarketplaceOfferSnapshot> previousExport,
+                                                      ForeignOffers foreignOffers) {
         List<CategoryDefinition> categories = new LinkedList<>();
         List<MarketplaceDefinition> definitions = new LinkedList<>();
         List<List<Product>> productsPerCategory = new LinkedList<>();
@@ -123,10 +131,17 @@ public class MarketplaceOfferExportEventListener {
             }
 
             List<Product> products = productRepository.findAllProductsWithPimId(category.getCategoryId(), true);
+            // linked products stay in this set too, so no other product takes their pricelist row by codes
             products.forEach(product -> exportedPimIds.add(product.getPimId()));
             categories.add(category);
             definitions.add(definitionForMarketplace.get());
-            productsPerCategory.add(products);
+            productsPerCategory.add(products.stream()
+                    .filter(product -> !foreignOffers.cover(storeId, product, aliases))
+                    .toList());
+        }
+        if (foreignOffers.skippedProducts() > 0) {
+            log.warn("Marketplace {} export of store {}: {} product(s) skipped, linked to offers published by another "
+                    + "system", marketplace, storeId, foreignOffers.skippedProducts());
         }
 
         Map<String, MarketplaceOffer> offersByOfferId = new LinkedHashMap<>();
@@ -214,6 +229,42 @@ public class MarketplaceOfferExportEventListener {
         }
         Optional<String> mfn = unifiedMfn(snapshot.manufacturerCode());
         return mfn.isPresent() && mfn.equals(unifiedMfn(product.getManufacturerCode()));
+    }
+
+    /**
+     * The links of this marketplace to offers published by another system (design D3): until the store chooses to
+     * update them, a product linked to one is left out of the export, so no duplicate offer appears under our id. A
+     * link whose offer key is the product's own offer id points at our offer, which is exported as before.
+     */
+    private static final class ForeignOffers {
+
+        private final Map<String, Set<String>> offerKeysByPimId = new HashMap<>();
+        private int skippedProducts;
+
+        ForeignOffers(List<MarketplaceOfferLink> links) {
+            for (MarketplaceOfferLink link : links) {
+                offerKeysByPimId.computeIfAbsent(link.getPimId(), pimId -> new HashSet<>()).add(link.getSellerOfferKey());
+            }
+        }
+
+        boolean cover(String storeId, Product product, StorePimAliases aliases) {
+            if (offerKeysByPimId.isEmpty()) {
+                return false;
+            }
+            String offerId = aliases.offerIdOf(storeId, product.getPimId());
+            boolean covered = Stream.concat(Stream.of(product.getPimId()),
+                            aliases.aliasesOf(storeId, product.getPimId()).stream())
+                    .flatMap(pimId -> offerKeysByPimId.getOrDefault(pimId, Set.of()).stream())
+                    .anyMatch(offerKey -> !offerKey.equals(offerId));
+            if (covered) {
+                skippedProducts++;
+            }
+            return covered;
+        }
+
+        int skippedProducts() {
+            return skippedProducts;
+        }
     }
 
     /** A product's offer, and whether the index copy knows its PIM entry. */
