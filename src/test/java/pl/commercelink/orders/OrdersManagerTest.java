@@ -87,6 +87,34 @@ class OrdersManagerTest {
     private OrdersManager ordersManager;
 
     @Test
+    void anOrderIsAlreadyImportedOnlyWhenTheStoreHasItsExternalId() {
+        // given
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, "mp-1")).thenReturn(new Order(STORE_ID));
+
+        // when / then
+        assertThat(ordersManager.isAlreadyImported(STORE_ID, "mp-1")).isTrue();
+        assertThat(ordersManager.isAlreadyImported(STORE_ID, "mp-2")).isFalse();
+        assertThat(ordersManager.isAlreadyImported(STORE_ID, " ")).isFalse();
+        verify(ordersRepository, never()).findByStoreIdAndExternalOrderId(STORE_ID, " ");
+    }
+
+    @Test
+    void saveWithFulfilmentStillRefusesAnOrderImportedMeanwhile() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setExternalOrderId("mp-1");
+        when(ordersRepository.findByStoreIdAndExternalOrderId(STORE_ID, "mp-1")).thenReturn(new Order(STORE_ID));
+
+        // when
+        boolean saved = ordersManager.saveWithFulfilment(order, List.of());
+
+        // then
+        assertThat(saved).isFalse();
+        verify(ordersRepository, never()).save(any(Order.class));
+        verify(orderFulfilmentEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
     @DisplayName("addOrderItem from matched inventory with offers persists item with taxonomy data and increments order total price")
     void addOrderItemFromMatchedInventoryWithOffersIncrementsOrderTotalsAndPersistsItem() {
         // given

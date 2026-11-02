@@ -84,9 +84,13 @@ public class MarketplaceOfferLinking {
         // resolved through the saved link, so the item gets exactly what the next import would give it
         ResolvedOffer offer = resolver.resolve(storeId, marketplace, offerKey, null).orElse(null);
         if (offer == null) {
-            log.warn("Offer {} of store {} linked to {}, but the product is not in the PIM view; no item filled",
-                    offerKey, storeId, pimId);
+            log.warn("Offer {} of store {} linked to {}, but the product is not in the PIM view or has no manufacturer"
+                    + " code; no item filled", offerKey, storeId, pimId);
             return new LinkResult(0);
+        }
+        if (StringUtils.isBlank(offer.category())) {
+            log.warn("Offer {} of store {} linked to {}, which has no category in the PIM nor in the store catalog;"
+                    + " the items keep their category", offerKey, storeId, pimId);
         }
 
         int updated = 0;

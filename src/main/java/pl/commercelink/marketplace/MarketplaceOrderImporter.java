@@ -36,6 +36,12 @@ public class MarketplaceOrderImporter {
 
     /** @return false when the marketplace order is already in the store and nothing was saved. */
     public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+        // every poll fetches orders already imported; resolving their lines would read the catalogs for nothing.
+        // saveWithFulfilment checks again, against an import running at the same time.
+        if (ordersManager.isAlreadyImported(store.getStoreId(), marketplaceOrder.externalOrderId())) {
+            return false;
+        }
+        MarketplaceOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
@@ -53,9 +59,9 @@ public class MarketplaceOrderImporter {
             String basketItemId = UUID.randomUUID().toString();
             rawKeysByBasketItemId.put(basketItemId, product.manufacturerCode());
 
-            Optional<ResolvedOffer> resolved = offerResolver.resolve(
-                    store.getStoreId(), marketplaceName, product.sellerOfferKey(), product.manufacturerCode());
-            resolvedByBasketItemId.put(basketItemId, new ResolvedLine(product.sellerOfferKey(), resolved.orElse(null)));
+            String sellerOfferKey = StringUtils.trimToNull(product.sellerOfferKey());
+            Optional<ResolvedOffer> resolved = offers.resolve(marketplaceName, sellerOfferKey, product.manufacturerCode());
+            resolvedByBasketItemId.put(basketItemId, new ResolvedLine(sellerOfferKey, resolved.orElse(null)));
 
             basketItems.add(new BasketItem(
                     basketItemId,

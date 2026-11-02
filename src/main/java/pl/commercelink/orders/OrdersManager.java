@@ -472,13 +472,16 @@ public class OrdersManager {
     }
 
     /** @return false when an order with the same externalOrderId already exists and nothing was saved. */
+    /** Whether the store already has an order with this external (marketplace) id. */
+    public boolean isAlreadyImported(String storeId, String externalOrderId) {
+        return StringUtils.isNotBlank(externalOrderId)
+                && ordersRepository.findByStoreIdAndExternalOrderId(storeId, externalOrderId) != null;
+    }
+
     public boolean saveWithFulfilment(Order order, List<OrderItem> orderItems) {
         // prevent duplicate orders based on externalOrderId
-        if (StringUtils.isNotBlank(order.getExternalOrderId())) {
-            Order existingOrder = ordersRepository.findByStoreIdAndExternalOrderId(order.getStoreId(), order.getExternalOrderId());
-            if (existingOrder != null) {
-                return false;
-            }
+        if (isAlreadyImported(order.getStoreId(), order.getExternalOrderId())) {
+            return false;
         }
 
         ordersRepository.save(order);
