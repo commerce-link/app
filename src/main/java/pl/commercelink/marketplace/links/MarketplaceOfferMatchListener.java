@@ -3,7 +3,6 @@ package pl.commercelink.marketplace.links;
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceOffers;
@@ -16,7 +15,8 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+// Not gated on application.env: the queue is fed only by an operator, not a schedule, and SQS gives each message to one
+// instance, so it runs in every environment, as ReportGenerationListener does.
 @RequiredArgsConstructor
 class MarketplaceOfferMatchListener {
 
