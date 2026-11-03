@@ -223,6 +223,34 @@ class CarriersEndToEndDynamoDbIntegrationTest {
     }
 
     @Test
+    void anUnknownCarrierTextPassesEveryPathUnchangedAndWithoutACode() {
+        // given: texts typed by hand or sent by a seller, as found on orders
+        List<String> texts = List.of("my", "me", "Odbiór osobisty w sklepie", "Kurier własny 24h", "123");
+
+        // when / then
+        for (String text : texts) {
+            assertThat(mappings.carrierNameFor(ALLEGRO_METHODS, text)).isEqualTo(text);
+            assertThat(mappings.carrierNameFor(MORELE, text)).isEqualTo(text);
+            assertThat(mappings.carrierNameFor(FURGONETKA, text)).isEqualTo(text);
+            assertThat(mappings.outboundMappingFor(FURGONETKA, text, List.of(FURGONETKA))).isEmpty();
+            assertThat(mappings.outboundMappingFor(ALLEGRO, text, List.of(FURGONETKA, ALLEGRO_METHODS))).isEmpty();
+            assertThat(mappings.outboundMappingFor(CENEO, text, List.of(FURGONETKA, CENEO_FORMS))).isEmpty();
+        }
+    }
+
+    @Test
+    void ordersFromSourcesWithoutDictionariesKeepTheirTextAndGetNoStatusCode() {
+        // given: order sources seen besides the connected marketplaces
+        List<String> sources = List.of("CsCartMultiVendor", "OLX", "amazon.pl", "https://www.amazon.pl/");
+
+        // when / then
+        for (String source : sources) {
+            assertThat(mappings.carrierNameFor(CarrierDictionaries.marketplaceImport(source), "DPD")).isEqualTo("DPD");
+            assertThat(CarrierDictionaries.marketplaceStatus(source)).isEmpty();
+        }
+    }
+
+    @Test
     void theSuperAdminAddsACarrierOnceAndCannotAddItTwice() throws Exception {
         // when
         mvc.perform(post(CarriersController.PATH).param("name", "  Pocztex   Kurier48 ").locale(PL))

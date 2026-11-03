@@ -1,7 +1,7 @@
 # Carriers and carrier dictionaries
 
 The app reads carriers from the `Carriers` table and the translations to and from external systems from
-`CarrierMappings` (see "Carriers" in `CLAUDE.md`). The app creates both tables (migration `V024`) but does not fill
+`CarrierMappings` (see "Carriers" in `CLAUDE.md`). The app creates both tables (migration `V024`; the script does it too when they are missing) but does not fill
 them: the data a deployment uses is its own and is not kept in this repository.
 
 ## File format
@@ -50,6 +50,10 @@ is loaded when it has problems.
 
 ## Rollout
 
-The tables appear when the new app version starts, so load the file right after the deploy. Until then nothing
-breaks, but carriers are not recognised: Allegro gets `OTHER` with the carrier name, and a Ceneo shipped status is
-refused (it needs a carrier code) and is retried, ending in the dead-letter queue after three attempts.
+Load the file **before** deploying the version that reads the tables. The script creates both tables when they are
+missing, with the schema of `V024` (which then finds them and does nothing), so the app reads complete dictionaries
+from its first request. Loaded only after the deploy, the dictionaries are empty in between: nothing breaks, but
+carriers are not recognised, so Allegro gets `OTHER` with the carrier name and a Ceneo shipped status is refused (it
+needs a carrier code) and retried, ending in the dead-letter queue after three attempts.
+
+`V016` turns on point-in-time recovery and deletion protection for both tables at the next app start.

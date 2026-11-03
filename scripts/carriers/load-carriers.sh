@@ -10,7 +10,8 @@
 #   scripts/carriers/load-carriers.sh src/main/resources/local-init/carriers/carriers.example.json \
 #       --endpoint-url http://localhost:8000 --region eu-central-1
 #
-# The tables are created by the app on startup (migration V024), so run it after the app has started once.
+# Creates the two tables when they are missing, with the schema of migration V024 (which then finds them), so the
+# data can be loaded before the deploy that starts reading it.
 set -euo pipefail
 
 CARRIERS_TABLE="Carriers"
@@ -62,9 +63,24 @@ PROBLEMS=$(jq -r '
         | "\($d): the pair \(.[0].text)=\(.[0].carrier) is there twice")
     ' <<<"$NORMALIZED")
 
-EXISTING_CARRIERS=$(aws_cli dynamodb scan --table-name "$CARRIERS_TABLE" \
-    --projection-expression "#n" --expression-attribute-names '{"#n":"name"}' --output json \
-    | jq -c '[.Items[].name.S]')
+# only a missing table is "no": an expired session or a wrong region stops the script instead of creating anything
+table_exists() {
+    local output
+    if output=$(aws_cli dynamodb describe-table --table-name "$1" 2>&1); then
+        return 0
+    elif grep -q "ResourceNotFoundException" <<<"$output"; then
+        return 1
+    fi
+    echo "$output" >&2
+    exit 1
+}
+
+EXISTING_CARRIERS='[]'
+if table_exists "$CARRIERS_TABLE"; then
+    EXISTING_CARRIERS=$(aws_cli dynamodb scan --table-name "$CARRIERS_TABLE" \
+        --projection-expression "#n" --expression-attribute-names '{"#n":"name"}' --output json \
+        | jq -c '[.Items[].name.S]')
+fi
 
 # A pair has to name a carrier of the file or of the table; dictionaries look carriers up regardless of case.
 UNKNOWN=$(jq -r --argjson existing "$EXISTING_CARRIERS" '
@@ -79,6 +95,27 @@ if [[ -n "$PROBLEMS$UNKNOWN" ]]; then
     exit 1
 fi
 
+# the schema of V024_CreateCarrierTables: a string hash key, on-demand capacity
+ensure_table() {
+    local table="$1" key="$2"
+    if table_exists "$table"; then
+        return
+    fi
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "would create table $table"
+        return
+    fi
+    aws_cli dynamodb create-table --table-name "$table" \
+        --attribute-definitions "AttributeName=$key,AttributeType=S" \
+        --key-schema "AttributeName=$key,KeyType=HASH" \
+        --billing-mode PAY_PER_REQUEST >/dev/null
+    aws_cli dynamodb wait table-exists --table-name "$table"
+    echo "created   table $table"
+}
+
+ensure_table "$CARRIERS_TABLE" name
+ensure_table "$DICTIONARIES_TABLE" dictionary
+
 created=0
 kept=0
 
@@ -87,7 +124,7 @@ put_if_absent() {
     local table="$1" key="$2" item="$3" output
     if [[ "$DRY_RUN" == true ]]; then
         if aws_cli dynamodb get-item --table-name "$table" --key "$(jq -c --arg k "$key" "{$4: {S: \$k}}" <<<'{}')" \
-            --output json | jq -e '.Item' >/dev/null 2>&1; then
+            --output json 2>/dev/null | jq -e '.Item' >/dev/null 2>&1; then
             echo "kept"
         else
             echo "created"
