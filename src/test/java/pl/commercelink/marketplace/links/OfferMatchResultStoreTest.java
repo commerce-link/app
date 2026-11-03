@@ -33,9 +33,9 @@ class OfferMatchResultStoreTest {
     @Test
     void readsAFileSavedBeforeRowsCarriedTheActiveFlagAsActive() {
         // given
-        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":1,\"linked\":[],\"notInCatalog\":[],"
-                + "\"noPimEntry\":[{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
-                + "\"pimId\":null,\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
+        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":1,\"linked\":[],\"notInCatalog\":["
+                + "{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
+                + "\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
         when(fileStorage.canRead(BUCKET, KEY)).thenReturn(true);
         when(fileStorage.getBytes(BUCKET, KEY)).thenReturn(old.getBytes(StandardCharsets.UTF_8));
 
@@ -44,15 +44,37 @@ class OfferMatchResultStoreTest {
 
         // then
         assertThat(latest).isPresent();
-        assertThat(latest.get().noPimEntry()).extracting(OfferMatchResult.Row::active, OfferMatchResult.Row::catalogEan)
+        assertThat(latest.get().notInCatalog()).extracting(OfferMatchResult.Row::active, OfferMatchResult.Row::catalogEan)
                 .containsExactly(org.assertj.core.api.Assertions.tuple(true, null));
+    }
+
+    @Test
+    void readsAFileSavedWhenOffersWereMatchedToPimEntries() {
+        // given a result of the PIM-based matching: rows with a pimId and a group of offers without a PIM entry
+        String old = "{\"finishedAt\":\"2026-11-02T10:00:00Z\",\"total\":2,"
+                + "\"linked\":[{\"sellerOfferKey\":\"SILLO-1\",\"title\":\"Klocki\",\"eans\":[\"5903771700818\"],"
+                + "\"pimId\":\"pim-1\",\"reason\":null,\"active\":true,\"catalogEan\":null}],\"notInCatalog\":[],"
+                + "\"noPimEntry\":[{\"sellerOfferKey\":\"SILLO-3\",\"title\":\"Puzzle\",\"eans\":[\"5900000000000\"],"
+                + "\"pimId\":null,\"reason\":null}],\"toReview\":[],\"ownOffers\":0,\"alreadyLinked\":0}";
+        when(fileStorage.canRead(BUCKET, KEY)).thenReturn(true);
+        when(fileStorage.getBytes(BUCKET, KEY)).thenReturn(old.getBytes(StandardCharsets.UTF_8));
+
+        // when
+        Optional<OfferMatchResult> latest = store().latest("s1", "Empik");
+
+        // then the page still shows it, without the dropped group and ids
+        assertThat(latest).isPresent();
+        assertThat(latest.get().total()).isEqualTo(2);
+        assertThat(latest.get().linked()).containsExactly(new OfferMatchResult.Row("SILLO-1", "Klocki",
+                List.of("5903771700818"), null, null));
+        assertThat(latest.get().toReview()).isEmpty();
     }
 
     private static OfferMatchResult result() {
         return new OfferMatchResult(Instant.parse("2026-11-02T10:00:00Z"), 6,
-                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "pim-1", null)),
-                List.of(new OfferMatchResult.Row("SILLO-2", "Lalka", List.of("5903771700825"), "pim-2", null)),
-                List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null)),
+                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "Klocki Classic", null)),
+                List.of(new OfferMatchResult.Row("SILLO-2", "Lalka", List.of("5903771700825"), null, null, true,
+                        "5903771700825")),
                 List.of(new OfferMatchResult.Row("SILLO-4", "Gra", List.of(), null, "no-ean")),
                 1, 1);
     }
@@ -116,9 +138,9 @@ class OfferMatchResultStoreTest {
     private static OfferMatchProgress progress() {
         return new OfferMatchProgress("run-1", Instant.parse("2026-11-02T10:00:00Z"),
                 Instant.parse("2026-11-02T10:01:00Z"), OfferMatchProgress.Status.RUNNING, "200", 2, 6150, 1, 0,
-                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "pim-1", null)),
-                List.of(), List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null,
-                        false, null)), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), 2,
+                List.of(new OfferMatchResult.Row("SILLO-1", "Klocki", List.of("5903771700818"), "Klocki Classic", null)),
+                List.of(new OfferMatchResult.Row("SILLO-3", "Puzzle", List.of("5900000000000"), null, null,
+                        false, "5900000000000")), List.of(), java.util.Set.of("SILLO-1", "SILLO-3"), 2,
                 null, null);
     }
 

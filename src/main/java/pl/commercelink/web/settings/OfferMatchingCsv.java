@@ -19,19 +19,18 @@ import java.util.function.Function;
 /**
  * Every offer of one group of the latest matching run as a CSV file: the page lists at most
  * {@link OfferMatchingView#ROW_LIMIT} rows per group, while a group can hold thousands of offers (the ones to review, or
- * a store's offers without a PIM card, kept for preparing the cards). Same order as the page: active offers first.
+ * those whose products are still to be added to a catalog). Same order as the page: active offers first.
  * Semicolon-separated UTF-8 with a BOM, like the reports' exports, so a spreadsheet opens it with Polish characters.
  */
 public final class OfferMatchingCsv {
 
-    public static final Set<String> GROUPS = Set.of("linked", "notInCatalog", "noPimEntry", "toReview");
+    public static final Set<String> GROUPS = Set.of("linked", "notInCatalog", "toReview");
 
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final String KEY = "store.marketplaces.offer.matching.csv.";
     private static final Map<String, Function<OfferMatchResult, List<OfferMatchResult.Row>>> ROWS = Map.of(
             "linked", OfferMatchResult::linked,
             "notInCatalog", OfferMatchResult::notInCatalog,
-            "noPimEntry", OfferMatchResult::noPimEntry,
             "toReview", OfferMatchResult::toReview);
 
     private OfferMatchingCsv() {
@@ -54,7 +53,8 @@ public final class OfferMatchingCsv {
                         nullToEmpty(row.title()),
                         row.eans() == null ? "" : String.join(", ", row.eans()),
                         Boolean.FALSE.equals(row.active()) ? no : yes,
-                        nullToEmpty(row.pimId()),
+                        nullToEmpty(row.product()),
+                        nullToEmpty(row.catalogEan()),
                         reason(row.reason(), messages, locale)})
                 .toList();
         String[] headers = {
@@ -63,6 +63,7 @@ public final class OfferMatchingCsv {
                 messages.getMessage(KEY + "column.eans", null, locale),
                 messages.getMessage(KEY + "column.active", null, locale),
                 messages.getMessage(KEY + "column.product", null, locale),
+                messages.getMessage(KEY + "column.catalogEan", null, locale),
                 messages.getMessage(KEY + "column.reason", null, locale)};
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -74,7 +75,7 @@ public final class OfferMatchingCsv {
         }
     }
 
-    // the page's sentence for a reason; an offer linked by an earlier run says so, an unknown code stays as it is
+    // the page's sentence for a reason; an offer linked by hand says so, an unknown code stays as it is
     private static String reason(String reason, MessageSource messages, Locale locale) {
         if (reason == null) {
             return "";

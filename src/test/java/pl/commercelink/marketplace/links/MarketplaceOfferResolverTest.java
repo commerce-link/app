@@ -179,36 +179,6 @@ class MarketplaceOfferResolverTest {
     }
 
     @Test
-    void aProductCountsAsInTheStoreCatalogOnlyInTheStoresOwnCategories() {
-        // given
-        when(aliases.aliasesOf(STORE, "pim-1")).thenReturn(Set.of("pim-1"));
-        when(aliases.aliasesOf(STORE, "pim-2")).thenReturn(Set.of("pim-2"));
-        when(aliases.aliasesOf(STORE, "pim-unknown")).thenReturn(Set.of("pim-unknown"));
-        catalogCategory("c1", "Krzesła");
-        catalogProduct("c1", "p1", "pim-1", null, null);
-        Product foreign = new Product("other-store-category");
-        foreign.setProductId("p2");
-        when(products.findAllByPimId("pim-2")).thenReturn(List.of(foreign));
-
-        // when / then
-        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-1")).isTrue();
-        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-2")).isFalse();
-        assertThat(resolver.forStore(STORE).isInStoreCatalog("pim-unknown")).isFalse();
-    }
-
-    @Test
-    void aCloneCountsAsInTheStoreCatalogWhileTheProductIsPinnedToItsSource() {
-        // given
-        when(aliases.aliasesOf(STORE, "clone")).thenReturn(Set.of("clone", "src"));
-        catalogCategory("c1", "Krzesła");
-        when(products.findAllByPimId("clone")).thenReturn(List.of());
-        catalogProduct("c1", "p1", "src", null, null);
-
-        // when / then
-        assertThat(resolver.forStore(STORE).isInStoreCatalog("clone")).isTrue();
-    }
-
-    @Test
     void listsEveryCatalogProductInStableOrderReadingTheCatalogsOnce() {
         // given
         storeCatalogs(catalog("b", category("c3", "Lampy")), catalog("a", category("c2", "Biurka"), category("c1", "Krzesła")));

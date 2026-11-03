@@ -8,10 +8,6 @@ import pl.commercelink.marketplace.api.MarketplaceOffers;
 import pl.commercelink.marketplace.api.MarketplaceOffersPage;
 import pl.commercelink.marketplace.api.MarketplaceRateLimitedException;
 import pl.commercelink.marketplace.links.OfferMatchResult.Row;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.pim.api.PimView;
-import pl.commercelink.products.Product;
 import pl.commercelink.products.information.StorePimAliases;
 import pl.commercelink.stores.Store;
 
@@ -27,12 +23,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
-
 /**
- * Links a store's offers on a marketplace, published there by another system, to PIM entries by EAN. Each link is
- * saved as soon as its offer is matched, so a run cut short keeps what it linked and the next run skips those offers.
- * Existing links (manual or from an earlier run) are never replaced.
+ * Links a store's offers on a marketplace, published there by another system, to their EANs, and reports what the
+ * store's catalogs make of them. Every offer with an EAN gets its link, also when no catalog product has the EAN yet: an
+ * order line finds the product through the link as soon as one is added. A link from an earlier run is replaced when
+ * the offer's EANs changed; an operator's (MANUAL) link is never touched. Each link is saved as soon as its offer is
+ * read, so a run cut short keeps what it linked.
  * <p>
  * A run goes page by page from where its {@link OfferMatchProgress} stopped, and pauses when the marketplace limits
  * requests (Empik answers about ten pages a minute) or the message's time budget is used, so the caller can carry on in
@@ -47,21 +43,19 @@ public class MarketplaceOfferMatching {
 
     private final MarketplaceOfferLinkRepository linkRepository;
     private final MarketplaceOfferResolver resolver;
-    private final PimCatalog pimCatalog;
     private final StorePimAliases pimAliases;
     private final Clock clock;
 
     @Autowired
     public MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, MarketplaceOfferResolver resolver,
-                                    PimCatalog pimCatalog, StorePimAliases pimAliases) {
-        this(linkRepository, resolver, pimCatalog, pimAliases, Clock.systemUTC());
+                                    StorePimAliases pimAliases) {
+        this(linkRepository, resolver, pimAliases, Clock.systemUTC());
     }
 
     MarketplaceOfferMatching(MarketplaceOfferLinkRepository linkRepository, MarketplaceOfferResolver resolver,
-                             PimCatalog pimCatalog, StorePimAliases pimAliases, Clock clock) {
+                             StorePimAliases pimAliases, Clock clock) {
         this.linkRepository = linkRepository;
         this.resolver = resolver;
-        this.pimCatalog = pimCatalog;
         this.pimAliases = pimAliases;
         this.clock = clock;
     }
@@ -116,12 +110,9 @@ public class MarketplaceOfferMatching {
         private final String storeId;
         private final String marketplace;
         private final OfferMatchProgress started;
-        private final PimView pim;
-        private final PimView globalPim;
         private final MarketplaceOfferResolver.StoreOffers storeOffers;
-        private final Map<String, List<String>> linkedEans = new HashMap<>();
+        private final Map<String, MarketplaceOfferLink> existingLinks = new HashMap<>();
         private final Set<String> seenKeys;
-        private Map<String, Set<String>> catalogEntriesByEan;
 
         private int total;
         private Integer listed;
@@ -130,7 +121,6 @@ public class MarketplaceOfferMatching {
         private int alreadyLinked;
         private final List<Row> linked;
         private final List<Row> notInCatalog;
-        private final List<Row> noPimEntry;
         private final List<Row> toReview;
 
         Run(String storeId, String marketplace, OfferMatchProgress progress) {
@@ -145,14 +135,11 @@ public class MarketplaceOfferMatching {
             this.alreadyLinked = progress.alreadyLinked();
             this.linked = new ArrayList<>(progress.linked());
             this.notInCatalog = new ArrayList<>(progress.notInCatalog());
-            this.noPimEntry = new ArrayList<>(progress.noPimEntry());
             this.toReview = new ArrayList<>(progress.toReview());
-            this.pim = pimCatalog.withStoreData(storeId);
-            this.globalPim = pimCatalog.withGlobalData();
             // one scope per message: the store's catalogs are read once, not once per offer or page
             this.storeOffers = resolver.forStore(storeId);
             linkRepository.findAll(storeId, marketplace)
-                    .forEach(link -> linkedEans.put(link.getSellerOfferKey(), link.getEans()));
+                    .forEach(link -> existingLinks.put(link.getSellerOfferKey(), link));
         }
 
         void match(MarketplaceListedOffer offer) {
@@ -164,11 +151,7 @@ public class MarketplaceOfferMatching {
             total++;
             List<String> eans = eansOf(offer);
             if (StringUtils.isBlank(key)) {
-                toReview.add(row(offer, eans, null, OfferMatchResult.NO_KEY));
-                return;
-            }
-            if (linkedEans.containsKey(key)) {
-                alreadyLinked(offer, eans, pimIdOfLink(linkedEans.get(key)));
+                toReview.add(row(offer, eans, null, OfferMatchResult.NO_KEY, null));
                 return;
             }
             // the export publishes our offers under the pimId, and a product on a clone under its source's id
@@ -176,118 +159,54 @@ public class MarketplaceOfferMatching {
                 ownOffers++;
                 return;
             }
-            if (eans.isEmpty()) {
-                toReview.add(row(offer, eans, null, OfferMatchResult.NO_EAN));
+            MarketplaceOfferLink existing = existingLinks.get(key);
+            if (existing != null && existing.getSource() == MarketplaceOfferLinkSource.MANUAL) {
+                linkedByHand(offer, eans, existing);
                 return;
             }
-
-            Set<String> pimIds = matchedEntries(eans);
-            if (pimIds.isEmpty()) {
-                noPimEntry.add(row(offer, eans, null, null));
-            } else if (pimIds.size() > 1) {
-                toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS));
-            } else {
-                link(offer, key, eans, pimIds.iterator().next());
+            MarketplaceOfferLink link = MarketplaceOfferLink.of(storeId, marketplace, key, eans,
+                    MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant());
+            if (link.getEans().isEmpty()) {
+                toReview.add(row(offer, eans, null, OfferMatchResult.NO_EAN, null));
+                return;
             }
-        }
-
-        private void link(MarketplaceListedOffer offer, String key, List<String> eans, String pimId) {
-            boolean saved = linkRepository.saveIfAbsent(MarketplaceOfferLink.of(storeId, marketplace, key, eans,
-                    MarketplaceOfferLinkSource.EAN, CREATED_BY, clock.instant()));
-            if (!saved) {
+            // an unchanged link is not written again, so a rerun does not rewrite thousands of items
+            boolean unchanged = existing != null && Set.copyOf(link.getEans()).equals(eanSet(existing));
+            if (!unchanged && !linkRepository.saveUnlessManual(link)) {
                 // linked by an operator after this run read the store's links
                 linkRepository.find(storeId, marketplace, key).ifPresentOrElse(
-                        existing -> alreadyLinked(offer, eans, pimIdOfLink(existing.getEans())),
+                        stored -> linkedByHand(offer, eans, stored),
                         () -> alreadyLinked++);
                 return;
             }
-            // linked either way: a product missing from the catalog has no price yet, but the link waits for it
-            if (storeOffers.isInStoreCatalog(pimId)) {
-                linked.add(row(offer, eans, pimId, null));
-            } else {
-                notInCatalog.add(row(offer, eans, pimId, null, primaryGtin(pimId)));
+            classify(offer, eans, link.getEans());
+        }
+
+        private void classify(MarketplaceListedOffer offer, List<String> eans, List<String> linkEans) {
+            switch (storeOffers.matchCatalog(linkEans)) {
+                case CatalogMatch.Found found -> linked.add(row(offer, eans, found.product().getName(), null, null));
+                case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null, null, linkEans.get(0)));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
+                case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
             }
         }
 
         /**
-         * Counted, and listed while the link cannot work yet, so a rerun keeps the shop's "add to catalog" list. Nothing
-         * is written: an existing link, even a stale one, is the operator's to change.
+         * Counted, and listed while the link cannot work, so a rerun keeps the shop's "add to catalog" list. Nothing is
+         * written: an operator's link is the operator's to change.
          */
-        private void alreadyLinked(MarketplaceListedOffer offer, List<String> eans, String pimId) {
+        private void linkedByHand(MarketplaceListedOffer offer, List<String> eans, MarketplaceOfferLink link) {
             alreadyLinked++;
-            if (pimId == null || pimAliases.effectiveEntry(storeId, pimId).isEmpty()) {
-                toReview.add(row(offer, eans, pimId, OfferMatchResult.STALE_LINK));
-            } else if (!storeOffers.isInStoreCatalog(pimId)) {
-                notInCatalog.add(row(offer, eans, pimId, OfferMatchResult.ALREADY_LINKED, primaryGtin(pimId)));
-            }
-        }
-
-        /** The one entry a link's EANs hit, or null when they hit none or several (temporary until the matching task). */
-        private String pimIdOfLink(List<String> linkEans) {
-            Set<String> pimIds = linkEans == null ? Set.of() : matchedEntries(linkEans);
-            return pimIds.size() == 1 ? pimIds.iterator().next() : null;
-        }
-
-        /** The entries the EANs hit, with the store's clone and its source counted as one entry (the source id). */
-        private Set<String> matchedEntries(List<String> eans) {
-            Set<String> pimIds = new LinkedHashSet<>();
-            for (String ean : eans) {
-                pimIds.addAll(entriesOf(ean));
-            }
-            return pimIds;
-        }
-
-        /**
-         * A product of the store's catalogs decides what its EAN means: the store view's lookup prefers the store's own
-         * card, which may share the EAN with the entry the catalog uses, and a link to that card would leave the product
-         * exported next to the foreign offer. Outside the catalog both views are asked, so a store card and a global card
-         * with one EAN make the offer ambiguous rather than picking one of them.
-         */
-        private Set<String> entriesOf(String ean) {
-            Set<String> inCatalog = catalogEntriesByEan().getOrDefault(unifyEan(ean), Set.of());
-            if (!inCatalog.isEmpty()) {
-                return inCatalog;
-            }
-            Set<String> pimIds = new LinkedHashSet<>();
-            pim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
-            globalPim.findByGtin(ean).map(this::canonicalId).ifPresent(pimIds::add);
-            return pimIds;
-        }
-
-        // built on the first EAN lookup from the scope's single catalog read; keyed by the product's EAN and its entry's
-        private Map<String, Set<String>> catalogEntriesByEan() {
-            if (catalogEntriesByEan == null) {
-                Map<String, Set<String>> index = new HashMap<>();
-                for (Product product : storeOffers.catalogProducts()) {
-                    if (StringUtils.isBlank(product.getPimId())) {
-                        continue;
-                    }
-                    String pimId = pimAliases.offerIdOf(storeId, product.getPimId());
-                    Set<String> gtins = new HashSet<>();
-                    if (StringUtils.isNotBlank(product.getEan())) {
-                        gtins.add(product.getEan());
-                    }
-                    pimAliases.effectiveEntry(storeId, product.getPimId()).map(PimEntry::gtins).orElse(List.of()).stream()
-                            .filter(StringUtils::isNotBlank)
-                            .map(gtin -> unifyEan(gtin))
-                            .forEach(gtins::add);
-                    gtins.forEach(gtin -> index.computeIfAbsent(gtin, key -> new LinkedHashSet<>()).add(pimId));
+            List<String> linkEans = link.getEans() == null ? List.of() : link.getEans();
+            switch (storeOffers.matchCatalog(linkEans)) {
+                case CatalogMatch.Found found -> {
+                    // a working link is only counted
                 }
-                catalogEntriesByEan = index;
+                case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null,
+                        OfferMatchResult.ALREADY_LINKED, linkEans.isEmpty() ? null : linkEans.get(0)));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
+                case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
             }
-            return catalogEntriesByEan;
-        }
-
-        private String primaryGtin(String pimId) {
-            return pimAliases.effectiveEntry(storeId, pimId).map(PimEntry::gtins)
-                    .flatMap(gtins -> gtins.stream().filter(StringUtils::isNotBlank).findFirst()).orElse(null);
-        }
-
-        private String canonicalId(PimEntry entry) {
-            if (storeId.equals(entry.ownerStoreId()) && StringUtils.isNotBlank(entry.clonedFromPimId())) {
-                return entry.clonedFromPimId();
-            }
-            return entry.pimId();
         }
 
         void total(Integer total) {
@@ -311,12 +230,12 @@ public class MarketplaceOfferMatching {
         OfferMatchProgress progress(String nextCursor) {
             return new OfferMatchProgress(started.runId(), started.startedAt(), clock.instant(),
                     OfferMatchProgress.Status.RUNNING, nextCursor, total, listed, ownOffers, alreadyLinked, linked,
-                    notInCatalog, noPimEntry, toReview, seenKeys, idleRateLimitPauses, null, null);
+                    notInCatalog, toReview, seenKeys, idleRateLimitPauses, null, null);
         }
 
         OfferMatchResult result() {
             return new OfferMatchResult(clock.instant(), total, List.copyOf(linked), List.copyOf(notInCatalog),
-                    List.copyOf(noPimEntry), List.copyOf(toReview), ownOffers, alreadyLinked);
+                    List.copyOf(toReview), ownOffers, alreadyLinked);
         }
     }
 
@@ -332,12 +251,12 @@ public class MarketplaceOfferMatching {
                 .toList();
     }
 
-    private static Row row(MarketplaceListedOffer offer, List<String> eans, String pimId, String reason) {
-        return row(offer, eans, pimId, reason, null);
+    private static Set<String> eanSet(MarketplaceOfferLink link) {
+        return link.getEans() == null ? Set.of() : new HashSet<>(link.getEans());
     }
 
-    private static Row row(MarketplaceListedOffer offer, List<String> eans, String pimId, String reason,
+    private static Row row(MarketplaceListedOffer offer, List<String> eans, String product, String reason,
                            String catalogEan) {
-        return new Row(offer.sellerOfferKey(), offer.title(), eans, pimId, reason, offer.active(), catalogEan);
+        return new Row(offer.sellerOfferKey(), offer.title(), eans, product, reason, offer.active(), catalogEan);
     }
 }

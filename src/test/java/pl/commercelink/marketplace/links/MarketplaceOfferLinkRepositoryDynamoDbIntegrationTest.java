@@ -104,29 +104,6 @@ class MarketplaceOfferLinkRepositoryDynamoDbIntegrationTest {
     }
 
     @Test
-    void saveIfAbsentWritesANewLink() {
-        // when
-        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "5900000000001"));
-
-        // then
-        assertThat(saved).isTrue();
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000001"));
-    }
-
-    @Test
-    void saveIfAbsentLeavesAnExistingLinkAlone() {
-        // given
-        repository.save(link("s1", "Empik", "SILLO-84980", "5900000000008"));
-
-        // when
-        boolean saved = repository.saveIfAbsent(link("s1", "Empik", "SILLO-84980", "5900000000009"));
-
-        // then
-        assertThat(saved).isFalse();
-        assertThat(repository.find("s1", "Empik", "SILLO-84980")).map(MarketplaceOfferLink::getEans).contains(List.of("5900000000008"));
-    }
-
-    @Test
     void aMultiEanListRoundTripsInOrder() {
         // given
         repository.save(MarketplaceOfferLink.of("s1", "Empik", "K-1", List.of("5900000000009", "5900000000001"),

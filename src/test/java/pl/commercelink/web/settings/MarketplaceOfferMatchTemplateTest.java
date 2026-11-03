@@ -33,12 +33,14 @@ class MarketplaceOfferMatchTemplateTest {
     void theLatestRunShowsCountsGroupsReasonsAndEansToCopy() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 9,
-                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), "pim-1", null)),
-                List.of(new Row("sku-2", "Klawiatura", List.of("5901234123458"), "pim-2", OfferMatchResult.ALREADY_LINKED)),
-                List.of(new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, null)),
+                List.of(new Row("sku-1", "Mysz", List.of("5901234123457"), "Mysz bezprzewodowa M1", null)),
+                List.of(new Row("sku-2", "Klawiatura", List.of("5901234123458"), null, OfferMatchResult.ALREADY_LINKED,
+                                true, "5901234123499"),
+                        new Row("sku-3", "Monitor", List.of("5901234123459", "5901234123460"), null, null, true,
+                                "5901234123459")),
                 List.of(new Row("sku-5", null, List.of(), null, OfferMatchResult.NO_EAN),
                         new Row("sku-6", "Kabel", List.of("5901234123461"), null, OfferMatchResult.AMBIGUOUS),
-                        new Row("sku-7", "Pad", List.of("5901234123462"), "pim-7", OfferMatchResult.STALE_LINK)),
+                        new Row("sku-7", "Pad", List.of("5901234123462"), null, OfferMatchResult.NO_MFN)),
                 2, 3);
 
         // when
@@ -47,13 +49,14 @@ class MarketplaceOfferMatchTemplateTest {
         // then
         assertThat(html).contains("Ostatni przebieg: 02.11.2026 10:15")
                 .contains("cl-stat-grid")
-                .contains("Połączone w tym przebiegu")
-                .contains("Połączone, produktu brak w katalogu")
-                .contains("Brak karty w PIM")
-                .contains("Do przejrzenia");
-        assertThat(html).contains(">5901234123459</textarea>").contains(">5901234123458</textarea>");
-        assertThat(html).contains("Oferta nie ma EAN").contains("różne karty PIM").contains("PIM już nie zna");
-        assertThat(html).contains("Połączona wcześniej").contains("pim-1").contains("sku-5");
+                .contains("W katalogu")
+                .contains("Brak w katalogu")
+                .contains("Do przejrzenia")
+                .doesNotContain("PIM");
+        assertThat(html).contains(">5901234123499\n5901234123459</textarea>");
+        assertThat(html).contains("Oferta nie ma EAN").contains("różne produkty w katalogach")
+                .contains("nie ma kodu producenta");
+        assertThat(html).contains("Połączona ręcznie").contains("Mysz bezprzewodowa M1").contains("sku-5");
         assertThat(html).doesNotContain("??");
     }
 
@@ -61,7 +64,7 @@ class MarketplaceOfferMatchTemplateTest {
     void everyNonEmptyGroupOffersItsOffersAsCsvAndAnEmptyOneDoesNot() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2,
-                List.of(), List.of(),
+                List.of(),
                 List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)),
                 List.of(new Row("sku-5", "Pad", List.of(), null, OfferMatchResult.NO_EAN)),
                 0, 0);
@@ -70,17 +73,17 @@ class MarketplaceOfferMatchTemplateTest {
         String html = render(OfferMatchingView.of(result), null);
 
         // then
-        assertThat(html).contains("href=\"" + ACTION + "/noPimEntry.csv\"")
+        assertThat(html).contains("href=\"" + ACTION + "/notInCatalog.csv\"")
                 .contains("href=\"" + ACTION + "/toReview.csv\"")
                 .contains("Pobierz CSV")
                 .doesNotContain(ACTION + "/linked.csv")
-                .doesNotContain(ACTION + "/notInCatalog.csv");
+                .doesNotContain("noPimEntry");
     }
 
     @Test
     void inactiveOffersGetAPillAndAreNotOfferedForCopying() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2, List.of(), List.of(),
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2, List.of(),
                 List.of(new Row("old-1", "Stara", List.of("5901234123457"), null, null, false, null),
                         new Row("new-1", "Nowa", List.of("5901234123458"), null, null, true, null)),
                 List.of(), 0, 0);
@@ -98,7 +101,7 @@ class MarketplaceOfferMatchTemplateTest {
     void aRowWithoutKeyAndTitleGetsAPlaceholderAndNoEmptySkuLine() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
-                List.of(), List.of(new Row(null, null, List.of("5901234123457"), null, OfferMatchResult.NO_KEY)), 0, 0);
+                List.of(new Row(null, null, List.of("5901234123457"), null, OfferMatchResult.NO_KEY)), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -111,7 +114,7 @@ class MarketplaceOfferMatchTemplateTest {
     void aRowWithoutTitleShowsItsSkuOnce() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 1, List.of(), List.of(),
-                List.of(), List.of(new Row("sku-unique", null, List.of(), null, OfferMatchResult.NO_EAN)), 0, 0);
+                List.of(new Row("sku-unique", null, List.of(), null, OfferMatchResult.NO_EAN)), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -125,8 +128,7 @@ class MarketplaceOfferMatchTemplateTest {
         // given
         List<Row> many = IntStream.range(0, 12345)
                 .mapToObj(index -> new Row("sku-" + index, "P", List.of("59" + index), null, null)).toList();
-        OfferMatchResult result = new OfferMatchResult(Instant.now(), many.size(), List.of(), List.of(), many,
-                List.of(), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.now(), many.size(), List.of(), many, List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -142,8 +144,7 @@ class MarketplaceOfferMatchTemplateTest {
         List<Row> missing = IntStream.range(0, OfferMatchingView.ROW_LIMIT + 1)
                 .mapToObj(index -> new Row("sku-" + index, "Produkt " + index, List.of("590000" + (100000 + index)), null, null))
                 .toList();
-        OfferMatchResult result = new OfferMatchResult(Instant.now(), missing.size(), List.of(), List.of(), missing,
-                List.of(), 0, 0);
+        OfferMatchResult result = new OfferMatchResult(Instant.now(), missing.size(), List.of(), missing, List.of(), 0, 0);
 
         // when
         String html = render(OfferMatchingView.of(result), null);
@@ -217,7 +218,7 @@ class MarketplaceOfferMatchTemplateTest {
     @Test
     void theLatestResultStaysVisibleDuringARun() {
         // given
-        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-01T09:15:00Z"), 1, List.of(), List.of(),
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-01T09:15:00Z"), 1, List.of(),
                 List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)), List.of(), 0, 0);
 
         // when

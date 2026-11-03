@@ -117,11 +117,11 @@ class MarketplaceOfferMatchListenerTest {
 
     private static OfferMatchProgress running(String runId, String nextCursor, Instant updatedAt) {
         return new OfferMatchProgress(runId, NOW.minus(Duration.ofHours(1)), updatedAt, Status.RUNNING, nextCursor, 100,
-                6150, 0, 0, null, null, null, null, null, 0, null, null);
+                6150, 0, 0, null, null, null, null, 0, null, null);
     }
 
     private static OfferMatchResult result() {
-        return new OfferMatchResult(NOW, 1, List.of(), List.of(), List.of(), List.of(), 1, 0);
+        return new OfferMatchResult(NOW, 1, List.of(), List.of(), List.of(), 1, 0);
     }
 
     private void givenProgress(OfferMatchProgress progress) {
@@ -130,7 +130,7 @@ class MarketplaceOfferMatchListenerTest {
 
     private static OfferMatchProgress pausedAt(String runId, String cursor, int idleRateLimitPauses) {
         return new OfferMatchProgress(runId, NOW.minus(Duration.ofHours(1)), NOW, Status.RUNNING, cursor, 200, 6150, 0, 0,
-                null, null, null, null, null, idleRateLimitPauses, null, null);
+                null, null, null, null, idleRateLimitPauses, null, null);
     }
 
     private OfferMatchProgress lastSavedProgress() {

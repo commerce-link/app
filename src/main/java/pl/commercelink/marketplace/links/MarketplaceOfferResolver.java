@@ -147,10 +147,6 @@ public class MarketplaceOfferResolver {
             return new CatalogMatch.Found(first, categoryNamesById().get(first.getCategoryId()));
         }
 
-        public boolean isInStoreCatalog(String pimId) {
-            return catalogProduct(pimId).isPresent();
-        }
-
         // without an MFN the item would carry the marketplace's raw code as its sku while looking resolved
         private boolean hasManufacturerCode(ResolvedOffer offer, String sellerOfferKey) {
             if (StringUtils.isNotBlank(offer.mfn())) {

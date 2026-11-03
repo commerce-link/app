@@ -22,7 +22,7 @@ import java.util.Set;
  */
 public record OfferMatchProgress(String runId, Instant startedAt, Instant updatedAt, Status status, String nextCursor,
                                  int processed, Integer total, int ownOffers, int alreadyLinked, List<Row> linked,
-                                 List<Row> notInCatalog, List<Row> noPimEntry, List<Row> toReview,
+                                 List<Row> notInCatalog, List<Row> toReview,
                                  Set<String> seenKeys, int idleRateLimitPauses, OfferMatchError error,
                                  Integer errorStatus) {
 
@@ -38,14 +38,13 @@ public record OfferMatchProgress(String runId, Instant startedAt, Instant update
     public OfferMatchProgress {
         linked = linked == null ? List.of() : List.copyOf(linked);
         notInCatalog = notInCatalog == null ? List.of() : List.copyOf(notInCatalog);
-        noPimEntry = noPimEntry == null ? List.of() : List.copyOf(noPimEntry);
         toReview = toReview == null ? List.of() : List.copyOf(toReview);
         seenKeys = seenKeys == null ? Set.of() : new LinkedHashSet<>(seenKeys);
     }
 
     public static OfferMatchProgress start(String runId, Instant now) {
         return new OfferMatchProgress(runId, now, now, Status.RUNNING, null, 0, null, 0, 0, List.of(), List.of(),
-                List.of(), List.of(), Set.of(), 0, null, null);
+                List.of(), Set.of(), 0, null, null);
     }
 
     /** Running and saved recently enough that it is still going on: a second run must wait. */
@@ -63,12 +62,11 @@ public record OfferMatchProgress(String runId, Instant startedAt, Instant update
 
     public OfferMatchProgress failed(Instant now, OfferMatchError reason, Integer httpStatus) {
         return new OfferMatchProgress(runId, startedAt, now, Status.FAILED, nextCursor, processed, total, ownOffers,
-                alreadyLinked, linked, notInCatalog, noPimEntry, toReview, seenKeys, idleRateLimitPauses, reason,
+                alreadyLinked, linked, notInCatalog, toReview, seenKeys, idleRateLimitPauses, reason,
                 httpStatus);
     }
 
     OfferMatchResult result(Instant finishedAt) {
-        return new OfferMatchResult(finishedAt, processed, linked, notInCatalog, noPimEntry, toReview, ownOffers,
-                alreadyLinked);
+        return new OfferMatchResult(finishedAt, processed, linked, notInCatalog, toReview, ownOffers, alreadyLinked);
     }
 }

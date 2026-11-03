@@ -23,6 +23,7 @@ import pl.commercelink.marketplace.api.MarketplaceExportReport;
 import pl.commercelink.marketplace.api.MarketplaceListedOffer;
 import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.marketplace.links.CatalogMatch;
 import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkSource;
@@ -1058,17 +1059,17 @@ class MarketplaceOfferExportEventListenerTest {
         MarketplaceOfferLinkRepository matchingLinks = mock(MarketplaceOfferLinkRepository.class);
         when(resolver.forStore(STORE_ID)).thenReturn(storeOffers);
         when(storeOffers.catalogProducts()).thenReturn(List.of(catalogProduct));
-        when(storeOffers.isInStoreCatalog(catalogProduct.getPimId())).thenReturn(true);
-        when(matchingLinks.saveIfAbsent(any())).thenReturn(true);
+        when(storeOffers.matchCatalog(any())).thenReturn(new CatalogMatch.Found(catalogProduct, null));
+        when(matchingLinks.saveUnlessManual(any())).thenReturn(true);
         Store matchingStore = new Store();
         matchingStore.setStoreId(STORE_ID);
 
-        new MarketplaceOfferMatching(matchingLinks, resolver, pim, new StorePimAliases(pim))
+        new MarketplaceOfferMatching(matchingLinks, resolver, new StorePimAliases(pim))
                 .resume(matchingStore, MARKETPLACE, cursor -> new MarketplaceOffersPage(List.of(offer), null, 1),
                         OfferMatchProgress.start("run-1", Instant.now()));
 
         ArgumentCaptor<MarketplaceOfferLink> saved = ArgumentCaptor.forClass(MarketplaceOfferLink.class);
-        verify(matchingLinks).saveIfAbsent(saved.capture());
+        verify(matchingLinks).saveUnlessManual(saved.capture());
         return saved.getValue();
     }
 

@@ -31,18 +31,6 @@ public class MarketplaceOfferLinkRepository extends DynamoDbRepository<Marketpla
                 MarketplaceOfferLink.linkKey(marketplace, sellerOfferKey), CONSISTENT));
     }
 
-    /** Writes the link only while the offer key has none, so an automatic match never replaces an existing link. */
-    public boolean saveIfAbsent(MarketplaceOfferLink link) {
-        DynamoDBSaveExpression absent = new DynamoDBSaveExpression()
-                .withExpectedEntry("linkKey", new ExpectedAttributeValue(false));
-        try {
-            dynamoDBMapper.save(link, absent);
-            return true;
-        } catch (ConditionalCheckFailedException e) {
-            return false;
-        }
-    }
-
     /**
      * Writes the link unless an operator's (MANUAL) one exists, in one conditional write, so a manual link saved
      * concurrently is never overwritten by an automatic match.

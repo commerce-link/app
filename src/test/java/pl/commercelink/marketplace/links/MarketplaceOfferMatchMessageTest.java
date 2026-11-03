@@ -13,7 +13,7 @@ class MarketplaceOfferMatchMessageTest {
 
     private static OfferMatchProgress progressAt(String runId, String nextCursor) {
         return new OfferMatchProgress(runId, NOW, NOW, OfferMatchProgress.Status.RUNNING, nextCursor, 0, null, 0, 0,
-                null, null, null, null, null, 0, null, null);
+                null, null, null, null, 0, null, null);
     }
 
     @Test

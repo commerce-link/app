@@ -11,13 +11,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OfferMatchingViewTest {
 
-    private static OfferMatchingView view(List<Row> notInCatalog, List<Row> noPimEntry) {
-        return OfferMatchingView.of(new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 5, List.of(),
-                notInCatalog, noPimEntry, List.of(), 0, 0));
+    private static OfferMatchingView view(List<Row> linked, List<Row> notInCatalog, List<Row> toReview) {
+        return OfferMatchingView.of(new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 5, linked,
+                notInCatalog, toReview, 0, 0));
+    }
+
+    private static OfferMatchingView notInCatalog(List<Row> rows) {
+        return view(List.of(), rows, List.of());
     }
 
     private static Row row(String key, List<String> eans, boolean active) {
         return new Row(key, "Title " + key, eans, null, null, active, null);
+    }
+
+    @Test
+    void groupsTheOffersByWhatTheCatalogSays() {
+        // when
+        OfferMatchingView view = view(List.of(), List.of(), List.of());
+
+        // then
+        assertThat(view.groups()).extracting(OfferMatchingView.Group::name)
+                .containsExactly("linked", "notInCatalog", "toReview");
+    }
+
+    @Test
+    void showsTheCatalogProductOfALinkedOffer() {
+        // given
+        List<Row> linked = List.of(new Row("a", "A", List.of("111"), "Klocki Classic", null));
+
+        // when
+        OfferMatchingView.Group group = view(linked, List.of(), List.of()).group("linked");
+
+        // then
+        assertThat(group.rows()).extracting(OfferMatchingView.Row::product).containsExactly("Klocki Classic");
+        assertThat(group.eans()).isNull();
     }
 
     @Test
@@ -27,23 +54,45 @@ class OfferMatchingViewTest {
                 row("c", List.of("333"), true));
 
         // when
-        String eans = view(List.of(), rows).group("noPimEntry").eans();
+        String eans = notInCatalog(rows).group("notInCatalog").eans();
 
         // then
         assertThat(eans).isEqualTo("111\n333");
     }
 
     @Test
-    void copiesTheLinkedEntrysPrimaryGtinForAProductMissingFromTheCatalog() {
-        // given the offer's first EAN is not the entry's primary GTIN, and another offer has no catalog EAN stored
-        List<Row> rows = List.of(new Row("a", "A", List.of("111", "222"), "pim-1", null, true, "222"),
-                new Row("b", "B", List.of("333"), "pim-2", OfferMatchResult.ALREADY_LINKED, true, null));
+    void copiesTheCatalogEanOfARowWhenItHasOne() {
+        // given a manual link whose EAN is not the offer's, and a row of an older file without a catalog EAN
+        List<Row> rows = List.of(new Row("a", "A", List.of("111", "222"), null, OfferMatchResult.ALREADY_LINKED, true, "999"),
+                new Row("b", "B", List.of("333"), null, null, true, null));
 
         // when
-        String eans = view(rows, List.of()).group("notInCatalog").eans();
+        OfferMatchingView.Group group = notInCatalog(rows).group("notInCatalog");
 
         // then
-        assertThat(eans).isEqualTo("222\n333");
+        assertThat(group.eans()).isEqualTo("999\n333");
+        assertThat(group.rows()).extracting(OfferMatchingView.Row::catalogEan, OfferMatchingView.Row::linkedBefore)
+                .containsExactly(org.assertj.core.api.Assertions.tuple("999", true),
+                        org.assertj.core.api.Assertions.tuple(null, false));
+    }
+
+    @Test
+    void namesEveryReasonAnOfferIsLeftToReviewFor() {
+        // given
+        List<Row> rows = List.of(new Row("a", "A", List.of("111"), null, OfferMatchResult.AMBIGUOUS),
+                new Row("b", "B", List.of("222"), null, OfferMatchResult.NO_MFN),
+                new Row("c", "C", List.of(), null, OfferMatchResult.NO_EAN),
+                new Row("d", "D", List.of("333"), null, "stale-link"));
+
+        // when
+        OfferMatchingView.Group group = view(List.of(), List.of(), rows).group("toReview");
+
+        // then a reason of an older file has no sentence any more
+        assertThat(group.rows()).extracting(OfferMatchingView.Row::reasonKey).containsExactly(
+                "store.marketplaces.offer.matching.reason.ambiguous",
+                "store.marketplaces.offer.matching.reason.no-mfn",
+                "store.marketplaces.offer.matching.reason.no-ean",
+                null);
     }
 
     @Test
@@ -52,7 +101,7 @@ class OfferMatchingViewTest {
         List<Row> rows = List.of(row("old", List.of("111"), false), row("new", List.of("222"), true));
 
         // when
-        OfferMatchingView.Group group = view(List.of(), rows).group("noPimEntry");
+        OfferMatchingView.Group group = notInCatalog(rows).group("notInCatalog");
 
         // then
         assertThat(group.eans()).isEqualTo("222");
@@ -64,7 +113,7 @@ class OfferMatchingViewTest {
     @Test
     void offersNothingToCopyWhenEveryOfferIsInactive() {
         // when
-        OfferMatchingView.Group group = view(List.of(), List.of(row("old", List.of("111"), false))).group("noPimEntry");
+        OfferMatchingView.Group group = notInCatalog(List.of(row("old", List.of("111"), false))).group("notInCatalog");
 
         // then
         assertThat(group.eans()).isEmpty();
