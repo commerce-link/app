@@ -36,6 +36,7 @@ public class MarketplaceOfferLinking {
     public static final String NO_OFFER_KEY = "order.item.link.offer.no.key";
     public static final String NOT_A_MARKETPLACE_ORDER = "order.item.link.offer.not.marketplace";
     public static final String PRODUCT_NOT_IN_CATALOG = "order.item.link.offer.product.unknown";
+    public static final String EAN_CONFLICT = "order.item.link.offer.conflict";
 
     // bounds the sweep over other orders (plan decision); an older open order keeps its item for a manual fix
     static final int SWEEP_DAYS = 90;
@@ -69,6 +70,8 @@ public class MarketplaceOfferLinking {
      * Links the item's offer key to the EAN of one product of the store's catalogs, named by its category and product
      * id (an EAN may repeat across products, so it cannot name the operator's choice by itself).
      *
+     * @throws OfferLinkConflictException when other catalog products carry the product's EAN under another
+     *                                    manufacturer code; nothing is saved, so an earlier link stays
      * @throws IllegalArgumentException with a message key when the item or the product cannot be linked
      */
     public LinkResult link(String storeId, Order order, String itemId, String categoryId, String productId, String userId) {
@@ -89,6 +92,14 @@ public class MarketplaceOfferLinking {
                         && StringUtils.isNotBlank(candidate.getManufacturerCode()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(PRODUCT_NOT_IN_CATALOG));
+        // a link holds EANs only, so a shared EAN would leave this and every later order unfilled; refused before
+        // saving, so a working earlier link is not replaced by one that recognises nothing
+        if (storeOffers.matchCatalog(List.of(product.getEan())) instanceof CatalogMatch.Ambiguous ambiguous) {
+            throw new OfferLinkConflictException(ambiguous.products().stream()
+                    .filter(other -> !(Objects.equals(other.getCategoryId(), categoryId)
+                            && Objects.equals(other.getProductId(), productId)))
+                    .toList());
+        }
         String offerKey = chosen.getMarketplaceOfferKey();
 
         // an existing link for the key is replaced: the operator's choice wins over an earlier one
@@ -100,10 +111,10 @@ public class MarketplaceOfferLinking {
                 .filter(resolved -> resolved.source() == ResolvedOffer.Source.LINK)
                 .orElse(null);
         if (offer == null) {
-            log.warn("Offer {} of store {} linked to EAN {} of product {}/{}, but the EAN does not lead to one catalog"
-                    + " product with a manufacturer code; no item filled", offerKey, storeId, product.getEan(),
-                    categoryId, productId);
-            return LinkResult.productNotRecognised();
+            // only when the catalog or the link changed since the check above, e.g. another operator linked meanwhile
+            log.warn("Offer {} of store {} linked to EAN {} of product {}/{}, but the link no longer leads to one"
+                    + " catalog product; no item filled", offerKey, storeId, product.getEan(), categoryId, productId);
+            return new LinkResult(0);
         }
         if (StringUtils.isBlank(offer.category())) {
             log.warn("Offer {} of store {} linked to product {}/{}, whose category has no name; the items keep their"
@@ -123,7 +134,7 @@ public class MarketplaceOfferLinking {
                 updated++;
             }
         }
-        return new LinkResult(updated, true);
+        return new LinkResult(updated);
     }
 
     private static String marketplaceOf(Order order) {
@@ -181,17 +192,6 @@ public class MarketplaceOfferLinking {
         }
     }
 
-    /**
-     * @param productRecognised false when the link is saved but does not lead to one product: another product of the
-     *                          store's catalogs has the same EAN with a different manufacturer code, so the items are
-     *                          not filled; the operator is told so instead of seeing a success with 0 items. A chosen
-     *                          product without an EAN or a manufacturer code never gets here: it is refused with
-     *                          {@link #PRODUCT_NOT_IN_CATALOG} before any link is saved
-     */
-    public record LinkResult(int updatedItems, boolean productRecognised) {
-
-        static LinkResult productNotRecognised() {
-            return new LinkResult(0, false);
-        }
+    public record LinkResult(int updatedItems) {
     }
 }

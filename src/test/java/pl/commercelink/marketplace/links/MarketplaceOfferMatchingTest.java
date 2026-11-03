@@ -362,6 +362,21 @@ class MarketplaceOfferMatchingTest {
     }
 
     @Test
+    void anOfferWhoseOnlyConflictIsAProductWithoutACodeIsReviewedForTheMissingCode() {
+        // given one product with a code and one without share the EAN: filling the code resolves it
+        catalog.put("5900000000055", new CatalogMatch.Ambiguous(List.of(
+                product("Zegar", "5900000000055", "ZG-1"), product("Zegar bez kodu", "5900000000055", null))));
+        MarketplaceOfferMatching matching = matching();
+
+        // when
+        OfferMatchResult result = runToEnd(matching, pages(List.of(offer("SILLO-4", "5900000000055"))));
+
+        // then
+        assertThat(result.toReview()).extracting(OfferMatchResult.Row::sellerOfferKey, OfferMatchResult.Row::reason)
+                .containsExactly(tuple("SILLO-4", "no-mfn"));
+    }
+
+    @Test
     void sendsOfferWithoutEanToReview() {
         // given
         MarketplaceOfferMatching matching = matchingWithKlocki();

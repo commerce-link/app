@@ -29,6 +29,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinking;
+import pl.commercelink.marketplace.links.OfferLinkConflictException;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
@@ -128,6 +129,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
@@ -1310,17 +1312,23 @@ public class OrdersController extends BaseController {
         MarketplaceOfferLinking.LinkResult result;
         try {
             result = marketplaceOfferLinking.link(getStoreId(), order, itemId, categoryId, productId, getUserId());
+        } catch (OfferLinkConflictException e) {
+            return refuse(redirectAttributes, orderId, e.getMessage(), locale, conflictingProducts(e, locale));
         } catch (IllegalArgumentException e) {
             return refuse(redirectAttributes, orderId, e.getMessage(), locale);
-        }
-        if (!result.productRecognised()) {
-            OrderFlash.warning(redirectAttributes,
-                    messageSource.getMessage("order.item.link.offer.unrecognised", null, locale));
-            return details(orderId);
         }
         OrderFlash.saved(redirectAttributes,
                 messageSource.getMessage("order.item.link.offer.done", new Object[]{result.updatedItems()}, locale));
         return details(orderId);
+    }
+
+    /** "Name (MFN), Name (no manufacturer code)" of the products sharing the chosen EAN, for the refusal. */
+    private String conflictingProducts(OfferLinkConflictException conflict, Locale locale) {
+        String noCode = messageSource.getMessage("order.item.link.offer.conflict.no.mfn", null, locale);
+        return conflict.conflicting().stream()
+                .map(product -> "%s (%s)".formatted(product.getName(),
+                        StringUtils.isNotBlank(product.getManufacturerCode()) ? product.getManufacturerCode() : noCode))
+                .collect(Collectors.joining(", "));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")

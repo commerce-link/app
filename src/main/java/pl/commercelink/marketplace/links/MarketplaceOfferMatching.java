@@ -186,7 +186,7 @@ public class MarketplaceOfferMatching {
             switch (storeOffers.matchCatalog(linkEans)) {
                 case CatalogMatch.Found found -> linked.add(row(offer, eans, found.product().getName(), null, null));
                 case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null, null, linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, reasonOf(ambiguous), null));
                 case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
             }
         }
@@ -204,7 +204,7 @@ public class MarketplaceOfferMatching {
                 }
                 case CatalogMatch.NotInCatalog none -> notInCatalog.add(row(offer, eans, null,
                         OfferMatchResult.ALREADY_LINKED, linkEans.isEmpty() ? null : linkEans.get(0)));
-                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, OfferMatchResult.AMBIGUOUS, null));
+                case CatalogMatch.Ambiguous ambiguous -> toReview.add(row(offer, eans, null, reasonOf(ambiguous), null));
                 case CatalogMatch.NoManufacturerCode noCode -> toReview.add(row(offer, eans, null, OfferMatchResult.NO_MFN, null));
             }
         }
@@ -249,6 +249,11 @@ public class MarketplaceOfferMatching {
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
                 .toList();
+    }
+
+    // a code-less product next to coded ones sharing one code is fixed by filling the code, not by fixing the EAN
+    private static String reasonOf(CatalogMatch.Ambiguous ambiguous) {
+        return ambiguous.onlyMissingCodes() ? OfferMatchResult.NO_MFN : OfferMatchResult.AMBIGUOUS;
     }
 
     private static Set<String> eanSet(MarketplaceOfferLink link) {

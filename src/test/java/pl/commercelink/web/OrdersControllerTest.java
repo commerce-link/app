@@ -17,6 +17,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import pl.commercelink.products.Product;
+import pl.commercelink.marketplace.links.OfferLinkConflictException;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
@@ -3967,7 +3969,7 @@ class OrdersControllerTest {
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
-                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3, true));
+                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(3));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -3979,15 +3981,17 @@ class OrdersControllerTest {
         }
 
         @Test
-        void linkOfferWarnsWhenTheLinkIsSavedButTheProductCannotFillTheItem() {
+        void linkOfferRefusesAProductWhoseEanOtherCatalogProductsShareAndNamesThem() {
             // given
             Order order = order(OrderStatus.New);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
             fresh.setMarketplaceOfferKey("SILLO-1");
             when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            Product grey = new Product("c1", null, "5900000000011", "PB-S", "Brand", "Brand", "Pościel szara", "Default");
+            Product uncoded = new Product("c1", null, "5900000000011", null, "Brand", "Brand", "Pościel bez kodu", "Default");
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
-                    .thenReturn(new pl.commercelink.marketplace.links.MarketplaceOfferLinking.LinkResult(0, false));
+                    .thenThrow(new OfferLinkConflictException(List.of(grey, uncoded)));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -3995,8 +3999,8 @@ class OrdersControllerTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(notice(redirect).text()).isEqualTo("order.item.link.offer.unrecognised");
-            assertThat(notice(redirect).tone()).isEqualTo(OrderLabels.WARN);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.conflict"
+                    + " [Pościel szara (PB-S), Pościel bez kodu (order.item.link.offer.conflict.no.mfn)]");
         }
 
         @Test

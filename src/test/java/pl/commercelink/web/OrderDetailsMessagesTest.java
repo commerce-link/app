@@ -72,14 +72,17 @@ class OrderDetailsMessagesTest {
                 MarketplaceOfferLinking.NO_OFFER_KEY,
                 MarketplaceOfferLinking.NOT_A_MARKETPLACE_ORDER,
                 MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
-                "order.item.link.offer.done",
-                "order.item.link.offer.unrecognised");
+                MarketplaceOfferLinking.EAN_CONFLICT,
+                "order.item.link.offer.conflict.no.mfn",
+                "order.item.link.offer.done");
 
         // then
         for (Properties bundle : List.of(pl, en)) {
             assertThat(keys).allSatisfy(key -> assertThat(bundle.getProperty(key)).as(key).isNotBlank());
             assertThat(bundle.getProperty("order.item.link.offer.done")).contains("{0}");
-            assertThat(bundle.getProperty("order.item.link.offer.unrecognised")).doesNotContain("PIM").contains("EAN");
+            assertThat(bundle.getProperty(MarketplaceOfferLinking.EAN_CONFLICT)).doesNotContain("PIM").contains("EAN")
+                    .contains("{0}").doesNotContain("'");
+            assertThat(bundle.getProperty("order.item.link.offer.unrecognised")).isNull();
         }
     }
 
