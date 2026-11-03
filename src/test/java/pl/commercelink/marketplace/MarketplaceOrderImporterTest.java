@@ -304,6 +304,46 @@ class MarketplaceOrderImporterTest {
     }
 
     @Test
+    void fillsALinkedLineFromTheCatalogProduct() {
+        // given
+        when(storeOffers.resolve("Empik", "SILLO-84980", "4M-7041"))
+                .thenReturn(Optional.of(new ResolvedOffer(null, "5903771700818", "ab 12", "Krzesła", ResolvedOffer.Source.LINK)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "SILLO-84980"));
+
+        // then
+        OrderItem item = productItem();
+        assertEquals("AB12", item.getSku());
+        assertEquals("AB12", item.getManufacturerCode());
+        assertEquals("5903771700818", item.getEan());
+        assertEquals("Krzesła", item.getCategory());
+        assertFalse(item.isUnlinkedMarketplaceItem());
+    }
+
+    @Test
+    void leavesTheManufacturerCodeOfOwnOfferAndManufacturerCodeLinesUnset() {
+        // given
+        when(storeOffers.resolve("Empik", "k7m2xq9pz4", "4M-7041"))
+                .thenReturn(Optional.of(new ResolvedOffer("k7m2xq9pz4", "5903771700818", "7041", "Zabawki", ResolvedOffer.Source.OWN_OFFER)));
+        when(storeOffers.resolve("Allegro", null, "ab 12"))
+                .thenReturn(Optional.of(new ResolvedOffer("pim-1", "5903771700818", "ab 12", "Monitors", ResolvedOffer.Source.MFN)));
+
+        // when
+        importer.importOrder(storeWithId("store-1"), "Empik", orderWithProduct("4M-7041", "k7m2xq9pz4"));
+        importer.importOrder(storeWithId("store-1"), "Allegro", orderWithProduct("ab 12"));
+
+        // then
+        ArgumentCaptor<List<OrderItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(ordersManager, times(2)).saveWithFulfilment(any(), itemsCaptor.capture());
+        List<OrderItem> lines = itemsCaptor.getAllValues().stream()
+                .flatMap(List::stream).filter(i -> !i.isService()).toList();
+        assertEquals(2, lines.size());
+        assertNull(lines.get(0).getManufacturerCode());
+        assertNull(lines.get(1).getManufacturerCode());
+    }
+
+    @Test
     void keepsTodaysBehaviourWithoutSellerOfferKey() {
         // given
         when(storeOffers.resolve("Allegro", null, "ab 12"))

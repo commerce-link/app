@@ -259,6 +259,9 @@ public class MarketplaceOfferMatching {
             if (catalogEntriesByEan == null) {
                 Map<String, Set<String>> index = new HashMap<>();
                 for (Product product : storeOffers.catalogProducts()) {
+                    if (StringUtils.isBlank(product.getPimId())) {
+                        continue;
+                    }
                     String pimId = pimAliases.offerIdOf(storeId, product.getPimId());
                     Set<String> gtins = new HashSet<>();
                     if (StringUtils.isNotBlank(product.getEan())) {
