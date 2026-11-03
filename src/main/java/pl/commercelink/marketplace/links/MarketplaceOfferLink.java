@@ -16,8 +16,6 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
-
 /**
  * Links an offer published on a marketplace by another system (identified by the seller's own offer key, e.g. the
  * Empik {@code offer_sku}) to the EANs of the product it stands for (several when the marketplace sells one offer
@@ -69,8 +67,8 @@ public class MarketplaceOfferLink {
         LinkedHashSet<String> unified = new LinkedHashSet<>();
         if (eans != null) {
             for (String ean : eans) {
-                String value = ean == null || ean.isBlank() ? null : unifyEan(ean.trim());
-                if (value != null && !value.isBlank()) {
+                String value = OfferEans.unify(ean);
+                if (value != null) {
                     unified.add(value);
                 }
             }

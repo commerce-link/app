@@ -13,6 +13,7 @@ import pl.commercelink.marketplace.api.MarketplaceOffer;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.links.MarketplaceOfferLink;
 import pl.commercelink.marketplace.links.MarketplaceOfferLinkRepository;
+import pl.commercelink.marketplace.links.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.Pricelist;
 import pl.commercelink.pricelist.PricelistRepository;
@@ -462,7 +463,7 @@ public class MarketplaceOfferExportEventListener {
     }
 
     private static Optional<String> unifiedEan(String ean) {
-        return Optional.ofNullable(UnifiedProductIdentifiers.unifyEan(ean)).filter(code -> !code.isBlank());
+        return Optional.ofNullable(OfferEans.unify(ean));
     }
 
     private static Optional<String> unifiedMfn(String manufacturerCode) {

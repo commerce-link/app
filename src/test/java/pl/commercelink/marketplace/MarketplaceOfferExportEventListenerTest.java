@@ -1205,6 +1205,56 @@ class MarketplaceOfferExportEventListenerTest {
     }
 
     @Test
+    void skipsProductWhoseCatalogEanHasSurroundingWhitespace() {
+        // given the order import trims the catalog EAN, so the export has to as well
+        Product product = product("pim-1", " 0730143315289 ");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(link("SILLO-84980", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
+    void skipsEveryProductCarryingTheLinkedEan() {
+        // given two catalog products share the EAN of one foreign offer
+        Product first = product("pim-1", "730143315289");
+        Product second = product("pim-2", "730143315289");
+        Product other = product("pim-3", "730143315999");
+        configureCategoryWith(warehouseDefinition(5), List.of(first, second, other), 10);
+        priceFor(first, 100, 2);
+        priceFor(second, 110, 2);
+        priceFor(other, 200, 2);
+        linksOnTheMarketplace(link("SILLO-84980", "730143315289"));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        assertThat(capturePublishedOffers()).extracting(MarketplaceOffer::productId).containsExactly("pim-3");
+    }
+
+    @Test
+    void skipsProductLinkedByAnOperatorLikeOneLinkedByMatching() {
+        // given
+        Product product = product("pim-1", "730143315289");
+        configureCategoryWith(warehouseDefinition(5), product, 10);
+        priceFor(product, 100, 2);
+        linksOnTheMarketplace(MarketplaceOfferLink.of(STORE_ID, MARKETPLACE, "SILLO-84980", List.of("730143315289"),
+                MarketplaceOfferLinkSource.MANUAL, "operator", Instant.parse("2026-11-01T10:00:00Z")));
+
+        // when
+        listener.handleMessage(request());
+
+        // then
+        verify(provider, never()).exportOffers(any(), any(), any());
+    }
+
+    @Test
     void exportsProductWithoutEanEvenWhenLinksExist() {
         // given a product that has no EAN cannot match any link
         Product product = product("pim-1", null);

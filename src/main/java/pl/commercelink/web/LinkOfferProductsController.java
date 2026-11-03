@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import pl.commercelink.marketplace.links.OfferEans;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.CategoryDefinition;
@@ -20,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 
 /**
  * The products "Link to product" offers for one catalog: every product of the catalog with an EAN and a manufacturer
@@ -58,7 +58,7 @@ public class LinkOfferProductsController extends BaseController {
                 pricesByPimId.putIfAbsent(row.getPimId(), row.getPrice());
             }
             if (StringUtils.isNotBlank(row.getEan())) {
-                pricesByEan.putIfAbsent(unifyEan(row.getEan().trim()), row.getPrice());
+                pricesByEan.putIfAbsent(OfferEans.unify(row.getEan()), row.getPrice());
             }
         }
         return productRepository.findAll(catalog).stream()
@@ -68,7 +68,7 @@ public class LinkOfferProductsController extends BaseController {
                         product.getName(), product.getLabel(), product.getManufacturerCode(),
                         categoryNames.get(product.getCategoryId()),
                         StringUtils.isNotBlank(product.getPimId()) ? pricesByPimId.get(product.getPimId())
-                                : pricesByEan.get(unifyEan(product.getEan().trim()))))
+                                : pricesByEan.get(OfferEans.unify(product.getEan()))))
                 .sorted(Comparator.comparing(LinkOfferProduct::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }

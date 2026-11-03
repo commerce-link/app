@@ -554,4 +554,18 @@ class MarketplaceOfferResolverTest {
         // then
         assertThat(match).isEqualTo(new CatalogMatch.Found(chair, "Krzesła"));
     }
+
+    @Test
+    void aLinkedLineCarriesTheCatalogEanWithoutPaddingOrLeadingZeros() {
+        // given
+        link("K", "5901234567890");
+        storeCatalogs(catalog("main", category("c1", "Krzesła")));
+        categoryHolds("c1", product("c1", "p1", null, " 05901234567890 ", "7041"));
+
+        // when
+        Optional<ResolvedOffer> result = resolver.resolve(STORE, EMPIK, "K", "1696938202");
+
+        // then
+        assertThat(result).contains(new ResolvedOffer(null, "5901234567890", "7041", "Krzesła", Source.LINK));
+    }
 }

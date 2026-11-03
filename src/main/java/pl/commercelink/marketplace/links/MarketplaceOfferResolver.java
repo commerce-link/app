@@ -25,7 +25,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
-import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 /**
@@ -120,7 +119,7 @@ public class MarketplaceOfferResolver {
         public CatalogMatch matchCatalog(Collection<String> eans) {
             Set<String> unified = new LinkedHashSet<>();
             if (eans != null) {
-                eans.stream().filter(StringUtils::isNotBlank).map(ean -> unifyEan(ean.trim())).forEach(unified::add);
+                eans.stream().map(OfferEans::unify).filter(Objects::nonNull).forEach(unified::add);
             }
             if (unified.isEmpty()) {
                 return new CatalogMatch.NotInCatalog();
@@ -160,7 +159,7 @@ public class MarketplaceOfferResolver {
         private Optional<ResolvedOffer> fromLink(MarketplaceOfferLink link, String sellerOfferKey) {
             return switch (matchCatalog(link.getEans())) {
                 case CatalogMatch.Found found -> Optional.of(new ResolvedOffer(found.product().getPimId(),
-                        found.product().getEan(), found.product().getManufacturerCode(), found.categoryName(), Source.LINK));
+                        OfferEans.unify(found.product().getEan()), found.product().getManufacturerCode(), found.categoryName(), Source.LINK));
                 case CatalogMatch.NoManufacturerCode none -> {
                     log.warn("Offer {} of store {} matches catalog product {}, which has no manufacturer code; treated as unresolved",
                             sellerOfferKey, storeId, none.products().get(0).getProductId());
@@ -181,9 +180,9 @@ public class MarketplaceOfferResolver {
                 Map<String, List<Integer>> index = new HashMap<>();
                 List<Product> all = catalogProducts();
                 for (int position = 0; position < all.size(); position++) {
-                    String ean = all.get(position).getEan();
-                    if (StringUtils.isNotBlank(ean)) {
-                        index.computeIfAbsent(unifyEan(ean.trim()), key -> new ArrayList<>()).add(position);
+                    String ean = OfferEans.unify(all.get(position).getEan());
+                    if (ean != null) {
+                        index.computeIfAbsent(ean, key -> new ArrayList<>()).add(position);
                     }
                 }
                 catalogPositionsByEan = index;
