@@ -175,7 +175,7 @@ public class ProductsAddReview {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, key, product);
+            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, product);
             if (entry.isPresent() && holdsAny(pimIdsInCategory, storeId, entry.get().pimId())) {
                 continue;
             }
@@ -214,9 +214,9 @@ public class ProductsAddReview {
         return aliasesOf(storeId, pimId).stream().anyMatch(pimIds::contains);
     }
 
-    /** The PIM entry of a product: by the inventory's own key when the inventory knows it, else by its EAN. */
-    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, InventoryKey key, Product product) {
-        MatchedInventory matched = inventory.findByInventoryKey(key);
+    /** The PIM entry of a product: by its group in the inventory when the inventory knows its EAN, else by its EAN. */
+    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, Product product) {
+        MatchedInventory matched = inventory.findByEan(product.getEan());
         if (!matched.isEmpty()) {
             Optional<PimEntry> byInventoryKey = pimEntryOfGroup(storeId, matched.getInventoryKey());
             if (byInventoryKey.isPresent()) {

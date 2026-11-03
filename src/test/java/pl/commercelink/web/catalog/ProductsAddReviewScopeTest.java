@@ -56,6 +56,9 @@ class ProductsAddReviewScopeTest {
         BrandMapper brandMapper = new BrandMapper(brandList);
         when(inventory.withEnabledSuppliersOnly(anyString())).thenReturn(view);
         when(productRepository.findAll(anyString())).thenReturn(List.of());
+        MatchedInventory notInInventory = mock(MatchedInventory.class);
+        when(notInInventory.isEmpty()).thenReturn(true);
+        when(view.findByEan(anyString())).thenReturn(notInInventory);
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
@@ -93,13 +96,10 @@ class ProductsAddReviewScopeTest {
         Product product = new Product();
         product.setEan(EAN);
         product.setManufacturerCode(MFN);
-        MatchedInventory unknown = mock(MatchedInventory.class);
-        when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(any())).thenReturn(unknown);
 
         // when
-        Optional<?> owner = review.pimEntryOf("s1", view, InventoryKey.fromProduct(product), product);
-        Optional<?> other = review.pimEntryOf("s2", view, InventoryKey.fromProduct(product), product);
+        Optional<?> owner = review.pimEntryOf("s1", view, product);
+        Optional<?> other = review.pimEntryOf("s2", view, product);
 
         // then
         assertThat(owner).isPresent();
@@ -114,9 +114,6 @@ class ProductsAddReviewScopeTest {
                 List.of(new PimIdentifier(EAN, PimIdentifierType.GTIN), new PimIdentifier(secondEan, PimIdentifierType.GTIN)),
                 "Brand", "Store s1-2", "GPU", null, true, 2000, 2200, null, "s1")));
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
-        MatchedInventory unknown = mock(MatchedInventory.class);
-        when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(any())).thenReturn(unknown);
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
                 new Product(null, null, EAN, "OTHER-1", "Brand", "L", "First", "Default"),
                 new Product(null, null, secondEan, "OTHER-2", "Brand", "L", "Second", "Default")));
@@ -133,9 +130,6 @@ class ProductsAddReviewScopeTest {
     private int addToCategoryHolding(String heldPimId, PimCatalog catalog) {
         ProductsAddReview review = review(catalog);
         when(productRepository.findAll(anyString())).thenReturn(List.of(new Product(null, heldPimId, null, null, "Brand", "L", "Held", "Default")));
-        MatchedInventory unknown = mock(MatchedInventory.class);
-        when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(any())).thenReturn(unknown);
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
         return review.save("s1", category, form);
@@ -209,12 +203,30 @@ class ProductsAddReviewScopeTest {
         // given: the group's EAN is unknown to the PIM, its code is the global entry's
         ProductsAddReview review = review(ScopedPimCatalog.of(
                 ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, MFN, "GPU")));
-        MatchedInventory group = mock(MatchedInventory.class);
-        when(group.isEmpty()).thenReturn(false);
-        when(group.getInventoryKey()).thenReturn(new InventoryKey(EAN, MFN));
-        when(view.findByInventoryKey(any())).thenReturn(group);
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, EAN, MFN, "Brand", "L", "New", "Default")));
+
+        // when
+        review.save("s1", category, form);
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isNull();
+    }
+
+    @Test
+    void saveTakesNoGroupSharingOnlyTheProductsCode() {
+        // given: the inventory does not know the product's EAN; its code is in the group of a PIM entry
+        PimEntry g1 = ScopedPimCatalog.globalEntry("g1", ScopedPimCatalog.GLOBAL_GTIN, MFN, "GPU");
+        ProductsAddReview review = review(ScopedPimCatalog.of(g1));
+        MatchedInventory groupOfG1 = mock(MatchedInventory.class);
+        when(groupOfG1.isEmpty()).thenReturn(false);
+        when(groupOfG1.getInventoryKey()).thenReturn(InventoryKey.fromPimEntry(g1));
+        when(view.findByInventoryKey(any())).thenReturn(groupOfG1);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
+                new Product(null, null, EAN_UNKNOWN_TO_PIM, MFN, "Brand", "L", "New", "Default")));
 
         // when
         review.save("s1", category, form);
@@ -257,9 +269,6 @@ class ProductsAddReviewScopeTest {
 
     private Product saveRow(PimEntry entry, String ean, String brand) {
         ProductsAddReview review = review(ScopedPimCatalog.of(entry));
-        MatchedInventory unknown = mock(MatchedInventory.class);
-        when(unknown.isEmpty()).thenReturn(true);
-        when(view.findByInventoryKey(any())).thenReturn(unknown);
         CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(new Product(null, null, ean, MFN, brand, "L", "New", "Default")));
         review.save("s1", category, form);

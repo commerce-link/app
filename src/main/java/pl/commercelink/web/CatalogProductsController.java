@@ -393,9 +393,9 @@ public class CatalogProductsController {
             return rejected(renderProduct(catalog, category, store, null, form, null, Map.of("ean", DUPLICATE), null,
                     currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
         }
-        // Resolved the way the prefill and the review resolve it, through the whole inventory key: asked by its own
-        // two codes alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
-        review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
+        // Resolved the way the prefill and the review resolve it, through its inventory group: asked by its own EAN
+        // alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
+        review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), product).ifPresent(entry -> {
             product.setPimId(entry.pimId());
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
@@ -455,16 +455,15 @@ public class CatalogProductsController {
             return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(), errors, null,
                     currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
         }
-        // A pending product is looked up in the PIM on every save, the way an added one is: the codes may have been
+        // A pending product is looked up in the PIM on every save, the way an added one is: the EAN may have been
         // corrected just now, or the PIM may have created the entry since. A product the PIM knows keeps its entry.
-        // Asked with the codes as they will be saved, before anything of the form reaches the product.
+        // Asked with the EAN as it will be saved, before anything of the form reaches the product.
         InventoryKey key = new InventoryKey(StringUtils.trimToNull(form.getEan()), StringUtils.trimToNull(form.getManufacturerCode()));
         Optional<PimEntry> joined = Optional.empty();
         if (!form.identifiersLocked()) {
             Product asSaved = new Product();
             asSaved.setEan(StringUtils.trimToNull(form.getEan()));
-            asSaved.setManufacturerCode(StringUtils.trimToNull(form.getManufacturerCode()));
-            joined = review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
+            joined = review.pimEntryOf(storeId(), inventory.withEnabledSuppliersOnly(storeId()), asSaved);
         }
         if (form.identifiersChanged() || joined.isPresent()) {
             // Corrected codes, or the entry they lead to, must not be another product's of the category: the category

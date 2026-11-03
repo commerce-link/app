@@ -158,7 +158,7 @@ class CatalogProductsControllerTest {
         // The save looks every row up in the inventory; by default nothing is there and the PIM is asked directly.
         lenient().when(emptyInventory.isEmpty()).thenReturn(true);
         lenient().when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
-        lenient().when(inventoryView.findByInventoryKey(any())).thenReturn(emptyInventory);
+        lenient().when(inventoryView.findByEan(any())).thenReturn(emptyInventory);
         lenient().when(store.getMarketplaces()).thenReturn(List.of());
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
@@ -918,9 +918,9 @@ class CatalogProductsControllerTest {
     }
 
     /**
-     * The review resolves a proposal through the whole inventory key -- every EAN and product code the suppliers list
+     * The review resolves a proposal through the whole inventory key -- its pim id and every EAN the suppliers list
      * the item under -- and the save must not be narrower, or a product whose PIM entry is known only by a sibling
-     * identifier would be written without a pim id and drop out of the price list.
+     * EAN would be written without a pim id and drop out of the price list.
      */
     @Test
     void saveResolvesThePimEntryThroughTheWholeInventoryKey() throws Exception {
@@ -930,7 +930,7 @@ class CatalogProductsControllerTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(inventoryView.findByEan("5901234567890")).thenReturn(matched);
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
@@ -953,18 +953,18 @@ class CatalogProductsControllerTest {
     }
 
     /**
-     * The inventory knows the product by its code but the catalogue has no entry under that key: the EAN the operator
-     * has just corrected in the review is the last thing left to ask about, so it is asked.
+     * The inventory has the product's EAN but the catalogue has no entry under its group's key: the EAN itself is the
+     * last thing left to ask about, so it is asked.
      */
     @Test
-    void saveStillAsksAboutTheCorrectedEanWhenTheInventoryKeyResolvesToNothing() throws Exception {
+    void saveStillAsksAboutTheEanWhenItsInventoryKeyResolvesToNothing() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         InventoryKey key = new InventoryKey(Set.of("5901234567890"), Set.of("MFN-9"));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(inventoryView.findByEan("5901234567899")).thenReturn(matched);
         when(pimView.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), List.of()))
                 .thenReturn(Optional.empty());
         PimEntry entry = mock(PimEntry.class);
@@ -1478,7 +1478,7 @@ class CatalogProductsControllerTest {
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.isEmpty()).thenReturn(false);
         when(matched.getInventoryKey()).thenReturn(key);
-        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(inventoryView.findByEan("5901234567890")).thenReturn(matched);
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
