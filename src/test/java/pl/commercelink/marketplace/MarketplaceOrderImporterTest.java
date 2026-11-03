@@ -408,8 +408,29 @@ class MarketplaceOrderImporterTest {
 
         // then
         assertFalse(imported);
-        verifyNoInteractions(offerResolver, storeOffers);
+        // the store scope reads the catalogs lazily, so creating it costs nothing; no line is resolved
+        verifyNoInteractions(storeOffers);
         verify(ordersManager, never()).saveWithFulfilment(any(), any());
+    }
+
+    @Test
+    void importsOneFetchReadingTheCatalogsOnceForAllItsOrders() {
+        // given three orders of one fetch, one of them already imported
+        MarketplaceOrder first = renamed(orderWithProduct("4M-7041", "SILLO-1"), "mp-order-1");
+        MarketplaceOrder second = renamed(orderWithProduct("4M-7042", "SILLO-2"), "mp-order-2");
+        MarketplaceOrder known = renamed(orderWithProduct("4M-7043", "SILLO-3"), "mp-order-3");
+        when(ordersManager.isAlreadyImported("store-1", "mp-order-3")).thenReturn(true);
+        when(ordersManager.saveWithFulfilment(any(), any())).thenReturn(true);
+
+        // when
+        int imported = importer.importOrders(storeWithId("store-1"), "Empik", List.of(first, second, known));
+
+        // then
+        assertEquals(2, imported);
+        verify(offerResolver, times(1)).forStore("store-1");
+        verify(storeOffers).resolve("Empik", "SILLO-1", "4M-7041");
+        verify(storeOffers).resolve("Empik", "SILLO-2", "4M-7042");
+        verify(storeOffers, never()).resolve("Empik", "SILLO-3", "4M-7043");
     }
 
     @Test
@@ -463,6 +484,11 @@ class MarketplaceOrderImporterTest {
                 BigDecimal.ZERO, sellerOfferKey);
         return new MarketplaceOrder(base.externalOrderId(), base.customer(), List.of(product), base.shipping(),
                 base.paymentType(), base.paymentTransactionId());
+    }
+
+    private static MarketplaceOrder renamed(MarketplaceOrder order, String externalOrderId) {
+        return new MarketplaceOrder(externalOrderId, order.customer(), order.products(), order.shipping(),
+                order.paymentType(), order.paymentTransactionId());
     }
 
     private static MarketplaceOrder orderWithProduct(String manufacturerCode) {

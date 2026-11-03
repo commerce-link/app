@@ -34,14 +34,35 @@ public class MarketplaceOrderImporter {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
+    /**
+     * Imports one fetch of a marketplace's orders. The store's catalogs are read at most once for all of them, not once
+     * per order: a large catalog read for every new order of a backlog could outlast the queue message.
+     *
+     * @return how many orders were new and saved
+     */
+    public int importOrders(Store store, String marketplaceName, List<MarketplaceOrder> marketplaceOrders) {
+        MarketplaceOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
+        int imported = 0;
+        for (MarketplaceOrder marketplaceOrder : marketplaceOrders) {
+            if (importOrder(store, marketplaceName, marketplaceOrder, offers)) {
+                imported++;
+            }
+        }
+        return imported;
+    }
+
     /** @return false when the marketplace order is already in the store and nothing was saved. */
     public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
+        return importOrder(store, marketplaceName, marketplaceOrder, offerResolver.forStore(store.getStoreId()));
+    }
+
+    private boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder,
+                                MarketplaceOfferResolver.StoreOffers offers) {
         // every poll fetches orders already imported; resolving their lines would read the catalogs for nothing.
         // saveWithFulfilment checks again, against an import running at the same time.
         if (ordersManager.isAlreadyImported(store.getStoreId(), marketplaceOrder.externalOrderId())) {
             return false;
         }
-        MarketplaceOfferResolver.StoreOffers offers = offerResolver.forStore(store.getStoreId());
         MarketplaceCustomer customer = marketplaceOrder.customer();
         BillingDetails billingDetails = toBillingDetails(customer);
         ShippingDetails shippingDetails = toShippingDetails(customer);
