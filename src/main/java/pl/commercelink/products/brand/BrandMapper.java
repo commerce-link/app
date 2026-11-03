@@ -24,6 +24,17 @@ public class BrandMapper {
         return findBrand(input).map(Brand::name).orElse(input);
     }
 
+    public boolean compatible(String brandA, String brandB) {
+        if (brandA == null || brandA.isBlank() || brandB == null || brandB.isBlank()) {
+            return false;
+        }
+        return canonicalName(brandA).equalsIgnoreCase(canonicalName(brandB));
+    }
+
+    private String canonicalName(String brand) {
+        return findBrand(brand).map(Brand::name).orElse(brand.trim());
+    }
+
     private Optional<Brand> findBrand(String input) {
         if (input == null || input.isBlank()) {
             return Optional.empty();

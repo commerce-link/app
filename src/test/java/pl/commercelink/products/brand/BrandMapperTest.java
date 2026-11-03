@@ -92,4 +92,38 @@ class BrandMapperTest {
         // then
         assertThat(result).isEqualTo("Western Digital");
     }
+
+    @Test
+    void aliasesOfOneBrandAreCompatible() {
+        // when / then
+        assertThat(brandMapper.compatible("asustek", "ASUS")).isTrue();
+    }
+
+    @Test
+    void differentBrandsAreNotCompatible() {
+        // when / then
+        assertThat(brandMapper.compatible("Asus", "Apple")).isFalse();
+    }
+
+    @Test
+    void unknownBrandIsCompatibleOnlyWithItself() {
+        // when
+        boolean sameName = brandMapper.compatible("Frobnitz", " frobnitz ");
+        boolean otherBrand = brandMapper.compatible("Frobnitz", "Asus");
+
+        // then
+        assertThat(sameName).isTrue();
+        assertThat(otherBrand).isFalse();
+    }
+
+    @Test
+    void missingBrandIsCompatibleWithNothing() {
+        // when
+        boolean withKnownBrand = brandMapper.compatible(null, "Asus");
+        boolean withAnotherMissingBrand = brandMapper.compatible(" ", " ");
+
+        // then
+        assertThat(withKnownBrand).isFalse();
+        assertThat(withAnotherMissingBrand).isFalse();
+    }
 }

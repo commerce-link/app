@@ -18,6 +18,7 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.brand.BrandMapper;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
@@ -92,7 +94,57 @@ class StoreEntryPinningTest {
             detached.forEach(product -> product.setPimId(null));
             return detached;
         });
-        pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history);
+        pinning = new StoreEntryPinning(productRepository, productCatalogRepository, history,
+                new BrandMapper(mock(PimCatalog.class)));
+    }
+
+    @Test
+    void storeEntryIsNotPinnedToAProductOfAnotherBrand() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(storeEntry("X", STORE, List.of(E1), List.of("A1")));
+        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
+        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E2, "A1"), "brand");
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E1), List.of("A1")), copy);
+
+        // then
+        assertThat(otherBrand.getPimId()).isNull();
+        assertThat(sameBrand.getPimId()).isEqualTo("X");
+    }
+
+    @Test
+    void cloneIsNotPinnedToAProductOfAnotherBrandByCode() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                ScopedPimCatalog.globalEntry("S", E1, null, "cat"),
+                ScopedPimCatalog.cloneEntry("C", STORE, "S", E2, "A1", "cat"));
+        Product otherBrand = branded(product("p1", STORE_CATEGORY, null, E9, "A1"), "Gembird");
+        Product sameBrand = branded(product("p2", STORE_CATEGORY, null, E3, "A1"), "Brand");
+
+        // when
+        pinning.onCloneAnnounced(cloneEvent("C", "S", List.of(E2)), copy);
+
+        // then
+        assertThat(otherBrand.getPimId()).isNull();
+        assertThat(sameBrand.getPimId()).isEqualTo("C");
+    }
+
+    @Test
+    void detachedProductIsPinnedToAGlobalEntryByCodeOnlyUnderItsBrand() {
+        // given
+        PimCatalog copy = ScopedPimCatalog.of(
+                storeEntry("X", STORE, List.of(E1, E2), List.of()),
+                ScopedPimCatalog.globalEntry("G", E3, "A1", "cat"));
+        Product otherBrand = branded(product("p1", STORE_CATEGORY, "X", E1, "A1"), "Gembird");
+        Product sameBrand = branded(product("p2", STORE_CATEGORY, "X", E2, "A1"), "Brand");
+
+        // when
+        pinning.onStoreEntryAnnounced(event("X", List.of(E9), List.of()), copy);
+
+        // then
+        assertThat(otherBrand.getPimId()).isNull();
+        assertThat(sameBrand.getPimId()).isEqualTo("G");
     }
 
     @Test
@@ -704,8 +756,13 @@ class StoreEntryPinningTest {
         return projection;
     }
 
+    private static Product branded(Product product, String brand) {
+        product.setBrand(brand);
+        return product;
+    }
+
     private static PIMEntryAddedEvent event(String pimId, List<String> eans, List<String> mfnCodes) {
-        return new PIMEntryAddedEvent(pimId, eans, mfnCodes, STORE);
+        return new PIMEntryAddedEvent(pimId, "Brand", eans, mfnCodes, STORE, null);
     }
 
     private static PimEntry storeEntry(String pimId, String storeId, List<String> gtins, List<String> mpns) {
@@ -725,7 +782,7 @@ class StoreEntryPinningTest {
     }
 
     private static PIMEntryAddedEvent cloneEvent(String pimId, String sourcePimId, List<String> eans) {
-        return new PIMEntryAddedEvent(pimId, eans, List.of(), STORE, sourcePimId);
+        return new PIMEntryAddedEvent(pimId, "Brand", eans, List.of(), STORE, sourcePimId);
     }
 
     private static ProductCatalog catalogOf(String storeId, String categoryId) {
