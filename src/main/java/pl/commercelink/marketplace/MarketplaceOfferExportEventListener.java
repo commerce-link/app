@@ -233,8 +233,9 @@ public class MarketplaceOfferExportEventListener {
 
     /**
      * The links of this marketplace to offers published by another system (design D3): until the store chooses to
-     * update them, a product linked to one is left out of the export, so no duplicate offer appears under our id. A
-     * link whose offer key is the product's own offer id points at our offer, which is exported as before.
+     * update them, a product whose EAN is among the EANs of such a link is left out of the export, so no duplicate
+     * offer appears under our id. A link whose offer key is the product's own offer id points at our offer, which is
+     * exported as before. EANs are compared unified on both sides; a product without EAN cannot match a link.
      */
     private static final class ForeignOffers {
 
@@ -243,8 +244,12 @@ public class MarketplaceOfferExportEventListener {
 
         ForeignOffers(List<MarketplaceOfferLink> links) {
             for (MarketplaceOfferLink link : links) {
-                for (String ean : link.getEans() == null ? List.<String>of() : link.getEans()) {
-                    offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getSellerOfferKey());
+                if (link.getEans() == null) {
+                    continue;
+                }
+                for (String linkEan : link.getEans()) {
+                    unifiedEan(linkEan).ifPresent(ean ->
+                            offerKeysByEan.computeIfAbsent(ean, key -> new HashSet<>()).add(link.getSellerOfferKey()));
                 }
             }
         }
@@ -253,10 +258,12 @@ public class MarketplaceOfferExportEventListener {
             if (offerKeysByEan.isEmpty()) {
                 return false;
             }
+            Optional<String> ean = unifiedEan(product.getEan());
+            if (ean.isEmpty()) {
+                return false;
+            }
             String offerId = aliases.offerIdOf(storeId, product.getPimId());
-            // temporary: keyed by the product's EAN until the export task reworks coverage
-            String ean = product.getEan() == null ? null : UnifiedProductIdentifiers.unifyEan(product.getEan());
-            boolean covered = offerKeysByEan.getOrDefault(ean, Set.of()).stream()
+            boolean covered = offerKeysByEan.getOrDefault(ean.get(), Set.of()).stream()
                     .anyMatch(offerKey -> !offerKey.equals(offerId));
             if (covered) {
                 skippedProducts++;
