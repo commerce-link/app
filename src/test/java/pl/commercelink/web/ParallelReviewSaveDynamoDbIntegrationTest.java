@@ -179,7 +179,7 @@ class ParallelReviewSaveDynamoDbIntegrationTest {
         MatchedInventory nothing = mock(MatchedInventory.class);
         when(nothing.isEmpty()).thenReturn(true);
         InventoryView view = mock(InventoryView.class);
-        when(view.findByInventoryKey(any())).thenReturn(nothing);
+        when(view.findByEan(any())).thenReturn(nothing);
         Inventory inventory = mock(Inventory.class);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
         PimCatalog pimCatalog = mock(PimCatalog.class);

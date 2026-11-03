@@ -5398,6 +5398,24 @@ class OrdersControllerTest {
         }
 
         @Test
+        void aBlankManufacturerCodeIsRefusedEvenWithATypedEan() {
+            // given: the dialog marks the field required, a hand-made post does not have to
+            OrderItem item = supplierItem(1.23);
+            AssignSupplierForm form = AssignSupplierForm.of("i1", " ", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+            form.setEan("5901234567890");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, form, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.assign.mfn.required");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.New);
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
         void aGrossPurchasePriceIsStoredNetWithTheItemsVat() {
             // given
             OrderItem item = supplierItem(1.23);

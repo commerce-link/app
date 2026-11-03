@@ -9,6 +9,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntryRequest;
 import pl.commercelink.products.*;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
@@ -36,10 +37,12 @@ class PIMIndexEventScheduler {
 
     private final StoreActivity storeActivity;
 
+    private final BrandMapper brandMapper;
+
     PIMIndexEventScheduler(PimCatalog pimCatalog, ProductRepository productRepository, ProductCatalogRepository productCatalogRepository,
                            StoresRepository storesRepository,
                            Inventory inventory, ProductRecommendationEngine recommendationEngine,
-                           StoreActivity storeActivity) {
+                           StoreActivity storeActivity, BrandMapper brandMapper) {
         this.pimCatalog = pimCatalog;
         this.productRepository = productRepository;
         this.productCatalogRepository = productCatalogRepository;
@@ -47,6 +50,7 @@ class PIMIndexEventScheduler {
         this.recommendationEngine = recommendationEngine;
         this.inventory = inventory;
         this.storeActivity = storeActivity;
+        this.brandMapper = brandMapper;
     }
 
     @SqsListener(
@@ -81,7 +85,7 @@ class PIMIndexEventScheduler {
 
         PimView pim = pimCatalog.withStoreData(storeId);
         return products.stream()
-                .filter(product -> pim.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).isEmpty())
+                .filter(product -> ProductEntryLookup.find(pim, product, brandMapper).isEmpty())
                 .map(p -> toPimEntryRequest(storeId, categoryDefinition.getType(), p))
                 .collect(Collectors.toList());
     }

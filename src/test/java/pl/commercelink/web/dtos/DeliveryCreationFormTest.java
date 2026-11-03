@@ -56,6 +56,23 @@ class DeliveryCreationFormTest {
     }
 
     @Test
+    void aChosenSuggestionWithoutEanDoesNotComeBack() {
+        // given: a suggestion always carries its offer's EAN, so a row without one is a hand-made post
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        fresh.setItems(new ArrayList<>());
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem merged = new DeliveryItem("Fan", " ", "FAN-1", 89.0, List.of());
+        merged.setRequestedQty(2);
+        posted.setItems(new ArrayList<>(List.of(merged)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems()).isNullOrEmpty();
+    }
+
+    @Test
     void anItemThatLeftThePlanDoesNotComeBackAsASuggestion() {
         // given: an item with sources is a planned item; one the plan no longer has is gone, not a suggestion
         DeliveryCreationForm fresh = new DeliveryCreationForm();
@@ -223,9 +240,11 @@ class DeliveryCreationFormTest {
         // given
         DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
         DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem extra = deliveryItem("MFN-EXTRA", 9, 99.0);
+        extra.setEan("5900000000009");
         posted.setItems(List.of(
                 deliveryItem("MFN-1", 5, 12.5),
-                deliveryItem("MFN-EXTRA", 9, 99.0)
+                extra
         ));
 
         // when

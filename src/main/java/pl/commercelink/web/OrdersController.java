@@ -1179,6 +1179,10 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
+        if (StringUtils.isBlank(form.getManufacturerCode())) {
+            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                    messageSource.getMessage("order.item.assign.mfn.required", null, locale));
+        }
         // The taxonomy is the source of truth for a product's EAN; the dialog offers the EAN field only once the
         // manufacturer code missed it, so a typed EAN never overrides a known one.
         Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());

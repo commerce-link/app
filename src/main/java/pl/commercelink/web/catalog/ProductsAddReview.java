@@ -13,7 +13,6 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimView;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CatalogPlacement;
 import pl.commercelink.products.CategoryDefinition;
@@ -93,7 +92,7 @@ public class ProductsAddReview {
                 skippedExisting.add(ean);
                 continue;
             }
-            Optional<PimEntry> entry = pimCatalog.withStoreData(storeId).findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
+            Optional<PimEntry> entry = pimEntryOfGroup(storeId, key);
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
             sources.add(ean);
         }
@@ -176,7 +175,7 @@ public class ProductsAddReview {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, key, product);
+            Optional<PimEntry> entry = pimEntryOf(storeId, enabled, product);
             if (entry.isPresent() && holdsAny(pimIdsInCategory, storeId, entry.get().pimId())) {
                 continue;
             }
@@ -215,19 +214,21 @@ public class ProductsAddReview {
         return aliasesOf(storeId, pimId).stream().anyMatch(pimIds::contains);
     }
 
-    /** The PIM entry of a product: by the inventory's own key when the inventory knows it, else by its identifiers. */
-    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, InventoryKey key, Product product) {
-        MatchedInventory matched = inventory.findByInventoryKey(key);
+    /** The PIM entry of a product: by its group in the inventory when the inventory knows its EAN, else by its EAN. */
+    public Optional<PimEntry> pimEntryOf(String storeId, InventoryView inventory, Product product) {
+        MatchedInventory matched = inventory.findByEan(product.getEan());
         if (!matched.isEmpty()) {
-            InventoryKey known = matched.getInventoryKey();
-            PimView pim = pimCatalog.withStoreData(storeId);
-            Optional<PimEntry> byInventoryKey = pim.findByPimIdOrGtinsOrMpns(
-                    known.getId(), known.getProductEans(), known.getProductCodes());
+            Optional<PimEntry> byInventoryKey = pimEntryOfGroup(storeId, matched.getInventoryKey());
             if (byInventoryKey.isPresent()) {
                 return byInventoryKey;
             }
         }
-        return pimCatalog.withStoreData(storeId).findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        return pimCatalog.withStoreData(storeId).findByGtin(product.getEan());
+    }
+
+    /** The PIM entry of an inventory group: by its pim id, else by any of its EANs, never by a manufacturer code. */
+    public Optional<PimEntry> pimEntryOfGroup(String storeId, InventoryKey group) {
+        return pimCatalog.withStoreData(storeId).findByPimIdOrGtinsOrMpns(group.getId(), group.getProductEans(), List.of());
     }
 
     /**

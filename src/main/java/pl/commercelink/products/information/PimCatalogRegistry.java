@@ -15,6 +15,7 @@ import pl.commercelink.pim.api.PIMEntryAddedEvent;
 import pl.commercelink.pim.api.PIMEntryDeletedEvent;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.provider.EventBindingRegistrar;
 import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.stores.Store;
@@ -99,15 +100,18 @@ public class PimCatalogRegistry {
 
     private void registerEntryHandlers(ProductRepository productRepository,
                                        ProductCatalogRepository productCatalogRepository) {
-        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository, codeHistory);
-        catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository, productCatalogRepository));
+        // not the BrandMapper bean: it needs the PimCatalog this class creates
+        BrandMapper brandMapper = new BrandMapper(catalog);
+        StoreEntryPinning storeEntryPinning = new StoreEntryPinning(productRepository, productCatalogRepository,
+                codeHistory, brandMapper);
+        catalog.onEntryAdded(event -> onEntryAdded(event, storeEntryPinning, productRepository, brandMapper));
         catalog.onEntryDeleted(event -> onEntryDeleted(event, storeEntryPinning));
     }
 
     private void onEntryAdded(PIMEntryAddedEvent event, StoreEntryPinning storeEntryPinning,
-                              ProductRepository productRepository, ProductCatalogRepository productCatalogRepository) {
+                              ProductRepository productRepository, BrandMapper brandMapper) {
         if (event.ownerStoreId() == null) {
-            attachEntryToProducts(event, productRepository);
+            attachEntryToProducts(event, productRepository, brandMapper);
         } else if (event.clonedFromPimId() != null && !event.clonedFromPimId().isBlank()) {
             // the delayed announcement of a new clone refreshes the copy itself, synchronously, so no background
             // refresh follows; the codes of the store entries go to the history first, as before every refresh, so a
@@ -176,11 +180,15 @@ public class PimCatalogRegistry {
     }
 
     /** Global entries only: a store's own entries are pinned by {@link StoreEntryPinning}. */
-    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository) {
-        productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes()).forEach(product -> {
-            product.setPimId(event.pimId());
-            productRepository.save(product);
-        });
+    static void attachEntryToProducts(PIMEntryAddedEvent event, ProductRepository productRepository,
+                                      BrandMapper brandMapper) {
+        productRepository.findAllWithoutPimIdByEanOrMfn(event.eans(), event.mfnCodes()).stream()
+                .filter(product -> event.eans().contains(product.getEan())
+                        || brandMapper.compatible(product.getBrand(), event.brand()))
+                .forEach(product -> {
+                    product.setPimId(event.pimId());
+                    productRepository.save(product);
+                });
     }
 
     static PimCatalogDescriptor resolveDescriptor(List<PimCatalogDescriptor> descriptors) {

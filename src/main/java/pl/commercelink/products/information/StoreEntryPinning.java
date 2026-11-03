@@ -12,6 +12,7 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 
 import java.util.Collection;
@@ -39,6 +40,7 @@ class StoreEntryPinning {
     private final ProductRepository productRepository;
     private final ProductCatalogRepository productCatalogRepository;
     private final StoreEntryCodeHistory codeHistory;
+    private final BrandMapper brandMapper;
 
     void onStoreEntryAnnounced(PIMEntryAddedEvent event, PimCatalog catalog) {
         String ownerStoreId = event.ownerStoreId();
@@ -57,7 +59,8 @@ class StoreEntryPinning {
 
         int unpinned = detachProductsOfRemovedCodes(event.pimId(), ownerStoreId, announced, inCopy, before,
                 ownerCategoryIds, catalog);
-        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, announced, storeView, ownerCategoryIds);
+        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, announced, event.brand(), storeView,
+                ownerCategoryIds);
         // one line per event, also when nothing changed: with two instances, it shows which one handled the event and
         // whether that instance knew the codes the edit replaced (a product pinned by an unknown code stays pinned)
         log.info("PIM entry {} of store {} with EANs {} and MPNs {}: {} products unpinned, {} pinned or moved here{}",
@@ -111,7 +114,8 @@ class StoreEntryPinning {
         // the clone's codes in the refreshed copy, not the ones the event carries: the store may have changed them
         // during the delay, and those code-change events were already handled as for any store entry
         Codes current = Codes.of(clone.get().gtins(), clone.get().mpns());
-        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, current, storeView, ownerCategoryIds);
+        int pinned = attachMatchingProducts(event.pimId(), ownerStoreId, current, clone.get().brand(), storeView,
+                ownerCategoryIds);
         log.info("PIM clone {} of {} in store {} with EANs {} and MPNs {}: {} products moved from the source, {} pinned "
                         + "or moved here by code", event.pimId(), sourcePimId, ownerStoreId, current.eans(),
                 current.mfnCodes(), onSource.size(), pinned);
@@ -230,10 +234,12 @@ class StoreEntryPinning {
         return toDetach.size();
     }
 
-    private int attachMatchingProducts(String pimId, String ownerStoreId, Codes announced, PimView storeView,
-                                       List<String> ownerCategoryIds) {
+    private int attachMatchingProducts(String pimId, String ownerStoreId, Codes announced, String entryBrand,
+                                       PimView storeView, List<String> ownerCategoryIds) {
         List<Product> toAttach = productRepository
                 .findAllByEanOrMfnInCategories(ownerCategoryIds, announced.eanList(), announced.mfnList()).stream()
+                .filter(product -> announced.matchesEan(product)
+                        || brandMapper.compatible(product.getBrand(), entryBrand))
                 .filter(product -> isBlank(product.getPimId())
                         || isOtherEntryOfSameStore(product.getPimId(), pimId, ownerStoreId, storeView))
                 .toList();
@@ -264,8 +270,8 @@ class StoreEntryPinning {
     }
 
     // the handled entry may still sit in the copy of the index, so it is never the result
-    private static Optional<String> pinToGlobalEntry(Product product, String handledPimId, PimView globalView) {
-        return globalView.findByGtinOrMpn(product.getEan(), product.getManufacturerCode())
+    private Optional<String> pinToGlobalEntry(Product product, String handledPimId, PimView globalView) {
+        return ProductEntryLookup.find(globalView, product, brandMapper)
                 .map(PimEntry::pimId)
                 .filter(globalPimId -> !globalPimId.equals(handledPimId));
     }
@@ -331,9 +337,12 @@ class StoreEntryPinning {
         }
 
         boolean matches(Product product) {
-            String ean = product.getEan();
             String mfn = product.getManufacturerCode();
-            return (ean != null && eans.contains(ean)) || (mfn != null && mfnCodes.contains(mfn));
+            return matchesEan(product) || (mfn != null && mfnCodes.contains(mfn));
+        }
+
+        boolean matchesEan(Product product) {
+            return product.getEan() != null && eans.contains(product.getEan());
         }
 
         List<String> eanList() {

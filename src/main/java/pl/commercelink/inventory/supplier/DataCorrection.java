@@ -21,8 +21,8 @@ class DataCorrection {
     private final BrandMapper brandMapper;
 
     InventoryItem run(InventoryItem item) {
-        String ean = item.requiresEanCorrection() ? correctEan(item) : item.ean();
         String brand = item.requiresBrandCorrection() ? correctBrand(item) : item.brand();
+        String ean = item.requiresEanCorrection() ? correctEan(item, brand) : item.ean();
         return item.withBrandAndEan(brand, ean);
     }
 
@@ -35,7 +35,7 @@ class DataCorrection {
         Integer grossWeight = product.grossWeightInGrams();
         String categoryId = null;
 
-        Optional<PimEntry> pim = resolveFromPim(offer.ean(), offer.mfn());
+        Optional<PimEntry> pim = resolveFromPim(offer);
         if (pim.isPresent()) {
             PimEntry entry = pim.get();
             if (isNotBlank(entry.brand())) brand = entry.brand();
@@ -56,8 +56,9 @@ class DataCorrection {
                 product.rawCategory(), categoryId);
     }
 
-    private String correctEan(InventoryItem item) {
-        return resolveCorrectEanForMfn(item.mfn())
+    private String correctEan(InventoryItem item, String brand) {
+        return pimCatalog.withGlobalData().findByMpnAndBrand(item.mfn(), brand)
+                .flatMap(PimEntry::primaryGtin)
                 .map(UnifiedProductIdentifiers::unifyEan)
                 .orElse(item.ean());
     }
@@ -76,12 +77,9 @@ class DataCorrection {
                 .orElse(null);
     }
 
-    Optional<String> resolveCorrectEanForMfn(String mfn) {
-        return pimCatalog.withGlobalData().findByMpn(mfn)
-                .flatMap(PimEntry::primaryGtin);
-    }
-
-    Optional<PimEntry> resolveFromPim(String ean, String mfn) {
-        return pimCatalog.withGlobalData().findByGtinOrMpn(ean, mfn).filter(PimEntry::approved);
+    private Optional<PimEntry> resolveFromPim(InventoryItem offer) {
+        return pimCatalog.withGlobalData()
+                .findByGtinOrMpnAndBrand(offer.ean(), offer.mfn(), offer.brand())
+                .filter(PimEntry::approved);
     }
 }
