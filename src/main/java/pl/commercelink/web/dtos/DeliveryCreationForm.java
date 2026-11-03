@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static pl.commercelink.invoicing.api.Price.DEFAULT_VAT_RATE;
 
@@ -256,7 +257,7 @@ public class DeliveryCreationForm {
                 .findFirst()
                 .orElse(null);
         if (suggested == null) {
-            if (requestedQty <= 0 || mfn == null) {
+            if (requestedQty <= 0 || mfn == null || isBlank(ean)) {
                 return;
             }
             if (suggestedItems == null) {
