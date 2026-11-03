@@ -74,6 +74,8 @@ class OrderDetailsMessagesTest {
                 MarketplaceOfferLinking.PRODUCT_NOT_IN_CATALOG,
                 MarketplaceOfferLinking.EAN_CONFLICT,
                 "order.item.link.offer.conflict.no.mfn",
+                MarketplaceOfferLinking.EAN_CONFLICT_MISSING_CODE,
+                "order.item.link.offer.conflict.more",
                 "order.item.link.offer.done");
 
         // then

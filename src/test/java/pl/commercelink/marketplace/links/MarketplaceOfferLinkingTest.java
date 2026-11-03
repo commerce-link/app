@@ -278,6 +278,26 @@ class MarketplaceOfferLinkingTest {
     }
 
     @Test
+    void aConflictOnlyWithAProductWithoutACodeAsksForTheCodeAndLeavesTheSameGoodsOut() {
+        // given the chosen goods also sit in another category (same code) and a code-less product shares the EAN
+        Order order = marketplaceOrder("o1", EMPIK, OrderStatus.New, 1);
+        OrderItem item = unlinkedItem("o1", "i1", FulfilmentStatus.New);
+        when(orderItemsRepository.findById("o1", "i1")).thenReturn(item);
+        Product chosen = catalogProduct("c1", "p1", null, EAN, "ab 123");
+        Product sameGoods = catalogProduct("c2", "p1b", null, EAN, "AB123");
+        Product uncoded = catalogProduct("c2", "p7", null, EAN, null);
+        when(storeOffers.matchCatalog(List.of(EAN)))
+                .thenReturn(new CatalogMatch.Ambiguous(List.of(chosen, sameGoods, uncoded)));
+
+        // when / then
+        assertThatThrownBy(() -> linking.link(STORE, order, "i1", "c1", "p1", "user-1"))
+                .isInstanceOf(OfferLinkConflictException.class)
+                .hasMessage(MarketplaceOfferLinking.EAN_CONFLICT_MISSING_CODE)
+                .satisfies(e -> assertThat(((OfferLinkConflictException) e).conflicting()).containsExactly(uncoded));
+        verify(linkRepository, never()).save(any());
+    }
+
+    @Test
     void theConflictIsFoundInTheRealCatalogAndAnEarlierLinkIsKept() {
         // given the store's real catalog, read through the resolver: two products share the EAN under different codes
         ProductRepository productRepository = Mockito.mock(ProductRepository.class);

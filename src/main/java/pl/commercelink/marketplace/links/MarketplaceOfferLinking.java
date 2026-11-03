@@ -37,6 +37,7 @@ public class MarketplaceOfferLinking {
     public static final String NOT_A_MARKETPLACE_ORDER = "order.item.link.offer.not.marketplace";
     public static final String PRODUCT_NOT_IN_CATALOG = "order.item.link.offer.product.unknown";
     public static final String EAN_CONFLICT = "order.item.link.offer.conflict";
+    public static final String EAN_CONFLICT_MISSING_CODE = "order.item.link.offer.conflict.missing.code";
 
     // bounds the sweep over other orders (plan decision); an older open order keeps its item for a manual fix
     static final int SWEEP_DAYS = 90;
@@ -95,10 +96,12 @@ public class MarketplaceOfferLinking {
         // a link holds EANs only, so a shared EAN would leave this and every later order unfilled; refused before
         // saving, so a working earlier link is not replaced by one that recognises nothing
         if (storeOffers.matchCatalog(List.of(product.getEan())) instanceof CatalogMatch.Ambiguous ambiguous) {
+            // the same goods in another category share the chosen code and are no part of the conflict
+            String chosenCode = UnifiedProductIdentifiers.unifyMfn(product.getManufacturerCode());
             throw new OfferLinkConflictException(ambiguous.products().stream()
-                    .filter(other -> !(Objects.equals(other.getCategoryId(), categoryId)
-                            && Objects.equals(other.getProductId(), productId)))
-                    .toList());
+                    .filter(other -> !Objects.equals(UnifiedProductIdentifiers.unifyMfn(other.getManufacturerCode()),
+                            chosenCode))
+                    .toList(), ambiguous.onlyMissingCodes());
         }
         String offerKey = chosen.getMarketplaceOfferKey();
 

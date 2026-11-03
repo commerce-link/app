@@ -12,12 +12,17 @@ public class OfferLinkConflictException extends IllegalArgumentException {
 
     private final transient List<Product> conflicting;
 
-    public OfferLinkConflictException(List<Product> conflicting) {
-        super(MarketplaceOfferLinking.EAN_CONFLICT);
+    /**
+     * @param conflicting      the other products whose manufacturer code differs from the chosen one's or is missing
+     * @param onlyMissingCodes true when every conflicting product just lacks a code: filling it resolves the conflict,
+     *                         so the message asks for the code rather than for a fixed EAN
+     */
+    public OfferLinkConflictException(List<Product> conflicting, boolean onlyMissingCodes) {
+        super(onlyMissingCodes ? MarketplaceOfferLinking.EAN_CONFLICT_MISSING_CODE : MarketplaceOfferLinking.EAN_CONFLICT);
         this.conflicting = List.copyOf(conflicting);
     }
 
-    /** The other catalog products with the chosen product's EAN, in catalog order. */
+    /** The other catalog products with the chosen product's EAN and another or no manufacturer code, in catalog order. */
     public List<Product> conflicting() {
         return conflicting;
     }

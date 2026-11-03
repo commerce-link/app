@@ -3991,7 +3991,7 @@ class OrdersControllerTest {
             Product grey = new Product("c1", null, "5900000000011", "PB-S", "Brand", "Brand", "Pościel szara", "Default");
             Product uncoded = new Product("c1", null, "5900000000011", null, "Brand", "Brand", "Pościel bez kodu", "Default");
             when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
-                    .thenThrow(new OfferLinkConflictException(List.of(grey, uncoded)));
+                    .thenThrow(new OfferLinkConflictException(List.of(grey, uncoded), false));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4001,6 +4001,52 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.conflict"
                     + " [Pościel szara (PB-S), Pościel bez kodu (order.item.link.offer.conflict.no.mfn)]");
+        }
+
+        @Test
+        void linkOfferNamesEachConflictingProductOnceAndAtMostFive() {
+            // given seven products, one of them twice (the same goods in two categories)
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            List<Product> conflicting = new java.util.ArrayList<>();
+            for (int i = 1; i <= 7; i++) {
+                conflicting.add(new Product("c1", null, "5900000000011", "M-" + i, "Brand", "Brand", "P" + i, "Default"));
+            }
+            conflicting.add(new Product("c2", null, "5900000000011", "M-1", "Brand", "Brand", "P1", "Default"));
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
+                    .thenThrow(new OfferLinkConflictException(conflicting, false));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.conflict"
+                    + " [P1 (M-1), P2 (M-2), P3 (M-3), P4 (M-4), P5 (M-5) order.item.link.offer.conflict.more [2]]");
+        }
+
+        @Test
+        void linkOfferAsksForTheMissingCodeWhenOnlyCodesAreMissing() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            OrderItem fresh = item("i1", FulfilmentStatus.New, "RAW-1");
+            fresh.setMarketplaceOfferKey("SILLO-1");
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(fresh);
+            Product uncoded = new Product("c1", null, "5900000000011", null, "Brand", "Brand", "Zegar", "Default");
+            when(marketplaceOfferLinking.link(STORE_ID, order, "i1", "c1", "p1", null))
+                    .thenThrow(new OfferLinkConflictException(List.of(uncoded), true));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.linkOffer(ORDER_ID, "i1", "c1", "p1", redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.item.link.offer.conflict.missing.code"
+                    + " [Zegar (order.item.link.offer.conflict.no.mfn)]");
         }
 
         @Test

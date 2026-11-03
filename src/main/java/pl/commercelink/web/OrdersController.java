@@ -129,7 +129,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
@@ -1322,13 +1321,26 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
-    /** "Name (MFN), Name (no manufacturer code)" of the products sharing the chosen EAN, for the refusal. */
+    // a placeholder EAN shared by hundreds of products must not produce a message of hundreds of names
+    private static final int CONFLICTS_NAMED = 5;
+
+    /**
+     * "Name (MFN), Name (no manufacturer code)" of the products sharing the chosen EAN, for the refusal: each one once
+     * (the same goods may sit in several categories), at most {@link #CONFLICTS_NAMED}, then "and N more".
+     */
     private String conflictingProducts(OfferLinkConflictException conflict, Locale locale) {
         String noCode = messageSource.getMessage("order.item.link.offer.conflict.no.mfn", null, locale);
-        return conflict.conflicting().stream()
+        List<String> names = conflict.conflicting().stream()
                 .map(product -> "%s (%s)".formatted(product.getName(),
                         StringUtils.isNotBlank(product.getManufacturerCode()) ? product.getManufacturerCode() : noCode))
-                .collect(Collectors.joining(", "));
+                .distinct()
+                .toList();
+        String named = String.join(", ", names.subList(0, Math.min(names.size(), CONFLICTS_NAMED)));
+        if (names.size() <= CONFLICTS_NAMED) {
+            return named;
+        }
+        return named + " " + messageSource.getMessage("order.item.link.offer.conflict.more",
+                new Object[]{names.size() - CONFLICTS_NAMED}, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/assign-warehouse")
