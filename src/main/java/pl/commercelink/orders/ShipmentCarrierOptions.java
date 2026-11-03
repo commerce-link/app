@@ -3,9 +3,7 @@ package pl.commercelink.orders;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
-import pl.commercelink.shipping.CarrierDictionary;
-import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.Store;
+import pl.commercelink.carriers.CarriersRepository;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -15,11 +13,11 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ShipmentCarrierOptions {
 
-    private final CarrierDictionary carrierDictionary;
+    private final CarriersRepository carriersRepository;
 
-    public List<String> forOrder(Order order, Store store) {
-        Set<String> options = new LinkedHashSet<>(
-                carrierDictionary.namesUsedBy(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)));
+    /** Our carriers, plus what the order's shipments already hold, so an older or typed-in text stays selectable. */
+    public List<String> forOrder(Order order) {
+        Set<String> options = new LinkedHashSet<>(carriersRepository.names());
         if (options.isEmpty()) {
             return List.of();
         }

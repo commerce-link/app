@@ -2230,7 +2230,7 @@ public class OrdersController extends BaseController {
 
     private List<String> shipmentCarriers(Order order) {
         Store store = storesRepository.findById(getStoreId());
-        return store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
+        return store == null ? List.of() : shipmentCarrierOptions.forOrder(order);
     }
 
     private String shipmentPage(Order order, OrderShipmentForm form, Model model) {

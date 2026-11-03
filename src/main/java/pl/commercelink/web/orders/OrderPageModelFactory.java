@@ -401,7 +401,7 @@ public class OrderPageModelFactory {
         String details = "/dashboard/orders/" + order.getOrderId();
         Set<String> labelProviders = readOnly ? Set.of()
                 : ShipmentLinks.labelProviders(shipments, provider -> shippingService.supportsLabels(store, provider));
-        List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
+        List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
         List<OrderShipmentForm> forms = new ArrayList<>();

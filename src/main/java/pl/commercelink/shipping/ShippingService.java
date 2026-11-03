@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
@@ -28,7 +30,7 @@ public class ShippingService {
     private ShippingProviderFactory shippingProviderFactory;
 
     @Autowired
-    private CarrierDictionary carrierDictionary;
+    private CarrierMappings carrierMappings;
 
     @Autowired
     private ShippingProviders shippingProviders;
@@ -75,8 +77,9 @@ public class ShippingService {
                 .build();
 
 
-        Set<String> carrierIds = carriersMatching(carrierDictionary, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER),
-                deliveryTarget.source(), store.getShippingConfiguration().getAuthorizedCarriers(), deliveryTarget.carrier()).stream()
+        String integration = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        Optional<String> service = serviceCodeFor(integration, deliveryTarget);
+        Set<String> carrierIds = carriersMatching(store.getShippingConfiguration().getAuthorizedCarriers(), service).stream()
                 .map(AuthorizedCarrier::getId)
                 .collect(Collectors.toSet());
 
@@ -264,24 +267,25 @@ public class ShippingService {
         );
     }
 
-    static List<AuthorizedCarrier> carriersMatching(CarrierDictionary dictionary, String shippingProvider,
-            String source, List<AuthorizedCarrier> authorizedCarriers, String shippingCarrier) {
-        Optional<String> chosen = StringUtils.equalsIgnoreCase(shippingProvider, source)
-                ? Optional.ofNullable(StringUtils.trimToNull(shippingCarrier))
-                : dictionary.translate(source, shippingProvider, shippingCarrier);
-        if (chosen.isEmpty()) {
+    /** The integration's code of the carrier the customer chose, read like a label code when an older shipment holds one. */
+    private Optional<String> serviceCodeFor(String integration, DeliveryTarget deliveryTarget) {
+        if (integration == null || StringUtils.isBlank(deliveryTarget.carrier())) {
+            return Optional.empty();
+        }
+        String dictionary = CarrierDictionaries.shipping(integration);
+        return carrierMappings.outboundMappingFor(dictionary, deliveryTarget.carrier(), List.of(dictionary));
+    }
+
+    /** The services of the code, or every service the store ticked when there is no code or none of them has it. */
+    static List<AuthorizedCarrier> carriersMatching(List<AuthorizedCarrier> authorizedCarriers, Optional<String> serviceCode) {
+        if (serviceCode.isEmpty()) {
             return authorizedCarriers;
         }
         List<AuthorizedCarrier> matching = authorizedCarriers.stream()
-                .filter(carrier -> describes(chosen.get(), carrier))
+                .filter(carrier -> serviceCode.get().equalsIgnoreCase(StringUtils.trim(carrier.getName())))
                 .collect(Collectors.toList());
 
         return matching.isEmpty() ? authorizedCarriers : matching;
-    }
-
-    private static boolean describes(String chosen, AuthorizedCarrier carrier) {
-        return StringUtils.containsIgnoreCase(carrier.getName(), chosen)
-                || StringUtils.containsIgnoreCase(carrier.getDisplayName(), chosen);
     }
 
     private static DeliveryPoint toDeliveryPoint(String pointCode) {

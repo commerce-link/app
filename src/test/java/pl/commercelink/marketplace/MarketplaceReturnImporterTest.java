@@ -1,5 +1,8 @@
 package pl.commercelink.marketplace;
 
+import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierMappings;
+import pl.commercelink.carriers.InMemoryCarrierDictionaries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -62,6 +66,9 @@ class MarketplaceReturnImporterTest {
     @Mock private StoreNotificationService notificationService;
     @Mock private OrderItemFamily orderItemFamily;
     @Mock private OpenRmaCoverage openRmaCoverage;
+    @Spy private CarrierMappings carrierMappings = new InMemoryCarrierDictionaries()
+            .with(CarrierDictionaries.marketplaceStatus("Allegro").orElseThrow(), "INPOST=InPost", "INPOST=InPost Kurier")
+            .mappings();
     @Mock private Order order;
     @Mock private OrderItem orderItem;
 
@@ -159,7 +166,7 @@ class MarketplaceReturnImporterTest {
         assertFalse(rma.isEmailNotificationsEnabled());
         assertEquals(LocalDateTime.of(2026, 8, 20, 12, 0), rma.getCreatedAt());
         assertEquals("0000123456", rma.getShipments().get(0).getTrackingNo());
-        assertEquals("INPOST", rma.getShipments().get(0).getCarrier());
+        assertEquals("InPost", rma.getShipments().get(0).getCarrier());
         assertEquals(200.0, rma.getShippingInsurance(), 0.001);
 
         ArgumentCaptor<List<RMAItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
@@ -514,7 +521,7 @@ class MarketplaceReturnImporterTest {
         assertEquals(MarketplaceReturnStatus.DECLARED, existing.getExternalReturnStatus());
         assertEquals(1, existing.getShipments().size());
         assertEquals("0000123456", existing.getShipments().get(0).getTrackingNo());
-        assertEquals("INPOST", existing.getShipments().get(0).getCarrier());
+        assertEquals("InPost", existing.getShipments().get(0).getCarrier());
         verify(rmaRepository).save(existing);
     }
 

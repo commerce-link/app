@@ -4,11 +4,12 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.documents.Document;
 import pl.commercelink.marketplace.api.InvoiceUpdate;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.ShipmentUpdate;
-import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.shipping.ShippingProviders;
 import pl.commercelink.orders.*;
 import pl.commercelink.stores.MarketplaceIntegration;
@@ -28,7 +29,7 @@ public class MarketplaceOrderLifecycleEventListener {
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
     private final MarketplaceProviderFactory providerFactory;
-    private final CarrierDictionary carrierDictionary;
+    private final CarrierMappings carrierMappings;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -116,7 +117,7 @@ public class MarketplaceOrderLifecycleEventListener {
                 .filter(s -> !attachedByMarketplace(s, marketplace))
                 .findFirst()
                 .map(s -> new ShipmentUpdate(s.getTrackingNo(),
-                        carrierDictionary.translate(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), marketplace, s.getCarrier()).orElse(null),
+                        carrierCode(s, store, marketplace),
                         s.getCarrier(),
                         s.getTrackingUrl()));
 
@@ -133,6 +134,22 @@ public class MarketplaceOrderLifecycleEventListener {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Newer shipments hold our carrier name; older ones a label code ("dhl") of their integration (the store's default
+     * one when the shipment names none) or the marketplace's own text, which are turned into a carrier first.
+     */
+    private String carrierCode(Shipment shipment, Store store, String marketplace) {
+        String integration = shipment.getProvider() != null
+                ? shipment.getProvider()
+                : store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+        List<String> sources = integration != null
+                ? List.of(CarrierDictionaries.shipping(integration), CarrierDictionaries.marketplaceImport(marketplace))
+                : List.of(CarrierDictionaries.marketplaceImport(marketplace));
+        return CarrierDictionaries.marketplaceStatus(marketplace)
+                .flatMap(status -> carrierMappings.outboundMappingFor(status, shipment.getCarrier(), sources))
+                .orElse(null);
     }
 
     // Allegro attaches the waybill of its own shipments; posting it again is refused (422) and duplicates it otherwise

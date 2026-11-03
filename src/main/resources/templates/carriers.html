@@ -1,0 +1,88 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <header class="cl-page-header">
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{carriers.title}"></h1>
+                </div>
+                <p class="cl-page-lead" th:text="#{carriers.lead}"></p>
+            </header>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div th:unless="${missingStatusCodes.isEmpty()}" class="cl-alert is-warn" role="status">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <div>
+                    <p class="cl-alert-title" th:text="#{carriers.missingStatus.title}"></p>
+                    <ul class="cl-alert-text">
+                        <li th:each="m : ${missingStatusCodes}"
+                            th:text="#{carriers.missingStatus.item(${m.carrier()}, ${m.importDictionary()}, ${m.statusDictionary()})}"></li>
+                    </ul>
+                </div>
+            </div>
+
+            <section class="cl-card" aria-labelledby="carriers-list-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="carriers-list-title" th:text="#{carriers.list.title}"></h2>
+                </div>
+                <p class="cl-card-desc" th:text="#{carriers.list.description}"></p>
+                <ul th:unless="${carriers.isEmpty()}" class="cl-list" aria-labelledby="carriers-list-title">
+                    <li class="cl-list-item" th:each="carrier : ${carriers}">
+                        <div>
+                            <div class="cl-list-title" th:text="${carrier.name}"></div>
+                            <p th:if="${carrier.description != null}" class="cl-list-desc" th:text="${carrier.description}"></p>
+                        </div>
+                    </li>
+                </ul>
+                <p th:if="${carriers.isEmpty()}" class="cl-list-empty" th:text="#{carriers.list.empty}"></p>
+
+                <form class="cl-form" th:action="@{/dashboard/carriers}" method="post">
+                    <div class="cl-form-grid">
+                        <div class="cl-field cl-span-2">
+                            <label class="cl-label" for="carrier-name" th:text="#{carriers.create.name}"></label>
+                            <input class="cl-input" id="carrier-name" name="name" type="text" required maxlength="64"
+                                   autocomplete="off"/>
+                            <p class="cl-help" th:text="#{carriers.create.name.help}"></p>
+                        </div>
+                        <div class="cl-field cl-span-2">
+                            <label class="cl-label" for="carrier-description" th:text="#{carriers.create.description}"></label>
+                            <input class="cl-input" id="carrier-description" name="description" type="text" maxlength="200"
+                                   autocomplete="off"/>
+                        </div>
+                    </div>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{carriers.create.submit}"></button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="cl-card" aria-labelledby="carriers-dictionaries-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="carriers-dictionaries-title" th:text="#{carriers.dictionaries.title}"></h2>
+                </div>
+                <p class="cl-card-desc" th:text="#{carriers.dictionaries.description}"></p>
+                <ul class="cl-list" aria-labelledby="carriers-dictionaries-title">
+                    <li class="cl-list-item" th:each="d : ${dictionaries}">
+                        <div>
+                            <div class="cl-list-title"><code th:text="${d.key()}"></code></div>
+                            <p class="cl-list-desc">
+                                <span th:text="#{${'carriers.dictionary.purpose.' + d.key()}}"></span>
+                                <span th:text="'· ' + #{carriers.dictionaries.pairs(${d.pairs()})}"></span>
+                            </p>
+                        </div>
+                        <div class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${d.href()}}" th:text="#{settings.list.edit}"
+                               th:attr="aria-label=#{settings.list.edit.for(${d.key()})}"></a>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

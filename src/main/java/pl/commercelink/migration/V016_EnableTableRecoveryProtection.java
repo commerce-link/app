@@ -16,6 +16,8 @@ import io.mongock.api.annotations.RollbackExecution;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
+import pl.commercelink.carriers.Carrier;
+import pl.commercelink.carriers.CarrierDictionary;
 import pl.commercelink.discounts.DiscountCode;
 import pl.commercelink.notifications.StoreNotificationRecord;
 import pl.commercelink.receipts.ReceiptAttempt;
@@ -41,6 +43,8 @@ public class V016_EnableTableRecoveryProtection {
     static final List<String> TABLES = List.of(
             "AppMigrationsHistory",
             "Baskets",
+            CarrierDictionary.TABLE_NAME,
+            Carrier.TABLE_NAME,
             "Catalogs",
             "ClientVerifications",
             DailyScheduleExecutionCount.TABLE_NAME,

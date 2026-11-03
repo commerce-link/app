@@ -43,7 +43,8 @@ public final class NavigationCatalog {
             new NavSection("nav.group.administration", List.of(
                     new NavItem("stores", "nav.stores", "/dashboard/stores", "fa-shopping-bag", Set.of(SUPER_ADMIN)),
                     new NavItem("rmaCenters", "nav.rma.centers", "/dashboard/store/rma-centers", "fa-building",
-                            Set.of(SUPER_ADMIN)))));
+                            Set.of(SUPER_ADMIN)),
+                    new NavItem("carriers", "nav.carriers", "/dashboard/carriers", "fa-shipping-fast", Set.of(SUPER_ADMIN)))));
 
     private static final List<NavItem> FOOTER = List.of(
             new NavItem("settings", "nav.settings", "/dashboard/store", "fa-cog", Set.of(ADMIN)));

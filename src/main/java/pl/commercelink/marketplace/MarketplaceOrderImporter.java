@@ -1,10 +1,13 @@
 package pl.commercelink.marketplace;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
+import pl.commercelink.carriers.CarrierDictionaries;
+import pl.commercelink.carriers.CarrierMappings;
 import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
@@ -13,15 +16,14 @@ import pl.commercelink.orders.*;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.starter.util.CountryCodeConverter;
-import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class MarketplaceOrderImporter {
 
@@ -32,7 +34,7 @@ public class MarketplaceOrderImporter {
     private OrdersManager ordersManager;
 
     @Autowired
-    private CarrierDictionary carrierDictionary;
+    private CarrierMappings carrierMappings;
 
     /** @return false when the marketplace order is already in the store and nothing was saved. */
     public boolean importOrder(Store store, String marketplaceName, MarketplaceOrder marketplaceOrder) {
@@ -87,7 +89,7 @@ public class MarketplaceOrderImporter {
                 .withExternalOrderId(marketplaceOrder.externalOrderId())
                 .withExternalSupplierId(marketplaceOrder.externalSupplierId())
                 .withPayment(payment)
-                .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shipping().carrier()))
+                .withDeliveryCarrier(toCarrierName(marketplaceName, marketplaceOrder.shipping().carrier()))
                 .withPreferredShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.shipping().pickupPoint());
@@ -110,10 +112,14 @@ public class MarketplaceOrderImporter {
         return ordersManager.saveWithFulfilment(order, orderItems);
     }
 
-    String toCarrierName(Store store, String marketplaceName, String shippingCarrier) {
-        return carrierDictionary
-                .translate(marketplaceName, store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER), shippingCarrier)
-                .orElse(shippingCarrier);
+    String toCarrierName(String marketplaceName, String shippingCarrier) {
+        Optional<String> carrier = carrierMappings.recognize(CarrierDictionaries.marketplaceImport(marketplaceName), shippingCarrier);
+        carrier.filter(name -> CarrierDictionaries.statusRequiresCode(marketplaceName))
+                .ifPresent(name -> CarrierDictionaries.marketplaceStatus(marketplaceName)
+                        .filter(status -> carrierMappings.outboundMappingFor(status, name).isEmpty())
+                        .ifPresent(status -> log.error("Carrier {} of a {} order has no code in {}: its shipment status "
+                                + "will be refused until the dictionary gets one", name, marketplaceName, status)));
+        return carrier.orElse(shippingCarrier);
     }
 
     static String toCollectionPointCode(PickupPoint pickupPoint) {
