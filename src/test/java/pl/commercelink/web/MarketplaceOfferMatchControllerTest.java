@@ -107,6 +107,58 @@ class MarketplaceOfferMatchControllerTest {
     }
 
     @Test
+    void downloadsEveryOfferOfAGroupAsCsvWithActiveOffersFirst() throws Exception {
+        // given
+        List<Row> missing = new java.util.ArrayList<>();
+        missing.add(new Row("sku-old", "Pled; bawełna", List.of("5901234123460"), null, null, false, null));
+        for (int i = 0; i < 150; i++) {
+            missing.add(new Row("sku-" + i, "Oferta " + i, List.of("59012341" + String.format("%05d", i), "5901"), null, null));
+        }
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 151, List.of(),
+                List.of(), missing, List.of(new Row("sku-r", "Zestaw", List.of(), null, OfferMatchResult.NO_EAN)), 0, 0)));
+
+        // when
+        var response = controller.groupCsv(EMPIK, "noPimEntry", PL);
+
+        // then
+        byte[] body = response.getBody().getByteArray();
+        assertThat(body).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
+        List<String> lines = new String(body, 3, body.length - 3, java.nio.charset.StandardCharsets.UTF_8).lines().toList();
+        assertThat(lines).hasSize(152);
+        assertThat(lines.get(0)).isEqualTo("\"SKU oferty\";\"Tytuł oferty\";\"EAN\";\"Aktywna\";\"Produkt (PIM)\";\"Powód\"");
+        assertThat(lines.get(1)).isEqualTo("\"sku-0\";\"Oferta 0\";\"5901234100000, 5901\";\"tak\";\"\";\"\"");
+        assertThat(lines.get(151)).isEqualTo("\"sku-old\";\"Pled; bawełna\";\"5901234123460\";\"nie\";\"\";\"\"");
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).isEqualTo("offer-matching-Empik-noPimEntry.csv");
+        assertThat(response.getHeaders().getContentType().toString()).isEqualTo("text/csv;charset=UTF-8");
+    }
+
+    @Test
+    void theCsvOfAGroupToReviewCarriesTheReasonAsThePageSaysIt() throws Exception {
+        // given
+        authenticateAs("super", "SUPER_ADMIN");
+        when(resultStore.latest("store-2", EMPIK)).thenReturn(Optional.of(new OfferMatchResult(NOW, 1, List.of(),
+                List.of(), List.of(), List.of(new Row("sku-r", "Zestaw", List.of(), null, OfferMatchResult.NO_EAN)), 0, 0)));
+
+        // when
+        var response = controller.superAdminGroupCsv("store-2", EMPIK, "toReview", PL);
+
+        // then
+        String csv = new String(response.getBody().getByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains("\"sku-r\";\"Zestaw\";\"\";\"tak\";\"\";\"Oferta nie ma EAN-u.");
+    }
+
+    @Test
+    void theCsvIsNotFoundBeforeTheFirstRun() {
+        // given
+        when(resultStore.latest(STORE_ID, EMPIK)).thenReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> controller.groupCsv(EMPIK, "noPimEntry", PL))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
     void showsGroupsOfLatestRun() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 9,

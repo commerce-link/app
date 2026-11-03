@@ -2,7 +2,11 @@ package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,16 +17,19 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.marketplace.links.MarketplaceOfferMatchPublisher;
+import pl.commercelink.marketplace.links.OfferMatchResult;
 import pl.commercelink.marketplace.links.OfferMatchResultStore;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.settings.OfferMatchingCsv;
 import pl.commercelink.web.settings.OfferMatchingRunView;
 import pl.commercelink.web.settings.OfferMatchingView;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Locale;
 
@@ -42,6 +49,7 @@ public class MarketplaceOfferMatchController {
     private static final String BLOCKED_INTEGRATION = "store.marketplaces.offer.matching.blocked.integration";
     private static final String RUNNING = "store.marketplaces.offer.matching.running.refused";
     private static final String MARKETPLACE_PATH = "/{marketplace:[A-Za-z0-9_.-]+}/offer-matching";
+    private static final String GROUP_CSV_PATH = "/{group:linked|notInCatalog|noPimEntry|toReview}.csv";
 
     private final StoresRepository storesRepository;
     private final MarketplaceConnections marketplaces;
@@ -83,6 +91,21 @@ public class MarketplaceOfferMatchController {
         return render(storeId, marketplace, model, locale);
     }
 
+    @GetMapping("/dashboard/store/marketplaces" + MARKETPLACE_PATH + GROUP_CSV_PATH)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ByteArrayResource> groupCsv(@PathVariable String marketplace, @PathVariable String group,
+                                                      Locale locale) {
+        return csv(CustomSecurityContext.getStoreId(), marketplace, group, locale);
+    }
+
+    @GetMapping("/dashboard/store/{storeId}/marketplaces" + MARKETPLACE_PATH + GROUP_CSV_PATH)
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ByteArrayResource> superAdminGroupCsv(@PathVariable String storeId,
+                                                                @PathVariable String marketplace,
+                                                                @PathVariable String group, Locale locale) {
+        return csv(storeId, marketplace, group, locale);
+    }
+
     @PostMapping("/dashboard/store/marketplaces" + MARKETPLACE_PATH)
     @PreAuthorize("hasRole('ADMIN')")
     public String orderOfferMatching(@PathVariable String marketplace, Locale locale,
@@ -111,12 +134,26 @@ public class MarketplaceOfferMatchController {
                 .map(progress -> OfferMatchingRunView.of(progress, clock.instant())).orElse(null));
         model.addAttribute("displayName", displayName);
         model.addAttribute("formAction", pagePath(storeId, marketplace));
+        model.addAttribute("csvHrefBase", pagePath(storeId, marketplace));
         model.addAttribute("marketplacesHref", SettingsPaths.store(storeId, "/marketplaces"));
         model.addAttribute("backLabel", messageSource.getMessage("store.marketplaces", null, locale));
         model.addAttribute("pageTitle", messageSource.getMessage("store.marketplaces.offer.matching.title",
                 new Object[]{displayName}, locale));
         model.addAttribute("storeId", storeId);
         return VIEW;
+    }
+
+    private ResponseEntity<ByteArrayResource> csv(String storeId, String marketplace, String group, Locale locale) {
+        requireOfferListing(storeId, marketplace);
+        OfferMatchResult result = resultStore.latest(storeId, marketplace)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        byte[] csv = OfferMatchingCsv.of(result, group, messageSource, locale)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String filename = "offer-matching-" + marketplace + "-" + group + ".csv";
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(new ByteArrayResource(csv));
     }
 
     private String order(String storeId, String marketplace, Locale locale, RedirectAttributes redirectAttributes) {

@@ -58,6 +58,26 @@ class MarketplaceOfferMatchTemplateTest {
     }
 
     @Test
+    void everyNonEmptyGroupOffersItsOffersAsCsvAndAnEmptyOneDoesNot() {
+        // given
+        OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2,
+                List.of(), List.of(),
+                List.of(new Row("sku-3", "Monitor", List.of("5901234123459"), null, null)),
+                List.of(new Row("sku-5", "Pad", List.of(), null, OfferMatchResult.NO_EAN)),
+                0, 0);
+
+        // when
+        String html = render(OfferMatchingView.of(result), null);
+
+        // then
+        assertThat(html).contains("href=\"" + ACTION + "/noPimEntry.csv\"")
+                .contains("href=\"" + ACTION + "/toReview.csv\"")
+                .contains("Pobierz CSV")
+                .doesNotContain(ACTION + "/linked.csv")
+                .doesNotContain(ACTION + "/notInCatalog.csv");
+    }
+
+    @Test
     void inactiveOffersGetAPillAndAreNotOfferedForCopying() {
         // given
         OfferMatchResult result = new OfferMatchResult(Instant.parse("2026-11-02T09:15:00Z"), 2, List.of(), List.of(),
@@ -112,7 +132,8 @@ class MarketplaceOfferMatchTemplateTest {
         String html = render(OfferMatchingView.of(result), null);
 
         // then
-        assertThat(html).containsPattern("cl-stat-value\">12\u00a0345<");
+        assertThat(html).containsPattern("cl-stat-value\">12\u00a0345<")
+                .containsPattern("cl-status is-neutral\">12\u00a0345<");
     }
 
     @Test
@@ -239,6 +260,7 @@ class MarketplaceOfferMatchTemplateTest {
         variables.put("settingsSavedMessage", savedMessage);
         variables.put("displayName", "Empik");
         variables.put("formAction", ACTION);
+        variables.put("csvHrefBase", ACTION);
         variables.put("marketplacesHref", "/dashboard/store/marketplaces");
         variables.put("backLabel", "Marketplace'y");
         variables.put("pageTitle", "Dopasuj oferty · Empik");

@@ -72,8 +72,15 @@
                         <div class="cl-card-head">
                             <h2 class="cl-card-title" th:id="${'offer-matching-' + group.name() + '-title'}">
                                 <span th:text="#{${key + '.title'}}"></span>
-                                <span class="cl-status is-neutral" th:text="${group.count()}"></span>
+                                <span class="cl-status is-neutral" th:text="${#numbers.formatInteger(group.count(), 1, 'DEFAULT')}"></span>
                             </h2>
+                            <!--/* Every offer of the group: the list below stops at the first rows. */-->
+                            <a th:if="${group.count() > 0}" class="cl-link-button" download
+                               th:href="@{${csvHrefBase + '/' + group.name() + '.csv'}}"
+                               th:id="${'offer-matching-' + group.name() + '-csv'}">
+                                <i class="fas fa-download" aria-hidden="true"></i>
+                                <span th:text="#{store.marketplaces.offer.matching.csv.download}"></span>
+                            </a>
                         </div>
                         <p class="cl-card-desc" th:text="#{${key + '.description'}}"></p>
 
