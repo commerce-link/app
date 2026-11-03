@@ -6,7 +6,6 @@ import pl.commercelink.pim.api.Brand;
 import pl.commercelink.pim.api.PimCatalog;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -28,28 +27,27 @@ class BrandMapperTest {
     }
 
     @Test
-    void findBrandResolvesByAliasCaseInsensitively() {
-        Optional<Brand> result = brandMapper.findBrand("Asustek");
-        assertThat(result).isPresent();
-        assertThat(result.get().name()).isEqualTo("Asus");
+    void unifyBrandResolvesAnAliasCaseInsensitively() {
+        // when / then
+        assertThat(brandMapper.unifyBrand(" ASUSTEK ")).isEqualTo("Asus");
     }
 
     @Test
-    void findBrandResolvesByCanonicalName() {
-        Optional<Brand> result = brandMapper.findBrand("Apple");
-        assertThat(result).isPresent();
-        assertThat(result.get().name()).isEqualTo("Apple");
+    void unifyBrandResolvesTheCanonicalNameNotListedAmongAliases() {
+        // given
+        when(pimCatalog.allBrands()).thenReturn(List.of(new Brand("Western Digital", List.of("sandisk"))));
+
+        // when
+        String result = brandMapper.unifyBrand("WESTERN DIGITAL");
+
+        // then
+        assertThat(result).isEqualTo("Western Digital");
     }
 
     @Test
-    void findBrandReturnsEmptyForUnknownInput() {
-        assertThat(brandMapper.findBrand("UnknownBrand")).isEmpty();
-    }
-
-    @Test
-    void findBrandReturnsEmptyForNullOrBlank() {
-        assertThat(brandMapper.findBrand(null)).isEmpty();
-        assertThat(brandMapper.findBrand("  ")).isEmpty();
+    void unifyBrandLeavesBlankInputUnchanged() {
+        // when / then
+        assertThat(brandMapper.unifyBrand("  ")).isEqualTo("  ");
     }
 
     @Test
@@ -65,5 +63,33 @@ class BrandMapperTest {
     @Test
     void unifyBrandReturnsNullForNull() {
         assertThat(brandMapper.unifyBrand(null)).isNull();
+    }
+
+    @Test
+    void brandListChangedInPimIsPickedUp() {
+        // given
+        brandMapper.unifyBrand("asustek");
+        when(pimCatalog.allBrands()).thenReturn(List.of(new Brand("ASUSTeK Computer", List.of("asustek"))));
+
+        // when
+        String result = brandMapper.unifyBrand("Asustek");
+
+        // then
+        assertThat(result).isEqualTo("ASUSTeK Computer");
+    }
+
+    @Test
+    void firstBrandOnTheListWinsAnAliasSharedByTwoBrands() {
+        // given
+        when(pimCatalog.allBrands()).thenReturn(List.of(
+                new Brand("Western Digital", List.of("sandisk")),
+                new Brand("SanDisk", List.of())
+        ));
+
+        // when
+        String result = brandMapper.unifyBrand("SanDisk");
+
+        // then
+        assertThat(result).isEqualTo("Western Digital");
     }
 }
